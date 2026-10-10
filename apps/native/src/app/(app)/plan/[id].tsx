@@ -89,7 +89,7 @@ function PlanLoading({ images }: { images: string[] }) {
 }
 
 export default function PlanScreen() {
-  useAppLocale();
+  const locale = useAppLocale();
   const { id } = useLocalSearchParams<{ id: string }>();
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
@@ -97,9 +97,11 @@ export default function PlanScreen() {
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: spaceId }),
   );
-  const { state, retry } = useMakePlan(spaceId);
+  const { state, retry } = useMakePlan(spaceId, locale);
+  const reducedMotion = useReducedMotion();
   const [highlight, setHighlight] = useState<number | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
+  const [isSpinning, setIsSpinning] = useState(false);
   const spinning = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -122,11 +124,14 @@ export default function PlanScreen() {
   const pickForMe = () => {
     if (spinning.current || places.length === 0) return;
     spinning.current = true;
+    setIsSpinning(true);
     timers.current = [];
     setPicked(null);
     const winner = Math.floor(Math.random() * places.length);
+    // Reduce Motion lands straight on the pick instead of cycling cards.
+    const steps = reducedMotion ? [] : spinSteps(places.length, winner);
     let at = 0;
-    for (const step of spinSteps(places.length, winner)) {
+    for (const step of steps) {
       timers.current.push(
         setTimeout(() => {
           setHighlight(step.index);
@@ -138,6 +143,7 @@ export default function PlanScreen() {
     timers.current.push(
       setTimeout(() => {
         spinning.current = false;
+        setIsSpinning(false);
         setPicked(winner);
         haptic("done");
         analytics.capture("plan_picked", { place_count: places.length });
@@ -150,6 +156,7 @@ export default function PlanScreen() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     spinning.current = false;
+    setIsSpinning(false);
     setHighlight(null);
     setPicked(null);
     void retry();
@@ -157,20 +164,26 @@ export default function PlanScreen() {
 
   const share = async () => {
     if (!space || places.length === 0) return;
-    const result = await Share.share({
-      message: planShareText(space.name, places, pickedPlace),
-    });
-    if (result.action === Share.sharedAction) {
-      analytics.capture("plan_shared", {
-        place_count: places.length,
-        picked: pickedPlace !== null,
+    try {
+      const result = await Share.share({
+        message: planShareText(space.name, places, pickedPlace),
       });
+      if (result.action === Share.sharedAction) {
+        analytics.capture("plan_shared", {
+          place_count: places.length,
+          picked: pickedPlace !== null,
+        });
+      }
+    } catch (error) {
+      analytics.captureError("plan_share_failed", error);
     }
   };
 
   const openMaps = (place: PlanPlace, rank: number) => {
     analytics.capture("plan_place_opened", { rank });
-    void runIntent("open_maps", placeLabel(place));
+    runIntent("open_maps", placeLabel(place)).catch((error: unknown) =>
+      analytics.captureError("plan_open_maps_failed", error),
+    );
   };
 
   const canShare = places.length > 0;
@@ -228,18 +241,6 @@ export default function PlanScreen() {
 
         {state.status === "ready" && places.length > 0 ? (
           <>
-            {pickedPlace ? (
-              <Animated.View entering={FadeIn} style={styles.tonight}>
-                <AppSymbolIcon
-                  name="sparkles"
-                  size={16}
-                  tintColor={theme.colors.onTint}
-                />
-                <ThemedText variant="headline" style={styles.tonightText}>
-                  {t("plan.tonight", { name: pickedPlace.name })}
-                </ThemedText>
-              </Animated.View>
-            ) : null}
             <View style={styles.list}>
               {places.map((place, i) => (
                 <PlanPlaceCard
@@ -253,7 +254,6 @@ export default function PlanScreen() {
                 />
               ))}
             </View>
-            <Button title={t("plan.pick")} onPress={pickForMe} />
             <Pressable
               accessibilityRole="button"
               onPress={again}
@@ -311,6 +311,34 @@ export default function PlanScreen() {
           </View>
         ) : null}
       </ScrollView>
+      {state.status === "ready" && places.length > 0 ? (
+        // Pinned under the list so the pick and its result stay on screen
+        // however long the shortlist is.
+        <View style={styles.footer}>
+          {pickedPlace ? (
+            <Animated.View
+              entering={FadeIn}
+              style={styles.tonight}
+              accessibilityLiveRegion="polite"
+              accessibilityRole="text"
+            >
+              <AppSymbolIcon
+                name="sparkles"
+                size={16}
+                tintColor={theme.colors.onTint}
+              />
+              <ThemedText variant="headline" style={styles.tonightText}>
+                {t("plan.tonight", { name: pickedPlace.name })}
+              </ThemedText>
+            </Animated.View>
+          ) : null}
+          <Button
+            title={t("plan.pick")}
+            onPress={pickForMe}
+            disabled={isSpinning}
+          />
+        </View>
+      ) : null}
     </>
   );
 }
@@ -322,8 +350,17 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   content: {
     paddingHorizontal: theme.gap(2),
-    paddingBottom: rt.insets.bottom + theme.gap(4),
+    paddingBottom: theme.gap(4),
     gap: theme.gap(2),
+  },
+  footer: {
+    gap: theme.gap(1.5),
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(1.5),
+    paddingBottom: rt.insets.bottom + theme.gap(1.5),
+    backgroundColor: theme.colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
   heading: {
     gap: theme.gap(0.5),

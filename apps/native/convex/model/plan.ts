@@ -58,11 +58,12 @@ export function planSourceLines(sources: PlanSource[]): string {
     .map((source, i) => {
       const parts = [
         source.title && `Title: ${clip(source.title, 200)}`,
-        source.author && `By: ${source.author}`,
+        source.author && `By: ${clip(source.author, 80)}`,
         source.siteName && `From: ${source.siteName}`,
         source.description && `Description: ${clip(source.description, 300)}`,
         source.content && `Text: ${clip(source.content, PLAN_CONTENT_CHARS)}`,
-        source.places.length > 0 && `Places: ${source.places.join("; ")}`,
+        source.places.length > 0 &&
+          `Places: ${source.places.map((place) => clip(place, 120)).join("; ")}`,
       ].filter(Boolean);
       return `Save ${i + 1}\n${parts.join("\n")}`;
     })
@@ -103,16 +104,24 @@ const GENERIC_WORDS = new Set([
   "house",
   "room",
   "lounge",
+  "cocktail",
+  "cocktails",
+  "wine",
+  "brunch",
+  "diner",
+  "tavern",
+  "pub",
+  "trattoria",
+  "osteria",
+  "taqueria",
+  "eatery",
+  "shop",
+  "spot",
 ]);
 
-/**
- * True when the save's own text carries the place name. The model may only
- * pick places a save names; this drops one it made up. Loose on purpose: one
- * distinctive word of the name is enough, matched against the text with
- * spaces and punctuation removed, so "@parici_cafe" grounds "Par Ici Café".
- */
-export function isGrounded(name: string, source: PlanSource): boolean {
-  const haystack = squash(
+/** The save's own text, squashed, that a pick must be found in. */
+function sourceText(source: PlanSource): string {
+  return squash(
     [
       source.title,
       source.description,
@@ -123,16 +132,40 @@ export function isGrounded(name: string, source: PlanSource): boolean {
       .filter(Boolean)
       .join(" "),
   );
-  if (haystack === "") return false;
-  const words = name
+}
+
+function distinctiveWords(text: string): string[] {
+  return text
     .split(/[\s\-–—&/,.']+/)
     .map(squash)
     .filter((word) => distinctive(word) && !GENERIC_WORDS.has(word));
+}
+
+/**
+ * True when the save's own text carries the place name. The model may only
+ * pick places a save names; this drops one it made up. Every distinctive word
+ * of the name must appear, matched against the text with spaces and
+ * punctuation removed, so "@parici_cafe" grounds "Par Ici Café" while "Great
+ * pasta tonight" does not ground "Pasta Palace".
+ */
+export function isGrounded(name: string, source: PlanSource): boolean {
+  const haystack = sourceText(source);
+  if (haystack === "") return false;
+  const words = distinctiveWords(name);
   if (words.length === 0) {
     const whole = squash(name);
     return distinctive(whole) && haystack.includes(whole);
   }
-  return words.some((word) => haystack.includes(word));
+  return words.every((word) => haystack.includes(word));
+}
+
+/** Keep an area only when the save mentions it: it goes to Maps and shares. */
+function groundedArea(area: string, source: PlanSource): string {
+  const haystack = sourceText(source);
+  const words = distinctiveWords(area);
+  return words.length > 0 && words.some((word) => haystack.includes(word))
+    ? area
+    : "";
 }
 
 /**
@@ -156,7 +189,7 @@ export function sanitizePlan(
     const why = clip(pick.why, MAX_WHY_CHARS);
     if (why === "") continue;
     seen.add(key);
-    const area = clip(pick.area, MAX_AREA_CHARS);
+    const area = groundedArea(clip(pick.area, MAX_AREA_CHARS), source);
     places.push({
       name,
       ...(area !== "" ? { area } : {}),
@@ -165,4 +198,22 @@ export function sanitizePlan(
     });
   }
   return places;
+}
+
+// The model writes each reason in the app's language. Keys are the app's
+// catalog locales; anything else gets English.
+const PLAN_LANGUAGES: Record<string, string> = {
+  en: "English",
+  de: "German",
+  es: "Spanish",
+  "es-MX": "Mexican Spanish",
+  fr: "French",
+  "fr-CA": "Canadian French",
+  ja: "Japanese",
+  ko: "Korean",
+  "pt-BR": "Brazilian Portuguese",
+};
+
+export function planLanguage(locale: string | undefined): string {
+  return (locale && PLAN_LANGUAGES[locale]) || "English";
 }

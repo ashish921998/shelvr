@@ -134,6 +134,17 @@ describe("makePlan", () => {
     });
   });
 
+  it("asks for reasons in the app's language", async () => {
+    const { t, spaceId } = await setup([{ title: "Reel" }]);
+    generateObject.mockResolvedValue({ object: { places: [] } });
+
+    await t.action(api.plans.makePlan, { spaceId, locale: "ja" });
+    await t.action(api.plans.makePlan, { spaceId, locale: "xx" });
+
+    expect(promptOf(0)).toContain('Write each "why" in Japanese');
+    expect(promptOf(1)).toContain('Write each "why" in English');
+  });
+
   it("reads only saved, ready items, with their map places", async () => {
     const { t, spaceId } = await setup([
       { title: "Filed reel", maps: "Par Ici Café, Chicago" },

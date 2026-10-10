@@ -22,7 +22,7 @@ export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
  * Runs `plans.makePlan` for a space once on mount, and again on `retry`.
  * A late answer from an earlier run never overwrites a newer one.
  */
-export function useMakePlan(spaceId: Id<"spaces">) {
+export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
   const makePlan = useAction(api.plans.makePlan);
   const [state, setState] = useState<PlanState>({ status: "loading" });
   const run = useRef(0);
@@ -31,7 +31,7 @@ export function useMakePlan(spaceId: Id<"spaces">) {
   // no newer run has started.
   const load = useCallback(async (): Promise<PlanState> => {
     try {
-      const plan = await makePlan({ spaceId });
+      const plan = await makePlan({ spaceId, locale });
       analytics.capture("plan_made", {
         considered: plan.considered,
         place_count: plan.places.length,
@@ -45,7 +45,7 @@ export function useMakePlan(spaceId: Id<"spaces">) {
       if (!aiOff) analytics.captureError("make_plan_failed", error);
       return { status: aiOff ? "ai_off" : "error" };
     }
-  }, [makePlan, spaceId]);
+  }, [makePlan, spaceId, locale]);
 
   // The initial state is already "loading", so mounting only waits.
   useEffect(() => {

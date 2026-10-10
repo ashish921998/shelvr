@@ -94,9 +94,14 @@ export default function SpaceScreen() {
 
   const suggestionCount = space.suggestions.length;
   // The planner reads ready saves only; still-processing ones don't count.
+  // At least one must already carry a place (an "Open in Maps" action), so a
+  // reading list never offers a plan.
+  const readySaves = space.items.filter((item) => item.status === "ready");
   const canPlan =
-    space.items.filter((item) => item.status === "ready").length >=
-    PLAN_MIN_SAVES;
+    readySaves.length >= PLAN_MIN_SAVES &&
+    readySaves.some((item) =>
+      item.intents?.some((intent) => intent.kind === "open_maps"),
+    );
 
   const makePlan = () => {
     void planGuard(() =>

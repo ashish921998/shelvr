@@ -77,7 +77,12 @@ export function PlanPlaceCard({
         accessibilityLabel={t("plan.openMapsFor", { name: place.name })}
         onPress={onOpenMaps}
         hitSlop={8}
-        style={({ pressed }) => [styles.maps, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.maps,
+          // The card turns primarySoft when highlighted; keep the pill visible.
+          highlighted && styles.mapsOnHighlight,
+          pressed && styles.pressed,
+        ]}
       >
         <AppSymbolIcon
           name="map"
@@ -141,6 +146,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.gap(0.75),
     paddingHorizontal: theme.gap(1.5),
     marginLeft: theme.gap(3.5),
+  },
+  mapsOnHighlight: {
+    backgroundColor: theme.colors.surface,
   },
   mapsText: {
     color: theme.colors.primaryText,

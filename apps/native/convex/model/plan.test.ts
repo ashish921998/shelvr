@@ -34,11 +34,20 @@ describe("isGrounded", () => {
       isGrounded("すし匠", source({ content: "四谷のすし匠でおまかせ" })),
     ).toBe(true);
     expect(
-      isGrounded("을지로 골뱅이", source({ title: "을지로 노포 맛집" })),
+      isGrounded("을지로 골뱅이", source({ title: "을지로 골뱅이 노포 맛집" })),
     ).toBe(true);
     expect(isGrounded("すし匠", source({ content: "最高のラーメン" }))).toBe(
       false,
     );
+  });
+
+  it("needs every distinctive word of the name", () => {
+    expect(
+      isGrounded("Pasta Palace", source({ title: "Great pasta tonight" })),
+    ).toBe(false);
+    expect(
+      isGrounded("Tigre cocktail bar", source({ title: "Tigre, LES" })),
+    ).toBe(true);
   });
 
   it("rejects a name the save never mentions", () => {
@@ -50,7 +59,7 @@ describe("isGrounded", () => {
   it("does not ground a name on generic words alone", () => {
     expect(
       isGrounded("The Wine Bar", source({ title: "the best bar for wine" })),
-    ).toBe(true);
+    ).toBe(false);
     expect(isGrounded("The Cafe", source({ title: "Cute cafe" }))).toBe(false);
   });
 });
@@ -70,6 +79,20 @@ describe("sanitizePlan", () => {
       why: "Good",
     }));
     expect(sanitizePlan(raw, sources)).toHaveLength(5);
+  });
+
+  it("keeps an area only when the save mentions it", () => {
+    const sources = [source({ title: "Balthazar in SoHo" })];
+    const [kept] = sanitizePlan(
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, NYC", why: "Go" }],
+      sources,
+    );
+    expect(kept.area).toBe("SoHo, NYC");
+    const [dropped] = sanitizePlan(
+      [{ saveNumber: 1, name: "Balthazar", area: "Brooklyn", why: "Go" }],
+      sources,
+    );
+    expect(dropped.area).toBeUndefined();
   });
 
   it("drops picks with an empty reason and trims long fields", () => {
