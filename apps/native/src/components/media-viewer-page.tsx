@@ -27,6 +27,7 @@ import {
   type NativeSyntheticEvent,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   Text,
   useWindowDimensions,
   View,
@@ -64,7 +65,7 @@ type Props = {
   headerInset: number;
   // Leave room for the pager's bottom bar on this page.
   reserveFooter: boolean;
-  scrollRef: RefObject<ScrollView | null>;
+  scrollRef: RefObject<ScrollViewInstance | null>;
   // Told when the details sheet reaches (true) or leaves (false) the header,
   // so the pager can hand the header back its light-page colors.
   onSheetUnderHeader?: (itemId: string, under: boolean) => void;
