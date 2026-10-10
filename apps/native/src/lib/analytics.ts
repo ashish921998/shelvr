@@ -249,6 +249,13 @@ type AnalyticsEventProperties = {
   space_updated: { dynamic: boolean };
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
+  // "Make a plan" on a space. `considered` is the saves read, `place_count`
+  // the shortlist size (0 = nothing named a place).
+  plan_made: { considered: number; place_count: number };
+  plan_failed: { reason: "ai_consent" | "error" };
+  plan_picked: { place_count: number };
+  plan_place_opened: { rank: number };
+  plan_shared: { place_count: number; picked: boolean };
   onboarding_completed: {
     // Always empty since the pileup question was removed. Kept so existing
     // PostHog insights keep a stable property shape.

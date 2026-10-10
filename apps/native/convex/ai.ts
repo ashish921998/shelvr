@@ -367,7 +367,7 @@ const MAX_CONTENT_CHARS = 8000;
  * TypeError) for observability without leaking data — never the error's message
  * or cause, which may carry a URL, response body, or resolved address.
  */
-function summarizeError(error: unknown): string {
+export function summarizeError(error: unknown): string {
   if (error instanceof StoredImageError) return `stored_image:${error.code}`;
   // A model call that hit its AbortSignal.timeout deadline. Its own stable
   // category so provider slowness is visible in telemetry separately from

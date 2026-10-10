@@ -201,6 +201,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   JavaScript app and so have no JWT. The app mints a per-device capture token
   (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
   user and run the same save helpers, gates and limits as the app's own mutations.
+- **`plans.ts`** (`"use node"` action) — "Make a plan": `makePlan` reads a space's saved
+  items and makes one model call that returns a shortlist of up to five places the saves
+  name, each with a reason and its source item. Nothing is stored. Pro, AI consent and the
+  `makePlan` rate limit are claimed first in `spaces.claimPlanInternal`; the pure prompt and
+  sanitizing half (which drops a place no save names) is `model/plan.ts`.
 - **`demo.ts`** — the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`.
 - **`cancelSurvey.ts`** — the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
@@ -247,7 +252,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `import`, `onboarding`, `paywall`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`
+  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`,
+  `digest/[id]`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides

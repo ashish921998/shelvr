@@ -53,6 +53,7 @@ import type * as model_notificationSchedule from "../model/notificationSchedule.
 import type * as model_oracle from "../model/oracle.js";
 import type * as model_pageRead from "../model/pageRead.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
+import type * as model_plan from "../model/plan.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
 import type * as model_readBudget from "../model/readBudget.js";
@@ -75,6 +76,7 @@ import type * as notifications from "../notifications.js";
 import type * as oracle from "../oracle.js";
 import type * as oracleLimits from "../oracleLimits.js";
 import type * as paymentTelemetry from "../paymentTelemetry.js";
+import type * as plans from "../plans.js";
 import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
@@ -132,6 +134,7 @@ declare const fullApi: ApiFromModules<{
   "model/oracle": typeof model_oracle;
   "model/pageRead": typeof model_pageRead;
   "model/paymentTelemetry": typeof model_paymentTelemetry;
+  "model/plan": typeof model_plan;
   "model/posthogCapture": typeof model_posthogCapture;
   "model/rateLimiter": typeof model_rateLimiter;
   "model/readBudget": typeof model_readBudget;
@@ -154,6 +157,7 @@ declare const fullApi: ApiFromModules<{
   oracle: typeof oracle;
   oracleLimits: typeof oracleLimits;
   paymentTelemetry: typeof paymentTelemetry;
+  plans: typeof plans;
   spaces: typeof spaces;
   subscriptions: typeof subscriptions;
   users: typeof users;
