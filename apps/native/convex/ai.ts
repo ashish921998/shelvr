@@ -778,6 +778,7 @@ async function analyzeImageItem(
 }
 
 async function analyzeNoteItem(
+  ctx: ActionCtx,
   item: Doc<"items">,
   spacesBlock: string,
   aiAllowed: boolean,
@@ -786,7 +787,7 @@ async function analyzeNoteItem(
   if (!item.note) {
     throw new Error("Note item has no text");
   }
-  if (!aiAllowed) {
+  if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return { result: unclassified(firstLine(item.note)) };
   }
   const { object } = await generateObject({
@@ -1035,6 +1036,7 @@ export const processItem = internalAction({
 
       const allowedAtStart = await ctx.runQuery(internal.aiConsent.isAllowed, {
         userId: item.userId,
+        itemId: item._id,
       });
       let outcome: AnalysisOutcome;
       if (item.type === "link") {
@@ -1056,6 +1058,7 @@ export const processItem = internalAction({
         );
       } else {
         outcome = await analyzeNoteItem(
+          ctx,
           item,
           spacesBlock,
           allowedAtStart,
@@ -1229,9 +1232,28 @@ export const sweepItemEmbeddings = internalAction({
     if (pending.length === 0) {
       return { scanned: 0, written: 0 };
     }
-    // A declined owner's text is never sent: an empty slot is skipped.
+    // Eligibility from the page read is only a snapshot. Recheck each owned
+    // item before constructing the provider list, and map vectors from that
+    // actual list rather than from the original page.
+    const eligible = [];
+    for (const entry of pending) {
+      const item = await ctx.runQuery(internal.items.getItemInternal, {
+        itemId: entry.itemId,
+      });
+      if (item === null || item.userId !== entry.userId) continue;
+      const allowed = await stillAllowed(ctx, true, item);
+      if (
+        !allowed &&
+        (!entry.aiDeclined ||
+          !(await ctx.runQuery(internal.users.isLiveOwner, {
+            userId: item.userId,
+          })))
+      )
+        continue;
+      eligible.push({ ...entry, aiDeclined: !allowed });
+    }
     const { vectors, callFailed } = await embedTexts(
-      pending.map((entry) => (entry.aiDeclined ? "" : entry.text)),
+      eligible.map((entry) => (entry.aiDeclined ? "" : entry.text)),
     );
 
     // Whether the provider answered at all, taken from the call itself rather
@@ -1247,7 +1269,7 @@ export const sweepItemEmbeddings = internalAction({
     const { written, stamped, deferred } = await ctx.runMutation(
       internal.items.setEmbeddingsInternal,
       {
-        entries: pending.map((entry, index) => ({
+        entries: eligible.map((entry, index) => ({
           itemId: entry.itemId,
           text: entry.text,
           embedding: vectors[index],
@@ -1394,6 +1416,14 @@ async function recommendationCandidates(
     title: space.name,
     description: space.description,
   });
+  if (
+    (await ctx.runQuery(internal.aiConsent.recommendationAllowed, {
+      userId: space.userId,
+      spaceId: space._id,
+      itemIds: [],
+    })) === null
+  )
+    return [];
   const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
   const ranked =
     vector === undefined
@@ -1461,19 +1491,23 @@ export const recommendForSpace = internalAction({
           spaceId: args.spaceId,
         }),
       );
-      const items = await recommendationCandidates(ctx, space, memberIds);
-      if (items.length === 0) {
+      const candidates = await recommendationCandidates(ctx, space, memberIds);
+      if (candidates.length === 0) {
         return null;
       }
       // Asked again: picking the candidates embeds the space, which is slow,
       // and the next call sends their titles, descriptions and tags.
-      if (
-        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
+      const surviving = await ctx.runQuery(
+        internal.aiConsent.recommendationAllowed,
+        {
           userId: space.userId,
-        }))
-      ) {
-        return null;
-      }
+          spaceId: space._id,
+          itemIds: candidates.map((item) => item._id),
+        },
+      );
+      if (surviving === null || surviving.length === 0) return null;
+      const survivingIds = new Set(surviving);
+      const items = candidates.filter((item) => survivingIds.has(item._id));
 
       const itemLines = items
         .map((item, i) => {
@@ -1616,6 +1650,7 @@ export const findProductLinks = internalAction({
       if (
         !(await ctx.runQuery(internal.aiConsent.isAllowed, {
           userId: item.userId,
+          itemId: item._id,
         }))
       ) {
         await fail();
@@ -1667,6 +1702,10 @@ export const findProductLinks = internalAction({
         });
         query = object.query.trim();
       } else {
+        if (!(await stillAllowed(ctx, true, item))) {
+          await fail();
+          return null;
+        }
         const { object } = await generateObject({
           model: MODEL,
           ...modelCallOptions(SMALL_TIMEOUT_MS),
@@ -1789,8 +1828,10 @@ export const steerItemForSpace = internalAction({
         item === null ||
         space === null ||
         item.status !== "ready" ||
+        item.userId !== space.userId ||
         !(await ctx.runQuery(internal.aiConsent.isAllowed, {
           userId: item.userId,
+          itemId: item._id,
         }))
       ) {
         return null;

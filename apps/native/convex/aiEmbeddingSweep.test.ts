@@ -42,9 +42,10 @@ afterEach(() => {
 async function seedReady(count: number) {
   const t = newConvexTest();
   await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", {});
     for (let i = 0; i < count; i++) {
       await ctx.db.insert("items", {
-        userId: "sweeper",
+        userId,
         type: "link" as const,
         status: "ready" as const,
         title: `Save ${i}`,
@@ -199,8 +200,9 @@ describe("sweepItemEmbeddings", () => {
   it("finishes items with no embeddable text without calling the provider", async () => {
     const t = newConvexTest();
     await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {});
       await ctx.db.insert("items", {
-        userId: "sweeper",
+        userId,
         type: "image" as const,
         status: "ready" as const,
         tags: [],

@@ -2781,6 +2781,7 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
   returns: v.array(
     v.object({
       itemId: v.id("items"),
+      userId: v.string(),
       text: v.string(),
       // The owner declined AI processing: the caller must not send `text`
       // anywhere, only stamp the row so it leaves the range.
@@ -2801,7 +2802,12 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
           .eq("status", "ready")
           .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
       );
-    const page: { itemId: Id<"items">; text: string; aiDeclined?: true }[] = [];
+    const page: {
+      itemId: Id<"items">;
+      userId: string;
+      text: string;
+      aiDeclined?: true;
+    }[] = [];
     const allowedByUser = new Map<string, boolean>();
     let bytes = 0;
     for await (const item of rows) {
@@ -2812,6 +2818,7 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
       }
       page.push({
         itemId: item._id,
+        userId: item.userId,
         ...(allowed ? {} : { aiDeclined: true as const }),
         text: buildEmbeddingText({
           title: item.title,

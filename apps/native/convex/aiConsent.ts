@@ -8,7 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import { CURRENT_EMBEDDING_VERSION } from "./model/embedding";
 
 async function consentRow(ctx: QueryCtx, userId: string) {
@@ -31,6 +31,7 @@ export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
 ): Promise<boolean> {
+  if ((await liveOwner(ctx, userId)) === null) return false;
   return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
@@ -42,10 +43,44 @@ export const isAllowed = internalQuery({
   args: { userId: v.string(), itemId: v.optional(v.id("items")) },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    if (args.itemId !== undefined && (await ctx.db.get(args.itemId)) === null) {
-      return false;
+    if (args.itemId !== undefined) {
+      const item = await ctx.db.get(args.itemId);
+      if (item === null || item.userId !== args.userId) return false;
     }
     return await aiAllowed(ctx, args.userId);
+  },
+});
+
+/** Revalidate cached recommendation identities in one bounded transaction.
+ * null aborts the run; an empty list is also used to authorize space embedding.
+ * This check cannot recall requests dispatched before deletion begins. */
+export const recommendationAllowed = internalQuery({
+  args: {
+    userId: v.string(),
+    spaceId: v.id("spaces"),
+    itemIds: v.array(v.id("items")),
+  },
+  returns: v.union(v.null(), v.array(v.id("items"))),
+  handler: async (ctx, args) => {
+    if (args.itemIds.length > 100) throw new Error("Too many candidates");
+    const space = await ctx.db.get(args.spaceId);
+    if (
+      space === null ||
+      space.userId !== args.userId ||
+      !(await aiAllowed(ctx, args.userId))
+    )
+      return null;
+    const surviving = [];
+    for (const itemId of args.itemIds) {
+      const item = await ctx.db.get(itemId);
+      if (
+        item !== null &&
+        item.userId === args.userId &&
+        item.status === "ready"
+      )
+        surviving.push(itemId);
+    }
+    return surviving;
   },
 });
 

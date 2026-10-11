@@ -1170,9 +1170,10 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "ig-user",
+        userId,
         type: "link",
         url: "https://www.instagram.com/reel/DHVrPLrIyQ_/",
         status: "processing",
