@@ -936,6 +936,7 @@ describe("fetchInstagram", () => {
       heroAspectRatio: 9 / 16,
       content:
         "Meet the National Geographic 33!\n\nWe're honoring modern trailblazers. #NatGeo33",
+      caption: true,
       video: true,
     });
     expect(safeFetch).toHaveBeenCalledWith(
@@ -1556,14 +1557,13 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
-  it("marks an Instagram reel short-form without asking for a recipe", async () => {
-    // Short-form, but its caption is not a caption source the model may
-    // transcribe a recipe from.
+  it("marks an Instagram reel short-form and allows its full caption recipe path", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({
       status: "ok",
-      askForRecipe: false,
+      askForRecipe: true,
+      page: { caption: true },
       shortForm: { site: "Instagram", video: true },
     });
     expect(read.status === "ok" && read.page.content).toContain(

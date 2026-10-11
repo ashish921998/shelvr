@@ -330,6 +330,33 @@ const YOUTUBE_HOSTS = new Set([
   "music.youtube.com",
 ]);
 
+/** Only exact public video URL shapes may supply a Data API video id. */
+export function youtubeVideoId(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      !YOUTUBE_HOSTS.has(url.hostname.toLowerCase()) ||
+      url.username ||
+      url.password ||
+      url.port
+    )
+      return undefined;
+    const id =
+      url.hostname === "youtu.be"
+        ? url.pathname.match(/^\/([A-Za-z0-9_-]{11})$/)?.[1]
+        : url.pathname === "/watch" && url.searchParams.getAll("v").length === 1
+          ? url.searchParams.get("v")
+          : url.pathname.match(
+              /^\/(?:shorts|embed)\/([A-Za-z0-9_-]{11})$/,
+            )?.[1];
+    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** True for a YouTube video link: youtube.com (www, m, music) and the youtu.be
  * short host. YouTube often answers a server's page load with a consent or
  * bot-check page that has no video metadata, so these go to its oEmbed. */

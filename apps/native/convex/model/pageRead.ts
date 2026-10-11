@@ -2,7 +2,7 @@
 
 /**
  * Reading a saved link's page: fetch it through the safe fetcher, pick the
- * reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
+ * reader for the host (TikTok oEmbed, YouTube Data API with oEmbed fallback, X syndication, Instagram
  * embed, or a plain HTML page), extract the title, meta, hero image, readable body and any
  * schema.org recipe, and follow a caption's link to its recipe page.
  *
@@ -18,6 +18,7 @@ import { z } from "zod";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import type { Id } from "../_generated/dataModel";
+import { env } from "../_generated/server";
 import {
   safeFetch,
   decodeWithContentType,
@@ -33,6 +34,7 @@ import {
   pinterestPinId,
   shortFormSource,
   xStatusId,
+  youtubeVideoId,
   normalizeExternalUrl,
   type LinkSource,
 } from "./externalUrl";
@@ -389,7 +391,7 @@ const OEMBED_REFUSALS = new Set([400, 401, 403, 404]);
  * After a transient oEmbed failure the page read is marked incomplete, so the
  * save can be retried for the real title and thumbnail.
  */
-async function fetchYouTube(url: string): Promise<PageData> {
+async function fetchYouTubeOEmbed(url: string): Promise<PageData> {
   const endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
   const result = await safeFetch(endpoint, {
     timeoutMs: 15000,
@@ -431,6 +433,86 @@ async function fetchYouTube(url: string): Promise<PageData> {
     heroImageUrl: str("thumbnail_url"),
     heroAspectRatio: width > 0 && height > 0 ? width / height : undefined,
   };
+}
+
+const youtubeSnippetSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string(),
+      snippet: z.object({
+        title: z.string().trim().min(1),
+        channelTitle: z.string().optional(),
+        description: z.string().optional(),
+        thumbnails: z
+          .record(
+            z.string(),
+            z.object({
+              url: z.string().url(),
+              width: z.number().positive().finite().optional(),
+              height: z.number().positive().finite().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    }),
+  ),
+});
+
+/** Optional description read; every failure preserves the existing oEmbed path. */
+async function fetchYouTube(url: string): Promise<PageData> {
+  // The intersection supports this optional config before CLI regeneration.
+  const key = (env as typeof env & { YOUTUBE_API_KEY?: string })
+    .YOUTUBE_API_KEY;
+  const id = youtubeVideoId(url);
+  if (key && id) {
+    try {
+      const endpoint = new URL("https://www.googleapis.com/youtube/v3/videos");
+      endpoint.search = new URLSearchParams({
+        part: "snippet,contentDetails",
+        id,
+        key,
+      }).toString();
+      const result = await safeFetch(endpoint.toString(), {
+        timeoutMs: 15000,
+        maxBytes: 64 * 1024,
+        allowContentType: (ct) => ct.startsWith("application/json"),
+        headers: {
+          "User-Agent": SHELVR_USER_AGENT,
+          Accept: "application/json",
+        },
+      });
+      if (result.ok && !result.truncated) {
+        const data = youtubeSnippetSchema.safeParse(parseJson(result.bytes));
+        const snippet = data.success
+          ? data.data.items.find((item) => item.id === id)?.snippet
+          : undefined;
+        if (snippet) {
+          const thumbnail = Object.values(snippet.thumbnails ?? {}).sort(
+            (a, b) => (b.width ?? 0) - (a.width ?? 0),
+          )[0];
+          const content = snippet.description?.trim() || undefined;
+          return withLinkedRecipe({
+            title: snippet.title,
+            author: snippet.channelTitle,
+            siteName: "YouTube",
+            heroImageUrl: thumbnail?.url,
+            heroAspectRatio:
+              thumbnail?.width && thumbnail.height
+                ? thumbnail.width / thumbnail.height
+                : undefined,
+            content: content?.slice(0, MAX_STORED_CONTENT_CHARS),
+            ...(content ? { caption: true as const } : {}),
+            ...(content && content.length > MAX_STORED_CONTENT_CHARS
+              ? { truncated: true as const }
+              : {}),
+          });
+        }
+      }
+    } catch {
+      // No secret-bearing URL, API body or caption enters diagnostics.
+    }
+  }
+  return fetchYouTubeOEmbed(url);
 }
 
 /**
@@ -859,6 +941,12 @@ async function fetchInstagramPost(url: string) {
  * classifies from its URL. A transiently failed embed marks the read
  * incomplete so the save can retry.
  */
+function captionEvidence(
+  content: string | undefined,
+): Pick<PageData, "caption"> {
+  return content ? { caption: true } : {};
+}
+
 export async function fetchInstagram(url: string): Promise<PageData> {
   const { page, html, kind, embed } = await fetchInstagramPost(url);
   const embedded: InstagramEmbedFields =
@@ -901,6 +989,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    ...captionEvidence(caption),
     video: card?.video,
     ...(truncated ? { truncated: true as const } : {}),
     ...(embed.status === "transient" || (readNothing && truncated)

@@ -189,10 +189,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
   [embeddings](docs/architecture/embeddings.md)).
 - **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
-  one entry point: it picks the reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
+  one entry point: it picks the reader for the host (TikTok oEmbed, YouTube Data API with oEmbed fallback, X syndication, Instagram
   embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
   image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
-  schema.org recipe. Host-specific knowledge stays in this file, not in `ai.ts`.
+  schema.org recipe. Full YouTube descriptions and verified Instagram captions follow linked
+  recipe markup first, then the existing complete-caption recipe path. Host-specific knowledge
+  stays in this file, not in `ai.ts`.
 - **`model/safeFetch.ts`**, **`model/externalUrl.ts`** — every backend fetch of an external URL
   goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).
   `externalUrl.ts` is the runtime-agnostic URL policy and host detection (`linkSource`,
@@ -342,6 +344,9 @@ needed at runtime by the features that use them:
   ones included, without a deploy. See
   [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
+- `YOUTUBE_API_KEY` — optional YouTube Data API v3 key for video descriptions and metadata.
+  Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
+  oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
 - `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent
 - `RESEND_SEGMENT_ID` — Resend segment for `shelvr` waitlist signups

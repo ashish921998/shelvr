@@ -36,6 +36,8 @@ const app = defineApp({
     // reminders stop at their next attempt, with no deploy.
     SAVE_REMINDERS_ENABLED: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
+    // Optional video descriptions; absent or failed reads retain oEmbed.
+    YOUTUBE_API_KEY: v.optional(v.string()),
     // Shared with the marketing site's server; authenticates POST /waitlist/join.
     WAITLIST_SHARED_SECRET: v.optional(v.string()),
   },
