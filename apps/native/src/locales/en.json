@@ -521,6 +521,7 @@
   "onboarding.sampleSofa": "Velvet 3-seater, forest",
   "onboarding.sampleDiner": "The red booth diner",
   "onboarding.setupTitle": "What do you save?",
+  "onboarding.setupHint": "Pick at least one. You can pick more than one.",
   "onboarding.yourSpaces": "Your spaces",
   "onboarding.spacesChangeable": "You can change it anytime",
   "onboarding.newSpace": "+ New",
