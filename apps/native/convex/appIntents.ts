@@ -70,29 +70,26 @@ export const issueCaptureToken = action({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
     const token = newCaptureToken();
     await ctx.runMutation(internal.appIntents.storeCaptureToken, {
-      userId,
       tokenHash: await sha256Hex(token),
     });
     return token;
   },
 });
 
-/** Persists a freshly minted token hash and trims the user's oldest tokens. */
+/** Persists a freshly minted token hash and trims the caller's oldest tokens.
+ * The caller is derived here, not in the action: Convex forwards the caller's
+ * identity to functions run from an action, so authorization and the write
+ * are one transaction and a deletion that has already begun fails the same
+ * `requireUserId` check every public function uses. */
 export const storeCaptureToken = internalMutation({
-  args: { userId: v.id("users"), tokenHash: v.string() },
+  args: { tokenHash: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // The action authorized the caller in an earlier transaction. Deletion
-    // can land in between, and its first pass drains this table, so a token
-    // written now would be the one credential that survives the account.
-    if ((await liveOwner(ctx, args.userId)) === null) {
-      throw new Error("Not authenticated");
-    }
+    const userId = await requireUserId(ctx);
     await ctx.db.insert("captureTokens", {
-      userId: args.userId,
+      userId,
       tokenHash: args.tokenHash,
       createdAt: Date.now(),
     });
@@ -100,7 +97,7 @@ export const storeCaptureToken = internalMutation({
     // MAX_CAPTURE_TOKENS_PER_USER rows, plus any a racing issue just added.
     const tokens = await ctx.db
       .query("captureTokens")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(50);
     for (const stale of tokens.slice(MAX_CAPTURE_TOKENS_PER_USER)) {

@@ -47,15 +47,6 @@ export const getCurrentUser = query({
   },
 });
 
-/** `requireUserId`'s owner check for actions, which have no `ctx.db`. */
-export const isLiveOwner = internalQuery({
-  args: { userId: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    return (await liveOwner(ctx, args.userId)) !== null;
-  },
-});
-
 /**
  * Deletes the currently authenticated user's Shelvr account and all owned data.
  *

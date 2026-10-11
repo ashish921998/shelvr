@@ -101,8 +101,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `keepAppleRefreshToken` (`model/appleTokens.ts`) moves the token to `appleTokens` in the
   same transaction, so no stored users row carries it. `deleting`: a one-way marker
   `deleteCurrentUserAccount` sets in its first transaction, so the account stops owning
-  data before the batched cleanup finishes. `liveOwner` / `isLiveOwner` (`model/auth.ts`)
-  are the one definition of an account that may still own data (row present, `deleting`
+  data before the batched cleanup finishes. `liveOwner` (`model/auth.ts`)
+  is the one definition of an account that may still own data (row present, `deleting`
   unset), used by `requireUserId`, `getCurrentUser`, the capture-token, Apple-token and
   billing writes, and `canResetCurrentUser`. The marker is never cleared; the cleanup
   deletes the row. It stays declared `v.optional(...)` through any rollback while a row
@@ -189,8 +189,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   identity sync (null once deletion has begun), plus `deleteCurrentUserAccount` and its batched
   internal deletion. Deletion is idempotent: the first call marks the row `deleting`, revokes
   the Apple token and starts the cleanup; a repeat resumes the cleanup without a second revoke
-  job; a call after the row is gone is a no-op. `isLiveOwner` is the internal query actions
-  use for the same owner check, since they have no `ctx.db`.
+  job; a call after the row is gone is a no-op.
 - **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
   `AUTH_ENABLE_ANONYMOUS` is `"true"` and the caller is a development anonymous user.
 - **`analytics.ts`**, **`accountTelemetry.ts`**, **`paymentTelemetry.ts`** — server-side PostHog
@@ -229,7 +228,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
-  argument.**
+  argument.** It takes a query or mutation context; an action derives the caller through the
+  internal mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`),
+  so authorization and the write stay in one transaction.
 - **`model/log.ts`** — `logEvent(level, event, fields)` structured logging: one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).

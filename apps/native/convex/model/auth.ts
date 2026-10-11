@@ -1,11 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "../_generated/api";
-import {
-  env,
-  type ActionCtx,
-  type MutationCtx,
-  type QueryCtx,
-} from "../_generated/server";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
 const NOT_AUTHENTICATED = "Not authenticated";
@@ -51,20 +45,19 @@ export async function liveOwner(
  * same unauthenticated error either way.
  *
  * This stays provider-agnostic: it works identically whether the user signed in
- * via OAuth or Anonymous.
+ * via OAuth or Anonymous. Query and mutation contexts only: an action derives
+ * the caller through the internal mutation or query it runs (Convex forwards
+ * the caller's identity to it), so the authorization and the write stay in one
+ * transaction.
  */
 export async function requireUserId(
-  ctx: QueryCtx | MutationCtx | ActionCtx,
+  ctx: QueryCtx | MutationCtx,
 ): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (userId === null) {
     throw new Error(NOT_AUTHENTICATED);
   }
-  const live: boolean =
-    "db" in ctx
-      ? (await liveOwner(ctx, userId)) !== null
-      : await ctx.runQuery(internal.users.isLiveOwner, { userId });
-  if (!live) {
+  if ((await liveOwner(ctx, userId)) === null) {
     throw new Error(NOT_AUTHENTICATED);
   }
   return userId;
