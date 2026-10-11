@@ -210,14 +210,20 @@ http.route({
 
     const { type, userId, productId, periodType, eventTimestampMs } = event;
 
-    if (requiresRefundReconciliation(event)) {
+    if (type === "BILLING_ISSUE" || requiresRefundReconciliation(event)) {
       try {
         await reconcileRevenueCatCustomers(ctx, [userId], eventTimestampMs);
       } catch (error) {
-        logEvent("error", "revenuecat_refund_reconciliation_failed", {
-          error_name: errorName(error),
-        });
-        return new Response("Refund reconciliation unavailable", {
+        logEvent(
+          "error",
+          type === "BILLING_ISSUE"
+            ? "revenuecat_billing_reconciliation_failed"
+            : "revenuecat_refund_reconciliation_failed",
+          {
+            error_name: errorName(error),
+          },
+        );
+        return new Response("Subscription reconciliation unavailable", {
           status: 503,
         });
       }
