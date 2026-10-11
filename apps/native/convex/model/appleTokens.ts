@@ -50,7 +50,7 @@ export async function storeAppleToken(
   userId: Id<"users">,
   token: { refreshToken: string; clientId?: string },
 ) {
-  if ((await liveOwner(ctx, userId)) === null) return;
+  if ((await liveOwner(ctx, userId)) === null) return false;
   const existing = await tokenRow(ctx, userId);
   const values = {
     refreshToken: token.refreshToken,
@@ -62,6 +62,7 @@ export async function storeAppleToken(
   } else {
     await ctx.db.patch(existing._id, values);
   }
+  return true;
 }
 
 /** The id of the user's stored refresh token row, or null. The row outlives

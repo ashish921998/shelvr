@@ -4,10 +4,9 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { env, internalAction, type ActionCtx } from "./_generated/server";
-import { clientSecret } from "./model/appleClient";
+import { clientSecret, revokeRefreshToken } from "./model/appleClient";
 import { errorName, logEvent } from "./model/log";
 
-const REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5 * 60_000;
 
@@ -55,23 +54,7 @@ export const revoke = internalAction({
       return null;
     }
     const attempt = args.attempt ?? 1;
-    let status: number | undefined;
-    try {
-      const response = await fetch(REVOKE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: secret,
-          token: refreshToken,
-          token_type_hint: "refresh_token",
-        }).toString(),
-        signal: AbortSignal.timeout(15_000),
-      });
-      status = response.status;
-    } catch {
-      status = undefined;
-    }
+    const status = await revokeRefreshToken({ clientId, secret, refreshToken });
     // 429 is Apple asking us to slow down, not a refusal: keep the token and
     // take the bounded retry path.
     if (status !== undefined && status < 500 && status !== 429) {

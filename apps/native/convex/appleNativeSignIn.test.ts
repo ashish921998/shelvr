@@ -17,6 +17,8 @@ let appleKey: CryptoKey;
 // What Apple's token endpoint answers the code exchange with.
 let exchange: () => Response | Promise<Response>;
 const exchanges: URLSearchParams[] = [];
+const revocations: URLSearchParams[] = [];
+let revoke: () => Response;
 
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
@@ -74,16 +76,24 @@ beforeEach(async () => {
         exchanges.push(new URLSearchParams(String(init?.body)));
         return exchange();
       }
+      if (String(url) === "https://appleid.apple.com/auth/revoke") {
+        revocations.push(new URLSearchParams(String(init?.body)));
+        return revoke();
+      }
       if (String(url) !== "https://appleid.apple.com/auth/keys")
         throw new Error("Unexpected fetch");
       return Response.json(jwks);
     }),
   );
   exchanges.length = 0;
+  revocations.length = 0;
+  revoke = () => new Response(null, { status: 200 });
   const owned = await identityToken({ nonce: undefined });
   exchange = () =>
     Response.json({ refresh_token: "r.native", id_token: owned });
   vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   const session = await generateKeyPair("RS256", { extractable: true });
   vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(session.privateKey));
   vi.stubEnv("CONVEX_SITE_URL", "https://example.convex.site");
@@ -144,6 +154,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
       clientId: "app.shelvr.save",
     });
     expect(users[0]).not.toHaveProperty("appleRefreshToken");
+    expect(revocations).toHaveLength(0);
   });
 
   it.each([
@@ -168,6 +179,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
 
     expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
     expect(await appleTokens(backend)).toEqual([]);
+    expect(revocations).toHaveLength(0);
   });
 
   it("drops a token whose code belongs to another Apple account", async () => {
@@ -189,6 +201,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
 
     expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
     expect(await appleTokens(backend)).toEqual([]);
+    expect(revocations).toHaveLength(0);
   });
 
   it.each([
@@ -218,6 +231,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
 
     expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
     expect(await appleTokens(backend)).toEqual([]);
+    expect(revocations).toHaveLength(0);
   });
 
   it("asks Apple nothing without a code or without the signing key", async () => {
@@ -237,70 +251,111 @@ describe("keeping Apple's refresh token from the native sheet", () => {
     expect(await appleTokens(backend)).toEqual([]);
   });
 
-  it("keeps no token for an account whose deletion began while Apple was answering", async () => {
-    await configureRevocation();
-    const backend = newConvexTest();
-    // The account exists before the sign-in under test, with enough rows that
-    // the first deletion pass leaves the owner row behind, marked.
-    await signIn(backend, {
-      identityToken: await identityToken(),
-      nonce: NONCE,
-    });
-    const { users } = await tables(backend);
-    const userId = users[0]._id;
-    const sessionId = await backend.run(async (ctx) => {
-      for (let i = 0; i < DELETE_BATCH + 1; i++) {
-        await ctx.db.insert("items", {
+  it.each([
+    ["deleting", "success"],
+    ["missing", "success"],
+    ["deleting", "network failure"],
+    ["deleting", "refusal"],
+  ])(
+    "revokes the late token for a %s owner despite %s",
+    async (ownerState, outcome) => {
+      await configureRevocation();
+      const backend = newConvexTest();
+      // The account exists before the sign-in under test, with enough rows that
+      // the first deletion pass leaves the owner row behind, marked.
+      await signIn(backend, {
+        identityToken: await identityToken(),
+        nonce: NONCE,
+      });
+      const { users } = await tables(backend);
+      const userId = users[0]._id;
+      const sessionId = await backend.run(async (ctx) => {
+        for (let i = 0; i < DELETE_BATCH + 1; i++) {
+          await ctx.db.insert("items", {
+            userId,
+            type: "note",
+            status: "ready",
+            tags: [],
+            searchText: `note ${i}`,
+            note: `note ${i}`,
+          });
+        }
+        return await ctx.db.insert("authSessions", {
           userId,
-          type: "note",
-          status: "ready",
-          tags: [],
-          searchText: `note ${i}`,
-          note: `note ${i}`,
+          expirationTime: Date.now() + 60_000,
         });
+      });
+
+      // Hold Apple's answer: the user was verified and created before the
+      // exchange, so deletion landing here is the race under test.
+      const owned = await identityToken({ nonce: undefined });
+      let release!: () => void;
+      let exchangeReached!: () => void;
+      const reached = new Promise<void>((resolve) => {
+        exchangeReached = resolve;
+      });
+      exchange = () => {
+        exchangeReached();
+        return new Promise<Response>((resolve) => {
+          release = () =>
+            resolve(
+              Response.json({ refresh_token: "r.native", id_token: owned }),
+            );
+        });
+      };
+
+      const signingIn = signIn(backend, {
+        identityToken: await identityToken(),
+        nonce: NONCE,
+        authorizationCode: "c.code",
+      });
+      await reached;
+      await backend
+        .withIdentity({ subject: `${userId}|${sessionId}` })
+        .mutation(api.users.deleteCurrentUserAccount, {});
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toMatchObject({
+        deleting: true,
+      });
+      if (ownerState === "missing") {
+        await backend.run((ctx) => ctx.db.delete(userId));
       }
-      return await ctx.db.insert("authSessions", {
-        userId,
-        expirationTime: Date.now() + 60_000,
-      });
-    });
+      revoke = () => {
+        if (outcome === "network failure") throw new Error("network down");
+        return new Response(null, {
+          status: outcome === "refusal" ? 400 : 200,
+        });
+      };
 
-    // Hold Apple's answer: the user was verified and created before the
-    // exchange, so deletion landing here is the race under test.
-    const owned = await identityToken({ nonce: undefined });
-    let release!: () => void;
-    let exchangeReached!: () => void;
-    const reached = new Promise<void>((resolve) => {
-      exchangeReached = resolve;
-    });
-    exchange = () => {
-      exchangeReached();
-      return new Promise<Response>((resolve) => {
-        release = () =>
-          resolve(
-            Response.json({ refresh_token: "r.native", id_token: owned }),
-          );
-      });
-    };
-
-    const signingIn = signIn(backend, {
-      identityToken: await identityToken(),
-      nonce: NONCE,
-      authorizationCode: "c.code",
-    });
-    await reached;
-    await backend
-      .withIdentity({ subject: `${userId}|${sessionId}` })
-      .mutation(api.users.deleteCurrentUserAccount, {});
-    expect(await backend.run((ctx) => ctx.db.get(userId))).toMatchObject({
-      deleting: true,
-    });
-
-    release();
-    await signingIn;
-    expect(exchanges).toHaveLength(1);
-    expect(await appleTokens(backend)).toEqual([]);
-  });
+      release();
+      await signingIn;
+      expect(exchanges).toHaveLength(1);
+      expect(await appleTokens(backend)).toEqual([]);
+      // Assert scalar facts, never dump a request body containing credentials.
+      expect(revocations).toHaveLength(1);
+      expect(revocations[0].get("client_id")).toBe("app.shelvr.save");
+      expect(revocations[0].get("token") === "r.native").toBe(true);
+      expect(revocations[0].get("token_type_hint")).toBe("refresh_token");
+      const state = await backend.run(async (ctx) => ({
+        user: await ctx.db.get(userId),
+        jobs: await ctx.db.system.query("_scheduled_functions").collect(),
+      }));
+      expect(
+        ownerState === "missing" ? state.user === null : state.user?.deleting,
+      ).toBe(true);
+      expect(JSON.stringify(state.jobs).includes("r.native")).toBe(false);
+      expect(
+        JSON.stringify(vi.mocked(console.log).mock.calls).includes("r.native"),
+      ).toBe(false);
+      expect(
+        JSON.stringify(vi.mocked(console.error).mock.calls).includes(
+          "r.native",
+        ),
+      ).toBe(false);
+      expect(
+        JSON.stringify(vi.mocked(console.warn).mock.calls).includes("r.native"),
+      ).toBe(false);
+    },
+  );
 
   it("never sends a code from a rejected identity token to Apple", async () => {
     await configureRevocation();

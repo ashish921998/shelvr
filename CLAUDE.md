@@ -149,6 +149,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   could not be reached. A token from the native sheet (traded for the sheet's code in
   `auth.ts`, via `model/appleClient.ts`) carries the bundle id it was issued to as
   `clientId`, and is revoked as that client instead of the web Service ID.
+  If deletion wins the native exchange-to-persistence race, `auth.ts` revokes the
+  freshly exchanged, ownership-verified token immediately through the shared
+  runtime-neutral `model/appleClient.ts` request. This is one bounded best-effort
+  attempt, with no persistence or scheduled token arguments; retained-token
+  revocation keeps its existing retries.
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.

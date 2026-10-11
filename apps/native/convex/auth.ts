@@ -12,7 +12,11 @@ import type { DataModel, Id } from "./_generated/dataModel";
 import { env, type ActionCtx } from "./_generated/server";
 import { nativeAppleProfile, normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
-import { exchangeAuthorizationCode } from "./model/appleClient";
+import {
+  clientSecret,
+  exchangeAuthorizationCode,
+  revokeRefreshToken,
+} from "./model/appleClient";
 import {
   AppleIdTokenError,
   appleTokenSubject,
@@ -80,11 +84,33 @@ async function keepNativeAppleToken(
       });
       return;
     }
-    await ctx.runMutation(internal.users.keepNativeAppleToken, {
+    const stored = await ctx.runMutation(internal.users.keepNativeAppleToken, {
       userId,
       refreshToken,
       clientId,
     });
+    if (!stored) {
+      // Deletion won the persistence race. Revoke here while the verified
+      // token is still in memory, never in a row or scheduled job argument.
+      const secret = await clientSecret({
+        clientId,
+        privateKey,
+        keyId,
+        teamId,
+      });
+      const revokeStatus = await revokeRefreshToken({
+        clientId,
+        secret,
+        refreshToken,
+      });
+      logEvent(
+        revokeStatus === 200 ? "info" : "error",
+        "apple_native_late_token_revoke",
+        revokeStatus === undefined
+          ? { code: "unreachable" }
+          : { status: revokeStatus },
+      );
+    }
   } catch (error) {
     logEvent("error", "apple_native_token_failed", {
       code: "unreachable",

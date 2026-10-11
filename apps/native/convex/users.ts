@@ -165,20 +165,20 @@ export const appleTokenForRevoke = internalQuery({
 /** Stores the refresh token the native Apple sheet's code was traded for.
  * Internal-only: the sign-in that calls it has just verified the user.
  * Deletion can start while Apple is still answering; `storeAppleToken` then
- * keeps whatever token the revoke job was already pointed at. */
+ * keeps whatever token the revoke job was already pointed at and returns false
+ * so the action can revoke the freshly exchanged token without storing it. */
 export const keepNativeAppleToken = internalMutation({
   args: {
     userId: v.id("users"),
     refreshToken: v.string(),
     clientId: v.string(),
   },
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, args) => {
-    await storeAppleToken(ctx, args.userId, {
+    return await storeAppleToken(ctx, args.userId, {
       refreshToken: args.refreshToken,
       clientId: args.clientId,
     });
-    return null;
   },
 });
 
