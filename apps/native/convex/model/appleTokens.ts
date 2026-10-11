@@ -1,4 +1,5 @@
 import type { ConvexAuthConfig } from "@convex-dev/auth/server";
+import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
@@ -18,6 +19,11 @@ async function tokenRow(ctx: MutationCtx, userId: Id<"users">) {
  * Moves the refresh token `normalizeAppleProfile` attached to the profile off
  * the users row Convex Auth just wrote it to, into `appleTokens`. Same
  * transaction, so the users row is never stored with it.
+ *
+ * When storing is refused — the sign-in landed while the owner row was
+ * already `deleting` — the token must not be dropped unrevoked, so it is
+ * handed to the same best-effort revocation the deletion path uses, mirroring
+ * the native sheet's late-token path in `auth.ts`.
  */
 export const keepAppleRefreshToken = async (
   authCtx: Parameters<AfterUserSaved>[0],
@@ -31,7 +37,12 @@ export const keepAppleRefreshToken = async (
   const ctx = authCtx as unknown as MutationCtx;
   const user = userId as Id<"users">;
   await ctx.db.patch(user, { appleRefreshToken: undefined });
-  await storeAppleToken(ctx, user, { refreshToken });
+  const stored = await storeAppleToken(ctx, user, { refreshToken });
+  if (!stored) {
+    await ctx.scheduler.runAfter(0, internal.appleRevoke.revokeDetachedToken, {
+      refreshToken,
+    });
+  }
 };
 
 /**

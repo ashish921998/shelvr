@@ -14,6 +14,87 @@ async function forget(ctx: ActionCtx, tokenId: Id<"appleTokens">) {
   await ctx.runMutation(internal.users.forgetAppleToken, { tokenId });
 }
 
+type RevokeResult =
+  | { kind: "unconfigured" }
+  | { kind: "badKey"; error: unknown }
+  | { kind: "status"; status: number }
+  | { kind: "unreachable" };
+
+/**
+ * One revocation attempt against Apple. Apple revokes a token only for the
+ * client it was issued to: the app's bundle id for the native sheet, the
+ * Service ID for the web flow. The Service ID is Convex Auth's own variable,
+ * so it is not declared in convex.config.ts.
+ */
+async function revokeOnce(
+  refreshToken: string,
+  clientId: string | undefined,
+): Promise<RevokeResult> {
+  const resolvedClientId = clientId ?? process.env.AUTH_APPLE_ID;
+  const privateKey = env.APPLE_REVOKE_PRIVATE_KEY;
+  const keyId = env.APPLE_REVOKE_KEY_ID;
+  const teamId = env.APPLE_REVOKE_TEAM_ID;
+  if (!resolvedClientId || !privateKey || !keyId || !teamId) {
+    return { kind: "unconfigured" };
+  }
+  try {
+    const status = await revokeRefreshToken({
+      refreshToken,
+      clientId: resolvedClientId,
+      privateKey,
+      keyId,
+      teamId,
+    });
+    return status === undefined
+      ? { kind: "unreachable" }
+      : { kind: "status", status };
+  } catch (error) {
+    return { kind: "badKey", error };
+  }
+}
+
+/**
+ * Logs one attempt's outcome and applies the shared policy: a refusal (an
+ * already revoked token, a bad key) would be refused again, so it settles;
+ * only "Apple could not be reached" is retried, a bounded number of times.
+ * 429 is Apple asking us to slow down, not a refusal, so it takes the retry
+ * path too.
+ */
+function classify(result: RevokeResult, attempt: number): "settled" | "retry" {
+  if (result.kind === "unconfigured") {
+    logEvent("info", "apple_revoke_skipped", { code: "unconfigured" });
+    return "settled";
+  }
+  if (result.kind === "badKey") {
+    logEvent("error", "apple_revoke_failed", {
+      code: "bad_signing_key",
+      error: errorName(result.error),
+    });
+    return "settled";
+  }
+  if (
+    result.kind === "status" &&
+    result.status < 500 &&
+    result.status !== 429
+  ) {
+    logEvent(
+      result.status === 200 ? "info" : "error",
+      "apple_revoke_finished",
+      {
+        status: result.status,
+      },
+    );
+    return "settled";
+  }
+  const willRetry = attempt < MAX_ATTEMPTS;
+  logEvent(willRetry ? "warn" : "error", "apple_revoke_failed", {
+    code: "unreachable",
+    attempt,
+    ...(result.kind === "status" ? { status: result.status } : {}),
+  });
+  return willRetry ? "retry" : "settled";
+}
+
 /**
  * Revokes a Sign in with Apple refresh token after its account was deleted.
  * Best effort by design: nothing about the deletion
@@ -28,61 +109,43 @@ export const revoke = internalAction({
       tokenId: args.tokenId,
     });
     if (stored === null) return null;
-    const { refreshToken } = stored;
-    // Apple revokes a token only for the client it was issued to: the app's
-    // bundle id for the native sheet, the Service ID for the web flow. The
-    // Service ID is Convex Auth's own variable, so it is not declared in
-    // convex.config.ts.
-    const clientId = stored.clientId ?? process.env.AUTH_APPLE_ID;
-    const privateKey = env.APPLE_REVOKE_PRIVATE_KEY;
-    const keyId = env.APPLE_REVOKE_KEY_ID;
-    const teamId = env.APPLE_REVOKE_TEAM_ID;
-    if (!clientId || !privateKey || !keyId || !teamId) {
-      logEvent("info", "apple_revoke_skipped", { code: "unconfigured" });
-      await forget(ctx, args.tokenId);
-      return null;
-    }
     const attempt = args.attempt ?? 1;
-    let status: number | undefined;
-    try {
-      status = await revokeRefreshToken({
-        refreshToken,
-        clientId,
-        privateKey,
-        keyId,
-        teamId,
-      });
-    } catch (error) {
-      logEvent("error", "apple_revoke_failed", {
-        code: "bad_signing_key",
-        error: errorName(error),
-      });
-      await forget(ctx, args.tokenId);
-      return null;
-    }
-    // 429 is Apple asking us to slow down, not a refusal: keep the token and
-    // take the bounded retry path.
-    if (status !== undefined && status < 500 && status !== 429) {
-      logEvent(status === 200 ? "info" : "error", "apple_revoke_finished", {
-        status,
-      });
-      await forget(ctx, args.tokenId);
-      return null;
-    }
-    const willRetry = attempt < MAX_ATTEMPTS;
-    logEvent(willRetry ? "warn" : "error", "apple_revoke_failed", {
-      code: "unreachable",
-      attempt,
-      ...(status !== undefined ? { status } : {}),
-    });
-    if (willRetry) {
+    const result = await revokeOnce(stored.refreshToken, stored.clientId);
+    if (classify(result, attempt) === "retry") {
       await ctx.scheduler.runAfter(
         RETRY_DELAY_MS * attempt,
         internal.appleRevoke.revoke,
-        { tokenId: args.tokenId, attempt: attempt + 1 },
+        {
+          tokenId: args.tokenId,
+          attempt: attempt + 1,
+        },
       );
     } else {
       await forget(ctx, args.tokenId);
+    }
+    return null;
+  },
+});
+
+/**
+ * Revokes a refresh token that was never stored: a web-flow sign-in landed
+ * while the owner row was already `deleting`, so `storeAppleToken` refused it
+ * and there is no row for `revoke` to point at. The token travels in the job
+ * arguments — the one place it may, since nothing else will ever ask Apple
+ * about it. Same best-effort policy as `revoke`, with nothing to forget.
+ */
+export const revokeDetachedToken = internalAction({
+  args: { refreshToken: v.string(), attempt: v.optional(v.number()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const attempt = args.attempt ?? 1;
+    const result = await revokeOnce(args.refreshToken, undefined);
+    if (classify(result, attempt) === "retry") {
+      await ctx.scheduler.runAfter(
+        RETRY_DELAY_MS * attempt,
+        internal.appleRevoke.revokeDetachedToken,
+        { refreshToken: args.refreshToken, attempt: attempt + 1 },
+      );
     }
     return null;
   },

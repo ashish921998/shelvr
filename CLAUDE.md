@@ -148,7 +148,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   one log line when the `APPLE_REVOKE_*` variables are unset, and retries only when Apple
   could not be reached. A token from the native sheet (traded for the sheet's code in
   `auth.ts`, via `model/appleClient.ts`) carries the bundle id it was issued to as
-  `clientId`, and is revoked as that client instead of the web Service ID.
+  `clientId`, and is revoked as that client instead of the web Service ID. A web-flow
+  sign-in that lands while the owner row is already `deleting` cannot store its token, so
+  `keepAppleRefreshToken` schedules `revokeDetachedToken` to revoke it under the same
+  policy instead of dropping it.
   If deletion wins the native exchange-to-persistence race, `auth.ts` revokes the
   freshly exchanged, ownership-verified token immediately through the shared
   runtime-neutral `model/appleClient.ts` request. This is one bounded best-effort
