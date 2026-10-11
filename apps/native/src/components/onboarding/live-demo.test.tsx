@@ -18,6 +18,7 @@ const mock = vi.hoisted(() => {
     authUrl: "",
     authRequest: null,
     submitting: false,
+    submissionTimedOut: false,
     timedOut: false,
     demoUsed: false,
     canSkip: false,
@@ -91,6 +92,11 @@ const mock = vi.hoisted(() => {
       </button>
     ),
     reading: () => <div>reading</div>,
+    button: ({ title, onPress }: { title: string; onPress: () => void }) => (
+      <button type="button" onClick={onPress}>
+        {title}
+      </button>
+    ),
     sampleSignIn: () => <div>sample-sign-in</div>,
   };
 });
@@ -154,8 +160,17 @@ vi.mock("@/lib/use-incoming-share-url", () => ({
     mock.intake.canAccept = options.canAccept;
   },
 }));
-vi.mock("@/components/onboarding/sample-sign-in", () => ({
-  SampleSignIn: mock.sampleSignIn,
+vi.mock("@/components/onboarding/save-summary", () => ({
+  SaveSummary: mock.nothing,
+}));
+vi.mock("@/components/onboarding/sign-in-buttons", () => ({
+  SignInButtons: mock.sampleSignIn,
+}));
+vi.mock("@/components/ui/button", () => ({
+  Button: mock.button,
+}));
+vi.mock("@/components/ui/themed-text", () => ({
+  ThemedText: mock.text,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
@@ -182,8 +197,39 @@ beforeEach(() => {
   mock.demo.error = null;
   mock.demo.demoUsed = false;
   mock.demo.authUrl = "";
+  mock.demo.submitting = false;
+  mock.demo.submissionTimedOut = false;
+  mock.demo.isAuthenticated = false;
   vi.clearAllMocks();
   mock.actions.canAcceptShare.mockReturnValue(true);
+});
+
+describe("submission recovery", () => {
+  it.each(["share", "reading", "auth"])(
+    "offers truthful enabled recovery from %s without saved claims",
+    (view) => {
+      mock.demo.view = view;
+      mock.demo.submitting = true;
+      mock.demo.submissionTimedOut = true;
+      mock.demo.isAuthenticated = true;
+      mock.demo.authUrl = DEMO_SAMPLES[0].url;
+      render(step());
+      expect(screen.getByText("demo.submissionUnconfirmed")).toBeTruthy();
+      expect(screen.queryByText(/reveal\.previewTitle/)).toBeNull();
+      expect(screen.queryByText("reveal.filedIn")).toBeNull();
+      expect(screen.queryByText("reading")).toBeNull();
+      expect(linkField()).toBeNull();
+      const wait = screen.getByRole("button", { name: "demo.keepWaiting" });
+      const proceed = screen.getByRole("button", { name: "common.continue" });
+      expect((wait as HTMLButtonElement).disabled).toBe(false);
+      expect((proceed as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(wait);
+      expect(mock.actions.keepWaiting).toHaveBeenCalledOnce();
+      fireEvent.click(proceed);
+      expect(mock.actions.continueAfterTimeout).toHaveBeenCalledOnce();
+      expect(mock.actions.skip).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("first-save picker", () => {
@@ -261,7 +307,7 @@ describe("first-save picker", () => {
 
     mock.demo.authUrl = "https://a.test/p";
     rerender(step());
-    expect(screen.queryByText("sample-sign-in")).toBeNull();
+    expect(screen.queryByText("reveal.previewSubtitle")).toBeNull();
     expect(screen.getByText("demo.signInTitle")).toBeTruthy();
   });
   it("gives the screen a way back from the picker and from a sample's sign-in ask, and none while reading", () => {

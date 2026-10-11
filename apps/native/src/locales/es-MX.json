@@ -225,6 +225,8 @@
   "demo.reading": "Leyendo la página…",
   "demo.slow": "Está tardando más de lo habitual.",
   "demo.keepWaiting": "Seguir esperando",
+  "demo.submissionTitle": "Seguimos esperando la confirmación.",
+  "demo.submissionUnconfirmed": "Shelvr aún no ha confirmado que se haya guardado. Puedes seguir esperando o continuar la configuración.",
   "demo.continueWaiting": "Continuar sin esperar",
   "demo.skip": "Omitir por ahora",
   "demo.pastePlaceholder": "Pega o escribe un enlace",

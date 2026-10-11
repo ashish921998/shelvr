@@ -227,6 +227,8 @@
   "demo.reading": "ページを読み取っています…",
   "demo.slow": "いつもより時間がかかっています。",
   "demo.keepWaiting": "このまま待つ",
+  "demo.submissionTitle": "保存の確認を待っています。",
+  "demo.submissionUnconfirmed": "Shelvrでの保存はまだ確認できていません。このまま待つか、設定を続けることができます。",
   "demo.continueWaiting": "待たずに続ける",
   "demo.skip": "今はスキップ",
   "demo.pastePlaceholder": "リンクをペーストまたは入力",

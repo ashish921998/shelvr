@@ -226,6 +226,8 @@ export type MessageParams = {
   "demo.reading": undefined;
   "demo.slow": undefined;
   "demo.keepWaiting": undefined;
+  "demo.submissionTitle": undefined;
+  "demo.submissionUnconfirmed": undefined;
   "demo.continueWaiting": undefined;
   "demo.skip": undefined;
   "demo.pastePlaceholder": undefined;

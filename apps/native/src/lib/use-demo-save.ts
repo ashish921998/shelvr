@@ -49,6 +49,7 @@ type DemoSaveState = {
   previewedUrl: string | null;
   itemId: Id<"items"> | null;
   submitting: boolean;
+  submissionTimedOut: boolean;
   error: TextMessageKey | null;
   demoUsed: boolean;
   /** A save attempt failed, so the step offers a way on without one. */
@@ -75,6 +76,7 @@ type DemoSaveAction =
   | { type: "retryFailed"; error: TextMessageKey }
   | { type: "setError"; error: TextMessageKey | null; lost: boolean }
   | { type: "keepWaiting" }
+  | { type: "submissionTimedOut" }
   | { type: "timedOut"; key: string };
 
 export function initialDemoSaveState(
@@ -87,6 +89,7 @@ export function initialDemoSaveState(
     previewedUrl: null,
     itemId: null,
     submitting: false,
+    submissionTimedOut: false,
     error: null,
     demoUsed: false,
     saveFailed: false,
@@ -121,6 +124,7 @@ export function demoSaveReducer(
           ...next,
           authRequest: alreadyPreviewed(next) ? state.authRequest : null,
           submitting: true,
+          submissionTimedOut: false,
         };
       }
       return {
@@ -145,11 +149,13 @@ export function demoSaveReducer(
         authRequest: alreadyPreviewed(state) ? state.authRequest : null,
         itemId: action.itemId,
         submitting: false,
+        submissionTimedOut: false,
       };
     case "submitFailed":
       return {
         ...state,
         submitting: false,
+        submissionTimedOut: false,
         authRequest: null,
         demoUsed: action.used,
         saveFailed: state.saveFailed || !action.used,
@@ -174,7 +180,13 @@ export function demoSaveReducer(
       if (!action.lost && state.error === action.error) return state;
       return { ...dropLost(state, action.lost), error: action.error };
     case "keepWaiting":
-      return { ...state, deadlineNonce: state.deadlineNonce + 1 };
+      return {
+        ...state,
+        submissionTimedOut: false,
+        deadlineNonce: state.deadlineNonce + 1,
+      };
+    case "submissionTimedOut":
+      return { ...state, submissionTimedOut: true };
     case "timedOut":
       return { ...state, timedOutKey: action.key, authRequest: null };
   }
@@ -183,6 +195,8 @@ export function demoSaveReducer(
 type ItemSnapshot = {
   status: "processing" | "ready" | "failed";
 } | null;
+
+type SubmissionAttempt = { timer: ReturnType<typeof setTimeout> | null };
 
 function deadlineKeyOf(state: DemoSaveState): string {
   return `${state.itemId}:${state.deadlineNonce}`;
@@ -265,6 +279,30 @@ export function useDemoSave({
   );
   const inFlightRef = useRef(false);
   const advancedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const submissionRef = useRef<SubmissionAttempt | null>(null);
+  const invalidateSubmission = useCallback(() => {
+    const attempt = submissionRef.current;
+    submissionRef.current = null;
+    if (attempt?.timer !== null && attempt?.timer !== undefined) {
+      clearTimeout(attempt.timer);
+    }
+  }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      invalidateSubmission();
+    };
+  }, [invalidateSubmission]);
+  const armSubmissionDeadline = useCallback((attempt: SubmissionAttempt) => {
+    if (attempt.timer !== null) clearTimeout(attempt.timer);
+    attempt.timer = setTimeout(() => {
+      if (submissionRef.current === attempt) {
+        dispatch({ type: "submissionTimedOut" });
+      }
+    }, TIMEOUT_MS);
+  }, []);
   const { itemId } = state;
 
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
@@ -283,11 +321,13 @@ export function useDemoSave({
   const advance = useCallback(() => {
     if (advancedRef.current) return;
     advancedRef.current = true;
+    invalidateSubmission();
     onAdvance();
-  }, [onAdvance]);
+  }, [onAdvance, invalidateSubmission]);
 
   const status = view === "share" ? null : item?.status;
   useEffect(() => {
+    if (advancedRef.current) return;
     if (status === "ready") {
       analytics.capture("onboarding_demo_result", { outcome: "ready" });
       advance();
@@ -315,7 +355,13 @@ export function useDemoSave({
   const submit = useCallback(
     async (request: PendingDemo, resumed = false) => {
       const url = request.url.trim();
-      if (url === "" || inFlightRef.current) return;
+      if (
+        url === "" ||
+        inFlightRef.current ||
+        advancedRef.current ||
+        !mountedRef.current
+      )
+        return;
       const trimmed = { ...request, url };
       const sample = isDemoSample(url);
       // Fires before any sign-in, so the funnel shows a pick that never got
@@ -337,12 +383,20 @@ export function useDemoSave({
       if (!canSave) return;
 
       inFlightRef.current = true;
+      // Ownership and its deadline start with creation, never during OAuth
+      // or consent. Continuing/unmounting withdraws local authority only;
+      // the server request and durable pending work remain intact.
+      const attempt: SubmissionAttempt = { timer: null };
+      submissionRef.current = attempt;
+      armSubmissionDeadline(attempt);
       try {
         const result = await createDemoItem({
           url,
           spaceName: trimmed.destination ?? undefined,
           analyticsSessionId: analytics.sessionId(),
         });
+        if (submissionRef.current !== attempt) return;
+        invalidateSubmission();
         // A relaunch resubmits the persisted save and gets it back; that is
         // not a second submission.
         if (!result.reused) analytics.capture("onboarding_demo_submitted");
@@ -370,6 +424,8 @@ export function useDemoSave({
           savedSpaceNames: result.savedSpaceNames,
         });
       } catch (err) {
+        if (submissionRef.current !== attempt) return;
+        invalidateSubmission();
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
         const used = demoErrorCode(err) === "demo_used";
@@ -382,7 +438,15 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [createDemoItem, isAuthenticated, canSave, lost, onSaved],
+    [
+      createDemoItem,
+      isAuthenticated,
+      canSave,
+      lost,
+      onSaved,
+      armSubmissionDeadline,
+      invalidateSubmission,
+    ],
   );
 
   const submitUrl = useCallback(
@@ -462,6 +526,7 @@ export function useDemoSave({
   const previewed = useCallback(() => dispatch({ type: "previewed" }), []);
 
   const continueAfterTimeout = () => {
+    if (advancedRef.current) return;
     analytics.capture("onboarding_demo_result", { outcome: "timeout" });
     advance();
   };
@@ -498,6 +563,7 @@ export function useDemoSave({
     submitting: state.submitting,
     error: state.error ?? lostError,
     timedOut,
+    submissionTimedOut: state.submissionTimedOut,
     demoUsed: state.demoUsed,
     canSkip: view === "share" && !state.demoUsed && (state.saveFailed || lost),
     canAcceptShare,
@@ -510,7 +576,12 @@ export function useDemoSave({
     retry,
     submitSharedUrl,
     previewed,
-    keepWaiting: () => dispatch({ type: "keepWaiting" }),
+    keepWaiting: () => {
+      if (advancedRef.current) return;
+      const attempt = submissionRef.current;
+      if (attempt !== null) armSubmissionDeadline(attempt);
+      dispatch({ type: "keepWaiting" });
+    },
     continueAfterTimeout,
   };
 }

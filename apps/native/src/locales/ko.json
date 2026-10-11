@@ -227,6 +227,8 @@
   "demo.reading": "페이지 읽는 중…",
   "demo.slow": "평소보다 오래 걸리고 있어요.",
   "demo.keepWaiting": "계속 기다리기",
+  "demo.submissionTitle": "저장 확인을 기다리고 있어요.",
+  "demo.submissionUnconfirmed": "Shelvr에서 아직 저장을 확인하지 못했어요. 계속 기다리거나 설정을 이어갈 수 있어요.",
   "demo.continueWaiting": "기다리지 않고 계속",
   "demo.skip": "지금은 건너뛰기",
   "demo.pastePlaceholder": "링크 붙여넣기 또는 입력",
