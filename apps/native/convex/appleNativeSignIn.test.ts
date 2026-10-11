@@ -4,7 +4,7 @@ import { exportJWK, exportPKCS8, generateKeyPair, SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./_generated/api";
-import { newConvexTest } from "./test.setup";
+import { gate, newConvexTest, seedNotes } from "./test.setup";
 import { DELETE_BATCH } from "./users";
 
 // The native Sign in with Apple path end to end: the client's identity token
@@ -269,47 +269,29 @@ describe("keeping Apple's refresh token from the native sheet", () => {
       });
       const { users } = await tables(backend);
       const userId = users[0]._id;
-      const sessionId = await backend.run(async (ctx) => {
-        for (let i = 0; i < DELETE_BATCH + 1; i++) {
-          await ctx.db.insert("items", {
-            userId,
-            type: "note",
-            status: "ready",
-            tags: [],
-            searchText: `note ${i}`,
-            note: `note ${i}`,
-          });
-        }
-        return await ctx.db.insert("authSessions", {
+      await seedNotes(backend, userId, DELETE_BATCH + 1);
+      const sessionId = await backend.run((ctx) =>
+        ctx.db.insert("authSessions", {
           userId,
           expirationTime: Date.now() + 60_000,
-        });
-      });
+        }),
+      );
 
       // Hold Apple's answer: the user was verified and created before the
       // exchange, so deletion landing here is the race under test.
       const owned = await identityToken({ nonce: undefined });
-      let release!: () => void;
-      let exchangeReached!: () => void;
-      const reached = new Promise<void>((resolve) => {
-        exchangeReached = resolve;
-      });
-      exchange = () => {
-        exchangeReached();
-        return new Promise<Response>((resolve) => {
-          release = () =>
-            resolve(
-              Response.json({ refresh_token: "r.native", id_token: owned }),
-            );
-        });
-      };
+      const exchangeGate = gate();
+      exchange = () =>
+        exchangeGate.hold(
+          Response.json({ refresh_token: "r.native", id_token: owned }),
+        );
 
       const signingIn = signIn(backend, {
         identityToken: await identityToken(),
         nonce: NONCE,
         authorizationCode: "c.code",
       });
-      await reached;
+      await exchangeGate.reached;
       await backend
         .withIdentity({ subject: `${userId}|${sessionId}` })
         .mutation(api.users.deleteCurrentUserAccount, {});
@@ -326,7 +308,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
         });
       };
 
-      release();
+      exchangeGate.open();
       await signingIn;
       expect(exchanges).toHaveLength(1);
       expect(await appleTokens(backend)).toEqual([]);

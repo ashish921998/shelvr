@@ -86,3 +86,34 @@ export async function seedNotes(
     }
   });
 }
+
+/**
+ * A one-shot barrier for race tests. Hand `hold` to the seam under test (a
+ * stubbed fetch, an exchange): when the code reaches it, `reached` resolves
+ * and the seam waits; the test then arranges the racing state and calls
+ * `open()`, and `hold` resolves with its value. Single use — arm a fresh gate
+ * per held call.
+ */
+export function gate(): {
+  reached: Promise<void>;
+  open(): void;
+  hold<T>(value: T): Promise<T>;
+} {
+  let arrived!: () => void;
+  let release!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    arrived = resolve;
+  });
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    reached,
+    open: release,
+    async hold<T>(value: T): Promise<T> {
+      arrived();
+      await opened;
+      return value;
+    },
+  };
+}
