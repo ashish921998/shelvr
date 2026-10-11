@@ -96,10 +96,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `appleTokens` — the latest Sign in with Apple refresh token per user, kept only to
     revoke it on account deletion; never returned to a client or logged
 
-  `schema.ts` also redeclares Convex Auth's `users` table with one optional field,
-  `appleRefreshToken`. Convex Auth writes the Apple profile onto that row, and
+  `schema.ts` also redeclares Convex Auth's `users` table with two optional fields.
+  `appleRefreshToken`: Convex Auth writes the Apple profile onto that row, and
   `keepAppleRefreshToken` (`model/appleTokens.ts`) moves the token to `appleTokens` in the
-  same transaction, so no stored users row carries it.
+  same transaction, so no stored users row carries it. `deleting`: a one-way marker
+  `deleteCurrentUserAccount` sets in its first transaction, so the account stops owning
+  data before the batched cleanup finishes. `liveOwner` / `isLiveOwner` (`model/auth.ts`)
+  are the one definition of an account that may still own data (row present, `deleting`
+  unset), used by `requireUserId`, `getCurrentUser`, the capture-token, Apple-token and
+  billing writes, and `canResetCurrentUser`. The marker is never cleared; the cleanup
+  deletes the row. It stays declared `v.optional(...)` through any rollback while a row
+  still carries it (see the one-way-door rule under Working conventions).
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -171,7 +178,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
   `image: null` Apple's provider emits, which the users schema rejects.
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
-  identity sync, plus `deleteCurrentUserAccount` and its batched internal deletion.
+  identity sync (null once deletion has begun), plus `deleteCurrentUserAccount` and its batched
+  internal deletion. Deletion is idempotent: the first call marks the row `deleting`, revokes
+  the Apple token and starts the cleanup; a repeat resumes the cleanup without a second revoke
+  job; a call after the row is gone is a no-op. `isLiveOwner` is the internal query actions
+  use for the same owner check, since they have no `ctx.db`.
 - **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
   `AUTH_ENABLE_ANONYMOUS` is `"true"` and the caller is a development anonymous user.
 - **`analytics.ts`**, **`accountTelemetry.ts`**, **`paymentTelemetry.ts`** — server-side PostHog

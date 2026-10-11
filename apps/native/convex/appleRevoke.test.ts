@@ -189,6 +189,56 @@ describe("capturing Apple's refresh token at sign-in", () => {
     expect(tokens[0]).toMatchObject({ refreshToken: "web-again" });
     expect(tokens[0]).not.toHaveProperty("clientId");
   });
+
+  it("keeps the web flow's token off a deleting owner without recreating or replacing a row", async () => {
+    const t = newConvexTest();
+    await signIn(t, "web-first");
+    const [retained] = await tokenRows(t);
+    await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
+
+    // A web sign-in lands on the same (deleting) user: the secret is still
+    // cleared from the users row, but the retained token is not replaced.
+    await signIn(t, "web-during-deletion");
+    const users = await t.run((ctx) => ctx.db.query("users").collect());
+    expect(users).toHaveLength(1);
+    expect(users[0]).not.toHaveProperty("appleRefreshToken");
+    expect(await tokenRows(t)).toEqual([retained]);
+
+    // With the retained row gone, nothing is inserted either.
+    await t.run((ctx) => ctx.db.delete(retained._id));
+    await signIn(t, "web-after-forget");
+    expect(await tokenRows(t)).toEqual([]);
+  });
+
+  it("refuses the native sheet's token for a deleting or missing owner and never replaces a retained row", async () => {
+    const t = newConvexTest();
+    const { userId, tokenId } = await tokenRow(t);
+    const retained = await t.run((ctx) => ctx.db.get(tokenId));
+    await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+
+    await t.mutation(internal.users.keepNativeAppleToken, {
+      userId,
+      refreshToken: "native-late",
+      clientId: "app.shelvr.save",
+    });
+    expect(await tokenRows(t)).toEqual([retained]);
+
+    await t.run((ctx) => ctx.db.delete(tokenId));
+    await t.mutation(internal.users.keepNativeAppleToken, {
+      userId,
+      refreshToken: "native-late",
+      clientId: "app.shelvr.save",
+    });
+    expect(await tokenRows(t)).toEqual([]);
+
+    await t.run((ctx) => ctx.db.delete(userId));
+    await t.mutation(internal.users.keepNativeAppleToken, {
+      userId,
+      refreshToken: "native-late",
+      clientId: "app.shelvr.save",
+    });
+    expect(await tokenRows(t)).toEqual([]);
+  });
 });
 
 describe("deleting an account that signed in with Apple", () => {
@@ -223,6 +273,30 @@ describe("deleting an account that signed in with Apple", () => {
 
     expect(await scheduledRevokes(t)).toEqual([]);
     expect(await t.run((ctx) => ctx.db.get(userId))).toBeNull();
+  });
+
+  it("keeps the retained token readable for the revoke job after the owner is gone, then forgets it", async () => {
+    await configure();
+    const t = newConvexTest();
+    const { userId, tokenId } = await tokenRow(t);
+
+    await as(t, userId).mutation(api.users.deleteCurrentUserAccount, {});
+    expect(await t.run((ctx) => ctx.db.get(userId))).toBeNull();
+
+    // The live-owner fence must not reach the revocation lookup: the row is
+    // deliberately the one thing deletion leaves behind.
+    await expect(
+      t.query(internal.users.appleTokenForRevoke, { tokenId }),
+    ).resolves.toEqual({ refreshToken: "r.token", clientId: undefined });
+
+    await t.action(internal.appleRevoke.revoke, { tokenId });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await tokenRows(t)).toEqual([]);
+    await expect(
+      t.query(internal.users.appleTokenForRevoke, { tokenId }),
+    ).resolves.toBeNull();
+    // Forgetting an already forgotten row is harmless.
+    await t.mutation(internal.users.forgetAppleToken, { tokenId });
   });
 });
 

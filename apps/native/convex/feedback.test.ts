@@ -30,13 +30,8 @@ function setup() {
   return newConvexTest();
 }
 
-/** A synthetic subject identity; the users row only needs to exist when the
- * test asserts on the account email. */
-function as(t: ReturnType<typeof newConvexTest>, userId: string) {
-  return t.withIdentity({ subject: `${userId}|session-1` });
-}
-
-/** A real users row + session so claimDelivery can read the account email. */
+/** A real users row + session; the shared guard rejects an identity whose
+ * owner row is missing, and claimDelivery reads the account email from it. */
 async function signedInWithEmail(
   t: ReturnType<typeof newConvexTest>,
   email?: string,
@@ -49,7 +44,10 @@ async function signedInWithEmail(
     });
     return userId;
   });
-  return { t: as(t, userId as string), userId: userId as string };
+  return {
+    t: t.withIdentity({ subject: `${userId}|session-1` }),
+    userId: userId as string,
+  };
 }
 
 function okFetch() {
@@ -155,7 +153,7 @@ describe("submitFeedback", () => {
 
   it("rejects empty and over-long messages instead of truncating them", async () => {
     const t = setup();
-    const signedIn = as(t, "user-validate");
+    const { t: signedIn } = await signedInWithEmail(t);
     await expect(
       signedIn.mutation(api.feedback.submitFeedback, {
         message: "   ",
@@ -174,7 +172,7 @@ describe("submitFeedback", () => {
     // No inbox env: nothing is scheduled, so the row can be inspected without
     // a delivery action pending behind the test.
     const t = newConvexTest();
-    const signedIn = as(t, "user-context");
+    const { t: signedIn } = await signedInWithEmail(t);
     const result = await signedIn.mutation(api.feedback.submitFeedback, {
       message: "hello",
       surface: "profile",
@@ -188,7 +186,7 @@ describe("submitFeedback", () => {
 
   it("rate limits rapid submissions per user", async () => {
     const t = newConvexTest();
-    const signedIn = as(t, "user-rate");
+    const { t: signedIn } = await signedInWithEmail(t);
     const args = { message: "hi", surface: "profile" as const };
     await signedIn.mutation(api.feedback.submitFeedback, args);
     await signedIn.mutation(api.feedback.submitFeedback, args);

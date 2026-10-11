@@ -7,7 +7,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { IMAGE_EMPTY_MESSAGE } from "./model/imagePolicy";
 import {
@@ -85,6 +85,12 @@ export const storeCaptureToken = internalMutation({
   args: { userId: v.id("users"), tokenHash: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // The action authorized the caller in an earlier transaction. Deletion
+    // can land in between, and its first pass drains this table, so a token
+    // written now would be the one credential that survives the account.
+    if ((await liveOwner(ctx, args.userId)) === null) {
+      throw new Error("Not authenticated");
+    }
     await ctx.db.insert("captureTokens", {
       userId: args.userId,
       tokenHash: args.tokenHash,
@@ -129,7 +135,10 @@ export const revokeCaptureToken = mutation({
   },
 });
 
-/** The token row for a hash, or null. Marks it used (coarsely). */
+/** The token row for a hash when its owner is still live, or null. Marks it
+ * used (coarsely). A row whose owner is missing or deleting is as good as
+ * absent: deletion drains tokens in batches, so one can outlive its owner for
+ * a moment. */
 async function claimCaptureToken(
   ctx: MutationCtx,
   tokenHash: string,
@@ -139,6 +148,7 @@ async function claimCaptureToken(
     .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
     .first();
   if (token === null) return null;
+  if ((await liveOwner(ctx, token.userId)) === null) return null;
   const now = Date.now();
   if (
     token.lastUsedAt === undefined ||

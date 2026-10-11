@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { TestConvexForDataModel } from "convex-test";
@@ -9,19 +9,8 @@ import type { DataModel } from "./_generated/dataModel";
 type TestCtx = TestConvexForDataModel<DataModel>;
 
 // Mirrors spaces.test.ts's helper: an authenticated, Pro-entitled test user.
-async function entitledUser(userId: string): Promise<TestCtx> {
-  const t = newConvexTest().withIdentity({
-    subject: `${userId}|session-1`,
-  });
-  await t.run(async (ctx) => {
-    await ctx.db.insert("subscriptions", {
-      userId,
-      status: "pro",
-      expiresAt: Date.now() + 60_000,
-      updatedAt: Date.now(),
-    });
-  });
-  return t;
+async function entitledUser(): Promise<TestCtx> {
+  return (await signedInUser(newConvexTest(), { pro: true })).t;
 }
 
 /**
@@ -34,7 +23,7 @@ async function entitledUser(userId: string): Promise<TestCtx> {
  */
 describe("explicit space assignment vs classification", () => {
   it("keeps the user's saved assignment when classification suggests other spaces", async () => {
-    const t = await entitledUser("assign-user");
+    const t = await entitledUser();
     const dynamicSpace = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
       dynamic: true,
@@ -68,7 +57,7 @@ describe("explicit space assignment vs classification", () => {
   });
 
   it("never duplicates a membership when classification re-proposes the saved space", async () => {
-    const t = await entitledUser("dupe-user");
+    const t = await entitledUser();
     const space = await t.mutation(api.spaces.createSpace, {
       name: "Read later",
       dynamic: true,
@@ -95,7 +84,7 @@ describe("explicit space assignment vs classification", () => {
   });
 
   it("only suggests into dynamic spaces — quiet spaces never hear from the pipeline", async () => {
-    const t = await entitledUser("quiet-user");
+    const t = await entitledUser();
     // No `dynamic` → server default false (the onboarding-replay trap).
     const quietSpace = await t.mutation(api.spaces.createSpace, {
       name: "Quiet shelf",
@@ -119,7 +108,7 @@ describe("explicit space assignment vs classification", () => {
   });
 
   it("createSpace persists the dynamic flag the classifier depends on", async () => {
-    const t = await entitledUser("flag-user");
+    const t = await entitledUser();
     const explicit = await t.mutation(api.spaces.createSpace, {
       name: "Explicit dynamic",
       dynamic: true,

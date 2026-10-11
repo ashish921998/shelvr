@@ -30,14 +30,19 @@ export default defineSchema({
   // include a session suffix.
   ...authTables,
 
-  // Convex Auth's own users table with one field added; the indexes must stay
+  // Convex Auth's own users table with two fields added; the indexes must stay
   // the ones `authTables` declares. Convex Auth writes everything the Apple
   // profile callback returns onto this row, so the refresh token has to be a
   // legal field for that write. `keepAppleRefreshToken` moves it to
   // `appleTokens` in the same transaction, so no stored row carries it.
+  // `deleting` is set by the mutation that starts account deletion and stays
+  // on the row until the final batch removes it; `model/auth.ts` treats such
+  // an owner as gone. Rows carry it only mid-deletion, but it must stay
+  // declared (optional) while any row does, or the deploy is rejected.
   users: defineTable({
     ...authTables.users.validator.fields,
     appleRefreshToken: v.optional(v.string()),
+    deleting: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"]),

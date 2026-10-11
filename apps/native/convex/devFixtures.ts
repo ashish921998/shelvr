@@ -2,7 +2,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { env, mutation, query, type MutationCtx } from "./_generated/server";
-import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
+import {
+  isDevelopmentAnonymousUser,
+  liveOwner,
+  requireUserId,
+} from "./model/auth";
 import { insertMembership } from "./model/memberships";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -21,6 +25,7 @@ export const canResetCurrentUser = query({
     if (env.AUTH_ENABLE_ANONYMOUS !== "true") return false;
     const userId = await getAuthUserId(ctx);
     if (userId === null) return false;
+    if ((await liveOwner(ctx, userId)) === null) return false;
     return await isDevelopmentAnonymousUser(ctx, userId);
   },
 });
@@ -173,7 +178,7 @@ export const resetCurrentUser = mutation({
         "The objects that stay with us are rarely the ones built to impress at first glance. They are the ones that were assembled with an opinion — a decision about what they should be, made by someone who cared enough to defend it.",
         "Durability is the quiet half of craft. A well-made thing absorbs use without showing it as damage; the patina becomes a record of a life rather than a tally of failures. Mass production struggles here because its economics reward the cheapest acceptable outcome, not the most durable one.",
         "Thoughtful design also knows when to stop. Every feature added to fill a spec sheet is a claim on the user's attention, and attention is the scarcest material any product touches. The discipline is not in what a thing can do, but in what it declines to do.",
-        "None of this is nostalgia. New tools, new materials, and new methods all have a place — but the intent behind them is the part that compounds. A workshop that asks \"what should this be?\" before \"how fast can we ship it?\" will make objects worth keeping, whatever century it works in.",
+        'None of this is nostalgia. New tools, new materials, and new methods all have a place — but the intent behind them is the part that compounds. A workshop that asks "what should this be?" before "how fast can we ship it?" will make objects worth keeping, whatever century it works in.',
       ].join("\n\n"),
       searchText:
         "the value of craft durable objects thoughtful design reading example journal",

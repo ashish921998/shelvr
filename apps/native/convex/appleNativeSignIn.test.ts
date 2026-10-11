@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./_generated/api";
 import { newConvexTest } from "./test.setup";
+import { DELETE_BATCH } from "./users";
 
 // The native Sign in with Apple path end to end: the client's identity token
 // goes in, a session comes out, and the account lands where the web Apple flow
@@ -14,7 +15,7 @@ const SUB = "001234.abcdef.5678";
 
 let appleKey: CryptoKey;
 // What Apple's token endpoint answers the code exchange with.
-let exchange: () => Response;
+let exchange: () => Response | Promise<Response>;
 const exchanges: URLSearchParams[] = [];
 
 async function sha256Hex(value: string) {
@@ -233,6 +234,71 @@ describe("keeping Apple's refresh token from the native sheet", () => {
     });
 
     expect(exchanges).toEqual([]);
+    expect(await appleTokens(backend)).toEqual([]);
+  });
+
+  it("keeps no token for an account whose deletion began while Apple was answering", async () => {
+    await configureRevocation();
+    const backend = newConvexTest();
+    // The account exists before the sign-in under test, with enough rows that
+    // the first deletion pass leaves the owner row behind, marked.
+    await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+    });
+    const { users } = await tables(backend);
+    const userId = users[0]._id;
+    const sessionId = await backend.run(async (ctx) => {
+      for (let i = 0; i < DELETE_BATCH + 1; i++) {
+        await ctx.db.insert("items", {
+          userId,
+          type: "note",
+          status: "ready",
+          tags: [],
+          searchText: `note ${i}`,
+          note: `note ${i}`,
+        });
+      }
+      return await ctx.db.insert("authSessions", {
+        userId,
+        expirationTime: Date.now() + 60_000,
+      });
+    });
+
+    // Hold Apple's answer: the user was verified and created before the
+    // exchange, so deletion landing here is the race under test.
+    const owned = await identityToken({ nonce: undefined });
+    let release!: () => void;
+    let exchangeReached!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      exchangeReached = resolve;
+    });
+    exchange = () => {
+      exchangeReached();
+      return new Promise<Response>((resolve) => {
+        release = () =>
+          resolve(
+            Response.json({ refresh_token: "r.native", id_token: owned }),
+          );
+      });
+    };
+
+    const signingIn = signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+      authorizationCode: "c.code",
+    });
+    await reached;
+    await backend
+      .withIdentity({ subject: `${userId}|${sessionId}` })
+      .mutation(api.users.deleteCurrentUserAccount, {});
+    expect(await backend.run((ctx) => ctx.db.get(userId))).toMatchObject({
+      deleting: true,
+    });
+
+    release();
+    await signingIn;
+    expect(exchanges).toHaveLength(1);
     expect(await appleTokens(backend)).toEqual([]);
   });
 

@@ -383,10 +383,11 @@ describe("useCancelSurvey", () => {
   it.each(["foreground", "relaunch"])(
     "retries the saved response on %s after the real server has consumed the ask",
     async (resume) => {
-      const { newConvexTest } = await import("../../convex/test.setup");
+      const { newConvexTest, signedInUser } =
+        await import("../../convex/test.setup");
       const { api } = await import("../../convex/_generated/api");
       const backend = newConvexTest();
-      const user = backend.withIdentity({ subject: "user-1|session" });
+      const { t: user } = await signedInUser(backend);
       mock.surveyStatus = await user.query(api.cancelSurvey.getStatus, {});
       mock.markShown.mockImplementation(async () => {
         const result = await user.mutation(api.cancelSurvey.markShown, {});

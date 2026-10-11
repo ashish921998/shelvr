@@ -1,11 +1,39 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "../_generated/api";
 import {
   env,
   type ActionCtx,
   type MutationCtx,
   type QueryCtx,
 } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
+
+const NOT_AUTHENTICATED = "Not authenticated";
+
+/**
+ * Whether a users row may still own data: it exists and account deletion has
+ * not started on it. The one definition every fence in the backend shares.
+ */
+export function isLiveOwner(
+  user: Doc<"users"> | null | undefined,
+): user is Doc<"users"> {
+  return user !== null && user !== undefined && user.deleting !== true;
+}
+
+/**
+ * The live owner row behind `userId`, or null when the id is not a users id,
+ * the row is gone, or deletion has begun. Takes the raw string form because
+ * webhook app user ids and the string `userId` columns are not typed ids.
+ */
+export async function liveOwner(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+): Promise<Doc<"users"> | null> {
+  const id = ctx.db.normalizeId("users", userId);
+  if (id === null) return null;
+  const user = await ctx.db.get(id);
+  return isLiveOwner(user) ? user : null;
+}
 
 /**
  * Returns the authenticated user's stable users-table id, or throws. Every
@@ -16,6 +44,12 @@ import type { Id } from "../_generated/dataModel";
  * raw `identity.subject` would make ownership session-scoped and would not
  * match RevenueCat's user id or `getCurrentUser`.
  *
+ * A valid JWT is not enough on its own: the owner row must still be live.
+ * Account deletion marks the row in its first transaction, so a retained
+ * token on another device stops authorizing the moment deletion starts, not
+ * only once the batched cleanup reaches the auth tables. The rejection is the
+ * same unauthenticated error either way.
+ *
  * This stays provider-agnostic: it works identically whether the user signed in
  * via OAuth or Anonymous.
  */
@@ -24,7 +58,14 @@ export async function requireUserId(
 ): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (userId === null) {
-    throw new Error("Not authenticated");
+    throw new Error(NOT_AUTHENTICATED);
+  }
+  const live: boolean =
+    "db" in ctx
+      ? (await liveOwner(ctx, userId)) !== null
+      : await ctx.runQuery(internal.users.isLiveOwner, { userId });
+  if (!live) {
+    throw new Error(NOT_AUTHENTICATED);
   }
   return userId;
 }
