@@ -396,7 +396,6 @@ export function useDemoSave({
           analyticsSessionId: analytics.sessionId(),
         });
         if (submissionRef.current !== attempt) return;
-        invalidateSubmission();
         // A relaunch resubmits the persisted save and gets it back; that is
         // not a second submission.
         if (!result.reused) analytics.capture("onboarding_demo_submitted");
@@ -425,7 +424,6 @@ export function useDemoSave({
         });
       } catch (err) {
         if (submissionRef.current !== attempt) return;
-        invalidateSubmission();
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
         const used = demoErrorCode(err) === "demo_used";
@@ -435,6 +433,7 @@ export function useDemoSave({
         });
         dispatch({ type: "submitFailed", used });
       } finally {
+        if (submissionRef.current === attempt) invalidateSubmission();
         inFlightRef.current = false;
       }
     },

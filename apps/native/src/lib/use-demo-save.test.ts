@@ -278,6 +278,20 @@ describe("useDemoSave", () => {
     }
   });
 
+  it("still handles a live completion-side-effect failure", async () => {
+    mock.create.mockResolvedValue(saved());
+    mock.setPendingDemo
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error("storage unavailable");
+      });
+    const { result, onSaved } = renderDemo();
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.error).toBe("demo.saveFailed");
+    expect(result.current.submitting).toBe(false);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("asks for sign-in first, then saves the same link once signed in", async () => {
     mock.authenticated = false;
     mock.create.mockResolvedValue(saved());
