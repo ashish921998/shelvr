@@ -5,18 +5,10 @@ import type { Doc, Id } from "../_generated/dataModel";
 const NOT_AUTHENTICATED = "Not authenticated";
 
 /**
- * Whether a users row may still own data: it exists and account deletion has
- * not started on it. The one definition every fence in the backend shares.
- */
-export function isLiveOwner(
-  user: Doc<"users"> | null | undefined,
-): user is Doc<"users"> {
-  return user !== null && user !== undefined && user.deleting !== true;
-}
-
-/**
  * The live owner row behind `userId`, or null when the id is not a users id,
- * the row is gone, or deletion has begun. Takes the raw string form because
+ * the row is gone, or deletion has begun: a row may still own data only while
+ * it exists and account deletion has not started on it. The one definition
+ * every fence in the backend shares. Takes the raw string form because
  * webhook app user ids and the string `userId` columns are not typed ids.
  */
 export async function liveOwner(
@@ -26,7 +18,7 @@ export async function liveOwner(
   const id = ctx.db.normalizeId("users", userId);
   if (id === null) return null;
   const user = await ctx.db.get(id);
-  return isLiveOwner(user) ? user : null;
+  return user !== null && user.deleting !== true ? user : null;
 }
 
 /**
