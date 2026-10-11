@@ -75,6 +75,23 @@ describe("redirectSystemPath", () => {
     const path = "shelvr:///add";
     expect(redirectSystemPath({ path, initial: false })).toBe(path);
   });
+
+  it.each([
+    ["shelvr:///tidy", true],
+    ["shelvr:///tidy", false],
+    ["shelvr:///map", true],
+    ["shelvr:///map", false],
+    ["shelvr://tidy", true],
+    ["shelvr://tidy", false],
+    ["shelvr://map", true],
+    ["shelvr://map", false],
+  ] as const)(
+    "preserves public tool link %s (cold launch: %s)",
+    (path, initial) => {
+      expect(redirectSystemPath({ path, initial })).toBe(path);
+      expect(markPendingShareOnDevice).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("redirectSystemPath and the launch animation", () => {

@@ -32,8 +32,12 @@ export default function ProfileScreen() {
   const { data: user } = useCurrentUser();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { status, loading } = useEntitlement();
+  const { status, loading, entitled } = useEntitlement();
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
+  const { data: hasLocatedItems } = useQuery({
+    ...convexQuery(api.items.hasLocatedItems, {}),
+    enabled: entitled,
+  });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
@@ -46,6 +50,15 @@ export default function ProfileScreen() {
     // A development reload or direct link can restore Profile as the root
     // route. In that state there is no history entry for Android Back to pop.
     router.replace("/");
+  };
+
+  const openTool = async (tool: "tidy" | "map") => {
+    closeProfile();
+    await waitForSheetTransition();
+    analytics.capture(tool === "tidy" ? "tidy_opened" : "map_opened", {
+      source: "profile",
+    });
+    router.push(tool === "tidy" ? "/tidy" : "/map");
   };
 
   const proLabel =
@@ -161,6 +174,20 @@ export default function ProfileScreen() {
           />
         </Pressable>
       </View>
+
+      <SettingsGroup>
+        <SettingsRow
+          divider={false}
+          label={t("navigation.tidy")}
+          onPress={() => void openTool("tidy")}
+        />
+        {entitled && hasLocatedItems === true ? (
+          <SettingsRow
+            label={t("navigation.map")}
+            onPress={() => void openTool("map")}
+          />
+        ) : null}
+      </SettingsGroup>
 
       <SettingsGroup>
         <ActionMenu

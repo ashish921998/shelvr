@@ -44,6 +44,7 @@ vi.mock("expo-router", () => {
   const Stack = Object.assign(() => <div>app-stack</div>, {
     Screen: nothing,
     Protected: nothing,
+    Title: nothing,
   });
   return { Stack, Redirect: nothing, useRouter: () => ({}) };
 });
@@ -77,6 +78,9 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
+  Text: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
 }));
 
 const shows = (text: string) => screen.queryByText(text) !== null;

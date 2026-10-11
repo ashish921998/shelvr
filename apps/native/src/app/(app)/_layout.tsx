@@ -17,7 +17,7 @@ import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
-import { Platform, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /**
@@ -60,6 +60,15 @@ export default function AppLayout() {
 const styles = StyleSheet.create({
   cover: { ...StyleSheet.absoluteFillObject },
 });
+
+const toolStyles = StyleSheet.create((theme) => ({
+  title: {
+    fontFamily: theme.fonts.display,
+    fontSize: 31,
+    letterSpacing: 0.5,
+    color: theme.colors.foreground,
+  },
+}));
 
 function AppStack() {
   useAppLocale();
@@ -106,6 +115,49 @@ function AppStack() {
       >
         <Stack.Protected guard={onboarded}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="tidy"
+            options={{
+              gestureEnabled: false,
+              headerBackButtonDisplayMode: "minimal",
+              headerTitleStyle: toolStyles.title,
+              headerLeft: ({ canGoBack }) =>
+                canGoBack ? null : (
+                  <HeaderIconButton
+                    icon="house.fill"
+                    label={t("digest.backHome")}
+                    onPress={() => router.replace("/")}
+                  />
+                ),
+            }}
+          >
+            <Stack.Title asChild>
+              <Text testID="tidy-screen-title" style={toolStyles.title}>
+                {t("navigation.tidyHeader")}
+              </Text>
+            </Stack.Title>
+          </Stack.Screen>
+          <Stack.Screen
+            name="map"
+            options={{
+              headerBackButtonDisplayMode: "minimal",
+              headerTitleStyle: toolStyles.title,
+              headerLeft: ({ canGoBack }) =>
+                canGoBack ? null : (
+                  <HeaderIconButton
+                    icon="house.fill"
+                    label={t("digest.backHome")}
+                    onPress={() => router.replace("/")}
+                  />
+                ),
+            }}
+          >
+            <Stack.Title asChild>
+              <Text testID="map-screen-title" style={toolStyles.title}>
+                {t("navigation.mapHeader")}
+              </Text>
+            </Stack.Title>
+          </Stack.Screen>
           <Stack.Screen name="share" options={{ headerShown: false }} />
           <Stack.Screen
             name="item/[id]"

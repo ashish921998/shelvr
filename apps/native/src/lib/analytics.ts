@@ -83,6 +83,8 @@ type SaveKind = "link" | "note" | "image";
 type NextUpKind = "read" | "cook" | "watch" | "open";
 
 type AnalyticsEventProperties = {
+  tidy_opened: { source: "profile" };
+  map_opened: { source: "profile" };
   onboarding_step_viewed: {
     step_id: string;
     step_index: number;

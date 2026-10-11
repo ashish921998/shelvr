@@ -1,13 +1,12 @@
 import { OnboardingProvider } from "@/lib/onboarding";
 import { useEntitlementSync } from "@/lib/entitlement";
-import { analytics } from "@/lib/analytics";
+import { PostHogScreenTracking } from "@/lib/posthog-screen-tracking";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { authStorage } from "@/lib/auth-storage";
 import { convex, persister, queryClient } from "@/lib/query-client";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { Slot, useRouter, useSegments, type Href } from "expo-router";
+import { Slot, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
 import { useUnistyles } from "react-native-unistyles";
@@ -25,16 +24,6 @@ import { posthog } from "@/lib/posthog";
 
 // Expo Router reads the root boundary from this module's exports.
 export { RootErrorBoundary as ErrorBoundary } from "@/components/root-error-boundary";
-
-function PostHogScreenTracking() {
-  // Route segments retain placeholders such as [id], excluding saved item IDs,
-  // URLs and OAuth query parameters from the analytics screen name.
-  const route = useSegments().join("/");
-  useEffect(() => {
-    analytics.screen(route || "index");
-  }, [route]);
-  return null;
-}
 
 function NotificationSetup() {
   useNotificationObserver();

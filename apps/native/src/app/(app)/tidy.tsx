@@ -172,17 +172,15 @@ const TidyDeckView: FC<DeckViewProps> = ({
           title: currentSource.title,
           ...(Platform.OS === "android"
             ? {
-                headerLeft: canUndo
-                  ? () => (
+                headerRight: () => (
+                  <View style={styles.headerActions}>
+                    {canUndo ? (
                       <HeaderIconButton
                         icon="arrow.uturn.backward"
                         label={t("common.undo")}
                         onPress={handleUndo}
                       />
-                    )
-                  : undefined,
-                headerRight: () => (
-                  <View style={styles.headerActions}>
+                    ) : null}
                     {pendingDeleteCount > 0 ? (
                       <HeaderIconButton
                         icon="trash"
@@ -226,10 +224,9 @@ const TidyDeckView: FC<DeckViewProps> = ({
         }}
       />
 
-      {/* Native header controls: undo on the left, delete on the
-          right with a live count badge. */}
+      {/* Back owns the left; undo and delete sit on the right. */}
       {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="left">
+        <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
             icon="arrow.uturn.backward"
             hidden={!canUndo}
@@ -237,10 +234,6 @@ const TidyDeckView: FC<DeckViewProps> = ({
           >
             {t("common.undo")}
           </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      ) : null}
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
             icon="trash"
             hidden={pendingDeleteCount === 0}
@@ -365,8 +358,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   deckArea: {
     flex: 1,
     marginHorizontal: theme.gap(2),
-    // Clear the floating native tab bar with a comfortable gap.
-    marginBottom: rt.insets.bottom + theme.gap(11),
+    // This stack screen has no tab bar; clear only the home indicator.
+    marginBottom: rt.insets.bottom + theme.gap(2),
   },
   gate: {
     flex: 1,
