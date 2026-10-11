@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { env, internalAction, type ActionCtx } from "./_generated/server";
-import { clientSecret, revokeRefreshToken } from "./model/appleClient";
+import { revokeRefreshToken } from "./model/appleClient";
 import { errorName, logEvent } from "./model/log";
 
 const MAX_ATTEMPTS = 3;
@@ -42,9 +42,16 @@ export const revoke = internalAction({
       await forget(ctx, args.tokenId);
       return null;
     }
-    let secret: string;
+    const attempt = args.attempt ?? 1;
+    let status: number | undefined;
     try {
-      secret = await clientSecret({ clientId, privateKey, keyId, teamId });
+      status = await revokeRefreshToken({
+        refreshToken,
+        clientId,
+        privateKey,
+        keyId,
+        teamId,
+      });
     } catch (error) {
       logEvent("error", "apple_revoke_failed", {
         code: "bad_signing_key",
@@ -53,8 +60,6 @@ export const revoke = internalAction({
       await forget(ctx, args.tokenId);
       return null;
     }
-    const attempt = args.attempt ?? 1;
-    const status = await revokeRefreshToken({ clientId, secret, refreshToken });
     // 429 is Apple asking us to slow down, not a refusal: keep the token and
     // take the bounded retry path.
     if (status !== undefined && status < 500 && status !== 429) {

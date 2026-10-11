@@ -1,31 +1,6 @@
 const TOKEN_URL = "https://appleid.apple.com/auth/token";
 const REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 
-/** Runtime-neutral, bounded best-effort request. Undefined means unreachable;
- * callers decide whether a retained row permits a scheduled retry. */
-export async function revokeRefreshToken(config: {
-  clientId: string;
-  secret: string;
-  refreshToken: string;
-}): Promise<number | undefined> {
-  try {
-    const response = await fetch(REVOKE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.secret,
-        token: config.refreshToken,
-        token_type_hint: "refresh_token",
-      }).toString(),
-      signal: AbortSignal.timeout(15_000),
-    });
-    return response.status;
-  } catch {
-    return undefined;
-  }
-}
-
 function base64Url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, "-")
@@ -122,4 +97,38 @@ export async function exchangeAuthorizationCode(config: {
     identityToken: typeof body.id_token === "string" ? body.id_token : null,
     status: response.status,
   };
+}
+
+/**
+ * Asks Apple to revoke a refresh token, signing the client secret with the
+ * team key itself, like `exchangeAuthorizationCode`. A thrown error is a
+ * signing failure (a malformed key); undefined means Apple could not be
+ * reached. Runtime-neutral and bounded; callers decide whether a retained
+ * row permits a scheduled retry.
+ */
+export async function revokeRefreshToken(config: {
+  refreshToken: string;
+  clientId: string;
+  privateKey: string;
+  keyId: string;
+  teamId: string;
+}): Promise<number | undefined> {
+  const { refreshToken, ...signing } = config;
+  const secret = await clientSecret(signing);
+  try {
+    const response = await fetch(REVOKE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: secret,
+        token: refreshToken,
+        token_type_hint: "refresh_token",
+      }).toString(),
+      signal: AbortSignal.timeout(15_000),
+    });
+    return response.status;
+  } catch {
+    return undefined;
+  }
 }
