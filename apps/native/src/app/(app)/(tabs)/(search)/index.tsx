@@ -74,11 +74,13 @@ export default function SearchScreen() {
       )}
       {query.length === 0 ? (
         <EmptyState
+          animateEntrance={false}
           title={t("search.emptyTitle")}
           message={t("search.emptyBody")}
         />
       ) : results && results.length === 0 ? (
         <EmptyState
+          animateEntrance={false}
           title={t("search.noResultsTitle")}
           message={t("search.noResults", { query })}
         />
