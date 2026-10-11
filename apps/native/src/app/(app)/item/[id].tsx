@@ -40,7 +40,11 @@ import {
 } from "react-native";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ProgressiveBlurHeader } from "progressive-blur";
-import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
+import Animated, {
+  FadeOutDown,
+  SlideInDown,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
@@ -329,6 +333,7 @@ function usePagerPages({
 }
 
 function ItemScreenContent() {
+  const reducedMotion = useReducedMotion();
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
     from?: string;
@@ -575,7 +580,7 @@ function ItemScreenContent() {
     if (neighbor) {
       listRef.current?.scrollToIndex({
         index: items.indexOf(neighbor),
-        animated: true,
+        animated: !reducedMotion,
       });
       goTo(neighbor._id);
       writeParams(neighbor._id);
@@ -596,6 +601,7 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    reducedMotion,
   ]);
 
   const onDelete = useCallback(async () => {
@@ -612,7 +618,7 @@ function ItemScreenContent() {
         writeParams(neighbor._id);
         listRef.current?.scrollToIndex({
           index: Math.min(idx, items.length - 2),
-          animated: true,
+          animated: !reducedMotion,
         });
       } else if (router.canGoBack()) router.back();
       else router.replace("/");
@@ -627,6 +633,7 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    reducedMotion,
   ]);
 
   if (items === undefined) {
