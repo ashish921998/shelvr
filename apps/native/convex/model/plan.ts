@@ -119,18 +119,30 @@ const GENERIC_WORDS = new Set([
   "spot",
 ]);
 
+function rawSourceText(source: PlanSource): string {
+  return [
+    source.title,
+    source.description,
+    source.content?.slice(0, PLAN_CONTENT_CHARS),
+    source.author,
+    ...source.places,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** The save's own text, squashed, that a pick must be found in. */
 function sourceText(source: PlanSource): string {
-  return squash(
-    [
-      source.title,
-      source.description,
-      source.content?.slice(0, PLAN_CONTENT_CHARS),
-      source.author,
-      ...source.places,
-    ]
-      .filter(Boolean)
-      .join(" "),
+  return squash(rawSourceText(source));
+}
+
+/** The save's whole words, squashed, for parts too short to substring-match. */
+function sourceWords(source: PlanSource): Set<string> {
+  return new Set(
+    rawSourceText(source)
+      .split(/[^\p{L}\p{N}\p{M}]+/u)
+      .map(squash)
+      .filter(Boolean),
   );
 }
 
@@ -163,16 +175,22 @@ export function isGrounded(name: string, source: PlanSource): boolean {
  * Keep only the parts of an area the save names: it goes to Maps and shares.
  * Each comma-separated part must have every distinctive word in the save, so
  * "SoHo, London" on a save about SoHo in New York keeps "SoHo" and never
- * sends anyone to the wrong city.
+ * sends anyone to the wrong city. A part too short to be distinctive, such as
+ * a state code ("IL"), must appear in the save as a whole word.
  */
 function groundedArea(area: string, source: PlanSource): string {
   const haystack = sourceText(source);
+  const wholeWords = sourceWords(source);
   return area
     .split(",")
     .map((part) => part.trim())
     .filter((part) => {
       const words = distinctiveWords(part);
-      return words.length > 0 && words.every((word) => haystack.includes(word));
+      if (words.length === 0) {
+        const whole = squash(part);
+        return whole !== "" && wholeWords.has(whole);
+      }
+      return words.every((word) => haystack.includes(word));
     })
     .join(", ");
 }

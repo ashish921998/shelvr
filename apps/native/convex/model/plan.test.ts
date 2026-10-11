@@ -109,6 +109,34 @@ describe("sanitizePlan", () => {
     expect(whole.area).toBe("SoHo, New York");
   });
 
+  it("keeps a short state code only when the save names it", () => {
+    const sources = [source({ title: "Balthazar in Springfield, IL" })];
+    const [kept] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Balthazar",
+          area: "Springfield, IL",
+          why: "Go",
+        },
+      ],
+      sources,
+    );
+    expect(kept.area).toBe("Springfield, IL");
+    const [dropped] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Balthazar",
+          area: "Springfield, MO",
+          why: "Go",
+        },
+      ],
+      sources,
+    );
+    expect(dropped.area).toBe("Springfield");
+  });
+
   it("drops picks with an empty reason and trims long fields", () => {
     const sources = [source({ title: "Balthazar" })];
     expect(
