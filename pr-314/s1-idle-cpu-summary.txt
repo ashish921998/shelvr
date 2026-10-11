@@ -1,0 +1,6 @@
+profile wall: 15854 ms, samples: 1171, sampled total: 15854 ms, idle: 15824 ms, non-idle JS: 30 ms
+top self-time:
+   15823.5 ms  [root] [[root]:0]
+      13.6 ms  (anonymous) [app&unstable_transformProfile=hermes-sta:48097]
+       9.7 ms  (anonymous) [:10]
+       6.9 ms  toggleProfilingStatus [app&unstable_transformProfile=hermes-sta:43812]

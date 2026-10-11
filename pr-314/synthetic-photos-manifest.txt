@@ -1,0 +1,57 @@
+Synthetic photos added to QA iPhone 17 Pro Max (C1B2695A-F68D-4FE5-B8A6-B20DCF8819FB) for the #314 exploratory run
+
+Generator: python3 (stdlib zlib + struct), 24 solid-colour 1170x2532 RGB PNGs, hue = i/24 at saturation 0.75 and value 0.9, written to /tmp/tidy-synth/tidy-synth-NN.png
+Added with: xcrun simctl addmedia C1B2695A-F68D-4FE5-B8A6-B20DCF8819FB /tmp/tidy-synth/*.png
+Library before: 6 stock simulator photos (IMG_0001.JPG .. IMG_0005.JPG, IMG_0006.HEIC), untouched. Library after: 30 assets.
+
+file                    bytes dims
+tidy-synth-01.png       12229 1170x2532
+tidy-synth-02.png       12230 1170x2532
+tidy-synth-03.png       12230 1170x2532
+tidy-synth-04.png       12230 1170x2532
+tidy-synth-05.png       12229 1170x2532
+tidy-synth-06.png       12230 1170x2532
+tidy-synth-07.png       12230 1170x2532
+tidy-synth-08.png       12230 1170x2532
+tidy-synth-09.png       12229 1170x2532
+tidy-synth-10.png       12230 1170x2532
+tidy-synth-11.png       12230 1170x2532
+tidy-synth-12.png       12230 1170x2532
+tidy-synth-13.png       12229 1170x2532
+tidy-synth-14.png       12230 1170x2532
+tidy-synth-15.png       12230 1170x2532
+tidy-synth-16.png       12230 1170x2532
+tidy-synth-17.png       12229 1170x2532
+tidy-synth-18.png       12230 1170x2532
+tidy-synth-19.png       12230 1170x2532
+tidy-synth-20.png       12230 1170x2532
+tidy-synth-21.png       12229 1170x2532
+tidy-synth-22.png       12230 1170x2532
+tidy-synth-23.png       12230 1170x2532
+tidy-synth-24.png       12230 1170x2532
+
+sha256:
+9dccb5c2bab83913880acee81e99b79625447a596ccbb29e251cae5c736cd0ec  tidy-synth-01.png
+05240dc3b4aba9f76a08fcbc21c18ab09015592a0e700715ea0ee63ec91b633c  tidy-synth-02.png
+a682498ba27819a7459deb68c3f2757bd36ace8d71f10b1f2a60dfc424db2495  tidy-synth-03.png
+d88aafccd2b9ddaecb894d6f136410a8dc2e61484f4c3a40c12b997670aeb96a  tidy-synth-04.png
+48ae17c87eb7669e2ff847fd8369022f1d0127322359918a0682b2928788f0d2  tidy-synth-05.png
+86d3aa8ceb552facfa176d2b7b2a3e6ce07339347a6156b3bfb8a79d9102b2e3  tidy-synth-06.png
+8215f61a3bdac5ace48d6b132d80f7df7f005a43736c6397aeb2ffcf072e0335  tidy-synth-07.png
+b36d1cfc6ae78913da0bcd5690ee19e7acd6224bf8ead5af83804f1f65079678  tidy-synth-08.png
+4ebd801405620ff32873b03ba66715018f9965ba14528fb02520de56361c3b64  tidy-synth-09.png
+8c9508c088a73faf6f8f087c4dc9f4d9514948732bab923dcb354dc829a1aa75  tidy-synth-10.png
+168007479ca235af8b7a0b7dc418969cafd189005b2220bee60d5e675c798a4e  tidy-synth-11.png
+0b77887087d4c38274fd4a9caad9ffdb45b55adf98be60ce426b88ba9fd451ec  tidy-synth-12.png
+c40eb1d78d4dc0b751a9bc15ef8ccdfdb492c23b5725e2b79e7404c5dd0102f3  tidy-synth-13.png
+f01d95f7d90402fa71d594ec7a2ec5b06635aa0a090055bed11365b5adb68df7  tidy-synth-14.png
+3664a133b29dff435d725fe946b52b608a5649529bf14c17ec3fbe6686322c68  tidy-synth-15.png
+ba060c4caa4dc475abbbb953838a2247524a25793d555235f1ac9264ecd9fcf0  tidy-synth-16.png
+6a8ef3cbb0da107f21a527088cea587cb6057656e7c20fe7dea99932db13c403  tidy-synth-17.png
+dae18a735b41f9108c3a9992c9c2998918d9bad5323022c303137486429020f0  tidy-synth-18.png
+c8bf0f694bbeca6064f753d8e6d260a3f136bacc9c96daeae1e1a96bfb270228  tidy-synth-19.png
+976c0820df0599c7cdfbb0ef8db07cca66c545e3c57b0b315b1e5009259c5ccf  tidy-synth-20.png
+78332dba039d5d14bd5bfcee376760fd1152b6d9fd2716a6c2a8e07ab27f0ce4  tidy-synth-21.png
+09be5325dcc84b72c5927e5bf887882e0be19bc445e3af72d102d09ae151172c  tidy-synth-22.png
+b28bdef1a3b226758f2f1a126702bb39e19f94b57be635397d6c252bb52ebc21  tidy-synth-23.png
+f113dd228bac69daf3006453cce182edd659aa5815af9f47bd4476eb5dbb21f3  tidy-synth-24.png

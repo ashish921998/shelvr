@@ -1,0 +1,17 @@
+profile wall: 47266 ms, samples: 3462, sampled total: 47264 ms, idle: 45797 ms, non-idle JS: 1467 ms
+top self-time:
+   45796.9 ms  [root] [[root]:0]
+     249.5 ms  [Host Function] completeRoot [[host]:0]
+     196.5 ms  [Host Function] link [[host]:0]
+      88.9 ms  [Host Function] createTask [[host]:0]
+      88.9 ms  [GC Young Gen] [[suspended]:0]
+      72.0 ms  propagateParentContextChanges [app&unstable_transformProfile=hermes-sta:21599]
+      41.5 ms  fire [app&unstable_transformProfile=hermes-sta:369746]
+      39.1 ms  [Host Function] createSerializableArray [[host]:0]
+      37.3 ms  [Host Function] unstable_now [[host]:0]
+      30.8 ms  [Host Function] unlink [[host]:0]
+      30.2 ms  addObjectDiffToProperties [app&unstable_transformProfile=hermes-sta:21076]
+      29.4 ms  TidyHints [app&unstable_transformProfile=hermes-sta:370342]
+      25.0 ms  structuredCloneInternal [app&unstable_transformProfile=hermes-sta:30563]
+      25.0 ms  [Native] arrayPrototypeMap [[native]:0]
+      24.7 ms  [Host Function] run [[host]:0]

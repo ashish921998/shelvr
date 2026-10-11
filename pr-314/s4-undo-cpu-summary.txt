@@ -1,0 +1,12 @@
+profile wall: 13620 ms, samples: 976, sampled total: 13620 ms, idle: 13368 ms, non-idle JS: 252 ms
+top self-time:
+   13368.4 ms  [root] [[root]:0]
+      35.2 ms  [Host Function] completeRoot [[host]:0]
+      31.0 ms  [Host Function] createTask [[host]:0]
+      27.5 ms  [Native] weakMapPrototypeGet [[native]:0]
+      21.6 ms  [Native] mapPrototypeSet [[native]:0]
+      20.4 ms  commitMutationEffectsOnFiber [app&unstable_transformProfile=hermes-sta:25494]
+      16.7 ms  [Host Function] scheduleOnUI [[host]:0]
+      16.2 ms  propagateParentContextChanges [app&unstable_transformProfile=hermes-sta:21599]
+      14.0 ms  pushComponentEffectStart [app&unstable_transformProfile=hermes-sta:21715]
+      13.7 ms  addObjectDiffToProperties [app&unstable_transformProfile=hermes-sta:21076]

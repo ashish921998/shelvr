@@ -1,0 +1,12 @@
+profile wall: 15643 ms, samples: 1178, sampled total: 15643 ms, idle: 15388 ms, non-idle JS: 254 ms
+top self-time:
+   15388.5 ms  [root] [[root]:0]
+      49.2 ms  updateTrackedPathStateBeforeMount [app&unstable_transformProfile=hermes-sta:48285]
+      41.8 ms  [Host Function] completeRoot [[host]:0]
+      27.0 ms  [GC Young Gen] [[suspended]:0]
+      25.5 ms  [Native] setPrototypeAdd [[native]:0]
+      25.0 ms  [Host Function] cloneNodeWithNewProps [[host]:0]
+      18.6 ms  [Host Function] link [[host]:0]
+      16.7 ms  commitBeforeMutationEffects [app&unstable_transformProfile=hermes-sta:25237]
+      14.3 ms  __argent_fiberRootTracker [:14]
+       9.5 ms  PerformanceMeasure [app&unstable_transformProfile=hermes-sta:31186]

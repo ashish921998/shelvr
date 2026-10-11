@@ -1,0 +1,17 @@
+{
+  "source": "React DevTools backend getProfilingData() read over the Argent debugger (same session as s2-cancelled-swipe-report.md). Root: main(RootComponent).",
+  "note": "fibersRendered counts entries in fiberActualDurations (inclusive actualDuration per fiber, so they double count children). commit duration is the authoritative per-commit figure.",
+  "scenario": "slow 1.5 s drag right by 14% of screen width, released below the quarter-width threshold; card springs home (cancelled swipe)",
+  "commits": [
+    { "i": 0, "durationMs": 0.77, "fibersRendered": 72, "updaters": { "Memo(TidyCardComponent) > View > AnimatedComponent(View)": 24 } },
+    { "i": 1, "durationMs": 0.64, "fibersRendered": 72, "updaters": { "Memo(TidyCardComponent) > View > AnimatedComponent(View)": 24 } },
+    { "i": 2, "durationMs": 1.83, "fibersRendered": 168, "updaters": { "Memo(TidyCardComponent) > View > AnimatedComponent(View)": 24, "Memo(TidyCardContainerComponent) > View > AnimatedComponent(View)": 24, "TidyHints > Tint > View > AnimatedComponent(View)": 2, "TidyHints > Badge > View > AnimatedComponent(View)": 6 } },
+    { "i": 3, "durationMs": 2.60, "fibersRendered": 96, "updaters": { "Memo(TidyCardContainerComponent) > View > AnimatedComponent(View)": 24, "TidyHints > Tint > View > AnimatedComponent(View)": 2, "TidyHints > Badge > View > AnimatedComponent(View)": 6 } }
+  ],
+  "totalCommitMs": 5.84,
+  "maxCommitMs": 2.60,
+  "topComponentsByInclusiveActualDuration": [
+    { "name": "View", "renders": 272, "inclusiveMs": 61.1 },
+    { "name": "AnimatedComponent(View)", "renders": 136, "inclusiveMs": 51.04 }
+  ]
+}
