@@ -4,6 +4,11 @@
 
 The app records behavior; this dashboard is for the product team. It does not add a countdown, reminder, or analytics screen to Shelvr.
 
+## Related reports
+
+- [Trial baselines](trial-baselines.md): onboarding and sample progression before the paywall, attempt-based paywall outcomes with webhook trial confirmation, trial-anchored first save and own-item reopen, and trial conversion versus expiry and cancellation. The queries live in `trial-baselines.sql`; `validate-trial-baselines.sql` runs synthetic rows through the same transforms without inserting events.
+- [Growth funnel](growth-funnel.md) and [payment funnel](payment-funnel.md) cover acquisition and the payment event contract.
+
 ## Metric contract
 
 - A save is an item successfully created in Convex, timed by `_creationTime`, not a photo's original `capturedAt`. Link, note, share-sheet, onboarding, camera, and Tidy imports all converge on the instrumented creation paths.
