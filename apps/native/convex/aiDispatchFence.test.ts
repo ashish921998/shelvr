@@ -98,20 +98,35 @@ function handler<Args extends DefaultFunctionArgs, Result>(
   )._handler;
 }
 
+type PausedQuery = { name: string; args: unknown; result: unknown };
+
 /** Pause after a real DB query completes, never replace its authorization. */
 function queryBarrier(ctx: ActionCtx, name: string, occurrence = 1) {
   const reached = deferred();
   const resume = deferred();
+  let pausedQuery: PausedQuery | undefined;
   let calls = 0;
   const runQuery: ActionCtx["runQuery"] = async (ref, ...args) => {
     const value = await ctx.runQuery(ref, ...args);
     if (getFunctionName(ref) === name && ++calls === occurrence) {
+      pausedQuery = {
+        name: getFunctionName(ref),
+        args: args[0],
+        result: value,
+      };
       reached.resolve();
       await resume.promise;
     }
     return value;
   };
-  return { ctx: { ...ctx, runQuery }, reached, resume };
+  return {
+    ctx: { ...ctx, runQuery },
+    reached,
+    resume,
+    get pausedQuery() {
+      return pausedQuery;
+    },
+  };
 }
 
 async function fixture(type: "note" | "link" | "image" = "note") {
@@ -175,20 +190,71 @@ async function paused(
   f: Fixture,
   name: string,
   run: (ctx: ActionCtx) => Promise<unknown>,
-  change: () => Promise<void>,
+  change: (query: PausedQuery | undefined) => Promise<void>,
   occurrence = 1,
 ) {
   await f.t.action(async (ctx) => {
     const barrier = queryBarrier(ctx, name, occurrence);
     const running = run(barrier.ctx);
     await barrier.reached.promise;
-    await change();
+    await change(barrier.pausedQuery);
     barrier.resume.resolve();
     await running;
   });
 }
 
 describe("AI dispatch uses fresh live ownership", () => {
+  it("excludes declined sweep text after consent removal following fresh denial", async () => {
+    const f = await fixture();
+    const consentId = await f.t.run((ctx) =>
+      ctx.db.insert("aiConsents", {
+        userId: f.userId,
+        status: "declined",
+        version: 1,
+        updatedAt: 0,
+      }),
+    );
+    await f.t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: f.foreignId,
+        type: "note",
+        status: "ready",
+        title: "Allowed synthetic save",
+        note: "Allowed synthetic note",
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await paused(
+      f,
+      "aiConsent:isAllowed",
+      (ctx) => handler(sweepItemEmbeddings)(ctx, {}),
+      async (query) => {
+        expect(query).toEqual({
+          name: "aiConsent:isAllowed",
+          args: { userId: f.userId, itemId: f.itemId },
+          result: false,
+        });
+        expect(
+          await f.t.query(internal.aiConsent.isAllowed, {
+            userId: f.userId,
+            itemId: f.itemId,
+          }),
+        ).toBe(false);
+        await f.t.run((ctx) => ctx.db.delete(consentId));
+        expect(
+          await f.t.query(internal.users.isLiveOwner, { userId: f.userId }),
+        ).toBe(true);
+      },
+    );
+    expect(embedMany).toHaveBeenCalledOnce();
+    expect(embedMany.mock.calls[0][0].values).toEqual([
+      expect.stringContaining("Allowed synthetic note"),
+    ]);
+    expect(embedMany.mock.calls[0][0].values).not.toEqual(
+      expect.arrayContaining([expect.stringContaining("Synthetic note")]),
+    );
+  });
   it.each(["removed owner", "deleting owner", "declined"] as const)(
     "rejects %s even without an item identity",
     async (kind) => {
