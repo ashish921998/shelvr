@@ -125,7 +125,7 @@ describe("makePlan", () => {
       places: [
         {
           name: "Balthazar",
-          area: "SoHo, NYC",
+          area: "SoHo",
           why: "The vodka pasta",
           itemId: itemIds[0],
         },

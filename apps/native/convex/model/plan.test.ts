@@ -84,15 +84,29 @@ describe("sanitizePlan", () => {
   it("keeps an area only when the save mentions it", () => {
     const sources = [source({ title: "Balthazar in SoHo" })];
     const [kept] = sanitizePlan(
-      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, NYC", why: "Go" }],
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo", why: "Go" }],
       sources,
     );
-    expect(kept.area).toBe("SoHo, NYC");
+    expect(kept.area).toBe("SoHo");
     const [dropped] = sanitizePlan(
       [{ saveNumber: 1, name: "Balthazar", area: "Brooklyn", why: "Go" }],
       sources,
     );
     expect(dropped.area).toBeUndefined();
+  });
+
+  it("drops a city the save does not name", () => {
+    const sources = [source({ title: "Balthazar, SoHo, New York" })];
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, London", why: "Go" }],
+      sources,
+    );
+    expect(pick.area).toBe("SoHo");
+    const [whole] = sanitizePlan(
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, New York", why: "Go" }],
+      sources,
+    );
+    expect(whole.area).toBe("SoHo, New York");
   });
 
   it("drops picks with an empty reason and trims long fields", () => {

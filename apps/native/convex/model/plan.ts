@@ -159,13 +159,22 @@ export function isGrounded(name: string, source: PlanSource): boolean {
   return words.every((word) => haystack.includes(word));
 }
 
-/** Keep an area only when the save mentions it: it goes to Maps and shares. */
+/**
+ * Keep only the parts of an area the save names: it goes to Maps and shares.
+ * Each comma-separated part must have every distinctive word in the save, so
+ * "SoHo, London" on a save about SoHo in New York keeps "SoHo" and never
+ * sends anyone to the wrong city.
+ */
 function groundedArea(area: string, source: PlanSource): string {
   const haystack = sourceText(source);
-  const words = distinctiveWords(area);
-  return words.length > 0 && words.some((word) => haystack.includes(word))
-    ? area
-    : "";
+  return area
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => {
+      const words = distinctiveWords(part);
+      return words.length > 0 && words.every((word) => haystack.includes(word));
+    })
+    .join(", ");
 }
 
 /**
