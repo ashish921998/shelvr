@@ -85,12 +85,13 @@ export function NotificationSessionProvider({
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
-        saveToken: (token, locale) =>
+        getTimezone: getNotificationTimezone,
+        saveToken: (token, locale, timezone) =>
           registerDevice({
             token,
             locale,
             platform: Platform.OS === "ios" ? "ios" : "android",
-            timezone: getNotificationTimezone(),
+            timezone,
           }),
         revokeToken: (token) => unregisterDevice({ token }),
         setWeeklyShelf: (enabled) =>

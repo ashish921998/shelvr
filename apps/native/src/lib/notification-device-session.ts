@@ -19,8 +19,13 @@ type TokenStore = {
 
 type SessionDependencies = {
   getToken: (requestPermission: boolean) => Promise<string | null>;
-  saveToken: (token: string, locale?: string) => Promise<unknown>;
+  saveToken: (
+    token: string,
+    locale?: string,
+    timezone?: string,
+  ) => Promise<unknown>;
   getLocale?: () => string;
+  getTimezone?: () => string | undefined;
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   setSaveReminders: (enabled: boolean) => Promise<unknown>;
@@ -37,13 +42,19 @@ type NotificationOperation =
   | "sign_out"
   | "delete_account";
 
+type RegistrationSnapshot = {
+  token: string;
+  locale: string | undefined;
+  timezone: string | undefined;
+};
+
 export class NotificationDeviceSession {
   private generation = 0;
   private paused = true;
   private operation: NotificationOperation = "idle";
   private listeners = new Set<() => void>();
   private queue: Promise<void> = Promise.resolve();
-  private registeredKey: string | null = null;
+  private registeredSnapshot: RegistrationSnapshot | null = null;
   private registrationBlocked = false;
 
   constructor(
@@ -80,22 +91,23 @@ export class NotificationDeviceSession {
   start() {
     this.generation++;
     this.paused = false;
-    this.registeredKey = null;
+    this.registeredSnapshot = null;
     this.registrationBlocked = false;
   }
 
   stop() {
     this.generation++;
     this.paused = true;
-    this.registeredKey = null;
+    this.registeredSnapshot = null;
     this.registrationBlocked = false;
   }
 
   isRegistered() {
     return (
       !this.paused &&
-      this.registeredKey !== null &&
-      this.registeredKey.endsWith(`\0${this.deps.getLocale?.() ?? ""}`)
+      this.registeredSnapshot !== null &&
+      this.registeredSnapshot.locale === this.deps.getLocale?.() &&
+      this.registeredSnapshot.timezone === this.deps.getTimezone?.()
     );
   }
 
@@ -119,31 +131,39 @@ export class NotificationDeviceSession {
         const token = await getToken();
         if (!current()) return false;
         if (!token) {
-          this.registeredKey = null;
+          this.registeredSnapshot = null;
           this.registrationBlocked = false;
           return false;
         }
         const locale = this.deps.getLocale?.();
-        const key = `${token}\0${locale ?? ""}`;
-        if (key === this.registeredKey) return true;
+        const timezone = this.deps.getTimezone?.();
+        const snapshot = { token, locale, timezone };
+        if (
+          token === this.registeredSnapshot?.token &&
+          locale === this.registeredSnapshot.locale &&
+          timezone === this.registeredSnapshot.timezone
+        )
+          return true;
         // Persist before the server write so a restart can still revoke an accepted token.
         const tokens = await this.store.read();
         if (!tokens.includes(token)) await this.store.write([...tokens, token]);
         if (!current()) return false;
         try {
-          if (locale === undefined) await this.deps.saveToken(token);
+          if (this.deps.getTimezone)
+            await this.deps.saveToken(token, locale, timezone);
+          else if (locale === undefined) await this.deps.saveToken(token);
           else await this.deps.saveToken(token, locale);
         } catch (error) {
           if (current()) this.registrationBlocked = isOwnershipConflict(error);
           throw error;
         }
         if (!current()) return false;
-        this.registeredKey = key;
+        this.registeredSnapshot = snapshot;
         this.registrationBlocked = false;
         return true;
       })
       .catch((error: unknown) => {
-        if (current()) this.registeredKey = null;
+        if (current()) this.registeredSnapshot = null;
         throw error;
       });
     this.queue = operation.then(

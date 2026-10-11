@@ -11,6 +11,7 @@ import {
 const mock = vi.hoisted(() => ({
   authenticated: true,
   locale: "en",
+  timezone: "Europe/Berlin",
   token: vi.fn(),
   register: vi.fn(),
   otherMutation: vi.fn(),
@@ -30,6 +31,9 @@ const mock = vi.hoisted(() => ({
 vi.mock("@/lib/i18n", () => ({
   currentLocale: () => mock.locale,
   useAppLocale: () => mock.locale,
+}));
+vi.mock("expo-localization", () => ({
+  getCalendars: () => [{ timeZone: mock.timezone }],
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
@@ -111,6 +115,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.authenticated = true;
   mock.locale = "en";
+  mock.timezone = "Europe/Berlin";
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
@@ -123,6 +128,90 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
+  it("updates timezone once on foreground without recreating the session or asking permission", async () => {
+    const { result } = renderSession();
+    const session = result.current.session;
+    await waitFor(() => expect(session.isRegistered()).toBe(true));
+    mock.timezone = "Asia/Tokyo";
+    await act(async () => mock.appState?.("active"));
+    expect(mock.register).toHaveBeenCalledTimes(2);
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Asia/Tokyo" }),
+    );
+    await act(async () => {
+      mock.appState?.("active");
+      mock.appState?.("active");
+    });
+    expect(mock.token.mock.calls).toEqual([[false], [false]]);
+    expect(mock.register).toHaveBeenCalledTimes(2);
+    expect(result.current.session).toBe(session);
+  });
+
+  it("resyncs a timezone changed during persistence on the later foreground", async () => {
+    let finish!: () => void;
+    const writing = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    mock.register.mockReturnValueOnce(writing);
+    const { result } = renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ timezone: "Europe/Berlin" }),
+    );
+    mock.timezone = "Asia/Tokyo";
+    await act(async () => {
+      finish();
+      await writing;
+    });
+    expect(result.current.session.shouldRetryRegistration()).toBe(true);
+    await act(async () => mock.appState?.("active"));
+    expect(mock.register).toHaveBeenCalledTimes(2);
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ timezone: "Asia/Tokyo" }),
+    );
+  });
+
+  it("retries a failed timezone update then deduplicates successful foregrounds", async () => {
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    mock.timezone = "Asia/Tokyo";
+    mock.register.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => mock.appState?.("active"));
+    expect(result.current.session.shouldRetryRegistration()).toBe(true);
+    await act(async () => mock.appState?.("active"));
+    expect(mock.register).toHaveBeenCalledTimes(3);
+    await act(async () => mock.appState?.("active"));
+    expect(mock.register).toHaveBeenCalledTimes(3);
+  });
+  it("does not acknowledge a pending timezone write after sign-out", async () => {
+    let finish!: () => void;
+    const writing = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    mock.register.mockReturnValueOnce(writing);
+    const { result, rerender } = renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    mock.authenticated = false;
+    rerender();
+    await act(async () => {
+      finish();
+      await writing;
+    });
+    expect(result.current.session.isRegistered()).toBe(false);
+    mock.authenticated = true;
+    mock.timezone = "Asia/Tokyo";
+    rerender();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    expect(mock.register).toHaveBeenCalledTimes(2);
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ timezone: "Asia/Tokyo" }),
+    );
+  });
+
   it("reports the safe file-cleanup category from account deletion", async () => {
     mock.clearWidget.mockRejectedValueOnce(
       new Error("widget_thumbnail_cleanup_failed"),
@@ -215,6 +304,7 @@ describe("notification session lifecycle", () => {
     );
     renderSession();
     await waitFor(() => expect(mock.captureError).toHaveBeenCalledTimes(1));
+    mock.timezone = "Asia/Tokyo";
     await act(async () => {
       mock.appState?.("active");
       mock.appState?.("active");

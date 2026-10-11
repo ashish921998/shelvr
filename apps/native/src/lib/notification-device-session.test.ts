@@ -10,14 +10,21 @@ function deferred() {
   return { promise, resolve };
 }
 
-function setup(initial: string[] = [], getLocale?: () => string) {
+function setup(
+  initial: string[] = [],
+  getLocale?: () => string,
+  getTimezone?: () => string | undefined,
+) {
   let tokens = initial;
   const deps = {
     getLocale,
+    getTimezone,
     getToken: vi.fn(
       async (_requestPermission: boolean): Promise<string | null> => "token-a",
     ),
-    saveToken: vi.fn(async (_token: string, _locale?: string) => {}),
+    saveToken: vi.fn(
+      async (_token: string, _locale?: string, _timezone?: string) => {},
+    ),
     revokeToken: vi.fn(async (_token: string) => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
@@ -41,6 +48,73 @@ function setup(initial: string[] = [], getLocale?: () => string) {
 }
 
 describe("notification device session", () => {
+  it("syncs timezone-only changes and acknowledges only the snapshot sent", async () => {
+    let timezone = "Europe/Berlin";
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => timezone,
+    );
+    await session.register();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    timezone = "Asia/Tokyo";
+    expect(session.shouldRetryRegistration()).toBe(true);
+    const writing = deferred();
+    deps.saveToken.mockImplementationOnce(() => writing.promise);
+    const update = session.register();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(2));
+    timezone = "America/New_York";
+    writing.resolve();
+    await update;
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await Promise.all([session.register(), session.register()]);
+    expect(session.shouldRetryRegistration()).toBe(false);
+    expect(deps.saveToken.mock.calls).toEqual([
+      ["token-a", "en", "Europe/Berlin"],
+      ["token-a", "en", "Asia/Tokyo"],
+      ["token-a", "en", "America/New_York"],
+    ]);
+  });
+
+  it("keeps timezone failures retryable but ownership conflicts blocked", async () => {
+    let timezone = "Europe/Berlin";
+    const { session, deps } = setup([], undefined, () => timezone);
+    await session.register();
+    timezone = "Asia/Tokyo";
+    deps.saveToken.mockRejectedValueOnce(new Error("offline"));
+    await expect(session.register()).rejects.toThrow("offline");
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    timezone = "America/New_York";
+    deps.saveToken.mockRejectedValueOnce(
+      new ConvexError({ code: "notification_token_owned_by_another_account" }),
+    );
+    await expect(session.register()).rejects.toThrow();
+    timezone = "Europe/Berlin";
+    expect(session.shouldRetryRegistration()).toBe(false);
+    await session.register(async () => "token-b");
+    expect(session.isRegistered()).toBe(true);
+  });
+
+  it("ignores timezone snapshot success from a stopped generation", async () => {
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => "Asia/Tokyo",
+    );
+    const writing = deferred();
+    deps.saveToken.mockImplementationOnce(() => writing.promise);
+    const old = session.register();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(1));
+    session.stop();
+    session.start();
+    writing.resolve();
+    expect(await old).toBe(false);
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(deps.saveToken).toHaveBeenCalledTimes(2);
+  });
   it("blocks foreground retries for ownership rejection until a new session or token succeeds", async () => {
     const { session, deps } = setup();
     const conflict = new ConvexError({
