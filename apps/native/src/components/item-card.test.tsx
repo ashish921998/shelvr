@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { cloneElement, isValidElement, type ReactNode } from "react";
-import { View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemCard, type FeedItem } from "./item-card";
 
@@ -45,7 +45,7 @@ vi.mock("react-native", () => {
           ...props,
           children:
             typeof children === "function"
-              ? children({ pressed: false })
+              ? children({ pressed: motionPreference.pressed })
               : children,
         }),
     ),
@@ -64,12 +64,21 @@ vi.mock("react-native", () => {
 // has to win that merge to read as a button. Mirroring the spread here is what
 // makes the role assertions mean anything.
 const routerPush = vi.hoisted(() => vi.fn());
+const motionPreference = vi.hoisted(() => ({ reduced: true, pressed: false }));
+const linkProps = vi.hoisted(() => vi.fn());
+const triggerProps = vi.hoisted(() => vi.fn());
 vi.mock("expo-router", () => {
-  const Link = ({ children }: { children?: ReactNode }) => <>{children}</>;
-  Link.Trigger = ({ children }: { children?: ReactNode }) =>
-    isValidElement<A11yProps>(children)
+  const Link = (props: { children?: ReactNode }) => {
+    linkProps(props);
+    return <>{props.children}</>;
+  };
+  Link.Trigger = (props: { children?: ReactNode; withAppleZoom?: boolean }) => {
+    triggerProps(props);
+    const { children } = props;
+    return isValidElement<A11yProps>(children)
       ? cloneElement(children, { role: "link", ...children.props })
       : children;
+  };
   Link.Preview = function LinkPreview() {
     return null;
   };
@@ -91,7 +100,7 @@ vi.mock("react-native-reanimated", async () => {
     ZoomOut: {
       springify: () => ({ damping: () => ({ stiffness: () => ({}) }) }),
     },
-    useReducedMotion: () => true,
+    useReducedMotion: () => motionPreference.reduced,
   };
 });
 vi.mock("@/lib/motion", () => ({
@@ -104,7 +113,7 @@ vi.mock("@/lib/motion", () => ({
   REDUCED_FADE_OUT: {},
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
+  StyleSheet: { create: () => ({ cell: { padding: 4 } }) },
   useUnistyles: () => ({
     theme: {
       colors: {
@@ -152,6 +161,128 @@ const base: FeedItem = {
   status: "ready",
   tags: [],
 };
+describe.each([false, true])("with reduced motion %s", (reduced) => {
+  const os = process.env.EXPO_OS;
+  afterEach(() => {
+    process.env.EXPO_OS = os;
+    motionPreference.reduced = true;
+    motionPreference.pressed = false;
+  });
+
+  it.each(["ios", "android"])(
+    "keeps the %s shell immediate and navigation current when a cell is rebound",
+    (platform) => {
+      process.env.EXPO_OS = platform;
+      motionPreference.reduced = reduced;
+      vi.mocked(View).mockClear();
+      const { rerender } = render(
+        <ItemCard
+          item={{ ...base, title: "First save" }}
+          source={{ from: "home" }}
+        />,
+      );
+      const assertShell = () => {
+        const shell = vi.mocked(View).mock.calls[0][0];
+        expect(shell).not.toHaveProperty("entering", expect.anything());
+        expect(shell).not.toHaveProperty("exiting", expect.anything());
+        expect(shell).not.toHaveProperty("layout", expect.anything());
+        expect(shell.style).toEqual({ padding: 4 });
+        expect(triggerProps).toHaveBeenLastCalledWith(
+          expect.objectContaining({ withAppleZoom: !reduced }),
+        );
+      };
+      assertShell();
+      vi.mocked(View).mockClear();
+      rerender(
+        <ItemCard
+          item={{
+            ...base,
+            _id: "item-2" as FeedItem["_id"],
+            title: "Second save",
+            fixtureKey: "second",
+          }}
+          source={{ from: "search", q: "Second" }}
+        />,
+      );
+      assertShell();
+      expect(
+        screen.getAllByRole("button", { name: "Second save" }),
+      ).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: "First save" })).toBeNull();
+      const href = {
+        pathname: "/item/[id]",
+        params: { id: "item-2", from: "search", q: "Second" },
+      };
+      expect(linkProps).toHaveBeenLastCalledWith(
+        expect.objectContaining({ href, asChild: true }),
+      );
+      const owner = platform === "ios" ? View : Pressable;
+      const props = vi
+        .mocked(owner)
+        .mock.calls.findLast(
+          ([value]) => value.accessibilityLabel === "Second save",
+        )?.[0];
+      expect(props?.testID).toBe("fixture-item-second");
+      expect(props?.accessibilityActions?.map(({ label }) => label)).toEqual([
+        "Change spaces",
+        "Delete",
+      ]);
+      routerPush.mockClear();
+      props?.onAccessibilityTap?.();
+      expect(routerPush).toHaveBeenCalledWith(href);
+      expect(screen.getByTestId("link-menu").textContent).toContain("Delete");
+      vi.mocked(Alert.alert).mockClear();
+      props?.onAccessibilityAction?.({
+        nativeEvent: { actionName: "Delete" },
+      } as never);
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "Delete this save?",
+        expect.any(String),
+        expect.any(Array),
+      );
+      vi.mocked(View).mockClear();
+      rerender(
+        <ItemCard
+          item={{ ...base, title: "Space save", suggested: true }}
+          source={{ from: "space", spaceId: "space-1" }}
+        />,
+      );
+      assertShell();
+      expect(linkProps).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          href: {
+            pathname: "/item/[id]",
+            params: { id: "item-1", from: "space", spaceId: "space-1" },
+          },
+        }),
+      );
+      expect(screen.getByTestId("link-menu").textContent).toContain("Dismiss");
+    },
+  );
+
+  it("retains pressed opacity on the face without animating the shell", () => {
+    motionPreference.reduced = reduced;
+    motionPreference.pressed = true;
+    vi.mocked(View).mockClear();
+    render(<ItemCard item={{ ...base, title: "Pressed save" }} />);
+    expect(vi.mocked(View).mock.calls[0][0].style).toEqual({ padding: 4 });
+    expect(
+      vi
+        .mocked(View)
+        .mock.calls.some(
+          ([props]) =>
+            Array.isArray(props.style) &&
+            props.style.some(
+              (style) =>
+                style &&
+                typeof style === "object" &&
+                "opacity" in style &&
+                style.opacity === 0.85,
+            ),
+        ),
+    ).toBe(true);
+  });
+});
 /** Finds the card the way a screen reader would: a button with this name. */
 function card(item: Partial<FeedItem>, name: string) {
   render(<ItemCard item={{ ...base, ...item }} />);

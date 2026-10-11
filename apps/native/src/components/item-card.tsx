@@ -13,8 +13,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { Link, useRouter } from "expo-router";
-import { Alert, Pressable, Share } from "react-native";
-import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
+import { Alert, Pressable, Share, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 import {
   shareRefOf,
@@ -241,11 +241,7 @@ export const ItemCard = memo(function ItemCard({
   const a11yOnCell = process.env.EXPO_OS === "ios";
 
   return (
-    <Animated.View
-      entering={reducedMotion ? undefined : FadeIn.duration(300)}
-      style={styles.cell}
-      {...(a11yOnCell ? cardA11y : {})}
-    >
+    <View style={styles.cell} {...(a11yOnCell ? cardA11y : {})}>
       <Link href={href} asChild>
         <Link.Trigger withAppleZoom={!reducedMotion}>
           <Pressable {...(a11yOnCell ? {} : cardA11y)}>
@@ -308,7 +304,7 @@ export const ItemCard = memo(function ItemCard({
           )}
         </Link.Menu>
       </Link>
-    </Animated.View>
+    </View>
   );
 });
 
