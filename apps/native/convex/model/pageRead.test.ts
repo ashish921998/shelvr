@@ -101,7 +101,7 @@ describe("YouTube description reader", () => {
   function serveVideo(description: unknown, width = 1280, height = 720) {
     vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
     safeFetch.mockImplementation(async (endpoint: string) =>
-      endpoint.includes("googleapis.com")
+      new URL(endpoint).hostname === "www.googleapis.com"
         ? json(endpoint, {
             items: [
               {
@@ -355,7 +355,8 @@ describe("YouTube description reader", () => {
       expect(safeFetch).toHaveBeenCalledTimes(1);
       vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
       safeFetch.mockImplementation(async (endpoint: string) => {
-        if (!endpoint.includes("googleapis.com")) return json(endpoint, oembed);
+        if (new URL(endpoint).hostname !== "www.googleapis.com")
+          return json(endpoint, oembed);
         if (failure instanceof Error) throw failure;
         return failure;
       });
