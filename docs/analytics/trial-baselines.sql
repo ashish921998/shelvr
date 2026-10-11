@@ -47,7 +47,7 @@ onboarding_rows AS (
         coalesce(toInt(properties.analytics_version), 0) AS analytics_version,
         coalesce(toString(properties.step_id), '') AS step_id,
         coalesce(toInt(properties.flow_version), 0) AS flow_version,
-        coalesce(toString(properties.sample), '') = 'true' AS sample,
+        coalesce(properties.sample, false) = true AS sample,
         coalesce(toString(properties.outcome), '') AS outcome,
         coalesce(toString(properties.placement), '') AS placement
     FROM events
@@ -637,7 +637,8 @@ activity_events AS (
     FROM activity_rows
     WHERE environment = 'production'
       AND analytics_version = 1
-      AND store_environment != 'sandbox'
+      -- Only payment webhooks carry store_environment; saves and opens do not.
+      AND (event != 'trial_started' OR (event = 'trial_started' AND store_environment != 'sandbox'))
 ),
 per_account AS (
     SELECT

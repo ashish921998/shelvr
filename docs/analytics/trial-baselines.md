@@ -127,7 +127,12 @@ validation file exercises the filter with synthetic rows.
   build variant, backend events from `OBSERVABILITY_ENV`, and webhook events
   only when RevenueCat also reports PRODUCTION, so sandbox purchases are
   already labelled `sandbox`. The webhook queries additionally require
-  `store_environment != 'sandbox'` as a belt-and-braces check.
+  `store_environment != 'sandbox'` as a belt-and-braces check, on webhook
+  rows only. In Query 3 this predicate applies only to `trial_started`;
+  `item_saved` and `item_opened` never carry `store_environment` and must
+  pass without it. HogQL missing-property comparisons do not reliably pass
+  `!=`, so applying this webhook filter to every activity row drops saves
+  and opens.
 - `analytics_version = 1` on every event, read as an integer. Every client,
   save, account and webhook event in the contract carries it.
 - Internal accounts are flagged per row (`is_internal`) and counted in an
@@ -379,8 +384,10 @@ outcomes below are desk-checked against the SQL, not observed; the first
 operator run should confirm them and fix the SQL, not the table, on any
 difference.
 
-Synthetic rows carry `environment`, `analytics_version`, `store_environment`
-and the required ids, so each statement also proves its filter: rows tagged
+Synthetic rows carry `environment`, `analytics_version` and the required
+ids. Webhook rows also carry `store_environment`; Query 3 save/open rows
+use `NULL` to represent its absence, not an empty-string stand-in.
+These cases exercise each statement's filter: rows tagged
 `development`, `sandbox`, `analytics_version = 0`, or with an empty required
 id must be absent from the output. The absent cases are listed under each
 table.
@@ -500,7 +507,7 @@ the earlier unresolved one. `rc-trial-e` ignores the cancelled first attempt.
 | t_dup_trial_delivery   | 1          | 0                       | 1          | 1          | 0                | 0                  | 0                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
 | t_duplicate_save       | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
 | t_foreign_item         | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_ideal                | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 1                | 0          | 0                    | 0                   | 0           |
+| t_missing_store_env    | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 1                | 0          | 0                    | 0                   | 0           |
 | t_immature             | 1          | 0                       | 0          | 0          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
 | t_immature_72h         | 1          | 0                       | 1          | 0          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
 | t_missing_open_session | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
@@ -524,8 +531,11 @@ trial), `t_sandbox_trial` (its trial row is `store_environment = sandbox`,
 leaving only a save), `t_dev_env` (tagged `development`), `t_version_0`
 (`analytics_version = 0`).
 
-- Only `t_ideal` reopens; every other case fails exactly one clause of the
-  reopen rule or has nothing measurable.
+- `t_missing_store_env` saves two hours after its trial and opens the same
+  item thirty hours after the trial in another session. Both activity rows
+  lack `store_environment`, yet `saved_within_24h`, `distinct_saves_72h` and
+  `reopened_own_72h` are 1. Only this case reopens; every other case fails
+  a clause of the reopen rule or has nothing measurable.
 - `t_missing_trial_id` has a `trial_started` without its webhook id, so it
   has no anchor, every metric is 0, and the production query counts it in
   `accounts_without_webhook_id` and `trial_start_events_missing_id`, outside
