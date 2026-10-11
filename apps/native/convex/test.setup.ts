@@ -24,20 +24,29 @@ export type TestBackend = ReturnType<typeof newConvexTest>;
  * identity whose owner row is missing or mid-deletion, so a made-up subject
  * cannot authorize anything; tests take the row's id from here and use it for
  * the data they seed. `pro` adds an active subscription, which every save and
- * Pro feature is gated on.
+ * Pro feature is gated on. `session` adds a real `authSessions` row and makes
+ * it the subject's session suffix, for tests that assert auth-table cleanup.
  */
 export async function signedInUser(
   backend: TestBackend,
-  options: { email?: string; pro?: boolean } = {},
+  options: { email?: string; pro?: boolean; session?: boolean } = {},
 ): Promise<{
   userId: Id<"users">;
+  sessionId: Id<"authSessions"> | undefined;
   t: ReturnType<TestBackend["withIdentity"]>;
 }> {
-  const userId = await backend.run(async (ctx) => {
+  const { userId, sessionId } = await backend.run(async (ctx) => {
     const userId = await ctx.db.insert(
       "users",
       options.email === undefined ? {} : { email: options.email },
     );
+    const sessionId =
+      options.session === true
+        ? await ctx.db.insert("authSessions", {
+            userId,
+            expirationTime: Date.now() + 60_000,
+          })
+        : undefined;
     if (options.pro === true) {
       await ctx.db.insert("subscriptions", {
         userId,
@@ -46,10 +55,34 @@ export async function signedInUser(
         updatedAt: Date.now(),
       });
     }
-    return userId;
+    return { userId, sessionId };
   });
   return {
     userId,
-    t: backend.withIdentity({ subject: `${userId}|session-1` }),
+    sessionId,
+    t: backend.withIdentity({
+      subject: `${userId}|${sessionId ?? "session-1"}`,
+    }),
   };
+}
+
+/** `count` ready note items for `userId`, the payload deletion tests use to
+ * keep an account mid-deletion past the first batch. */
+export async function seedNotes(
+  backend: Pick<TestBackend, "run">,
+  userId: Id<"users">,
+  count: number,
+): Promise<void> {
+  await backend.run(async (ctx) => {
+    for (let i = 0; i < count; i++) {
+      await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        tags: [],
+        searchText: `note ${i}`,
+        note: `note ${i}`,
+      });
+    }
+  });
 }

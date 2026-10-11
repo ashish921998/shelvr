@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -12,33 +12,11 @@ import { DELETE_BATCH } from "./users";
 type TestCtx = TestConvexForDataModel<DataModel>;
 type Backend = ReturnType<typeof newConvexTest>;
 
-/** A signed-in Pro user with a real users row: the shared guard rejects an
- * identity whose owner row is missing, so a synthetic subject would never
- * reach the deletion mutation. */
-async function as(backend: Backend): Promise<{ t: TestCtx; userId: string }> {
-  const userId = await backend.run((ctx) => ctx.db.insert("users", {}));
-  const t = backend.withIdentity({ subject: `${userId}|session-1` });
-  await seedPro(t, userId);
-  return { t, userId };
-}
-
-async function seedPro(t: TestCtx, userId: string): Promise<void> {
-  await t.run(async (ctx) => {
-    const existing = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
-    const fields = {
-      status: "pro" as const,
-      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      updatedAt: Date.now(),
-    };
-    if (existing !== null) {
-      await ctx.db.patch(existing._id, fields);
-    } else {
-      await ctx.db.insert("subscriptions", { userId, ...fields });
-    }
-  });
+/** A signed-in Pro user backed by a real users row. */
+async function as(
+  backend: Backend,
+): Promise<{ t: TestCtx; userId: Id<"users"> }> {
+  return await signedInUser(backend, { pro: true });
 }
 
 async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
@@ -206,34 +184,13 @@ describe("deleteCurrentUserAccount", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, sessionId } = await backend.run(async (ctx) => {
-        const userId = await ctx.db.insert("users", {
-          email: "big@example.com",
-        });
-        const sessionId = await ctx.db.insert("authSessions", {
-          userId,
-          expirationTime: Date.now() + 60_000,
-        });
-        for (let i = 0; i < DELETE_BATCH + 1; i++) {
-          await ctx.db.insert("items", {
-            userId: userId as string,
-            type: "note",
-            status: "ready",
-            tags: [],
-            searchText: `note ${i}`,
-            note: `note ${i}`,
-          });
-        }
-        await ctx.db.insert("subscriptions", {
-          userId: userId as string,
-          status: "pro",
-          expiresAt: Date.now() + 60_000,
-          updatedAt: Date.now(),
-        });
-        return { userId, sessionId };
+      const { userId, t } = await signedInUser(backend, {
+        email: "big@example.com",
+        pro: true,
+        session: true,
       });
+      await seedNotes(backend, userId, DELETE_BATCH + 1);
 
-      const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
       await t.mutation(api.users.deleteCurrentUserAccount, {});
       await backend.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -307,16 +264,14 @@ describe("deleteCurrentUserAccount", () => {
   it("removes auth sessions, accounts, and the users document", async () => {
     const backend = newConvexTest();
 
-    const { userId, sessionId, accountId } = await backend.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {
-        email: "delete-me@example.com",
-      });
-      const sessionId = await ctx.db.insert("authSessions", {
-        userId,
-        expirationTime: Date.now() + 60_000,
-      });
+    const { userId, sessionId, t } = await signedInUser(backend, {
+      email: "delete-me@example.com",
+      pro: true,
+      session: true,
+    });
+    const accountId = await backend.run(async (ctx) => {
       await ctx.db.insert("authRefreshTokens", {
-        sessionId,
+        sessionId: sessionId!,
         expirationTime: Date.now() + 60_000,
       });
       const accountId = await ctx.db.insert("authAccounts", {
@@ -332,25 +287,18 @@ describe("deleteCurrentUserAccount", () => {
         searchText: "x",
         note: "x",
       });
-      await ctx.db.insert("subscriptions", {
-        userId: userId as string,
-        status: "pro",
-        expiresAt: Date.now() + 60_000,
-        updatedAt: Date.now(),
-      });
-      return { userId, sessionId, accountId };
+      return accountId;
     });
 
-    const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
     await t.mutation(api.users.deleteCurrentUserAccount, {});
 
     await backend.run(async (ctx) => {
       expect(await ctx.db.get(userId)).toBeNull();
-      expect(await ctx.db.get(sessionId)).toBeNull();
+      expect(await ctx.db.get(sessionId!)).toBeNull();
       expect(await ctx.db.get(accountId)).toBeNull();
       const tokens = await ctx.db
         .query("authRefreshTokens")
-        .withIndex("sessionId", (q) => q.eq("sessionId", sessionId))
+        .withIndex("sessionId", (q) => q.eq("sessionId", sessionId!))
         .collect();
       expect(tokens).toHaveLength(0);
       expect(
@@ -370,14 +318,12 @@ describe("deleteCurrentUserAccount", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, sessionId } = await backend.run(async (ctx) => {
-        const userId = await ctx.db.insert("users", {
-          email: "chatty@example.com",
-        });
-        const sessionId = await ctx.db.insert("authSessions", {
-          userId,
-          expirationTime: Date.now() + 60_000,
-        });
+      const { userId, t } = await signedInUser(backend, {
+        email: "chatty@example.com",
+        pro: true,
+        session: true,
+      });
+      await backend.run(async (ctx) => {
         for (let i = 0; i < DELETE_BATCH + 1; i++) {
           await ctx.db.insert("feedbackSubmissions", {
             userId: userId as string,
@@ -387,16 +333,8 @@ describe("deleteCurrentUserAccount", () => {
             attempts: 1,
           });
         }
-        await ctx.db.insert("subscriptions", {
-          userId: userId as string,
-          status: "pro",
-          expiresAt: Date.now() + 60_000,
-          updatedAt: Date.now(),
-        });
-        return { userId, sessionId };
       });
 
-      const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
       await t.mutation(api.users.deleteCurrentUserAccount, {});
       await backend.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -420,14 +358,12 @@ describe("deleteCurrentUserAccount", () => {
   // orphan allowance row (or dangling item reference) may survive deletion.
   it("removes the onboarding demo allowance with the account", async () => {
     const backend = newConvexTest();
-    const { userId, sessionId } = await backend.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {
-        email: "demo-delete@example.com",
-      });
-      const sessionId = await ctx.db.insert("authSessions", {
-        userId,
-        expirationTime: Date.now() + 60_000,
-      });
+    const { userId, t } = await signedInUser(backend, {
+      email: "demo-delete@example.com",
+      pro: true,
+      session: true,
+    });
+    await backend.run(async (ctx) => {
       const itemId = await ctx.db.insert("items", {
         userId: userId as string,
         type: "link",
@@ -441,16 +377,8 @@ describe("deleteCurrentUserAccount", () => {
         itemId,
         createdAt: Date.now(),
       });
-      await ctx.db.insert("subscriptions", {
-        userId: userId as string,
-        status: "pro",
-        expiresAt: Date.now() + 60_000,
-        updatedAt: Date.now(),
-      });
-      return { userId, sessionId };
     });
 
-    const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
     await t.mutation(api.users.deleteCurrentUserAccount, {});
 
     await backend.run(async (ctx) => {
@@ -467,38 +395,14 @@ describe("deleteCurrentUserAccount", () => {
 /** A real signed-in Pro user with `itemCount` notes. More than `DELETE_BATCH`
  * leaves the account mid-deletion after the first mutation, so the owner row
  * is still there to carry the marker. */
-async function signedInUser(
-  backend: ReturnType<typeof newConvexTest>,
-  itemCount: number,
-) {
-  const { userId, sessionId } = await backend.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", { email: "fence@example.com" });
-    const sessionId = await ctx.db.insert("authSessions", {
-      userId,
-      expirationTime: Date.now() + 60_000,
-    });
-    for (let i = 0; i < itemCount; i++) {
-      await ctx.db.insert("items", {
-        userId: userId as string,
-        type: "note",
-        status: "ready",
-        tags: [],
-        searchText: `note ${i}`,
-        note: `note ${i}`,
-      });
-    }
-    await ctx.db.insert("subscriptions", {
-      userId: userId as string,
-      status: "pro",
-      expiresAt: Date.now() + 60_000,
-      updatedAt: Date.now(),
-    });
-    return { userId, sessionId };
+async function fencedUser(backend: Backend, itemCount: number) {
+  const { userId, t } = await signedInUser(backend, {
+    email: "fence@example.com",
+    pro: true,
+    session: true,
   });
-  return {
-    userId,
-    t: backend.withIdentity({ subject: `${userId}|${sessionId}` }),
-  };
+  await seedNotes(backend, userId, itemCount);
+  return { userId, t };
 }
 
 async function remainingItems(backend: TestCtx, userId: Id<"users">) {
@@ -535,7 +439,7 @@ describe("account deletion fence", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, t } = await signedInUser(backend, DELETE_BATCH + 1);
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
 
       await t.mutation(api.users.deleteCurrentUserAccount, {});
 
@@ -558,7 +462,7 @@ describe("account deletion fence", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, t } = await signedInUser(backend, DELETE_BATCH + 1);
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
       await backend.run((ctx) =>
         ctx.db.insert("appleTokens", {
           userId,
@@ -592,7 +496,7 @@ describe("account deletion fence", () => {
 
   it("is a safe no-op once the account is gone", async () => {
     const backend = newConvexTest();
-    const { userId, t } = await signedInUser(backend, 1);
+    const { userId, t } = await fencedUser(backend, 1);
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
     expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
@@ -607,7 +511,7 @@ describe("account deletion fence", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, t } = await signedInUser(backend, DELETE_BATCH + 1);
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
 
       // Live: the identity works everywhere.
       await expect(t.query(api.spaces.listSpaces, {})).resolves.toEqual([]);
@@ -637,7 +541,7 @@ describe("account deletion fence", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, t } = await signedInUser(backend, DELETE_BATCH + 1);
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
       await expect(t.query(api.users.getCurrentUser, {})).resolves.toEqual({
         _id: userId,
         email: "fence@example.com",

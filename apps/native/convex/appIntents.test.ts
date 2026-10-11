@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -164,22 +164,13 @@ describe("bounded upload endpoint", () => {
   });
 });
 
-/** A signed-in user with a real users row, Pro unless `pro` is false, and a
- * freshly issued capture token. */
+/** A signed-in user with a freshly issued capture token, Pro unless `pro` is
+ * false. */
 async function setup(options: { pro?: boolean } = {}) {
   const base = newConvexTest();
-  const userId = await base.run((ctx) => ctx.db.insert("users", {}));
-  const t = base.withIdentity({ subject: `${userId}|session-1` });
-  if (options.pro !== false) {
-    await t.run(async (ctx) => {
-      await ctx.db.insert("subscriptions", {
-        userId,
-        status: "pro",
-        expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-        updatedAt: Date.now(),
-      });
-    });
-  }
+  const { userId, t } = await signedInUser(base, {
+    pro: options.pro !== false,
+  });
   const token = await t.action(api.appIntents.issueCaptureToken, {});
   return { base, t, userId, token };
 }
@@ -249,8 +240,7 @@ describe("capture tokens", () => {
 
   it("never revokes another user's token", async () => {
     const { base, t: owner, token } = await setup();
-    const otherId = await base.run((ctx) => ctx.db.insert("users", {}));
-    const other = base.withIdentity({ subject: `${otherId}|session-1` });
+    const { t: other } = await signedInUser(base);
     await other.mutation(api.appIntents.revokeCaptureToken, { token });
     const response = await post(
       owner,
@@ -509,18 +499,7 @@ describe("account deletion", () => {
   /** Enough notes that the first deletion pass leaves the owner row behind,
    * marked, so the mid-deletion state can be observed. */
   async function leaveMidDeletion(t: TestCtx, userId: Id<"users">) {
-    await t.run(async (ctx) => {
-      for (let i = 0; i < DELETE_BATCH + 1; i++) {
-        await ctx.db.insert("items", {
-          userId,
-          type: "note",
-          status: "ready",
-          tags: [],
-          searchText: `note ${i}`,
-          note: `note ${i}`,
-        });
-      }
-    });
+    await seedNotes(t, userId, DELETE_BATCH + 1);
     await t.mutation(api.users.deleteCurrentUserAccount, {});
     expect(await t.run((ctx) => ctx.db.get(userId))).toMatchObject({
       deleting: true,

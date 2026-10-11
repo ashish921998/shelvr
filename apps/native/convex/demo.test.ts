@@ -1,47 +1,19 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
-import type { DataModel, Id } from "./_generated/dataModel";
 import { ConvexError, type Value } from "convex/values";
 import { MAX_DEMO_RETRIES } from "./demo";
 import { DEMO_ERROR_MESSAGES, demoErrorCode } from "./model/demoErrors";
-
-type TestCtx = TestConvexForDataModel<DataModel>;
-type TestBackend = ReturnType<typeof newConvexTest>;
-
-// One backend per test, then per-user identity accessors on it — so tests that
-// care about ownership/isolation really run two identities against the SAME
-// database, not two isolated test databases. Each gets a real users row: the
-// shared guard rejects identities whose owner row is missing.
-async function asUser(
-  backend: TestBackend,
-  opts?: { pro: boolean },
-): Promise<{ t: TestCtx; userId: Id<"users"> }> {
-  const userId = await backend.run((ctx) => ctx.db.insert("users", {}));
-  const t = backend.withIdentity({
-    subject: `${userId}|session-1`,
-  });
-  if (opts?.pro !== false) {
-    await t.run(async (ctx) => {
-      await ctx.db.insert("subscriptions", {
-        userId,
-        status: "pro",
-        expiresAt: Date.now() + 60_000,
-        updatedAt: Date.now(),
-      });
-    });
-  }
-  return { t, userId };
-}
 
 const URL = "https://www.bbcgoodfood.com/recipes/classic-lasagne";
 
 describe("onboarding demo allowance", () => {
   it("creates one real processing item and schedules the AI pipeline once", async () => {
-    const { t, userId: ownerId } = await asUser(newConvexTest());
+    const { t, userId: ownerId } = await signedInUser(newConvexTest(), {
+      pro: true,
+    });
     const { itemId, userId, urlMatchesRequest, reused, savedSpaceNames } =
       await t.mutation(api.demo.createDemoItem, { url: URL });
     expect(userId).toBe(ownerId);
@@ -72,7 +44,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("is idempotent: a repeat — even with a different URL — returns the same item and never re-schedules processing", async () => {
-    const { t, userId } = await asUser(newConvexTest());
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
     const first = await t.mutation(api.demo.createDemoItem, { url: URL });
     const second = await t.mutation(api.demo.createDemoItem, {
       url: "https://example.com/other",
@@ -98,7 +70,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("matches a canonicalized repeat of the original URL", async () => {
-    const { t } = await asUser(newConvexTest());
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
     await t.mutation(api.demo.createDemoItem, { url: "example.com/path" });
 
     const repeated = await t.mutation(api.demo.createDemoItem, {
@@ -125,7 +97,7 @@ describe("onboarding demo allowance", () => {
 
   it("refuses a demo for an owner whose deletion has begun, and once the owner is gone", async () => {
     const backend = newConvexTest();
-    const { t, userId } = await asUser(backend, { pro: false });
+    const { t, userId } = await signedInUser(backend);
     await backend.run((ctx) => ctx.db.patch(userId, { deleting: true }));
     await expect(
       t.mutation(api.demo.createDemoItem, { url: URL }),
@@ -146,8 +118,8 @@ describe("onboarding demo allowance", () => {
 
   it("is tied to the authenticated identity — two users on the same database each get their own allowance", async () => {
     const backend = newConvexTest();
-    const { t: a } = await asUser(backend);
-    const { t: b } = await asUser(backend);
+    const { t: a } = await signedInUser(backend, { pro: true });
+    const { t: b } = await signedInUser(backend, { pro: true });
     const first = await a.mutation(api.demo.createDemoItem, { url: URL });
 
     // User B still has their own allowance; A's row is never returned to B.
@@ -160,14 +132,14 @@ describe("onboarding demo allowance", () => {
   });
 
   it("does not require Pro — the scoped allowance is the point", async () => {
-    const { t } = await asUser(newConvexTest(), { pro: false });
+    const { t } = await signedInUser(newConvexTest());
     const { reused } = await t.mutation(api.demo.createDemoItem, { url: URL });
     expect(reused).toBe(false);
   });
 
   it("keeps normal Pro gating intact: createLinkItem still throws for the same free user", async () => {
     const backend = newConvexTest();
-    const { t } = await asUser(backend, { pro: false });
+    const { t } = await signedInUser(backend);
     await t.mutation(api.demo.createDemoItem, { url: URL });
     await expect(
       t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
@@ -175,7 +147,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("files the demo item into the ONE explicitly chosen destination as a saved membership, creating the space (dynamic)", async () => {
-    const { t, userId } = await asUser(newConvexTest());
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId, savedSpaceNames } = await t.mutation(
       api.demo.createDemoItem,
       { url: URL, spaceName: "  Travel  " },
@@ -222,7 +194,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("defaults to just the shelf when no destination is chosen", async () => {
-    const { t, userId } = await asUser(newConvexTest());
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
     const { savedSpaceNames } = await t.mutation(api.demo.createDemoItem, {
       url: URL,
     });
@@ -237,7 +209,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("rejects an invalid destination without consuming the allowance", async () => {
-    const { t } = await asUser(newConvexTest());
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
     await expect(
       t.mutation(api.demo.createDemoItem, { url: URL, spaceName: "   " }),
     ).rejects.toThrow();
@@ -259,7 +231,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("rejects a spent allowance whose demo item was deleted with a structured ConvexError", async () => {
-    const { t } = await asUser(newConvexTest());
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await t.mutation(api.items.deleteItem, { id: itemId });
     // ConvexError, not Error: production redacts a plain Error's message to
@@ -277,7 +249,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("rejects an invalid destination with a structured ConvexError", async () => {
-    const { t } = await asUser(newConvexTest());
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
     const error = await t
       .mutation(api.demo.createDemoItem, { url: URL, spaceName: "   " })
       .then(
@@ -288,7 +260,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("enforces the same URL policy as regular saves", async () => {
-    const { t } = await asUser(newConvexTest());
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
     await expect(
       t.mutation(api.demo.createDemoItem, { url: "ftp://example.com/file" }),
     ).rejects.toThrow();
@@ -298,7 +270,7 @@ describe("onboarding demo allowance", () => {
   });
 
   it("records save telemetry without the URL", async () => {
-    const { t, userId } = await asUser(newConvexTest());
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, {
       url: URL,
       analyticsSessionId: "demo-session",
@@ -323,7 +295,7 @@ describe("onboarding demo allowance", () => {
 
 describe("retryDemoItem", () => {
   it("re-runs the pipeline on the SAME failed demo item — no second item, no second allowance", async () => {
-    const { t, userId } = await asUser(newConvexTest());
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await t.run(async (ctx) => {
       await ctx.db.patch(itemId, { status: "failed", failureReason: "error" });
@@ -359,7 +331,7 @@ describe("retryDemoItem", () => {
 
   it("does not double-schedule while processing, and does nothing for a ready item", async () => {
     const backend = newConvexTest();
-    const { t } = await asUser(backend);
+    const { t } = await signedInUser(backend, { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
 
     await backend.run(async (ctx) => {
@@ -376,7 +348,7 @@ describe("retryDemoItem", () => {
   });
 
   it("requires the caller to own a demo and is unavailable without one", async () => {
-    const { t } = await asUser(newConvexTest());
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
     const error = await t.mutation(api.demo.retryDemoItem, {}).then(
       () => null,
       (e: unknown) => e,
@@ -387,7 +359,7 @@ describe("retryDemoItem", () => {
 
   it("refuses a terminal failure without spending the retry cap or the rate-limit bucket", async () => {
     const backend = newConvexTest();
-    const { t, userId } = await asUser(backend);
+    const { t, userId } = await signedInUser(backend, { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await backend.run(async (ctx) => {
       await ctx.db.patch(itemId, {
@@ -440,7 +412,7 @@ describe("retryDemoItem", () => {
 
   it("is rate limited so a broken page cannot loop classifications", async () => {
     const backend = newConvexTest();
-    const { t } = await asUser(backend);
+    const { t } = await signedInUser(backend, { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
 
     // Exhaust the bounded retry bucket (capacity 3), then the next attempt throws.
@@ -461,7 +433,7 @@ describe("retryDemoItem", () => {
 
   it("enforces the persistent retry cap even across rate-limit windows", async () => {
     const backend = newConvexTest();
-    const { t, userId } = await asUser(backend);
+    const { t, userId } = await signedInUser(backend, { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await backend.run(async (ctx) => {
       await ctx.db.patch(itemId, { status: "failed" });
