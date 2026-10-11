@@ -25,6 +25,10 @@ const mock = vi.hoisted(() => {
   };
   return {
     demo,
+    reducedMotion: false,
+    pendingProvider: null as "google" | null,
+    signInWith: vi.fn(),
+    modalProps: vi.fn(),
     actions: {
       setError: vi.fn(),
       submitUrl: vi.fn(),
@@ -43,8 +47,12 @@ const mock = vi.hoisted(() => {
     nothing: () => null,
     view: ({ children }: Children) => <div>{children}</div>,
     text: ({ children }: Children) => <span>{children}</span>,
-    modal: ({ visible, children }: Children & { visible: boolean }) =>
-      visible ? <div>{children}</div> : null,
+    modal: (
+      props: Children & { visible: boolean; onRequestClose?: () => void },
+    ) => {
+      mock.modalProps(props);
+      return props.visible ? <div>{props.children}</div> : null;
+    },
     pressable: ({
       children,
       onPress,
@@ -104,6 +112,9 @@ vi.mock("react-native", () => ({
   Pressable: mock.pressable,
   TextInput: mock.textInput,
 }));
+vi.mock("react-native-reanimated", () => ({
+  useReducedMotion: () => mock.reducedMotion,
+}));
 vi.mock("react-native-unistyles", () => {
   const anyStyle = new Proxy({}, { get: () => ({}) });
   return {
@@ -138,8 +149,8 @@ vi.mock("@/lib/anonymous-auth", () => ({
 }));
 vi.mock("@/lib/oauth-sign-in", () => ({
   useOAuthSignIn: () => ({
-    signInWith: vi.fn(),
-    pendingProvider: null,
+    signInWith: mock.signInWith,
+    pendingProvider: mock.pendingProvider,
     lastError: null,
     interrupted: false,
   }),
@@ -182,8 +193,59 @@ beforeEach(() => {
   mock.demo.error = null;
   mock.demo.demoUsed = false;
   mock.demo.authUrl = "";
+  mock.reducedMotion = false;
+  mock.pendingProvider = null;
   vi.clearAllMocks();
   mock.actions.canAcceptShare.mockReturnValue(true);
+});
+
+describe.each([false, true])("demo auth reduced motion %s", (reduced) => {
+  it("uses the native transition and keeps idle cancellation and the draft", () => {
+    mock.reducedMotion = reduced;
+    const { rerender } = render(step());
+    expect(mock.modalProps.mock.lastCall?.[0].visible).toBe(false);
+    fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
+    mock.demo.view = "auth";
+    mock.demo.authUrl = "https://a.test/p";
+    rerender(step());
+    expect(mock.modalProps.mock.lastCall?.[0]).toMatchObject({
+      visible: true,
+      transparent: true,
+      animationType: reduced ? "fade" : "slide",
+    });
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    expect(screen.getByText("demo.signInHelp")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "common.back" }));
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(2);
+    mock.demo.view = "pick";
+    rerender(step());
+    expect(screen.queryByText("demo.signInTitle")).toBeNull();
+    expect(linkField()?.value).toBe("https://a.test/p");
+    fireEvent.click(screen.getByRole("button", { name: "demo.save" }));
+    expect(mock.actions.submitTyped).toHaveBeenCalledWith("https://a.test/p");
+  });
+
+  it("blocks scrim and native close while the provider is pending, then allows cancellation", () => {
+    mock.reducedMotion = reduced;
+    mock.demo.view = "auth";
+    mock.demo.authUrl = "https://a.test/p";
+    const { rerender } = render(step());
+    fireEvent.click(screen.getByRole("button", { name: "account.google" }));
+    expect(mock.signInWith).toHaveBeenCalledWith("google");
+    mock.pendingProvider = "google";
+    rerender(step());
+    expect(mock.modalProps.mock.lastCall?.[0].onRequestClose).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "common.back" }));
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).not.toHaveBeenCalled();
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    mock.pendingProvider = null;
+    rerender(step());
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("first-save picker", () => {
