@@ -7,9 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   clearLegacyDemoUrl,
   clearPending,
-  getPendingDemoUrl,
-  getPendingSpaces,
-  getOrCreatePendingOperationId,
+  getPendingReplayWork,
   hasPending,
   subscribePendingOnboarding,
   getPendingOnboardingRevision,
@@ -59,9 +57,31 @@ export function noteDeclinedDuringOnboarding() {
   onboardingPaywall = "declined";
 }
 
+type ReplayWork = NonNullable<ReturnType<typeof getPendingReplayWork>>;
+
+/** The identity of one unit of replay work. Two reads with the same
+ * operation, the same spaces in the same order and the same queued demo link
+ * are the same work, however many times the store announced it. */
+function identityOf(work: ReplayWork): string {
+  return JSON.stringify([work.operationId, work.spaces, work.demoUrl]);
+}
+
+function currentIdentity(): string | null {
+  const work = getPendingReplayWork();
+  return work === null ? null : identityOf(work);
+}
+
 /**
  * After onboarding is finished and the user signs in, replay the deferred
- * onboarding spaces, then present the paywall. Runs once.
+ * onboarding spaces, then present the paywall.
+ *
+ * Each unit of work (see `identityOf`) is attempted at most once per recovery
+ * epoch. A mount opens the first epoch and every real entitlement transition
+ * opens the next, so work that failed stays in SecureStore until a relaunch,
+ * a purchase or a lapse gives it a genuine reason to run again. The store
+ * revision only wakes the effect; it never makes work eligible by itself,
+ * because the hook's own write-back of the failed subset is one of those
+ * revisions.
  *
  * Mounted in (app)/_layout.tsx. Gated on `onboarded`: onboarding replay must
  * never fire mid-onboarding (the demo step's inline sign-in authenticates the
@@ -75,11 +95,12 @@ export function useReplayOnboarding() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
-  const ranRef = useRef(false);
   const runningRef = useRef(false);
-  const startedEntitledRef = useRef(false);
-  const rerunRef = useRef(false);
+  const deferredPassRef = useRef(false);
   const awaitingEntitlementRef = useRef(false);
+  const settledEntitledRef = useRef<boolean | null>(null);
+  const epochRef = useRef(0);
+  const attemptedRef = useRef({ epoch: 0, identities: new Set<string>() });
   const [retryNonce, setRetryNonce] = useState(0);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
@@ -91,16 +112,24 @@ export function useReplayOnboarding() {
   );
 
   useEffect(() => {
-    if (!isAuthenticated || ranRef.current) return;
+    if (!isAuthenticated) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
+    // Only a settled value that differs from the last settled value is a
+    // transition. A query that reloads and lands where it was is not one.
+    if (
+      settledEntitledRef.current !== null &&
+      settledEntitledRef.current !== entitled
+    ) {
+      epochRef.current += 1;
+    }
+    settledEntitledRef.current = entitled;
+
     if (runningRef.current) {
-      // If entitlement changes while the paywall or mutations are in flight,
-      // schedule one pass after the current run finishes instead of starting
-      // a second paywall/mutation batch concurrently.
-      if (entitled !== startedEntitledRef.current) {
-        rerunRef.current = true;
-      }
+      // Whatever changed (entitlement, new work, the run's own write-back) is
+      // judged once the current run finishes, never by a second concurrent
+      // paywall or mutation batch.
+      deferredPassRef.current = true;
       return;
     }
     if (!hasPending()) return;
@@ -110,20 +139,31 @@ export function useReplayOnboarding() {
     )
       return;
 
-    const spaces = getPendingSpaces();
-
-    const legacyDemoUrl = getPendingDemoUrl();
+    const work = getPendingReplayWork();
+    if (work === null) return;
+    const identity = identityOf(work);
+    if (attemptedRef.current.epoch !== epochRef.current) {
+      attemptedRef.current = {
+        epoch: epochRef.current,
+        identities: new Set(),
+      };
+    }
+    // The run keeps this set even if a transition opens a new epoch while it
+    // is in flight: the identities it consumes belong to the epoch it started
+    // in, and the new epoch judges the leftover work afresh.
+    const attempted = attemptedRef.current.identities;
+    if (attempted.has(identity)) return;
+    attempted.add(identity);
 
     runningRef.current = true;
-    startedEntitledRef.current = entitled;
 
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
         // requireProEntitlement on the server, so it will fail for
         // non-entitled users. If the user cancels, keep the pending data —
-        // the effect re-runs when `entitled` changes (e.g., after a future
-        // purchase via the paywall route).
+        // the next epoch (a future purchase through the paywall route) offers
+        // the work again.
         if (!entitled) {
           await waitForSheetTransition();
           const purchased = await openPaywall(router, "onboarding");
@@ -140,44 +180,49 @@ export function useReplayOnboarding() {
 
         // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
-          spaces.map((name) => createSpace({ name, dynamic: true })),
+          work.spaces.map((name) => createSpace({ name, dynamic: true })),
         );
-        const failedSpaces = spaceResults
-          .map((result, index) =>
-            result.status === "rejected" ? spaces[index] : null,
-          )
-          .filter((name): name is string => name !== null);
+        const failedSpaces = work.spaces.filter(
+          (_, index) => spaceResults[index].status === "rejected",
+        );
+        // Work that arrived while the mutations were in flight is newer than
+        // this run's view of the store. Leave it to the deferred pass; the
+        // server deduplicates spaces by name, so nothing created here is
+        // lost to it.
+        if (currentIdentity() !== identity) return;
         // Persist only the failed work so a later replay retries it without
-        // recreating spaces that already succeeded.
+        // recreating spaces that already succeeded. Its identity is consumed
+        // before the write publishes it, so the write cannot re-enter here.
+        const remaining = { ...work, spaces: failedSpaces };
+        attempted.add(identityOf(remaining));
         updatePendingSpaces(failedSpaces);
-        const allSpacesOk = failedSpaces.length === 0;
 
-        if (legacyDemoUrl) {
+        if (work.demoUrl) {
           try {
             // No saveSource: this replays an onboarding demo, but
             // `onboarding_demo` is stamped server-side by createDemoItem and
             // the client must not claim it. No other literal is truthful here.
             await createLinkItem({
-              url: legacyDemoUrl,
-              operationId: getOrCreatePendingOperationId(),
+              url: work.demoUrl,
+              operationId: work.operationId,
               analyticsSessionId: analytics.sessionId(),
             });
-            clearLegacyDemoUrl();
           } catch {
             return;
           }
+          if (currentIdentity() !== identityOf(remaining)) return;
+          attempted.add(identityOf({ ...remaining, demoUrl: null }));
+          clearLegacyDemoUrl();
         }
 
         // Only mark as done when all required mutations succeed.
-        if (!allSpacesOk) return;
-
-        ranRef.current = true;
+        if (failedSpaces.length > 0) return;
         clearPending();
       } finally {
-        const shouldRerun = rerunRef.current;
-        rerunRef.current = false;
+        const deferredPass = deferredPassRef.current;
+        deferredPassRef.current = false;
         runningRef.current = false;
-        if (shouldRerun) {
+        if (deferredPass) {
           setRetryNonce((nonce) => nonce + 1);
         }
       }

@@ -6,22 +6,124 @@ import {
   getOnboardingProgress,
   getOrCreatePendingOperationId,
   getPendingDemoUrl,
+  getPendingOnboardingRevision,
   getPendingSpaces,
   hasPending,
   setOnboardingProgress,
   setPendingDemo,
   setPendingSpaces,
+  subscribePendingOnboarding,
   updatePendingSpaces,
 } from "./pending-onboarding";
 
 const storage = vi.hoisted(() => new Map<string, string>());
+const setItem = vi.hoisted(() =>
+  vi.fn((key: string, value: string) => storage.set(key, value)),
+);
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => storage.get(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
+  setItem,
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "new-operation-id" }));
 
-beforeEach(() => storage.clear());
+beforeEach(() => {
+  storage.clear();
+  setItem.mockClear();
+});
+
+describe("the replay's pending-space updates", () => {
+  const demo = {
+    url: "https://example.com/design",
+    destination: "Inspiration",
+    source: "share" as const,
+  };
+
+  function observe() {
+    const listener = vi.fn();
+    const unsubscribe = subscribePendingOnboarding(listener);
+    const revision = getPendingOnboardingRevision();
+    setItem.mockClear();
+    return {
+      listener,
+      unsubscribe,
+      revisionAdvancedBy: () => getPendingOnboardingRevision() - revision,
+    };
+  }
+
+  it("treats an ordered-identical update as a no-op: no write, no notification, same operation", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "legacy-operation",
+        spaces: ["Recipes", "Inspiration"],
+        demoUrl: "https://example.com/queued",
+      }),
+    );
+    setPendingDemo(demo);
+    const observed = observe();
+
+    updatePendingSpaces(["Recipes", "Inspiration"]);
+
+    expect(setItem).not.toHaveBeenCalled();
+    expect(observed.listener).not.toHaveBeenCalled();
+    expect(observed.revisionAdvancedBy()).toBe(0);
+    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
+    expect(getPendingSpaces()).toEqual(["Recipes", "Inspiration"]);
+    expect(getPendingDemoUrl()).toBe("https://example.com/queued");
+    expect(
+      JSON.parse(storage.get("shelvr.pending.onboarding") ?? "").demo,
+    ).toEqual(demo);
+    observed.unsubscribe();
+  });
+
+  it("treats an empty update of an empty list as a no-op too", () => {
+    setPendingSpaces([]);
+    const observed = observe();
+    updatePendingSpaces([]);
+    expect(setItem).not.toHaveBeenCalled();
+    expect(observed.listener).not.toHaveBeenCalled();
+    observed.unsubscribe();
+  });
+
+  it("writes and notifies once when the order differs, keeping the operation", () => {
+    setPendingSpaces(["Recipes", "Inspiration"]);
+    const operationId = getOrCreatePendingOperationId();
+    const observed = observe();
+
+    updatePendingSpaces(["Inspiration", "Recipes"]);
+
+    expect(setItem).toHaveBeenCalledOnce();
+    expect(observed.listener).toHaveBeenCalledOnce();
+    expect(observed.revisionAdvancedBy()).toBe(1);
+    expect(getPendingSpaces()).toEqual(["Inspiration", "Recipes"]);
+    expect(getOrCreatePendingOperationId()).toBe(operationId);
+    observed.unsubscribe();
+  });
+
+  it("writes and notifies once when the failed subset shrinks", () => {
+    setPendingSpaces(["Recipes", "Inspiration"]);
+    const observed = observe();
+
+    updatePendingSpaces(["Inspiration"]);
+
+    expect(setItem).toHaveBeenCalledOnce();
+    expect(observed.listener).toHaveBeenCalledOnce();
+    expect(getPendingSpaces()).toEqual(["Inspiration"]);
+    observed.unsubscribe();
+  });
+
+  it("still publishes onboarding completion, even for the same spaces", () => {
+    setPendingSpaces(["Recipes"]);
+    const observed = observe();
+
+    setPendingSpaces(["Recipes"]);
+
+    expect(setItem).toHaveBeenCalledOnce();
+    expect(observed.listener).toHaveBeenCalledOnce();
+    expect(observed.revisionAdvancedBy()).toBe(1);
+    observed.unsubscribe();
+  });
+});
 
 describe("onboarding recovery", () => {
   it("does not request a replay or paywall when storage is absent, cleared, or corrupt", () => {

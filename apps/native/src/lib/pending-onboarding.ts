@@ -230,8 +230,12 @@ export function setPendingSpaces(spaces: string[]) {
   writePendingSpaces(spaces, true, null, null);
 }
 
+/** The replay's write-back of the spaces it still owes. An ordered-identical
+ * list is a no-op: no write and no notification, so a replay that failed
+ * outright does not wake itself through the subscription it is listening on. */
 export function updatePendingSpaces(spaces: string[]) {
   const existing = readPendingRecord();
+  if (sameOrder(existing?.spaces ?? [], spaces)) return;
   writePendingSpaces(
     spaces,
     false,
@@ -240,8 +244,29 @@ export function updatePendingSpaces(spaces: string[]) {
   );
 }
 
+function sameOrder(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((name, i) => name === b[i]);
+}
+
 export function getPendingSpaces(): string[] {
   return readPendingRecord()?.spaces ?? [];
+}
+
+/** What the replay hook owes, read without creating a record: the operation
+ * the work runs under, the spaces still to create, and an older build's
+ * queued demo link. Null when nothing is stored. */
+export function getPendingReplayWork(): {
+  operationId: string;
+  spaces: string[];
+  demoUrl: string | null;
+} | null {
+  const record = readPendingRecord();
+  if (record === null) return null;
+  return {
+    operationId: record.operationId,
+    spaces: record.spaces,
+    demoUrl: record.demoUrl,
+  };
 }
 
 export function getOrCreatePendingOperationId(): string {
