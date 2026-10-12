@@ -1,20 +1,16 @@
 # Tidy hint profiling
 
-Use this protocol for [#314](https://github.com/ashish921998/shelvr/issues/314)
-before claiming that Tidy hints are a bottleneck. It defines a baseline, not
+Use this protocol before claiming that Tidy hints are a bottleneck. It defines a baseline, not
 an optimization or a completed measurement. Mounted canvases and React render
 times alone do not establish native frame, CPU or memory cost.
-
-Physical-device traces and the final decision remain an owner task. The owner
-approved implementing #315 independently of this result; that approval does
-not establish a performance benefit or complete #314.
 
 ## Safe, repeatable setup
 
 - Use an isolated development device and anonymous development account with
   disposable fixtures. Confirm the development bundle and backend, never
   production. Follow [local QA](local-qa.md) for login and fixture setup.
-- The device photo library must contain exactly 24 synthetic images and no
+- The device photo library must contain exactly the Tidy batch size
+  (`BATCH_SIZE`, currently 24) of synthetic images and no
   personal photos. If isolation cannot be confirmed, stop. Never clear an
   existing library, delete personal photos or reset a real account.
 - Generate numbered images `tidy-01` through `tidy-24`: 12 portrait
@@ -50,13 +46,43 @@ Record the following in each run's metadata:
 
 Use portrait orientation, default text size, fixed theme/locale, low-power mode
 off and a cool device. Fix charging and refresh-rate settings across runs.
-Relaunch after changing Reduce Motion; the app snapshots that preference.
+Relaunch after changing Reduce Motion (see [local QA](local-qa.md#getting-into-a-specific-state)).
 Run the complete matrix separately with Reduce Motion off and on.
 
 Use a release-mode development build for the primary baseline if signing and
 tool attachment support it. Otherwise label the actual profileable build and
 its limitations, and do not extrapolate debug timings to production. Keep
 Metro, debugger and recording attachment identical in later comparisons.
+
+## Pre-register before capture
+
+Record the following together in the run plan before seeing results:
+
+- **Materiality thresholds:** accept the proposed thresholds below or record
+  alternatives. A finding must recur in at least four of five valid warm
+  repetitions and exceed the noise band:
+  - Missed-deadline fraction at least 5%, with symbolized hint/worklet/Skia
+    activity accounting for at least 20% of sampled CPU in those windows
+    and critical-path evidence that hint work delays presentation. Overlap
+    alone does not qualify; unresolved dependencies or misses explained by
+    decoding or another task make frame attribution BLOCKED; or
+  - Hint-attributed CPU at least 5% of one core averaged over the window; or
+  - At least 5 MiB retained native allocations attributed to hints/canvases
+    after restoration, not decoded images or general renderer caches.
+- **Paired-control plan:** for each scenario, five paired controls using the
+  same native capture with React profiling/recording attached and detached.
+  Take the mounted census outside timing runs.
+- **Noise-band method:** the larger within-condition max-minus-min range
+  across five repetitions, plus the absolute difference between attached
+  and detached medians, in the metric's native units (CPU percentage points,
+  MiB or missed-deadline percentage points). Findings and improvements must
+  exceed this band. If it obscures the threshold, gather more controlled
+  evidence or report BLOCKED.
+- **Comparison target:** name the specific attributed metric and target:
+  at least 15% improvement in CPU or retained memory cost, or at least
+  2 percentage points fewer missed deadlines for a frame finding, exceeding
+  the noise band. Require identical conditions and no swipe/Undo regression;
+  reduced canvas counts do not substitute for measured benefit.
 
 ## Scenarios and timing
 
@@ -84,6 +110,14 @@ Read the tested revision's swipe thresholds and velocity rules, and record
 gesture displacement and duration. Slow/cancelled releases must not cross a
 velocity commit threshold. If a cancel advances, mark the run invalid and
 restore the deck, rather than relabelling it as cancellation.
+
+Code owners: batch size is in
+[`use-photo-batch.ts`](../../apps/native/src/lib/tidy/use-photo-batch.ts);
+`swipeProgress` and `MOMENTUM_WINDOW_S` are in
+[`swipe-decision.ts`](../../apps/native/src/lib/tidy/swipe-decision.ts);
+the `TidyHints` overlays and badge canvases are in
+[`tidy-hints.tsx`](../../apps/native/src/components/tidy/tidy-hints.tsx).
+Use these files at the tested revision rather than assuming constants stayed fixed.
 
 Perform five valid repetitions of each scenario per preference. Allow at
 least 30 seconds cooling between runs, longer if thermally throttled. Record
@@ -117,21 +151,14 @@ scenario windows separate; do not hide mounting spikes in idle averages.
   seconds; report transient cleanup separately. State unavailable
   counters; JS heap is not native memory.
 
-Inspection and React profiling can add overhead. Take the mounted census
-outside timing runs, then repeat representative timing runs with and without
-React profiling/recording. Do not claim a speedup from changed instrumentation.
-For each scenario, run five paired controls with the same native capture but
-React profiling/recording detached. Pre-register a conservative noise band:
-the larger within-condition max-minus-min range across five repetitions,
-plus the absolute difference between attached and detached medians. Use the
-metric's native units (CPU percentage points, MiB or missed-deadline percentage
-points). A finding or later improvement must exceed that band; if the band
-obscures the threshold, gather more controlled evidence or report BLOCKED.
+Inspection and React profiling can add overhead. Run the paired controls and
+apply the noise-band method in [Pre-register before capture](#pre-register-before-capture).
+Do not claim a speedup from changed instrumentation.
 
 ## Physical iOS: Instruments and xctrace
 
-Use an owner-authorized, connected, isolated iPhone. Argent's simulator React
-profiler does not satisfy physical-iPhone acceptance.
+Use an authorized, connected, isolated iPhone. A simulator React profiler,
+regardless of the tool driving it, does not satisfy physical-device acceptance.
 
 1. In Instruments, select the device and exact Shelvr development binary.
    Record Animation Hitches (or Core Animation frame information available on
@@ -157,14 +184,13 @@ profiler does not satisfy physical-iPhone acceptance.
    original `.trace`. If attachment, symbols or frame data are missing,
    record that limitation instead of substituting React render durations.
 
-## Physical Android: Perfetto, owner follow-up only
+## Physical Android: Perfetto
 
-Android behaviour and profiling are **not verified** in this mission. Never
-start an Android emulator or use adb for mission work. These instructions are
-for a separately authorized owner run on an isolated physical Android device.
+Use an authorized, isolated physical Android device. Emulator traces do not
+count as physical-device acceptance.
 
 Use the device's Developer options → System tracing interface to record and
-share a Perfetto trace without emulator/adb commands. Use a profileable
+share a Perfetto trace. Use a profileable
 development binary. Enable the available graphics/FrameTimeline, scheduler,
 CPU frequency and process-memory counters; record OS and source availability.
 Open the trace in Perfetto and select Shelvr's process/surface:
@@ -185,20 +211,8 @@ cadence in any later comparison.
 
 ## Attribution, materiality and decision
 
-Before capture, the owner must accept the following proposed thresholds or
-record alternatives in the run plan. Do not choose a threshold after seeing
-the results. A material finding must recur in at least four of five valid
-warm repetitions of a scenario and exceed instrumentation/run-to-run noise:
-
-- Missed-deadline fraction at least 5%, with symbolized hint/worklet/Skia
-  activity overlapping the missed frames and accounting for at least 20% of
-  sampled CPU in those windows, and critical-path evidence that hint work
-  delays presentation beyond the deadline. Overlap alone does not qualify:
-  if decoding or another task explains the deadline miss, or the dependency
-  cannot be resolved, the frame attribution is BLOCKED; or
-- Hint-attributed CPU at least 5% of one core averaged over the window; or
-- At least 5 MiB retained native allocations attributed to hints/canvases
-  after restoration, not decoded images or general renderer caches.
+Apply the thresholds, repetition requirement and noise band recorded in
+[Pre-register before capture](#pre-register-before-capture).
 
 Separate decoding/upload stacks, network/fixture work, general renderer work
 and profiler overhead from hint progress, opacity subscriptions and badge
@@ -213,11 +227,7 @@ ambiguous, stop at BLOCKED. This protocol does not add product instrumentation.
 | NOT PURSUED | Complete, valid physical-device matrix with adequate attribution coverage, no meaningful hint cost against the accepted threshold; leave product code unchanged as the measurement outcome |
 | BLOCKED     | No safe physical device/build, unavailable required metrics/symbols, unacceptable confounding/noise, or inconclusive attribution; list what is missing, never call acceptance complete     |
 
-For a later comparison, pre-register the specific metric and target: at least
-15% improvement in the attributed CPU or retained memory cost, or at least
-2 percentage points fewer missed deadlines for the frame finding, exceeding
-the observed noise band. Require identical conditions and no swipe/Undo
-regression. Do not substitute reduced canvas counts for that measured benefit.
+Evaluate later comparisons against the pre-registered metric and target.
 
 Publish a redacted evidence bundle containing metadata, synthetic manifest,
 scenario timestamps, all per-run metric tables, filtered count artifacts,
