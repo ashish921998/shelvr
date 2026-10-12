@@ -50,6 +50,8 @@ test("shares Query 2 and preserves reporting group and source boundaries", () =>
   assert.equal((production.match(/-- source:begin /g) ?? []).length, 4);
   assert.equal((production.match(/cohort AS \(SELECT toDateTime/g) ?? []).length, 4);
   assert.doesNotMatch(production, /is_internal = 0 AND|trial_windows AS|trial_pre_terminal AS/);
+  assert.doesNotMatch(production, /\bx\.matched_attribution/);
+  assert.match(production, /attribution\.matched_attribution/);
   for (const id of queryIds) {
     const tail = region(production, "final", id);
     assert.match(tail, /reported AS \(SELECT \* FROM .* WHERE is_internal = 0\)/);

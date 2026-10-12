@@ -401,7 +401,7 @@ trial_report AS (
         t.product AS product_id,
         t.deliveries AS deliveries,
         coalesce(attribution.matched_attempt_id, '') AS attempt_id,
-        if(empty(coalesce(attribution.matched_attribution, '')), 'unmatched', x.matched_attribution) AS attribution,
+        if(empty(coalesce(attribution.matched_attribution, '')), 'unmatched', attribution.matched_attribution) AS attribution,
         coalesce(attribution.candidate_attempts, 0) AS candidate_attempts,
         c.account_trial_count AS account_trial_count,
         t.trial_started_at = c.first_trial_at AS is_first_trial,
