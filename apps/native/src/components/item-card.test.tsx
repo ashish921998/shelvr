@@ -2,6 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { cloneElement, isValidElement, type ReactNode } from "react";
 import { View } from "react-native";
+import { MenuView } from "@expo/ui/community/menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemCard, type FeedItem } from "./item-card";
 
@@ -157,6 +158,25 @@ function card(item: Partial<FeedItem>, name: string) {
   render(<ItemCard item={{ ...base, ...item }} />);
   return screen.getByRole("button", { name });
 }
+
+it("skips re-rendering when the feed passes an equal source in a new object", () => {
+  const item = { ...base, title: "Miso soup recipe" };
+  const menuRenders = () => vi.mocked(MenuView).mock.calls.length;
+  const { rerender } = render(
+    <ItemCard item={item} source={{ from: "home" }} />,
+  );
+  const first = menuRenders();
+
+  rerender(<ItemCard item={item} source={{ from: "home" }} />);
+  expect(menuRenders()).toBe(first);
+
+  rerender(<ItemCard item={item} source={{ from: "search", q: "miso" }} />);
+  expect(menuRenders()).toBeGreaterThan(first);
+
+  const searched = menuRenders();
+  rerender(<ItemCard item={item} source={{ from: "search", q: "soup" }} />);
+  expect(menuRenders()).toBeGreaterThan(searched);
+});
 
 it("reads a card out by its title", () => {
   expect(card({ title: "Miso soup recipe" }, "Miso soup recipe")).toBeTruthy();

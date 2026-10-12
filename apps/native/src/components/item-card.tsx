@@ -84,10 +84,7 @@ function cardMenuActions({
   return actions;
 }
 
-// Memoized: feed rows are the highest-churn surface in the app (every live-query
-// tick and parent re-render touches the list), so skip re-renders when a row's
-// `item` ref is unchanged.
-export const ItemCard = memo(function ItemCard({
+function ItemCardView({
   item,
   source,
 }: {
@@ -310,7 +307,29 @@ export const ItemCard = memo(function ItemCard({
       </Link>
     </Animated.View>
   );
-});
+}
+
+// Feeds pass `source` as a fresh literal on every render, so it is compared by
+// value: comparing the reference would never let a row skip.
+function sameSource(a?: ItemSource, b?: ItemSource) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const aEntries = Object.entries(a);
+  const other: Record<string, unknown> = b;
+  return (
+    aEntries.length === Object.keys(b).length &&
+    aEntries.every(([key, value]) => other[key] === value)
+  );
+}
+
+// Memoized: feed rows are the highest-churn surface in the app (every live-query
+// tick and parent re-render touches the list), so skip re-renders when a row's
+// `item` ref and `source` value are unchanged.
+export const ItemCard = memo(
+  ItemCardView,
+  (prev, next) =>
+    prev.item === next.item && sameSource(prev.source, next.source),
+);
 
 const styles = StyleSheet.create(() => ({
   cell: {
