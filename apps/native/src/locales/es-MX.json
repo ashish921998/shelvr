@@ -52,6 +52,7 @@
   "common.save": "Guardar",
   "errors.saveTitle": "No se ha podido guardar",
   "errors.tryAgain": "Algo ha salido mal. Vuelve a intentarlo.",
+  "errors.notALink": "Eso no es un enlace. Revísalo e inténtalo de nuevo.",
   "errors.batchSaveTitle": "No se han podido guardar todas las imágenes",
   "capture.retryFailed": "El reintento ha fallado",
   "common.done": "Listo",

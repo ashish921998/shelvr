@@ -52,6 +52,7 @@
   "common.save": "저장",
   "errors.saveTitle": "저장하지 못했어요",
   "errors.tryAgain": "문제가 발생했어요. 다시 시도해 주세요.",
+  "errors.notALink": "링크가 아니에요. 확인한 뒤 다시 시도해 주세요.",
   "errors.batchSaveTitle": "모든 이미지를 저장하지 못했어요",
   "capture.retryFailed": "다시 시도 실패",
   "common.done": "완료",

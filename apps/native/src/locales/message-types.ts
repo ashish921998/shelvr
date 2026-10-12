@@ -53,6 +53,7 @@ export type MessageParams = {
   "common.save": undefined;
   "errors.saveTitle": undefined;
   "errors.tryAgain": undefined;
+  "errors.notALink": undefined;
   "errors.batchSaveTitle": undefined;
   "capture.retryFailed": undefined;
   "common.done": undefined;
