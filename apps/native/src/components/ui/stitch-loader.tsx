@@ -4,6 +4,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   interpolate,
+  ReduceMotion,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -39,9 +40,19 @@ export function useLoop(period: number, easing = Easing.linear) {
       return;
     }
     progress.value = 0;
+    // The startup check above decides Reduce Motion. The animations opt out of
+    // the system flag: if it is switched on mid-session, a System animation
+    // would jump to 1, where the row and the mark have faded out.
     progress.value = withRepeat(
-      withTiming(1, { duration: period, easing }),
+      withTiming(1, {
+        duration: period,
+        easing,
+        reduceMotion: ReduceMotion.Never,
+      }),
       -1,
+      false,
+      undefined,
+      ReduceMotion.Never,
     );
     return () => cancelAnimation(progress);
   }, [easing, period, progress, reducedMotion]);

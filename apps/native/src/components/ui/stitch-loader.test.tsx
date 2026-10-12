@@ -5,7 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const motion = vi.hoisted(() => ({
   reduced: false,
-  withRepeat: vi.fn((animation: unknown) => animation),
+  withRepeat: vi.fn((animation: unknown, _repeats?: number) => animation),
   cancelAnimation: vi.fn(),
 }));
 
@@ -22,6 +22,7 @@ vi.mock("react-native-reanimated", () => ({
   },
   Easing: { linear: (t: number) => t },
   interpolate: () => 1,
+  ReduceMotion: { Never: "never" },
   useAnimatedStyle: (worklet: () => unknown) => worklet(),
   useReducedMotion: () => motion.reduced,
   useSharedValue: (value: number) => ({ value }),
@@ -43,7 +44,7 @@ it("sews a ring of eight stitches and stops the loop when it leaves", async () =
   const { StitchRing } = await import("./stitch-loader");
   const { getAllByTestId, unmount } = render(<StitchRing />);
   expect(getAllByTestId("stitch")).toHaveLength(8);
-  expect(motion.withRepeat).toHaveBeenCalledWith(expect.anything(), -1);
+  expect(motion.withRepeat.mock.calls[0]?.[1]).toBe(-1);
   unmount();
   expect(motion.cancelAnimation).toHaveBeenCalledTimes(1);
 });
