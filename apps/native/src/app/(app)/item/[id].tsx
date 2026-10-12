@@ -344,7 +344,7 @@ function useRemoveFromSpace({
   from,
   spaceId,
   activeId,
-  activeIsSuggested,
+  space,
   items,
   listRef,
   goTo,
@@ -354,7 +354,7 @@ function useRemoveFromSpace({
   from: string | undefined;
   spaceId: string | undefined;
   activeId: string;
-  activeIsSuggested: boolean;
+  space: { items: { _id: string }[] } | null | undefined;
   items: DetailItem[] | undefined;
   listRef: RefObject<FlashListRef<DetailItem> | null>;
   goTo: (id: string) => void;
@@ -363,7 +363,12 @@ function useRemoveFromSpace({
 }) {
   const router = useRouter();
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
-  const available = from === "space" && !!spaceId && !activeIsSuggested;
+  // Read live from the space's saved list, not the route: the save may have
+  // left the space in Change spaces while this screen stayed open.
+  const available =
+    from === "space" &&
+    !!spaceId &&
+    !!space?.items.some((item) => item._id === activeId);
   // A second tap while the first is in flight would navigate twice.
   const pending = useRef(false);
   const remove = useCallback(async () => {
@@ -725,7 +730,7 @@ function ItemScreenContent() {
     from,
     spaceId,
     activeId,
-    activeIsSuggested,
+    space: spaceQ.data,
     items,
     listRef,
     goTo,
