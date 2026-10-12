@@ -19,13 +19,9 @@ type TokenStore = {
 
 type SessionDependencies = {
   getToken: (requestPermission: boolean) => Promise<string | null>;
-  saveToken: (
-    token: string,
-    locale?: string,
-    timezone?: string,
-  ) => Promise<unknown>;
-  getLocale?: () => string;
-  getTimezone?: () => string | undefined;
+  saveToken: (registration: RegistrationSnapshot) => Promise<unknown>;
+  getLocale: () => string;
+  getTimezone: () => string;
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   setSaveReminders: (enabled: boolean) => Promise<unknown>;
@@ -42,10 +38,10 @@ type NotificationOperation =
   | "sign_out"
   | "delete_account";
 
-type RegistrationSnapshot = {
+export type RegistrationSnapshot = {
   token: string;
-  locale: string | undefined;
-  timezone: string | undefined;
+  locale: string;
+  timezone: string;
 };
 
 export class NotificationDeviceSession {
@@ -106,8 +102,20 @@ export class NotificationDeviceSession {
     return (
       !this.paused &&
       this.registeredSnapshot !== null &&
-      this.registeredSnapshot.locale === this.deps.getLocale?.() &&
-      this.registeredSnapshot.timezone === this.deps.getTimezone?.()
+      this.matchesEnvironment(this.registeredSnapshot)
+    );
+  }
+
+  private matchesEnvironment(
+    snapshot: RegistrationSnapshot,
+    environment = {
+      locale: this.deps.getLocale(),
+      timezone: this.deps.getTimezone(),
+    },
+  ) {
+    return (
+      snapshot.locale === environment.locale &&
+      snapshot.timezone === environment.timezone
     );
   }
 
@@ -135,13 +143,13 @@ export class NotificationDeviceSession {
           this.registrationBlocked = false;
           return false;
         }
-        const locale = this.deps.getLocale?.();
-        const timezone = this.deps.getTimezone?.();
+        const locale = this.deps.getLocale();
+        const timezone = this.deps.getTimezone();
         const snapshot = { token, locale, timezone };
+        const registered = this.registeredSnapshot;
         if (
-          token === this.registeredSnapshot?.token &&
-          locale === this.registeredSnapshot.locale &&
-          timezone === this.registeredSnapshot.timezone
+          registered?.token === token &&
+          this.matchesEnvironment(registered, snapshot)
         )
           return true;
         // Persist before the server write so a restart can still revoke an accepted token.
@@ -149,10 +157,7 @@ export class NotificationDeviceSession {
         if (!tokens.includes(token)) await this.store.write([...tokens, token]);
         if (!current()) return false;
         try {
-          if (this.deps.getTimezone)
-            await this.deps.saveToken(token, locale, timezone);
-          else if (locale === undefined) await this.deps.saveToken(token);
-          else await this.deps.saveToken(token, locale);
+          await this.deps.saveToken(snapshot);
         } catch (error) {
           if (current()) this.registrationBlocked = isOwnershipConflict(error);
           throw error;

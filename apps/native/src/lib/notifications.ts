@@ -58,7 +58,7 @@ export function useNotificationSession() {
   return { session, operation };
 }
 
-function getNotificationTimezone(): string | undefined {
+function getNotificationTimezone(): string {
   return (
     Localization.getCalendars()[0]?.timeZone ??
     Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -86,12 +86,10 @@ export function NotificationSessionProvider({
         getToken: getExpoPushToken,
         getLocale: currentLocale,
         getTimezone: getNotificationTimezone,
-        saveToken: (token, locale, timezone) =>
+        saveToken: (registration) =>
           registerDevice({
-            token,
-            locale,
+            ...registration,
             platform: Platform.OS === "ios" ? "ios" : "android",
-            timezone,
           }),
         revokeToken: (token) => unregisterDevice({ token }),
         setWeeklyShelf: (enabled) =>

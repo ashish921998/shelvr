@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
-import { NotificationDeviceSession } from "./notification-device-session";
+import {
+  NotificationDeviceSession,
+  type RegistrationSnapshot,
+} from "./notification-device-session";
 
 function deferred() {
   let resolve!: () => void;
@@ -12,8 +15,8 @@ function deferred() {
 
 function setup(
   initial: string[] = [],
-  getLocale?: () => string,
-  getTimezone?: () => string | undefined,
+  getLocale = () => "en",
+  getTimezone = () => "UTC",
 ) {
   let tokens = initial;
   const deps = {
@@ -22,9 +25,7 @@ function setup(
     getToken: vi.fn(
       async (_requestPermission: boolean): Promise<string | null> => "token-a",
     ),
-    saveToken: vi.fn(
-      async (_token: string, _locale?: string, _timezone?: string) => {},
-    ),
+    saveToken: vi.fn(async (_registration: RegistrationSnapshot) => {}),
     revokeToken: vi.fn(async (_token: string) => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
@@ -69,7 +70,9 @@ describe("notification device session", () => {
     expect(session.shouldRetryRegistration()).toBe(true);
     await Promise.all([session.register(), session.register()]);
     expect(session.shouldRetryRegistration()).toBe(false);
-    expect(deps.saveToken.mock.calls).toEqual([
+    expect(
+      deps.saveToken.mock.calls.map(([r]) => [r.token, r.locale, r.timezone]),
+    ).toEqual([
       ["token-a", "en", "Europe/Berlin"],
       ["token-a", "en", "Asia/Tokyo"],
       ["token-a", "en", "America/New_York"],
@@ -206,10 +209,12 @@ describe("notification device session", () => {
     locale = "ja";
     await session.register();
     await session.register();
-    expect(deps.saveToken.mock.calls).toEqual([
-      ["token-a", "en"],
-      ["token-a", "ja"],
-    ]);
+    expect(deps.saveToken.mock.calls.map(([r]) => [r.token, r.locale])).toEqual(
+      [
+        ["token-a", "en"],
+        ["token-a", "ja"],
+      ],
+    );
   });
 
   it("captures language with the registration while a server write is pending", async () => {
@@ -223,10 +228,12 @@ describe("notification device session", () => {
     const second = session.register();
     writing.resolve();
     await Promise.all([first, second]);
-    expect(deps.saveToken.mock.calls).toEqual([
-      ["token-a", "de"],
-      ["token-a", "ja"],
-    ]);
+    expect(deps.saveToken.mock.calls.map(([r]) => [r.token, r.locale])).toEqual(
+      [
+        ["token-a", "de"],
+        ["token-a", "ja"],
+      ],
+    );
   });
 
   it("deduplicates overlapping boot and token-event registrations", async () => {
@@ -311,7 +318,11 @@ describe("notification device session", () => {
     await expect(session.signOut()).rejects.toThrow("offline");
     expect(end).not.toHaveBeenCalled();
     await session.register();
-    expect(deps.saveToken).toHaveBeenCalledWith("token-a");
+    expect(deps.saveToken).toHaveBeenCalledWith({
+      token: "token-a",
+      locale: "en",
+      timezone: "UTC",
+    });
     revoke.mockResolvedValue(undefined);
     await session.signOut();
     expect(revoke).toHaveBeenCalledWith("token-old");
@@ -370,7 +381,11 @@ describe("notification device session", () => {
     deps.deleteAccount.mockRejectedValueOnce(new Error("offline"));
     await expect(session.deleteAccount()).rejects.toThrow("offline");
     await session.register();
-    expect(deps.saveToken).toHaveBeenCalledWith("token-a");
+    expect(deps.saveToken).toHaveBeenCalledWith({
+      token: "token-a",
+      locale: "en",
+      timezone: "UTC",
+    });
     expect(deps.signOut).not.toHaveBeenCalled();
     expect(deps.resetAnalytics).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toBe("idle");
