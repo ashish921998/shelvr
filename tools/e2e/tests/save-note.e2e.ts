@@ -1,7 +1,11 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { SHEET_TRANSITION_MS, startOnSeededHome } from "./seeded-home.ts";
+import {
+  chooseAddOption,
+  SHEET_TRANSITION_MS,
+  startOnSeededHome,
+} from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -10,8 +14,7 @@ const NOTE = "Ask the landlord about the quokka mural";
 // A note's own words are searchable, so the check needs no model: the word
 // below is in no seeded save, and only the new note can answer for it.
 test("saves a note and finds it by its own words", async ({ screen }) => {
-  await screen.getByRole("button", "Add").tap();
-  await screen.getByTestId("add-option-note").tap();
+  await chooseAddOption(screen, screen.getByTestId("add-option-note"));
   await screen.getByTestId("add-note-input").fill(NOTE);
   await screen.getByRole("button", "Save").tap();
   // The tab bar stays in the tree under the Add sheet, and the tree has no
