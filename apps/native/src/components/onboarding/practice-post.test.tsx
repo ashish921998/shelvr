@@ -41,7 +41,9 @@ vi.mock("react-native-reanimated", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
+  useUnistyles: () => ({
+    theme: { colors: {}, opacity: { pressed: 0.7, disabled: 0.4 } },
+  }),
 }));
 vi.mock("expo-image", () => ({ Image: mock.empty }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.empty }));

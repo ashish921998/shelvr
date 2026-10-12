@@ -64,7 +64,9 @@ export function PracticePost({
         onPress={onPress}
         style={({ pressed }) => [
           styles.post,
-          disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
+          disabled
+            ? { opacity: theme.opacity.disabled }
+            : pressed && { opacity: theme.opacity.pressed },
         ]}
       >
         <View style={styles.byline}>

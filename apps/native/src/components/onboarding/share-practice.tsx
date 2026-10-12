@@ -263,7 +263,7 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     lineHeight: 18,
-    color: theme.colors.faint,
+    color: theme.colors.muted,
   },
   error: {
     fontFamily: theme.fonts.regular,
