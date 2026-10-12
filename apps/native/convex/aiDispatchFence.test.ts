@@ -10,7 +10,11 @@ import type { ActionCtx } from "./_generated/server";
 import { findProductLinks, processItem, steerItemForSpace } from "./ai";
 import { recommendForSpace } from "./aiRecommendForSpace";
 import { sweepItemEmbeddings } from "./aiEmbeddingSweep";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
+import {
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_SWEEP_PAGE,
+} from "./model/embedding";
 import { newConvexTest } from "./test.setup";
 import { aiAllowed } from "./aiConsent";
 
@@ -212,6 +216,119 @@ async function paused(
 }
 
 describe("AI dispatch uses fresh live ownership", () => {
+  it("revalidates a mixed sweep in one query and maps distinct vectors around empty and gone slots", async () => {
+    const f = await fixture();
+    const [declinedId, goneId, secondId] = await f.t.run(async (ctx) => {
+      await ctx.db.insert("aiConsents", {
+        userId: f.foreignId,
+        status: "declined",
+        version: 1,
+        updatedAt: 0,
+      });
+      const insert = (userId: string, title: string) =>
+        ctx.db.insert("items", {
+          userId,
+          title,
+          type: "note",
+          status: "ready",
+          tags: [],
+          searchText: "",
+        });
+      return [
+        await insert(f.foreignId, "Declined synthetic"),
+        await insert(f.userId, "Gone synthetic"),
+        await insert(f.userId, "Second allowed"),
+      ];
+    });
+    const secondVector = vector.map((value, i) =>
+      i === 1 ? 1 : value === 1 ? 0 : value,
+    );
+    embedMany.mockResolvedValue({ embeddings: [vector, secondVector] });
+    await f.t.action(async (ctx) => {
+      let batches = 0;
+      const runQuery: ActionCtx["runQuery"] = async (ref, ...args) => {
+        const name = getFunctionName(ref);
+        expect(["aiConsent:isAllowed", "items:getItemInternal"]).not.toContain(
+          name,
+        );
+        if (name === "aiConsent:revalidateEmbeddingBatch") batches++;
+        const result = await ctx.runQuery(ref, ...args);
+        if (name === "items:listItemsNeedingEmbeddingInternal")
+          await f.t.run((db) => db.db.delete(goneId));
+        return result;
+      };
+      await handler(sweepItemEmbeddings)({ ...ctx, runQuery }, {});
+      expect(batches).toBe(1);
+    });
+    expect(embedMany.mock.calls[0][0].values).toEqual([
+      expect.stringContaining("Synthetic save"),
+      "Second allowed",
+    ]);
+    expect(await f.t.run((ctx) => ctx.db.get(f.itemId))).toMatchObject({
+      embedding: vector,
+    });
+    expect(await f.t.run((ctx) => ctx.db.get(secondId))).toMatchObject({
+      embedding: secondVector,
+    });
+    expect(await f.t.run((ctx) => ctx.db.get(declinedId))).toMatchObject({
+      embeddingVersion: CURRENT_EMBEDDING_VERSION,
+    });
+    expect(
+      (await f.t.run((ctx) => ctx.db.get(declinedId)))?.embedding,
+    ).toBeUndefined();
+  });
+
+  it("reads recommendation context once before embedding and survivors once after hydration", async () => {
+    const f = await fixture();
+    const calls: string[] = [];
+    embedMany.mockImplementation(async ({ values }: { values: string[] }) => {
+      expect(calls).toEqual(["spaces:recommendationContext"]);
+      return { embeddings: values.map(() => vector) };
+    });
+    generateObject.mockImplementation(async () => {
+      expect(
+        calls.filter((name) => name === "spaces:survivingCandidates"),
+      ).toHaveLength(1);
+      expect(calls.indexOf("spaces:survivingCandidates")).toBeGreaterThan(
+        calls.indexOf("items:listReadyItemsInternal"),
+      );
+      return { object: { itemNumbers: [] } };
+    });
+    await f.t.action(async (ctx) => {
+      const runQuery: ActionCtx["runQuery"] = async (ref, ...args) => {
+        calls.push(getFunctionName(ref));
+        return await ctx.runQuery(ref, ...args);
+      };
+      await handler(recommendForSpace)(
+        { ...ctx, runQuery },
+        { spaceId: f.spaceId },
+      );
+    });
+    expect(
+      calls.filter((name) => name === "spaces:recommendationContext"),
+    ).toHaveLength(1);
+    expect(generateObject).toHaveBeenCalledOnce();
+  });
+
+  it("rejects oversized sweep batches and empty recommendation validation", async () => {
+    const f = await fixture();
+    await expect(
+      f.t.query(internal.aiConsent.revalidateEmbeddingBatch, {
+        entries: Array.from({ length: EMBEDDING_SWEEP_PAGE + 1 }, () => ({
+          itemId: f.itemId,
+          userId: f.userId,
+        })),
+      }),
+    ).rejects.toThrow("Too many embedding entries");
+    await expect(
+      f.t.query(internal.spaces.survivingCandidates, {
+        spaceId: f.spaceId,
+        userId: f.userId,
+        itemIds: [],
+      }),
+    ).rejects.toThrow("No candidates");
+  });
+
   it.each(["note", "text product"] as const)(
     "uses one consent query before the %s model call",
     async (path) => {
