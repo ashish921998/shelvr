@@ -77,6 +77,10 @@ describe("isGrounded", () => {
       true,
     );
     expect(isGrounded("Si Si", source({ title: "This is it" }))).toBe(false);
+    expect(isGrounded("Go", source({ title: "Go try the vodka pasta" }))).toBe(
+      false,
+    );
+    expect(isGrounded("A", source({ title: "A great night out" }))).toBe(false);
   });
 });
 

@@ -159,8 +159,11 @@ function namesPlace(name: string, evidence: Evidence): boolean {
   if (strong.length > 0) {
     return strong.every((word) => evidence.text.includes(word));
   }
+  // The whole name must still be long enough to prove anything, so a word
+  // like "Go" or "A" never grounds on its own.
   return (
-    specific.length > 0 && specific.every((word) => evidence.words.has(word))
+    distinctive(specific.join("")) &&
+    specific.every((word) => evidence.words.has(word))
   );
 }
 
