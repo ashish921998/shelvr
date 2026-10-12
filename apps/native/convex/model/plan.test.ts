@@ -65,6 +65,19 @@ describe("isGrounded", () => {
       isGrounded("Cafe", source({ title: "Cute cafe with good coffee" })),
     ).toBe(false);
   });
+
+  it("grounds a short name the save spells out word for word", () => {
+    expect(
+      isGrounded(
+        "Si Si",
+        source({ title: "Si Si", places: ["Si Si, Brooklyn, NY"] }),
+      ),
+    ).toBe(true);
+    expect(isGrounded("Au 79", source({ title: "Bubble tea at Au 79" }))).toBe(
+      true,
+    );
+    expect(isGrounded("Si Si", source({ title: "This is it" }))).toBe(false);
+  });
 });
 
 describe("sanitizePlan", () => {

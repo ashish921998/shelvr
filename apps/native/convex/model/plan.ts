@@ -119,8 +119,20 @@ const GENERIC_WORDS = new Set([
   "spot",
 ]);
 
-function rawSourceText(source: PlanSource): string {
-  return [
+/** What a save offers as evidence: its text squashed whole, for names that
+ * run together ("@parici_cafe"), and its separate words. */
+type Evidence = { text: string; words: Set<string> };
+
+/** Squashed words in any script; punctuation and spaces split them. */
+function wordsOf(text: string): string[] {
+  return text
+    .split(/[^\p{L}\p{N}\p{M}]+/u)
+    .map(squash)
+    .filter(Boolean);
+}
+
+function evidenceOf(source: PlanSource): Evidence {
+  const raw = [
     source.title,
     source.description,
     source.content?.slice(0, PLAN_CONTENT_CHARS),
@@ -129,66 +141,59 @@ function rawSourceText(source: PlanSource): string {
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-/** The save's own text, squashed, that a pick must be found in. */
-function sourceText(source: PlanSource): string {
-  return squash(rawSourceText(source));
-}
-
-/** The save's whole words, squashed, for parts too short to substring-match. */
-function sourceWords(source: PlanSource): Set<string> {
-  return new Set(
-    rawSourceText(source)
-      .split(/[^\p{L}\p{N}\p{M}]+/u)
-      .map(squash)
-      .filter(Boolean),
-  );
-}
-
-function distinctiveWords(text: string): string[] {
-  return text
-    .split(/[\s\-–—&/,.']+/)
-    .map(squash)
-    .filter((word) => distinctive(word) && !GENERIC_WORDS.has(word));
+  return { text: squash(raw), words: new Set(wordsOf(raw)) };
 }
 
 /**
- * True when the save's own text carries the place name. The model may only
- * pick places a save names; this drops one it made up. Every distinctive word
- * of the name must appear, matched against the text with spaces and
- * punctuation removed, so "@parici_cafe" grounds "Par Ici Café" while "Great
- * pasta tonight" does not ground "Pasta Palace".
+ * True when the save names the place. The model may only pick places a save
+ * names; this drops one it made up. A name made only of generic words
+ * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
+ * every distinctive word must appear in the squashed text, so "@parici_cafe"
+ * grounds "Par Ici Café" while "Great pasta tonight" does not ground "Pasta
+ * Palace". A name with no distinctive word ("Si Si", "Au 79") must appear
+ * word for word.
  */
+function namesPlace(name: string, evidence: Evidence): boolean {
+  const specific = wordsOf(name).filter((word) => !GENERIC_WORDS.has(word));
+  const strong = specific.filter(distinctive);
+  if (strong.length > 0) {
+    return strong.every((word) => evidence.text.includes(word));
+  }
+  return (
+    specific.length > 0 && specific.every((word) => evidence.words.has(word))
+  );
+}
+
 export function isGrounded(name: string, source: PlanSource): boolean {
-  const haystack = sourceText(source);
-  if (haystack === "") return false;
-  // A name made only of generic words ("Cafe") describes a save, it does not
-  // name a place, so it never grounds.
-  const words = distinctiveWords(name);
-  return words.length > 0 && words.every((word) => haystack.includes(word));
+  return namesPlace(name, evidenceOf(source));
+}
+
+/** A word of an area: a whole word of the save, or a distinctive one inside
+ * its squashed text ("#soho"). */
+function supportsAreaWord(word: string, evidence: Evidence): boolean {
+  return (
+    evidence.words.has(word) ||
+    (distinctive(word) && evidence.text.includes(word))
+  );
 }
 
 /**
  * Keep only the parts of an area the save names: it goes to Maps and shares.
- * Each comma-separated part must have every distinctive word in the save, so
- * "SoHo, London" on a save about SoHo in New York keeps "SoHo" and never
- * sends anyone to the wrong city. A part too short to be distinctive, such as
- * a state code ("IL"), must appear in the save as a whole word.
+ * Every word of each comma-separated part must be in the save, so "SoHo,
+ * London" on a save about SoHo in New York keeps "SoHo" and never sends
+ * anyone to the wrong city, and a state code ("IL") stays only when the save
+ * has it as a word.
  */
-function groundedArea(area: string, source: PlanSource): string {
-  const haystack = sourceText(source);
-  const wholeWords = sourceWords(source);
+function groundedArea(area: string, evidence: Evidence): string {
   return area
     .split(",")
     .map((part) => part.trim())
     .filter((part) => {
-      const words = distinctiveWords(part);
-      if (words.length === 0) {
-        const whole = squash(part);
-        return whole !== "" && wholeWords.has(whole);
-      }
-      return words.every((word) => haystack.includes(word));
+      const words = wordsOf(part);
+      return (
+        words.length > 0 &&
+        words.every((word) => supportsAreaWord(word, evidence))
+      );
     })
     .join(", ");
 }
@@ -210,11 +215,13 @@ export function sanitizePlan(
     const source = sources[n - 1];
     const name = clip(pick.name, MAX_NAME_CHARS);
     const key = squash(name);
-    if (key === "" || seen.has(key) || !isGrounded(name, source)) continue;
+    if (key === "" || seen.has(key)) continue;
+    const evidence = evidenceOf(source);
+    if (!namesPlace(name, evidence)) continue;
     const why = clip(pick.why, MAX_WHY_CHARS);
     if (why === "") continue;
     seen.add(key);
-    const area = groundedArea(clip(pick.area, MAX_AREA_CHARS), source);
+    const area = groundedArea(clip(pick.area, MAX_AREA_CHARS), evidence);
     places.push({
       name,
       ...(area !== "" ? { area } : {}),
