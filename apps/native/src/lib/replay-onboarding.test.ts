@@ -179,7 +179,7 @@ describe("useReplayOnboarding", () => {
 
   it("keeps every failed space after a complete failure without retrying itself", async () => {
     store.setPendingSpaces(["Recipes", "Travel"]);
-    const operationId = store.getOrCreatePendingOperationId();
+    const operationId = store.getPendingReplayWork()?.operationId;
     spacesFailing("all");
     const hook = mountReplay();
     await flush();
@@ -197,7 +197,7 @@ describe("useReplayOnboarding", () => {
 
   it("persists only the failed subset after a partial success, with no immediate second pass", async () => {
     store.setPendingSpaces(["Recipes", "Travel"]);
-    const operationId = store.getOrCreatePendingOperationId();
+    const operationId = store.getPendingReplayWork()?.operationId;
     spacesFailing(["Travel"]);
     const hook = mountReplay();
     await flush();
@@ -320,7 +320,7 @@ describe("useReplayOnboarding", () => {
       await act(async () => {
         store.setPendingSpaces(["Travel"]);
       });
-      const newOperationId = store.getOrCreatePendingOperationId();
+      const newOperationId = store.getPendingReplayWork()?.operationId;
       await flush();
       // Serialized: the new work waits for the in-flight run.
       expect(createdNames()).toEqual(["Recipes"]);
@@ -490,7 +490,7 @@ describe("useReplayOnboarding", () => {
     await act(async () => {
       store.setPendingSpaces(["Travel"]);
     });
-    expect(store.getOrCreatePendingOperationId()).toBe("legacy-operation");
+    expect(store.getPendingReplayWork()?.operationId).toBe("legacy-operation");
     await act(async () => {
       link.resolve("item-1");
     });

@@ -2,12 +2,13 @@ import type { Id } from "@convex/_generated/dataModel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearLegacyDemoUrlIfSaved,
+  clearLegacyDemoUrl,
   clearPending,
   getOnboardingProgress,
-  getOrCreatePendingOperationId,
-  getPendingDemoUrl,
+  getPendingReplayWork,
+  remainingReplayWork,
+  withoutDemoReplayWork,
   getPendingOnboardingRevision,
-  getPendingSpaces,
   hasPending,
   setOnboardingProgress,
   setPendingDemo,
@@ -50,6 +51,32 @@ describe("the replay's pending-space updates", () => {
     };
   }
 
+  it("publishes the predicted work for partial spaces and a saved legacy demo", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "legacy-operation",
+        spaces: ["Recipes", "Travel"],
+        demoUrl: "https://example.com/queued",
+      }),
+    );
+    const work = getPendingReplayWork();
+    if (work === null) throw new Error("Missing seeded replay work");
+    const remaining = remainingReplayWork(work, ["Travel"]);
+    const withoutDemo = withoutDemoReplayWork(remaining);
+    expect(setItem).not.toHaveBeenCalled();
+    const snapshots: unknown[] = [];
+    const unsubscribe = subscribePendingOnboarding(() => {
+      snapshots.push(getPendingReplayWork());
+    });
+    updatePendingSpaces(remaining.spaces);
+    clearLegacyDemoUrl();
+    expect(snapshots).toEqual([remaining, withoutDemo]);
+    expect(work.spaces).toEqual(["Recipes", "Travel"]);
+    expect(work.demoUrl).toBe("https://example.com/queued");
+    unsubscribe();
+  });
+
   it("treats an ordered-identical update as a no-op: no write, no notification, same operation", () => {
     storage.set(
       "shelvr.pending.onboarding",
@@ -67,9 +94,9 @@ describe("the replay's pending-space updates", () => {
     expect(setItem).not.toHaveBeenCalled();
     expect(observed.listener).not.toHaveBeenCalled();
     expect(observed.revisionAdvancedBy()).toBe(0);
-    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
-    expect(getPendingSpaces()).toEqual(["Recipes", "Inspiration"]);
-    expect(getPendingDemoUrl()).toBe("https://example.com/queued");
+    expect(getPendingReplayWork()?.operationId).toBe("legacy-operation");
+    expect(getPendingReplayWork()?.spaces).toEqual(["Recipes", "Inspiration"]);
+    expect(getPendingReplayWork()?.demoUrl).toBe("https://example.com/queued");
     expect(
       JSON.parse(storage.get("shelvr.pending.onboarding") ?? "").demo,
     ).toEqual(demo);
@@ -87,7 +114,7 @@ describe("the replay's pending-space updates", () => {
 
   it("writes and notifies once when the order differs, keeping the operation", () => {
     setPendingSpaces(["Recipes", "Inspiration"]);
-    const operationId = getOrCreatePendingOperationId();
+    const operationId = getPendingReplayWork()?.operationId;
     const observed = observe();
 
     updatePendingSpaces(["Inspiration", "Recipes"]);
@@ -95,8 +122,8 @@ describe("the replay's pending-space updates", () => {
     expect(setItem).toHaveBeenCalledOnce();
     expect(observed.listener).toHaveBeenCalledOnce();
     expect(observed.revisionAdvancedBy()).toBe(1);
-    expect(getPendingSpaces()).toEqual(["Inspiration", "Recipes"]);
-    expect(getOrCreatePendingOperationId()).toBe(operationId);
+    expect(getPendingReplayWork()?.spaces).toEqual(["Inspiration", "Recipes"]);
+    expect(getPendingReplayWork()?.operationId).toBe(operationId);
     observed.unsubscribe();
   });
 
@@ -108,7 +135,7 @@ describe("the replay's pending-space updates", () => {
 
     expect(setItem).toHaveBeenCalledOnce();
     expect(observed.listener).toHaveBeenCalledOnce();
-    expect(getPendingSpaces()).toEqual(["Inspiration"]);
+    expect(getPendingReplayWork()?.spaces).toEqual(["Inspiration"]);
     observed.unsubscribe();
   });
 
@@ -147,8 +174,8 @@ describe("onboarding recovery", () => {
     );
     setPendingSpaces(["Recipes", "Inspiration"]);
     updatePendingSpaces([]);
-    expect(getPendingDemoUrl()).toBe("https://example.com");
-    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
+    expect(getPendingReplayWork()?.demoUrl).toBe("https://example.com");
+    expect(getPendingReplayWork()?.operationId).toBe("legacy-operation");
     expect(hasPending()).toBe(true);
   });
 
@@ -164,7 +191,7 @@ describe("onboarding recovery", () => {
     clearLegacyDemoUrlIfSaved("https://example.org/");
     expect(hasPending()).toBe(true);
     clearLegacyDemoUrlIfSaved("https://example.com/");
-    expect(getPendingDemoUrl()).toBeNull();
+    expect(getPendingReplayWork()?.demoUrl).toBeNull();
     expect(hasPending()).toBe(false);
   });
 
@@ -378,8 +405,8 @@ describe("progress written by an older onboarding flow", () => {
       demo: null,
       saved: null,
     });
-    expect(getPendingDemoUrl()).toBe("https://example.com/queued");
-    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
+    expect(getPendingReplayWork()?.demoUrl).toBe("https://example.com/queued");
+    expect(getPendingReplayWork()?.operationId).toBe("legacy-operation");
   });
 
   it("still hands an older finished record's spaces to the replay", () => {
@@ -393,6 +420,6 @@ describe("progress written by an older onboarding flow", () => {
       }),
     );
     expect(hasPending()).toBe(true);
-    expect(getPendingSpaces()).toEqual(["Recipes"]);
+    expect(getPendingReplayWork()?.spaces).toEqual(["Recipes"]);
   });
 });

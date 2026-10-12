@@ -8,7 +8,9 @@ import {
   clearLegacyDemoUrl,
   clearPending,
   getPendingReplayWork,
-  hasPending,
+  remainingReplayWork,
+  withoutDemoReplayWork,
+  type ReplayWork,
   subscribePendingOnboarding,
   getPendingOnboardingRevision,
   updatePendingSpaces,
@@ -18,6 +20,7 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import { createReplayLedger, sameReplayWork } from "./replay-ledger";
 
 // Onboarding opens its own paywall at the end. A purchase there can finish
 // onboarding before the webhook marks the user entitled, so replay must wait
@@ -57,25 +60,70 @@ export function noteDeclinedDuringOnboarding() {
   onboardingPaywall = "declined";
 }
 
-type ReplayWork = NonNullable<ReturnType<typeof getPendingReplayWork>>;
-
-/** The identity of one unit of replay work. Two reads with the same
- * operation, the same spaces in the same order and the same queued demo link
- * are the same work, however many times the store announced it. */
-function identityOf(work: ReplayWork): string {
-  return JSON.stringify([work.operationId, work.spaces, work.demoUrl]);
-}
-
-function currentIdentity(): string | null {
-  const work = getPendingReplayWork();
-  return work === null ? null : identityOf(work);
+async function runReplay({
+  work,
+  consume,
+  entitled,
+  router,
+  createSpace,
+  createLinkItem,
+  awaitingEntitlement,
+}: {
+  work: ReplayWork;
+  consume: (next: ReplayWork) => void;
+  entitled: boolean;
+  router: ReturnType<typeof useRouter>;
+  createSpace: ReturnType<typeof useMutation<typeof api.spaces.createSpace>>;
+  createLinkItem: ReturnType<
+    typeof useMutation<typeof api.items.createLinkItem>
+  >;
+  awaitingEntitlement: { current: boolean };
+}) {
+  // Ask before Pro-gated mutations; cancellation keeps the pending work.
+  if (!entitled) {
+    await waitForSheetTransition();
+    if (await openPaywall(router, "onboarding")) {
+      awaitingEntitlement.current = true;
+    }
+    return;
+  }
+  awaitingEntitlement.current = false;
+  onboardingPaywall = "unseen";
+  const results = await Promise.allSettled(
+    work.spaces.map((name) => createSpace({ name, dynamic: true })),
+  );
+  const failedSpaces = work.spaces.filter(
+    (_, index) => results[index].status === "rejected",
+  );
+  // Newer work belongs to the deferred pass, not this run's write-back.
+  if (!sameReplayWork(getPendingReplayWork(), work)) return;
+  const remaining = remainingReplayWork(work, failedSpaces);
+  // Consume before publishing; subscribers must never retry this write.
+  consume(remaining);
+  updatePendingSpaces(failedSpaces);
+  if (work.demoUrl) {
+    try {
+      // Only createDemoItem may stamp onboarding_demo on the server.
+      await createLinkItem({
+        url: work.demoUrl,
+        operationId: work.operationId,
+        analyticsSessionId: analytics.sessionId(),
+      });
+    } catch {
+      return;
+    }
+    if (!sameReplayWork(getPendingReplayWork(), remaining)) return;
+    consume(withoutDemoReplayWork(remaining));
+    clearLegacyDemoUrl();
+  }
+  if (failedSpaces.length === 0) clearPending();
 }
 
 /**
  * After onboarding is finished and the user signs in, replay the deferred
  * onboarding spaces, then present the paywall.
  *
- * Each unit of work (see `identityOf`) is attempted at most once per recovery
+ * Each unit of work is attempted at most once per recovery
  * epoch. A mount opens the first epoch and every real entitlement transition
  * opens the next, so work that failed stays in SecureStore until a relaunch,
  * a purchase or a lapse gives it a genuine reason to run again. The store
@@ -98,9 +146,7 @@ export function useReplayOnboarding() {
   const runningRef = useRef(false);
   const deferredPassRef = useRef(false);
   const awaitingEntitlementRef = useRef(false);
-  const settledEntitledRef = useRef<boolean | null>(null);
-  const epochRef = useRef(0);
-  const attemptedRef = useRef({ epoch: 0, identities: new Set<string>() });
+  const ledgerRef = useRef(createReplayLedger());
   const [retryNonce, setRetryNonce] = useState(0);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
@@ -115,15 +161,7 @@ export function useReplayOnboarding() {
     if (!isAuthenticated) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
-    // Only a settled value that differs from the last settled value is a
-    // transition. A query that reloads and lands where it was is not one.
-    if (
-      settledEntitledRef.current !== null &&
-      settledEntitledRef.current !== entitled
-    ) {
-      epochRef.current += 1;
-    }
-    settledEntitledRef.current = entitled;
+    ledgerRef.current.settle(entitled);
 
     if (runningRef.current) {
       // Whatever changed (entitlement, new work, the run's own write-back) is
@@ -132,7 +170,6 @@ export function useReplayOnboarding() {
       deferredPassRef.current = true;
       return;
     }
-    if (!hasPending()) return;
     if (
       !entitled &&
       (awaitingEntitlementRef.current || onboardingPaywall !== "unseen")
@@ -140,95 +177,29 @@ export function useReplayOnboarding() {
       return;
 
     const work = getPendingReplayWork();
-    if (work === null) return;
-    const identity = identityOf(work);
-    if (attemptedRef.current.epoch !== epochRef.current) {
-      attemptedRef.current = {
-        epoch: epochRef.current,
-        identities: new Set(),
-      };
-    }
-    // The run keeps this set even if a transition opens a new epoch while it
-    // is in flight: the identities it consumes belong to the epoch it started
-    // in, and the new epoch judges the leftover work afresh.
-    const attempted = attemptedRef.current.identities;
-    if (attempted.has(identity)) return;
-    attempted.add(identity);
+    if (work === null || (work.spaces.length === 0 && work.demoUrl === null))
+      return;
+    const consume = ledgerRef.current.claim(work);
+    if (consume === null) return;
 
     runningRef.current = true;
 
-    const run = async () => {
-      try {
-        // Show the paywall before Pro-gated mutations. createSpace calls
-        // requireProEntitlement on the server, so it will fail for
-        // non-entitled users. If the user cancels, keep the pending data —
-        // the next epoch (a future purchase through the paywall route) offers
-        // the work again.
-        if (!entitled) {
-          await waitForSheetTransition();
-          const purchased = await openPaywall(router, "onboarding");
-          if (purchased) {
-            // The RevenueCat webhook may not have updated Convex yet. Keep
-            // pending data and wait for the entitlement query to become true.
-            awaitingEntitlementRef.current = true;
-          }
-          return;
-        }
-
-        awaitingEntitlementRef.current = false;
-        onboardingPaywall = "unseen";
-
-        // Match the new-space screen: starter spaces receive AI suggestions.
-        const spaceResults = await Promise.allSettled(
-          work.spaces.map((name) => createSpace({ name, dynamic: true })),
-        );
-        const failedSpaces = work.spaces.filter(
-          (_, index) => spaceResults[index].status === "rejected",
-        );
-        // Work that arrived while the mutations were in flight is newer than
-        // this run's view of the store. Leave it to the deferred pass; the
-        // server deduplicates spaces by name, so nothing created here is
-        // lost to it.
-        if (currentIdentity() !== identity) return;
-        // Persist only the failed work so a later replay retries it without
-        // recreating spaces that already succeeded. Its identity is consumed
-        // before the write publishes it, so the write cannot re-enter here.
-        const remaining = { ...work, spaces: failedSpaces };
-        attempted.add(identityOf(remaining));
-        updatePendingSpaces(failedSpaces);
-
-        if (work.demoUrl) {
-          try {
-            // No saveSource: this replays an onboarding demo, but
-            // `onboarding_demo` is stamped server-side by createDemoItem and
-            // the client must not claim it. No other literal is truthful here.
-            await createLinkItem({
-              url: work.demoUrl,
-              operationId: work.operationId,
-              analyticsSessionId: analytics.sessionId(),
-            });
-          } catch {
-            return;
-          }
-          if (currentIdentity() !== identityOf(remaining)) return;
-          attempted.add(identityOf({ ...remaining, demoUrl: null }));
-          clearLegacyDemoUrl();
-        }
-
-        // Only mark as done when all required mutations succeed.
-        if (failedSpaces.length > 0) return;
-        clearPending();
-      } finally {
-        const deferredPass = deferredPassRef.current;
-        deferredPassRef.current = false;
-        runningRef.current = false;
-        if (deferredPass) {
-          setRetryNonce((nonce) => nonce + 1);
-        }
+    void runReplay({
+      work,
+      consume,
+      entitled,
+      router,
+      createSpace,
+      createLinkItem,
+      awaitingEntitlement: awaitingEntitlementRef,
+    }).finally(() => {
+      const deferredPass = deferredPassRef.current;
+      deferredPassRef.current = false;
+      runningRef.current = false;
+      if (deferredPass) {
+        setRetryNonce((nonce) => nonce + 1);
       }
-    };
-
-    void run();
+    });
   }, [
     isAuthenticated,
     onboarded,

@@ -47,7 +47,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   link lists in `src/lib/import-links.ts`.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
-  `onboarding-steps.ts` and `pending-onboarding.ts`.
+  `onboarding-steps.ts` and `pending-onboarding.ts`. Post-sign-in replay lives
+  in `src/lib/replay-onboarding.ts`; its pure eligibility policy is
+  `src/lib/replay-ledger.ts`.
 - **Copy:** `src/locales/en.json` is the source catalog; `t()` and
   `useAppLocale()` come from `src/lib/i18n.ts`. `src/locales/catalogs.ts`,
   `src/locales/message-types.ts` and

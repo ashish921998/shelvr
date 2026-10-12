@@ -43,6 +43,12 @@ type PendingSaved = {
   savedSpaceNames: string[];
 };
 
+export type ReplayWork = {
+  operationId: string;
+  spaces: string[];
+  demoUrl: string | null;
+};
+
 type PendingRecord = {
   operationId: string;
   spaces: string[];
@@ -244,22 +250,22 @@ export function updatePendingSpaces(spaces: string[]) {
   );
 }
 
-function sameOrder(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((name, i) => name === b[i]);
+/** Predict replay's write-back before it notifies subscribers. */
+export function remainingReplayWork(
+  work: ReplayWork,
+  spaces: string[],
+): ReplayWork {
+  return { ...work, spaces };
 }
 
-export function getPendingSpaces(): string[] {
-  return readPendingRecord()?.spaces ?? [];
+function sameOrder(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((name, i) => name === b[i]);
 }
 
 /** What the replay hook owes, read without creating a record: the operation
  * the work runs under, the spaces still to create, and an older build's
  * queued demo link. Null when nothing is stored. */
-export function getPendingReplayWork(): {
-  operationId: string;
-  spaces: string[];
-  demoUrl: string | null;
-} | null {
+export function getPendingReplayWork(): ReplayWork | null {
   const record = readPendingRecord();
   if (record === null) return null;
   return {
@@ -269,12 +275,8 @@ export function getPendingReplayWork(): {
   };
 }
 
-export function getOrCreatePendingOperationId(): string {
-  return ensureOperationId();
-}
-
 /** Older builds queued this save until purchase. Preserve that intent. */
-export function getPendingDemoUrl(): string | null {
+function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
 }
 
@@ -283,6 +285,11 @@ export function clearLegacyDemoUrl() {
   if (existing === null || existing.demoUrl === null) return;
   writePendingRecord({ ...existing, demoUrl: null });
   notifyChanged();
+}
+
+/** Predict clearing the legacy link before the write notifies subscribers. */
+export function withoutDemoReplayWork(work: ReplayWork): ReplayWork {
+  return { ...work, demoUrl: null };
 }
 
 export function clearLegacyDemoUrlIfSaved(savedUrl: string) {

@@ -4,7 +4,7 @@ import { api } from "@convex/_generated/api";
 import {
   clearPending,
   getOnboardingProgress,
-  getPendingSpaces,
+  getPendingReplayWork,
   resolveOnboardingSpaceName,
   setOnboardingProgress,
   setPendingDemo,
@@ -63,7 +63,7 @@ it("reuses the demo space after a language change and persisted-step resume", as
   const resumed = getOnboardingProgress();
   setPendingSpaces(resumed.spaces.map(resolveOnboardingSpaceName));
   const ids = await Promise.all(
-    getPendingSpaces().map((name) =>
+    (getPendingReplayWork()?.spaces ?? []).map((name) =>
       owner.mutation(api.spaces.createSpace, { name, dynamic: true }),
     ),
   );
