@@ -37,7 +37,7 @@ export default {
         command: {
           executable: "pnpm",
           args: ["exec", "expo", "start", "--dev-client", "--port", metroPort],
-          cwd: "../native",
+          cwd: "../../apps/native",
           startupTimeout: 120_000,
           log: ".e2e/metro.log",
         },
