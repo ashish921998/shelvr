@@ -12,10 +12,12 @@ export type MessageParams = {
   "spaces.dismissSuggestion": undefined;
   "common.share": undefined;
   "spaces.changeMembership": undefined;
+  "spaces.removeFromSpace": undefined;
   "common.delete": undefined;
   "item.actions": undefined;
   "item.deleteTitle": undefined;
   "item.deleteBody": undefined;
+  "item.deleteEverywhere": undefined;
   "common.cancel": undefined;
   "errors.photoUnavailable": undefined;
   "item.stillWorking": undefined;

@@ -28,7 +28,14 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   type LayoutChangeEvent,
@@ -326,6 +333,86 @@ function usePagerPages({
     [pageStyle, pushedId, suggestedIds, acceptedId, onSheetUnderHeader],
   );
   return { renderItem, onListLayout, sheetsUnder, browserOpen };
+}
+
+// Takes the save in view out of the space it was opened from, and only that
+// space: Home and its other spaces keep it. The page leaves the space's list,
+// so slide to a neighbour first, the way dismiss and delete do. A suggested
+// page has its own Dismiss, so only a saved one offers this, and Delete then
+// has to say it reaches every space.
+function useRemoveFromSpace({
+  from,
+  spaceId,
+  activeId,
+  activeIsSuggested,
+  items,
+  listRef,
+  goTo,
+  writeParams,
+  cancelParamWrite,
+}: {
+  from: string | undefined;
+  spaceId: string | undefined;
+  activeId: string;
+  activeIsSuggested: boolean;
+  items: DetailItem[] | undefined;
+  listRef: RefObject<FlashListRef<DetailItem> | null>;
+  goTo: (id: string) => void;
+  writeParams: (id: string) => void;
+  cancelParamWrite: () => void;
+}) {
+  const router = useRouter();
+  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
+  const available = from === "space" && !!spaceId && !activeIsSuggested;
+  const remove = useCallback(async () => {
+    if (!spaceId || !activeId || !items) return;
+    cancelParamWrite();
+    const idx = items.findIndex((i) => i._id === activeId);
+    const neighbor = items[idx + 1] ?? items[idx - 1];
+    const membership = {
+      itemId: activeId as Id<"items">,
+      spaceId: spaceId as Id<"spaces">,
+    };
+    try {
+      await removeItemFromSpace(membership);
+      analytics.capture("item_space_membership_changed", {
+        membership_added: false,
+        item_id: membership.itemId,
+        space_id: membership.spaceId,
+        undone: false,
+      });
+      if (neighbor) {
+        listRef.current?.scrollToIndex({
+          index: Math.min(idx, items.length - 2),
+          animated: true,
+        });
+        goTo(neighbor._id);
+        writeParams(neighbor._id);
+      } else if (router.canGoBack()) router.back();
+      else router.replace("/");
+    } catch {
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    }
+  }, [
+    spaceId,
+    activeId,
+    items,
+    listRef,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+    removeItemFromSpace,
+    router,
+  ]);
+  return {
+    available,
+    remove,
+    deleteLabel: available ? t("item.deleteEverywhere") : t("common.delete"),
+    // Spread straight into the Android header menu.
+    menuActions: available
+      ? [{ label: t("spaces.removeFromSpace"), onPress: remove }]
+      : [],
+  };
 }
 
 function ItemScreenContent() {
@@ -629,6 +716,18 @@ function ItemScreenContent() {
     cancelParamWrite,
   ]);
 
+  const removeFromSpace = useRemoveFromSpace({
+    from,
+    spaceId,
+    activeId,
+    activeIsSuggested,
+    items,
+    listRef,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  });
+
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
   }
@@ -684,8 +783,9 @@ function ItemScreenContent() {
                             },
                           ]
                         : []),
+                      ...removeFromSpace.menuActions,
                       {
-                        label: t("common.delete"),
+                        label: removeFromSpace.deleteLabel,
                         destructive: true,
                         onPress: onDelete,
                       },
@@ -731,11 +831,18 @@ function ItemScreenContent() {
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
+              icon="minus.circle"
+              hidden={!removeFromSpace.available}
+              onPress={removeFromSpace.remove}
+            >
+              {t("spaces.removeFromSpace")}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
               icon="trash"
               destructive
               onPress={onDelete}
             >
-              {t("common.delete")}
+              {removeFromSpace.deleteLabel}
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
