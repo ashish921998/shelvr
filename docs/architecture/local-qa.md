@@ -82,10 +82,12 @@ only loads bundles whose native fingerprint matches. Rebuild with
   is a new anonymous user with an unused demo save. No reinstall needed.
 - **The paywall.** A development anonymous user never sees it:
   `getEntitlement` in `convex/subscriptions.ts` returns `lifetime` for them. To
-  see the real sheet, either sign in with a real account, or temporarily make
-  `useEntitlement` return a lapsed, non-entitled state after its effects (so
-  hook order is preserved) and revert the patch afterwards. Then Home, "Paste a
-  link", "Article" reaches the Pro gate. "Paste a link" does nothing unless a
+  see the real sheet, either sign in with a real account, or launch the
+  development build with the `-E2EHidePro YES` argument
+  (`src/lib/e2e-hide-pro.ts`), which makes the client show that user as not
+  Pro, as the paywall flow in `tools/e2e/tests/paywall.e2e.ts` does. The
+  server still treats them as Pro. Then Home's Add button, or "Paste a link",
+  "Article", reaches the Pro gate. "Paste a link" does nothing unless a
   URL is on the device clipboard. `pbcopy` reads standard input:
   `printf '%s' '<url>' | xcrun simctl pbcopy <udid>`.
 - **Reduced motion.**
