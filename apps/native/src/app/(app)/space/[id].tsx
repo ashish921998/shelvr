@@ -108,11 +108,7 @@ export default function SpaceScreen() {
       hitSlop={8}
       style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
     >
-      <AppSymbolIcon
-        name="sparkles"
-        size={14}
-        tintColor={theme.colors.onTint}
-      />
+      <AppSymbolIcon name="map" size={14} tintColor={theme.colors.onTint} />
       <Text style={styles.planText}>{t("plan.make")}</Text>
     </Pressable>
   ) : null;
@@ -280,8 +276,13 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
+  // One row under the title; wraps only when the text is too wide.
   headerPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: theme.gap(2),
     gap: theme.gap(1),
     marginTop: theme.gap(0.5),
     marginBottom: theme.gap(1),
@@ -304,7 +305,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
-    alignSelf: "center",
     backgroundColor: theme.colors.primarySoft,
     borderRadius: 50,
     paddingVertical: theme.gap(1),
