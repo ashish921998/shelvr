@@ -4,6 +4,13 @@ import { expect } from "e2e";
 const BUNDLE_TIMEOUT = 180_000;
 
 /**
+ * How long an iOS sheet takes to finish opening or closing. The engine's
+ * default allows half a second, and a tap on a control inside a sheet that is
+ * still rising lands on the screen behind it.
+ */
+export const SHEET_TRANSITION_MS = 1000;
+
+/**
  * Starts every test on Home as the anonymous dev user with the fixture data:
  * 4 saves, 3 spaces and a Pro entitlement. Needs AUTH_ENABLE_ANONYMOUS on the
  * dev Convex deployment; the reset button does not exist otherwise.
@@ -39,7 +46,11 @@ export function startOnSeededHome(): void {
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
 
     await profile.tap({ timeout: BUNDLE_TIMEOUT });
-    await screen.getByRole("button", "Settings").tap();
+    // Right after a cold start the first Profile open has taken longer than
+    // a locator's default wait.
+    await screen
+      .getByRole("button", "Settings")
+      .tap({ timeout: BUNDLE_TIMEOUT });
     const reset = screen.getByTestId("reset-flow-fixtures");
     await screen.scrollUntilVisible(reset);
     await reset.tap();
