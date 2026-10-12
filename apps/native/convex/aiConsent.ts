@@ -38,18 +38,16 @@ export async function aiAllowed(
   return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
-/** The action-side check. With `itemId` it also answers no once that save is
+/** The action-side check answers no once that save is
  * gone: a deleted save, or a deleted account, whose content a run still
  * holds in memory, must not be sent after the fact. Deleting the account
  * removes the consent row too, which on its own would read as "not asked". */
 export const isAllowed = internalQuery({
-  args: { userId: v.string(), itemId: v.optional(v.id("items")) },
+  args: { userId: v.string(), itemId: v.id("items") },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    if (args.itemId !== undefined) {
-      const item = await ctx.db.get(args.itemId);
-      if (item === null || item.userId !== args.userId) return false;
-    }
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== args.userId) return false;
     return await aiAllowed(ctx, args.userId);
   },
 });

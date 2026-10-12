@@ -566,13 +566,17 @@ async function stillAllowed(
   allowedAtStart: boolean,
   item: Pick<Doc<"items">, "_id" | "userId">,
 ): Promise<boolean> {
-  return (
-    allowedAtStart &&
-    (await ctx.runQuery(internal.aiConsent.isAllowed, {
-      userId: item.userId,
-      itemId: item._id,
-    }))
-  );
+  return allowedAtStart && (await itemAllowed(ctx, item));
+}
+
+async function itemAllowed(
+  ctx: ActionCtx,
+  item: Pick<Doc<"items">, "_id" | "userId">,
+): Promise<boolean> {
+  return await ctx.runQuery(internal.aiConsent.isAllowed, {
+    userId: item.userId,
+    itemId: item._id,
+  });
 }
 
 /** Without the model there is nothing new to say about the save, so a retry
@@ -779,7 +783,6 @@ async function analyzeImageItem(
 }
 
 async function analyzeNoteItem(
-  ctx: ActionCtx,
   item: Doc<"items">,
   spacesBlock: string,
   aiAllowed: boolean,
@@ -788,7 +791,7 @@ async function analyzeNoteItem(
   if (!item.note) {
     throw new Error("Note item has no text");
   }
-  if (!(await stillAllowed(ctx, aiAllowed, item))) {
+  if (!aiAllowed) {
     return { result: unclassified(firstLine(item.note)) };
   }
   const { object } = await generateObject({
@@ -1059,7 +1062,6 @@ export const processItem = internalAction({
         );
       } else {
         outcome = await analyzeNoteItem(
-          ctx,
           item,
           spacesBlock,
           allowedAtStart,
@@ -1654,7 +1656,7 @@ export const findProductLinks = internalAction({
         }
         const image = await readStoredImage(ctx.storage, item.storageId);
         // The read can be slow; the image goes nowhere if AI went off meanwhile.
-        if (!(await stillAllowed(ctx, true, item))) {
+        if (!(await itemAllowed(ctx, item))) {
           await fail();
           return null;
         }
@@ -1681,10 +1683,6 @@ export const findProductLinks = internalAction({
         });
         query = object.query.trim();
       } else {
-        if (!(await stillAllowed(ctx, true, item))) {
-          await fail();
-          return null;
-        }
         const { object } = await generateObject({
           model: MODEL,
           ...modelCallOptions(SMALL_TIMEOUT_MS),
@@ -1716,7 +1714,7 @@ export const findProductLinks = internalAction({
       // Asked again: the model call above took a while, and the query it
       // wrote is derived from the save. A decline or a deletion since then
       // stops the search here.
-      if (!(await stillAllowed(ctx, true, item))) {
+      if (!(await itemAllowed(ctx, item))) {
         await fail();
         return null;
       }

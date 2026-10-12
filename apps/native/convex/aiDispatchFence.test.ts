@@ -16,6 +16,7 @@ import {
 } from "./ai";
 import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import { newConvexTest } from "./test.setup";
+import { aiAllowed } from "./aiConsent";
 
 const generateObject = vi.hoisted(() => vi.fn());
 const embedMany = vi.hoisted(() => vi.fn());
@@ -215,6 +216,36 @@ async function paused(
 }
 
 describe("AI dispatch uses fresh live ownership", () => {
+  it.each(["note", "text product"] as const)(
+    "uses one consent query before the %s model call",
+    async (path) => {
+      const f = await fixture();
+      let checks = 0;
+      generateObject.mockImplementation(async () => {
+        expect(checks).toBe(1);
+        return {
+          object: {
+            title: "Synthetic title",
+            description: "",
+            tags: [],
+            spaceNames: [],
+            intents: [],
+            query: "",
+          },
+        };
+      });
+      await f.t.action(async (ctx) => {
+        const runQuery: ActionCtx["runQuery"] = async (ref, ...args) => {
+          if (getFunctionName(ref) === "aiConsent:isAllowed") checks++;
+          return await ctx.runQuery(ref, ...args);
+        };
+        const action = path === "note" ? processItem : findProductLinks;
+        await handler(action)({ ...ctx, runQuery }, { itemId: f.itemId });
+      });
+      expect(generateObject).toHaveBeenCalledOnce();
+    },
+  );
+
   it("excludes declined sweep text after consent removal following fresh denial", async () => {
     const f = await fixture();
     const consentId = await f.t.run((ctx) =>
@@ -279,9 +310,7 @@ describe("AI dispatch uses fresh live ownership", () => {
     async (kind) => {
       const f = await fixture();
       await invalidate(f, kind);
-      expect(
-        await f.t.query(internal.aiConsent.isAllowed, { userId: f.userId }),
-      ).toBe(false);
+      expect(await f.t.run((ctx) => aiAllowed(ctx, f.userId))).toBe(false);
     },
   );
   it.each(["deleted item", "foreign item"] as const)(
@@ -313,9 +342,7 @@ describe("AI dispatch uses fresh live ownership", () => {
         updatedAt: 0,
       }),
     );
-    expect(
-      await f.t.query(internal.aiConsent.isAllowed, { userId: f.userId }),
-    ).toBe(true);
+    expect(await f.t.run((ctx) => aiAllowed(ctx, f.userId))).toBe(true);
   });
 
   it.each([
@@ -331,6 +358,8 @@ describe("AI dispatch uses fresh live ownership", () => {
       "aiConsent:isAllowed",
       (ctx) => handler(processItem)(ctx, { itemId: f.itemId }),
       () => invalidate(f, kind),
+      1,
+      true,
     );
     expect(generateObject).not.toHaveBeenCalled();
     expect(embedMany).not.toHaveBeenCalled();
@@ -374,13 +403,15 @@ describe("AI dispatch uses fresh live ownership", () => {
     expect(embedMany).not.toHaveBeenCalled();
   });
 
-  it("blocks a text product query after cached permission", async () => {
+  it("blocks a hydrated text product query before its single consent check", async () => {
     const f = await fixture();
     await paused(
       f,
       "aiConsent:isAllowed",
       (ctx) => handler(findProductLinks)(ctx, { itemId: f.itemId }),
       () => invalidate(f, "deleted item"),
+      1,
+      true,
     );
     expect(generateObject).not.toHaveBeenCalled();
     expect(safeFetch).not.toHaveBeenCalled();
