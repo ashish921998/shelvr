@@ -364,8 +364,11 @@ function useRemoveFromSpace({
   const router = useRouter();
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
   const available = from === "space" && !!spaceId && !activeIsSuggested;
+  // A second tap while the first is in flight would navigate twice.
+  const pending = useRef(false);
   const remove = useCallback(async () => {
-    if (!spaceId || !activeId || !items) return;
+    if (!spaceId || !activeId || !items || pending.current) return;
+    pending.current = true;
     cancelParamWrite();
     const idx = items.findIndex((i) => i._id === activeId);
     const neighbor = items[idx + 1] ?? items[idx - 1];
@@ -392,6 +395,8 @@ function useRemoveFromSpace({
       else router.replace("/");
     } catch {
       Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    } finally {
+      pending.current = false;
     }
   }, [
     spaceId,
