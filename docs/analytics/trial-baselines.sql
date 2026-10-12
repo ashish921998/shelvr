@@ -1,23 +1,22 @@
 -- Trial baselines: reusable PostHog SQL (HogQL). Methodology and reading
 -- rules are in trial-baselines.md; read it before running any of these.
 --
--- Five standalone statements. Paste one at a time into a PostHog SQL insight.
--- Every statement repeats the same two operator inputs, then its source CTEs
--- (the only ones that read `events`; they extract typed columns and apply
--- only the time range and event-name predicates), then its transform CTEs
--- between `-- transform:begin <q>` and `-- transform:end <q>`, then a final
--- SELECT. The first transform CTE is the row filter (environment, analytics
--- version, store environment, required ids), so the filter is exercised by
--- validate-trial-baselines.sql, which swaps the source CTEs for literal rows
--- and reuses each transform block byte for byte. trial-baselines.md has the
--- drift check that proves they still match.
+-- Five outputs from four shared query blocks. Paste one shared block plus
+-- its labeled final tail; Query 2 has separate per-attempt and per-trial tails.
+-- Source CTEs extract typed event fields. Transform CTEs filter and derive
+-- outcomes once; tools/assemble-analytics-validation.mjs reuses them directly.
+-- Validation parts are not standalone SQL. See trial-baselines.md.
+-- Reported metrics exclude internal accounts once, while report_groups keeps
+-- every original group and its internal exclusion count (including groups
+-- containing only internal accounts). Query 2a's outcome-only diagnostic
+-- intentionally includes internal rows, matching the original contract.
 --
 -- Operator inputs (identical in every statement):
 --   internal_accounts  Convex user ids of internal and test accounts. The
 --                      placeholder matches nobody, so an unfilled list
 --                      excludes nothing. Read the internal_* columns before
 --                      trusting a rate: zero there means the list is empty.
---   cohort start       toDateTime('2026-09-20 00:00:00'): the first day
+--   cohort start       cohort.start (defined once per shared source): first day
 --                      item_saved carried save_source. Move it later for a
 --                      narrower cohort, never earlier.
 --
@@ -37,6 +36,7 @@ WITH internal_accounts AS (
     SELECT arrayJoin(['__internal_account_placeholder__']) AS account_id
 ),
 -- source:begin q1
+cohort AS (SELECT toDateTime('2026-09-20 00:00:00') AS start),
 onboarding_rows AS (
     SELECT
         person_id,
@@ -51,7 +51,7 @@ onboarding_rows AS (
         coalesce(toString(properties.outcome), '') AS outcome,
         coalesce(toString(properties.placement), '') AS placement
     FROM events
-    WHERE timestamp >= toDateTime('2026-09-20 00:00:00')
+    WHERE timestamp >= (SELECT start FROM cohort)
       AND timestamp <= now()
       AND event IN ('onboarding_step_viewed', 'onboarding_demo_picked', 'onboarding_demo_result',
                     'auth_succeeded', 'auth_completed', 'onboarding_completed',
@@ -64,7 +64,7 @@ account_rows AS (
         coalesce(toInt(properties.analytics_version), 0) AS analytics_version
     FROM events
     WHERE event = 'account_created'
-      AND timestamp >= toDateTime('2026-09-20 00:00:00') - INTERVAL 1 DAY
+      AND timestamp >= (SELECT start FROM cohort) - INTERVAL 1 DAY
       AND timestamp <= now()
 ),
 -- source:end q1
@@ -151,7 +151,7 @@ per_person AS (
     FROM windowed
     GROUP BY person_id
 ),
-cohort AS (
+onboarding_cohort AS (
     SELECT
         o.person_id AS person_id,
         o.first_flow_version AS flow_version,
@@ -178,36 +178,76 @@ cohort AS (
     LEFT JOIN person_internal AS i ON i.person_id = o.person_id
 )
 -- transform:end q1
+-- final:begin q1
+,
+reported AS (SELECT * FROM onboarding_cohort WHERE is_internal = 0),
+reported_metrics AS (
 SELECT
+    count() AS reported_row_count,
     flow_version,
-    countIf(is_internal = 0) AS openers,
-    countIf(is_internal = 1) AS internal_persons_excluded,
-    countIf(is_internal = 0 AND opener_views > 1) AS persons_with_repeated_opener,
-    countIf(is_internal = 0 AND mature = 0) AS immature_openers,
-    countIf(is_internal = 0 AND mature) AS mature_openers,
-    countIf(is_internal = 0 AND mature AND reached_interests) AS persons_reached_interests,
-    countIf(is_internal = 0 AND mature AND reached_setup) AS persons_reached_setup,
-    countIf(is_internal = 0 AND mature AND reached_demo) AS persons_reached_demo,
-    countIf(is_internal = 0 AND mature AND demo_picked) AS persons_demo_picked,
-    countIf(is_internal = 0 AND mature AND sample_picked) AS persons_sample_picked,
-    countIf(is_internal = 0 AND mature AND demo_ready) AS persons_demo_ready,
-    countIf(is_internal = 0 AND mature AND signed_in) AS persons_signed_in,
-    countIf(is_internal = 0 AND mature AND new_accounts > 0) AS persons_new_account,
-    countIf(is_internal = 0 AND mature AND account_count > 1) AS persons_with_several_accounts,
-    countIf(is_internal = 0 AND mature AND reached_notifications) AS persons_reached_notifications,
-    countIf(is_internal = 0 AND mature AND reached_share) AS persons_reached_share,
-    countIf(is_internal = 0 AND mature AND completed) AS persons_completed_onboarding,
-    countIf(is_internal = 0 AND mature AND paywall_attempted) AS persons_onboarding_paywall_attempted,
-    sumIf(onboarding_paywall_attempts, is_internal = 0 AND mature) AS onboarding_paywall_attempt_events,
+    count() AS openers,
+    countIf(opener_views > 1) AS persons_with_repeated_opener,
+    countIf(mature = 0) AS immature_openers,
+    countIf(mature) AS mature_openers,
+    countIf(mature AND reached_interests) AS persons_reached_interests,
+    countIf(mature AND reached_setup) AS persons_reached_setup,
+    countIf(mature AND reached_demo) AS persons_reached_demo,
+    countIf(mature AND demo_picked) AS persons_demo_picked,
+    countIf(mature AND sample_picked) AS persons_sample_picked,
+    countIf(mature AND demo_ready) AS persons_demo_ready,
+    countIf(mature AND signed_in) AS persons_signed_in,
+    countIf(mature AND new_accounts > 0) AS persons_new_account,
+    countIf(mature AND account_count > 1) AS persons_with_several_accounts,
+    countIf(mature AND reached_notifications) AS persons_reached_notifications,
+    countIf(mature AND reached_share) AS persons_reached_share,
+    countIf(mature AND completed) AS persons_completed_onboarding,
+    countIf(mature AND paywall_attempted) AS persons_onboarding_paywall_attempted,
+    sumIf(onboarding_paywall_attempts, mature) AS onboarding_paywall_attempt_events,
     round(100.0 * persons_demo_ready / nullIf(mature_openers, 0), 1) AS demo_ready_percent,
     round(100.0 * persons_signed_in / nullIf(mature_openers, 0), 1) AS signed_in_percent,
     round(100.0 * persons_onboarding_paywall_attempted / nullIf(mature_openers, 0), 1) AS paywall_attempted_percent
-FROM cohort
+FROM reported
 GROUP BY flow_version
+),
+report_groups AS (
+    SELECT
+        flow_version,
+        countIf(is_internal = 1) AS internal_persons_excluded
+    FROM onboarding_cohort
+    GROUP BY flow_version
+)
+SELECT
+    groups.flow_version AS flow_version,
+    coalesce(metrics.openers, 0) AS openers,
+    groups.internal_persons_excluded AS internal_persons_excluded,
+    coalesce(metrics.persons_with_repeated_opener, 0) AS persons_with_repeated_opener,
+    coalesce(metrics.immature_openers, 0) AS immature_openers,
+    coalesce(metrics.mature_openers, 0) AS mature_openers,
+    coalesce(metrics.persons_reached_interests, 0) AS persons_reached_interests,
+    coalesce(metrics.persons_reached_setup, 0) AS persons_reached_setup,
+    coalesce(metrics.persons_reached_demo, 0) AS persons_reached_demo,
+    coalesce(metrics.persons_demo_picked, 0) AS persons_demo_picked,
+    coalesce(metrics.persons_sample_picked, 0) AS persons_sample_picked,
+    coalesce(metrics.persons_demo_ready, 0) AS persons_demo_ready,
+    coalesce(metrics.persons_signed_in, 0) AS persons_signed_in,
+    coalesce(metrics.persons_new_account, 0) AS persons_new_account,
+    coalesce(metrics.persons_with_several_accounts, 0) AS persons_with_several_accounts,
+    coalesce(metrics.persons_reached_notifications, 0) AS persons_reached_notifications,
+    coalesce(metrics.persons_reached_share, 0) AS persons_reached_share,
+    coalesce(metrics.persons_completed_onboarding, 0) AS persons_completed_onboarding,
+    coalesce(metrics.persons_onboarding_paywall_attempted, 0) AS persons_onboarding_paywall_attempted,
+    coalesce(metrics.onboarding_paywall_attempt_events, 0) AS onboarding_paywall_attempt_events,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.demo_ready_percent) AS demo_ready_percent,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.signed_in_percent) AS signed_in_percent,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.paywall_attempted_percent) AS paywall_attempted_percent
+FROM report_groups AS groups
+LEFT JOIN reported_metrics AS metrics ON groups.flow_version = metrics.flow_version
 ORDER BY flow_version
+-- final:end q1
 
 -- ============================================================================
--- Query 2a: paywall attempts and their outcomes
+-- Query 2: paywall attempts and confirmed trials
+-- Paste its shared WITH/source/transform block plus exactly one labeled tail.
 -- Unit: attempt (paywall_attempt_id), grouped by placement. The denominator
 -- is paywall_presentation_started. Trial confirmation comes from the webhook
 -- trial_started event, attributed to one attempt by the rule in
@@ -217,6 +257,7 @@ WITH internal_accounts AS (
     SELECT arrayJoin(['__internal_account_placeholder__']) AS account_id
 ),
 -- source:begin q2a
+cohort AS (SELECT toDateTime('2026-09-20 00:00:00') AS start),
 attempt_rows AS (
     SELECT
         distinct_id AS account_id,
@@ -229,7 +270,7 @@ attempt_rows AS (
         coalesce(toString(properties.offering_id), '') AS offering_id,
         coalesce(toString(properties.trial_eligible), '') AS trial_eligible
     FROM events
-    WHERE timestamp >= toDateTime('2026-09-20 00:00:00')
+    WHERE timestamp >= (SELECT start FROM cohort)
       AND timestamp <= now()
       AND event IN ('paywall_presentation_started', 'paywall_shown', 'paywall_cancelled',
                     'paywall_failed', 'paywall_purchase_completed', 'paywall_restored')
@@ -245,7 +286,7 @@ trial_rows AS (
         coalesce(toString(properties.product_id), '') AS product_id
     FROM events
     WHERE event = 'trial_started'
-      AND timestamp >= toDateTime('2026-09-20 00:00:00')
+      AND timestamp >= (SELECT start FROM cohort)
       AND timestamp <= now()
 ),
 -- source:end q2a
@@ -268,7 +309,7 @@ trial_events AS (
 attempts AS (
     SELECT
         attempt_id,
-        argMin(account_id, timestamp) AS account,
+        argMin(account_id, timestamp) AS account_id,
         argMinIf(placement, timestamp, event = 'paywall_presentation_started') AS started_placement,
         argMinIf(offering_id, timestamp, event = 'paywall_presentation_started') AS started_offering_id,
         argMinIf(trial_eligible, timestamp, event = 'paywall_presentation_started') AS started_trial_eligible,
@@ -283,7 +324,7 @@ attempts AS (
 attempt_outcomes AS (
     SELECT
         attempt_id,
-        account AS account_id,
+        account_id,
         started_placement AS placement,
         started_offering_id AS offering_id,
         started_trial_eligible AS trial_eligible,
@@ -298,13 +339,13 @@ attempt_outcomes AS (
             'restored') AS outcome,
         length(outcome_events) AS outcome_event_count,
         started_at <= now() - INTERVAL 1 DAY AS mature,
-        account IN (SELECT account_id FROM internal_accounts) AS is_internal
+        account_id IN (SELECT account_id FROM internal_accounts) AS is_internal
     FROM attempts
 ),
 trials AS (
     SELECT
         event_id,
-        argMin(account_id, trial_at) AS account,
+        argMin(account_id, trial_at) AS account_id,
         min(trial_at) AS trial_started_at,
         argMin(product_id, trial_at) AS product,
         count() AS deliveries
@@ -312,9 +353,9 @@ trials AS (
     GROUP BY event_id
 ),
 trials_per_account AS (
-    SELECT account, count() AS account_trial_count, min(trial_started_at) AS first_trial_at
+    SELECT account_id, count() AS account_trial_count, min(trial_started_at) AS first_trial_at
     FROM trials
-    GROUP BY account
+    GROUP BY account_id
 ),
 trial_candidates AS (
     SELECT
@@ -324,7 +365,7 @@ trial_candidates AS (
         if(a.outcome = 'purchase_completed', 0, 1) AS priority,
         abs(dateDiff('second', a.started_at, t.trial_started_at)) AS distance_seconds
     FROM trials AS t
-    INNER JOIN attempt_outcomes AS a ON a.account_id = t.account
+    INNER JOIN attempt_outcomes AS a ON a.account_id = t.account_id
     WHERE a.presentation_events > 0
       AND a.outcome IN ('purchase_completed', 'unresolved')
       AND a.started_at >= t.trial_started_at - INTERVAL 6 HOUR
@@ -346,265 +387,148 @@ attempt_attribution AS (
 ),
 attempt_report AS (
     SELECT
-        o.attempt_id AS attempt_id,
-        o.account_id AS account_id,
-        o.placement AS placement,
-        o.offering_id AS offering_id,
-        o.trial_eligible AS trial_eligible,
-        o.started_at AS started_at,
-        o.presentation_events AS presentation_events,
-        o.shown_confirmed AS shown_confirmed,
-        o.outcome AS outcome,
-        o.outcome_event_count AS outcome_event_count,
-        o.mature AS mature,
-        o.is_internal AS is_internal,
-        coalesce(x.trial_attribution, '') AS trial_attribution,
-        coalesce(x.trials_attributed, 0) AS trials_attributed
+        o.*,
+        coalesce(attribution.trial_attribution, '') AS trial_attribution,
+        coalesce(attribution.trials_attributed, 0) AS trials_attributed
     FROM attempt_outcomes AS o
-    LEFT JOIN attempt_attribution AS x ON x.matched_attempt_id = o.attempt_id
+    LEFT JOIN attempt_attribution AS attribution ON attribution.matched_attempt_id = o.attempt_id
 ),
 trial_report AS (
     SELECT
         t.event_id AS trial_event_id,
-        t.account AS account_id,
+        t.account_id,
         t.trial_started_at AS trial_at,
         t.product AS product_id,
         t.deliveries AS deliveries,
-        coalesce(x.matched_attempt_id, '') AS attempt_id,
-        if(empty(coalesce(x.matched_attribution, '')), 'unmatched', x.matched_attribution) AS attribution,
-        coalesce(x.candidate_attempts, 0) AS candidate_attempts,
+        coalesce(attribution.matched_attempt_id, '') AS attempt_id,
+        if(empty(coalesce(attribution.matched_attribution, '')), 'unmatched', x.matched_attribution) AS attribution,
+        coalesce(attribution.candidate_attempts, 0) AS candidate_attempts,
         c.account_trial_count AS account_trial_count,
         t.trial_started_at = c.first_trial_at AS is_first_trial,
-        t.account IN (SELECT account_id FROM internal_accounts) AS is_internal
+        t.account_id IN (SELECT account_id FROM internal_accounts) AS is_internal
     FROM trials AS t
-    LEFT JOIN trial_attribution AS x ON x.trial_event_id = t.event_id
-    INNER JOIN trials_per_account AS c ON c.account = t.account
+    LEFT JOIN trial_attribution AS attribution ON attribution.trial_event_id = t.event_id
+    INNER JOIN trials_per_account AS c ON c.account_id = t.account_id
 )
 -- transform:end q2a
+-- Final SELECT 2a (per attempt)
+-- final:begin q2a
+,
+reported AS (SELECT * FROM attempt_report WHERE is_internal = 0),
+reported_metrics AS (
 SELECT
+    count() AS reported_row_count,
     placement,
-    countIf(is_internal = 0 AND presentation_events > 0) AS attempts,
-    countIf(is_internal = 1 AND presentation_events > 0) AS internal_attempts_excluded,
-    countIf(presentation_events = 0) AS outcome_only_attempt_ids,
-    uniqExactIf(account_id, is_internal = 0 AND presentation_events > 0) AS persons,
-    countIf(is_internal = 0 AND presentation_events > 1) AS duplicate_presentation_rows,
-    countIf(is_internal = 0 AND presentation_events > 0 AND outcome_event_count > 1) AS attempts_with_several_outcomes,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature = 0) AS immature_attempts,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature) AS mature_attempts,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND shown_confirmed) AS shown_confirmed_attempts,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND outcome = 'cancelled') AS cancelled,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND outcome = 'failed') AS failed,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND outcome = 'purchase_completed') AS purchase_completed,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND outcome = 'restored') AS restored,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND outcome = 'unresolved') AS unresolved,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND trial_attribution = 'purchase_completed_attempt') AS purchases_with_confirmed_trial,
-    countIf(is_internal = 0 AND presentation_events > 0 AND mature AND trial_attribution = 'unresolved_attempt') AS unresolved_with_confirmed_trial,
-    uniqExactIf(account_id, is_internal = 0 AND presentation_events > 0 AND mature AND trial_attribution != '') AS persons_with_confirmed_trial,
+    countIf(presentation_events > 0) AS attempts,
+    uniqExactIf(account_id, presentation_events > 0) AS persons,
+    countIf(presentation_events > 1) AS duplicate_presentation_rows,
+    countIf(presentation_events > 0 AND outcome_event_count > 1) AS attempts_with_several_outcomes,
+    countIf(presentation_events > 0 AND mature = 0) AS immature_attempts,
+    countIf(presentation_events > 0 AND mature) AS mature_attempts,
+    countIf(presentation_events > 0 AND mature AND shown_confirmed) AS shown_confirmed_attempts,
+    countIf(presentation_events > 0 AND mature AND outcome = 'cancelled') AS cancelled,
+    countIf(presentation_events > 0 AND mature AND outcome = 'failed') AS failed,
+    countIf(presentation_events > 0 AND mature AND outcome = 'purchase_completed') AS purchase_completed,
+    countIf(presentation_events > 0 AND mature AND outcome = 'restored') AS restored,
+    countIf(presentation_events > 0 AND mature AND outcome = 'unresolved') AS unresolved,
+    countIf(presentation_events > 0 AND mature AND trial_attribution = 'purchase_completed_attempt') AS purchases_with_confirmed_trial,
+    countIf(presentation_events > 0 AND mature AND trial_attribution = 'unresolved_attempt') AS unresolved_with_confirmed_trial,
+    uniqExactIf(account_id, presentation_events > 0 AND mature AND trial_attribution != '') AS persons_with_confirmed_trial,
     round(100.0 * cancelled / nullIf(mature_attempts, 0), 1) AS cancelled_percent,
     round(100.0 * failed / nullIf(mature_attempts, 0), 1) AS failed_percent,
     round(100.0 * purchase_completed / nullIf(mature_attempts, 0), 1) AS purchase_completed_percent,
     round(100.0 * unresolved / nullIf(mature_attempts, 0), 1) AS unresolved_percent,
     round(100.0 * purchases_with_confirmed_trial / nullIf(mature_attempts, 0), 1) AS confirmed_trial_percent
-FROM attempt_report
+FROM reported
 GROUP BY placement
-ORDER BY attempts DESC
-
--- ============================================================================
--- Query 2b: confirmed trial starts and which attempt each one matched
--- Unit: trial_started webhook event (deduplicated on revenuecat_event_id),
--- grouped by product. Same inputs and transform as Query 2a; only the final
--- SELECT differs.
--- ============================================================================
-WITH internal_accounts AS (
-    SELECT arrayJoin(['__internal_account_placeholder__']) AS account_id
 ),
--- source:begin q2b
-attempt_rows AS (
+report_groups AS (
     SELECT
-        distinct_id AS account_id,
-        event,
-        timestamp,
-        coalesce(toString(properties.environment), '') AS environment,
-        coalesce(toInt(properties.analytics_version), 0) AS analytics_version,
-        coalesce(toString(properties.paywall_attempt_id), '') AS attempt_id,
-        coalesce(toString(properties.placement), '') AS placement,
-        coalesce(toString(properties.offering_id), '') AS offering_id,
-        coalesce(toString(properties.trial_eligible), '') AS trial_eligible
-    FROM events
-    WHERE timestamp >= toDateTime('2026-09-20 00:00:00')
-      AND timestamp <= now()
-      AND event IN ('paywall_presentation_started', 'paywall_shown', 'paywall_cancelled',
-                    'paywall_failed', 'paywall_purchase_completed', 'paywall_restored')
-),
-trial_rows AS (
-    SELECT
-        distinct_id AS account_id,
-        timestamp AS trial_at,
-        coalesce(toString(properties.environment), '') AS environment,
-        coalesce(toString(properties.store_environment), '') AS store_environment,
-        coalesce(toInt(properties.analytics_version), 0) AS analytics_version,
-        coalesce(toString(properties.revenuecat_event_id), '') AS event_id,
-        coalesce(toString(properties.product_id), '') AS product_id
-    FROM events
-    WHERE event = 'trial_started'
-      AND timestamp >= toDateTime('2026-09-20 00:00:00')
-      AND timestamp <= now()
-),
--- source:end q2b
--- transform:begin q2b
-attempt_events AS (
-    SELECT account_id, event, timestamp, attempt_id, placement, offering_id, trial_eligible
-    FROM attempt_rows
-    WHERE environment = 'production'
-      AND analytics_version = 1
-      AND notEmpty(attempt_id)
-),
-trial_events AS (
-    SELECT account_id, trial_at, event_id, product_id
-    FROM trial_rows
-    WHERE environment = 'production'
-      AND store_environment != 'sandbox'
-      AND analytics_version = 1
-      AND notEmpty(event_id)
-),
-attempts AS (
-    SELECT
-        attempt_id,
-        argMin(account_id, timestamp) AS account,
-        argMinIf(placement, timestamp, event = 'paywall_presentation_started') AS started_placement,
-        argMinIf(offering_id, timestamp, event = 'paywall_presentation_started') AS started_offering_id,
-        argMinIf(trial_eligible, timestamp, event = 'paywall_presentation_started') AS started_trial_eligible,
-        minIf(timestamp, event = 'paywall_presentation_started') AS started_at,
-        countIf(event = 'paywall_presentation_started') AS presentation_events,
-        countIf(event = 'paywall_shown') > 0 AS shown_confirmed,
-        arraySort(x -> x.1, groupArrayIf(tuple(timestamp, event),
-            event IN ('paywall_cancelled', 'paywall_failed', 'paywall_purchase_completed', 'paywall_restored'))) AS outcome_events
-    FROM attempt_events
-    GROUP BY attempt_id
-),
-attempt_outcomes AS (
-    SELECT
-        attempt_id,
-        account AS account_id,
-        started_placement AS placement,
-        started_offering_id AS offering_id,
-        started_trial_eligible AS trial_eligible,
-        started_at,
-        presentation_events,
-        shown_confirmed,
-        multiIf(
-            length(outcome_events) = 0, 'unresolved',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_cancelled', 'cancelled',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_failed', 'failed',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_purchase_completed', 'purchase_completed',
-            'restored') AS outcome,
-        length(outcome_events) AS outcome_event_count,
-        started_at <= now() - INTERVAL 1 DAY AS mature,
-        account IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM attempts
-),
-trials AS (
-    SELECT
-        event_id,
-        argMin(account_id, trial_at) AS account,
-        min(trial_at) AS trial_started_at,
-        argMin(product_id, trial_at) AS product,
-        count() AS deliveries
-    FROM trial_events
-    GROUP BY event_id
-),
-trials_per_account AS (
-    SELECT account, count() AS account_trial_count, min(trial_started_at) AS first_trial_at
-    FROM trials
-    GROUP BY account
-),
-trial_candidates AS (
-    SELECT
-        t.event_id AS trial_event_id,
-        a.attempt_id AS attempt_id,
-        if(a.outcome = 'purchase_completed', 'purchase_completed_attempt', 'unresolved_attempt') AS attribution,
-        if(a.outcome = 'purchase_completed', 0, 1) AS priority,
-        abs(dateDiff('second', a.started_at, t.trial_started_at)) AS distance_seconds
-    FROM trials AS t
-    INNER JOIN attempt_outcomes AS a ON a.account_id = t.account
-    WHERE a.presentation_events > 0
-      AND a.outcome IN ('purchase_completed', 'unresolved')
-      AND a.started_at >= t.trial_started_at - INTERVAL 6 HOUR
-      AND a.started_at <= t.trial_started_at + INTERVAL 6 HOUR
-),
-trial_attribution AS (
-    SELECT
-        trial_event_id,
-        argMin(attempt_id, tuple(priority, distance_seconds)) AS matched_attempt_id,
-        argMin(attribution, tuple(priority, distance_seconds)) AS matched_attribution,
-        count() AS candidate_attempts
-    FROM trial_candidates
-    GROUP BY trial_event_id
-),
-attempt_attribution AS (
-    SELECT matched_attempt_id, any(matched_attribution) AS trial_attribution, count() AS trials_attributed
-    FROM trial_attribution
-    GROUP BY matched_attempt_id
-),
-attempt_report AS (
-    SELECT
-        o.attempt_id AS attempt_id,
-        o.account_id AS account_id,
-        o.placement AS placement,
-        o.offering_id AS offering_id,
-        o.trial_eligible AS trial_eligible,
-        o.started_at AS started_at,
-        o.presentation_events AS presentation_events,
-        o.shown_confirmed AS shown_confirmed,
-        o.outcome AS outcome,
-        o.outcome_event_count AS outcome_event_count,
-        o.mature AS mature,
-        o.is_internal AS is_internal,
-        coalesce(x.trial_attribution, '') AS trial_attribution,
-        coalesce(x.trials_attributed, 0) AS trials_attributed
-    FROM attempt_outcomes AS o
-    LEFT JOIN attempt_attribution AS x ON x.matched_attempt_id = o.attempt_id
-),
-trial_report AS (
-    SELECT
-        t.event_id AS trial_event_id,
-        t.account AS account_id,
-        t.trial_started_at AS trial_at,
-        t.product AS product_id,
-        t.deliveries AS deliveries,
-        coalesce(x.matched_attempt_id, '') AS attempt_id,
-        if(empty(coalesce(x.matched_attribution, '')), 'unmatched', x.matched_attribution) AS attribution,
-        coalesce(x.candidate_attempts, 0) AS candidate_attempts,
-        c.account_trial_count AS account_trial_count,
-        t.trial_started_at = c.first_trial_at AS is_first_trial,
-        t.account IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trials AS t
-    LEFT JOIN trial_attribution AS x ON x.trial_event_id = t.event_id
-    INNER JOIN trials_per_account AS c ON c.account = t.account
+        placement,
+        countIf(is_internal = 1 AND presentation_events > 0) AS internal_attempts_excluded,
+        countIf(presentation_events = 0) AS outcome_only_attempt_ids
+    FROM attempt_report
+    GROUP BY placement
 )
--- transform:end q2b
 SELECT
+    groups.placement AS placement,
+    coalesce(metrics.attempts, 0) AS attempts,
+    groups.internal_attempts_excluded AS internal_attempts_excluded,
+    groups.outcome_only_attempt_ids AS outcome_only_attempt_ids,
+    coalesce(metrics.persons, 0) AS persons,
+    coalesce(metrics.duplicate_presentation_rows, 0) AS duplicate_presentation_rows,
+    coalesce(metrics.attempts_with_several_outcomes, 0) AS attempts_with_several_outcomes,
+    coalesce(metrics.immature_attempts, 0) AS immature_attempts,
+    coalesce(metrics.mature_attempts, 0) AS mature_attempts,
+    coalesce(metrics.shown_confirmed_attempts, 0) AS shown_confirmed_attempts,
+    coalesce(metrics.cancelled, 0) AS cancelled,
+    coalesce(metrics.failed, 0) AS failed,
+    coalesce(metrics.purchase_completed, 0) AS purchase_completed,
+    coalesce(metrics.restored, 0) AS restored,
+    coalesce(metrics.unresolved, 0) AS unresolved,
+    coalesce(metrics.purchases_with_confirmed_trial, 0) AS purchases_with_confirmed_trial,
+    coalesce(metrics.unresolved_with_confirmed_trial, 0) AS unresolved_with_confirmed_trial,
+    coalesce(metrics.persons_with_confirmed_trial, 0) AS persons_with_confirmed_trial,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.cancelled_percent) AS cancelled_percent,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.failed_percent) AS failed_percent,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.purchase_completed_percent) AS purchase_completed_percent,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.unresolved_percent) AS unresolved_percent,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.confirmed_trial_percent) AS confirmed_trial_percent
+FROM report_groups AS groups
+LEFT JOIN reported_metrics AS metrics ON groups.placement = metrics.placement
+ORDER BY attempts DESC
+-- final:end q2a
+
+-- Final SELECT 2b (per trial): shared Query 2 block above + this tail.
+-- final:begin q2b
+,
+reported AS (SELECT * FROM trial_report WHERE is_internal = 0),
+reported_metrics AS (
+SELECT
+    count() AS reported_row_count,
     product_id,
-    countIf(is_internal = 0) AS trial_starts,
-    countIf(is_internal = 1) AS internal_trial_starts_excluded,
-    sumIf(deliveries - 1, is_internal = 0) AS duplicate_deliveries_removed,
-    uniqExactIf(account_id, is_internal = 0) AS accounts,
-    countIf(is_internal = 0 AND is_first_trial = 0) AS repeat_trial_starts,
-    countIf(is_internal = 0 AND attribution = 'purchase_completed_attempt') AS matched_purchase_completed_attempt,
-    countIf(is_internal = 0 AND attribution = 'unresolved_attempt') AS matched_unresolved_attempt,
-    countIf(is_internal = 0 AND attribution = 'unmatched') AS unmatched,
-    countIf(is_internal = 0 AND candidate_attempts > 1) AS trials_with_several_candidates,
+    count() AS trial_starts,
+    sum(deliveries - 1) AS duplicate_deliveries_removed,
+    uniqExact(account_id) AS accounts,
+    countIf(is_first_trial = 0) AS repeat_trial_starts,
+    countIf(attribution = 'purchase_completed_attempt') AS matched_purchase_completed_attempt,
+    countIf(attribution = 'unresolved_attempt') AS matched_unresolved_attempt,
+    countIf(attribution = 'unmatched') AS unmatched,
+    countIf(candidate_attempts > 1) AS trials_with_several_candidates,
     round(100.0 * unmatched / nullIf(trial_starts, 0), 1) AS unmatched_percent
-FROM trial_report
+FROM reported
 GROUP BY product_id
+),
+report_groups AS (
+    SELECT
+        product_id,
+        countIf(is_internal = 1) AS internal_trial_starts_excluded
+    FROM trial_report
+    GROUP BY product_id
+)
+SELECT
+    groups.product_id AS product_id,
+    coalesce(metrics.trial_starts, 0) AS trial_starts,
+    groups.internal_trial_starts_excluded AS internal_trial_starts_excluded,
+    coalesce(metrics.duplicate_deliveries_removed, 0) AS duplicate_deliveries_removed,
+    coalesce(metrics.accounts, 0) AS accounts,
+    coalesce(metrics.repeat_trial_starts, 0) AS repeat_trial_starts,
+    coalesce(metrics.matched_purchase_completed_attempt, 0) AS matched_purchase_completed_attempt,
+    coalesce(metrics.matched_unresolved_attempt, 0) AS matched_unresolved_attempt,
+    coalesce(metrics.unmatched, 0) AS unmatched,
+    coalesce(metrics.trials_with_several_candidates, 0) AS trials_with_several_candidates,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.unmatched_percent) AS unmatched_percent
+FROM report_groups AS groups
+LEFT JOIN reported_metrics AS metrics ON groups.product_id = metrics.product_id
 ORDER BY trial_starts DESC
+-- final:end q2b
 
 -- ============================================================================
 -- Query 3: trial-anchored personal save and return
--- Unit: account with a confirmed trial (anchor = first production
+-- Unit: account_id with a confirmed trial (anchor = first production
 -- trial_started that carries a revenuecat_event_id). Day 3 is 72 elapsed
 -- hours from the anchor. Reopen follows the strict useful-returns rule: the
--- same account's own item, saved inside the window, opened after its save in
+-- same account_id's own item, saved inside the window, opened after its save in
 -- a different nonempty session. Accounts whose only trial_started rows lack
 -- the webhook id are reported as a gap and enter no rate.
 -- ============================================================================
@@ -612,6 +536,7 @@ WITH internal_accounts AS (
     SELECT arrayJoin(['__internal_account_placeholder__']) AS account_id
 ),
 -- source:begin q3
+cohort AS (SELECT toDateTime('2026-09-20 00:00:00') AS start),
 activity_rows AS (
     SELECT
         distinct_id AS account_id,
@@ -626,7 +551,7 @@ activity_rows AS (
         coalesce(toString(properties.save_source), '') AS save_source,
         coalesce(toString(properties.revenuecat_event_id), '') AS event_id
     FROM events
-    WHERE timestamp >= toDateTime('2026-09-20 00:00:00')
+    WHERE timestamp >= (SELECT start FROM cohort)
       AND timestamp <= now()
       AND event IN ('trial_started', 'item_saved', 'item_opened')
 ),
@@ -655,30 +580,17 @@ per_account AS (
     GROUP BY account_id
     HAVING trial_starts > 0 OR trial_starts_missing_id > 0
 ),
-trial_windows AS (
-    SELECT
-        account_id,
-        trial_at,
-        trial_starts,
-        trial_starts > 0 AS has_anchor,
-        trial_starts_missing_id,
-        demo_saves,
-        unknown_source_saves,
-        personal_saves,
-        opens,
-        arrayFilter(s -> trial_starts > 0 AND s.1 >= trial_at AND s.1 <= trial_at + INTERVAL 72 HOUR, personal_saves) AS window_saves
-    FROM per_account
-),
 trial_outcomes AS (
     SELECT
         account_id,
         trial_at,
-        has_anchor,
+        trial_starts > 0 AS has_anchor,
         trial_starts_missing_id,
         trial_starts > 1 AS repeat_trial_starts,
         has_anchor AND trial_at <= now() - INTERVAL 24 HOUR AS mature_24h,
         has_anchor AND trial_at <= now() - INTERVAL 72 HOUR AS mature_72h,
         arrayExists(s -> has_anchor AND s.1 >= trial_at AND s.1 <= trial_at + INTERVAL 24 HOUR, personal_saves) AS saved_within_24h,
+        arrayFilter(s -> has_anchor AND s.1 >= trial_at AND s.1 <= trial_at + INTERVAL 72 HOUR, personal_saves) AS window_saves,
         length(arrayDistinct(arrayMap(s -> s.2, window_saves))) AS distinct_saves_72h,
         length(arrayFilter(s -> has_anchor AND s.1 < trial_at, personal_saves)) AS saves_before_anchor,
         arrayExists(s -> notEmpty(s.3), window_saves) AS reopen_measurable,
@@ -693,40 +605,77 @@ trial_outcomes AS (
         demo_saves,
         unknown_source_saves,
         account_id IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trial_windows
+    FROM per_account
 )
 -- transform:end q3
+-- final:begin q3
+,
+reported AS (SELECT * FROM trial_outcomes WHERE is_internal = 0),
+reported_metrics AS (
 SELECT
-    countIf(is_internal = 0 AND has_anchor) AS trial_accounts,
-    countIf(is_internal = 1 AND has_anchor) AS internal_accounts_excluded,
-    countIf(is_internal = 0 AND has_anchor = 0) AS accounts_without_webhook_id,
-    sumIf(trial_starts_missing_id, is_internal = 0) AS trial_start_events_missing_id,
-    countIf(is_internal = 0 AND has_anchor AND repeat_trial_starts) AS accounts_with_repeat_trial_starts,
-    countIf(is_internal = 0 AND has_anchor AND mature_24h = 0) AS immature_24h_trials,
-    countIf(is_internal = 0 AND mature_24h) AS mature_24h_trials,
-    countIf(is_internal = 0 AND mature_24h AND saved_within_24h) AS first_personal_save_within_24h,
+    count() AS reported_row_count,
+    countIf(has_anchor) AS trial_accounts,
+    countIf(has_anchor = 0) AS accounts_without_webhook_id,
+    sum(trial_starts_missing_id) AS trial_start_events_missing_id,
+    countIf(has_anchor AND repeat_trial_starts) AS accounts_with_repeat_trial_starts,
+    countIf(has_anchor AND mature_24h = 0) AS immature_24h_trials,
+    countIf(mature_24h) AS mature_24h_trials,
+    countIf(mature_24h AND saved_within_24h) AS first_personal_save_within_24h,
     round(100.0 * first_personal_save_within_24h / nullIf(mature_24h_trials, 0), 1) AS first_save_24h_percent,
-    countIf(is_internal = 0 AND has_anchor AND mature_72h = 0) AS immature_72h_trials,
-    countIf(is_internal = 0 AND mature_72h) AS mature_72h_trials,
-    countIf(is_internal = 0 AND mature_72h AND distinct_saves_72h = 0) AS no_personal_save_by_72h,
-    countIf(is_internal = 0 AND mature_72h AND distinct_saves_72h = 1) AS one_save_by_72h,
-    countIf(is_internal = 0 AND mature_72h AND distinct_saves_72h = 2) AS two_saves_by_72h,
-    countIf(is_internal = 0 AND mature_72h AND distinct_saves_72h >= 3) AS three_plus_saves_by_72h,
-    round(100.0 * countIf(is_internal = 0 AND mature_72h AND distinct_saves_72h > 0) / nullIf(mature_72h_trials, 0), 1) AS saved_by_72h_percent,
-    countIf(is_internal = 0 AND mature_72h AND reopen_measurable) AS reopen_measurable_72h,
-    countIf(is_internal = 0 AND mature_72h AND distinct_saves_72h > 0 AND reopen_measurable = 0) AS saves_without_session_72h,
-    countIf(is_internal = 0 AND mature_72h AND reopened_own_72h) AS reopened_own_item_by_72h,
+    countIf(has_anchor AND mature_72h = 0) AS immature_72h_trials,
+    countIf(mature_72h) AS mature_72h_trials,
+    countIf(mature_72h AND distinct_saves_72h = 0) AS no_personal_save_by_72h,
+    countIf(mature_72h AND distinct_saves_72h = 1) AS one_save_by_72h,
+    countIf(mature_72h AND distinct_saves_72h = 2) AS two_saves_by_72h,
+    countIf(mature_72h AND distinct_saves_72h >= 3) AS three_plus_saves_by_72h,
+    round(100.0 * countIf(mature_72h AND distinct_saves_72h > 0) / nullIf(mature_72h_trials, 0), 1) AS saved_by_72h_percent,
+    countIf(mature_72h AND reopen_measurable) AS reopen_measurable_72h,
+    countIf(mature_72h AND distinct_saves_72h > 0 AND reopen_measurable = 0) AS saves_without_session_72h,
+    countIf(mature_72h AND reopened_own_72h) AS reopened_own_item_by_72h,
     round(100.0 * reopened_own_item_by_72h / nullIf(reopen_measurable_72h, 0), 1) AS reopen_percent_of_measurable,
-    sumIf(saves_before_anchor, is_internal = 0) AS personal_saves_before_anchor,
-    sumIf(demo_saves, is_internal = 0) AS demo_saves_excluded,
-    sumIf(unknown_source_saves, is_internal = 0) AS unknown_source_saves_excluded
-FROM trial_outcomes
+    sum(saves_before_anchor) AS personal_saves_before_anchor,
+    sum(demo_saves) AS demo_saves_excluded,
+    sum(unknown_source_saves) AS unknown_source_saves_excluded
+FROM reported
+),
+report_groups AS (
+    SELECT
+        countIf(is_internal = 1 AND has_anchor) AS internal_accounts_excluded
+    FROM trial_outcomes
+)
+SELECT
+    coalesce(metrics.trial_accounts, 0) AS trial_accounts,
+    groups.internal_accounts_excluded AS internal_accounts_excluded,
+    coalesce(metrics.accounts_without_webhook_id, 0) AS accounts_without_webhook_id,
+    coalesce(metrics.trial_start_events_missing_id, 0) AS trial_start_events_missing_id,
+    coalesce(metrics.accounts_with_repeat_trial_starts, 0) AS accounts_with_repeat_trial_starts,
+    coalesce(metrics.immature_24h_trials, 0) AS immature_24h_trials,
+    coalesce(metrics.mature_24h_trials, 0) AS mature_24h_trials,
+    coalesce(metrics.first_personal_save_within_24h, 0) AS first_personal_save_within_24h,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.first_save_24h_percent) AS first_save_24h_percent,
+    coalesce(metrics.immature_72h_trials, 0) AS immature_72h_trials,
+    coalesce(metrics.mature_72h_trials, 0) AS mature_72h_trials,
+    coalesce(metrics.no_personal_save_by_72h, 0) AS no_personal_save_by_72h,
+    coalesce(metrics.one_save_by_72h, 0) AS one_save_by_72h,
+    coalesce(metrics.two_saves_by_72h, 0) AS two_saves_by_72h,
+    coalesce(metrics.three_plus_saves_by_72h, 0) AS three_plus_saves_by_72h,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.saved_by_72h_percent) AS saved_by_72h_percent,
+    coalesce(metrics.reopen_measurable_72h, 0) AS reopen_measurable_72h,
+    coalesce(metrics.saves_without_session_72h, 0) AS saves_without_session_72h,
+    coalesce(metrics.reopened_own_item_by_72h, 0) AS reopened_own_item_by_72h,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.reopen_percent_of_measurable) AS reopen_percent_of_measurable,
+    coalesce(metrics.personal_saves_before_anchor, 0) AS personal_saves_before_anchor,
+    coalesce(metrics.demo_saves_excluded, 0) AS demo_saves_excluded,
+    coalesce(metrics.unknown_source_saves_excluded, 0) AS unknown_source_saves_excluded
+FROM report_groups AS groups
+LEFT JOIN reported_metrics AS metrics ON 1 = 1
+-- final:end q3
 
 -- ============================================================================
 -- Query 4: trial lifecycle outcomes
--- Unit: account, grouped by population (trial, or direct initial charge with
+-- Unit: account_id, grouped by population (trial, or direct initial charge with
 -- no trial) and product. The lifecycle of the first trial is bounded at the
--- next trial_started of the same account, so a later trial's events are
+-- next trial_started of the same account_id, so a later trial's events are
 -- never credited to the first. Conversion is payment_succeeded with
 -- payment_kind = trial_conversion only. Only a trial_cancelled with
 -- cancel_category = voluntary turns auto-renew off; refund, billing,
@@ -738,6 +687,7 @@ WITH internal_accounts AS (
     SELECT arrayJoin(['__internal_account_placeholder__']) AS account_id
 ),
 -- source:begin q4
+cohort AS (SELECT toDateTime('2026-09-20 00:00:00') AS start),
 lifecycle_rows AS (
     SELECT
         distinct_id AS account_id,
@@ -751,7 +701,7 @@ lifecycle_rows AS (
         coalesce(toString(properties.cancel_category), '') AS cancel_category,
         coalesce(toString(properties.product_id), '') AS product_id
     FROM events
-    WHERE timestamp >= toDateTime('2026-09-20 00:00:00')
+    WHERE timestamp >= (SELECT start FROM cohort)
       AND timestamp <= now()
       AND event IN ('trial_started', 'trial_cancelled', 'subscription_uncancelled',
                     'trial_expired', 'payment_succeeded')
@@ -769,7 +719,7 @@ lifecycle_events AS (
 deduped AS (
     SELECT
         event_id,
-        argMin(account_id, timestamp) AS account,
+        argMin(account_id, timestamp) AS account_id,
         min(timestamp) AS event_at,
         argMin(event, timestamp) AS event_name,
         argMin(payment_kind, timestamp) AS kind_raw,
@@ -781,7 +731,7 @@ deduped AS (
 ),
 classified AS (
     SELECT
-        account AS account_id,
+        account_id,
         event_at AS timestamp,
         product AS product_id,
         deliveries,
@@ -829,25 +779,9 @@ trial_terminal AS (
         duplicate_deliveries_collapsed,
         arrayFilter(x -> x.1 >= trial_at AND (length(trial_times) < 2 OR x.1 < arrayElement(trial_times, 2)), lifecycle) AS bounded,
         length(arrayFilter(x -> x.2 IN ('expired', 'converted'), bounded)) AS terminal_count,
-        arrayFirst(x -> x.2 IN ('expired', 'converted'), bounded) AS terminal
-    FROM per_account
-),
-trial_pre_terminal AS (
-    SELECT
-        account_id,
-        population,
-        product_id,
-        trial_starts,
-        trial_at,
-        direct_initial_payments,
-        direct_initial_after_trial,
-        renewals,
-        other_events,
-        duplicate_deliveries_collapsed,
-        terminal_count,
-        terminal,
+        arrayFirst(x -> x.2 IN ('expired', 'converted'), bounded) AS terminal,
         arrayFilter(x -> terminal_count = 0 OR x.1 <= tupleElement(terminal, 1), bounded) AS pre_terminal
-    FROM trial_terminal
+    FROM per_account
 ),
 trial_state AS (
     SELECT
@@ -875,36 +809,79 @@ trial_state AS (
             tupleElement(arrayElement(arrayFilter(x -> x.2 IN ('cancel', 'uncancel'), pre_terminal), -1), 2) = 'cancel', 'off',
             're_enabled') AS auto_renew_state,
         account_id IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trial_pre_terminal
+    FROM trial_terminal
 )
 -- transform:end q4
+-- final:begin q4
+,
+reported AS (SELECT * FROM trial_state WHERE is_internal = 0),
+reported_metrics AS (
 SELECT
+    count() AS reported_row_count,
     population,
     product_id,
-    countIf(is_internal = 0) AS accounts,
-    countIf(is_internal = 1) AS internal_accounts_excluded,
-    sumIf(duplicate_deliveries_collapsed, is_internal = 0) AS duplicate_deliveries_removed,
-    countIf(is_internal = 0 AND repeat_trial_starts) AS accounts_with_repeat_trial_starts,
-    countIf(is_internal = 0 AND population = 'trial' AND mature = 0) AS immature_trials,
-    countIf(is_internal = 0 AND mature = 0 AND outcome = 'converted') AS immature_converted,
-    countIf(is_internal = 0 AND mature = 0 AND outcome = 'expired') AS immature_expired,
-    countIf(is_internal = 0 AND outcome = 'pending') AS pending,
-    countIf(is_internal = 0 AND outcome = 'pending' AND auto_renew_state = 'off') AS pending_auto_renew_off,
-    countIf(is_internal = 0 AND outcome = 'pending' AND auto_renew_state = 're_enabled') AS pending_re_enabled,
-    countIf(is_internal = 0 AND outcome = 'pending' AND auto_renew_state = 'never_cancelled') AS pending_never_cancelled,
-    countIf(is_internal = 0 AND mature) AS mature_trials,
-    countIf(is_internal = 0 AND mature AND outcome = 'converted') AS converted,
-    countIf(is_internal = 0 AND mature AND outcome = 'expired') AS expired,
-    countIf(is_internal = 0 AND mature AND outcome = 'unknown_no_terminal_event') AS unknown_no_terminal_event,
-    countIf(is_internal = 0 AND mature AND outcome = 'converted' AND ever_cancelled) AS converted_after_cancel,
-    countIf(is_internal = 0 AND mature AND outcome = 'expired' AND ever_cancelled) AS expired_after_cancel,
+    count() AS accounts,
+    sum(duplicate_deliveries_collapsed) AS duplicate_deliveries_removed,
+    countIf(repeat_trial_starts) AS accounts_with_repeat_trial_starts,
+    countIf(population = 'trial' AND mature = 0) AS immature_trials,
+    countIf(mature = 0 AND outcome = 'converted') AS immature_converted,
+    countIf(mature = 0 AND outcome = 'expired') AS immature_expired,
+    countIf(outcome = 'pending') AS pending,
+    countIf(outcome = 'pending' AND auto_renew_state = 'off') AS pending_auto_renew_off,
+    countIf(outcome = 'pending' AND auto_renew_state = 're_enabled') AS pending_re_enabled,
+    countIf(outcome = 'pending' AND auto_renew_state = 'never_cancelled') AS pending_never_cancelled,
+    countIf(mature) AS mature_trials,
+    countIf(mature AND outcome = 'converted') AS converted,
+    countIf(mature AND outcome = 'expired') AS expired,
+    countIf(mature AND outcome = 'unknown_no_terminal_event') AS unknown_no_terminal_event,
+    countIf(mature AND outcome = 'converted' AND ever_cancelled) AS converted_after_cancel,
+    countIf(mature AND outcome = 'expired' AND ever_cancelled) AS expired_after_cancel,
     round(100.0 * converted / nullIf(converted + expired, 0), 1) AS conversion_percent_of_settled,
-    countIf(is_internal = 0 AND other_cancels > 0) AS accounts_with_non_voluntary_cancel,
-    sumIf(other_cancels, is_internal = 0) AS non_voluntary_cancel_events,
-    countIf(is_internal = 0 AND direct_initial_after_trial) AS accounts_direct_initial_after_trial,
-    sumIf(direct_initial_payments, is_internal = 0) AS direct_initial_payment_events,
-    sumIf(renewals, is_internal = 0) AS renewals_excluded,
-    sumIf(other_events, is_internal = 0) AS other_lifecycle_events_ignored
-FROM trial_state
+    countIf(other_cancels > 0) AS accounts_with_non_voluntary_cancel,
+    sum(other_cancels) AS non_voluntary_cancel_events,
+    countIf(direct_initial_after_trial) AS accounts_direct_initial_after_trial,
+    sum(direct_initial_payments) AS direct_initial_payment_events,
+    sum(renewals) AS renewals_excluded,
+    sum(other_events) AS other_lifecycle_events_ignored
+FROM reported
 GROUP BY population, product_id
+),
+report_groups AS (
+    SELECT
+        population,
+        product_id,
+        countIf(is_internal = 1) AS internal_accounts_excluded
+    FROM trial_state
+    GROUP BY population, product_id
+)
+SELECT
+    groups.population AS population,
+    groups.product_id AS product_id,
+    coalesce(metrics.accounts, 0) AS accounts,
+    groups.internal_accounts_excluded AS internal_accounts_excluded,
+    coalesce(metrics.duplicate_deliveries_removed, 0) AS duplicate_deliveries_removed,
+    coalesce(metrics.accounts_with_repeat_trial_starts, 0) AS accounts_with_repeat_trial_starts,
+    coalesce(metrics.immature_trials, 0) AS immature_trials,
+    coalesce(metrics.immature_converted, 0) AS immature_converted,
+    coalesce(metrics.immature_expired, 0) AS immature_expired,
+    coalesce(metrics.pending, 0) AS pending,
+    coalesce(metrics.pending_auto_renew_off, 0) AS pending_auto_renew_off,
+    coalesce(metrics.pending_re_enabled, 0) AS pending_re_enabled,
+    coalesce(metrics.pending_never_cancelled, 0) AS pending_never_cancelled,
+    coalesce(metrics.mature_trials, 0) AS mature_trials,
+    coalesce(metrics.converted, 0) AS converted,
+    coalesce(metrics.expired, 0) AS expired,
+    coalesce(metrics.unknown_no_terminal_event, 0) AS unknown_no_terminal_event,
+    coalesce(metrics.converted_after_cancel, 0) AS converted_after_cancel,
+    coalesce(metrics.expired_after_cancel, 0) AS expired_after_cancel,
+    if(coalesce(metrics.reported_row_count, 0) = 0, NULL, metrics.conversion_percent_of_settled) AS conversion_percent_of_settled,
+    coalesce(metrics.accounts_with_non_voluntary_cancel, 0) AS accounts_with_non_voluntary_cancel,
+    coalesce(metrics.non_voluntary_cancel_events, 0) AS non_voluntary_cancel_events,
+    coalesce(metrics.accounts_direct_initial_after_trial, 0) AS accounts_direct_initial_after_trial,
+    coalesce(metrics.direct_initial_payment_events, 0) AS direct_initial_payment_events,
+    coalesce(metrics.renewals_excluded, 0) AS renewals_excluded,
+    coalesce(metrics.other_lifecycle_events_ignored, 0) AS other_lifecycle_events_ignored
+FROM report_groups AS groups
+LEFT JOIN reported_metrics AS metrics ON groups.population = metrics.population AND groups.product_id = metrics.product_id
 ORDER BY population, accounts DESC
+-- final:end q4

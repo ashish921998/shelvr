@@ -3,8 +3,8 @@
 Reusable method and PostHog SQL for two baselines that the existing dashboards
 do not separate: how far people get **before** a trial, and what trialists do
 **after** one is confirmed. `trial-baselines.sql` holds the queries;
-`validate-trial-baselines.sql` runs the same transformations over synthetic
-rows. Neither file contains or implies a production number.
+`validate-trial-baselines.sql` supplies synthetic validation parts assembled
+with the production transformations. Neither file contains or implies a production number.
 
 This document is method only. It does not establish a baseline, change the
 product or its pricing, add instrumentation, or recommend anything. Producing
@@ -110,12 +110,9 @@ confirmed trial and never looks at onboarding.
   trial and are never credited to the first anchor. A first trial with no
   terminal event before the second start is therefore unknown, not converted,
   even when the second trial converts.
-- **Only a voluntary cancellation turns auto-renew off.** `trial_cancelled`
-  carries `cancel_category` (`voluntary`, `refund`, `billing`, `developer`,
-  `unknown`). Only `voluntary` sets `auto_renew_state = off`; a later
-  `subscription_uncancelled` restores it. Every other category is counted as
-  a non-voluntary cancellation and leaves the auto-renew state unchanged,
-  because a refund or an unknown reason does not say that renewal is off.
+- **Only a voluntary cancellation turns auto-renew off.** See the cancellation
+  contract in [payment-funnel.md: Event contract](payment-funnel.md#event-contract); Query 4
+  counts other categories separately without changing auto-renew state.
 
 ## Filters applied everywhere
 
@@ -170,10 +167,10 @@ validation file exercises the filter with synthetic rows.
 
 ### Timestamps and duplicates
 
-- `item_saved` is timed by the item's `_creationTime` (the event's own
-  `timestamp`), `item_opened` by the client clock, `trial_started` and
-  `payment_succeeded` by `purchased_at_ms`, and the cancellation lifecycle by
-  `event_timestamp_ms`. None is webhook arrival time.
+- Timestamp sources and retry identity follow
+  [payment-funnel.md: Event contract](payment-funnel.md#event-contract), with save timestamps
+  owned by [item telemetry](../../apps/native/convex/analytics.ts)
+  and opens by [client analytics](../../apps/native/src/lib/analytics.ts).
 - Deliveries retry with the same event UUID, so PostHog already drops exact
   repeats. The queries still collapse on the canonical id (`item_id`,
   `paywall_attempt_id`, `revenuecat_event_id`) and report how many extra rows
@@ -200,8 +197,8 @@ The internal flag alone looks at every `auth_completed` of the person.
 
 Reading rules:
 
-- Step ids are from `onboarding-steps.ts` (`live_demo` and `share_practice`
-  are the analytics ids of the demo and share steps). Flow 7 is the current
+- Step ids are from [onboarding-steps.ts](../../apps/native/src/lib/onboarding-steps.ts) (`live_demo` and `share_practice`
+  are the analytics ids of the demo and share steps). The current `ONBOARDING_FLOW_VERSION` (7 at the time of writing) defines the
   flow; earlier flows lack some steps, so compare within a flow version.
 - `onboarding_step_viewed` fires once per step per onboarding mount, so a
   person can view later steps without a recorded opener only on an install
@@ -362,27 +359,31 @@ at or after its `trial_started`, and before the account's next
 
 ## Validation
 
-`validate-trial-baselines.sql` contains the same five statements with the
-source CTEs replaced by literal rows and the final SELECT listing one row per
-synthetic case. The transform blocks, including the row filter at the top of
-each, are byte-identical to the production file. Check that after editing
-either file:
+`validate-trial-baselines.sql` stores only synthetic sources, literal expected
+rows and self-checking tails. Assemble the five read-only statements from the
+production transforms (Query 2 shares one source and transform):
 
 ```sh
-for q in q1 q2a q2b q3 q4; do
-  diff <(awk "/^-- transform:begin $q\$/,/^-- transform:end $q\$/" docs/analytics/trial-baselines.sql) \
-       <(awk "/^-- transform:begin $q\$/,/^-- transform:end $q\$/" docs/analytics/validate-trial-baselines.sql) \
-    && echo "$q ok"
-done
+node tools/assemble-analytics-validation.mjs
+node --test tools/assemble-analytics-validation.test.mjs
 ```
 
-Run each validation statement as a PostHog SQL insight. It reads no events
-and writes nothing; it only proves the transformations behave as described.
-Passing it says nothing about production behaviour or rates. Engine
-execution was not available when these files were written, so the expected
-outcomes below are desk-checked against the SQL, not observed; the first
-operator run should confirm them and fix the SQL, not the table, on any
-difference.
+Paste one emitted statement at a time into a PostHog SQL insight. Every `ok`
+must be 1, including `__row_count__`; mismatching column names diagnose failures.
+Missing expected cases fail the left join; extra or duplicate cases fail the
+count/unique-id guard. Expected literals are transcribed from the original
+methodology tables, not observed engine results. Fix the SQL, not the expected
+rows, on a difference. These checks say nothing about production rates.
+
+**HogQL was not executed.** The first authorized engine run must also confirm
+same-SELECT alias reuse: `bounded` in Query 4, `persons_demo_ready` and
+`mature_openers` in Query 1, and the newly inlined `window_saves` and
+`pre_terminal`. Local assembler tests verify structure, not SQL semantics.
+
+Before restructuring, a temporary original-head fixture comparison passed:
+all five assembled validation statements were byte-identical to `cd8d9881`
+(`node --test tools/assemble-analytics-validation.test.mjs`, 1/1 pass).
+The fixture was removed after that green run; permanent tests cover assembly.
 
 Synthetic rows carry `environment`, `analytics_version` and the required
 ids. Webhook rows also carry `store_environment`; Query 3 save/open rows
@@ -390,28 +391,9 @@ use `NULL` to represent its absence, not an empty-string stand-in.
 These cases exercise each statement's filter: rows tagged
 `development`, `sandbox`, `analytics_version = 0`, or with an empty required
 id must be absent from the output. The absent cases are listed under each
-table.
+case section.
 
-### Query 1 expected rows
-
-| case_id              | flow_version | opener_views | mature | reached_interests | reached_setup | reached_demo | demo_picked | sample_picked | demo_ready | signed_in | new_accounts | account_count | is_internal | reached_notifications | reached_share | completed | paywall_attempted |
-| -------------------- | ------------ | ------------ | ------ | ----------------- | ------------- | ------------ | ----------- | ------------- | ---------- | --------- | ------------ | ------------- | ----------- | --------------------- | ------------- | --------- | ----------------- |
-| p_anon_demo          | 7            | 1            | 1      | 1                 | 1             | 1            | 1           | 1             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_demo_failed        | 7            | 1            | 1      | 0                 | 0             | 1            | 1           | 0             | 0          | 1         | 1            | 1             | 0           | 0                     | 0             | 0         | 0                 |
-| p_dev_account        | 7            | 1            | 1      | 0                 | 0             | 0            | 0           | 0             | 0          | 1         | 0            | 1             | 0           | 0                     | 0             | 0         | 0                 |
-| p_dropped_setup      | 7            | 1            | 1      | 1                 | 1             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_full               | 7            | 1            | 1      | 1                 | 1             | 1            | 1           | 1             | 1          | 1         | 1            | 1             | 0           | 1                     | 1             | 1         | 1                 |
-| p_immature           | 7            | 1            | 0      | 1                 | 0             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_internal           | 7            | 1            | 1      | 0                 | 0             | 0            | 0           | 0             | 0          | 1         | 0            | 1             | 1           | 0                     | 0             | 0         | 1                 |
-| p_internal_late_auth | 7            | 1            | 1      | 1                 | 0             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 1           | 0                     | 0             | 0         | 0                 |
-| p_late_step          | 7            | 1            | 1      | 0                 | 1             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_mixed_env          | 7            | 1            | 1      | 0                 | 0             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_old_flow           | 4            | 1            | 1      | 0                 | 1             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_other_placement    | 7            | 1            | 1      | 0                 | 0             | 0            | 0           | 0             | 0          | 1         | 1            | 1             | 0           | 0                     | 0             | 0         | 0                 |
-| p_replay_later       | 6            | 2            | 1      | 1                 | 0             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_returning          | 7            | 1            | 1      | 0                 | 0             | 1            | 1           | 0             | 1          | 1         | 0            | 1             | 0           | 0                     | 0             | 1         | 1                 |
-| p_same_day_replay    | 6            | 2            | 1      | 1                 | 0             | 0            | 0           | 0             | 0          | 0         | 0            | 0             | 0           | 0                     | 0             | 0         | 0                 |
-| p_two_accounts       | 7            | 1            | 1      | 0                 | 0             | 0            | 0           | 0             | 0          | 1         | 2            | 2             | 0           | 0                     | 0             | 0         | 0                 |
+### Query 1 cases
 
 Absent: `p_no_opener` (no opener view), `p_dev_env` (every row tagged
 `development`), `p_version_0` (`analytics_version = 0`).
@@ -439,29 +421,7 @@ Absent: `p_no_opener` (no opener view), `p_dev_env` (every row tagged
   no person links to the first inside a window, and the second's link is
   outside its person's window.
 
-### Query 2a expected rows
-
-| case_id               | placement  | presentation_events | shown_confirmed | outcome            | outcome_event_count | mature | is_internal | trial_attribution          |
-| --------------------- | ---------- | ------------------- | --------------- | ------------------ | ------------------- | ------ | ----------- | -------------------------- |
-| att_cancelled         | onboarding | 1                   | 1               | cancelled          | 1                   | 1      | 0           | (empty)                    |
-| att_dup_presentation  | add        | 2                   | 0               | cancelled          | 1                   | 1      | 0           | (empty)                    |
-| att_f_far_unresolved  | onboarding | 1                   | 0               | unresolved         | 0                   | 1      | 0           | (empty)                    |
-| att_f_near_purchase   | add        | 1                   | 0               | purchase_completed | 1                   | 1      | 0           | purchase_completed_attempt |
-| att_failed            | add        | 1                   | 0               | failed             | 1                   | 1      | 0           | (empty)                    |
-| att_g_outside_window  | onboarding | 1                   | 0               | purchase_completed | 1                   | 1      | 0           | (empty)                    |
-| att_internal          | onboarding | 1                   | 0               | cancelled          | 1                   | 1      | 1           | (empty)                    |
-| att_noid_trial        | onboarding | 1                   | 0               | purchase_completed | 1                   | 1      | 0           | (empty)                    |
-| att_orphan_outcome    | (empty)    | 0                   | 1               | cancelled          | 1                   | 1      | 0           | (empty)                    |
-| att_purchase_no_trial | onboarding | 1                   | 1               | purchase_completed | 1                   | 1      | 0           | (empty)                    |
-| att_purchase_trial    | onboarding | 1                   | 1               | purchase_completed | 1                   | 1      | 0           | purchase_completed_attempt |
-| att_repeat_1          | onboarding | 1                   | 0               | cancelled          | 1                   | 1      | 0           | (empty)                    |
-| att_repeat_2          | add        | 1                   | 1               | purchase_completed | 1                   | 1      | 0           | purchase_completed_attempt |
-| att_restored          | profile    | 1                   | 1               | restored           | 1                   | 1      | 0           | (empty)                    |
-| att_sandbox_trial     | onboarding | 1                   | 0               | purchase_completed | 1                   | 1      | 0           | (empty)                    |
-| att_two_outcomes      | add        | 1                   | 0               | cancelled          | 2                   | 1      | 0           | (empty)                    |
-| att_unresolved_mature | onboarding | 1                   | 0               | unresolved         | 0                   | 1      | 0           | (empty)                    |
-| att_unresolved_recent | onboarding | 1                   | 0               | unresolved         | 0                   | 0      | 0           | (empty)                    |
-| att_unresolved_trial  | onboarding | 1                   | 0               | unresolved         | 0                   | 1      | 0           | unresolved_attempt         |
+### Query 2a cases
 
 Absent: `att_dev_env` (tagged `development`), `att_version_0`
 (`analytics_version = 0`), and the `acct-a` presentation row with an empty
@@ -475,19 +435,7 @@ arrived too far away to attribute. `att_sandbox_trial` and `att_noid_trial`
 completed a checkout whose only `trial_started` is sandbox or lacks its
 webhook id, so neither is confirmed.
 
-### Query 2b expected rows
-
-| case_id           | attempt_id           | attribution                | candidate_attempts | deliveries | account_trial_count | is_first_trial | is_internal |
-| ----------------- | -------------------- | -------------------------- | ------------------ | ---------- | ------------------- | -------------- | ----------- |
-| rc-trial-b        | att_purchase_trial   | purchase_completed_attempt | 1                  | 2          | 1                   | 1              | 0           |
-| rc-trial-c        | att_unresolved_trial | unresolved_attempt         | 1                  | 1          | 1                   | 1              | 0           |
-| rc-trial-e        | att_repeat_2         | purchase_completed_attempt | 1                  | 1          | 1                   | 1              | 0           |
-| rc-trial-f        | att_f_near_purchase  | purchase_completed_attempt | 2                  | 1          | 1                   | 1              | 0           |
-| rc-trial-g        | (empty)              | unmatched                  | 0                  | 1          | 1                   | 1              | 0           |
-| rc-trial-h        | (empty)              | unmatched                  | 0                  | 1          | 1                   | 1              | 0           |
-| rc-trial-i1       | (empty)              | unmatched                  | 0                  | 1          | 2                   | 1              | 0           |
-| rc-trial-i2       | (empty)              | unmatched                  | 0                  | 1          | 2                   | 0              | 0           |
-| rc-trial-internal | (empty)              | unmatched                  | 0                  | 1          | 1                   | 1              | 1           |
+### Query 2b cases
 
 Absent: `rc-trial-sandbox` (`store_environment = sandbox`), `rc-trial-dev`
 (tagged `development`), `rc-trial-v0` (`analytics_version = 0`), and the
@@ -497,34 +445,7 @@ Absent: `rc-trial-sandbox` (`store_environment = sandbox`), `rc-trial-dev`
 `rc-trial-f` has two candidates and the `purchase_completed` one wins over
 the earlier unresolved one. `rc-trial-e` ignores the cancelled first attempt.
 
-### Query 3 expected rows
-
-| case_id                | has_anchor | trial_starts_missing_id | mature_24h | mature_72h | saved_within_24h | distinct_saves_72h | saves_before_anchor | reopen_measurable | reopened_own_72h | demo_saves | unknown_source_saves | repeat_trial_starts | is_internal |
-| ---------------------- | ---------- | ----------------------- | ---------- | ---------- | ---------------- | ------------------ | ------------------- | ----------------- | ---------------- | ---------- | -------------------- | ------------------- | ----------- |
-| acct-internal          | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 1           |
-| t_demo_only            | 1          | 0                       | 1          | 1          | 0                | 0                  | 0                   | 0                 | 0                | 1          | 0                    | 0                   | 0           |
-| t_dev_save             | 1          | 0                       | 1          | 1          | 0                | 0                  | 0                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_dup_trial_delivery   | 1          | 0                       | 1          | 1          | 0                | 0                  | 0                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_duplicate_save       | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_foreign_item         | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_missing_store_env    | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 1                | 0          | 0                    | 0                   | 0           |
-| t_immature             | 1          | 0                       | 0          | 0          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_immature_72h         | 1          | 0                       | 1          | 0          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_missing_open_session | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_missing_save_session | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_missing_trial_id     | 0          | 1                       | 0          | 0          | 0                | 0                  | 0                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_mixed_trial_id       | 1          | 1                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_open_after_72h       | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_pre_save_open        | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_repeat_trial         | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 1                   | 0           |
-| t_same_session         | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_save_after_24h       | 1          | 0                       | 1          | 1          | 0                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_save_after_72h       | 1          | 0                       | 1          | 1          | 0                | 0                  | 0                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_save_at_24h          | 1          | 0                       | 1          | 1          | 1                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_save_at_72h          | 1          | 0                       | 1          | 1          | 0                | 1                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_save_before_anchor   | 1          | 0                       | 1          | 1          | 0                | 0                  | 1                   | 0                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_two_items            | 1          | 0                       | 1          | 1          | 1                | 2                  | 0                   | 1                 | 0                | 0          | 0                    | 0                   | 0           |
-| t_unknown_source       | 1          | 0                       | 1          | 1          | 0                | 0                  | 0                   | 0                 | 0                | 0          | 1                    | 0                   | 0           |
+### Query 3 cases
 
 Absent: `acct-other` (saved the item that `t_foreign_item` opened and has no
 trial), `t_sandbox_trial` (its trial row is `store_environment = sandbox`,
@@ -546,34 +467,7 @@ leaving only a save), `t_dev_env` (tagged `development`), `t_version_0`
 - In the production query `t_immature` and `t_immature_72h` would sit in the
   `immature_*_trials` columns and outside every rate.
 
-### Query 4 expected rows
-
-| case_id                     | population              | product_id  | mature | outcome                   | ever_cancelled | other_cancels | auto_renew_state | repeat_trial_starts | direct_initial_payments | direct_initial_after_trial | renewals | other_events | duplicate_deliveries_collapsed | is_internal |
-| --------------------------- | ----------------------- | ----------- | ------ | ------------------------- | -------------- | ------------- | ---------------- | ------------------- | ----------------------- | -------------------------- | -------- | ------------ | ------------------------------ | ----------- |
-| acct-internal               | trial                   | annual_1999 | 1      | converted                 | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 1           |
-| l_billing_cancel_expired    | trial                   | annual_1999 | 1      | expired                   | 0              | 1             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_cancel_expired            | trial                   | annual_1999 | 1      | expired                   | 1              | 0             | off              | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_cancel_pending            | trial                   | annual_1999 | 0      | pending                   | 1              | 0             | off              | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_cancel_reenable_converted | trial                   | annual_1999 | 1      | converted                 | 1              | 0             | re_enabled       | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_cancel_reenable_pending   | trial                   | annual_1999 | 0      | pending                   | 1              | 0             | re_enabled       | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_converted                 | trial                   | annual_1999 | 1      | converted                 | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_converted_recent          | trial                   | annual_1999 | 0      | converted                 | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_direct_initial            | direct_initial_no_trial | monthly_499 | 0      | not_a_trial               | 0              | 0             | never_cancelled  | 0                   | 1                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_duplicate_delivery        | trial                   | annual_1999 | 1      | converted                 | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 1                              | 0           |
-| l_expired                   | trial                   | annual_1999 | 1      | expired                   | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_expired_recent            | trial                   | annual_1999 | 0      | expired                   | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_initial_after_expiry      | trial                   | annual_1999 | 1      | expired                   | 0              | 0             | never_cancelled  | 0                   | 1                       | 1                          | 0        | 0            | 0                              | 0           |
-| l_missing_id_conversion     | trial                   | annual_1999 | 1      | unknown_no_terminal_event | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_paid_uncancel_ignored     | trial                   | annual_1999 | 0      | pending                   | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 1            | 0                              | 0           |
-| l_pending_clean             | trial                   | annual_1999 | 0      | pending                   | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_pre_anchor_event          | trial                   | annual_1999 | 0      | pending                   | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_refund_cancel_converted   | trial                   | annual_1999 | 1      | converted                 | 0              | 1             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_renewal                   | trial                   | annual_1999 | 1      | converted                 | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 1        | 0            | 0                              | 0           |
-| l_repeat_first_open         | trial                   | annual_1999 | 1      | unknown_no_terminal_event | 0              | 0             | never_cancelled  | 1                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_repeat_trials             | trial                   | annual_1999 | 1      | expired                   | 0              | 0             | never_cancelled  | 1                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_uncancel_then_cancel      | trial                   | annual_1999 | 0      | pending                   | 1              | 0             | off              | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_unknown_cancel_pending    | trial                   | annual_1999 | 0      | pending                   | 0              | 1             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
-| l_unknown_overdue           | trial                   | annual_1999 | 1      | unknown_no_terminal_event | 0              | 0             | never_cancelled  | 0                   | 0                       | 0                          | 0        | 0            | 0                              | 0           |
+### Query 4 cases
 
 Absent: `l_missing_id_trial` (its only row has an empty
 `revenuecat_event_id`), `l_sandbox` (`store_environment = sandbox`),
