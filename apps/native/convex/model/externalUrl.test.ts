@@ -23,6 +23,9 @@ describe("youtubeVideoId", () => {
     "https://m.youtube.com/shorts/Ab_cd-Ef123?si=tracking",
     "https://www.youtube.com/embed/Ab_cd-Ef123",
     "https://youtu.be/Ab_cd-Ef123?t=20",
+    "https://music.youtube.com/watch?v=Ab_cd-Ef123",
+    "https://youtube.com:443/watch?v=Ab_cd-Ef123",
+    "http://youtube.com:80/watch?v=Ab_cd-Ef123",
   ])("reads a supported video URL: %s", (url) => {
     expect(youtubeVideoId(url)).toBe("Ab_cd-Ef123");
   });
@@ -37,6 +40,10 @@ describe("youtubeVideoId", () => {
     "https://youtube.com.evil.test/watch?v=Ab_cd-Ef123",
     "https://evil.youtube.com/watch?v=Ab_cd-Ef123",
     "ftp://youtube.com/watch?v=Ab_cd-Ef123",
+    "https://user@youtube.com/watch?v=Ab_cd-Ef123",
+    "https://:password@youtube.com/watch?v=Ab_cd-Ef123",
+    "https://youtube.com:8443/watch?v=Ab_cd-Ef123",
+    "http://youtube.com:443/watch?v=Ab_cd-Ef123",
     "youtube.com/watch?v=Ab_cd-Ef123",
     "https://youtube.com/embed/Ab_cd-Ef12!",
   ])("rejects unsupported or malformed URLs: %s", (url) => {
