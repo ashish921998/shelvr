@@ -156,6 +156,15 @@ export function LiveDemoStep({
     );
   }
 
+  if (demo.submissionTimedOut) {
+    return (
+      <SubmissionRecovery
+        onKeepWaiting={demo.keepWaiting}
+        onContinue={demo.continueAfterTimeout}
+      />
+    );
+  }
+
   // A previewed sample (or one restored after a relaunch) asks for sign-in
   // on its own screen. A previewed one keeps that screen up while its save
   // lands, then goes to the reveal; a restored one reads here like any other.
@@ -166,18 +175,6 @@ export function LiveDemoStep({
         sample={authSample}
         space={demo.authRequest?.destination ?? null}
         saving={demo.isAuthenticated}
-        submissionTimedOut={demo.submissionTimedOut}
-        onKeepWaiting={demo.keepWaiting}
-        onContinue={demo.continueAfterTimeout}
-      />
-    );
-  }
-
-  if (demo.submissionTimedOut) {
-    return (
-      <SubmissionRecovery
-        onKeepWaiting={demo.keepWaiting}
-        onContinue={demo.continueAfterTimeout}
       />
     );
   }

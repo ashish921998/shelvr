@@ -1,8 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { Button } from "@/components/ui/button";
-import { ThemedText } from "@/components/ui/themed-text";
-import { GhostButton } from "@/components/onboarding/parts";
-import { View } from "react-native";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
+import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** Creation has not returned an item ID: do not imply a confirmed save. */
@@ -16,12 +15,12 @@ export function SubmissionRecovery({
   useAppLocale();
   return (
     <View style={styles.wrap}>
-      <ThemedText variant="title">{t("demo.submissionTitle")}</ThemedText>
-      <ThemedText variant="body" style={styles.description}>
-        {t("demo.submissionUnconfirmed")}
-      </ThemedText>
+      <Text style={styles.headline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+        {t("demo.submissionTitle")}
+      </Text>
+      <Text style={styles.description}>{t("demo.submissionUnconfirmed")}</Text>
       <View style={styles.actions}>
-        <Button title={t("demo.keepWaiting")} onPress={onKeepWaiting} />
+        <CtaButton label={t("demo.keepWaiting")} onPress={onKeepWaiting} />
         <GhostButton label={t("common.continue")} onPress={onContinue} />
       </View>
     </View>
@@ -30,6 +29,17 @@ export function SubmissionRecovery({
 
 const styles = StyleSheet.create((theme) => ({
   wrap: { flex: 1, justifyContent: "center", gap: theme.gap(2) },
-  description: { color: theme.colors.muted },
+  headline: {
+    fontFamily: theme.fonts.display,
+    fontSize: 28,
+    lineHeight: 34,
+    color: theme.colors.foreground,
+  },
+  description: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    lineHeight: 21,
+    color: theme.colors.muted,
+  },
   actions: { gap: theme.gap(1.5) },
 }));

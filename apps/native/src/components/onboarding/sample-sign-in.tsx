@@ -6,7 +6,6 @@ import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { sampleImage } from "@/components/onboarding/sample-card";
 import { SaveSummary } from "@/components/onboarding/save-summary";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
-import { SubmissionRecovery } from "@/components/onboarding/submission-recovery";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -22,17 +21,11 @@ export function SampleSignIn({
   sample,
   space,
   saving,
-  submissionTimedOut,
-  onKeepWaiting,
-  onContinue,
 }: {
   sample: DemoSample;
   space: string | null;
   /** Signed in and the save is landing: nothing here takes a tap. */
   saving: boolean;
-  submissionTimedOut: boolean;
-  onKeepWaiting: () => void;
-  onContinue: () => void;
 }) {
   useAppLocale();
   const oauth = useOAuthSignIn("sample_preview");
@@ -43,15 +36,6 @@ export function SampleSignIn({
       action: "shown",
     });
   }, []);
-
-  if (submissionTimedOut) {
-    return (
-      <SubmissionRecovery
-        onKeepWaiting={onKeepWaiting}
-        onContinue={onContinue}
-      />
-    );
-  }
 
   return (
     <View style={styles.wrap}>

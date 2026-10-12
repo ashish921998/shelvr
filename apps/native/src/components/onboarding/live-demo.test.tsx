@@ -92,11 +92,6 @@ const mock = vi.hoisted(() => {
       </button>
     ),
     reading: () => <div>reading</div>,
-    button: ({ title, onPress }: { title: string; onPress: () => void }) => (
-      <button type="button" onClick={onPress}>
-        {title}
-      </button>
-    ),
     sampleSignIn: () => <div>sample-sign-in</div>,
   };
 });
@@ -125,6 +120,7 @@ vi.mock("expo-clipboard", () => ({
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.nothing }));
 vi.mock("@/components/onboarding/parts", () => ({
+  CtaButton: mock.ghostButton,
   GhostButton: mock.ghostButton,
 }));
 vi.mock("@/components/onboarding/demo-reading-view", () => ({
@@ -165,12 +161,6 @@ vi.mock("@/components/onboarding/save-summary", () => ({
 }));
 vi.mock("@/components/onboarding/sign-in-buttons", () => ({
   SignInButtons: mock.sampleSignIn,
-}));
-vi.mock("@/components/ui/button", () => ({
-  Button: mock.button,
-}));
-vi.mock("@/components/ui/themed-text", () => ({
-  ThemedText: mock.text,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
