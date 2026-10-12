@@ -1232,26 +1232,22 @@ export const sweepItemEmbeddings = internalAction({
     if (pending.length === 0) {
       return { scanned: 0, written: 0 };
     }
-    // Eligibility from the page read is only a snapshot. Recheck each owned
-    // item before constructing the provider list, and map vectors from that
-    // actual list rather than from the original page.
-    const eligible = [];
-    for (const entry of pending) {
-      const item = await ctx.runQuery(internal.items.getItemInternal, {
-        itemId: entry.itemId,
-      });
-      if (item === null || item.userId !== entry.userId) continue;
-      const allowed = await stillAllowed(ctx, true, item);
-      if (
-        !allowed &&
-        (!entry.aiDeclined ||
-          !(await ctx.runQuery(internal.aiConsent.hasLiveOwner, {
-            userId: item.userId,
-          })))
-      )
-        continue;
-      eligible.push({ ...entry, aiDeclined: !allowed });
-    }
+    const dispositions = await ctx.runQuery(
+      internal.aiConsent.revalidateEmbeddingBatch,
+      {
+        entries: pending.map(({ itemId, userId }) => ({ itemId, userId })),
+      },
+    );
+    const eligible = pending.flatMap((entry, index) =>
+      dispositions[index].disposition === "gone"
+        ? []
+        : [
+            {
+              ...entry,
+              aiDeclined: dispositions[index].disposition === "declined",
+            },
+          ],
+    );
     const { vectors, callFailed } = await embedTexts(
       eligible.map((entry) => (entry.aiDeclined ? "" : entry.text)),
     );

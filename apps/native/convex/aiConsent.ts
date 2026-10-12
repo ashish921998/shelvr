@@ -9,7 +9,10 @@ import {
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import { liveOwner, requireUserId } from "./model/auth";
-import { CURRENT_EMBEDDING_VERSION } from "./model/embedding";
+import {
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_SWEEP_PAGE,
+} from "./model/embedding";
 
 async function consentRow(ctx: QueryCtx, userId: string) {
   return await ctx.db
@@ -51,10 +54,53 @@ export const isAllowed = internalQuery({
   },
 });
 
-export const hasLiveOwner = internalQuery({
-  args: { userId: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => (await liveOwner(ctx, args.userId)) !== null,
+/** One snapshot for the whole page, immediately before provider inputs are built.
+ * Deleting owners get empty slots so their rows cannot wedge the sweep. */
+export const revalidateEmbeddingBatch = internalQuery({
+  args: {
+    entries: v.array(v.object({ itemId: v.id("items"), userId: v.string() })),
+  },
+  returns: v.array(
+    v.object({
+      itemId: v.id("items"),
+      disposition: v.union(
+        v.literal("allowed"),
+        v.literal("declined"),
+        v.literal("gone"),
+      ),
+    }),
+  ),
+  handler: async (ctx, { entries }) => {
+    if (entries.length > EMBEDDING_SWEEP_PAGE)
+      throw new Error("Too many embedding entries");
+    type Disposition = "allowed" | "declined" | "gone";
+    const owners = new Map<string, Disposition>();
+    const results: {
+      itemId: (typeof entries)[number]["itemId"];
+      disposition: Disposition;
+    }[] = [];
+    for (const { itemId, userId } of entries) {
+      const item = await ctx.db.get(itemId);
+      if (item === null || item.userId !== userId) {
+        results.push({ itemId, disposition: "gone" });
+        continue;
+      }
+      let disposition = owners.get(userId);
+      if (disposition === undefined) {
+        const ownerId = ctx.db.normalizeId("users", userId);
+        const owner = ownerId === null ? null : await ctx.db.get(ownerId);
+        disposition =
+          owner === null
+            ? "gone"
+            : (await aiAllowed(ctx, userId))
+              ? "allowed"
+              : "declined";
+        owners.set(userId, disposition);
+      }
+      results.push({ itemId, disposition });
+    }
+    return results;
+  },
 });
 
 /** Revalidate cached recommendation identities in one bounded transaction.

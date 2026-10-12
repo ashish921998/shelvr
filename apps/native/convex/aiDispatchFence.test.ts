@@ -227,14 +227,20 @@ describe("AI dispatch uses fresh live ownership", () => {
     );
     await paused(
       f,
-      "aiConsent:isAllowed",
+      "aiConsent:revalidateEmbeddingBatch",
       (ctx) => handler(sweepItemEmbeddings)(ctx, {}),
       async (query) => {
-        expect(query).toEqual({
-          name: "aiConsent:isAllowed",
-          args: { userId: f.userId, itemId: f.itemId },
-          result: false,
+        expect(query?.name).toBe("aiConsent:revalidateEmbeddingBatch");
+        expect(query?.args).toMatchObject({
+          entries: expect.arrayContaining([
+            { userId: f.userId, itemId: f.itemId },
+          ]),
         });
+        expect(query?.result).toEqual(
+          expect.arrayContaining([
+            { itemId: f.itemId, disposition: "declined" },
+          ]),
+        );
         expect(
           await f.t.query(internal.aiConsent.isAllowed, {
             userId: f.userId,
@@ -243,9 +249,9 @@ describe("AI dispatch uses fresh live ownership", () => {
         ).toBe(false);
         await f.t.run((ctx) => ctx.db.delete(consentId));
         expect(
-          await f.t.query(internal.aiConsent.hasLiveOwner, {
-            userId: f.userId,
-          }),
+          await f.t.run(
+            async (ctx) => (await ctx.db.get(f.userId))?.deleting !== true,
+          ),
         ).toBe(true);
       },
     );
