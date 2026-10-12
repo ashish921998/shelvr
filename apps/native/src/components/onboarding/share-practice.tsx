@@ -6,11 +6,11 @@ import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { SampleRow } from "@/components/onboarding/sample-card";
 import {
-  SampleCard,
-  SampleRow,
-  ShareHint,
-} from "@/components/onboarding/sample-card";
+  PracticePost,
+  ShareSteps,
+} from "@/components/onboarding/practice-post";
 import { CelebrationBadge } from "@/components/onboarding/celebration";
 import { settleIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
@@ -200,13 +200,11 @@ export function SharePracticeStep({
         >
           {t("sharePractice.title")}
         </Text>
-        <Text style={styles.support}>{t("sharePractice.body")}</Text>
       </View>
 
       {sample === undefined ? null : (
-        <SampleCard
+        <PracticePost
           sample={sample}
-          action="share"
           disabled={sheetOpen || leaving}
           onPress={() => void share()}
         />
@@ -214,7 +212,7 @@ export function SharePracticeStep({
       {wrongApp ? (
         <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
       ) : null}
-      <ShareHint />
+      <ShareSteps />
       <Text style={styles.tip}>
         {t(
           Platform.OS === "ios"
@@ -247,7 +245,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: "uppercase",
-    color: theme.colors.primary,
+    color: theme.colors.primaryText,
   },
   headline: {
     fontFamily: theme.fonts.display,

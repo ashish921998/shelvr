@@ -76,9 +76,11 @@ vi.mock("@/components/onboarding/parts", () => ({
   GhostButton: mock.button,
 }));
 vi.mock("@/components/onboarding/sample-card", () => ({
-  SampleCard: mock.card,
   SampleRow: mock.row,
-  ShareHint: mock.nothing,
+}));
+vi.mock("@/components/onboarding/practice-post", () => ({
+  PracticePost: mock.card,
+  ShareSteps: mock.nothing,
 }));
 
 const { SharePracticeStep } =

@@ -1,4 +1,4 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import type { DemoKind, DemoSample } from "@/lib/onboarding-demo";
 import type { Interest } from "@/lib/onboarding-interests";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -9,7 +9,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // The ready-made sample cards onboarding shows: the first-save picker and the
 // share-sheet practice.
 
-const APP_ICON = require("../../../assets/icon.png");
 const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Articles: require("../../../assets/onboarding/demo-article.jpg"),
   Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
@@ -46,38 +45,6 @@ export function sampleImage(sample: DemoSample): number {
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
     : INTEREST_IMAGES[sample.interest];
-}
-
-/** An illustration of the share gesture, not a control. */
-export function ShareHint() {
-  useAppLocale();
-  const { theme } = useUnistyles();
-  return (
-    <View
-      style={styles.hint}
-      accessible
-      accessibilityLabel={t("demo.shareHelp")}
-    >
-      <View style={styles.hintArt}>
-        {/* Outlined, not filled: the filled yellow share is the card's real
-            button, and the hint must not look like a second one. */}
-        <View style={styles.hintGlyph}>
-          <AppSymbolIcon
-            name="square.and.arrow.up"
-            size={18}
-            tintColor={theme.colors.foreground}
-          />
-        </View>
-        <AppSymbolIcon
-          name="chevron.right"
-          size={12}
-          tintColor={theme.colors.faint}
-        />
-        <Image source={APP_ICON} style={styles.hintIcon} />
-      </View>
-      <Text style={styles.hintText}>{t("demo.shareHelp")}</Text>
-    </View>
-  );
 }
 
 /** A large sample card. "save" saves it in one tap; "share" opens the real
@@ -120,19 +87,12 @@ export function SampleCard({
             {sample.domain}
           </Text>
         </View>
-        {/* The share card names its button: a bare icon on a mock post
-            does not say "tap me". */}
-        <View style={share ? styles.sharePill : styles.hintShare}>
+        <View style={styles.hintShare}>
           <AppSymbolIcon
             name={share ? "square.and.arrow.up" : "plus"}
-            size={share ? 16 : 18}
+            size={18}
             tintColor={theme.colors.primaryForeground}
           />
-          {share ? (
-            <Text style={styles.sharePillText}>
-              {t("sharePractice.shareButton")}
-            </Text>
-          ) : null}
         </View>
       </View>
     </Pressable>
@@ -181,20 +141,6 @@ export function SampleRow({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  hint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  hintArt: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-  },
   hintShare: {
     width: 36,
     height: 36,
@@ -202,43 +148,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
-  },
-  hintGlyph: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sharePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-    height: 36,
-    paddingHorizontal: theme.gap(1.75),
-    borderRadius: 18,
-    backgroundColor: theme.colors.primary,
-  },
-  sharePillText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.primaryForeground,
-  },
-  hintIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-  },
-  hintText: {
-    flex: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 19,
-    color: theme.colors.foreground,
   },
   post: {
     borderRadius: theme.radius.lg,

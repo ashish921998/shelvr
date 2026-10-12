@@ -488,7 +488,6 @@ export type MessageParams = {
   "onboarding.remindFallbackTitle": undefined;
   "onboarding.remindPledge": undefined;
   "onboarding.remindConsent": undefined;
-  "demo.shareHelp": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
   "demo.stepReading": undefined;
@@ -541,9 +540,9 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "sharePractice.eyebrow": undefined;
-  "sharePractice.shareButton": undefined;
+  "sharePractice.stepShare": undefined;
+  "sharePractice.stepShelvr": undefined;
   "sharePractice.title": undefined;
-  "sharePractice.body": undefined;
   "sharePractice.tipIos": undefined;
   "sharePractice.tipAndroid": undefined;
   "sharePractice.savedTitle": undefined;
