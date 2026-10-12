@@ -563,10 +563,15 @@
   "home.progressShareHelp": "共有をタップして Shelvr を選びます。見つからなければ「その他」をタップ。",
   "home.progressPhotos": "写真からスクリーンショットを追加",
   "home.progressNote": "さっとメモを書く",
-  "home.recallTitle": "似たものを前にも保存しています",
   "home.recallBody": {
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
   },
+  "home.recallKicker": "あなたの棚から",
+  "home.recallStackTitle": {
+    "other": "「%{title}」に関連する以前の保存項目が%{formattedCount}件あります"
+  },
+  "home.recallSavedOn": "%{date}に保存",
+  "home.recallOldest": "最も古いものは%{date}",
   "home.nextUpTitle": "次はこれを開く",
   "home.nextUpRead": "読むために保存",
   "home.nextUpCook": "作るために保存",

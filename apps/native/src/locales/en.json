@@ -581,11 +581,17 @@
   "home.progressShareHelp": "Tap Share, then Shelvr. Not in the row? Tap More.",
   "home.progressPhotos": "Add a screenshot from your photos",
   "home.progressNote": "Jot a quick note",
-  "home.recallTitle": "You've saved things like this before",
   "home.recallBody": {
     "one": "%{formattedCount} earlier save goes with what you just added.",
     "other": "%{formattedCount} earlier saves go with what you just added."
   },
+  "home.recallKicker": "From your shelf",
+  "home.recallStackTitle": {
+    "one": "%{formattedCount} older save goes with “%{title}”",
+    "other": "%{formattedCount} older saves go with “%{title}”"
+  },
+  "home.recallSavedOn": "Saved %{date}",
+  "home.recallOldest": "Oldest from %{date}",
   "home.nextUpTitle": "Open this next",
   "home.nextUpRead": "Saved to read",
   "home.nextUpCook": "Saved to cook",

@@ -599,12 +599,19 @@
   "home.progressShareHelp": "Toque em Compartilhar e depois no Shelvr. Não aparece? Toque em Mais.",
   "home.progressPhotos": "Adicione uma captura de tela das suas fotos",
   "home.progressNote": "Escreva uma nota rápida",
-  "home.recallTitle": "Você já salvou coisas parecidas",
   "home.recallBody": {
     "one": "%{formattedCount} conteúdo salvo antes combina com o que você acabou de adicionar.",
     "many": "%{formattedCount} conteúdos salvos antes combinam com o que você acabou de adicionar.",
     "other": "%{formattedCount} conteúdos salvos antes combinam com o que você acabou de adicionar."
   },
+  "home.recallKicker": "Da sua estante",
+  "home.recallStackTitle": {
+    "one": "%{formattedCount} conteúdo mais antigo combina com “%{title}”",
+    "many": "%{formattedCount} conteúdos mais antigos combinam com “%{title}”",
+    "other": "%{formattedCount} conteúdos mais antigos combinam com “%{title}”"
+  },
+  "home.recallSavedOn": "Salvo em %{date}",
+  "home.recallOldest": "O mais antigo é de %{date}",
   "home.nextUpTitle": "Abra este agora",
   "home.nextUpRead": "Salvo para ler",
   "home.nextUpCook": "Salvo para cozinhar",

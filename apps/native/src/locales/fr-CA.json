@@ -599,12 +599,19 @@
   "home.progressShareHelp": "Touchez Partager, puis Shelvr. Pas dans la liste ? Touchez Plus.",
   "home.progressPhotos": "Ajoutez une capture d’écran depuis votre photothèque",
   "home.progressNote": "Notez quelque chose rapidement",
-  "home.recallTitle": "Vous avez déjà enregistré des contenus similaires",
   "home.recallBody": {
     "one": "%{formattedCount} contenu enregistré plus tôt va avec ce que vous venez d'ajouter.",
     "many": "%{formattedCount} contenus enregistrés plus tôt vont avec ce que vous venez d'ajouter.",
     "other": "%{formattedCount} contenus enregistrés plus tôt vont avec ce que vous venez d'ajouter."
   },
+  "home.recallKicker": "Dans votre étagère",
+  "home.recallStackTitle": {
+    "one": "%{formattedCount} contenu plus ancien va avec « %{title} »",
+    "many": "%{formattedCount} contenus plus anciens vont avec « %{title} »",
+    "other": "%{formattedCount} contenus plus anciens vont avec « %{title} »"
+  },
+  "home.recallSavedOn": "Enregistré le %{date}",
+  "home.recallOldest": "Le plus ancien date du %{date}",
   "home.nextUpTitle": "À ouvrir ensuite",
   "home.nextUpRead": "Gardé pour lire",
   "home.nextUpCook": "Gardé pour cuisiner",
