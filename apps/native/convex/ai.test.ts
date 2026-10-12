@@ -936,7 +936,6 @@ describe("fetchInstagram", () => {
       heroAspectRatio: 9 / 16,
       content:
         "Meet the National Geographic 33!\n\nWe're honoring modern trailblazers. #NatGeo33",
-      caption: true,
       video: true,
     });
     expect(safeFetch).toHaveBeenCalledWith(

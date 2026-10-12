@@ -46,6 +46,7 @@ type Env = {
   readonly SAVE_REMINDERS_ENABLED: string | undefined;
   readonly SERPAPI_KEY: string | undefined;
   readonly WAITLIST_SHARED_SECRET: string | undefined;
+  readonly YOUTUBE_API_KEY: string | undefined;
 };
 
 /**

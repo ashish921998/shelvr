@@ -458,60 +458,61 @@ const youtubeSnippetSchema = z.object({
   ),
 });
 
+function parseYouTubeVideo(body: unknown, id: string): PageData | undefined {
+  const data = youtubeSnippetSchema.safeParse(body);
+  const snippet = data.success
+    ? data.data.items.find((item) => item.id === id)?.snippet
+    : undefined;
+  if (!snippet) return undefined;
+  const thumbnail = Object.values(snippet.thumbnails ?? {}).sort(
+    (a, b) => (b.width ?? 0) - (a.width ?? 0),
+  )[0];
+  return {
+    title: snippet.title,
+    author: snippet.channelTitle,
+    siteName: "YouTube",
+    heroImageUrl: thumbnail?.url,
+    heroAspectRatio:
+      thumbnail?.width && thumbnail.height
+        ? thumbnail.width / thumbnail.height
+        : undefined,
+    content: snippet.description?.trim() || undefined,
+    caption: true,
+  };
+}
+
 /** Optional description read; every failure preserves the existing oEmbed path. */
 async function fetchYouTube(url: string): Promise<PageData> {
-  // The intersection supports this optional config before CLI regeneration.
-  const key = (env as typeof env & { YOUTUBE_API_KEY?: string })
-    .YOUTUBE_API_KEY;
+  const key = env.YOUTUBE_API_KEY;
   const id = youtubeVideoId(url);
-  if (key && id) {
-    try {
-      const endpoint = new URL("https://www.googleapis.com/youtube/v3/videos");
-      endpoint.search = new URLSearchParams({
-        part: "snippet,contentDetails",
-        id,
-        key,
-      }).toString();
-      const result = await safeFetch(endpoint.toString(), {
-        timeoutMs: 15000,
-        maxBytes: 64 * 1024,
-        allowContentType: (ct) => ct.startsWith("application/json"),
-        headers: {
-          "User-Agent": SHELVR_USER_AGENT,
-          Accept: "application/json",
-        },
-      });
-      if (result.ok && !result.truncated) {
-        const data = youtubeSnippetSchema.safeParse(parseJson(result.bytes));
-        const snippet = data.success
-          ? data.data.items.find((item) => item.id === id)?.snippet
-          : undefined;
-        if (snippet) {
-          const thumbnail = Object.values(snippet.thumbnails ?? {}).sort(
-            (a, b) => (b.width ?? 0) - (a.width ?? 0),
-          )[0];
-          const content = snippet.description?.trim() || undefined;
-          return withLinkedRecipe({
-            title: snippet.title,
-            author: snippet.channelTitle,
-            siteName: "YouTube",
-            heroImageUrl: thumbnail?.url,
-            heroAspectRatio:
-              thumbnail?.width && thumbnail.height
-                ? thumbnail.width / thumbnail.height
-                : undefined,
-            content: content?.slice(0, MAX_STORED_CONTENT_CHARS),
-            ...(content ? { caption: true as const } : {}),
-            ...(content && content.length > MAX_STORED_CONTENT_CHARS
-              ? { truncated: true as const }
-              : {}),
-          });
-        }
-      }
-    } catch {
-      // No secret-bearing URL, API body or caption enters diagnostics.
+  if (!key || !id) return fetchYouTubeOEmbed(url);
+  const endpoint = new URL("https://www.googleapis.com/youtube/v3/videos");
+  endpoint.search = new URLSearchParams({
+    part: "snippet",
+    id,
+    key,
+  }).toString();
+  let read: PageData | undefined;
+  let errorCategory = "unreadable_video";
+  try {
+    const result = await safeFetch(endpoint.toString(), {
+      timeoutMs: 15000,
+      maxBytes: 64 * 1024,
+      allowContentType: (ct) => ct.startsWith("application/json"),
+      headers: { "User-Agent": SHELVR_USER_AGENT, Accept: "application/json" },
+    });
+    if (!result.ok) {
+      errorCategory = `page_fetch_error:${result.code}`;
+    } else if (!result.truncated) {
+      read = parseYouTubeVideo(parseJson(result.bytes), id);
     }
+  } catch (error) {
+    errorCategory = fetchErrorCategory(error);
   }
+  if (read) return withLinkedRecipe(read);
+  logEvent("warn", "youtube_data_api_fallback", {
+    error_category: errorCategory,
+  });
   return fetchYouTubeOEmbed(url);
 }
 
@@ -941,12 +942,6 @@ async function fetchInstagramPost(url: string) {
  * classifies from its URL. A transiently failed embed marks the read
  * incomplete so the save can retry.
  */
-function captionEvidence(
-  content: string | undefined,
-): Pick<PageData, "caption"> {
-  return content ? { caption: true } : {};
-}
-
 export async function fetchInstagram(url: string): Promise<PageData> {
   const { page, html, kind, embed } = await fetchInstagramPost(url);
   const embedded: InstagramEmbedFields =
@@ -989,7 +984,6 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
-    ...captionEvidence(caption),
     video: card?.video,
     ...(truncated ? { truncated: true as const } : {}),
     ...(embed.status === "transient" || (readNothing && truncated)
@@ -1549,7 +1543,7 @@ function mayAskForRecipe(page: PageData): boolean {
   );
 }
 
-/** Marks a reader's page as a caption: TikTok and X readers only ever return
+/** Marks a reader's page as a caption: TikTok, X and Instagram only ever return
  * a post's caption. */
 async function asCaption(read: Promise<PageData>): Promise<PageData> {
   return { ...(await read), caption: true };
@@ -1563,7 +1557,8 @@ const SOURCE_READERS = {
   tiktok: async (url) =>
     withLinkedRecipe(await asCaption(fetchTikTokOEmbed(url))),
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
-  instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
+  instagram: async (url) =>
+    withLinkedRecipe(await asCaption(fetchInstagram(url))),
   pinterest: fetchPinterestPin,
   youtube: fetchYouTube,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;

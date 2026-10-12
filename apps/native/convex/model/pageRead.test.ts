@@ -146,17 +146,15 @@ describe("YouTube description reader", () => {
         },
       });
       const [endpoint, options] = safeFetch.mock.calls[0];
-      expect(new URL(endpoint).searchParams.get("part")).toBe(
-        "snippet,contentDetails",
-      );
+      expect(new URL(endpoint).searchParams.get("part")).toBe("snippet");
       expect(new URL(endpoint).searchParams.get("id")).toBe("Ab_cd-Ef123");
       expect(options).toMatchObject({ timeoutMs: 15000, maxBytes: 64 * 1024 });
       expect(options.allowContentType("application/json")).toBe(true);
       expect(options.allowContentType("text/html")).toBe(false);
     },
   );
-  it.each([undefined, "", "x".repeat(6001), "x".repeat(100001)])(
-    "does not transcribe missing, over-limit or storage-cut descriptions",
+  it.each([undefined, "", "x".repeat(6001)])(
+    "does not transcribe missing or over-limit descriptions",
     async (description) => {
       serveVideo(description);
       expect(await readPage(url)).toMatchObject({
@@ -361,7 +359,20 @@ describe("YouTube description reader", () => {
         return failure;
       });
       expect(await readPage(url)).toEqual(baseline);
-      expect(logEvent).not.toHaveBeenCalled();
+      const category =
+        failure instanceof Error
+          ? "unexpected_error:Error"
+          : !failure.ok
+            ? `page_fetch_error:${failure.code}`
+            : failure.bytes[0] === "{".charCodeAt(0) &&
+                new TextDecoder().decode(failure.bytes) === "{bad"
+              ? "unexpected_error:SyntaxError"
+              : "unreadable_video";
+      expect(logEvent).toHaveBeenCalledExactlyOnceWith(
+        "warn",
+        "youtube_data_api_fallback",
+        { error_category: category },
+      );
     },
   );
   it.each([
@@ -616,7 +627,7 @@ describe("readPage for Instagram posts", () => {
       const result = await readPage(url);
       expect(result).toMatchObject({ status: "ok", askForRecipe: eligible });
       if (result.status === "ok") {
-        expect(result.page.caption).toBe(caption ? true : undefined);
+        expect(result.page.caption).toBe(true);
         expect(result.page.recipe).toBeUndefined();
       }
     },
