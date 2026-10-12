@@ -62,7 +62,9 @@ async function chainedRuns(t: Awaited<ReturnType<typeof seedReady>>) {
   const jobs = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
-  return jobs.filter((job) => job.name === "ai:sweepItemEmbeddings");
+  return jobs.filter(
+    (job) => job.name === "aiEmbeddingSweep:sweepItemEmbeddings",
+  );
 }
 
 describe("sweepItemEmbeddings", () => {

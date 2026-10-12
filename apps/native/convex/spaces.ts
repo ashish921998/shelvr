@@ -314,9 +314,13 @@ export const createSpace = mutation({
     });
     // Every new space gets one recommendation pass off its title; the dynamic
     // toggle only governs whether future saves keep getting suggested.
-    await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
-      spaceId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.aiRecommendForSpace.recommendForSpace,
+      {
+        spaceId,
+      },
+    );
     return spaceId;
   },
 });
@@ -362,9 +366,13 @@ export const updateSpace = mutation({
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
     if (enablingDynamic) {
-      await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
-        spaceId: space._id,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.aiRecommendForSpace.recommendForSpace,
+        {
+          spaceId: space._id,
+        },
+      );
     }
     return null;
   },

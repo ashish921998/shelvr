@@ -14,7 +14,7 @@ vi.mock("ai", () => ({
   wrapLanguageModel: vi.fn(() => ({})),
 }));
 
-const { embedTexts } = await import("./ai");
+const { embedTexts } = await import("./aiEmbeddingSweep");
 
 /** A vector of the indexed width whose components are all `fill`. */
 function vector(fill: number): number[] {

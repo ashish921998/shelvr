@@ -7,13 +7,9 @@ import {
 } from "convex/server";
 import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
-import {
-  findProductLinks,
-  processItem,
-  recommendForSpace,
-  steerItemForSpace,
-  sweepItemEmbeddings,
-} from "./ai";
+import { findProductLinks, processItem, steerItemForSpace } from "./ai";
+import { recommendForSpace } from "./aiRecommendForSpace";
+import { sweepItemEmbeddings } from "./aiEmbeddingSweep";
 import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import { newConvexTest } from "./test.setup";
 import { aiAllowed } from "./aiConsent";
