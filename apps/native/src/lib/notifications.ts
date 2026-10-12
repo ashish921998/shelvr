@@ -92,15 +92,15 @@ export function NotificationSessionProvider({
             platform: Platform.OS === "ios" ? "ios" : "android",
           }),
         revokeToken: (token) => unregisterDevice({ token }),
-        setWeeklyShelf: (enabled) =>
+        setWeeklyShelf: (enabled, timezone) =>
           setPreferences({
             weeklyShelfEnabled: enabled,
-            timezone: getNotificationTimezone(),
+            timezone,
           }),
-        setSaveReminders: async (enabled) => {
+        setSaveReminders: async (enabled, timezone) => {
           await setSaveReminders({
             enabled,
-            timezone: getNotificationTimezone(),
+            timezone,
           });
           // The onboarding reminder is a save reminder too, so the switch
           // turns it off with the rest.

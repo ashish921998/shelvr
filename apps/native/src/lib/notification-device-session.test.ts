@@ -27,8 +27,8 @@ function setup(
     ),
     saveToken: vi.fn(async (_registration: RegistrationSnapshot) => {}),
     revokeToken: vi.fn(async (_token: string) => {}),
-    setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
-    setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
+    setWeeklyShelf: vi.fn(async (_enabled: boolean, _timezone: string) => {}),
+    setSaveReminders: vi.fn(async (_enabled: boolean, _timezone: string) => {}),
     signOut: vi.fn(async () => {}),
     deleteAccount: vi.fn(async () => {}),
     clearWidget: vi.fn(async () => {}),
@@ -348,7 +348,7 @@ describe("notification device session", () => {
     expect(deps.saveToken).toHaveBeenCalledBefore(deps.setWeeklyShelf);
     expect(session.getSnapshot()).toBe("idle");
     await session.setWeeklyShelf(false);
-    expect(deps.setWeeklyShelf).toHaveBeenLastCalledWith(false);
+    expect(deps.setWeeklyShelf).toHaveBeenLastCalledWith(false, "UTC");
     expect(deps.getToken).toHaveBeenCalledTimes(2);
   });
 
@@ -359,11 +359,35 @@ describe("notification device session", () => {
     expect(deps.setSaveReminders).not.toHaveBeenCalled();
     expect(await session.setSaveReminders(true)).toBe(true);
     expect(deps.getToken).toHaveBeenLastCalledWith(true);
-    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(true);
+    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(true, "UTC");
     expect(await session.setSaveReminders(false)).toBe(true);
-    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(false);
+    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(false, "UTC");
     expect(deps.getToken).toHaveBeenCalledTimes(2);
     expect(deps.setWeeklyShelf).not.toHaveBeenCalled();
+  });
+
+  it("passes the current timezone to both preference writes after registration", async () => {
+    let timezone = "Europe/Berlin";
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => timezone,
+    );
+    const writing = deferred();
+    deps.saveToken.mockImplementationOnce(() => writing.promise);
+    const update = session.setWeeklyShelf(true);
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledOnce());
+    timezone = "Asia/Tokyo";
+    writing.resolve();
+    await update;
+    expect(deps.setWeeklyShelf).toHaveBeenLastCalledWith(true, "Asia/Tokyo");
+    timezone = "America/New_York";
+    await session.setSaveReminders(false);
+    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(
+      false,
+      "America/New_York",
+    );
+    expect(deps.getToken).toHaveBeenCalledOnce();
   });
 
   it("surfaces token registration failures separately from denied permission", async () => {
