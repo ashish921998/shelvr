@@ -5,6 +5,7 @@ import {
   Path,
   Skia,
 } from "@shopify/react-native-skia";
+import { useMemo } from "react";
 import { Easing, interpolate, useDerivedValue } from "react-native-reanimated";
 import { useUnistyles } from "react-native-unistyles";
 
@@ -14,9 +15,8 @@ import { useLoop } from "./stitch-loader";
 // splash ends on.
 
 /** The mark's outline, the same path `splash-mark.tsx` draws. */
-const MARK_PATH = Skia.Path.MakeFromSVGString(
-  "M320 224h400c44.2 0 80 35.8 80 80v176c0 44.2-35.8 80-80 80H416v80h288c44.2 0 80 35.8 80 80s-35.8 80-80 80H304c-44.2 0-80-35.8-80-80V544c0-44.2 35.8-80 80-80h304v-80H320c-44.2 0-80-35.8-80-80s35.8-80 80-80Z",
-)!;
+const MARK_PATH =
+  "M320 224h400c44.2 0 80 35.8 80 80v176c0 44.2-35.8 80-80 80H416v80h288c44.2 0 80 35.8 80 80s-35.8 80-80 80H304c-44.2 0-80-35.8-80-80V544c0-44.2 35.8-80 80-80h304v-80H320c-44.2 0-80-35.8-80-80s35.8-80 80-80Z";
 /** The glyph's bounds in that path, padded so the stitches' caps fit. */
 const MARK_BOX = { origin: 224 - 24, size: 576 + 48 };
 /** Share of each loop spent sewing; the rest holds, then fades. */
@@ -33,7 +33,11 @@ export function StitchMark({ size = 64 }: { size?: number }) {
   const opacity = useDerivedValue(() =>
     interpolate(progress.value, [0.86, 1], [1, 0], "clamp"),
   );
+  // Parsed on render, not at module load, so a bundle without Skia (the web
+  // design preview) can still import this file.
+  const path = useMemo(() => Skia.Path.MakeFromSVGString(MARK_PATH), []);
   const scale = size / MARK_BOX.size;
+  if (!path) return null;
   return (
     <Canvas style={{ width: size, height: size }}>
       <Group
@@ -43,9 +47,9 @@ export function StitchMark({ size = 64 }: { size?: number }) {
           { translateY: -MARK_BOX.origin },
         ]}
       >
-        <Path path={MARK_PATH} color={theme.colors.primarySoft} />
+        <Path path={path} color={theme.colors.primarySoft} />
         <Path
-          path={MARK_PATH}
+          path={path}
           color={theme.colors.primary}
           style="stroke"
           strokeWidth={30}
