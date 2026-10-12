@@ -519,6 +519,7 @@
   "onboarding.sampleSofa": "ベルベットの3人掛けソファ、フォレストグリーン",
   "onboarding.sampleDiner": "赤いボックス席のダイナー",
   "onboarding.setupTitle": "何を保存しますか？",
+  "onboarding.setupHint": "1つ以上選んでください。複数選べます。",
   "onboarding.yourSpaces": "スペース",
   "onboarding.spacesChangeable": "あとからいつでも変更できます",
   "onboarding.newSpace": "+ 新規",

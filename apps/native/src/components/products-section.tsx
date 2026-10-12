@@ -1,9 +1,9 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { AppSymbolIcon } from "@/components/symbol";
+import { openInAppBrowser } from "@/lib/in-app-browser";
 import { useFindLinks } from "@/lib/use-find-links";
 import { Image } from "expo-image";
-import * as WebBrowser from "expo-web-browser";
 import {
   ActivityIndicator,
   Pressable,
@@ -74,7 +74,7 @@ export function ProductsSection({
                 styles.productCard,
                 pressed && { opacity: 0.85 },
               ]}
-              onPress={() => WebBrowser.openBrowserAsync(product.url)}
+              onPress={() => openInAppBrowser(product.url)}
             >
               {product.thumbnailUrl ? (
                 <Image

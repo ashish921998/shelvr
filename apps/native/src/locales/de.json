@@ -537,6 +537,7 @@
   "onboarding.sampleSofa": "Samtsofa, Dreisitzer, Waldgrün",
   "onboarding.sampleDiner": "Das Diner mit den roten Sitznischen",
   "onboarding.setupTitle": "Was speicherst du?",
+  "onboarding.setupHint": "Wähle mindestens eins aus. Du kannst auch mehrere wählen.",
   "onboarding.yourSpaces": "Deine Bereiche",
   "onboarding.spacesChangeable": "Du kannst das jederzeit ändern",
   "onboarding.newSpace": "+ Neu",

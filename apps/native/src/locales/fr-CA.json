@@ -555,6 +555,7 @@
   "onboarding.sampleSofa": "Canapé trois places en velours, vert forêt",
   "onboarding.sampleDiner": "Le diner aux banquettes rouges",
   "onboarding.setupTitle": "Qu'enregistrez-vous ?",
+  "onboarding.setupHint": "Choisissez-en au moins un. Vous pouvez en choisir plusieurs.",
   "onboarding.yourSpaces": "Vos espaces",
   "onboarding.spacesChangeable": "Modifiable à tout moment",
   "onboarding.newSpace": "+ Nouveau",

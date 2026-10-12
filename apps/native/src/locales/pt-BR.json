@@ -555,6 +555,7 @@
   "onboarding.sampleSofa": "Sofá de veludo de 3 lugares, verde-floresta",
   "onboarding.sampleDiner": "A lanchonete das cabines vermelhas",
   "onboarding.setupTitle": "O que você salva?",
+  "onboarding.setupHint": "Escolha pelo menos um. Você pode escolher vários.",
   "onboarding.yourSpaces": "Seus espaços",
   "onboarding.spacesChangeable": "Você pode mudar quando quiser",
   "onboarding.newSpace": "+ Novo",

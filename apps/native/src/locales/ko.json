@@ -519,6 +519,7 @@
   "onboarding.sampleSofa": "벨벳 3인용 소파, 포레스트 그린",
   "onboarding.sampleDiner": "빨간 부스 다이너",
   "onboarding.setupTitle": "무엇을 저장하나요?",
+  "onboarding.setupHint": "하나 이상 골라 주세요. 여러 개 골라도 돼요.",
   "onboarding.yourSpaces": "내 스페이스",
   "onboarding.spacesChangeable": "언제든지 바꿀 수 있어요",
   "onboarding.newSpace": "+ 새로 만들기",
