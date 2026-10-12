@@ -51,6 +51,7 @@ import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
+import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 
 /**
  * Shelvr Pro entitlement.
@@ -307,6 +308,12 @@ export function useEntitlement(): Entitlement {
     return () => clearInterval(id);
   }, [hasExpiry]);
 
+  // An e2e run of the paywall flow: the dev user is always Pro, so the flow
+  // asks the client to show them as not Pro. After the hooks, so their order
+  // never changes.
+  if (isAuthenticated && isProHiddenForE2E()) {
+    return { status: "none", entitled: false, loading: false, now };
+  }
   // Onboarding is intentionally visible before sign-in. Do not invoke the
   // authenticated Convex query in that state, and never render persisted data
   // from a previous account as this user's entitlement.
