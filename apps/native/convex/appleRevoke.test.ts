@@ -210,6 +210,33 @@ describe("capturing Apple's refresh token at sign-in", () => {
     expect(await tokenRows(t)).toEqual([]);
   });
 
+  it("revokes the web flow's token when sign-in lands mid-deletion instead of dropping it", async () => {
+    await configure();
+    const t = newConvexTest();
+    await signIn(t, "web-first");
+    const [retained] = await tokenRows(t);
+    await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
+
+    // The sign-in lands while the owner row is deleting: the token is still
+    // moved off the users row, but storing it is refused — and it must not
+    // be dropped unrevoked.
+    await signIn(t, "web-during-deletion");
+    expect(await tokenRows(t)).toEqual([retained]);
+    const users = await t.run((ctx) => ctx.db.query("users").collect());
+    expect(users[0]).not.toHaveProperty("appleRefreshToken");
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://appleid.apple.com/auth/revoke");
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get("token")).toBe("web-during-deletion");
+    expect(body.get("client_id")).toBe("app.shelvr.signin");
+    expect(body.get("token_type_hint")).toBe("refresh_token");
+    // The retained row belongs to the deletion's own revoke job; untouched.
+    expect(await tokenRows(t)).toEqual([retained]);
+  });
+
   it("refuses the native sheet's token for a deleting or missing owner and never replaces a retained row", async () => {
     const t = newConvexTest();
     const { userId, tokenId } = await tokenRow(t);

@@ -13,7 +13,6 @@ import { env, type ActionCtx } from "./_generated/server";
 import { nativeAppleProfile, normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
 import {
-  clientSecret,
   exchangeAuthorizationCode,
   revokeRefreshToken,
 } from "./model/appleClient";
@@ -30,6 +29,26 @@ import { errorName, logEvent } from "./model/log";
 const isDevDeployment = () =>
   process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
   "https://amicable-antelope-639.convex.site";
+
+// A token that was verified but never stored — deletion won the persistence
+// race — is revoked here, while it is still in memory: never in a row or a
+// scheduled job argument. Best effort, like the rest of the flow.
+async function revokeUnstoredToken(
+  signing: {
+    clientId: string;
+    privateKey: string;
+    keyId: string;
+    teamId: string;
+  },
+  refreshToken: string,
+): Promise<void> {
+  const status = await revokeRefreshToken({ ...signing, refreshToken });
+  logEvent(
+    status === 200 ? "info" : "error",
+    "apple_native_late_token_revoke",
+    status === undefined ? { code: "unreachable" } : { status },
+  );
+}
 
 // The native sheet hands the app a one-time code where the web flow hands the
 // backend a refresh token. Trading the code here is what lets account deletion
@@ -90,25 +109,9 @@ async function keepNativeAppleToken(
       clientId,
     });
     if (!stored) {
-      // Deletion won the persistence race. Revoke here while the verified
-      // token is still in memory, never in a row or scheduled job argument.
-      const secret = await clientSecret({
-        clientId,
-        privateKey,
-        keyId,
-        teamId,
-      });
-      const revokeStatus = await revokeRefreshToken({
-        clientId,
-        secret,
+      await revokeUnstoredToken(
+        { clientId, privateKey, keyId, teamId },
         refreshToken,
-      });
-      logEvent(
-        revokeStatus === 200 ? "info" : "error",
-        "apple_native_late_token_revoke",
-        revokeStatus === undefined
-          ? { code: "unreachable" }
-          : { status: revokeStatus },
       );
     }
   } catch (error) {

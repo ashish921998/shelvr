@@ -1245,7 +1245,7 @@ export const sweepItemEmbeddings = internalAction({
       if (
         !allowed &&
         (!entry.aiDeclined ||
-          !(await ctx.runQuery(internal.users.isLiveOwner, {
+          !(await ctx.runQuery(internal.aiConsent.hasLiveOwner, {
             userId: item.userId,
           })))
       )

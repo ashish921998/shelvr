@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { newConvexTest } from "./test.setup";
+import { gate, newConvexTest, seedNotes } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import { DELETE_BATCH } from "./users";
 
@@ -139,47 +139,29 @@ describe("transfer webhook reconciliation", () => {
     "does not recreate access for a receiving owner whose deletion %s while RevenueCat was answering",
     async (_case, itemCount) => {
       const f = await fixture();
-      const { sessionId } = await f.t.run(async (ctx) => {
-        const sessionId = await ctx.db.insert("authSessions", {
+      await seedNotes(f.t, f.ids.to, itemCount);
+      const sessionId = await f.t.run((ctx) =>
+        ctx.db.insert("authSessions", {
           userId: f.ids.to,
           expirationTime: Date.now() + 60_000,
-        });
-        for (let i = 0; i < itemCount; i++) {
-          await ctx.db.insert("items", {
-            userId: f.ids.to,
-            type: "note",
-            status: "ready",
-            tags: [],
-            searchText: `note ${i}`,
-            note: `note ${i}`,
-          });
-        }
-        return { sessionId };
-      });
+        }),
+      );
 
       // Owner selection has already passed when the second lookup (the
       // receiving account) is held here.
-      let releaseLookup!: () => void;
-      let lookupReached!: () => void;
-      const reached = new Promise<void>((resolve) => {
-        lookupReached = resolve;
-      });
-      const held = new Promise<Response>((resolve) => {
-        releaseLookup = () => resolve(Response.json(f.active));
-      });
+      const lookupGate = gate();
       vi.stubGlobal(
         "fetch",
         vi
           .fn()
           .mockResolvedValueOnce(Response.json(f.empty))
-          .mockImplementationOnce(() => {
-            lookupReached();
-            return held;
-          }),
+          .mockImplementationOnce(() =>
+            lookupGate.hold(Response.json(f.active)),
+          ),
       );
 
       const webhook = f.send();
-      await reached;
+      await lookupGate.reached;
       await f.t
         .withIdentity({ subject: `${f.ids.to}|${sessionId}` })
         .mutation(api.users.deleteCurrentUserAccount, {});
@@ -187,7 +169,7 @@ describe("transfer webhook reconciliation", () => {
       if (itemCount === 0) expect(owner).toBeNull();
       else expect(owner).toMatchObject({ deleting: true });
 
-      releaseLookup();
+      lookupGate.open();
       expect((await webhook).status).toBe(200);
 
       const rows = await f.rows();

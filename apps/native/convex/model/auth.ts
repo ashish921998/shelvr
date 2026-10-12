@@ -1,28 +1,14 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "../_generated/api";
-import {
-  env,
-  type ActionCtx,
-  type MutationCtx,
-  type QueryCtx,
-} from "../_generated/server";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
 const NOT_AUTHENTICATED = "Not authenticated";
 
 /**
- * Whether a users row may still own data: it exists and account deletion has
- * not started on it. The one definition every fence in the backend shares.
- */
-export function isLiveOwner(
-  user: Doc<"users"> | null | undefined,
-): user is Doc<"users"> {
-  return user !== null && user !== undefined && user.deleting !== true;
-}
-
-/**
  * The live owner row behind `userId`, or null when the id is not a users id,
- * the row is gone, or deletion has begun. Takes the raw string form because
+ * the row is gone, or deletion has begun: a row may still own data only while
+ * it exists and account deletion has not started on it. The one definition
+ * every fence in the backend shares. Takes the raw string form because
  * webhook app user ids and the string `userId` columns are not typed ids.
  */
 export async function liveOwner(
@@ -32,7 +18,7 @@ export async function liveOwner(
   const id = ctx.db.normalizeId("users", userId);
   if (id === null) return null;
   const user = await ctx.db.get(id);
-  return isLiveOwner(user) ? user : null;
+  return user !== null && user.deleting !== true ? user : null;
 }
 
 /**
@@ -51,20 +37,19 @@ export async function liveOwner(
  * same unauthenticated error either way.
  *
  * This stays provider-agnostic: it works identically whether the user signed in
- * via OAuth or Anonymous.
+ * via OAuth or Anonymous. Query and mutation contexts only: an action derives
+ * the caller through the internal mutation or query it runs (Convex forwards
+ * the caller's identity to it), so the authorization and the write stay in one
+ * transaction.
  */
 export async function requireUserId(
-  ctx: QueryCtx | MutationCtx | ActionCtx,
+  ctx: QueryCtx | MutationCtx,
 ): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (userId === null) {
     throw new Error(NOT_AUTHENTICATED);
   }
-  const live: boolean =
-    "db" in ctx
-      ? (await liveOwner(ctx, userId)) !== null
-      : await ctx.runQuery(internal.users.isLiveOwner, { userId });
-  if (!live) {
+  if ((await liveOwner(ctx, userId)) === null) {
     throw new Error(NOT_AUTHENTICATED);
   }
   return userId;

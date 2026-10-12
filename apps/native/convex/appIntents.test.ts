@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -12,42 +12,6 @@ import { sha256Hex } from "./model/captureTokens";
 import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
-
-/** A one-shot pause between `issueCaptureToken`'s authorization and its real
- * persistence mutation. `sha256Hex` is the one awaited step between the two,
- * so holding it there models deletion landing in that gap. Unarmed, the real
- * digest runs untouched. */
-const persistenceBarrier: {
-  armed: Promise<void> | null;
-  reached: (() => void) | null;
-} = { armed: null, reached: null };
-
-vi.mock("./model/captureTokens", async (original) => {
-  const actual = await original<typeof import("./model/captureTokens")>();
-  return {
-    ...actual,
-    sha256Hex: async (value: string) => {
-      const hold = persistenceBarrier.armed;
-      if (hold !== null) {
-        persistenceBarrier.armed = null;
-        persistenceBarrier.reached?.();
-        await hold;
-      }
-      return await actual.sha256Hex(value);
-    },
-  };
-});
-
-function armPersistenceBarrier() {
-  let release!: () => void;
-  const reached = new Promise<void>((resolve) => {
-    persistenceBarrier.reached = resolve;
-  });
-  persistenceBarrier.armed = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { reached, release };
-}
 
 // Keep scheduled jobs queued (see items.test.ts): the rows stay assertable
 // without the AI action firing during teardown.
@@ -200,22 +164,13 @@ describe("bounded upload endpoint", () => {
   });
 });
 
-/** A signed-in user with a real users row, Pro unless `pro` is false, and a
- * freshly issued capture token. */
+/** A signed-in user with a freshly issued capture token, Pro unless `pro` is
+ * false. */
 async function setup(options: { pro?: boolean } = {}) {
   const base = newConvexTest();
-  const userId = await base.run((ctx) => ctx.db.insert("users", {}));
-  const t = base.withIdentity({ subject: `${userId}|session-1` });
-  if (options.pro !== false) {
-    await t.run(async (ctx) => {
-      await ctx.db.insert("subscriptions", {
-        userId,
-        status: "pro",
-        expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-        updatedAt: Date.now(),
-      });
-    });
-  }
+  const { userId, t } = await signedInUser(base, {
+    pro: options.pro !== false,
+  });
   const token = await t.action(api.appIntents.issueCaptureToken, {});
   return { base, t, userId, token };
 }
@@ -285,8 +240,7 @@ describe("capture tokens", () => {
 
   it("never revokes another user's token", async () => {
     const { base, t: owner, token } = await setup();
-    const otherId = await base.run((ctx) => ctx.db.insert("users", {}));
-    const other = base.withIdentity({ subject: `${otherId}|session-1` });
+    const { t: other } = await signedInUser(base);
     await other.mutation(api.appIntents.revokeCaptureToken, { token });
     const response = await post(
       owner,
@@ -545,88 +499,39 @@ describe("account deletion", () => {
   /** Enough notes that the first deletion pass leaves the owner row behind,
    * marked, so the mid-deletion state can be observed. */
   async function leaveMidDeletion(t: TestCtx, userId: Id<"users">) {
-    await t.run(async (ctx) => {
-      for (let i = 0; i < DELETE_BATCH + 1; i++) {
-        await ctx.db.insert("items", {
-          userId,
-          type: "note",
-          status: "ready",
-          tags: [],
-          searchText: `note ${i}`,
-          note: `note ${i}`,
-        });
-      }
-    });
+    await seedNotes(t, userId, DELETE_BATCH + 1);
     await t.mutation(api.users.deleteCurrentUserAccount, {});
     expect(await t.run((ctx) => ctx.db.get(userId))).toMatchObject({
       deleting: true,
     });
   }
 
-  it.each([
-    ["deletion finished", false],
-    ["deletion began", true],
-  ])(
-    "leaves no credential when %s between authorization and persistence",
-    async (_case, big) => {
-      const { t, userId } = await setup();
-      await t.run(async (ctx) => {
-        for (const row of await ctx.db.query("captureTokens").collect()) {
-          await ctx.db.delete(row._id);
-        }
-      });
-      if (big) {
-        await t.run(async (ctx) => {
-          for (let i = 0; i < DELETE_BATCH + 1; i++) {
-            await ctx.db.insert("items", {
-              userId,
-              type: "note",
-              status: "ready",
-              tags: [],
-              searchText: `note ${i}`,
-              note: `note ${i}`,
-            });
-          }
-        });
-      }
-
-      const { reached, release } = armPersistenceBarrier();
-      // Authorization has passed (the owner is live) by the time the barrier
-      // is reached; the real `storeCaptureToken` mutation has not yet run.
-      const issue = t.action(api.appIntents.issueCaptureToken, {});
-      await reached;
-
-      await t.mutation(api.users.deleteCurrentUserAccount, {});
-      const owner = await t.run((ctx) => ctx.db.get(userId));
-      if (big) expect(owner).toMatchObject({ deleting: true });
-      else expect(owner).toBeNull();
-
-      release();
-      await expect(issue).rejects.toThrow(/Not authenticated/);
-      expect(
-        await t.run((ctx) => ctx.db.query("captureTokens").collect()),
-      ).toEqual([]);
-    },
-  );
+  it("rejects issuing a token once the account is gone", async () => {
+    // Authorization and the write are one transaction inside
+    // storeCaptureToken, so there is no window to race: deleting first, then
+    // issuing, fails the same check every public function uses.
+    const { t } = await setup();
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+    await expect(
+      t.action(api.appIntents.issueCaptureToken, {}),
+    ).rejects.toThrow(/Not authenticated/);
+    expect(
+      await t.run((ctx) => ctx.db.query("captureTokens").collect()),
+    ).toEqual([]);
+  });
 
   it("refuses direct persistence for a missing or deleting owner", async () => {
     const { base, t, userId } = await setup();
     await leaveMidDeletion(t, userId);
     await expect(
-      base.mutation(internal.appIntents.storeCaptureToken, {
-        userId,
+      t.mutation(internal.appIntents.storeCaptureToken, {
         tokenHash: await sha256Hex("deleting-owner"),
       }),
     ).rejects.toThrow(/Not authenticated/);
 
-    const goneId = await base.run(async (ctx) => {
-      const id = await ctx.db.insert("users", {});
-      await ctx.db.delete(id);
-      return id;
-    });
+    await base.run((ctx) => ctx.db.delete(userId));
     await expect(
-      base.mutation(internal.appIntents.storeCaptureToken, {
-        userId: goneId,
+      t.mutation(internal.appIntents.storeCaptureToken, {
         tokenHash: await sha256Hex("missing-owner"),
       }),
     ).rejects.toThrow(/Not authenticated/);

@@ -51,6 +51,12 @@ export const isAllowed = internalQuery({
   },
 });
 
+export const hasLiveOwner = internalQuery({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => (await liveOwner(ctx, args.userId)) !== null,
+});
+
 /** Revalidate cached recommendation identities in one bounded transaction.
  * null aborts the run; an empty list is also used to authorize space embedding.
  * This check cannot recall requests dispatched before deletion begins. */

@@ -9,7 +9,7 @@ import {
   isFeedbackInboxConfigured,
 } from "./feedback";
 import { classifyResendError, formatResendError } from "./model/resend";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import type { Id } from "./_generated/dataModel";
 
 const INBOX = "support@shelvr.app";
@@ -30,24 +30,16 @@ function setup() {
   return newConvexTest();
 }
 
-/** A real users row + session; the shared guard rejects an identity whose
- * owner row is missing, and claimDelivery reads the account email from it. */
+/** A signed-in user whose account carries `email`; claimDelivery reads the
+ * address from the users row, so it must be a real row. */
 async function signedInWithEmail(
   t: ReturnType<typeof newConvexTest>,
   email?: string,
 ) {
-  const userId = await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", email ? { email } : {});
-    await ctx.db.insert("authSessions", {
-      userId,
-      expirationTime: Date.now() + 60_000,
-    });
-    return userId;
+  return await signedInUser(t, {
+    email,
+    session: true,
   });
-  return {
-    t: t.withIdentity({ subject: `${userId}|session-1` }),
-    userId: userId as string,
-  };
 }
 
 function okFetch() {

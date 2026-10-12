@@ -243,7 +243,9 @@ describe("AI dispatch uses fresh live ownership", () => {
         ).toBe(false);
         await f.t.run((ctx) => ctx.db.delete(consentId));
         expect(
-          await f.t.query(internal.users.isLiveOwner, { userId: f.userId }),
+          await f.t.query(internal.aiConsent.hasLiveOwner, {
+            userId: f.userId,
+          }),
         ).toBe(true);
       },
     );

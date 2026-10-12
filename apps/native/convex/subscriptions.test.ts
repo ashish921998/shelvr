@@ -1,23 +1,8 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import type { DataModel } from "./_generated/dataModel";
-
-type TestCtx = TestConvexForDataModel<DataModel>;
-
-/** A signed-in user with a real users row; the shared guard rejects an
- * identity whose owner row is missing. */
-async function signedIn(): Promise<{ t: TestCtx; userId: string }> {
-  const backend = newConvexTest();
-  const userId = await backend.run((ctx) => ctx.db.insert("users", {}));
-  return {
-    t: backend.withIdentity({ subject: `${userId}|session-1` }),
-    userId,
-  };
-}
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -25,7 +10,7 @@ afterEach(() => {
 
 describe("Convex Auth identity boundaries", () => {
   it("uses the stable users-table id instead of the session-bearing subject", async () => {
-    const { t, userId } = await signedIn();
+    const { t, userId } = await signedInUser(newConvexTest());
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
         userId,

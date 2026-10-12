@@ -339,8 +339,10 @@ export const searchItemsHybrid = action({
 
 Flow, kept to one query round trip per the guidelines' "as few calls as possible":
 
-1. `requireUserId(ctx)` — already accepts `ActionCtx` (`model/auth.ts:22`).
-   The vector filter uses that id. Never a client argument.
+1. The internal query at step 4 derives the caller with `requireUserId`
+   (`model/auth.ts`) — it takes a query or mutation context, so the action
+   gets the id through that query rather than directly. The vector filter
+   uses that id. Never a client argument.
 2. Embed the query string.
 3. `ctx.vectorSearch(..., filter: q => q.eq("userId", userId))` → `{_id, _score}`.
 4. One `internalQuery` that runs the lexical `search_text` search, fuses it with

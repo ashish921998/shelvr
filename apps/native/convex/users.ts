@@ -47,15 +47,6 @@ export const getCurrentUser = query({
   },
 });
 
-/** `requireUserId`'s owner check for actions, which have no `ctx.db`. */
-export const isLiveOwner = internalQuery({
-  args: { userId: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    return (await liveOwner(ctx, args.userId)) !== null;
-  },
-});
-
 /**
  * Deletes the currently authenticated user's Shelvr account and all owned data.
  *
@@ -98,8 +89,7 @@ export const deleteCurrentUserAccount = mutation({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
-    const ownerId = ctx.db.normalizeId("users", userId);
-    const user = ownerId === null ? null : await ctx.db.get(ownerId);
+    const user = await ctx.db.get(userId);
     // Already removed: the identity is a leftover token. Nothing to resume,
     // nothing to report.
     if (user === null) return null;
