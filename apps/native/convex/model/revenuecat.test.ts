@@ -3,7 +3,7 @@ import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   parseRevenueCatSnapshot,
-  resolveExpiresAt,
+  requiresAuthoritativeReconciliation,
 } from "./revenuecat";
 
 describe("parseRevenueCatEvent", () => {
@@ -105,48 +105,18 @@ describe("billing period classification", () => {
   });
 });
 
-describe("billing grace periods", () => {
-  const expiry = 1_800_000_000_000;
-  const graceEnd = 1_800_086_400_000;
-
-  it("reads the grace period end off a BILLING_ISSUE body", () => {
-    expect(
-      parseRevenueCatEvent({
-        event: {
-          type: "BILLING_ISSUE",
-          app_user_id: "user-1",
-          expiration_at_ms: expiry,
-          grace_period_expiration_at_ms: graceEnd,
-        },
-      }),
-    ).toMatchObject({ expiresAt: expiry, gracePeriodExpiresAt: graceEnd });
-  });
-
-  it("extends a BILLING_ISSUE to the end of the grace period", () => {
-    expect(
-      resolveExpiresAt({
-        type: "BILLING_ISSUE",
-        expiresAt: expiry,
-        gracePeriodExpiresAt: graceEnd,
-      }),
-    ).toBe(graceEnd);
-  });
-
-  it("ignores a grace period arriving on any other event type", () => {
-    expect(
-      resolveExpiresAt({
-        type: "EXPIRATION",
-        expiresAt: expiry,
-        gracePeriodExpiresAt: graceEnd,
-      }),
-    ).toBe(expiry);
-  });
-
-  it("falls back to the event expiry, then to zero, without a grace period", () => {
-    expect(resolveExpiresAt({ type: "BILLING_ISSUE", expiresAt: expiry })).toBe(
-      expiry,
-    );
-    expect(resolveExpiresAt({ type: "BILLING_ISSUE" })).toBe(0);
+describe("authoritative event policy", () => {
+  it.each([
+    [{ type: "BILLING_ISSUE" }, true],
+    [{ type: "REFUND_REVERSED" }, true],
+    [{ type: "CANCELLATION", cancelReason: "CUSTOMER_SUPPORT" }, true],
+    [{ type: "EXPIRATION", expirationReason: "CUSTOMER_SUPPORT" }, true],
+    [{ type: "CANCELLATION", cancelReason: "UNSUBSCRIBE" }, false],
+    [{ type: "EXPIRATION", expirationReason: "BILLING_ERROR" }, false],
+    [{ type: "RENEWAL" }, false],
+    [{}, false],
+  ])("classifies %j as authoritative=%s", (event, expected) => {
+    expect(requiresAuthoritativeReconciliation(event)).toBe(expected);
   });
 });
 

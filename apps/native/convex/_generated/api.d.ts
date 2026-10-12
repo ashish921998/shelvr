@@ -60,7 +60,7 @@ import type * as model_recipeMarkup from "../model/recipeMarkup.js";
 import type * as model_resend from "../model/resend.js";
 import type * as model_retentionMessaging from "../model/retentionMessaging.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
-import type * as model_revenuecatTransfer from "../model/revenuecatTransfer.js";
+import type * as model_revenuecatReconcile from "../model/revenuecatReconcile.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as model_saveErrors from "../model/saveErrors.js";
 import type * as model_saveReminders from "../model/saveReminders.js";
@@ -139,7 +139,7 @@ declare const fullApi: ApiFromModules<{
   "model/resend": typeof model_resend;
   "model/retentionMessaging": typeof model_retentionMessaging;
   "model/revenuecat": typeof model_revenuecat;
-  "model/revenuecatTransfer": typeof model_revenuecatTransfer;
+  "model/revenuecatReconcile": typeof model_revenuecatReconcile;
   "model/safeFetch": typeof model_safeFetch;
   "model/saveErrors": typeof model_saveErrors;
   "model/saveReminders": typeof model_saveReminders;

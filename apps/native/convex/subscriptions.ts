@@ -248,7 +248,7 @@ export const upsertSubscription = internalMutation({
   },
 });
 
-export const transferOwners = internalQuery({
+export const liveOwners = internalQuery({
   args: { userIds: v.array(v.string()) },
   returns: v.array(v.id("users")),
   handler: async (ctx, { userIds }) => {
@@ -261,7 +261,7 @@ export const transferOwners = internalQuery({
   },
 });
 
-export const reconcileTransfer = internalMutation({
+export const applySnapshots = internalMutation({
   args: {
     eventTimestampMs: v.number(),
     snapshots: v.array(

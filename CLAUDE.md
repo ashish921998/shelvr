@@ -127,7 +127,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `acceptAllSuggestions`), plus internal join helpers.
 - **`subscriptions.ts`** — `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
-  `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
+  `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
 - **`aiConsent.ts`** — consent to third-party AI processing (App Store guideline 5.1.2(i)):
   `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that

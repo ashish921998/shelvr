@@ -1,7 +1,11 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import { newConvexTest } from "./test.setup";
+import {
+  newConvexTest,
+  revenuecatSnapshot,
+  stubRevenueCatFetch,
+} from "./test.setup";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -61,7 +65,6 @@ async function fixture() {
           period_type: "NORMAL",
           environment: "SANDBOX",
           expiration_at_ms: expiresAt,
-          grace_period_expiration_at_ms: Date.now() + 999_999,
           event_timestamp_ms: timestamp,
         },
       }),
@@ -69,37 +72,21 @@ async function fixture() {
   return { t, userId, expiresAt, row, save, send };
 }
 
-function snapshot(
-  grace: number,
-  periodType = "normal",
-  entitlement = "Shelvr Pro",
-) {
-  return {
-    request_date_ms: Date.now(),
-    subscriber: {
-      entitlements: {
-        [entitlement]: {
-          product_identifier: "monthly_499",
-          expires_date: new Date(Date.now() - 1).toISOString(),
-          grace_period_expires_date: new Date(grace).toISOString(),
-        },
-      },
-      subscriptions: { monthly_499: { period_type: periodType } },
-    },
-  };
-}
-
-function mockSnapshot(body: unknown) {
-  const fetch = vi
-    .fn()
-    .mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(body))),
-    );
-  vi.stubGlobal("fetch", fetch);
-  return fetch;
-}
-
 describe("billing issue webhook", () => {
+  it("replaces a sticky lifetime row with the authoritative snapshot", async () => {
+    const f = await fixture();
+    await f.t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: f.userId,
+      status: "lifetime",
+      expiresAt: 0,
+      eventTimestampMs: 2,
+    });
+    expect(await f.row()).toMatchObject({ status: "lifetime" });
+    stubRevenueCatFetch(revenuecatSnapshot());
+    expect((await f.send(3)).status).toBe(200);
+    expect(await f.row()).toMatchObject({ status: "lapsed" });
+    await expect(f.save()).rejects.toThrow(/Pro required/);
+  });
   it.each([
     ["normal", "pro"],
     ["trial", "trialing"],
@@ -110,7 +97,14 @@ describe("billing issue webhook", () => {
       expect(await f.row()).toMatchObject({ status: "lapsed" });
       await expect(f.save()).rejects.toThrow(/Pro required/);
       const grace = Date.now() + 60_000;
-      mockSnapshot(snapshot(grace, period));
+      stubRevenueCatFetch(
+        revenuecatSnapshot({
+          productId: "monthly_499",
+          expiresAt: Date.now() - 1,
+          graceUntil: grace,
+          periodType: period,
+        }),
+      );
       expect((await f.send()).status).toBe(200);
       expect(await f.row()).toMatchObject({
         status,
@@ -137,17 +131,15 @@ describe("billing issue webhook", () => {
     "does not unlock %s Pro",
     async (kind) => {
       const f = await fixture();
-      mockSnapshot(
+      stubRevenueCatFetch(
         kind === "missing"
-          ? {
-              request_date_ms: Date.now(),
-              subscriber: { entitlements: {}, subscriptions: {} },
-            }
-          : snapshot(
-              Date.now() + (kind === "expired" ? -1 : 60_000),
-              "normal",
-              kind === "unrelated" ? "Other" : "Shelvr Pro",
-            ),
+          ? revenuecatSnapshot()
+          : revenuecatSnapshot({
+              productId: "monthly_499",
+              expiresAt: Date.now() - 1,
+              graceUntil: Date.now() + (kind === "expired" ? -1 : 60_000),
+              entitlement: kind === "unrelated" ? "Other" : "Shelvr Pro",
+            }),
       );
       expect((await f.send()).status).toBe(200);
       await expect(f.save()).rejects.toThrow(/Pro required/);
@@ -157,7 +149,14 @@ describe("billing issue webhook", () => {
   it("selects the configured entitlement instead of webhook product fields", async () => {
     const f = await fixture();
     vi.stubEnv("REVENUECAT_ENTITLEMENT_ID", "Custom Pro");
-    mockSnapshot(snapshot(Date.now() + 60_000, "normal", "Custom Pro"));
+    stubRevenueCatFetch(
+      revenuecatSnapshot({
+        productId: "monthly_499",
+        expiresAt: Date.now() - 1,
+        graceUntil: Date.now() + 60_000,
+        entitlement: "Custom Pro",
+      }),
+    );
     expect((await f.send()).status).toBe(200);
     await expect(f.save()).resolves.toBeDefined();
   });
@@ -167,7 +166,7 @@ describe("billing issue webhook", () => {
     async (kind) => {
       const f = await fixture();
       const before = await f.row();
-      const fetch = mockSnapshot({ invalid: true });
+      const fetch = stubRevenueCatFetch({ invalid: true });
       if (kind === "key") vi.stubEnv("REVENUECAT_API_KEY", "");
       if (kind === "http")
         fetch.mockResolvedValue(new Response(null, { status: 500 }));
@@ -201,7 +200,13 @@ describe("billing issue webhook", () => {
           eventTimestampMs: 3,
           authoritative: true,
         });
-        return new Response(JSON.stringify(snapshot(Date.now() + 60_000)));
+        return Response.json(
+          revenuecatSnapshot({
+            productId: "monthly_499",
+            expiresAt: Date.now() - 1,
+            graceUntil: Date.now() + 60_000,
+          }),
+        );
       }),
     );
     expect((await f.send()).status).toBe(200);
@@ -214,7 +219,13 @@ describe("billing issue webhook", () => {
 
   it("converges duplicate deliveries without introducing billing-issue telemetry", async () => {
     const f = await fixture();
-    mockSnapshot(snapshot(Date.now() + 60_000));
+    stubRevenueCatFetch(
+      revenuecatSnapshot({
+        productId: "monthly_499",
+        expiresAt: Date.now() - 1,
+        graceUntil: Date.now() + 60_000,
+      }),
+    );
     expect((await f.send()).status).toBe(200);
     const first = await f.row();
     expect((await f.send()).status).toBe(200);
@@ -240,7 +251,13 @@ describe("billing issue webhook", () => {
       if (row) await ctx.db.delete(row._id);
       await ctx.db.delete(f.userId);
     });
-    const fetch = mockSnapshot(snapshot(Date.now() + 60_000));
+    const fetch = stubRevenueCatFetch(
+      revenuecatSnapshot({
+        productId: "monthly_499",
+        expiresAt: Date.now() - 1,
+        graceUntil: Date.now() + 60_000,
+      }),
+    );
     expect((await f.send()).status).toBe(200);
     expect(fetch).not.toHaveBeenCalled();
     expect(await f.row()).toBeNull();
