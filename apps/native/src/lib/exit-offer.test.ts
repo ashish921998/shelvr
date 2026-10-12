@@ -77,8 +77,15 @@ describe("reminder controls", () => {
     expect(exitOfferReminderPending(endsAt, now)).toBe(true);
   });
 
-  it("stops offering cancel once the reminder has fired", () => {
-    expect(exitOfferReminderPending(endsAt, endsAt - 3 * HOUR)).toBe(false);
+  it("keeps cancel for a reminder an older build scheduled an hour out", () => {
+    // Opted in on a 1-hour build, updated with 2 hours left: the OS still
+    // holds that reminder, so it must stay cancellable.
+    expect(exitOfferReminderAt(endsAt, endsAt - 2 * HOUR)).toBeNull();
+    expect(exitOfferReminderPending(endsAt, endsAt - 2 * HOUR)).toBe(true);
+  });
+
+  it("stops offering cancel once any reminder has fired", () => {
+    expect(exitOfferReminderPending(endsAt, endsAt - HOUR)).toBe(false);
   });
 });
 
