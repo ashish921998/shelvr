@@ -28,7 +28,14 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   Alert,
   type LayoutChangeEvent,
@@ -46,6 +53,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
+import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
@@ -271,6 +279,28 @@ function usePageStyle(width: number, windowHeight: number) {
 
 const pagerKey = (item: DetailItem) => item._id;
 
+// The list can reorder under the pager (an accepted suggestion moves behind
+// the remaining ones). The pager keeps its offset, so without this it shows
+// a neighbour while the header and the action menu still target this save.
+function usePagerFollowsActive(
+  listRef: RefObject<FlashListRef<DetailItem> | null>,
+  items: DetailItem[] | undefined,
+  activeIdRef: RefObject<string>,
+) {
+  const previousItems = useRef(items);
+  useEffect(() => {
+    const index = pagerResyncIndex(
+      previousItems.current,
+      items,
+      activeIdRef.current,
+    );
+    previousItems.current = items;
+    if (index !== null) {
+      listRef.current?.scrollToIndex({ index, animated: false });
+    }
+  }, [listRef, items, activeIdRef]);
+}
+
 /**
  * The pager's page renderer. Stable across swipes for the same reason as
  * usePageStyle. A page whose bottom the pager covers with the suggestion bar
@@ -456,6 +486,8 @@ function ItemScreenContent() {
     suggestedIds,
     accepted,
   });
+
+  usePagerFollowsActive(listRef, items, activeIdRef);
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
