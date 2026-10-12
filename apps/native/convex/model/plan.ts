@@ -163,12 +163,10 @@ function distinctiveWords(text: string): string[] {
 export function isGrounded(name: string, source: PlanSource): boolean {
   const haystack = sourceText(source);
   if (haystack === "") return false;
+  // A name made only of generic words ("Cafe") describes a save, it does not
+  // name a place, so it never grounds.
   const words = distinctiveWords(name);
-  if (words.length === 0) {
-    const whole = squash(name);
-    return distinctive(whole) && haystack.includes(whole);
-  }
-  return words.every((word) => haystack.includes(word));
+  return words.length > 0 && words.every((word) => haystack.includes(word));
 }
 
 /**

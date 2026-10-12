@@ -22,9 +22,9 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { usePaywallGuard } from "@/lib/entitlement";
+import { canMakePlan } from "@/lib/make-plan";
 
 /** Saved items a space needs before "Make a plan" shows. */
-const PLAN_MIN_SAVES = 3;
 
 export default function SpaceScreen() {
   useAppLocale();
@@ -93,15 +93,7 @@ export default function SpaceScreen() {
   };
 
   const suggestionCount = space.suggestions.length;
-  // The planner reads ready saves only; still-processing ones don't count.
-  // At least one must already carry a place (an "Open in Maps" action), so a
-  // reading list never offers a plan.
-  const readySaves = space.items.filter((item) => item.status === "ready");
-  const canPlan =
-    readySaves.length >= PLAN_MIN_SAVES &&
-    readySaves.some((item) =>
-      item.intents?.some((intent) => intent.kind === "open_maps"),
-    );
+  const canPlan = canMakePlan(space.items);
 
   const makePlan = () => {
     void planGuard(() =>

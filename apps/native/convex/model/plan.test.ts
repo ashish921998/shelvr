@@ -61,6 +61,9 @@ describe("isGrounded", () => {
       isGrounded("The Wine Bar", source({ title: "the best bar for wine" })),
     ).toBe(false);
     expect(isGrounded("The Cafe", source({ title: "Cute cafe" }))).toBe(false);
+    expect(
+      isGrounded("Cafe", source({ title: "Cute cafe with good coffee" })),
+    ).toBe(false);
   });
 });
 
@@ -107,6 +110,21 @@ describe("sanitizePlan", () => {
       sources,
     );
     expect(whole.area).toBe("SoHo, New York");
+  });
+
+  it("drops the region and country a save never names", () => {
+    const [pick] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Lola",
+          area: "London, Ontario, Canada",
+          why: "Go",
+        },
+      ],
+      [source({ title: "Lola in London" })],
+    );
+    expect(pick.area).toBe("London");
   });
 
   it("keeps a short state code only when the save names it", () => {
