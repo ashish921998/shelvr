@@ -309,17 +309,25 @@ function ItemCardView({
   );
 }
 
-// Feeds pass `source` as a fresh literal on every render, so it is compared by
-// value: comparing the reference would never let a row skip.
-function sameSource(a?: ItemSource, b?: ItemSource) {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  const aEntries = Object.entries(a);
-  const other: Record<string, unknown> = b;
-  return (
-    aEntries.length === Object.keys(b).length &&
-    aEntries.every(([key, value]) => other[key] === value)
-  );
+// Feeds pass `source` as a fresh literal on every render, so two sources are
+// the same when they name the same list, not when they are the same object.
+// Spelling out every variant makes a new one fail to compile here until it
+// says what identifies its list.
+function sourceKey(source: ItemSource | undefined): string | undefined {
+  switch (source?.from) {
+    case undefined:
+      return undefined;
+    case "home":
+    case "digest":
+    case "map":
+      return source.from;
+    case "space":
+      return `space:${source.spaceId}`;
+    case "search":
+      return `search:${source.q}`;
+    default:
+      return source satisfies never;
+  }
 }
 
 // Memoized: feed rows are the highest-churn surface in the app (every live-query
@@ -328,7 +336,8 @@ function sameSource(a?: ItemSource, b?: ItemSource) {
 export const ItemCard = memo(
   ItemCardView,
   (prev, next) =>
-    prev.item === next.item && sameSource(prev.source, next.source),
+    prev.item === next.item &&
+    sourceKey(prev.source) === sourceKey(next.source),
 );
 
 const styles = StyleSheet.create(() => ({
