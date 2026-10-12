@@ -188,13 +188,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
   [embeddings](docs/architecture/embeddings.md)).
-- **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
-  one entry point: it picks the reader for the host (TikTok oEmbed, YouTube Data API with oEmbed fallback, X syndication, Instagram
-  embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
-  image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
-  schema.org recipe. Full YouTube descriptions and verified Instagram captions follow linked
-  recipe markup first, then the existing complete-caption recipe path. Host-specific knowledge
-  stays in this file, not in `ai.ts`.
+- **`model/pageRead.ts`** — the single `readPage(url)` entry point and host dispatcher.
+  **`model/pageReadCore.ts`** holds shared page data, bounded fetches, HTML extraction
+  (Mozilla **Readability** via `linkedom`) and schema.org recipe helpers.
+  **`model/readers/youtube.ts`**, **`model/readers/x.ts`**, **`model/readers/instagram.ts`**,
+  **`model/readers/pinterest.ts`** and **`model/readers/tiktok.ts`** own each platform's
+  reader and fallback. Full YouTube descriptions and verified Instagram captions follow linked
+  recipe markup first, then the existing complete-caption recipe path.
+  Host-specific knowledge stays in the page readers, never in `ai.ts`.
 - **`model/safeFetch.ts`**, **`model/externalUrl.ts`** — every backend fetch of an external URL
   goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).
   `externalUrl.ts` is the runtime-agnostic URL policy and host detection (`linkSource`,
