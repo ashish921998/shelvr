@@ -20,15 +20,15 @@ const TYPE_SYMBOLS = {
 /** Where each thumbnail of the fanned stack sits, back to front, by how many
  * the card shows. The last entry is the front thumbnail: the top match. */
 const STACK_LAYOUTS: Record<number, StackSlot[]> = {
-  1: [{ left: 12, top: 8, rotate: 0 }],
+  1: [{ left: 18, top: 9, rotate: 0 }],
   2: [
-    { left: 24, top: 12, rotate: 7 },
-    { left: 6, top: 4, rotate: 0 },
+    { left: 34, top: 12, rotate: 9 },
+    { left: 8, top: 6, rotate: -3 },
   ],
   3: [
-    { left: 0, top: 12, rotate: -8 },
-    { left: 26, top: 14, rotate: 7 },
-    { left: 12, top: 2, rotate: 0 },
+    { left: 0, top: 14, rotate: -11 },
+    { left: 40, top: 14, rotate: 10 },
+    { left: 18, top: 3, rotate: 0 },
   ],
 };
 
@@ -154,6 +154,7 @@ function StackThumb({
           top: slot?.top ?? 0,
           transform: [{ rotate: `${slot?.rotate ?? 0}deg` }],
         },
+        !front && styles.backThumb,
       ]}
     >
       {imageUri ? (
@@ -185,8 +186,8 @@ function shortDate(ms: number): string {
   });
 }
 
-const FRONT_THUMB = 60;
-const BACK_THUMB = 54;
+const FRONT_THUMB = 58;
+const BACK_THUMB = 50;
 
 const styles = StyleSheet.create((theme) => ({
   wrap: {
@@ -206,7 +207,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primarySoft,
   },
   stack: {
-    width: 84,
+    width: 96,
     height: 76,
   },
   thumb: {
@@ -214,12 +215,17 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 2,
-    // The card's own tint, so overlapping thumbnails read as separate cards.
-    borderColor: theme.colors.primarySoft,
+    // A paper edge, so overlapping thumbnails read as separate cards in both
+    // themes; the card's own tint vanished against itself in dark mode.
+    borderColor: theme.colors.surface,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.colors.surface,
+  },
+  // Recedes the cards behind the top match so the front one leads.
+  backThumb: {
+    opacity: 0.8,
   },
   thumbImage: {
     width: "100%",
