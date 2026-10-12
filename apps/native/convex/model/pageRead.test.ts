@@ -56,6 +56,10 @@ function json(url: string, body: unknown) {
   };
 }
 
+function video(snippet: Record<string, unknown>, id = "Ab_cd-Ef123") {
+  return { items: [{ id, snippet }] };
+}
+
 function html(url: string, body: string) {
   return {
     ok: true,
@@ -98,29 +102,25 @@ describe("YouTube description reader", () => {
     thumbnail_width: 480,
     thumbnail_height: 360,
   };
-  function serveVideo(description: unknown, width = 1280, height = 720) {
+  function serveVideo(snippet: Record<string, unknown>) {
     vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
     safeFetch.mockImplementation(async (endpoint: string) =>
       new URL(endpoint).hostname === "www.googleapis.com"
-        ? json(endpoint, {
-            items: [
-              {
-                id: "Ab_cd-Ef123",
-                snippet: {
-                  title: "Soup",
-                  channelTitle: "Cook",
-                  description,
-                  thumbnails: {
-                    high: {
-                      url: "https://i.ytimg.com/soup.jpg",
-                      width,
-                      height,
-                    },
-                  },
+        ? json(
+            endpoint,
+            video({
+              title: "Soup",
+              channelTitle: "Cook",
+              thumbnails: {
+                high: {
+                  url: "https://i.ytimg.com/soup.jpg",
+                  width: 1280,
+                  height: 720,
                 },
               },
-            ],
-          })
+              ...snippet,
+            }),
+          )
         : json(endpoint, oembed),
     );
   }
@@ -130,7 +130,12 @@ describe("YouTube description reader", () => {
   ])(
     "maps verified snippet fields and dimensions %i x %i",
     async (width, height) => {
-      serveVideo("Ingredients: beans. Simmer until tender.", width, height);
+      serveVideo({
+        description: "Ingredients: beans. Simmer until tender.",
+        thumbnails: {
+          high: { url: "https://i.ytimg.com/soup.jpg", width, height },
+        },
+      });
       const result = await readPage(url);
       expect(result).toMatchObject({
         status: "ok",
@@ -156,7 +161,7 @@ describe("YouTube description reader", () => {
   it.each([undefined, "", "x".repeat(6001)])(
     "does not transcribe missing or over-limit descriptions",
     async (description) => {
-      serveVideo(description);
+      serveVideo({ description });
       expect(await readPage(url)).toMatchObject({
         status: "ok",
         askForRecipe: false,
@@ -189,21 +194,7 @@ describe("YouTube description reader", () => {
   ])(
     "selects the best thumbnail without inventing missing dimensions: %#",
     async ({ thumbnails, selected, ratio }) => {
-      vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
-      safeFetch.mockImplementation(async (endpoint: string) =>
-        json(endpoint, {
-          items: [
-            {
-              id: "Ab_cd-Ef123",
-              snippet: {
-                title: "Soup",
-                description: "Beans. Simmer.",
-                thumbnails,
-              },
-            },
-          ],
-        }),
-      );
+      serveVideo({ description: "Beans. Simmer.", thumbnails });
       const result = await readPage(url);
       expect(result).toMatchObject({
         status: "ok",
@@ -217,7 +208,7 @@ describe("YouTube description reader", () => {
     },
   );
   it("follows description links and lets markup win", async () => {
-    serveVideo("Recipe: https://recipes.example/soup");
+    serveVideo({ description: "Recipe: https://recipes.example/soup" });
     const primary = safeFetch.getMockImplementation()!;
     safeFetch.mockImplementation(async (endpoint: string) =>
       endpoint === "https://recipes.example/soup"
@@ -250,7 +241,7 @@ describe("YouTube description reader", () => {
   it.each(["https://linktr.ee/cook", "https://recipes.example/missing"])(
     "keeps captions when a linked recipe is skipped or fails: %s",
     async (link) => {
-      serveVideo(`Beans, simmer. ${link}`);
+      serveVideo({ description: `Beans, simmer. ${link}` });
       const primary = safeFetch.getMockImplementation()!;
       safeFetch.mockImplementation(async (endpoint: string) =>
         endpoint === link
@@ -280,7 +271,7 @@ describe("YouTube description reader", () => {
     "retains the exact caption result after linked %s",
     async (_, linkedResponse) => {
       const link = "https://recipes.example/soup";
-      serveVideo(`Beans. Simmer. ${link}`);
+      serveVideo({ description: `Beans. Simmer. ${link}` });
       const primary = safeFetch.getMockImplementation()!;
       safeFetch.mockImplementation(async (endpoint: string) =>
         endpoint === link ? linkedResponse : primary(endpoint),
@@ -306,7 +297,7 @@ describe("YouTube description reader", () => {
     "https://www.youtube.com/watch?v=Ab_cd-Ef123",
     "https://www.instagram.com/p/ABC123/",
   ])("skips social description links just like link hubs: %s", async (link) => {
-    serveVideo(`Beans. Simmer. ${link}`);
+    serveVideo({ description: `Beans. Simmer. ${link}` });
     expect(await readPage(url)).toMatchObject({
       status: "ok",
       askForRecipe: true,
@@ -315,37 +306,42 @@ describe("YouTube description reader", () => {
     expect(safeFetch).toHaveBeenCalledTimes(1);
   });
   it.each([
-    { ok: false, code: "http_error", status: 403 },
-    { ok: false, code: "http_error", status: 401 },
-    { ok: false, code: "http_error", status: 500 },
-    { ok: false, code: "network_error" },
-    json(url, { items: [] }),
-    json(url, { items: [{ snippet: { title: 42 } }] }),
-    json(url, null),
-    json(url, {
-      items: [{ id: "differentID", snippet: { title: "Wrong video" } }],
-    }),
-    json(url, {
-      items: [
-        { id: "Ab_cd-Ef123", snippet: { title: "Soup", description: 42 } },
-      ],
-    }),
-    { ...json(url, {}), bytes: new TextEncoder().encode("{bad") },
-    new Error("fixture network rejection"),
-    {
-      ...json(url, {
-        items: [
-          {
-            id: "Ab_cd-Ef123",
-            snippet: { title: "Soup", description: "Cut ingredients" },
-          },
-        ],
-      }),
-      truncated: true,
-    },
+    [
+      { ok: false, code: "http_error", status: 403 },
+      "page_fetch_error:http_error",
+    ],
+    [
+      { ok: false, code: "http_error", status: 401 },
+      "page_fetch_error:http_error",
+    ],
+    [
+      { ok: false, code: "http_error", status: 500 },
+      "page_fetch_error:http_error",
+    ],
+    [{ ok: false, code: "network_error" }, "page_fetch_error:network_error"],
+    [json(url, { items: [] }), "unreadable_video"],
+    [json(url, video({ title: 42 })), "unreadable_video"],
+    [json(url, null), "unreadable_video"],
+    [
+      json(url, video({ title: "Wrong video" }, "differentID")),
+      "unreadable_video",
+    ],
+    [json(url, video({ title: "Soup", description: 42 })), "unreadable_video"],
+    [
+      { ...json(url, {}), bytes: new TextEncoder().encode("{bad") },
+      "unexpected_error:SyntaxError",
+    ],
+    [new Error("fixture network rejection"), "unexpected_error:Error"],
+    [
+      {
+        ...json(url, video({ title: "Soup", description: "Cut ingredients" })),
+        truncated: true,
+      },
+      "unreadable_video",
+    ],
   ])(
     "preserves the exact no-key oEmbed result on optional API failure %#",
-    async (failure) => {
+    async (failure, category) => {
       safeFetch.mockImplementation(async (endpoint: string) =>
         json(endpoint, oembed),
       );
@@ -359,15 +355,6 @@ describe("YouTube description reader", () => {
         return failure;
       });
       expect(await readPage(url)).toEqual(baseline);
-      const category =
-        failure instanceof Error
-          ? "unexpected_error:Error"
-          : !failure.ok
-            ? `page_fetch_error:${failure.code}`
-            : failure.bytes[0] === "{".charCodeAt(0) &&
-                new TextDecoder().decode(failure.bytes) === "{bad"
-              ? "unexpected_error:SyntaxError"
-              : "unreadable_video";
       expect(logEvent).toHaveBeenCalledExactlyOnceWith(
         "warn",
         "youtube_data_api_fallback",
