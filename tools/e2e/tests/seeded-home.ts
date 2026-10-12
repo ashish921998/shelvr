@@ -1,5 +1,5 @@
 import { beforeEach } from "@e2e-dev/mobile";
-import { expect } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
 
 const BUNDLE_TIMEOUT = 180_000;
 
@@ -66,4 +66,18 @@ export function startOnSeededHome(): void {
       timeout: 30_000,
     });
   });
+}
+
+/**
+ * Opens Add and taps one of its options. The options are disabled until the
+ * entitlement has loaded, which right after a launch can be after the sheet
+ * is up, and a tap on a disabled option does nothing.
+ */
+export async function chooseAddOption(
+  screen: Screen,
+  option: Locator,
+): Promise<void> {
+  await screen.getByRole("button", "Add").tap();
+  await expect(option).toBeEnabled({ timeout: 30_000 });
+  await option.tap();
 }
