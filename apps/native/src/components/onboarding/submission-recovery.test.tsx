@@ -7,9 +7,9 @@ vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: () => "en",
 }));
-vi.mock("react-native", () => ({
-  View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Text: ({
+const mock = vi.hoisted(() => ({
+  view: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  text: ({
     children,
     style,
     maxFontSizeMultiplier,
@@ -22,6 +22,20 @@ vi.mock("react-native", () => ({
       {children}
     </span>
   ),
+  ctaButton: ({ label, onPress }: { label: string; onPress: () => void }) => (
+    <button data-primitive="cta" onClick={onPress}>
+      {label}
+    </button>
+  ),
+  ghostButton: ({ label, onPress }: { label: string; onPress: () => void }) => (
+    <button data-primitive="ghost" onClick={onPress}>
+      {label}
+    </button>
+  ),
+}));
+vi.mock("react-native", () => ({
+  View: mock.view,
+  Text: mock.text,
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: {
@@ -34,16 +48,8 @@ vi.mock("react-native-unistyles", () => ({
   },
 }));
 vi.mock("@/components/onboarding/parts", () => ({
-  CtaButton: ({ label, onPress }: { label: string; onPress: () => void }) => (
-    <button data-primitive="cta" onClick={onPress}>
-      {label}
-    </button>
-  ),
-  GhostButton: ({ label, onPress }: { label: string; onPress: () => void }) => (
-    <button data-primitive="ghost" onClick={onPress}>
-      {label}
-    </button>
-  ),
+  CtaButton: mock.ctaButton,
+  GhostButton: mock.ghostButton,
 }));
 
 const { SubmissionRecovery } = await import("./submission-recovery");
