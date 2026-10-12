@@ -10,11 +10,10 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | string
   | undefined;
 
-const REPLAY_VARIANTS = new Set<unknown>([
-  "development",
-  "preview",
-  "production",
-]);
+// Production never records. Apple's guideline 2.5.14 requires explicit consent
+// and a visible indicator for recording user activity, and the app has
+// neither. Replay stays a development and preview tool.
+const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
 
 // Distributed builds report crashes; local development does not. A dev machine
 // crash on an unmerged branch would otherwise open an error issue next to
@@ -110,10 +109,9 @@ export const posthog =
         // product gain. Fail closed, as replay and exception autocapture do.
         capturePushNotificationSubscriptions: false,
         capturePushNotificationOpened: false,
-        // Visual masking was verified on a signed preview build on 2026-09-28,
-        // so production records too, at the same sample rate. Fail closed: only
-        // builds that declare a known variant record, so a missing `extra` can
-        // never turn replay on.
+        // Fail closed: only builds that declare a development or preview
+        // variant record, so a production build or a missing `extra` can never
+        // turn replay on.
         enableSessionReplay: REPLAY_VARIANTS.has(
           Constants.expoConfig?.extra?.variant,
         ),
@@ -123,9 +121,8 @@ export const posthog =
           maskAllSandboxedViews: true,
           captureLog: false,
           captureNetworkTelemetry: false,
-          // Every session, while the user base is small enough that a 20%
-          // sample would yield a handful of recordings a week. Lower it once
-          // volume makes sampling worth it. Decided 2026-09-29.
+          // Every session: only development and preview builds record, so
+          // there is no volume to sample down.
           sampleRate: 1,
           throttleDelayMs: 1000,
         },

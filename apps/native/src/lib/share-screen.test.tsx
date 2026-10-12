@@ -38,6 +38,10 @@ const mock = vi.hoisted(() => ({
   sharedPayloads: [] as RawPayload[],
   resolvedSharedPayloads: [] as unknown[],
   isResolving: false,
+  // When set, the hook mock behaves like the real one: the raw batch is there
+  // on the first render with isResolving false, and resolution starts in a
+  // mount effect and settles when this promise does.
+  resolution: null as Promise<unknown[]> | null,
   openPaywall: vi.fn(),
   createLinkItem: vi.fn(),
   createNoteItem: vi.fn(),
@@ -108,18 +112,35 @@ vi.mock("expo-crypto", () => ({
   randomUUID: () => `session-${++mock.uuid}`,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => mock.router }));
-vi.mock("expo-sharing", () => ({
-  useIncomingShare: () => ({
-    sharedPayloads: mock.sharedPayloads,
-    resolvedSharedPayloads: mock.resolvedSharedPayloads,
-    isResolving: mock.isResolving,
-    error: null,
-    clearSharedPayloads: mock.clearSharedPayloads,
-  }),
-  // The native store the resume path reads. Clears are mocked, so it keeps
-  // whatever batch the test put there.
-  getSharedPayloads: () => mock.sharedPayloads,
-}));
+vi.mock("expo-sharing", async () => {
+  const { useEffect, useState } = await import("react");
+  return {
+    useIncomingShare: () => {
+      const [resolved, setResolved] = useState<unknown[]>([]);
+      const [resolving, setResolving] = useState(false);
+      useEffect(() => {
+        const resolution = mock.resolution;
+        if (resolution === null) return;
+        setResolving(true);
+        void resolution.then((payloads) => {
+          setResolved(payloads);
+          setResolving(false);
+        });
+      }, []);
+      const real = mock.resolution !== null;
+      return {
+        sharedPayloads: mock.sharedPayloads,
+        resolvedSharedPayloads: real ? resolved : mock.resolvedSharedPayloads,
+        isResolving: real ? resolving : mock.isResolving,
+        error: null,
+        clearSharedPayloads: mock.clearSharedPayloads,
+      };
+    },
+    // The native store the resume path reads. Clears are mocked, so it keeps
+    // whatever batch the test put there.
+    getSharedPayloads: () => mock.sharedPayloads,
+  };
+});
 vi.mock("react-native-mmkv", () => ({
   createMMKV: () => ({
     getString: (key: string) => mock.store.get(key),
@@ -182,11 +203,6 @@ const resolvedLink = {
 // before a negative assertion.
 const settle = () => act(() => new Promise((r) => setTimeout(r, 0)));
 
-async function confirmShare() {
-  await waitFor(() => expect(screen.getByText("common.save")).toBeDefined());
-  fireEvent.click(screen.getByText("common.save"));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   mock.entitled = false;
@@ -194,6 +210,7 @@ beforeEach(() => {
   mock.sharedPayloads = [link];
   mock.resolvedSharedPayloads = [];
   mock.isResolving = false;
+  mock.resolution = null;
   mock.store.clear();
   mock.secure.clear();
   mock.uuid = 0;
@@ -204,7 +221,6 @@ beforeEach(() => {
 
 it("presents one paywall per session across effect re-runs and saves once entitled", async () => {
   const view = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
   expect(mock.openPaywall).toHaveBeenCalledWith(mock.router, "share");
   expect(screen.getByText("pro.unlockShelvr")).toBeDefined();
@@ -227,25 +243,44 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
 });
 
-it("previews new and resumed Android shares without saving until confirmed", async () => {
+it("waits for the first resolution before saving a shared image", async () => {
+  // The hook hands over the raw batch before it has started resolving. With
+  // auth and Pro already cached, a save that starts then sees no resolved
+  // URI and marks the image failed for good.
   mock.entitled = true;
-  const first = render(<ShareScreen />);
-  await waitFor(() => expect(screen.getByText(link.value)).toBeDefined());
-  await settle();
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
-  expect(mock.saveImages).not.toHaveBeenCalled();
-  first.unmount();
+  mock.saveImages.mockResolvedValue([{ status: "saved", itemId: "item-1" }]);
+  const image: RawPayload = {
+    value: "content://media/1",
+    shareType: "image",
+    mimeType: "image/jpeg",
+  };
+  mock.sharedPayloads = [image];
+  let settleResolution: (payloads: unknown[]) => void = () => {};
+  mock.resolution = new Promise((resolve) => {
+    settleResolution = resolve;
+  });
   render(<ShareScreen />);
-  await waitFor(() => expect(screen.getByText("common.save")).toBeDefined());
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
-  await confirmShare();
-  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
+  await settle();
+  expect(mock.saveImages).not.toHaveBeenCalled();
+  expect(screen.queryByText("capture.retryFailed")).toBeNull();
+
+  await act(async () => {
+    settleResolution([
+      {
+        contentType: "image",
+        value: image.value,
+        contentUri: "file:///cache/1.jpg",
+        contentMimeType: image.mimeType,
+      },
+    ]);
+  });
+  await waitFor(() => expect(mock.saveImages).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
 });
 
 it("gates a retry again when the entitlement lapses after a locked session ran", async () => {
   mock.createLinkItem.mockRejectedValue(new Error("save failed"));
   const view = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
 
   mock.entitled = true;
@@ -310,7 +345,6 @@ it("keeps the tombstone when the native clear fails and the user cancels", async
     throw new Error("clear failed");
   });
   const first = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() =>
     expect(screen.getByText("share.finishFailed")).toBeDefined(),
   );
@@ -343,7 +377,6 @@ it("records the discard when Cancel's native clear throws, so the leftover is no
     throw new Error("clear failed");
   });
   render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() =>
     expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
   );
@@ -364,7 +397,6 @@ it("clears the pending flag and the discard record once a share completes", asyn
     fingerprintSharePayloads([{ value: "https://old.test", shareType: "url" }]),
   );
   render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
 
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
@@ -378,7 +410,6 @@ it("still resumes and saves a different batch after a discard", async () => {
     throw new Error("clear failed");
   });
   const first = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() =>
     expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
   );
@@ -399,7 +430,6 @@ it("still resumes and saves a different batch after a discard", async () => {
   mock.entitled = true;
   mock.router.replace.mockClear();
   render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({

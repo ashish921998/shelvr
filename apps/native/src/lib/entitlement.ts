@@ -761,21 +761,28 @@ export async function openExitOffer(
  * the offer is not shown the higher price on their next tap. With
  * `paywallOnDecline`, declining it there opens the regular paywall: right for
  * a tap, too much for a sheet nobody asked for. Otherwise it is `openPaywall`,
- * exit offer on close included.
+ * exit offer on close included. Returns the outcome itself, so onboarding can
+ * tell a paywall that never showed from one that was closed.
  */
 export async function openPaywallKeepingExitOffer(
   router: ReturnType<typeof useRouter>,
   placement: string,
   paywallOnDecline: boolean,
-): Promise<boolean> {
+): Promise<PaywallOutcome> {
   const { outcome, owned } = await presentPaywall(placement, () =>
     presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
   );
-  if (owned && shouldOpenPaywallFallback(outcome)) {
+  // Onboarding finishes whatever the outcome, which swaps the screens under
+  // a pushed fallback. The app's own Pro gates offer the paywall again.
+  if (
+    owned &&
+    shouldOpenPaywallFallback(outcome) &&
+    placement !== "onboarding"
+  ) {
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
-  return outcome === "success";
+  return outcome;
 }
 
 // ---------------------------------------------------------------------------
@@ -863,6 +870,21 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
   const rc = getPurchases();
   if (!rc) return "unknown";
   return await readFreshTrialCancellation(rc);
+}
+
+/**
+ * Whether the signed-in account can still start the free trial on the current
+ * offering, for copy that promises one. True only on RevenueCat's "eligible":
+ * a pending identity sync, a failed read or an unknown answer all read as no,
+ * so nobody who already used the trial is told they will get it.
+ */
+export async function readTrialEligible(): Promise<boolean> {
+  if (!(await awaitRcSyncReady())) return false;
+  try {
+    return (await readPaywallContext()).trial_eligible === "eligible";
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -38,24 +39,56 @@ const SHARE_LINK_TIMEOUT_MS = 3000;
  * an image) or the token could not be minted in time, e.g. offline. */
 export function useShareLink() {
   const createShareLink = useMutation(api.items.createShareLink);
+  const settle = useMutation(api.items.settleShareLink);
   return useCallback(
     async (itemId: string): Promise<string | undefined> => {
+      const id = itemId as Id<"items">;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const minting = createShareLink({ itemId: id, settles: true });
       try {
         const token = await Promise.race([
-          createShareLink({ itemId: itemId as Id<"items"> }),
+          minting,
           new Promise<null>((resolve) => {
             timer = setTimeout(() => resolve(null), SHARE_LINK_TIMEOUT_MS);
           }),
         ]);
-        return token === null ? undefined : shareLinkUrl(token);
+        if (token !== null) return shareLinkUrl(token);
+        // Too late to use: the caller shares the source instead. The mint is
+        // still queued, so the link it makes is taken back as soon as it
+        // exists instead of staying published with nobody holding it.
+        minting
+          .then((late) =>
+            late === null ? null : settle({ itemId: id, shared: false }),
+          )
+          .catch(() => {});
+        return undefined;
       } catch {
         return undefined;
       } finally {
         clearTimeout(timer);
       }
     },
-    [createShareLink],
+    [createShareLink, settle],
+  );
+}
+
+/**
+ * Tells the server how a share that minted the public link ended. The link is
+ * published before the sheet opens, so a dismissed or failed share would
+ * leave a public page behind; `shared: false` lets the server take it back,
+ * and `shared: true` marks it as one that went out. Every surface that
+ * shares reports here. Never awaited: the share is over either way.
+ */
+export function useSettleShareLink() {
+  const settle = useMutation(api.items.settleShareLink);
+  return useCallback(
+    (itemId: string, shared: boolean): void => {
+      settle({ itemId: itemId as Id<"items">, shared }).catch(
+        (error: unknown) =>
+          analytics.captureError("share_link_settle_failed", error),
+      );
+    },
+    [settle],
   );
 }
 

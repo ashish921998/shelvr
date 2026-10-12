@@ -1,9 +1,9 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { AppSymbolIcon } from "@/components/symbol";
+import { openInAppBrowser } from "@/lib/in-app-browser";
 import { useFindLinks } from "@/lib/use-find-links";
 import { Image } from "expo-image";
-import * as WebBrowser from "expo-web-browser";
 import {
   ActivityIndicator,
   Pressable,
@@ -74,7 +74,7 @@ export function ProductsSection({
                 styles.productCard,
                 pressed && { opacity: 0.85 },
               ]}
-              onPress={() => WebBrowser.openBrowserAsync(product.url)}
+              onPress={() => openInAppBrowser(product.url)}
             >
               {product.thumbnailUrl ? (
                 <Image
@@ -122,10 +122,11 @@ export function ProductsSection({
   return (
     <View style={styles.findLinksRow}>
       <Pressable
+        accessibilityRole="button"
         style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
         onPress={findLinks}
         disabled={disabled}
-        hitSlop={6}
+        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       >
         {finding ? (
           <ActivityIndicator size="small" color={theme.colors.primaryText} />

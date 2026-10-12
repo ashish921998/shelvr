@@ -16,7 +16,12 @@ import { Link, useRouter } from "expo-router";
 import { Alert, Pressable, Share } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
-import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
+import {
+  shareRefOf,
+  shareUrl,
+  useSettleShareLink,
+  useShareLink,
+} from "@/lib/share-link";
 
 export type { FeedItem } from "@/components/item-card-face";
 
@@ -79,10 +84,7 @@ function cardMenuActions({
   return actions;
 }
 
-// Memoized: feed rows are the highest-churn surface in the app (every live-query
-// tick and parent re-render touches the list), so skip re-renders when a row's
-// `item` ref is unchanged.
-export const ItemCard = memo(function ItemCard({
+function ItemCardView({
   item,
   source,
 }: {
@@ -99,14 +101,22 @@ export const ItemCard = memo(function ItemCard({
   const spaceId =
     source?.from === "space" ? (source.spaceId as Id<"spaces">) : undefined;
   const isSuggested = item.suggested === true && spaceId !== undefined;
+  const href = {
+    pathname: "/item/[id]" as const,
+    params: { id: item._id, ...source },
+  };
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
   const shareLink = useShareLink();
+  const settleShareLink = useSettleShareLink();
   const share = async () => {
     if (!item.url) return;
+    let link: string | undefined;
+    let shared = false;
     try {
-      const link = item.type === "link" ? await shareLink(item._id) : undefined;
+      link = item.type === "link" ? await shareLink(item._id) : undefined;
       const result = await shareUrl(link ?? item.url);
+      shared = result.action === Share.sharedAction;
       if (result.action === Share.sharedAction) {
         const shareRef = await shareRefOf(link);
         analytics.capture("item_shared", {
@@ -126,6 +136,7 @@ export const ItemCard = memo(function ItemCard({
     } catch {
       // A dismissed or failed share is not a completed action.
     }
+    if (link !== undefined) settleShareLink(item._id, shared);
   };
 
   // What a screen reader reads instead of the card's contents. The classifier
@@ -189,27 +200,52 @@ export const ItemCard = memo(function ItemCard({
     confirmDelete,
   });
 
+  // Where the card's accessibility lives. On iOS, expo-router hosts the
+  // trigger inside two native views with a zero-size frame (the zoom source
+  // and the link preview host), and iOS drops every accessibility element
+  // under a zero-size container, so a label on the Pressable never reaches
+  // VoiceOver or XCTest. The cell above them has a real frame, so iOS reads
+  // the card there. Android has no such wrappers, so the Pressable keeps it.
+  // The long-press menu's actions ride along as accessibility actions, since
+  // the ellipsis button inside is folded into the card on both platforms.
+  const cardA11y = {
+    accessible: true,
+    // `role`, not `accessibilityRole`: Link spreads its own role="link"
+    // onto the trigger, and React Native reads `role` first on both
+    // platforms (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt),
+    // so an accessibilityRole there would never reach the screen reader.
+    role: "button" as const,
+    accessibilityLabel,
+    accessibilityActions: menuActions.map(({ label }) => ({
+      name: label,
+      label,
+    })),
+    onAccessibilityAction: ({
+      nativeEvent,
+    }: {
+      nativeEvent: { actionName: string };
+    }) => {
+      menuActions
+        .find(({ label }) => label === nativeEvent.actionName)
+        ?.onPress();
+    },
+    // VoiceOver's double-tap. Without it iOS falls back to a synthetic touch
+    // at the cell's centre, which only opens the card while the centre lands
+    // on the Pressable. Opening here is a plain push, without the zoom.
+    onAccessibilityTap: () => router.push(href),
+    testID: item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined,
+  };
+  const a11yOnCell = process.env.EXPO_OS === "ios";
+
   return (
     <Animated.View
       entering={reducedMotion ? undefined : FadeIn.duration(300)}
       style={styles.cell}
+      {...(a11yOnCell ? cardA11y : {})}
     >
-      <Link
-        href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
-        asChild
-      >
+      <Link href={href} asChild>
         <Link.Trigger withAppleZoom={!reducedMotion}>
-          <Pressable
-            // `role`, not `accessibilityRole`: Link spreads its own role="link"
-            // onto this trigger, and React Native reads `role` first on both
-            // platforms (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt),
-            // so an accessibilityRole here would never reach the screen reader.
-            role="button"
-            accessibilityLabel={accessibilityLabel}
-            testID={
-              item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
-            }
-          >
+          <Pressable {...(a11yOnCell ? {} : cardA11y)}>
             {/* Link.Trigger's Slot drops a Pressable style function (it merges
                 style by object spread), so the card's look lives on the face's
                 View, driven by the Pressable's render-prop children. */}
@@ -271,7 +307,38 @@ export const ItemCard = memo(function ItemCard({
       </Link>
     </Animated.View>
   );
-});
+}
+
+// Feeds pass `source` as a fresh literal on every render, so two sources are
+// the same when they name the same list, not when they are the same object.
+// Spelling out every variant makes a new one fail to compile here until it
+// says what identifies its list.
+function sourceKey(source: ItemSource | undefined): string | undefined {
+  switch (source?.from) {
+    case undefined:
+      return undefined;
+    case "home":
+    case "digest":
+    case "map":
+      return source.from;
+    case "space":
+      return `space:${source.spaceId}`;
+    case "search":
+      return `search:${source.q}`;
+    default:
+      return source satisfies never;
+  }
+}
+
+// Memoized: feed rows are the highest-churn surface in the app (every live-query
+// tick and parent re-render touches the list), so skip re-renders when a row's
+// `item` ref and `source` value are unchanged.
+export const ItemCard = memo(
+  ItemCardView,
+  (prev, next) =>
+    prev.item === next.item &&
+    sourceKey(prev.source) === sourceKey(next.source),
+);
 
 const styles = StyleSheet.create(() => ({
   cell: {

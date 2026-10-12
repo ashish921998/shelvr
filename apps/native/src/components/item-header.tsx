@@ -9,7 +9,15 @@ import { StyleSheet } from "react-native-unistyles";
 // The item-detail header: the item's title (morphing via AnimatedText as the
 // user swipes between siblings) over the date it belongs to — the original
 // camera-roll capture time for imported photos, otherwise when it was saved.
-export function ItemHeader({ item }: { item: DetailItem | undefined }) {
+// Over a media save the title moves into the photo's caption, so the header
+// keeps only the date, in white over the black stage.
+export function ItemHeader({
+  item,
+  onMedia = false,
+}: {
+  item: DetailItem | undefined;
+  onMedia?: boolean;
+}) {
   useAppLocale();
   const title =
     item?.title ||
@@ -21,6 +29,21 @@ export function ItemHeader({ item }: { item: DetailItem | undefined }) {
     item?.type === "image" && item?.capturedAt
       ? item.capturedAt
       : item?._creationTime;
+
+  if (onMedia) {
+    return (
+      <View style={styles.container}>
+        {when ? (
+          <AnimatedText
+            text={formatShortDate(when)}
+            height={20}
+            truncate
+            style={styles.mediaDate}
+          />
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -49,6 +72,11 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.display,
     fontSize: 22,
     color: theme.colors.foreground,
+  },
+  mediaDate: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: "white",
   },
   date: {
     fontFamily: theme.fonts.medium,

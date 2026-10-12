@@ -17,6 +17,8 @@ const mock = vi.hoisted(() => ({
   signOut: vi.fn(),
   clearWidget: vi.fn(async () => true),
   revokeSiri: vi.fn(async () => {}),
+  clearFirstSave: vi.fn(async () => {}),
+  clearTrial: vi.fn(async () => {}),
   captureError: vi.fn(),
   capture: vi.fn(),
   push: vi.fn(),
@@ -35,6 +37,12 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
 vi.mock("@/lib/exit-offer-reminder", () => ({
   clearExitOfferReminder: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/first-save-reminder", () => ({
+  clearFirstSaveReminder: mock.clearFirstSave,
+}));
+vi.mock("@/lib/trial-reminder", () => ({
+  clearTrialReminder: mock.clearTrial,
 }));
 vi.mock("@/lib/widget-sync", () => ({
   clearRecentSavesWidget: mock.clearWidget,
@@ -147,6 +155,48 @@ describe("notification session lifecycle", () => {
       await result.current.session.signOut();
     });
     expect(order).toEqual(["revoke", "signOut"]);
+  });
+  it.each(["signOut", "deleteAccount"] as const)(
+    "%s clears the trial reminders",
+    async (action) => {
+      mock.clearTrial.mockClear();
+      const { result } = renderSession();
+      await waitFor(() =>
+        expect(result.current.session.isRegistered()).toBe(true),
+      );
+      await act(async () => {
+        await result.current.session[action]();
+      });
+      // Deleting also signs out, so the clear can run twice; it is idempotent.
+      expect(mock.clearTrial).toHaveBeenCalled();
+    },
+  );
+  it.each(["signOut", "deleteAccount"] as const)(
+    "%s clears the reminder that names the first save",
+    async (action) => {
+      const { result } = renderSession();
+      await waitFor(() =>
+        expect(result.current.session.isRegistered()).toBe(true),
+      );
+      await act(async () => {
+        await result.current.session[action]();
+      });
+      expect(mock.clearFirstSave).toHaveBeenCalled();
+    },
+  );
+  it("turning save reminders off also clears the first-save reminder", async () => {
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    await act(async () => {
+      await result.current.session.setSaveReminders(true);
+    });
+    expect(mock.clearFirstSave).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.session.setSaveReminders(false);
+    });
+    expect(mock.clearFirstSave).toHaveBeenCalledOnce();
   });
   it("clears the widget after successful server account deletion", async () => {
     const { result } = renderSession();

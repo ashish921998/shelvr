@@ -334,7 +334,7 @@ export default function HeroStage() {
             event.stopPropagation();
             toggle();
           }}
-          className="absolute bottom-3.5 left-4 z-[5] flex size-10 items-center justify-center rounded-full border border-dark-line bg-dark-3 text-ember-light transition-colors hover:bg-dark-plank focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember"
+          className="absolute bottom-3.5 left-4 z-[5] flex size-11 items-center justify-center rounded-full border border-dark-line bg-dark-3 text-ember-light transition-colors before:absolute before:-inset-1.5 before:content-[''] hover:bg-dark-plank focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember"
         >
           {tidy ? (
             <ArrowUturnLeftIcon

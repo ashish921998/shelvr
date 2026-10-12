@@ -4,7 +4,7 @@ import { useAppStoreLink } from "@/lib/appStoreLink";
 
 const VARIANTS = {
   header:
-    "h-10 gap-2 px-4 text-sm bg-ink text-paper hover:bg-ember-deep [&>svg]:h-4 [&>svg]:w-[13px]",
+    "h-11 gap-2 px-4 text-sm bg-ink text-paper hover:bg-ember-deep [&>svg]:h-4 [&>svg]:w-[13px]",
   hero: "h-11 gap-2.5 pr-5 pl-4 text-[15px] bg-ink text-paper hover:bg-ember-deep [&>svg]:h-5 [&>svg]:w-[18px]",
   footer:
     "h-11 gap-2.5 pr-5 pl-4 text-[15px] bg-ember text-ink hover:bg-ember-light [&>svg]:h-5 [&>svg]:w-4",

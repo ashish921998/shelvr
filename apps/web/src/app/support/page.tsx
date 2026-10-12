@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import Logo from "@/components/common/Logo";
+import Header from "@/components/Header";
+import Footer from "@/components/home/Footer";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata: Metadata = {
@@ -11,11 +11,10 @@ export const metadata: Metadata = {
 
 export default function SupportPage() {
   return (
-    <main className="bg-paper min-h-screen">
-      <div className="container max-w-3xl py-10 sm:py-16">
-        <Logo />
-
-        <h1 className="mt-10 font-display text-3xl text-ink sm:text-4xl">
+    <div className="bg-paper min-h-screen">
+      <Header />
+      <main className="container max-w-2xl py-10 sm:py-16">
+        <h1 className="font-display text-3xl text-ink sm:text-4xl">
           Shelvr Support
         </h1>
         <p className="mt-3 text-[15px] leading-7 text-ink/90">
@@ -44,7 +43,7 @@ export default function SupportPage() {
           <section>
             <h2 className="text-lg font-semibold text-ink">Account deletion</h2>
             <p className="mt-2">
-              Open Profile and choose Delete account. This permanently removes
+              Open Settings and choose Delete account. This permanently removes
               your Shelvr account and saved content; it does not cancel an App
               Store subscription.
             </p>
@@ -57,18 +56,19 @@ export default function SupportPage() {
               personal data not covered by the in-app deletion flow.
             </p>
           </section>
-        </div>
 
-        <p className="mt-12 border-t border-line pt-6 text-sm text-muted">
-          <Link className="underline hover:text-ink" href="/privacy">
-            Privacy Policy
-          </Link>{" "}
-          ·{" "}
-          <Link className="underline hover:text-ink" href="/terms">
-            Terms of Service
-          </Link>
-        </p>
-      </div>
-    </main>
+          <section>
+            <h2 className="text-lg font-semibold text-ink">
+              Copyright and abuse reports
+            </h2>
+            <p className="mt-2">
+              To report a Shelvr share page, email {SUPPORT_EMAIL} with the page
+              address and the reason.
+            </p>
+          </section>
+        </div>
+      </main>
+      <Footer />
+    </div>
   );
 }

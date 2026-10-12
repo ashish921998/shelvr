@@ -24,10 +24,11 @@ for Shelvr.
 
 ## What’s inside
 
-| Path          | Purpose                                            |
-| ------------- | -------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site                   |
-| `apps/native` | Expo native client (full product) + Convex backend |
+| Path          | Purpose                                             |
+| ------------- | --------------------------------------------------- |
+| `apps/web`    | Next.js marketing / landing site                    |
+| `apps/native` | Expo native client (full product) + Convex backend  |
+| `apps/e2e`    | End-to-end flow tests for the iOS simulator (pilot) |
 
 ## Quick start
 
@@ -171,6 +172,44 @@ Tests are `*.test.ts` files next to the code under `apps/native/convex/`,
 and opt into the edge runtime per file with a
 `// @vitest-environment edge-runtime` pragma. Web tests use Vitest's Node
 environment by default and opt into jsdom per file when browser APIs are needed.
+
+#### End-to-end flows on the iOS simulator (pilot)
+
+`apps/e2e` drives the development build through four flows with the
+[e2e](https://github.com/tester-army/e2e) framework: save a link, save a photo,
+create a space, and search. Search and create-a-space use plain locators and need no model. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo reaches its goal through an `agent.act` step, because the system photo picker is not in the accessibility tree. It is not part of `pnpm run check` or CI yet.
+
+It needs a booted iOS simulator with the development build
+(`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
+Convex deployment, and `AUTH_ENABLE_ANONYMOUS=true` on that deployment. The
+app runs in English whatever the simulator's language, and the save-a-photo
+flow adds its own photo (`apps/e2e/fixtures/photo.png`) to the simulator's
+library. Each
+test signs in as the anonymous dev user and resets its data through Settings >
+"Reset flow fixtures", so run it only against a throwaway dev user.
+
+```sh
+cd apps/e2e
+export GOOGLE_GENERATIVE_AI_API_KEY=...   # an AI Studio key; never commit it
+pnpm exec e2e run                         # all four flows
+pnpm exec e2e run tests/search.e2e.ts     # one flow
+pnpm exec e2e run --video on              # record an MP4 per test under .e2e/
+```
+
+The run starts its own Metro on port 8091 and stops it afterwards. Set
+`E2E_METRO_PORT` to move it, `E2E_DEVICE` to pick a simulator by name or UDID,
+and `E2E_MODEL` to try another Gemini model.
+
+The first run of a step asks the model how to reach the goal and records the
+taps under `apps/e2e/.e2e/cache/`. Later runs replay that recording without a
+model call, and fall back to the model when the screen has changed. The
+recordings are gitignored for now, so each machine makes its own.
+`pnpm exec e2e run --no-cache` forces every step back through the model.
+
+Checks use plain locators wherever the label is known in advance; seeded
+saves carry `fixture-item-*` test IDs. Only the count of saves after a new link
+or photo, whose title the model writes, is judged from a screenshot
+(`agent.waitFor` with `vision`), at one model call per run.
 
 ## Domain model (Convex)
 

@@ -78,7 +78,10 @@ export default function AndroidWaitlist() {
         On Android? Leave your email and we’ll tell you the day it lands.
       </label>
       {status === "success" ? null : (
-        <form onSubmit={submit} className="flex w-full gap-2">
+        <form
+          onSubmit={submit}
+          className="flex w-full flex-col gap-2 min-[360px]:flex-row"
+        >
           <input
             id={inputId}
             name="email"
@@ -101,7 +104,7 @@ export default function AndroidWaitlist() {
           <button
             type="submit"
             disabled={status === "loading"}
-            className="h-11 shrink-0 rounded-[11px] border border-dark-plank-2 px-[18px] text-[15px] font-bold whitespace-nowrap text-dark-text transition-colors hover:bg-dark-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember disabled:cursor-wait disabled:opacity-60"
+            className="h-11 w-full shrink-0 rounded-[11px] border border-dark-plank-2 px-[18px] min-[360px]:w-auto text-[15px] font-bold whitespace-nowrap text-dark-text transition-colors hover:bg-dark-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember disabled:cursor-wait disabled:opacity-60"
           >
             {status === "loading" ? "Joining…" : "Join waitlist"}
           </button>

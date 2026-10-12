@@ -1,3 +1,4 @@
+import type { Id } from "@convex/_generated/dataModel";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -15,13 +16,16 @@ const PENDING_KEY = "shelvr.pending.onboarding";
 // Older flows stored `step` as an index into a different step list, under the
 // same key. Their step and answers are ignored so progress restarts at the
 // opener; the replay fields (operationId, spaces, demoUrl) still apply.
-// Version 3 inserted the acquisition source step after the opener.
-const PROGRESS_VERSION = 3;
+// Version 3 inserted the acquisition source step after the opener, 4 the
+// notifications step before the reveal. 5 removed the source step, inserted
+// the interests step after the opener and added the share step. 6 removed
+// the reveal step.
+const PROGRESS_VERSION = 6;
 
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
  * while the save is still processing) resumes the exact save the user asked
- * for. It is kept after the demo step advances so a relaunch on the reveal
- * step can re-attach to the same item. Cancelling the demo's sign-in clears
+ * for. It is kept after the demo step advances so the share practice can
+ * avoid offering the same link again. Cancelling the demo's sign-in clears
  * it, and `setPendingSpaces` (the finish path) drops it, so a completed save
  * is never replayed or left behind in SecureStore. */
 export type PendingDemo = {
@@ -30,6 +34,13 @@ export type PendingDemo = {
   destination: string | null;
   /** Only a URL received through Shelvr's share extension counts as a share. */
   source: "direct" | "share";
+};
+
+/** The demo's finished save, so a relaunch on the reminder step still has
+ * the save to remind about. Dropped with the demo when onboarding finishes. */
+type PendingSaved = {
+  itemId: Id<"items">;
+  savedSpaceNames: string[];
 };
 
 type PendingRecord = {
@@ -41,6 +52,8 @@ type PendingRecord = {
   saveKinds: string[];
   step: number | null;
   demo: PendingDemo | null;
+  /** Absent on records written before the save was kept. */
+  saved: PendingSaved | null;
   spaceNames: Record<string, string>;
 };
 
@@ -50,6 +63,7 @@ type OnboardingProgress = {
   spaces: string[];
   step: number | null;
   demo: PendingDemo | null;
+  saved: PendingSaved | null;
 };
 
 let revision = 0;
@@ -125,11 +139,24 @@ function readPendingRecord(): PendingRecord | null {
       saveKinds,
       step,
       demo,
+      saved: readSaved(record.saved),
       spaceNames: readSpaceNames(record.spaceNames),
     };
   } catch {
     return null;
   }
+}
+
+function readSaved(value: unknown): PendingSaved | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { itemId, savedSpaceNames } = value as Partial<PendingSaved>;
+  if (typeof itemId !== "string" || itemId === "") return null;
+  if (
+    !Array.isArray(savedSpaceNames) ||
+    !savedSpaceNames.every((name) => typeof name === "string")
+  )
+    return null;
+  return { itemId, savedSpaceNames };
 }
 
 function readSpaceNames(value: unknown): Record<string, string> {
@@ -161,6 +188,7 @@ function ensureOperationId(): string {
     saveKinds: [],
     step: null,
     demo: null,
+    saved: null,
     spaceNames: {},
   });
   return operationId;
@@ -173,6 +201,7 @@ function writePendingSpaces(
   spaces: string[],
   refreshOperationId: boolean,
   demo: PendingDemo | null,
+  saved: PendingSaved | null,
 ) {
   const existing = readPendingRecord();
   const operationId =
@@ -187,6 +216,7 @@ function writePendingSpaces(
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
     demo,
+    saved,
     spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
@@ -197,11 +227,17 @@ function writePendingSpaces(
  * completed save would outlive onboarding in SecureStore (`hasPending` ignores
  * it, so nothing downstream would ever clear it). */
 export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true, null);
+  writePendingSpaces(spaces, true, null, null);
 }
 
 export function updatePendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, false, readPendingRecord()?.demo ?? null);
+  const existing = readPendingRecord();
+  writePendingSpaces(
+    spaces,
+    false,
+    existing?.demo ?? null,
+    existing?.saved ?? null,
+  );
 }
 
 export function getPendingSpaces(): string[] {
@@ -241,13 +277,14 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { saveKinds: [], spaces: [], step: null, demo: null };
+    return { saveKinds: [], spaces: [], step: null, demo: null, saved: null };
   }
   return {
     saveKinds: record.saveKinds,
     spaces: record.spaces,
     step: record.step,
     demo: record.demo,
+    saved: record.saved,
   };
 }
 
@@ -255,6 +292,7 @@ export function setOnboardingProgress(progress: {
   saveKinds: string[];
   spaces: string[];
   step: number;
+  saved?: PendingSaved | null;
 }) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
@@ -267,6 +305,7 @@ export function setOnboardingProgress(progress: {
     step: progress.step,
     // An older flow's in-flight demo belongs to a step this flow restarted.
     demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
+    saved: progress.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
@@ -284,6 +323,7 @@ export function setPendingDemo(demo: PendingDemo | null) {
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
     demo,
+    saved: existing?.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();

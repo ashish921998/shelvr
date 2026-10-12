@@ -1,6 +1,11 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
+import {
+  shareRefOf,
+  shareUrl,
+  useSettleShareLink,
+  useShareLink,
+} from "@/lib/share-link";
 import type { DetailItem } from "@/components/item-detail";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -10,6 +15,7 @@ import { Share } from "react-native";
 export function useItemShare(activeItem: DetailItem | undefined) {
   useAppLocale();
   const shareLink = useShareLink();
+  const settleShareLink = useSettleShareLink();
   return useCallback(async () => {
     if (!activeItem) return;
 
@@ -58,6 +64,7 @@ export function useItemShare(activeItem: DetailItem | undefined) {
       // Dismissed or failed share is not a completed action.
     }
 
+    if (branded !== undefined) settleShareLink(activeItem._id, shared);
     if (shared) {
       const shareRef = await shareRefOf(branded);
       analytics.capture("item_shared", {
@@ -69,5 +76,5 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         shareSheetOnly ? "share_sheet_opened" : "share",
       );
     }
-  }, [activeItem, shareLink]);
+  }, [activeItem, shareLink, settleShareLink]);
 }

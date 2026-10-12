@@ -25,13 +25,34 @@ const READY_ITEM_THRESHOLD = 3;
  */
 export const REVIEW_PROMPT_SETTLE_MS = 1500;
 
-/** `defer` holds the prompt back, e.g. through an account's first session:
- * asking for a rating before real use is what people resent. */
+/**
+ * Asks for a rating right after a win: coming back to Home from a save the
+ * user opened, the "saved it, came back to it" moment. That works whichever
+ * way the save arrived. Opening the app onto a full Home is not a win, so it
+ * never asks then. `defer` holds the prompt back, e.g. through an account's
+ * first session: asking for a rating before real use is what people resent.
+ */
 export function useReviewPrompt(
   items: FeedbackFeedItem[] | undefined,
   { defer = false }: { defer?: boolean } = {},
 ) {
-  const home = isHomeRootRoute(useSegments());
+  const segments: readonly string[] = useSegments();
+  const home = isHomeRootRoute(segments);
+  const onSave = segments[1] === "item";
+  // Whether the screen before this visit to Home was a save. Any other screen
+  // in between ends the moment, so the ask never lands long after the win.
+  const cameFromSave = useRef(false);
+  const [returned, setReturned] = useState(false);
+  // One try per return. An attempt that ran and was held back (no review
+  // action, a paywall, the keyboard) ends the moment: a later change on the
+  // same visit to Home, like another save landing, is no longer the win.
+  const spent = useRef(false);
+  useEffect(() => {
+    if (home) {
+      spent.current = false;
+      setReturned(cameFromSave.current);
+    } else cameFromSave.current = onSave;
+  }, [onSave, home]);
   const homeRef = useRef(home);
   useEffect(() => {
     homeRef.current = home;
@@ -49,6 +70,8 @@ export function useReviewPrompt(
   // pushing the prompt back until the feed is quiet: Home must hold still.
   useEffect(() => {
     if (
+      !returned ||
+      spent.current ||
       !home ||
       defer ||
       keyboardVisible ||
@@ -104,9 +127,13 @@ export function useReviewPrompt(
       } finally {
         // A cancelled attempt's cleanup already released the hold, and a
         // newer attempt may own it now. A suppressed one (no review action,
-        // keyboard up, paywall) recorded nothing, so a later change retries.
-        if (!cancelled) setNativeReviewAttemptInFlight(false);
+        // keyboard up, paywall) recorded nothing, so the next return from a
+        // save retries.
+        if (!cancelled) {
+          spent.current = true;
+          setNativeReviewAttemptInFlight(false);
+        }
       }
     }
-  }, [items, home, defer, keyboardVisible, appState]);
+  }, [items, returned, home, defer, keyboardVisible, appState]);
 }
