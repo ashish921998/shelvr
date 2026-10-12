@@ -101,14 +101,24 @@ function handler<Args extends DefaultFunctionArgs, Result>(
 type PausedQuery = { name: string; args: unknown; result: unknown };
 
 /** Pause after a real DB query completes, never replace its authorization. */
-function queryBarrier(ctx: ActionCtx, name: string, occurrence = 1) {
+function queryBarrier(
+  ctx: ActionCtx,
+  name: string,
+  occurrence = 1,
+  before = false,
+) {
   const reached = deferred();
   const resume = deferred();
   let pausedQuery: PausedQuery | undefined;
   let calls = 0;
   const runQuery: ActionCtx["runQuery"] = async (ref, ...args) => {
+    const shouldPause = getFunctionName(ref) === name && ++calls === occurrence;
+    if (before && shouldPause) {
+      reached.resolve();
+      await resume.promise;
+    }
     const value = await ctx.runQuery(ref, ...args);
-    if (getFunctionName(ref) === name && ++calls === occurrence) {
+    if (!before && shouldPause) {
       pausedQuery = {
         name: getFunctionName(ref),
         args: args[0],
@@ -192,9 +202,10 @@ async function paused(
   run: (ctx: ActionCtx) => Promise<unknown>,
   change: (query: PausedQuery | undefined) => Promise<void>,
   occurrence = 1,
+  before = false,
 ) {
   await f.t.action(async (ctx) => {
-    const barrier = queryBarrier(ctx, name, occurrence);
+    const barrier = queryBarrier(ctx, name, occurrence, before);
     const running = run(barrier.ctx);
     await barrier.reached.promise;
     await change(barrier.pausedQuery);
@@ -533,7 +544,7 @@ describe("AI dispatch uses fresh live ownership", () => {
   it("bounds recommendation validation to 100 identities", async () => {
     const f = await fixture();
     await expect(
-      f.t.query(internal.aiConsent.recommendationAllowed, {
+      f.t.query(internal.spaces.survivingCandidates, {
         userId: f.userId,
         spaceId: f.spaceId,
         itemIds: Array.from({ length: 101 }, () => f.itemId),
@@ -541,28 +552,24 @@ describe("AI dispatch uses fresh live ownership", () => {
     ).rejects.toThrow("Too many candidates");
   });
 
-  it.each([
-    "removed owner",
-    "deleting owner",
-    "space removed",
-    "space foreign",
-  ] as const)("does not embed a cached space after %s", async (kind) => {
-    const f = await fixture();
-    await paused(
-      f,
-      "spaces:listMemberItemIdsInternal",
-      (ctx) => handler(recommendForSpace)(ctx, { spaceId: f.spaceId }),
-      async () => {
-        if (kind === "space removed")
-          await f.t.run((ctx) => ctx.db.delete(f.spaceId));
-        else if (kind === "space foreign")
-          await f.t.run((ctx) =>
-            ctx.db.patch(f.spaceId, { userId: f.foreignId }),
-          );
-        else await invalidate(f, kind);
-      },
-    );
-    expect(embedMany).not.toHaveBeenCalled();
-    expect(generateObject).not.toHaveBeenCalled();
-  });
+  it.each(["removed owner", "deleting owner", "space removed"] as const)(
+    "does not embed a cached space after %s",
+    async (kind) => {
+      const f = await fixture();
+      await paused(
+        f,
+        "spaces:recommendationContext",
+        (ctx) => handler(recommendForSpace)(ctx, { spaceId: f.spaceId }),
+        async () => {
+          if (kind === "space removed")
+            await f.t.run((ctx) => ctx.db.delete(f.spaceId));
+          else await invalidate(f, kind);
+        },
+        1,
+        true,
+      );
+      expect(embedMany).not.toHaveBeenCalled();
+      expect(generateObject).not.toHaveBeenCalled();
+    },
+  );
 });

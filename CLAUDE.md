@@ -144,8 +144,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   must keep working. A declined user's saves still finish `ready` from what Shelvr read
   itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
   client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
-  `recommendationAllowed` revalidates the space and up to 100 candidate identities before
-  dispatch; the embedding sweep revalidates each cached save and maps vectors to the surviving
+  `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
+  and `survivingCandidates` (up to 100 hydrated identities, revalidated before classification).
+  The embedding sweep revalidates each cached save in one batch and maps vectors to the surviving
   list. These are pre-dispatch fences, not cancellation or recall of already-sent requests:
   a database check and an external provider call cannot be atomic.
 - **`appleRevoke.ts`** (`"use node"` action) — revokes a Sign in with Apple refresh token

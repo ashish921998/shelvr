@@ -103,39 +103,6 @@ export const revalidateEmbeddingBatch = internalQuery({
   },
 });
 
-/** Revalidate cached recommendation identities in one bounded transaction.
- * null aborts the run; an empty list is also used to authorize space embedding.
- * This check cannot recall requests dispatched before deletion begins. */
-export const recommendationAllowed = internalQuery({
-  args: {
-    userId: v.string(),
-    spaceId: v.id("spaces"),
-    itemIds: v.array(v.id("items")),
-  },
-  returns: v.union(v.null(), v.array(v.id("items"))),
-  handler: async (ctx, args) => {
-    if (args.itemIds.length > 100) throw new Error("Too many candidates");
-    const space = await ctx.db.get(args.spaceId);
-    if (
-      space === null ||
-      space.userId !== args.userId ||
-      !(await aiAllowed(ctx, args.userId))
-    )
-      return null;
-    const surviving = [];
-    for (const itemId of args.itemIds) {
-      const item = await ctx.db.get(itemId);
-      if (
-        item !== null &&
-        item.userId === args.userId &&
-        item.status === "ready"
-      )
-        surviving.push(itemId);
-    }
-    return surviving;
-  },
-});
-
 export const getStatus = query({
   args: {},
   returns: v.object({

@@ -29,6 +29,7 @@ import {
   EMBEDDING_SWEEP_PAGE,
   isValidEmbedding,
   normalizeEmbedding,
+  RECOMMEND_CANDIDATES,
 } from "./model/embedding";
 import {
   deliverPostHogEvent,
@@ -1312,9 +1313,6 @@ const recommendSchema = z.object({
 // sweep — the user can always add more by hand or ask again later.
 const MAX_RECOMMENDATIONS = 8;
 
-/** How many candidate items the recommendation prompt is handed. */
-const RECOMMEND_CANDIDATES = 100;
-
 /**
  * How many hits the candidate vector search asks for.
  *
@@ -1412,14 +1410,6 @@ async function recommendationCandidates(
     title: space.name,
     description: space.description,
   });
-  if (
-    (await ctx.runQuery(internal.aiConsent.recommendationAllowed, {
-      userId: space.userId,
-      spaceId: space._id,
-      itemIds: [],
-    })) === null
-  )
-    return [];
   const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
   const ranked =
     vector === undefined
@@ -1471,22 +1461,15 @@ export const recommendForSpace = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const space = await ctx.runQuery(internal.spaces.getSpaceInternal, {
-        spaceId: args.spaceId,
-      });
-      if (
-        space === null ||
-        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
-          userId: space.userId,
-        }))
-      ) {
-        return null;
-      }
-      const memberIds = new Set(
-        await ctx.runQuery(internal.spaces.listMemberItemIdsInternal, {
+      const context = await ctx.runQuery(
+        internal.spaces.recommendationContext,
+        {
           spaceId: args.spaceId,
-        }),
+        },
       );
+      if (context === null) return null;
+      const { space } = context;
+      const memberIds = new Set(context.memberIds);
       const candidates = await recommendationCandidates(ctx, space, memberIds);
       if (candidates.length === 0) {
         return null;
@@ -1494,7 +1477,7 @@ export const recommendForSpace = internalAction({
       // Asked again: picking the candidates embeds the space, which is slow,
       // and the next call sends their titles, descriptions and tags.
       const surviving = await ctx.runQuery(
-        internal.aiConsent.recommendationAllowed,
+        internal.spaces.survivingCandidates,
         {
           userId: space.userId,
           spaceId: space._id,
