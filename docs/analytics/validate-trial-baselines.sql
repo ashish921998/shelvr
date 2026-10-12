@@ -1,29 +1,9 @@
--- Synthetic validation for trial-baselines.sql. Runs read-only against
--- PostHog's SQL engine: every source CTE below is literal rows, no events are
--- read or written, and nothing here says anything about production.
---
--- Each statement keeps the transform block of its production twin byte for
--- byte (the `-- transform:begin <q>` ... `-- transform:end <q>` region) and
--- replaces only the source CTEs and the final SELECT. The source rows carry
--- the raw environment, analytics_version, store_environment and id columns,
--- so the shared filter at the top of each transform block is exercised too:
--- rows tagged development or sandbox, with analytics_version 0, or with an
--- empty required id must not appear in the output. The final SELECT lists
--- one row per synthetic case instead of aggregating, so each expected
--- outcome in trial-baselines.md can be checked by eye. Run the drift check
--- there after editing either file.
---
--- Time offsets are seconds before now(). 86400 = 1 day, 172800 = 2 days,
--- 864000 = 10 days, 1728000 = 20 days. Case ids double as account or person
--- ids.
-
--- ============================================================================
--- Query 1 validation: pre-trial progression, one row per synthetic person
--- ============================================================================
+-- inputs:begin q1
 WITH internal_accounts AS (
     SELECT arrayJoin(['acct-internal']) AS account_id
 ),
--- source:begin q1 (synthetic)
+-- inputs:end q1
+-- source:begin q1
 onboarding_rows AS (
     SELECT 'p_full' AS person_id, 'anon-full' AS distinct_id, 'onboarding_step_viewed' AS event, now() - INTERVAL 180000 SECOND AS timestamp, 'opener' AS step_id, 7 AS flow_version, 0 AS sample, '' AS outcome, '' AS placement, 'production' AS environment, 1 AS analytics_version
     UNION ALL SELECT 'p_full' AS person_id, 'anon-full' AS distinct_id, 'onboarding_step_viewed' AS event, now() - INTERVAL 179900 SECOND AS timestamp, 'interests' AS step_id, 7 AS flow_version, 0 AS sample, '' AS outcome, '' AS placement, 'production' AS environment, 1 AS analytics_version
@@ -109,117 +89,8 @@ account_rows AS (
     UNION ALL SELECT 'acct-replay' AS account_id, 'production' AS environment, 1 AS analytics_version
     UNION ALL SELECT 'acct-devcreated' AS account_id, 'development' AS environment, 1 AS analytics_version
 ),
--- source:end q1 (synthetic)
--- transform:begin q1
-onboarding_events AS (
-    SELECT person_id, distinct_id, event, timestamp, step_id, flow_version, sample, outcome, placement
-    FROM onboarding_rows
-    WHERE environment = 'production'
-      AND analytics_version = 1
-),
-created_accounts AS (
-    SELECT account_id
-    FROM account_rows
-    WHERE environment = 'production'
-      AND analytics_version = 1
-    GROUP BY account_id
-),
-openers AS (
-    SELECT
-        person_id,
-        minIf(timestamp, event = 'onboarding_step_viewed' AND step_id = 'opener') AS opened_at,
-        argMinIf(flow_version, timestamp, event = 'onboarding_step_viewed' AND step_id = 'opener') AS first_flow_version,
-        countIf(event = 'onboarding_step_viewed' AND step_id = 'opener') AS opener_views,
-        arraySort(groupArrayIf(timestamp, event = 'onboarding_step_viewed' AND step_id = 'opener')) AS opener_times
-    FROM onboarding_events
-    GROUP BY person_id
-    HAVING opener_views > 0
-),
-person_internal AS (
-    SELECT
-        person_id,
-        max(distinct_id IN (SELECT account_id FROM internal_accounts)) AS any_internal
-    FROM onboarding_events
-    WHERE event = 'auth_completed'
-    GROUP BY person_id
-),
-windowed AS (
-    SELECT
-        e.person_id AS person_id,
-        e.distinct_id AS distinct_id,
-        e.event AS event,
-        e.timestamp AS timestamp,
-        e.step_id AS step_id,
-        e.sample AS sample,
-        e.outcome AS outcome,
-        e.placement AS placement
-    FROM onboarding_events AS e
-    INNER JOIN openers AS o ON o.person_id = e.person_id
-    WHERE e.timestamp >= o.opened_at
-      AND e.timestamp <= o.opened_at + INTERVAL 1 DAY
-      AND (length(o.opener_times) < 2 OR e.timestamp < arrayElement(o.opener_times, 2))
-),
-person_accounts AS (
-    SELECT
-        person_id,
-        distinct_id AS account_id,
-        max(distinct_id IN (SELECT account_id FROM created_accounts)) AS is_new_account
-    FROM windowed
-    WHERE event = 'auth_completed'
-    GROUP BY person_id, distinct_id
-),
-accounts_by_person AS (
-    SELECT
-        person_id,
-        count() AS account_count,
-        countIf(is_new_account) AS new_accounts
-    FROM person_accounts
-    GROUP BY person_id
-),
-per_person AS (
-    SELECT
-        person_id,
-        countIf(event = 'onboarding_step_viewed' AND step_id = 'interests') > 0 AS reached_interests,
-        countIf(event = 'onboarding_step_viewed' AND step_id = 'setup') > 0 AS reached_setup,
-        countIf(event = 'onboarding_step_viewed' AND step_id = 'live_demo') > 0 AS reached_demo,
-        countIf(event = 'onboarding_step_viewed' AND step_id = 'notifications') > 0 AS reached_notifications,
-        countIf(event = 'onboarding_step_viewed' AND step_id = 'share_practice') > 0 AS reached_share,
-        countIf(event = 'onboarding_demo_picked') > 0 AS demo_picked,
-        countIf(event = 'onboarding_demo_picked' AND sample) > 0 AS sample_picked,
-        countIf(event = 'onboarding_demo_result' AND outcome = 'ready') > 0 AS demo_ready,
-        countIf(event = 'auth_succeeded') > 0 AS auth_succeeded,
-        countIf(event = 'onboarding_completed') > 0 AS completed,
-        countIf(event = 'paywall_presentation_started' AND placement = 'onboarding') AS onboarding_paywall_attempts
-    FROM windowed
-    GROUP BY person_id
-),
-cohort AS (
-    SELECT
-        o.person_id AS person_id,
-        o.first_flow_version AS flow_version,
-        o.opener_views AS opener_views,
-        o.opened_at <= now() - INTERVAL 1 DAY AS mature,
-        p.reached_interests AS reached_interests,
-        p.reached_setup AS reached_setup,
-        p.reached_demo AS reached_demo,
-        p.reached_notifications AS reached_notifications,
-        p.reached_share AS reached_share,
-        p.demo_picked AS demo_picked,
-        p.sample_picked AS sample_picked,
-        p.demo_ready AS demo_ready,
-        p.auth_succeeded OR coalesce(a.account_count, 0) > 0 AS signed_in,
-        p.completed AS completed,
-        p.onboarding_paywall_attempts > 0 AS paywall_attempted,
-        p.onboarding_paywall_attempts AS onboarding_paywall_attempts,
-        coalesce(a.account_count, 0) AS account_count,
-        coalesce(i.any_internal, 0) AS is_internal,
-        coalesce(a.new_accounts, 0) AS new_accounts
-    FROM openers AS o
-    INNER JOIN per_person AS p ON p.person_id = o.person_id
-    LEFT JOIN accounts_by_person AS a ON a.person_id = o.person_id
-    LEFT JOIN person_internal AS i ON i.person_id = o.person_id
-)
--- transform:end q1
+-- source:end q1
+-- final:begin q1
 SELECT
     person_id AS case_id,
     flow_version,
@@ -241,14 +112,14 @@ SELECT
     paywall_attempted
 FROM cohort
 ORDER BY case_id
+-- final:end q1
 
--- ============================================================================
--- Query 2a validation: paywall attempts, one row per synthetic attempt
--- ============================================================================
+-- inputs:begin q2a
 WITH internal_accounts AS (
     SELECT arrayJoin(['acct-internal']) AS account_id
 ),
--- source:begin q2a (synthetic)
+-- inputs:end q2a
+-- source:begin q2a
 attempt_rows AS (
     SELECT 'acct-a' AS account_id, 'paywall_presentation_started' AS event, now() - INTERVAL 172800 SECOND AS timestamp, 'att_cancelled' AS attempt_id, 'onboarding' AS placement, 'default' AS offering_id, 'eligible' AS trial_eligible, 'production' AS environment, 1 AS analytics_version
     UNION ALL SELECT 'acct-a' AS account_id, 'paywall_shown' AS event, now() - INTERVAL 172740 SECOND AS timestamp, 'att_cancelled' AS attempt_id, 'onboarding' AS placement, 'default' AS offering_id, 'eligible' AS trial_eligible, 'production' AS environment, 1 AS analytics_version
@@ -312,139 +183,8 @@ trial_rows AS (
     UNION ALL SELECT 'acct-dev' AS account_id, now() - INTERVAL 172600 SECOND AS trial_at, 'rc-trial-dev' AS event_id, 'annual_1999' AS product_id, 'development' AS environment, 'production' AS store_environment, 1 AS analytics_version
     UNION ALL SELECT 'acct-x' AS account_id, now() - INTERVAL 172600 SECOND AS trial_at, 'rc-trial-v0' AS event_id, 'annual_1999' AS product_id, 'production' AS environment, 'production' AS store_environment, 0 AS analytics_version
 ),
--- source:end q2a (synthetic)
--- transform:begin q2a
-attempt_events AS (
-    SELECT account_id, event, timestamp, attempt_id, placement, offering_id, trial_eligible
-    FROM attempt_rows
-    WHERE environment = 'production'
-      AND analytics_version = 1
-      AND notEmpty(attempt_id)
-),
-trial_events AS (
-    SELECT account_id, trial_at, event_id, product_id
-    FROM trial_rows
-    WHERE environment = 'production'
-      AND store_environment != 'sandbox'
-      AND analytics_version = 1
-      AND notEmpty(event_id)
-),
-attempts AS (
-    SELECT
-        attempt_id,
-        argMin(account_id, timestamp) AS account,
-        argMinIf(placement, timestamp, event = 'paywall_presentation_started') AS started_placement,
-        argMinIf(offering_id, timestamp, event = 'paywall_presentation_started') AS started_offering_id,
-        argMinIf(trial_eligible, timestamp, event = 'paywall_presentation_started') AS started_trial_eligible,
-        minIf(timestamp, event = 'paywall_presentation_started') AS started_at,
-        countIf(event = 'paywall_presentation_started') AS presentation_events,
-        countIf(event = 'paywall_shown') > 0 AS shown_confirmed,
-        arraySort(x -> x.1, groupArrayIf(tuple(timestamp, event),
-            event IN ('paywall_cancelled', 'paywall_failed', 'paywall_purchase_completed', 'paywall_restored'))) AS outcome_events
-    FROM attempt_events
-    GROUP BY attempt_id
-),
-attempt_outcomes AS (
-    SELECT
-        attempt_id,
-        account AS account_id,
-        started_placement AS placement,
-        started_offering_id AS offering_id,
-        started_trial_eligible AS trial_eligible,
-        started_at,
-        presentation_events,
-        shown_confirmed,
-        multiIf(
-            length(outcome_events) = 0, 'unresolved',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_cancelled', 'cancelled',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_failed', 'failed',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_purchase_completed', 'purchase_completed',
-            'restored') AS outcome,
-        length(outcome_events) AS outcome_event_count,
-        started_at <= now() - INTERVAL 1 DAY AS mature,
-        account IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM attempts
-),
-trials AS (
-    SELECT
-        event_id,
-        argMin(account_id, trial_at) AS account,
-        min(trial_at) AS trial_started_at,
-        argMin(product_id, trial_at) AS product,
-        count() AS deliveries
-    FROM trial_events
-    GROUP BY event_id
-),
-trials_per_account AS (
-    SELECT account, count() AS account_trial_count, min(trial_started_at) AS first_trial_at
-    FROM trials
-    GROUP BY account
-),
-trial_candidates AS (
-    SELECT
-        t.event_id AS trial_event_id,
-        a.attempt_id AS attempt_id,
-        if(a.outcome = 'purchase_completed', 'purchase_completed_attempt', 'unresolved_attempt') AS attribution,
-        if(a.outcome = 'purchase_completed', 0, 1) AS priority,
-        abs(dateDiff('second', a.started_at, t.trial_started_at)) AS distance_seconds
-    FROM trials AS t
-    INNER JOIN attempt_outcomes AS a ON a.account_id = t.account
-    WHERE a.presentation_events > 0
-      AND a.outcome IN ('purchase_completed', 'unresolved')
-      AND a.started_at >= t.trial_started_at - INTERVAL 6 HOUR
-      AND a.started_at <= t.trial_started_at + INTERVAL 6 HOUR
-),
-trial_attribution AS (
-    SELECT
-        trial_event_id,
-        argMin(attempt_id, tuple(priority, distance_seconds)) AS matched_attempt_id,
-        argMin(attribution, tuple(priority, distance_seconds)) AS matched_attribution,
-        count() AS candidate_attempts
-    FROM trial_candidates
-    GROUP BY trial_event_id
-),
-attempt_attribution AS (
-    SELECT matched_attempt_id, any(matched_attribution) AS trial_attribution, count() AS trials_attributed
-    FROM trial_attribution
-    GROUP BY matched_attempt_id
-),
-attempt_report AS (
-    SELECT
-        o.attempt_id AS attempt_id,
-        o.account_id AS account_id,
-        o.placement AS placement,
-        o.offering_id AS offering_id,
-        o.trial_eligible AS trial_eligible,
-        o.started_at AS started_at,
-        o.presentation_events AS presentation_events,
-        o.shown_confirmed AS shown_confirmed,
-        o.outcome AS outcome,
-        o.outcome_event_count AS outcome_event_count,
-        o.mature AS mature,
-        o.is_internal AS is_internal,
-        coalesce(x.trial_attribution, '') AS trial_attribution,
-        coalesce(x.trials_attributed, 0) AS trials_attributed
-    FROM attempt_outcomes AS o
-    LEFT JOIN attempt_attribution AS x ON x.matched_attempt_id = o.attempt_id
-),
-trial_report AS (
-    SELECT
-        t.event_id AS trial_event_id,
-        t.account AS account_id,
-        t.trial_started_at AS trial_at,
-        t.product AS product_id,
-        t.deliveries AS deliveries,
-        coalesce(x.matched_attempt_id, '') AS attempt_id,
-        if(empty(coalesce(x.matched_attribution, '')), 'unmatched', x.matched_attribution) AS attribution,
-        coalesce(x.candidate_attempts, 0) AS candidate_attempts,
-        c.account_trial_count AS account_trial_count,
-        t.trial_started_at = c.first_trial_at AS is_first_trial,
-        t.account IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trials AS t
-    LEFT JOIN trial_attribution AS x ON x.trial_event_id = t.event_id
-    INNER JOIN trials_per_account AS c ON c.account = t.account
-)
--- transform:end q2a
+-- source:end q2a
+-- final:begin q2a
 SELECT
     attempt_id AS case_id,
     placement,
@@ -458,15 +198,14 @@ SELECT
     trials_attributed
 FROM attempt_report
 ORDER BY case_id
+-- final:end q2a
 
--- ============================================================================
--- Query 2b validation: confirmed trials, one row per synthetic trial event
--- Same synthetic sources as 2a.
--- ============================================================================
+-- inputs:begin q2b
 WITH internal_accounts AS (
     SELECT arrayJoin(['acct-internal']) AS account_id
 ),
--- source:begin q2b (synthetic)
+-- inputs:end q2b
+-- source:begin q2b
 attempt_rows AS (
     SELECT 'acct-a' AS account_id, 'paywall_presentation_started' AS event, now() - INTERVAL 172800 SECOND AS timestamp, 'att_cancelled' AS attempt_id, 'onboarding' AS placement, 'default' AS offering_id, 'eligible' AS trial_eligible, 'production' AS environment, 1 AS analytics_version
     UNION ALL SELECT 'acct-a' AS account_id, 'paywall_shown' AS event, now() - INTERVAL 172740 SECOND AS timestamp, 'att_cancelled' AS attempt_id, 'onboarding' AS placement, 'default' AS offering_id, 'eligible' AS trial_eligible, 'production' AS environment, 1 AS analytics_version
@@ -530,139 +269,8 @@ trial_rows AS (
     UNION ALL SELECT 'acct-dev' AS account_id, now() - INTERVAL 172600 SECOND AS trial_at, 'rc-trial-dev' AS event_id, 'annual_1999' AS product_id, 'development' AS environment, 'production' AS store_environment, 1 AS analytics_version
     UNION ALL SELECT 'acct-x' AS account_id, now() - INTERVAL 172600 SECOND AS trial_at, 'rc-trial-v0' AS event_id, 'annual_1999' AS product_id, 'production' AS environment, 'production' AS store_environment, 0 AS analytics_version
 ),
--- source:end q2b (synthetic)
--- transform:begin q2b
-attempt_events AS (
-    SELECT account_id, event, timestamp, attempt_id, placement, offering_id, trial_eligible
-    FROM attempt_rows
-    WHERE environment = 'production'
-      AND analytics_version = 1
-      AND notEmpty(attempt_id)
-),
-trial_events AS (
-    SELECT account_id, trial_at, event_id, product_id
-    FROM trial_rows
-    WHERE environment = 'production'
-      AND store_environment != 'sandbox'
-      AND analytics_version = 1
-      AND notEmpty(event_id)
-),
-attempts AS (
-    SELECT
-        attempt_id,
-        argMin(account_id, timestamp) AS account,
-        argMinIf(placement, timestamp, event = 'paywall_presentation_started') AS started_placement,
-        argMinIf(offering_id, timestamp, event = 'paywall_presentation_started') AS started_offering_id,
-        argMinIf(trial_eligible, timestamp, event = 'paywall_presentation_started') AS started_trial_eligible,
-        minIf(timestamp, event = 'paywall_presentation_started') AS started_at,
-        countIf(event = 'paywall_presentation_started') AS presentation_events,
-        countIf(event = 'paywall_shown') > 0 AS shown_confirmed,
-        arraySort(x -> x.1, groupArrayIf(tuple(timestamp, event),
-            event IN ('paywall_cancelled', 'paywall_failed', 'paywall_purchase_completed', 'paywall_restored'))) AS outcome_events
-    FROM attempt_events
-    GROUP BY attempt_id
-),
-attempt_outcomes AS (
-    SELECT
-        attempt_id,
-        account AS account_id,
-        started_placement AS placement,
-        started_offering_id AS offering_id,
-        started_trial_eligible AS trial_eligible,
-        started_at,
-        presentation_events,
-        shown_confirmed,
-        multiIf(
-            length(outcome_events) = 0, 'unresolved',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_cancelled', 'cancelled',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_failed', 'failed',
-            tupleElement(arrayElement(outcome_events, 1), 2) = 'paywall_purchase_completed', 'purchase_completed',
-            'restored') AS outcome,
-        length(outcome_events) AS outcome_event_count,
-        started_at <= now() - INTERVAL 1 DAY AS mature,
-        account IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM attempts
-),
-trials AS (
-    SELECT
-        event_id,
-        argMin(account_id, trial_at) AS account,
-        min(trial_at) AS trial_started_at,
-        argMin(product_id, trial_at) AS product,
-        count() AS deliveries
-    FROM trial_events
-    GROUP BY event_id
-),
-trials_per_account AS (
-    SELECT account, count() AS account_trial_count, min(trial_started_at) AS first_trial_at
-    FROM trials
-    GROUP BY account
-),
-trial_candidates AS (
-    SELECT
-        t.event_id AS trial_event_id,
-        a.attempt_id AS attempt_id,
-        if(a.outcome = 'purchase_completed', 'purchase_completed_attempt', 'unresolved_attempt') AS attribution,
-        if(a.outcome = 'purchase_completed', 0, 1) AS priority,
-        abs(dateDiff('second', a.started_at, t.trial_started_at)) AS distance_seconds
-    FROM trials AS t
-    INNER JOIN attempt_outcomes AS a ON a.account_id = t.account
-    WHERE a.presentation_events > 0
-      AND a.outcome IN ('purchase_completed', 'unresolved')
-      AND a.started_at >= t.trial_started_at - INTERVAL 6 HOUR
-      AND a.started_at <= t.trial_started_at + INTERVAL 6 HOUR
-),
-trial_attribution AS (
-    SELECT
-        trial_event_id,
-        argMin(attempt_id, tuple(priority, distance_seconds)) AS matched_attempt_id,
-        argMin(attribution, tuple(priority, distance_seconds)) AS matched_attribution,
-        count() AS candidate_attempts
-    FROM trial_candidates
-    GROUP BY trial_event_id
-),
-attempt_attribution AS (
-    SELECT matched_attempt_id, any(matched_attribution) AS trial_attribution, count() AS trials_attributed
-    FROM trial_attribution
-    GROUP BY matched_attempt_id
-),
-attempt_report AS (
-    SELECT
-        o.attempt_id AS attempt_id,
-        o.account_id AS account_id,
-        o.placement AS placement,
-        o.offering_id AS offering_id,
-        o.trial_eligible AS trial_eligible,
-        o.started_at AS started_at,
-        o.presentation_events AS presentation_events,
-        o.shown_confirmed AS shown_confirmed,
-        o.outcome AS outcome,
-        o.outcome_event_count AS outcome_event_count,
-        o.mature AS mature,
-        o.is_internal AS is_internal,
-        coalesce(x.trial_attribution, '') AS trial_attribution,
-        coalesce(x.trials_attributed, 0) AS trials_attributed
-    FROM attempt_outcomes AS o
-    LEFT JOIN attempt_attribution AS x ON x.matched_attempt_id = o.attempt_id
-),
-trial_report AS (
-    SELECT
-        t.event_id AS trial_event_id,
-        t.account AS account_id,
-        t.trial_started_at AS trial_at,
-        t.product AS product_id,
-        t.deliveries AS deliveries,
-        coalesce(x.matched_attempt_id, '') AS attempt_id,
-        if(empty(coalesce(x.matched_attribution, '')), 'unmatched', x.matched_attribution) AS attribution,
-        coalesce(x.candidate_attempts, 0) AS candidate_attempts,
-        c.account_trial_count AS account_trial_count,
-        t.trial_started_at = c.first_trial_at AS is_first_trial,
-        t.account IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trials AS t
-    LEFT JOIN trial_attribution AS x ON x.trial_event_id = t.event_id
-    INNER JOIN trials_per_account AS c ON c.account = t.account
-)
--- transform:end q2b
+-- source:end q2b
+-- final:begin q2b
 SELECT
     trial_event_id AS case_id,
     attempt_id,
@@ -674,15 +282,14 @@ SELECT
     is_internal
 FROM trial_report
 ORDER BY case_id
+-- final:end q2b
 
--- ============================================================================
--- Query 3 validation: trial save and return, one row per synthetic account
--- Anchor for most cases: trial_started 864000 s (10 days) ago.
--- ============================================================================
+-- inputs:begin q3
 WITH internal_accounts AS (
     SELECT arrayJoin(['acct-internal']) AS account_id
 ),
--- source:begin q3 (synthetic)
+-- inputs:end q3
+-- source:begin q3
 activity_rows AS (
     SELECT 't_missing_store_env' AS account_id, 'trial_started' AS event, now() - INTERVAL 864000 SECOND AS timestamp, '' AS item_id, '' AS save_session, '' AS open_session, '' AS save_source, 'rc-ideal' AS event_id, 'production' AS environment, 1 AS analytics_version, 'production' AS store_environment
     UNION ALL SELECT 't_missing_store_env' AS account_id, 'item_saved' AS event, now() - INTERVAL 856800 SECOND AS timestamp, 'i1' AS item_id, 's1' AS save_session, '' AS open_session, 'paste' AS save_source, '' AS event_id, 'production' AS environment, 1 AS analytics_version, NULL AS store_environment
@@ -753,72 +360,8 @@ activity_rows AS (
     UNION ALL SELECT 't_dev_save' AS account_id, 'trial_started' AS event, now() - INTERVAL 864000 SECOND AS timestamp, '' AS item_id, '' AS save_session, '' AS open_session, '' AS save_source, 'rc-devsave' AS event_id, 'production' AS environment, 1 AS analytics_version, 'production' AS store_environment
     UNION ALL SELECT 't_dev_save' AS account_id, 'item_saved' AS event, now() - INTERVAL 856800 SECOND AS timestamp, 'i20' AS item_id, 's1' AS save_session, '' AS open_session, 'paste' AS save_source, '' AS event_id, 'development' AS environment, 1 AS analytics_version, NULL AS store_environment
 ),
--- source:end q3 (synthetic)
--- transform:begin q3
-activity_events AS (
-    SELECT account_id, event, timestamp, item_id, save_session, open_session, save_source, event_id
-    FROM activity_rows
-    WHERE environment = 'production'
-      AND analytics_version = 1
-      -- Only payment webhooks carry store_environment; saves and opens do not.
-      AND (event != 'trial_started' OR (event = 'trial_started' AND store_environment != 'sandbox'))
-),
-per_account AS (
-    SELECT
-        account_id,
-        uniqExactIf(event_id, event = 'trial_started' AND notEmpty(event_id)) AS trial_starts,
-        countIf(event = 'trial_started' AND empty(event_id)) AS trial_starts_missing_id,
-        minIf(timestamp, event = 'trial_started' AND notEmpty(event_id)) AS trial_at,
-        groupArrayIf(tuple(timestamp, item_id, save_session),
-            event = 'item_saved' AND notEmpty(item_id) AND notEmpty(save_source) AND save_source != 'onboarding_demo') AS personal_saves,
-        countIf(event = 'item_saved' AND save_source = 'onboarding_demo') AS demo_saves,
-        countIf(event = 'item_saved' AND empty(save_source)) AS unknown_source_saves,
-        groupArrayIf(tuple(timestamp, item_id, open_session), event = 'item_opened' AND notEmpty(item_id)) AS opens
-    FROM activity_events
-    GROUP BY account_id
-    HAVING trial_starts > 0 OR trial_starts_missing_id > 0
-),
-trial_windows AS (
-    SELECT
-        account_id,
-        trial_at,
-        trial_starts,
-        trial_starts > 0 AS has_anchor,
-        trial_starts_missing_id,
-        demo_saves,
-        unknown_source_saves,
-        personal_saves,
-        opens,
-        arrayFilter(s -> trial_starts > 0 AND s.1 >= trial_at AND s.1 <= trial_at + INTERVAL 72 HOUR, personal_saves) AS window_saves
-    FROM per_account
-),
-trial_outcomes AS (
-    SELECT
-        account_id,
-        trial_at,
-        has_anchor,
-        trial_starts_missing_id,
-        trial_starts > 1 AS repeat_trial_starts,
-        has_anchor AND trial_at <= now() - INTERVAL 24 HOUR AS mature_24h,
-        has_anchor AND trial_at <= now() - INTERVAL 72 HOUR AS mature_72h,
-        arrayExists(s -> has_anchor AND s.1 >= trial_at AND s.1 <= trial_at + INTERVAL 24 HOUR, personal_saves) AS saved_within_24h,
-        length(arrayDistinct(arrayMap(s -> s.2, window_saves))) AS distinct_saves_72h,
-        length(arrayFilter(s -> has_anchor AND s.1 < trial_at, personal_saves)) AS saves_before_anchor,
-        arrayExists(s -> notEmpty(s.3), window_saves) AS reopen_measurable,
-        arrayExists(
-            s -> notEmpty(s.3) AND arrayExists(
-                o -> o.2 = s.2
-                    AND o.1 > s.1
-                    AND o.1 <= trial_at + INTERVAL 72 HOUR
-                    AND notEmpty(o.3) AND o.3 != s.3,
-                opens),
-            window_saves) AS reopened_own_72h,
-        demo_saves,
-        unknown_source_saves,
-        account_id IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trial_windows
-)
--- transform:end q3
+-- source:end q3
+-- final:begin q3
 SELECT
     account_id AS case_id,
     has_anchor,
@@ -836,14 +379,14 @@ SELECT
     is_internal
 FROM trial_outcomes
 ORDER BY case_id
+-- final:end q3
 
--- ============================================================================
--- Query 4 validation: trial lifecycle, one row per synthetic account
--- ============================================================================
+-- inputs:begin q4
 WITH internal_accounts AS (
     SELECT arrayJoin(['acct-internal']) AS account_id
 ),
--- source:begin q4 (synthetic)
+-- inputs:end q4
+-- source:begin q4
 lifecycle_rows AS (
     SELECT 'l_converted' AS account_id, 'trial_started' AS event, now() - INTERVAL 1728000 SECOND AS timestamp, 'c-1' AS event_id, 'trial' AS payment_kind, 'annual_1999' AS product_id, 'production' AS environment, 'production' AS store_environment, 1 AS analytics_version, '' AS cancel_category
     UNION ALL SELECT 'l_converted' AS account_id, 'payment_succeeded' AS event, now() - INTERVAL 1123200 SECOND AS timestamp, 'c-2' AS event_id, 'trial_conversion' AS payment_kind, 'annual_1999' AS product_id, 'production' AS environment, 'production' AS store_environment, 1 AS analytics_version, '' AS cancel_category
@@ -909,128 +452,8 @@ lifecycle_rows AS (
     UNION ALL SELECT 'l_dev_env' AS account_id, 'trial_started' AS event, now() - INTERVAL 1728000 SECOND AS timestamp, 'de-1' AS event_id, 'trial' AS payment_kind, 'annual_1999' AS product_id, 'development' AS environment, 'production' AS store_environment, 1 AS analytics_version, '' AS cancel_category
     UNION ALL SELECT 'l_version_0' AS account_id, 'trial_started' AS event, now() - INTERVAL 1728000 SECOND AS timestamp, 'v0-1' AS event_id, 'trial' AS payment_kind, 'annual_1999' AS product_id, 'production' AS environment, 'production' AS store_environment, 0 AS analytics_version, '' AS cancel_category
 ),
--- source:end q4 (synthetic)
--- transform:begin q4
-lifecycle_events AS (
-    SELECT account_id, event, timestamp, event_id, payment_kind, cancel_category, product_id
-    FROM lifecycle_rows
-    WHERE environment = 'production'
-      AND store_environment != 'sandbox'
-      AND analytics_version = 1
-      AND notEmpty(event_id)
-),
-deduped AS (
-    SELECT
-        event_id,
-        argMin(account_id, timestamp) AS account,
-        min(timestamp) AS event_at,
-        argMin(event, timestamp) AS event_name,
-        argMin(payment_kind, timestamp) AS kind_raw,
-        argMin(cancel_category, timestamp) AS cancel_category_raw,
-        argMin(product_id, timestamp) AS product,
-        count() AS deliveries
-    FROM lifecycle_events
-    GROUP BY event_id
-),
-classified AS (
-    SELECT
-        account AS account_id,
-        event_at AS timestamp,
-        product AS product_id,
-        deliveries,
-        multiIf(
-            event_name = 'trial_started', 'trial_started',
-            event_name = 'trial_cancelled' AND cancel_category_raw = 'voluntary', 'cancel',
-            event_name = 'trial_cancelled', 'cancel_other',
-            event_name = 'subscription_uncancelled' AND kind_raw = 'trial', 'uncancel',
-            event_name = 'trial_expired', 'expired',
-            event_name = 'payment_succeeded' AND kind_raw = 'trial_conversion', 'converted',
-            event_name = 'payment_succeeded' AND kind_raw = 'initial', 'direct_initial',
-            event_name = 'payment_succeeded' AND kind_raw = 'renewal', 'renewal',
-            'other') AS kind
-    FROM deduped
-),
-per_account AS (
-    SELECT
-        account_id,
-        countIf(kind = 'trial_started') AS trial_starts,
-        arraySort(groupArrayIf(timestamp, kind = 'trial_started')) AS trial_times,
-        minIf(timestamp, kind = 'trial_started') AS trial_at,
-        argMinIf(product_id, timestamp, kind = 'trial_started') AS trial_product_id,
-        argMinIf(product_id, timestamp, kind = 'direct_initial') AS direct_product_id,
-        arraySort(x -> x.1, groupArrayIf(tuple(timestamp, kind), kind IN ('cancel', 'cancel_other', 'uncancel', 'expired', 'converted'))) AS lifecycle,
-        countIf(kind = 'direct_initial') AS direct_initial_payments,
-        minIf(timestamp, kind = 'direct_initial') AS first_direct_initial_at,
-        countIf(kind = 'renewal') AS renewals,
-        countIf(kind = 'other') AS other_events,
-        sum(deliveries) - count() AS duplicate_deliveries_collapsed
-    FROM classified
-    GROUP BY account_id
-    HAVING trial_starts > 0 OR direct_initial_payments > 0
-),
-trial_terminal AS (
-    SELECT
-        account_id,
-        if(trial_starts > 0, 'trial', 'direct_initial_no_trial') AS population,
-        if(trial_starts > 0, trial_product_id, direct_product_id) AS product_id,
-        trial_starts,
-        trial_at,
-        direct_initial_payments,
-        trial_starts > 0 AND direct_initial_payments > 0 AND first_direct_initial_at > trial_at AS direct_initial_after_trial,
-        renewals,
-        other_events,
-        duplicate_deliveries_collapsed,
-        arrayFilter(x -> x.1 >= trial_at AND (length(trial_times) < 2 OR x.1 < arrayElement(trial_times, 2)), lifecycle) AS bounded,
-        length(arrayFilter(x -> x.2 IN ('expired', 'converted'), bounded)) AS terminal_count,
-        arrayFirst(x -> x.2 IN ('expired', 'converted'), bounded) AS terminal
-    FROM per_account
-),
-trial_pre_terminal AS (
-    SELECT
-        account_id,
-        population,
-        product_id,
-        trial_starts,
-        trial_at,
-        direct_initial_payments,
-        direct_initial_after_trial,
-        renewals,
-        other_events,
-        duplicate_deliveries_collapsed,
-        terminal_count,
-        terminal,
-        arrayFilter(x -> terminal_count = 0 OR x.1 <= tupleElement(terminal, 1), bounded) AS pre_terminal
-    FROM trial_terminal
-),
-trial_state AS (
-    SELECT
-        account_id,
-        population,
-        product_id,
-        trial_at,
-        population = 'trial' AND trial_at <= now() - INTERVAL 14 DAY AS mature,
-        trial_starts > 1 AS repeat_trial_starts,
-        direct_initial_payments,
-        direct_initial_after_trial,
-        renewals,
-        other_events,
-        duplicate_deliveries_collapsed,
-        multiIf(
-            population != 'trial', 'not_a_trial',
-            terminal_count > 0 AND tupleElement(terminal, 2) = 'converted', 'converted',
-            terminal_count > 0, 'expired',
-            trial_at > now() - INTERVAL 14 DAY, 'pending',
-            'unknown_no_terminal_event') AS outcome,
-        arrayExists(x -> x.2 = 'cancel', pre_terminal) AS ever_cancelled,
-        length(arrayFilter(x -> x.2 = 'cancel_other', pre_terminal)) AS other_cancels,
-        multiIf(
-            length(arrayFilter(x -> x.2 IN ('cancel', 'uncancel'), pre_terminal)) = 0, 'never_cancelled',
-            tupleElement(arrayElement(arrayFilter(x -> x.2 IN ('cancel', 'uncancel'), pre_terminal), -1), 2) = 'cancel', 'off',
-            're_enabled') AS auto_renew_state,
-        account_id IN (SELECT account_id FROM internal_accounts) AS is_internal
-    FROM trial_pre_terminal
-)
--- transform:end q4
+-- source:end q4
+-- final:begin q4
 SELECT
     account_id AS case_id,
     population,
@@ -1049,3 +472,4 @@ SELECT
     is_internal
 FROM trial_state
 ORDER BY case_id
+-- final:end q4
