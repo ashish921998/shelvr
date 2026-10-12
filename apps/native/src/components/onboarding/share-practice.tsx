@@ -193,6 +193,7 @@ export function SharePracticeStep({
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
+        <Text style={styles.eyebrow}>{t("sharePractice.eyebrow")}</Text>
         <Text
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
@@ -240,6 +241,13 @@ const styles = StyleSheet.create((theme) => ({
   },
   head: {
     gap: theme.gap(1),
+  },
+  eyebrow: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: theme.colors.primary,
   },
   headline: {
     fontFamily: theme.fonts.display,

@@ -540,6 +540,8 @@ export type MessageParams = {
   "demo.samplesOr": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
+  "sharePractice.eyebrow": undefined;
+  "sharePractice.shareButton": undefined;
   "sharePractice.title": undefined;
   "sharePractice.body": undefined;
   "sharePractice.tipIos": undefined;

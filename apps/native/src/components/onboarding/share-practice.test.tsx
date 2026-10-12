@@ -97,6 +97,17 @@ beforeEach(() => {
 });
 
 describe("share practice", () => {
+  it("says up front that this share is a practice run", () => {
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("sharePractice.eyebrow")).toBeTruthy();
+  });
+
   it("skips the practice when a share is already held, so it is not replaced", () => {
     mock.payloads = [{ value: "https://mine.test", shareType: "url" }];
     const onFinish = vi.fn();
