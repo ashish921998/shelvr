@@ -14,7 +14,8 @@ const LAUNCH_ARGUMENT = "E2EHidePro";
  * Only development builds with dev sign-in look at it, the same builds that
  * show the fixture reset, so the argument does nothing in a store build. It
  * changes what the client shows and nothing else: the server still decides
- * who may save.
+ * who may save. It also skips the exit offer after a paywall close, so the
+ * flow lands on Home whether or not this simulator's offer is due.
  */
 export function isProHiddenForE2E(): boolean {
   return (

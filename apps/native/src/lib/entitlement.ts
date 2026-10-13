@@ -452,6 +452,9 @@ async function presentExitOffer(
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   if (!userId || !rc) return null;
+  // The paywall e2e flow closes the paywall and expects Home, on a simulator
+  // whose offer may or may not be due.
+  if (isProHiddenForE2E()) return null;
   const key = exitOfferShownKey(userId);
   const now = Date.now();
   let lastShownAt: number | null;

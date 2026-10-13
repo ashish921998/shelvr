@@ -17,9 +17,8 @@ async function expectPaywall(screen: Screen): Promise<void> {
 }
 
 /**
- * Closes the paywall and waits until Home is back. This expects no exit
- * offer to follow the close: development builds have not shown one, and the
- * flow would need to handle its sheet and Home card if they start to.
+ * Closes the paywall and waits until Home is back. No exit offer follows the
+ * close: the launch argument that hides Pro also skips it.
  */
 async function closePaywall(screen: Screen): Promise<void> {
   // The close control has no label; it is the first button on the sheet.
