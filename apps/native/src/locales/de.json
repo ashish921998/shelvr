@@ -582,11 +582,17 @@
   "home.progressShareHelp": "Tippe auf Teilen, dann auf Shelvr. Nicht in der App-Reihe? Tippe auf Mehr.",
   "home.progressPhotos": "Screenshot aus deinen Fotos hinzufügen",
   "home.progressNote": "Schnell eine Notiz schreiben",
-  "home.recallTitle": "Du hast so etwas schon mal gespeichert",
   "home.recallBody": {
     "one": "%{formattedCount} früher gespeicherter Inhalt passt zu dem, was du gerade hinzugefügt hast.",
     "other": "%{formattedCount} früher gespeicherte Inhalte passen zu dem, was du gerade hinzugefügt hast."
   },
+  "home.recallKicker": "Aus deinem Regal",
+  "home.recallStackTitle": {
+    "one": "%{formattedCount} älterer Inhalt passt zu „%{title}“",
+    "other": "%{formattedCount} ältere Inhalte passen zu „%{title}“"
+  },
+  "home.recallSavedOn": "Gespeichert am %{date}",
+  "home.recallOldest": "Der älteste vom %{date}",
   "home.nextUpTitle": "Als Nächstes öffnen",
   "home.nextUpRead": "Zum Lesen gespeichert",
   "home.nextUpCook": "Zum Kochen gespeichert",

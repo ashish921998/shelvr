@@ -529,8 +529,11 @@ export type MessageParams = {
   "home.progressShareHelp": undefined;
   "home.progressPhotos": undefined;
   "home.progressNote": undefined;
-  "home.recallTitle": undefined;
   "home.recallBody": { count: number };
+  "home.recallKicker": undefined;
+  "home.recallStackTitle": { count: number; title: string };
+  "home.recallSavedOn": { date: string };
+  "home.recallOldest": { date: string };
   "home.nextUpTitle": undefined;
   "home.nextUpRead": undefined;
   "home.nextUpCook": undefined;

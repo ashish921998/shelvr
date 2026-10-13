@@ -1,88 +1,161 @@
-import { t, useAppLocale } from "@/lib/i18n";
-import { InlineCard } from "@/components/ui/inline-card";
+import { t, formattingLocale, useAppLocale } from "@/lib/i18n";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { RECALL_MAX_SHOWN } from "@/lib/save-recall";
-import { displayHost } from "@/lib/url";
 import type { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type RecallItem = FunctionReturnType<typeof api.items.similarItems>[number];
 
+/** The glyph a thumbnail shows when the save has no picture. */
+const TYPE_SYMBOLS = {
+  link: "link",
+  image: "photo.stack",
+  note: "doc.text",
+} as const satisfies Record<RecallItem["type"], AppSymbolName>;
+
+/** Where each thumbnail of the fanned stack sits, back to front, by how many
+ * the card shows. The last entry is the front thumbnail: the top match. */
+const STACK_LAYOUTS: Record<number, StackSlot[]> = {
+  1: [{ left: 18, top: 9, rotate: 0 }],
+  2: [
+    { left: 34, top: 12, rotate: 9 },
+    { left: 8, top: 6, rotate: -3 },
+  ],
+  3: [
+    { left: 0, top: 14, rotate: -11 },
+    { left: 40, top: 14, rotate: 10 },
+    { left: 18, top: 3, rotate: 0 },
+  ],
+};
+
+type StackSlot = { left: number; top: number; rotate: number };
+
 /**
- * The save recall card on Home: older saves that go with the one just added.
- * Purely presentational; the hook in lib/use-save-recall.ts owns when it shows
- * and its analytics.
+ * The save recall card on Home: older saves that go with the one just added,
+ * as one tappable row with their thumbnails fanned into a stack. Tapping it
+ * opens the top match. Purely presentational; the hook in
+ * lib/use-save-recall.ts owns when it shows and its analytics.
  */
 export function SaveRecallCard({
+  savedTitle,
   matches,
   onOpen,
   onDismiss,
 }: {
+  savedTitle: string | undefined;
   matches: RecallItem[];
   onOpen: () => void;
   onDismiss: () => void;
 }) {
   useAppLocale();
-  // The count names only the saves the card can open, so it never promises
-  // more than the thumbnails deliver.
+  const router = useRouter();
+  const { theme } = useUnistyles();
+  // The count names only the saves the stack shows, so it never promises
+  // more than the card delivers.
   const shown = matches.slice(0, RECALL_MAX_SHOWN);
+  const top = shown[0];
+  if (top === undefined) return null;
+  const title = savedTitle
+    ? t("home.recallStackTitle", { count: shown.length, title: savedTitle })
+    : t("home.recallBody", { count: shown.length });
+  const oldest = Math.min(...shown.map((item) => item._creationTime));
+  const date = shortDate(oldest);
+  const meta =
+    shown.length === 1
+      ? t("home.recallSavedOn", { date })
+      : t("home.recallOldest", { date });
+  const slots = STACK_LAYOUTS[shown.length] ?? [];
+  // Back to front, so the top match paints last and sits on top.
+  const stack = shown.slice().reverse();
   return (
-    <InlineCard
-      testID="save-recall-card"
-      title={t("home.recallTitle")}
-      body={t("home.recallBody", { count: shown.length })}
-    >
-      <View style={styles.row}>
-        {shown.map((item) => (
-          <RecallThumb key={item._id} item={item} onOpen={onOpen} />
-        ))}
-      </View>
-      <View style={styles.buttonRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("common.notNow")}
-          style={({ pressed }) => [
-            styles.secondaryButton,
-            pressed && { opacity: 0.7 },
-          ]}
-          onPress={onDismiss}
-        >
-          <Text style={styles.secondaryButtonText}>{t("common.notNow")}</Text>
-        </Pressable>
-      </View>
-    </InlineCard>
+    <View style={styles.wrap} testID="save-recall-card">
+      {/* No `Link asChild`: its Slot drops a Pressable style function. */}
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={`${title}. ${meta}`}
+        testID="save-recall-open"
+        onPress={() => {
+          onOpen();
+          router.push({ pathname: "/item/[id]", params: { id: top._id } });
+        }}
+        style={({ pressed }) => [
+          styles.card,
+          pressed && { opacity: theme.opacity.pressed },
+        ]}
+      >
+        <View style={styles.stack}>
+          {stack.map((item, index) => (
+            <StackThumb
+              key={item._id}
+              item={item}
+              slot={slots[index]}
+              front={index === stack.length - 1}
+            />
+          ))}
+        </View>
+        <View style={styles.text}>
+          <Text style={styles.kicker} numberOfLines={1}>
+            {t("home.recallKicker")}
+          </Text>
+          <Text style={styles.title} numberOfLines={3}>
+            {title}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {meta}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("common.notNow")}
+        testID="save-recall-dismiss"
+        onPress={onDismiss}
+        style={({ pressed }) => [
+          styles.dismiss,
+          pressed && { opacity: theme.opacity.pressed },
+        ]}
+      >
+        <View style={styles.dismissDot}>
+          <AppSymbolIcon
+            name="xmark"
+            size={14}
+            tintColor={theme.colors.muted}
+          />
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
-function RecallThumb({
+function StackThumb({
   item,
-  onOpen,
+  slot,
+  front,
 }: {
   item: RecallItem;
-  onOpen: () => void;
+  slot: StackSlot | undefined;
+  front: boolean;
 }) {
-  const router = useRouter();
+  const { theme } = useUnistyles();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const title =
-    item.title ??
-    item.note ??
-    (item.url ? displayHost(item.url) : t("item.untitledItem"));
-  // No `Link asChild` here: its Slot merges the child's style as an object, so
-  // a Pressable style function is dropped on every platform and the thumbnail
-  // loses its size. The card then collapsed into a tall empty box (first seen
-  // on Android, and it reproduces on iOS too).
+  const size = front ? FRONT_THUMB : BACK_THUMB;
   return (
-    <Pressable
-      accessibilityRole="link"
-      accessibilityLabel={title}
-      onPress={() => {
-        onOpen();
-        router.push({ pathname: "/item/[id]", params: { id: item._id } });
-      }}
-      style={({ pressed }) => [styles.thumb, pressed && { opacity: 0.7 }]}
+    <View
+      style={[
+        styles.thumb,
+        {
+          width: size,
+          height: size,
+          left: slot?.left ?? 0,
+          top: slot?.top ?? 0,
+          transform: [{ rotate: `${slot?.rotate ?? 0}deg` }],
+        },
+        !front && styles.backThumb,
+      ]}
     >
       {imageUri ? (
         <Image
@@ -92,61 +165,107 @@ function RecallThumb({
           style={styles.thumbImage}
         />
       ) : (
-        <View style={styles.thumbTextFace}>
-          <Text style={styles.thumbTitle} numberOfLines={4}>
-            {title}
-          </Text>
-        </View>
+        <AppSymbolIcon
+          name={TYPE_SYMBOLS[item.type]}
+          size={front ? 22 : 18}
+          tintColor={theme.colors.primaryText}
+        />
       )}
-    </Pressable>
+    </View>
   );
 }
 
+/** "Aug 14", with the year only when it is not this year's. */
+function shortDate(ms: number): string {
+  const date = new Date(ms);
+  const thisYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(formattingLocale(), {
+    month: "short",
+    day: "numeric",
+    ...(thisYear ? {} : { year: "numeric" }),
+  });
+}
+
+const FRONT_THUMB = 58;
+const BACK_THUMB = 50;
+
 const styles = StyleSheet.create((theme) => ({
-  row: {
+  wrap: {
+    marginHorizontal: theme.gap(2),
+    marginTop: theme.gap(1),
+    marginBottom: theme.gap(1),
+  },
+  card: {
     flexDirection: "row",
-    gap: theme.gap(1),
-    marginTop: theme.gap(0.5),
+    alignItems: "center",
+    gap: theme.gap(2),
+    padding: theme.gap(1.75),
+    // Room for the dismiss button in the top corner.
+    paddingRight: theme.gap(5.5),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primarySoft,
+  },
+  stack: {
+    width: 96,
+    height: 76,
   },
   thumb: {
-    flex: 1,
-    aspectRatio: 1,
-    maxWidth: 104,
+    position: "absolute",
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
+    borderWidth: 2,
+    // A paper edge, so overlapping thumbnails read as separate cards in both
+    // themes; the card's own tint vanished against itself in dark mode.
+    borderColor: theme.colors.surface,
     overflow: "hidden",
-    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface,
+  },
+  // Recedes the cards behind the top match so the front one leads.
+  backThumb: {
+    opacity: 0.8,
   },
   thumbImage: {
     width: "100%",
     height: "100%",
   },
-  thumbTextFace: {
+  text: {
     flex: 1,
-    padding: theme.gap(1),
-    justifyContent: "flex-end",
+    gap: theme.gap(0.25),
   },
-  thumbTitle: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 12,
-    lineHeight: 15,
+  kicker: {
+    ...theme.type.captionStrong,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.primaryText,
+  },
+  title: {
+    ...theme.type.header,
+    lineHeight: 23,
     color: theme.colors.foreground,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
+  meta: {
+    ...theme.type.caption,
+    color: theme.colors.muted,
   },
-  secondaryButton: {
-    minHeight: 44,
-    paddingHorizontal: theme.gap(2),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
+  // A full-size tap target around the small visible circle.
+  dismiss: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryButtonText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    color: theme.colors.muted,
+  dismissDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface,
   },
 }));
