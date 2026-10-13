@@ -76,7 +76,7 @@ describe("practice post", () => {
   });
 
   it("lists both taps in order", () => {
-    render(<ShareSteps />);
+    render(<ShareSteps active={1} />);
     expect(screen.getByText("sharePractice.stepShare")).toBeTruthy();
     expect(screen.getByText("sharePractice.stepShelvr")).toBeTruthy();
   });

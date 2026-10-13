@@ -27,6 +27,7 @@ const mock = vi.hoisted(() => ({
     </button>
   ),
   nothing: () => null,
+  steps: ({ active }: { active: number }) => <div>{`step-${active}`}</div>,
   row: ({ sample }: { sample: { pageHeading: string } }) => (
     <div>{sample.pageHeading}</div>
   ),
@@ -80,7 +81,7 @@ vi.mock("@/components/onboarding/sample-card", () => ({
 }));
 vi.mock("@/components/onboarding/practice-post", () => ({
   PracticePost: mock.card,
-  ShareSteps: mock.nothing,
+  ShareSteps: mock.steps,
 }));
 
 const { SharePracticeStep } =
@@ -108,6 +109,27 @@ describe("share practice", () => {
       />,
     );
     expect(screen.getByText("sharePractice.eyebrow")).toBeTruthy();
+  });
+
+  it("lights the Shelvr step while the share sheet is open", async () => {
+    let finish!: (result: string) => void;
+    mock.present.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("step-1")).toBeTruthy();
+    fireEvent.click(screen.getByText("share-sample"));
+    expect(screen.getByText("step-2")).toBeTruthy();
+    await act(async () => finish("dismissed"));
+    expect(screen.getByText("step-1")).toBeTruthy();
   });
 
   it("skips the practice when a share is already held, so it is not replaced", () => {

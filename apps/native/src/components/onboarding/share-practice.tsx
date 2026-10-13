@@ -202,6 +202,8 @@ export function SharePracticeStep({
         </Text>
       </View>
 
+      {/* Above the post, so the sheet never covers it while it is open. */}
+      <ShareSteps active={sheetOpen ? 2 : 1} />
       {sample === undefined ? null : (
         <PracticePost
           sample={sample}
@@ -212,7 +214,6 @@ export function SharePracticeStep({
       {wrongApp ? (
         <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
       ) : null}
-      <ShareSteps />
       <Text style={styles.tip}>
         {t(
           Platform.OS === "ios"

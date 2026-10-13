@@ -84,21 +84,12 @@ export function PracticePost({
           contentFit="cover"
           style={styles.image}
         />
-        <Text style={styles.title} numberOfLines={2}>
-          {sample.pageHeading}
-        </Text>
-        <View style={styles.actions}>
-          <AppSymbolIcon
-            name="heart"
-            size={20}
-            tintColor={theme.colors.faint}
-          />
-          <AppSymbolIcon
-            name="message"
-            size={20}
-            tintColor={theme.colors.faint}
-          />
-          <View style={styles.spacer} />
+        {/* Title and Share on one row: the button is the only action, so
+            nothing else on the post competes with it. */}
+        <View style={styles.footer}>
+          <Text style={styles.title} numberOfLines={2}>
+            {sample.pageHeading}
+          </Text>
           <View style={styles.shareWrap}>
             {disabled ? null : <Pulse />}
             <View style={styles.share}>
@@ -121,17 +112,18 @@ export function PracticePost({
   );
 }
 
-/** The two taps, in order: this step is the first, the share sheet holds the
- * second. Shelvr's own icon shows what to look for in the sheet. */
-export function ShareSteps() {
+/** The two taps, in order. The first is lit until the share sheet opens,
+ * then the second, so the step that matters shows while the sheet covers the
+ * post. Shelvr's own icon shows what to look for in the sheet. */
+export function ShareSteps({ active }: { active: 1 | 2 }) {
   useAppLocale();
   return (
     <View style={styles.steps}>
-      <View style={[styles.step, styles.stepOn]}>
+      <View style={[styles.step, active === 1 && styles.stepOn]}>
         <Text style={styles.stepNumber}>1</Text>
         <Text style={styles.stepText}>{t("sharePractice.stepShare")}</Text>
       </View>
-      <View style={styles.step}>
+      <View style={[styles.step, active === 2 && styles.stepOn]}>
         <Text style={styles.stepNumber}>2</Text>
         <Image source={APP_ICON} style={styles.stepIcon} />
         <Text style={styles.stepText}>{t("sharePractice.stepShelvr")}</Text>
@@ -170,28 +162,23 @@ const styles = StyleSheet.create((theme) => ({
   },
   image: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    aspectRatio: 2,
     backgroundColor: theme.colors.primarySoft,
   },
-  title: {
-    paddingHorizontal: theme.gap(1.5),
-    paddingTop: theme.gap(1.25),
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    lineHeight: 21,
-    color: theme.colors.foreground,
-  },
-  actions: {
+  footer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(2),
-    paddingHorizontal: theme.gap(1.5),
-    paddingTop: theme.gap(0.75),
-    paddingBottom: theme.gap(1.25),
+    gap: theme.gap(1.5),
+    padding: theme.gap(1.5),
   },
-  spacer: {
+  title: {
     flex: 1,
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    lineHeight: 20,
+    color: theme.colors.foreground,
   },
+
   shareWrap: {
     width: SHARE_SIZE,
     height: SHARE_SIZE,
