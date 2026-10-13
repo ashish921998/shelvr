@@ -20,7 +20,6 @@ const placement = fc.oneof(
   fc.constantFrom("save", "onboarding", "profile", "retry"),
   fc.string(),
 );
-// From a minute in the past to a year ahead, in milliseconds.
 const elapsed = fc.integer({ min: -60_000, max: 365 * 24 * 60 * 60 * 1000 });
 
 describe("exit offer window", () => {
@@ -71,7 +70,6 @@ describe("exit offer reminder", () => {
       fc.property(time, elapsed, (endsAt, until) => {
         const now = endsAt - until;
         const fireAt = exitOfferReminderAt(endsAt, now);
-        // Three hours before the close, unless that is under a minute away.
         expect(fireAt).toBe(
           until - 3 * HOUR_MS > 60_000 ? endsAt - 3 * HOUR_MS : null,
         );

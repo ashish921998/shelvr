@@ -97,12 +97,17 @@ const batchAnswer = fc.record({
   invalidShare: fc.double({ min: 0, max: 1, noNaN: true }),
 });
 
+const MAX_LINKS = 400;
+
 describe("importInBatches", () => {
   it("accounts for every link exactly once, however the import ends", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.integer({ min: 0, max: 400 }),
-        fc.array(batchAnswer, { minLength: 9, maxLength: 9 }),
+        fc.integer({ min: 0, max: MAX_LINKS }),
+        fc.array(batchAnswer, {
+          minLength: Math.ceil(MAX_LINKS / IMPORT_BATCH_SIZE),
+          maxLength: Math.ceil(MAX_LINKS / IMPORT_BATCH_SIZE),
+        }),
         async (count, answers) => {
           const urls = Array.from(
             { length: count },

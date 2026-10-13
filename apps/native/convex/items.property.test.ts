@@ -87,6 +87,28 @@ const command = fc.oneof(
   },
 );
 
+type Saves = Map<Id<"items">, { user: User; kind: string }>;
+type Operations = Map<string, { kind: string; itemId: Id<"items"> }>;
+
+/** Deletes one of the user's saves, if they have any, and takes it out of
+ * what should exist. */
+async function deleteOneSave(
+  t: TestCtx,
+  step: { user: User; pick: number },
+  saves: Saves,
+  operations: Operations,
+): Promise<void> {
+  const mine = [...saves].filter(([, s]) => s.user === step.user);
+  if (mine.length === 0) return;
+  const [itemId] = mine[step.pick % mine.length];
+  await t.mutation(api.items.deleteItem, { id: itemId });
+  saves.delete(itemId);
+  // A deleted save frees its operation id for a fresh save.
+  for (const [key, op] of operations) {
+    if (op.itemId === itemId) operations.delete(key);
+  }
+}
+
 describe("saving links and notes", () => {
   it("makes one save per operation, whatever is retried, mixed up or deleted", async () => {
     await fc.assert(
@@ -100,26 +122,15 @@ describe("saving links and notes", () => {
 
           // What should exist: each user's saves, and which save each of
           // their operation ids produced.
-          const saves = new Map<Id<"items">, { user: User; kind: string }>();
-          const operations = new Map<
-            string,
-            { kind: string; itemId: Id<"items"> }
-          >();
+          const saves: Saves = new Map();
+          const operations: Operations = new Map();
           // Every save ever made, deleted ones included.
           const everSaved: Id<"items">[] = [];
 
           for (const step of commands) {
             const t = as[step.user];
             if (step.do === "delete") {
-              const mine = [...saves].filter(([, s]) => s.user === step.user);
-              if (mine.length === 0) continue;
-              const [itemId] = mine[step.pick % mine.length];
-              await t.mutation(api.items.deleteItem, { id: itemId });
-              saves.delete(itemId);
-              // A deleted save frees its operation id for a fresh save.
-              for (const [key, op] of operations) {
-                if (op.itemId === itemId) operations.delete(key);
-              }
+              await deleteOneSave(t, step, saves, operations);
               continue;
             }
 
@@ -138,13 +149,11 @@ describe("saving links and notes", () => {
                   });
 
             if (earlier !== undefined && earlier.kind !== step.do) {
-              // The id already names a save of the other kind.
               await expect(save).rejects.toThrow("Operation kind mismatch");
               continue;
             }
             const itemId = await save;
             if (earlier !== undefined) {
-              // A retry gets the save it already made.
               expect(itemId).toBe(earlier.itemId);
               continue;
             }
