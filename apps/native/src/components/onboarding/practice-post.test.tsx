@@ -61,7 +61,7 @@ describe("practice post", () => {
   it("points at the Share tap and opens the sheet from the card", () => {
     const onPress = vi.fn();
     render(<PracticePost sample={sample} disabled={false} onPress={onPress} />);
-    expect(screen.getByText("sharePractice.stepShare")).toBeTruthy();
+    expect(screen.getByText("sharePractice.coachTap")).toBeTruthy();
     expect(screen.getByTestId("pulse")).toBeTruthy();
     fireEvent.click(screen.getByRole("button"));
     expect(onPress).toHaveBeenCalledTimes(1);

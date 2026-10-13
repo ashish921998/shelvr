@@ -105,7 +105,7 @@ export function PracticePost({
       <View style={styles.coachRow} pointerEvents="none">
         <View style={styles.coach}>
           <View style={styles.caret} />
-          <Text style={styles.coachText}>{t("sharePractice.stepShare")}</Text>
+          <Text style={styles.coachText}>{t("sharePractice.coachTap")}</Text>
         </View>
       </View>
     </View>
