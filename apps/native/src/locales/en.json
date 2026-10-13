@@ -228,6 +228,8 @@
   "demo.reading": "Reading the page…",
   "demo.slow": "Taking longer than usual.",
   "demo.keepWaiting": "Keep waiting",
+  "demo.submissionTitle": "Still waiting for confirmation.",
+  "demo.submissionUnconfirmed": "Shelvr hasn’t confirmed your save yet. You can keep waiting or continue setup.",
   "demo.continueWaiting": "Continue without waiting",
   "demo.skip": "Skip for now",
   "demo.pastePlaceholder": "Paste or type a link",

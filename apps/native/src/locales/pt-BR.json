@@ -228,6 +228,8 @@
   "demo.reading": "Lendo a página…",
   "demo.slow": "Está demorando mais que o normal.",
   "demo.keepWaiting": "Continuar aguardando",
+  "demo.submissionTitle": "Ainda aguardando confirmação.",
+  "demo.submissionUnconfirmed": "O Shelvr ainda não confirmou que foi salvo. Você pode continuar aguardando ou prosseguir com a configuração.",
   "demo.continueWaiting": "Continuar sem esperar",
   "demo.skip": "Pular por enquanto",
   "demo.pastePlaceholder": "Cole ou digite um link",

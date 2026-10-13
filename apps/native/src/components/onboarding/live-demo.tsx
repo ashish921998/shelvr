@@ -20,6 +20,7 @@ import {
 import { GhostButton } from "@/components/onboarding/parts";
 import { SampleCard, SampleRow } from "@/components/onboarding/sample-card";
 import { SampleSignIn } from "@/components/onboarding/sample-sign-in";
+import { SubmissionRecovery } from "@/components/onboarding/submission-recovery";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { isTerminalFailure } from "@convex/model/itemFields";
@@ -152,6 +153,15 @@ export function LiveDemoStep({
         title={findSample(url)?.pageHeading ?? displayHost(url)}
         url={url}
         onDone={demo.previewed}
+      />
+    );
+  }
+
+  if (demo.submissionTimedOut) {
+    return (
+      <SubmissionRecovery
+        onKeepWaiting={demo.keepWaiting}
+        onContinue={demo.continueAfterTimeout}
       />
     );
   }
