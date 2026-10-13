@@ -45,6 +45,7 @@ function cardMenuActions({
   dismiss,
   share,
   changeSpaces,
+  removeFromSpace,
   confirmDelete,
 }: {
   isSuggested: boolean;
@@ -54,6 +55,9 @@ function cardMenuActions({
   dismiss: () => void;
   share: () => void;
   changeSpaces: () => void;
+  // Set only on a card inside a space: it takes the save out of that space
+  // alone, so Delete there has to say it reaches every space.
+  removeFromSpace?: () => void;
   confirmDelete: () => void;
 }): ActionMenuItem[] {
   if (isSuggested) {
@@ -76,18 +80,21 @@ function cardMenuActions({
       onPress: changeSpaces,
     });
   }
+  if (removeFromSpace) {
+    actions.push({
+      label: t("spaces.removeFromSpace"),
+      onPress: removeFromSpace,
+    });
+  }
   actions.push({
-    label: t("common.delete"),
+    label: removeFromSpace ? t("item.deleteEverywhere") : t("common.delete"),
     destructive: true,
     onPress: confirmDelete,
   });
   return actions;
 }
 
-// Memoized: feed rows are the highest-churn surface in the app (every live-query
-// tick and parent re-render touches the list), so skip re-renders when a row's
-// `item` ref is unchanged.
-export const ItemCard = memo(function ItemCard({
+function ItemCardView({
   item,
   source,
 }: {
@@ -100,6 +107,7 @@ export const ItemCard = memo(function ItemCard({
   const deleteItem = useMutation(api.items.deleteItem);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
+  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
 
   const spaceId =
     source?.from === "space" ? (source.spaceId as Id<"spaces">) : undefined;
@@ -178,6 +186,20 @@ export const ItemCard = memo(function ItemCard({
     );
   };
 
+  const removeFromSpace = () => {
+    if (spaceId === undefined) return;
+    void removeItemFromSpace({ itemId: item._id, spaceId }).then(
+      () =>
+        analytics.capture("item_space_membership_changed", {
+          membership_added: false,
+          item_id: item._id,
+          space_id: spaceId,
+          undone: false,
+        }),
+      () => Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody")),
+    );
+  };
+
   const confirmDelete = () => {
     Alert.alert(t("item.deleteTitle"), t("item.deleteBody"), [
       { text: t("common.cancel"), style: "cancel" },
@@ -200,6 +222,7 @@ export const ItemCard = memo(function ItemCard({
     dismiss,
     share,
     changeSpaces,
+    removeFromSpace: spaceId === undefined ? undefined : removeFromSpace,
     confirmDelete,
   });
 
@@ -298,9 +321,20 @@ export const ItemCard = memo(function ItemCard({
               onPress={changeSpaces}
             />
           ) : null}
+          {!isSuggested && spaceId !== undefined ? (
+            <Link.MenuAction
+              title={t("spaces.removeFromSpace")}
+              icon="minus.circle"
+              onPress={removeFromSpace}
+            />
+          ) : null}
           {!isSuggested && (
             <Link.MenuAction
-              title={t("common.delete")}
+              title={
+                spaceId === undefined
+                  ? t("common.delete")
+                  : t("item.deleteEverywhere")
+              }
               icon="trash"
               destructive
               onPress={confirmDelete}
@@ -310,7 +344,38 @@ export const ItemCard = memo(function ItemCard({
       </Link>
     </Animated.View>
   );
-});
+}
+
+// Feeds pass `source` as a fresh literal on every render, so two sources are
+// the same when they name the same list, not when they are the same object.
+// Spelling out every variant makes a new one fail to compile here until it
+// says what identifies its list.
+function sourceKey(source: ItemSource | undefined): string | undefined {
+  switch (source?.from) {
+    case undefined:
+      return undefined;
+    case "home":
+    case "digest":
+    case "map":
+      return source.from;
+    case "space":
+      return `space:${source.spaceId}`;
+    case "search":
+      return `search:${source.q}`;
+    default:
+      return source satisfies never;
+  }
+}
+
+// Memoized: feed rows are the highest-churn surface in the app (every live-query
+// tick and parent re-render touches the list), so skip re-renders when a row's
+// `item` ref and `source` value are unchanged.
+export const ItemCard = memo(
+  ItemCardView,
+  (prev, next) =>
+    prev.item === next.item &&
+    sourceKey(prev.source) === sourceKey(next.source),
+);
 
 const styles = StyleSheet.create(() => ({
   cell: {
