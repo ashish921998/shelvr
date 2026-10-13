@@ -175,9 +175,10 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 
 #### End-to-end flows on the iOS simulator (pilot)
 
-`tools/e2e` drives the development build through four flows with the
-[e2e](https://github.com/tester-army/e2e) framework: save a link, save a photo,
-create a space, and search. Search and create-a-space use plain locators and need no model. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo reaches its goal through an `agent.act` step, because the system photo picker is not in the accessibility tree. It is not part of `pnpm run check` or CI yet.
+`tools/e2e` drives the development build through six flows with the
+[e2e](https://github.com/tester-army/e2e) framework: save a link, save a note,
+save a photo, create a space, search, and a search with no match. Search,
+save-a-note and create-a-space use plain locators and need no model. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo reaches its goal through an `agent.act` step, because the system photo picker is not in the accessibility tree. It is not part of `pnpm run check` or CI yet.
 
 It needs a booted iOS simulator with the development build
 (`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
@@ -191,7 +192,7 @@ test signs in as the anonymous dev user and resets its data through Settings >
 ```sh
 cd tools/e2e
 export GOOGLE_GENERATIVE_AI_API_KEY=...   # an AI Studio key; never commit it
-pnpm exec e2e run                         # all four flows
+pnpm exec e2e run                         # all six flows
 pnpm exec e2e run tests/search.e2e.ts     # one flow
 pnpm exec e2e run --video on              # record an MP4 per test under .e2e/
 ```
