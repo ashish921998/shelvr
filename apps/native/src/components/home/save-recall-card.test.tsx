@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { SaveRecallCard } from "./save-recall-card";
@@ -77,21 +77,36 @@ it("names the new save and counts only the saves the stack shows", () => {
   expect(screen.getByText(/^home\.recallOldest /)).toBeDefined();
 });
 
-it("shortens a long title so the count still fits", () => {
+function renderedTitle(savedTitle: string) {
   render(
     <SaveRecallCard
-      savedTitle={`  ${"Very long article title ".repeat(4)} `}
+      savedTitle={savedTitle}
       matches={[match("a", 10)]}
       onOpen={vi.fn()}
       onDismiss={vi.fn()}
     />,
   );
   const text = screen.getByText(/^home\.recallStackTitle /).textContent ?? "";
-  const { title } = JSON.parse(text.slice(text.indexOf("{"))) as {
-    title: string;
-  };
-  expect(Array.from(title).length).toBeLessThanOrEqual(48);
-  expect(title).toMatch(/^Very long article title.*\S…$/);
+  return (JSON.parse(text.slice(text.indexOf("{"))) as { title: string }).title;
+}
+
+it("keeps a short title whole", () => {
+  expect(renderedTitle("  Ramen ")).toBe("Ramen");
+});
+
+it("shortens a long title to the room the sentence leaves", () => {
+  const title = renderedTitle("Very long article title ".repeat(4));
+  expect(title).toMatch(/^Very long\S*.*\S…$/);
+  expect(title.length).toBeLessThan(20);
+});
+
+it("gives full-width characters half the letters", () => {
+  const latin = renderedTitle("a".repeat(40));
+  cleanup();
+  const wide = renderedTitle("あ".repeat(40));
+  expect(Array.from(wide).length - 1).toBe(
+    Math.floor((Array.from(latin).length - 1) / 2),
+  );
 });
 
 it("falls back to the generic line when the new save has no title", () => {

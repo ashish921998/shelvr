@@ -61,10 +61,7 @@ export function SaveRecallCard({
   const top = shown[0];
   if (top === undefined) return null;
   const title = savedTitle
-    ? t("home.recallStackTitle", {
-        count: shown.length,
-        title: clipTitle(savedTitle),
-      })
+    ? stackTitle(shown.length, savedTitle)
     : t("home.recallBody", { count: shown.length });
   const oldest = Math.min(...shown.map((item) => item._creationTime));
   const date = formatRecentDate(oldest);
@@ -179,19 +176,50 @@ function StackThumb({
   );
 }
 
-/** Shortens a long save title so the rest of the sentence, which comes after
- * it in some languages, still fits in the card's three lines. */
-function clipTitle(title: string): string {
-  const trimmed = title.trim();
-  const chars = Array.from(trimmed);
-  if (chars.length <= TITLE_MAX_CHARS) return trimmed;
-  return `${chars
-    .slice(0, TITLE_MAX_CHARS - 1)
-    .join("")
-    .trimEnd()}…`;
+/**
+ * The card's title sentence, with the save's title shortened so the whole
+ * sentence fits the card's three lines. The room left for the title is what
+ * the locale's own words leave over, so the count still shows in languages
+ * that put it after the title (ja, ko).
+ */
+function stackTitle(count: number, savedTitle: string): string {
+  const frame = textWidth(t("home.recallStackTitle", { count, title: "" }));
+  const room = Math.max(TITLE_MIN_WIDTH, TITLE_LINES_WIDTH - frame);
+  return t("home.recallStackTitle", {
+    count,
+    title: clipToWidth(savedTitle.trim(), room),
+  });
 }
 
-const TITLE_MAX_CHARS = 48;
+/** CJK and other full-width characters take about two Latin letters' room. */
+const WIDE_CHAR =
+  /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/u;
+
+function charWidth(char: string): number {
+  return WIDE_CHAR.test(char) ? 2 : 1;
+}
+
+function textWidth(text: string): number {
+  return Array.from(text).reduce((sum, char) => sum + charWidth(char), 0);
+}
+
+function clipToWidth(text: string, room: number): string {
+  if (textWidth(text) <= room) return text;
+  let kept = "";
+  let width = 0;
+  for (const char of text) {
+    // One unit stays free for the ellipsis.
+    if (width + charWidth(char) > room - 1) break;
+    kept += char;
+    width += charWidth(char);
+  }
+  return `${kept.trimEnd()}…`;
+}
+
+/** About how many Latin letters the title's three lines hold at its size on
+ * a phone-width card, and the least room a title ever gets. */
+const TITLE_LINES_WIDTH = 60;
+const TITLE_MIN_WIDTH = 8;
 const FRONT_THUMB = 58;
 const BACK_THUMB = 50;
 
