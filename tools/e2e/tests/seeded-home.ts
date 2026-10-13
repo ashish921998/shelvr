@@ -4,9 +4,12 @@ import { expect, type Locator, type Screen } from "e2e";
 const BUNDLE_TIMEOUT = 180_000;
 
 /**
- * How long an iOS sheet takes to finish opening or closing. The engine's
- * default allows half a second, and a tap on a control inside a sheet that is
- * still rising lands on the screen behind it.
+ * How long an iOS sheet takes to finish moving. As the engine's `transition`
+ * budget it only delays a tap on a control that appeared or moved with the
+ * last action: the default allows half a second, and a tap on a control
+ * inside a sheet that is still rising lands on the screen behind it. A
+ * control that was already on screen under a closing sheet is tapped at once,
+ * so a flow that taps one must wait for the close itself.
  */
 export const SHEET_TRANSITION_MS = 1000;
 
