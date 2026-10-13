@@ -16,7 +16,11 @@ async function expectPaywall(screen: Screen): Promise<void> {
   await expect(screen.getByRole("button", "Restore Purchases")).toBeVisible();
 }
 
-/** Closes the paywall and waits until Home is back with nothing new on it. */
+/**
+ * Closes the paywall and waits until Home is back. This expects no exit
+ * offer to follow the close: development builds have not shown one, and the
+ * flow would need to handle its sheet and Home card if they start to.
+ */
 async function closePaywall(screen: Screen): Promise<void> {
   // The close control has no label; it is the first button on the sheet.
   await screen.getByRole("button").first().tap();
@@ -39,6 +43,11 @@ test("shows the paywall instead of Add to someone without Pro", async ({
   });
   const viewPlans = screen.getByRole("button", "View Pro plans");
   await expect(viewPlans).toBeVisible({ timeout: 180_000 });
+  // The relaunch plays the launch splash again, over a Home that is already
+  // in the tree.
+  await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+    timeout: 30_000,
+  });
 
   // Add is a Pro action: it opens the paywall, not the Add sheet.
   await screen.getByRole("button", "Add").tap();
@@ -51,7 +60,8 @@ test("shows the paywall instead of Add to someone without Pro", async ({
   await expectPaywall(screen);
   await closePaywall(screen);
 
-  // Closing bought nothing and saved nothing.
+  // Home is as it was: the four seeded saves, and nothing being saved.
+  await expect(screen.getByRole("button", "Still working on it")).toBeHidden();
   for (const seeded of [
     "ramen",
     "belem-tower",
