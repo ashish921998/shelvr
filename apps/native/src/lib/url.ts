@@ -26,8 +26,8 @@ function trimTrailingPunctuation(url: string) {
     const last = trimmed[trimmed.length - 1];
     const drop =
       TRAILING_PUNCTUATION.test(last) ||
-      (last === ')' && closesMoreThanItOpens(trimmed, '(', ')')) ||
-      (last === ']' && closesMoreThanItOpens(trimmed, '[', ']'));
+      (last === ")" && closesMoreThanItOpens(trimmed, "(", ")")) ||
+      (last === "]" && closesMoreThanItOpens(trimmed, "[", "]"));
     if (!drop) break;
     trimmed = trimmed.slice(0, -1);
   }
@@ -46,13 +46,24 @@ export function extractFirstUrl(text: string): string | null {
   return trimTrailingPunctuation(match[0]);
 }
 
+/** The link in text typed into the article composer, or null when it holds
+ * none. A single token is passed through untouched (trailing punctuation,
+ * internationalized hosts and all) so the server's URL policy stays the judge
+ * of anything that could be an address; only text that plainly is not one, a
+ * word without a dot or a sentence without a link, is refused here. */
+export function typedLink(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  if (/\s/.test(trimmed)) return extractFirstUrl(trimmed);
+  return trimmed.includes(".") ? trimmed : null;
+}
+
 export function displayHost(url: string | undefined) {
-  if (!url) return '';
+  if (!url) return "";
   try {
-    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(
-      /^www\./,
-      '',
-    );
+    return new URL(
+      /^https?:\/\//i.test(url) ? url : `https://${url}`,
+    ).hostname.replace(/^www\./, "");
   } catch {
     return url;
   }

@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
-import { linkFromText } from "@/lib/use-demo-save";
+import { typedLink } from "@/lib/url";
 
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
@@ -205,7 +205,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
     if (!canSave) return;
     // Checked here so typed text that is not a link never reaches the server,
     // whose refusal would only surface as the generic failure alert.
-    const link = mode === "article" ? linkFromText(trimmed) : null;
+    const link = mode === "article" ? typedLink(trimmed) : null;
     if (mode === "article" && link === null) {
       Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
       return;
