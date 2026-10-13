@@ -30,12 +30,15 @@ test("saves a note and finds it by its own words", async ({ screen }) => {
   await screen.getByRole("textbox", "Search your saves").fill("quokka");
 
   // The model titles the note, so the result's label is not known ahead of
-  // time. It is the first button on the screen that is not a search or
-  // keyboard control, and opening it shows the words that were typed.
-  await screen
-    .getByRole("button", /^(?!(Clear text|Close|Emoji|Dictate)$).+/)
-    .first()
-    .tap({ timeout: 60_000 });
+  // time. Once the search has answered, the result is the only button on the
+  // screen that is not a search or keyboard control. Waiting for exactly one
+  // means a stray button fails the flow here instead of being tapped.
+  const result = screen.getByRole(
+    "button",
+    /^(?!(Clear text|Close|Emoji|Dictate)$).+/,
+  );
+  await expect(result).toHaveCount(1, { timeout: 60_000 });
+  await result.tap();
   await expect(screen.getByRole("textbox", "Note text")).toHaveValue(NOTE, {
     timeout: 30_000,
   });
