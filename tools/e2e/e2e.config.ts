@@ -3,12 +3,13 @@ import { mobile } from "@e2e-dev/mobile";
 import { mobileTools } from "@e2e-dev/mobile/tools";
 import type { E2EConfig } from "e2e";
 
+import {
+  BUNDLE_ID,
+  LAUNCH_ARGUMENTS,
+  METRO_PORT,
+  METRO_URL,
+} from "./tests/launch.ts";
 import { SHEET_TRANSITION_MS } from "./tests/seeded-home.ts";
-
-// A port of its own, so the suite never loads another checkout's bundle from
-// a Metro that happens to be running on 8081.
-const metroPort = process.env.E2E_METRO_PORT ?? "8091";
-const metroUrl = `http://localhost:${metroPort}`;
 
 const ios = mobile({
   platform: "ios",
@@ -22,32 +23,16 @@ export default {
       name: "ios",
       engine: ios,
       app: {
-        bundleId: "app.shelvr.save.dev",
-        // Skip the dev launcher and keep the dev menu from covering the app.
-        // The locators match English labels, so run the app in English
-        // whatever the simulator's language.
-        launchArguments: [
-          "--initialUrl",
-          metroUrl,
-          "-AppleLanguages",
-          "(en)",
-          "-AppleLocale",
-          "en_US",
-          "-EXDevMenuShowsAtLaunch",
-          "NO",
-          "-EXDevMenuIsOnboardingFinished",
-          "YES",
-          "-EXDevMenuShowFloatingActionButton",
-          "NO",
-        ],
+        bundleId: BUNDLE_ID,
+        launchArguments: LAUNCH_ARGUMENTS,
         command: {
           executable: "pnpm",
-          args: ["exec", "expo", "start", "--dev-client", "--port", metroPort],
+          args: ["exec", "expo", "start", "--dev-client", "--port", METRO_PORT],
           cwd: "../../apps/native",
           startupTimeout: 120_000,
           log: ".e2e/metro.log",
         },
-        readyUrl: `${metroUrl}/status`,
+        readyUrl: `${METRO_URL}/status`,
       },
     },
   ],
