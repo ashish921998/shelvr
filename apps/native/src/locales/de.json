@@ -52,6 +52,7 @@
   "common.save": "Speichern",
   "errors.saveTitle": "Speichern fehlgeschlagen",
   "errors.tryAgain": "Etwas ist schiefgelaufen. Versuche es erneut.",
+  "errors.notALink": "Das ist kein Link. Prüfe ihn und versuche es noch einmal.",
   "errors.batchSaveTitle": "Nicht alle Bilder konnten gespeichert werden",
   "capture.retryFailed": "Erneuter Versuch fehlgeschlagen",
   "common.done": "Fertig",

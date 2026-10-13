@@ -52,6 +52,7 @@
   "common.save": "Save",
   "errors.saveTitle": "Could not save",
   "errors.tryAgain": "Something went wrong. Try again.",
+  "errors.notALink": "That isn't a link. Check it and try again.",
   "errors.batchSaveTitle": "Could not save all images",
   "capture.retryFailed": "Retry failed",
   "common.done": "Done",

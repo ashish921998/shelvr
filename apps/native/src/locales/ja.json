@@ -52,6 +52,7 @@
   "common.save": "保存",
   "errors.saveTitle": "保存できませんでした",
   "errors.tryAgain": "問題が発生しました。もう一度お試しください。",
+  "errors.notALink": "リンクではないようです。確認してもう一度お試しください。",
   "errors.batchSaveTitle": "すべての画像を保存できませんでした",
   "capture.retryFailed": "再試行に失敗しました",
   "common.done": "完了",

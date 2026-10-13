@@ -52,6 +52,7 @@
   "common.save": "Enregistrer",
   "errors.saveTitle": "Enregistrement impossible",
   "errors.tryAgain": "Une erreur est survenue. Réessayez.",
+  "errors.notALink": "Ce n'est pas un lien. Vérifiez-le et réessayez.",
   "errors.batchSaveTitle": "Impossible d'enregistrer toutes les images",
   "capture.retryFailed": "La nouvelle tentative a échoué",
   "common.done": "Terminé",
