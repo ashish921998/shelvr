@@ -54,6 +54,7 @@
   "common.save": "저장",
   "errors.saveTitle": "저장하지 못했어요",
   "errors.tryAgain": "문제가 발생했어요. 다시 시도해 주세요.",
+  "errors.notALink": "링크가 아니에요. 확인한 뒤 다시 시도해 주세요.",
   "errors.batchSaveTitle": "모든 이미지를 저장하지 못했어요",
   "capture.retryFailed": "다시 시도 실패",
   "common.done": "완료",
@@ -565,10 +566,15 @@
   "home.progressShareHelp": "공유를 탭한 다음 Shelvr를 고르세요. 안 보이면 더 보기를 탭하세요.",
   "home.progressPhotos": "사진에서 스크린샷 추가",
   "home.progressNote": "간단한 메모 쓰기",
-  "home.recallTitle": "비슷한 항목을 이전에도 저장했어요",
   "home.recallBody": {
     "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."
   },
+  "home.recallKicker": "내 선반에서",
+  "home.recallStackTitle": {
+    "other": "'%{title}'와 관련된 이전 저장 항목 %{formattedCount}개"
+  },
+  "home.recallSavedOn": "%{date}에 저장",
+  "home.recallOldest": "가장 오래된 항목: %{date}",
   "home.nextUpTitle": "다음으로 열어 보기",
   "home.nextUpRead": "읽으려고 저장함",
   "home.nextUpCook": "요리하려고 저장함",

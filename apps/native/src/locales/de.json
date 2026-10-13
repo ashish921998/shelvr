@@ -54,6 +54,7 @@
   "common.save": "Speichern",
   "errors.saveTitle": "Speichern fehlgeschlagen",
   "errors.tryAgain": "Etwas ist schiefgelaufen. Versuche es erneut.",
+  "errors.notALink": "Das ist kein Link. Prüfe ihn und versuche es noch einmal.",
   "errors.batchSaveTitle": "Nicht alle Bilder konnten gespeichert werden",
   "capture.retryFailed": "Erneuter Versuch fehlgeschlagen",
   "common.done": "Fertig",
@@ -583,11 +584,17 @@
   "home.progressShareHelp": "Tippe auf Teilen, dann auf Shelvr. Nicht in der App-Reihe? Tippe auf Mehr.",
   "home.progressPhotos": "Screenshot aus deinen Fotos hinzufügen",
   "home.progressNote": "Schnell eine Notiz schreiben",
-  "home.recallTitle": "Du hast so etwas schon mal gespeichert",
   "home.recallBody": {
     "one": "%{formattedCount} früher gespeicherter Inhalt passt zu dem, was du gerade hinzugefügt hast.",
     "other": "%{formattedCount} früher gespeicherte Inhalte passen zu dem, was du gerade hinzugefügt hast."
   },
+  "home.recallKicker": "Aus deinem Regal",
+  "home.recallStackTitle": {
+    "one": "%{formattedCount} älterer Inhalt passt zu „%{title}“",
+    "other": "%{formattedCount} ältere Inhalte passen zu „%{title}“"
+  },
+  "home.recallSavedOn": "Gespeichert am %{date}",
+  "home.recallOldest": "Der älteste vom %{date}",
   "home.nextUpTitle": "Als Nächstes öffnen",
   "home.nextUpRead": "Zum Lesen gespeichert",
   "home.nextUpCook": "Zum Kochen gespeichert",

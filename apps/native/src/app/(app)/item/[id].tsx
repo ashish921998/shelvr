@@ -29,12 +29,12 @@ import {
   useRouter,
 } from "expo-router";
 import {
-  type RefObject,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 import {
   Alert,
@@ -53,6 +53,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
+import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
@@ -277,6 +278,30 @@ function usePageStyle(width: number, windowHeight: number) {
 }
 
 const pagerKey = (item: DetailItem) => item._id;
+// Module-level so the pager sees one stable object across renders.
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
+
+// The list can reorder under the pager (an accepted suggestion moves behind
+// the remaining ones). The pager keeps its offset, so without this it shows
+// a neighbour while the header and the action menu still target this save.
+function usePagerFollowsActive(
+  listRef: RefObject<FlashListRef<DetailItem> | null>,
+  items: DetailItem[] | undefined,
+  activeIdRef: RefObject<string>,
+) {
+  const previousItems = useRef(items);
+  useEffect(() => {
+    const index = pagerResyncIndex(
+      previousItems.current,
+      items,
+      activeIdRef.current,
+    );
+    previousItems.current = items;
+    if (index !== null) {
+      listRef.current?.scrollToIndex({ index, animated: false });
+    }
+  }, [listRef, items, activeIdRef]);
+}
 
 /**
  * The pager's page renderer. Stable across swipes for the same reason as
@@ -541,10 +566,6 @@ function ItemScreenContent() {
     },
     [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
-  const viewabilityConfig = useMemo(
-    () => ({ itemVisiblePercentThreshold: 60 }),
-    [],
-  );
 
   const { renderItem, onListLayout, sheetsUnder, browserOpen } = usePagerPages({
     width,
@@ -553,6 +574,8 @@ function ItemScreenContent() {
     suggestedIds,
     accepted,
   });
+
+  usePagerFollowsActive(listRef, items, activeIdRef);
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
@@ -870,7 +893,7 @@ function ItemScreenContent() {
         initialScrollIndex={startIndex >= 0 ? startIndex : 0}
         renderItem={renderItem}
         onViewableItemsChanged={onViewable}
-        viewabilityConfig={viewabilityConfig}
+        viewabilityConfig={VIEWABILITY_CONFIG}
         onEndReached={onEndReached}
         onEndReachedThreshold={2}
       />

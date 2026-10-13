@@ -32,9 +32,10 @@ type RecallFeedItem = {
  * nothing is recorded while the app is in the background. `pending` is true
  * while the newest save's similar items are still loading, so the caller can
  * hold a competing Home card until the recall card has had its chance.
+ * `saved` is that newest save, so the card can name it.
  */
-export function useSaveRecall(
-  items: readonly RecallFeedItem[] | undefined,
+export function useSaveRecall<Item extends RecallFeedItem>(
+  items: readonly Item[] | undefined,
   opts: { defer?: boolean } = {},
 ) {
   const { data: user } = useCurrentUser();
@@ -119,5 +120,5 @@ export function useSaveRecall(
   const opened = useCallback(() => finish("save_recall_opened"), [finish]);
   const dismiss = useCallback(() => finish("save_recall_dismissed"), [finish]);
 
-  return { visible, pending, matches, opened, dismiss };
+  return { visible, pending, saved: candidate, matches, opened, dismiss };
 }

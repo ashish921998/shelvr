@@ -54,6 +54,7 @@
   "common.save": "Guardar",
   "errors.saveTitle": "No se ha podido guardar",
   "errors.tryAgain": "Algo ha salido mal. Vuelve a intentarlo.",
+  "errors.notALink": "Eso no es un enlace. Revísalo e inténtalo de nuevo.",
   "errors.batchSaveTitle": "No se han podido guardar todas las imágenes",
   "capture.retryFailed": "El reintento ha fallado",
   "common.done": "Listo",
@@ -601,12 +602,19 @@
   "home.progressShareHelp": "Toca Compartir y luego Shelvr. ¿No aparece? Toca Más.",
   "home.progressPhotos": "Añade una captura de tus fotos",
   "home.progressNote": "Escribe una nota rápida",
-  "home.recallTitle": "Ya guardaste cosas parecidas",
   "home.recallBody": {
     "one": "%{formattedCount} contenido guardado antes encaja con lo que acabas de añadir.",
     "many": "%{formattedCount} contenidos guardados antes encajan con lo que acabas de añadir.",
     "other": "%{formattedCount} contenidos guardados antes encajan con lo que acabas de añadir."
   },
+  "home.recallKicker": "De tu estante",
+  "home.recallStackTitle": {
+    "one": "%{formattedCount} contenido anterior encaja con “%{title}”",
+    "many": "%{formattedCount} contenidos anteriores encajan con “%{title}”",
+    "other": "%{formattedCount} contenidos anteriores encajan con “%{title}”"
+  },
+  "home.recallSavedOn": "Guardado el %{date}",
+  "home.recallOldest": "El más antiguo, del %{date}",
   "home.nextUpTitle": "Ábrelo ahora",
   "home.nextUpRead": "Guardado para leer",
   "home.nextUpCook": "Guardado para cocinar",

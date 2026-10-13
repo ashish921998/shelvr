@@ -3,12 +3,18 @@ import { mobile } from "@e2e-dev/mobile";
 import { mobileTools } from "@e2e-dev/mobile/tools";
 import type { E2EConfig } from "e2e";
 
+import { SHEET_TRANSITION_MS } from "./tests/seeded-home.ts";
+
 // A port of its own, so the suite never loads another checkout's bundle from
 // a Metro that happens to be running on 8081.
 const metroPort = process.env.E2E_METRO_PORT ?? "8091";
 const metroUrl = `http://localhost:${metroPort}`;
 
-const ios = mobile({ platform: "ios", device: process.env.E2E_DEVICE });
+const ios = mobile({
+  platform: "ios",
+  device: process.env.E2E_DEVICE,
+  transition: SHEET_TRANSITION_MS,
+});
 
 export default {
   targets: [
