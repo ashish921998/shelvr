@@ -105,7 +105,8 @@ describe("saving links and notes", () => {
             string,
             { kind: string; itemId: Id<"items"> }
           >();
-          let created = 0;
+          // Every save ever made, deleted ones included.
+          const everSaved: Id<"items">[] = [];
 
           for (const step of commands) {
             const t = as[step.user];
@@ -149,7 +150,7 @@ describe("saving links and notes", () => {
             }
             expect(saves.has(itemId)).toBe(false);
             saves.set(itemId, { user: step.user, kind: step.do });
-            created += 1;
+            everSaved.push(itemId);
             if (step.operationId !== undefined) {
               operations.set(key, { kind: step.do, itemId });
             }
@@ -175,11 +176,17 @@ describe("saving links and notes", () => {
           expect(
             stored.operations.every((op) => op.status === "complete"),
           ).toBe(true);
-          // Each save was sent for processing once; a retry never sends it
-          // again.
+          // No operation id has two ledger rows, which the map above would
+          // have folded into one.
+          expect(stored.operations).toHaveLength(operations.size);
+          // Each save was sent for processing once, and a retry never sends
+          // it again.
           expect(
-            stored.jobs.filter((job) => job.name === "ai:processItem"),
-          ).toHaveLength(created);
+            stored.jobs
+              .filter((job) => job.name === "ai:processItem")
+              .map((job) => (job.args[0] as { itemId: string }).itemId)
+              .sort(),
+          ).toEqual([...everSaved].sort());
         },
       ),
     );

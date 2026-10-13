@@ -14,6 +14,7 @@ import {
   timeLeft,
 } from "./exit-offer";
 
+const HOUR_MS = 60 * 60 * 1000;
 const time = fc.integer({ min: 0, max: 4_102_444_800_000 });
 const placement = fc.oneof(
   fc.constantFrom("save", "onboarding", "profile", "retry"),
@@ -27,16 +28,15 @@ describe("exit offer window", () => {
     fc.assert(
       fc.property(placement, time, elapsed, (where, shownAt, since) => {
         const now = shownAt + since;
-        const open = exitOfferEndsAt(shownAt, now) !== null;
+        const endsAt = exitOfferEndsAt(shownAt, now);
         const due = exitOfferDue(where, shownAt, now);
-        expect(open && due).toBe(false);
-        if (due) expect(since).toBeGreaterThanOrEqual(EXIT_OFFER_COOLDOWN_MS);
-        // The countdown's deadline never moves once the offer has been shown.
-        if (open) {
-          expect(exitOfferEndsAt(shownAt, now)).toBe(
-            shownAt + EXIT_OFFER_WINDOW_MS,
-          );
-        }
+        // Open for exactly the window, with a deadline that never moves.
+        expect(endsAt).toBe(
+          since < EXIT_OFFER_WINDOW_MS ? shownAt + EXIT_OFFER_WINDOW_MS : null,
+        );
+        // Due again exactly when the cooldown is over, so never while open.
+        expect(due).toBe(where !== "retry" && since >= EXIT_OFFER_COOLDOWN_MS);
+        expect(endsAt !== null && due).toBe(false);
       }),
     );
   });
@@ -71,6 +71,10 @@ describe("exit offer reminder", () => {
       fc.property(time, elapsed, (endsAt, until) => {
         const now = endsAt - until;
         const fireAt = exitOfferReminderAt(endsAt, now);
+        // Three hours before the close, unless that is under a minute away.
+        expect(fireAt).toBe(
+          until - 3 * HOUR_MS > 60_000 ? endsAt - 3 * HOUR_MS : null,
+        );
         if (fireAt !== null) {
           expect(fireAt).toBeGreaterThan(now);
           expect(fireAt).toBeLessThan(endsAt);
@@ -83,17 +87,20 @@ describe("exit offer reminder", () => {
 
   it("is cancelled once the offer is gone and never scheduled for a closed one", () => {
     fc.assert(
-      fc.property(fc.option(time, { nil: null }), time, (endsAt, now) => {
+      fc.property(fc.option(time, { nil: null }), elapsed, (endsAt, until) => {
+        const now = (endsAt ?? 0) - until;
         const plan = exitOfferReminderPlan(endsAt, now);
         if (endsAt === null || now >= endsAt) {
           expect(plan).toEqual({ kind: "cancel" });
           return;
         }
-        expect(plan.kind).not.toBe("cancel");
-        if (plan.kind === "schedule") {
-          expect(plan.fireAt).toBeGreaterThan(now);
-          expect(plan.fireAt).toBeLessThan(endsAt);
-        }
+        // An open offer schedules its reminder while there is still time
+        // to, and after that leaves whatever is scheduled alone.
+        expect(plan).toEqual(
+          endsAt - now - 3 * HOUR_MS > 60_000
+            ? { kind: "schedule", fireAt: endsAt - 3 * HOUR_MS }
+            : { kind: "keep" },
+        );
       }),
     );
   });
