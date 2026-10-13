@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { cloneElement, isValidElement, type ReactNode } from "react";
-import { View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { MenuView } from "@expo/ui/community/menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemCard, type FeedItem } from "./item-card";
@@ -68,12 +68,21 @@ vi.mock("react-native", () => {
 // has to win that merge to read as a button. Mirroring the spread here is what
 // makes the role assertions mean anything.
 const routerPush = vi.hoisted(() => vi.fn());
+const motionPreference = vi.hoisted(() => ({ reduced: true }));
+const linkProps = vi.hoisted(() => vi.fn());
+const triggerProps = vi.hoisted(() => vi.fn());
 vi.mock("expo-router", () => {
-  const Link = ({ children }: { children?: ReactNode }) => <>{children}</>;
-  Link.Trigger = ({ children }: { children?: ReactNode }) =>
-    isValidElement<A11yProps>(children)
+  const Link = (props: { children?: ReactNode }) => {
+    linkProps(props);
+    return <>{props.children}</>;
+  };
+  Link.Trigger = (props: { children?: ReactNode; withAppleZoom?: boolean }) => {
+    triggerProps(props);
+    const { children } = props;
+    return isValidElement<A11yProps>(children)
       ? cloneElement(children, { role: "link", ...children.props })
       : children;
+  };
   Link.Preview = function LinkPreview() {
     return null;
   };
@@ -90,12 +99,10 @@ vi.mock("react-native-reanimated", async () => {
   const { View } = await import("react-native");
   return {
     default: { View },
-    FadeIn: { duration: () => ({ easing: () => ({}) }) },
-    FadeOut: { duration: () => ({ easing: () => ({}) }) },
     ZoomOut: {
       springify: () => ({ damping: () => ({ stiffness: () => ({}) }) }),
     },
-    useReducedMotion: () => true,
+    useReducedMotion: () => motionPreference.reduced,
   };
 });
 vi.mock("@/lib/motion", () => ({
@@ -108,7 +115,7 @@ vi.mock("@/lib/motion", () => ({
   REDUCED_FADE_OUT: {},
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
+  StyleSheet: { create: () => ({ cell: { padding: 4 } }) },
   useUnistyles: () => ({
     theme: {
       colors: {
@@ -157,6 +164,92 @@ const base: FeedItem = {
   status: "ready",
   tags: [],
 };
+/** The props of the one native element the screen reader sees as the card. */
+function labelledProps(owner: typeof View | typeof Pressable, name: string) {
+  const call = vi
+    .mocked(owner)
+    .mock.calls.findLast(([props]) => props.accessibilityLabel === name);
+  if (!call) throw new Error(`no card labelled ${name}`);
+  return call[0];
+}
+
+describe.each([false, true])("with reduced motion %s", (reduced) => {
+  const os = process.env.EXPO_OS;
+  afterEach(() => {
+    process.env.EXPO_OS = os;
+    motionPreference.reduced = true;
+  });
+
+  it.each(["ios", "android"])(
+    "keeps the %s shell immediate and navigation current when a cell is rebound",
+    (platform) => {
+      process.env.EXPO_OS = platform;
+      motionPreference.reduced = reduced;
+      vi.mocked(View).mockClear();
+      const { rerender } = render(
+        <ItemCard
+          item={{ ...base, title: "First save" }}
+          source={{ from: "home" }}
+        />,
+      );
+      const assertShell = () => {
+        const shell = vi.mocked(View).mock.calls[0][0];
+        expect(shell).not.toHaveProperty("entering", expect.anything());
+        expect(shell).not.toHaveProperty("exiting", expect.anything());
+        expect(shell).not.toHaveProperty("layout", expect.anything());
+        expect(shell.style).toEqual({ padding: 4 });
+        expect(triggerProps).toHaveBeenLastCalledWith(
+          expect.objectContaining({ withAppleZoom: !reduced }),
+        );
+      };
+      assertShell();
+      vi.mocked(View).mockClear();
+      rerender(
+        <ItemCard
+          item={{
+            ...base,
+            _id: "item-2" as FeedItem["_id"],
+            title: "Second save",
+            fixtureKey: "second",
+          }}
+          source={{ from: "search", q: "Second" }}
+        />,
+      );
+      assertShell();
+      expect(
+        screen.getAllByRole("button", { name: "Second save" }),
+      ).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: "First save" })).toBeNull();
+      const href = {
+        pathname: "/item/[id]",
+        params: { id: "item-2", from: "search", q: "Second" },
+      };
+      expect(linkProps).toHaveBeenLastCalledWith(
+        expect.objectContaining({ href, asChild: true }),
+      );
+      const owner = platform === "ios" ? View : Pressable;
+      expect(labelledProps(owner, "Second save").accessibilityLabel).toBe(
+        "Second save",
+      );
+      vi.mocked(View).mockClear();
+      rerender(
+        <ItemCard
+          item={{ ...base, title: "Space save", suggested: true }}
+          source={{ from: "space", spaceId: "space-1" }}
+        />,
+      );
+      assertShell();
+      expect(linkProps).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          href: {
+            pathname: "/item/[id]",
+            params: { id: "item-1", from: "space", spaceId: "space-1" },
+          },
+        }),
+      );
+    },
+  );
+});
 /** Finds the card the way a screen reader would: a button with this name. */
 function card(item: Partial<FeedItem>, name: string) {
   render(<ItemCard item={{ ...base, ...item }} />);
@@ -244,6 +337,16 @@ it("still renders the save-actions control and the long-press menu", () => {
   expect(menu).toContain("Delete");
 });
 
+it("offers Dismiss in the suggested save's long-press menu", () => {
+  render(
+    <ItemCard
+      item={{ ...base, suggested: true }}
+      source={{ from: "space", spaceId: "space-1" }}
+    />,
+  );
+  expect(screen.getByTestId("link-menu").textContent).toContain("Dismiss");
+});
+
 describe("on iOS", () => {
   // expo-router wraps the trigger in zero-size native views there, which hide
   // anything below them from VoiceOver and XCTest, so the cell carries the card.
@@ -258,22 +361,13 @@ describe("on iOS", () => {
     render(<ItemCard item={{ ...base, ...item }} />);
   }
 
-  /** The props of the one View the screen reader sees as the card. */
-  function cellProps(name: string) {
-    const call = vi
-      .mocked(View)
-      .mock.calls.find(([props]) => props.accessibilityLabel === name);
-    if (!call) throw new Error(`no View labelled ${name}`);
-    return call[0];
-  }
-
   it("reads the card from the cell, as one button, with its fixture id", () => {
     renderOnIos({ title: "Miso soup recipe", fixtureKey: "ramen" });
     expect(
       screen.getAllByRole("button", { name: "Miso soup recipe" }),
     ).toHaveLength(1);
     expect(screen.queryByRole("link")).toBeNull();
-    const props = cellProps("Miso soup recipe");
+    const props = labelledProps(View, "Miso soup recipe");
     expect(props.accessible).toBe(true);
     expect(props.testID).toBe("fixture-item-ramen");
   });
@@ -281,7 +375,7 @@ describe("on iOS", () => {
   it("opens the save when VoiceOver activates the card", () => {
     renderOnIos({ title: "Miso soup recipe" });
     routerPush.mockClear();
-    cellProps("Miso soup recipe").onAccessibilityTap?.();
+    labelledProps(View, "Miso soup recipe").onAccessibilityTap?.();
     expect(routerPush).toHaveBeenCalledWith({
       pathname: "/item/[id]",
       params: { id: "item-1" },
@@ -290,7 +384,7 @@ describe("on iOS", () => {
 
   it("offers the card's menu actions to the screen reader", () => {
     renderOnIos({ title: "Miso soup recipe", url: "https://example.com" });
-    const props = cellProps("Miso soup recipe");
+    const props = labelledProps(View, "Miso soup recipe");
     expect(props.accessibilityActions?.map(({ label }) => label)).toEqual([
       "Share",
       "Change spaces",
@@ -299,17 +393,10 @@ describe("on iOS", () => {
   });
 });
 
-it("runs a menu action picked from the screen reader's actions", async () => {
-  const { Alert } = await import("react-native");
+it("runs a menu action picked from the screen reader's actions", () => {
   vi.mocked(View).mockClear();
   render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
-  const { Pressable } = await import("react-native");
-  const call = vi
-    .mocked(Pressable)
-    .mock.calls.findLast(
-      ([props]) => props.accessibilityLabel === "Miso soup recipe",
-    );
-  call?.[0].onAccessibilityAction?.({
+  labelledProps(Pressable, "Miso soup recipe").onAccessibilityAction?.({
     nativeEvent: { actionName: "Delete" },
   } as never);
   expect(Alert.alert).toHaveBeenCalledWith(
