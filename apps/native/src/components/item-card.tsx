@@ -45,6 +45,7 @@ function cardMenuActions({
   dismiss,
   share,
   changeSpaces,
+  removeFromSpace,
   confirmDelete,
 }: {
   isSuggested: boolean;
@@ -54,6 +55,9 @@ function cardMenuActions({
   dismiss: () => void;
   share: () => void;
   changeSpaces: () => void;
+  // Set only on a card inside a space: it takes the save out of that space
+  // alone, so Delete there has to say it reaches every space.
+  removeFromSpace?: () => void;
   confirmDelete: () => void;
 }): ActionMenuItem[] {
   if (isSuggested) {
@@ -76,8 +80,14 @@ function cardMenuActions({
       onPress: changeSpaces,
     });
   }
+  if (removeFromSpace) {
+    actions.push({
+      label: t("spaces.removeFromSpace"),
+      onPress: removeFromSpace,
+    });
+  }
   actions.push({
-    label: t("common.delete"),
+    label: removeFromSpace ? t("item.deleteEverywhere") : t("common.delete"),
     destructive: true,
     onPress: confirmDelete,
   });
@@ -97,6 +107,7 @@ function ItemCardView({
   const deleteItem = useMutation(api.items.deleteItem);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
+  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
 
   const spaceId =
     source?.from === "space" ? (source.spaceId as Id<"spaces">) : undefined;
@@ -175,6 +186,20 @@ function ItemCardView({
     );
   };
 
+  const removeFromSpace = () => {
+    if (spaceId === undefined) return;
+    void removeItemFromSpace({ itemId: item._id, spaceId }).then(
+      () =>
+        analytics.capture("item_space_membership_changed", {
+          membership_added: false,
+          item_id: item._id,
+          space_id: spaceId,
+          undone: false,
+        }),
+      () => Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody")),
+    );
+  };
+
   const confirmDelete = () => {
     Alert.alert(t("item.deleteTitle"), t("item.deleteBody"), [
       { text: t("common.cancel"), style: "cancel" },
@@ -197,6 +222,7 @@ function ItemCardView({
     dismiss,
     share,
     changeSpaces,
+    removeFromSpace: spaceId === undefined ? undefined : removeFromSpace,
     confirmDelete,
   });
 
@@ -295,9 +321,20 @@ function ItemCardView({
               onPress={changeSpaces}
             />
           ) : null}
+          {!isSuggested && spaceId !== undefined ? (
+            <Link.MenuAction
+              title={t("spaces.removeFromSpace")}
+              icon="minus.circle"
+              onPress={removeFromSpace}
+            />
+          ) : null}
           {!isSuggested && (
             <Link.MenuAction
-              title={t("common.delete")}
+              title={
+                spaceId === undefined
+                  ? t("common.delete")
+                  : t("item.deleteEverywhere")
+              }
               icon="trash"
               destructive
               onPress={confirmDelete}

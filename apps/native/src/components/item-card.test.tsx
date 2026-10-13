@@ -129,7 +129,8 @@ vi.mock("expo-haptics", () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: "success" },
 }));
-vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
+const mutate = vi.hoisted(() => vi.fn(async () => null));
+vi.mock("convex/react", () => ({ useMutation: () => mutate }));
 vi.mock("@/lib/share/share-store", () => ({
   forgetDeletedSharedItem: vi.fn(),
 }));
@@ -316,4 +317,56 @@ it("runs a menu action picked from the screen reader's actions", async () => {
     expect.any(String),
     expect.any(Array),
   );
+});
+
+describe("inside a space", () => {
+  const inSpace = { from: "space", spaceId: "space-1" } as const;
+
+  function menuIn(item: Partial<FeedItem>) {
+    render(<ItemCard item={{ ...base, ...item }} source={inSpace} />);
+    return screen.getByTestId("link-menu").textContent;
+  }
+
+  it("offers removing it from the space apart from deleting it everywhere", () => {
+    const menu = menuIn({ title: "Miso soup recipe" });
+    expect(menu).toContain("Remove from this space");
+    expect(menu).toContain("Delete everywhere");
+  });
+
+  it("keeps plain Delete off the space when opened from Home", () => {
+    render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
+    const menu = screen.getByTestId("link-menu").textContent;
+    expect(menu).not.toContain("Remove from this space");
+    expect(menu).not.toContain("Delete everywhere");
+  });
+
+  it("takes the save out of this space only", async () => {
+    const { Pressable, Alert } = await import("react-native");
+    vi.mocked(Alert.alert).mockClear();
+    mutate.mockClear();
+    render(
+      <ItemCard
+        item={{ ...base, title: "Miso soup recipe" }}
+        source={inSpace}
+      />,
+    );
+    const call = vi
+      .mocked(Pressable)
+      .mock.calls.findLast(
+        ([props]) => props.accessibilityLabel === "Miso soup recipe",
+      );
+    call?.[0].onAccessibilityAction?.({
+      nativeEvent: { actionName: "Remove from this space" },
+    } as never);
+    expect(mutate).toHaveBeenCalledWith({
+      itemId: "item-1",
+      spaceId: "space-1",
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it("leaves a suggestion to Add and Dismiss", () => {
+    const menu = menuIn({ title: "Miso soup recipe", suggested: true });
+    expect(menu).not.toContain("Remove from this space");
+  });
 });
