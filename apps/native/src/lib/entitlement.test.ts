@@ -75,6 +75,7 @@ vi.mock("./exit-offer-sheet", () => ({
   whenExitSheetDismissed: () => mock.dismissed(),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
+vi.mock("@/lib/e2e-hide-pro", () => ({ isProHiddenForE2E: () => false }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
   setItem: (key: string, value: string) => void mock.store.set(key, value),
