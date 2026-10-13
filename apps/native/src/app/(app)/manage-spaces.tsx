@@ -7,17 +7,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 // Per-space membership toggles for one item. Every write here is the user's
 // hand — `saved` rows only; flipping a space on also overrides a dismissal.
@@ -150,7 +143,7 @@ export default function ManageSpacesScreen() {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator style={styles.spinner} />
+        <StitchRing style={styles.spinner} />
       ) : item === null ? (
         <EmptyState
           title={t("common.unavailable")}

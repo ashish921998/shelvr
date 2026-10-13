@@ -20,6 +20,10 @@ type A11yProps = {
   accessibilityRole?: string;
   accessibilityLabel?: string;
 };
+vi.mock("@/components/ui/stitch-loader", () => ({
+  StitchRing: vi.fn(() => null),
+  StitchRow: vi.fn(() => null),
+}));
 vi.mock("react-native", () => {
   const a11yElement = ({
     children,
@@ -53,7 +57,6 @@ vi.mock("react-native", () => {
     Text: vi.fn(({ children }: { children?: ReactNode }) => (
       <span>{children}</span>
     )),
-    ActivityIndicator: vi.fn(() => null),
     Alert: { alert: vi.fn() },
     Share: { share: vi.fn(), sharedAction: "sharedAction" },
     StyleSheet: { flatten: (style: unknown) => style },

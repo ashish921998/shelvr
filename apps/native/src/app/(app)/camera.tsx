@@ -13,7 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
@@ -32,6 +32,7 @@ import {
   usePhotoOutput,
 } from "react-native-vision-camera";
 import { isAvailable as stickerLiftAvailable, liftSubject } from "subject-lift";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CaptureMode = "photo" | "sticker";
 
@@ -325,7 +326,7 @@ export default function CameraScreen() {
             </Pressable>
             <Pressable style={styles.shutter} onPress={capture} disabled={busy}>
               {busy ? (
-                <ActivityIndicator color="#1a1712" />
+                <StitchRing size={22} color="#1a1712" />
               ) : (
                 <View style={styles.shutterInner} />
               )}
