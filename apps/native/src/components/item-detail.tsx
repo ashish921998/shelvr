@@ -35,7 +35,6 @@ import {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
@@ -46,6 +45,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CardRow = FunctionReturnType<
   typeof api.items.listItemsPage
@@ -238,7 +238,7 @@ export const ItemDetail = memo(function ItemDetail({
         details={
           bodyPending ? (
             <View style={styles.bodyPending}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <StitchRing />
             </View>
           ) : (
             <ItemSheetBody
@@ -362,7 +362,7 @@ export const ItemDetail = memo(function ItemDetail({
       <ScrollView {...scrollProps}>
         {heroBlock}
         <View style={styles.bodyPending}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <StitchRing />
         </View>
       </ScrollView>
     );
@@ -757,10 +757,7 @@ function SaveStatusNotice({
   if (processing && state === null) {
     return (
       <View style={[styles.processingRow, centered && styles.centeredRow]}>
-        <ActivityIndicator
-          size="small"
-          color={onMedia ? "white" : theme.colors.primary}
-        />
+        <StitchRing color={onMedia ? "white" : undefined} />
         <Text style={[styles.processingText, onMedia && styles.onMediaText]}>
           {t("item.reading")}
         </Text>
@@ -824,7 +821,7 @@ function SaveStatusNotice({
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
           {retrying ? (
-            <ActivityIndicator size="small" color={theme.colors.primaryText} />
+            <StitchRing size={14} color={theme.colors.primaryText} />
           ) : (
             <AppSymbolIcon
               name="arrow.clockwise"

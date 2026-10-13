@@ -1,8 +1,9 @@
 import { FlashList } from "@shopify/flash-list";
 import { Link } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type Props = {
   items: FeedItem[];
@@ -31,7 +32,6 @@ export function MasonryFeed({
   ListHeaderComponent: listHeaderComponent,
   onScrollBeginDrag,
 }: Props) {
-  const { theme } = useUnistyles();
   return (
     <FlashList
       data={items}
@@ -66,7 +66,7 @@ export function MasonryFeed({
       ListFooterComponent={
         loadingMore ? (
           <View style={styles.footer}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <StitchRing />
           </View>
         ) : null
       }
