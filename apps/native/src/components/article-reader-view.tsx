@@ -14,7 +14,6 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { Id } from "@convex/_generated/dataModel";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
@@ -23,6 +22,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type Space = { _id: Id<"spaces">; name: string };
 
@@ -157,7 +157,7 @@ export function ArticleReaderView({
       <View style={styles.body}>
         {item.status === "processing" ? (
           <View style={styles.processingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <StitchRing />
             <Text style={styles.processingText}>{t("item.reading")}</Text>
           </View>
         ) : null}

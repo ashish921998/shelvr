@@ -28,7 +28,14 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   Alert,
   type LayoutChangeEvent,
@@ -40,12 +47,17 @@ import {
 } from "react-native";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ProgressiveBlurHeader } from "progressive-blur";
-import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
+import Animated, {
+  FadeOutDown,
+  SlideInDown,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
+import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
@@ -270,6 +282,30 @@ function usePageStyle(width: number, windowHeight: number) {
 }
 
 const pagerKey = (item: DetailItem) => item._id;
+// Module-level so the pager sees one stable object across renders.
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
+
+// The list can reorder under the pager (an accepted suggestion moves behind
+// the remaining ones). The pager keeps its offset, so without this it shows
+// a neighbour while the header and the action menu still target this save.
+function usePagerFollowsActive(
+  listRef: RefObject<FlashListRef<DetailItem> | null>,
+  items: DetailItem[] | undefined,
+  activeIdRef: RefObject<string>,
+) {
+  const previousItems = useRef(items);
+  useEffect(() => {
+    const index = pagerResyncIndex(
+      previousItems.current,
+      items,
+      activeIdRef.current,
+    );
+    previousItems.current = items;
+    if (index !== null) {
+      listRef.current?.scrollToIndex({ index, animated: false });
+    }
+  }, [listRef, items, activeIdRef]);
+}
 
 /**
  * The pager's page renderer. Stable across swipes for the same reason as
@@ -328,6 +364,103 @@ function usePagerPages({
   return { renderItem, onListLayout, sheetsUnder, browserOpen };
 }
 
+// Takes the save in view out of the space it was opened from, and only that
+// space: Home and its other spaces keep it. The page leaves the space's list,
+// so slide to a neighbour first, the way dismiss and delete do. A suggested
+// page has its own Dismiss, so only a saved one offers this, and Delete then
+// has to say it reaches every space.
+function useRemoveFromSpace({
+  from,
+  spaceId,
+  activeId,
+  space,
+  items,
+  listRef,
+  goTo,
+  writeParams,
+  cancelParamWrite,
+}: {
+  from: string | undefined;
+  spaceId: string | undefined;
+  activeId: string;
+  space: { items: { _id: string }[] } | null | undefined;
+  items: DetailItem[] | undefined;
+  listRef: RefObject<FlashListRef<DetailItem> | null>;
+  goTo: (id: string) => void;
+  writeParams: (id: string) => void;
+  cancelParamWrite: () => void;
+}) {
+  const router = useRouter();
+  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
+  // Read live from the space's saved list, not the route: the save may have
+  // left the space in Change spaces while this screen stayed open.
+  const available =
+    from === "space" &&
+    !!spaceId &&
+    !!space?.items.some((item) => item._id === activeId);
+  // A second tap while the first is in flight would navigate twice.
+  const pending = useRef(false);
+  const remove = useCallback(async () => {
+    if (!spaceId || !activeId || !items || pending.current) return;
+    pending.current = true;
+    cancelParamWrite();
+    const idx = items.findIndex((i) => i._id === activeId);
+    const neighbor = items[idx + 1] ?? items[idx - 1];
+    const membership = {
+      itemId: activeId as Id<"items">,
+      spaceId: spaceId as Id<"spaces">,
+    };
+    try {
+      await removeItemFromSpace(membership);
+      analytics.capture("item_space_membership_changed", {
+        membership_added: false,
+        item_id: membership.itemId,
+        space_id: membership.spaceId,
+        undone: false,
+      });
+      if (neighbor) {
+        listRef.current?.scrollToIndex({
+          index: Math.min(idx, items.length - 2),
+          animated: true,
+        });
+        goTo(neighbor._id);
+        writeParams(neighbor._id);
+      } else if (router.canGoBack()) router.back();
+      else router.replace("/");
+    } catch {
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    } finally {
+      pending.current = false;
+    }
+  }, [
+    spaceId,
+    activeId,
+    items,
+    listRef,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+    removeItemFromSpace,
+    router,
+  ]);
+  return {
+    available,
+    remove,
+    deleteLabel: available ? t("item.deleteEverywhere") : t("common.delete"),
+    // Spread straight into the Android header menu.
+    menuActions: available
+      ? [{ label: t("spaces.removeFromSpace"), onPress: remove }]
+      : [],
+  };
+}
+
+// The pager's list ref and whether its programmatic scrolls should animate.
+function usePagerScroll() {
+  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const reducedMotion = useReducedMotion();
+  return { listRef, reducedMotion };
+}
+
 function ItemScreenContent() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
@@ -350,7 +483,7 @@ function ItemScreenContent() {
   } | null>(null);
   const decisionPending = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const { listRef, reducedMotion } = usePagerScroll();
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
   // The home feed is paginated and shared through HomeFeedProvider, so every
@@ -444,10 +577,6 @@ function ItemScreenContent() {
     },
     [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
-  const viewabilityConfig = useMemo(
-    () => ({ itemVisiblePercentThreshold: 60 }),
-    [],
-  );
 
   const { renderItem, onListLayout, sheetsUnder, browserOpen } = usePagerPages({
     width,
@@ -456,6 +585,8 @@ function ItemScreenContent() {
     suggestedIds,
     accepted,
   });
+
+  usePagerFollowsActive(listRef, items, activeIdRef);
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
@@ -575,7 +706,7 @@ function ItemScreenContent() {
     if (neighbor) {
       listRef.current?.scrollToIndex({
         index: items.indexOf(neighbor),
-        animated: true,
+        animated: !reducedMotion,
       });
       goTo(neighbor._id);
       writeParams(neighbor._id);
@@ -596,6 +727,8 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
+    reducedMotion,
   ]);
 
   const onDelete = useCallback(async () => {
@@ -612,7 +745,7 @@ function ItemScreenContent() {
         writeParams(neighbor._id);
         listRef.current?.scrollToIndex({
           index: Math.min(idx, items.length - 2),
-          animated: true,
+          animated: !reducedMotion,
         });
       } else if (router.canGoBack()) router.back();
       else router.replace("/");
@@ -627,7 +760,21 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
+    reducedMotion,
   ]);
+
+  const removeFromSpace = useRemoveFromSpace({
+    from,
+    spaceId,
+    activeId,
+    space: spaceQ.data,
+    items,
+    listRef,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  });
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
@@ -684,8 +831,9 @@ function ItemScreenContent() {
                             },
                           ]
                         : []),
+                      ...removeFromSpace.menuActions,
                       {
-                        label: t("common.delete"),
+                        label: removeFromSpace.deleteLabel,
                         destructive: true,
                         onPress: onDelete,
                       },
@@ -731,11 +879,18 @@ function ItemScreenContent() {
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
+              icon="minus.circle"
+              hidden={!removeFromSpace.available}
+              onPress={removeFromSpace.remove}
+            >
+              {t("spaces.removeFromSpace")}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
               icon="trash"
               destructive
               onPress={onDelete}
             >
-              {t("common.delete")}
+              {removeFromSpace.deleteLabel}
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
@@ -753,7 +908,7 @@ function ItemScreenContent() {
         initialScrollIndex={startIndex >= 0 ? startIndex : 0}
         renderItem={renderItem}
         onViewableItemsChanged={onViewable}
-        viewabilityConfig={viewabilityConfig}
+        viewabilityConfig={VIEWABILITY_CONFIG}
         onEndReached={onEndReached}
         onEndReachedThreshold={2}
       />

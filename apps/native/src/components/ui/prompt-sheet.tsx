@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { ReactNode } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
 /**
@@ -26,11 +27,12 @@ export function PromptSheet({
   testID?: string;
 }) {
   useAppLocale();
+  const reducedMotion = useReducedMotion();
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reducedMotion ? "fade" : "slide"}
       onRequestClose={onClose}
     >
       <View style={styles.backdrop}>
