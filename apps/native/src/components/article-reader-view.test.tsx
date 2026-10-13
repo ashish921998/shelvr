@@ -4,6 +4,10 @@ import { expect, it, vi } from "vitest";
 import type { ComponentProps, ReactNode } from "react";
 import { ArticleReaderView } from "./article-reader-view";
 
+vi.mock("@/components/ui/stitch-loader", () => ({
+  StitchRing: vi.fn(() => null),
+  StitchRow: vi.fn(() => null),
+}));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: vi.fn(),
@@ -45,7 +49,6 @@ vi.mock("react-native", () => ({
       </button>
     ),
   ),
-  ActivityIndicator: vi.fn(() => null),
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock("react-native-unistyles", () => ({

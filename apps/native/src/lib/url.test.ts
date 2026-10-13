@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { displayHost, extractFirstUrl, isProbablyUrl } from "./url";
+import { displayHost, extractFirstUrl, isProbablyUrl, typedLink } from "./url";
 
 describe("isProbablyUrl", () => {
   it("recognizes a URL with and without an https scheme", () => {
@@ -15,14 +15,16 @@ describe("isProbablyUrl", () => {
 
 describe("extractFirstUrl", () => {
   it("pulls the URL out of caption text", () => {
-    expect(extractFirstUrl("Check out this video! https://tiktok.com/@a/video/1")).toBe(
-      "https://tiktok.com/@a/video/1",
-    );
+    expect(
+      extractFirstUrl("Check out this video! https://tiktok.com/@a/video/1"),
+    ).toBe("https://tiktok.com/@a/video/1");
   });
 
   it("keeps a closing paren the URL itself opened", () => {
     expect(
-      extractFirstUrl("read this https://en.wikipedia.org/wiki/Function_(mathematics)"),
+      extractFirstUrl(
+        "read this https://en.wikipedia.org/wiki/Function_(mathematics)",
+      ),
     ).toBe("https://en.wikipedia.org/wiki/Function_(mathematics)");
   });
 
@@ -34,7 +36,9 @@ describe("extractFirstUrl", () => {
 
   it("strips sentence punctuation after a balanced paren", () => {
     expect(
-      extractFirstUrl("go to https://en.wikipedia.org/wiki/Function_(mathematics)."),
+      extractFirstUrl(
+        "go to https://en.wikipedia.org/wiki/Function_(mathematics).",
+      ),
     ).toBe("https://en.wikipedia.org/wiki/Function_(mathematics)");
   });
 
@@ -55,4 +59,24 @@ describe("displayHost", () => {
   it("returns an empty string for undefined input", () => {
     expect(displayHost(undefined)).toBe("");
   });
+});
+
+describe("typedLink", () => {
+  it.each([
+    ["https://example.com/a!", "https://example.com/a!"],
+    ["en.wikipedia.org/wiki/Prague", "en.wikipedia.org/wiki/Prague"],
+    ["bücher.de", "bücher.de"],
+    ["example.com.", "example.com."],
+    ["  https://example.com/a  ", "https://example.com/a"],
+    ["Look at this https://example.org/tea.", "https://example.org/tea"],
+  ])("keeps the link in %j", (text, expected) => {
+    expect(typedLink(text)).toBe(expected);
+  });
+
+  it.each(["hello world", "hello", "", "   ", "see example.com later"])(
+    "refuses %j",
+    (text) => {
+      expect(typedLink(text)).toBeNull();
+    },
+  );
 });

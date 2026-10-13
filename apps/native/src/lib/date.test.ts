@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { trialTimelineVariables } from "./date";
+import { formatRecentDate, trialTimelineVariables } from "./date";
 
 // A zone with daylight saving, so the tests cover a trial that crosses it.
 process.env.TZ = "America/New_York";
@@ -71,5 +71,17 @@ describe("trialTimelineVariables", () => {
       trial_remind_day: text("5"),
       trial_end_day: text("7"),
     });
+  });
+});
+
+describe("formatRecentDate", () => {
+  it("leaves out the year for a date this year", () => {
+    expect(formatRecentDate(at(2026, 8, 14), at(2026, 10, 13))).toBe("Aug 14");
+  });
+
+  it("names the year for a date in an earlier year", () => {
+    expect(formatRecentDate(at(2025, 8, 14), at(2026, 10, 13))).toBe(
+      "Aug 14, 2025",
+    );
   });
 });
