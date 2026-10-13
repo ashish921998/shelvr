@@ -5,14 +5,25 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const motion = vi.hoisted(() => ({
   reduced: false,
+  themeName: "dark",
   withRepeat: vi.fn((animation: unknown, _repeats?: number) => animation),
   cancelAnimation: vi.fn(),
 }));
 
 vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div data-testid="stitch">{children}</div>
-  )),
+  View: vi.fn(
+    ({
+      children,
+      style,
+    }: {
+      children?: ReactNode;
+      style?: { backgroundColor?: string };
+    }) => (
+      <div data-testid="stitch" data-color={style?.backgroundColor}>
+        {children}
+      </div>
+    ),
+  ),
 }));
 vi.mock("react-native-reanimated", () => ({
   default: {
@@ -31,11 +42,15 @@ vi.mock("react-native-reanimated", () => ({
   cancelAnimation: motion.cancelAnimation,
 }));
 vi.mock("react-native-unistyles", () => ({
-  useUnistyles: () => ({ theme: { colors: { primary: "amber" } } }),
+  useUnistyles: () => ({
+    theme: { colors: { primary: "amber", primaryText: "deep-amber" } },
+    rt: { themeName: motion.themeName },
+  }),
 }));
 
 beforeEach(() => {
   motion.reduced = false;
+  motion.themeName = "dark";
   motion.withRepeat.mockClear();
   motion.cancelAnimation.mockClear();
 });
@@ -65,4 +80,17 @@ it("holds a still frame instead of looping under Reduce Motion", async () => {
     </>,
   );
   expect(motion.withRepeat).not.toHaveBeenCalled();
+});
+
+it("sews in the deeper amber on light paper and the brand amber on dark", async () => {
+  const { StitchRing } = await import("./stitch-loader");
+  const dark = render(<StitchRing />);
+  expect(dark.getAllByTestId("stitch")[0]?.dataset.color).toBe("amber");
+  dark.unmount();
+  motion.themeName = "light";
+  const light = render(<StitchRing />);
+  expect(light.getAllByTestId("stitch")[0]?.dataset.color).toBe("deep-amber");
+  light.unmount();
+  const custom = render(<StitchRing color="white" />);
+  expect(custom.getAllByTestId("stitch")[0]?.dataset.color).toBe("white");
 });

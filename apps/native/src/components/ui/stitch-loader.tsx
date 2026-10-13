@@ -59,6 +59,18 @@ export function useLoop(period: number, easing = Easing.linear) {
   return progress;
 }
 
+/**
+ * The default stitch color. On light paper the brand amber is too faint for a
+ * small loader, so light mode sews in the deeper amber the app uses for text.
+ */
+function useStitchTint(color: string | undefined) {
+  const { theme, rt } = useUnistyles();
+  if (color) return color;
+  return rt.themeName === "light"
+    ? theme.colors.primaryText
+    : theme.colors.primary;
+}
+
 const RING_STITCHES = 8;
 
 /**
@@ -74,12 +86,11 @@ export function StitchRing({
   size?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const { theme } = useUnistyles();
+  const tint = useStitchTint(color);
   const progress = useLoop(1100);
   const spin = useAnimatedStyle(() => ({
     transform: [{ rotate: `${progress.value * 360}deg` }],
   }));
-  const tint = color ?? theme.colors.primary;
   const thickness = Math.max(2, Math.round(size * 0.13));
   const length = size * 0.3;
   const radius = (size - thickness) / 2;
@@ -156,9 +167,8 @@ function RowStitch({
 
 /** Three stitches sewing left to right. For busy buttons. */
 export function StitchRow({ color }: { color?: string }) {
-  const { theme } = useUnistyles();
+  const tint = useStitchTint(color);
   const progress = useLoop(1200);
-  const tint = color ?? theme.colors.primary;
   return (
     <View
       style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
