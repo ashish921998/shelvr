@@ -4,14 +4,9 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { openInAppBrowser } from "@/lib/in-app-browser";
 import { useFindLinks } from "@/lib/use-find-links";
 import { Image } from "expo-image";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 // Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched
 // from the toolbar's action menu (an idle item renders no inline chip — it
@@ -47,7 +42,7 @@ export function ProductsSection({
     return (
       <View style={styles.findLinksRow}>
         <View style={styles.chip}>
-          <ActivityIndicator size="small" color={theme.colors.primaryText} />
+          <StitchRing size={14} color={theme.colors.primaryText} />
           <Text style={styles.chipLabel}>{t("products.finding")}</Text>
         </View>
       </View>
@@ -129,7 +124,7 @@ export function ProductsSection({
         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       >
         {finding ? (
-          <ActivityIndicator size="small" color={theme.colors.primaryText} />
+          <StitchRing size={14} color={theme.colors.primaryText} />
         ) : (
           <AppSymbolIcon
             name="bag"
