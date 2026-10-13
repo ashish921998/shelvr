@@ -34,8 +34,9 @@ test("saves a photo from the library", async ({ agent, screen }) => {
   // which is a photo: the run then saved two photos or timed out trying to
   // undo it. The positions are the centres of the picker's own accessibility
   // frames on iOS 26. The newest photo is first in the grid, which is the
-  // one just added unless the library holds a photo dated later; the result
-  // check below reads the saved picture, so a wrong pick fails the flow.
+  // one just added unless the library holds a photo dated later, so the pick
+  // is checked before it is confirmed: confirming uploads the photo, and the
+  // flow must not upload anything but its own fixture.
   // They hold for the one screen they were measured on, so any other
   // simulator stops here instead of tapping somewhere unmeasured.
   const tabBar = await screen.getByRole("tablist", "Tab Bar").boundingBox();
@@ -49,6 +50,10 @@ test("saves a photo from the library", async ({ agent, screen }) => {
     vision: "only",
   });
   await screen.tapAt(PICKER_FIRST_PHOTO);
+  await agent.waitFor(
+    "the photo picker has exactly one photo selected, and it is the plain orange picture that reads E2E PHOTO",
+    { timeout: 30_000, vision: "only" },
+  );
   await screen.tapAt(PICKER_CONFIRM);
 
   await agent.waitFor(
