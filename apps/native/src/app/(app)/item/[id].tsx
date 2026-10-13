@@ -47,7 +47,11 @@ import {
 } from "react-native";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ProgressiveBlurHeader } from "progressive-blur";
-import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
+import Animated, {
+  FadeOutDown,
+  SlideInDown,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
@@ -450,6 +454,13 @@ function useRemoveFromSpace({
   };
 }
 
+// The pager's list ref and whether its programmatic scrolls should animate.
+function usePagerScroll() {
+  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const reducedMotion = useReducedMotion();
+  return { listRef, reducedMotion };
+}
+
 function ItemScreenContent() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
@@ -472,7 +483,7 @@ function ItemScreenContent() {
   } | null>(null);
   const decisionPending = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const { listRef, reducedMotion } = usePagerScroll();
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
   // The home feed is paginated and shared through HomeFeedProvider, so every
@@ -695,7 +706,7 @@ function ItemScreenContent() {
     if (neighbor) {
       listRef.current?.scrollToIndex({
         index: items.indexOf(neighbor),
-        animated: true,
+        animated: !reducedMotion,
       });
       goTo(neighbor._id);
       writeParams(neighbor._id);
@@ -716,6 +727,8 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
+    reducedMotion,
   ]);
 
   const onDelete = useCallback(async () => {
@@ -732,7 +745,7 @@ function ItemScreenContent() {
         writeParams(neighbor._id);
         listRef.current?.scrollToIndex({
           index: Math.min(idx, items.length - 2),
-          animated: true,
+          animated: !reducedMotion,
         });
       } else if (router.canGoBack()) router.back();
       else router.replace("/");
@@ -747,6 +760,8 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
+    reducedMotion,
   ]);
 
   const removeFromSpace = useRemoveFromSpace({
