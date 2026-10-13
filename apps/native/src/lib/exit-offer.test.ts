@@ -72,12 +72,19 @@ describe("reminder controls", () => {
   const HOUR = 60 * 60 * 1000;
 
   it("keeps cancelling possible after scheduling a new reminder is too late", () => {
-    const now = endsAt - HOUR - 60_000; // 1:01:00 left, fires at 1:00:00
+    const now = endsAt - 3 * HOUR - 60_000; // 3:01:00 left, fires at 3:00:00
     expect(exitOfferReminderAt(endsAt, now)).toBeNull();
     expect(exitOfferReminderPending(endsAt, now)).toBe(true);
   });
 
-  it("stops offering cancel once the reminder has fired", () => {
+  it("keeps cancel for a reminder an older build scheduled an hour out", () => {
+    // Opted in on a 1-hour build, updated with 2 hours left: the OS still
+    // holds that reminder, so it must stay cancellable.
+    expect(exitOfferReminderAt(endsAt, endsAt - 2 * HOUR)).toBeNull();
+    expect(exitOfferReminderPending(endsAt, endsAt - 2 * HOUR)).toBe(true);
+  });
+
+  it("stops offering cancel once any reminder has fired", () => {
     expect(exitOfferReminderPending(endsAt, endsAt - HOUR)).toBe(false);
   });
 });
@@ -86,15 +93,15 @@ describe("exitOfferReminderPlan", () => {
   const endsAt = 1_000_000_000_000;
   const HOUR = 60 * 60 * 1000;
 
-  it("schedules an hour before the offer closes", () => {
+  it("schedules 3 hours before the offer closes", () => {
     expect(exitOfferReminderPlan(endsAt, endsAt - 24 * HOUR)).toEqual({
       kind: "schedule",
-      fireAt: endsAt - HOUR,
+      fireAt: endsAt - 3 * HOUR,
     });
   });
 
   it("keeps whatever the OS holds once the reminder is due within a minute", () => {
-    expect(exitOfferReminderPlan(endsAt, endsAt - HOUR - 30_000)).toEqual({
+    expect(exitOfferReminderPlan(endsAt, endsAt - 3 * HOUR - 30_000)).toEqual({
       kind: "keep",
     });
     expect(exitOfferReminderPlan(endsAt, endsAt - 30 * 60_000)).toEqual({

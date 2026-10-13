@@ -26,6 +26,18 @@ export function formatShortDate(ms: number): string {
   });
 }
 
+/** A short date that names the year only when it is not this year's:
+ * "Aug 14", but "Aug 14, 2025". */
+export function formatRecentDate(ms: number, now = Date.now()): string {
+  const date = new Date(ms);
+  const thisYear = date.getFullYear() === new Date(now).getFullYear();
+  return date.toLocaleDateString(formattingLocale(), {
+    month: "short",
+    day: "numeric",
+    ...(thisYear ? {} : { year: "numeric" }),
+  });
+}
+
 /** A free trial's length as the store reports it: `unit` is DAY, WEEK, MONTH
  * or YEAR. */
 export type TrialPeriod = { unit: string; count: number };
