@@ -95,11 +95,14 @@ const mock = vi.hoisted(() => {
   };
 });
 
+vi.mock("@/components/ui/stitch-loader", () => ({
+  StitchRing: vi.fn(() => null),
+  StitchRow: vi.fn(() => null),
+}));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   View: mock.view,
   Text: mock.text,
-  ActivityIndicator: mock.nothing,
   Modal: mock.modal,
   Pressable: mock.pressable,
   TextInput: mock.textInput,

@@ -54,14 +54,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { shareStore } from "@/lib/share/share-store";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -71,6 +64,7 @@ import {
   REDUCED_FADE_IN,
   REDUCED_FADE_OUT,
 } from "@/lib/motion";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -631,7 +625,7 @@ function Centered({
 }) {
   return (
     <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
-      {spinner ? <ActivityIndicator color={theme.colors.primary} /> : null}
+      {spinner ? <StitchRing size={22} /> : null}
       <Text style={styles.label(theme)}>{label}</Text>
     </PhaseSurface>
   );
