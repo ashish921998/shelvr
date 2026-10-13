@@ -454,8 +454,14 @@ function useRemoveFromSpace({
   };
 }
 
-function ItemScreenContent() {
+// The pager's list ref and whether its programmatic scrolls should animate.
+function usePagerScroll() {
+  const listRef = useRef<FlashListRef<DetailItem>>(null);
   const reducedMotion = useReducedMotion();
+  return { listRef, reducedMotion };
+}
+
+function ItemScreenContent() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
     from?: string;
@@ -477,7 +483,7 @@ function ItemScreenContent() {
   } | null>(null);
   const decisionPending = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const { listRef, reducedMotion } = usePagerScroll();
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
   // The home feed is paginated and shared through HomeFeedProvider, so every
@@ -721,6 +727,7 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
     reducedMotion,
   ]);
 
@@ -753,6 +760,7 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
     reducedMotion,
   ]);
 
