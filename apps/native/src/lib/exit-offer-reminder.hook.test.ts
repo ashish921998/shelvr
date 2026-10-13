@@ -95,7 +95,7 @@ afterEach(() => {
 describe("useExitOfferReminder", () => {
   it("does not cancel a due reminder while the account is still loading", async () => {
     // Cold launch 30 seconds before the reminder fires.
-    const resolve = optedIn(now + HOUR + 30_000);
+    const resolve = optedIn(now + 3 * HOUR + 30_000);
     await vi.runAllTimersAsync();
     expect(mock.cancel).not.toHaveBeenCalled();
     resolve();
@@ -113,7 +113,7 @@ describe("useExitOfferReminder", () => {
     expect(mock.cancel).toHaveBeenCalledTimes(1);
     expect(mock.schedule).toHaveBeenCalledTimes(1);
     expect(mock.schedule.mock.calls[0][0].trigger.date.getTime()).toBe(
-      now + 23 * HOUR,
+      now + 21 * HOUR,
     );
   });
 });
