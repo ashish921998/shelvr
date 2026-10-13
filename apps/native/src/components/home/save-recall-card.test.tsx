@@ -77,6 +77,23 @@ it("names the new save and counts only the saves the stack shows", () => {
   expect(screen.getByText(/^home\.recallOldest /)).toBeDefined();
 });
 
+it("shortens a long title so the count still fits", () => {
+  render(
+    <SaveRecallCard
+      savedTitle={`  ${"Very long article title ".repeat(4)} `}
+      matches={[match("a", 10)]}
+      onOpen={vi.fn()}
+      onDismiss={vi.fn()}
+    />,
+  );
+  const text = screen.getByText(/^home\.recallStackTitle /).textContent ?? "";
+  const { title } = JSON.parse(text.slice(text.indexOf("{"))) as {
+    title: string;
+  };
+  expect(Array.from(title).length).toBeLessThanOrEqual(48);
+  expect(title).toMatch(/^Very long article title.*\S…$/);
+});
+
 it("falls back to the generic line when the new save has no title", () => {
   render(
     <SaveRecallCard

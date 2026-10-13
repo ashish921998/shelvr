@@ -1,4 +1,5 @@
-import { t, formattingLocale, useAppLocale } from "@/lib/i18n";
+import { formatRecentDate } from "@/lib/date";
+import { t, useAppLocale } from "@/lib/i18n";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { RECALL_MAX_SHOWN } from "@/lib/save-recall";
 import type { api } from "@convex/_generated/api";
@@ -60,10 +61,13 @@ export function SaveRecallCard({
   const top = shown[0];
   if (top === undefined) return null;
   const title = savedTitle
-    ? t("home.recallStackTitle", { count: shown.length, title: savedTitle })
+    ? t("home.recallStackTitle", {
+        count: shown.length,
+        title: clipTitle(savedTitle),
+      })
     : t("home.recallBody", { count: shown.length });
   const oldest = Math.min(...shown.map((item) => item._creationTime));
-  const date = shortDate(oldest);
+  const date = formatRecentDate(oldest);
   const meta =
     shown.length === 1
       ? t("home.recallSavedOn", { date })
@@ -175,17 +179,19 @@ function StackThumb({
   );
 }
 
-/** "Aug 14", with the year only when it is not this year's. */
-function shortDate(ms: number): string {
-  const date = new Date(ms);
-  const thisYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString(formattingLocale(), {
-    month: "short",
-    day: "numeric",
-    ...(thisYear ? {} : { year: "numeric" }),
-  });
+/** Shortens a long save title so the rest of the sentence, which comes after
+ * it in some languages, still fits in the card's three lines. */
+function clipTitle(title: string): string {
+  const trimmed = title.trim();
+  const chars = Array.from(trimmed);
+  if (chars.length <= TITLE_MAX_CHARS) return trimmed;
+  return `${chars
+    .slice(0, TITLE_MAX_CHARS - 1)
+    .join("")
+    .trimEnd()}…`;
 }
 
+const TITLE_MAX_CHARS = 48;
 const FRONT_THUMB = 58;
 const BACK_THUMB = 50;
 
