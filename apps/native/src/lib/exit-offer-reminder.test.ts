@@ -113,13 +113,13 @@ describe("optOutOfExitOfferReminder", () => {
 });
 
 describe("syncExitOfferReminder", () => {
-  it("reminds an hour before the offer closes", async () => {
+  it("reminds 3 hours before the offer closes", async () => {
     await expect(syncExitOfferReminder(now + 24 * HOUR, now)).resolves.toBe(
       true,
     );
     const [request] = mock.schedule.mock.calls[0];
     expect(request.identifier).toBe(EXIT_OFFER_REMINDER_ID);
-    expect(request.trigger.date.getTime()).toBe(now + 23 * HOUR);
+    expect(request.trigger.date.getTime()).toBe(now + 21 * HOUR);
     expect(request.content.data).toEqual({
       url: "/",
       kind: "exit_offer_reminder",
@@ -144,9 +144,9 @@ describe("syncExitOfferReminder", () => {
 
   it("leaves a reminder alone once it is due within a minute", async () => {
     // Opening the app just before the reminder fires must not cancel it.
-    await expect(syncExitOfferReminder(now + HOUR + 30_000, now)).resolves.toBe(
-      false,
-    );
+    await expect(
+      syncExitOfferReminder(now + 3 * HOUR + 30_000, now),
+    ).resolves.toBe(false);
     await expect(syncExitOfferReminder(now + 30 * 60_000, now)).resolves.toBe(
       false,
     );

@@ -40,6 +40,7 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -196,6 +197,7 @@ export function AppTabs() {
 }
 
 function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
+  const reducedMotion = useReducedMotion();
   const { theme } = useUnistyles();
   const { width: windowWidth } = useWindowDimensions();
   const keyboardVisible = useKeyboardVisible();
@@ -399,12 +401,14 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     const press = 1 + pressed.get() * PRESS_GROWTH;
     return {
       width: interpolate(morph.get(), [0, 1], [pillWidth, BAR_HEIGHT]),
-      transform: [
-        { translateX: stretchX * DRIFT },
-        { translateY: stretchY * DRIFT },
-        { scaleX: press * (1 + growX - growY * SQUASH) },
-        { scaleY: press * (1 + growY - growX * SQUASH) },
-      ],
+      transform: reducedMotion
+        ? []
+        : [
+            { translateX: stretchX * DRIFT },
+            { translateY: stretchY * DRIFT },
+            { scaleX: press * (1 + growX - growY * SQUASH) },
+            { scaleY: press * (1 + growY - growX * SQUASH) },
+          ],
     };
   });
 

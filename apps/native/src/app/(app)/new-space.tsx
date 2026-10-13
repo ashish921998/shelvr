@@ -13,7 +13,6 @@ import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -29,6 +28,7 @@ import Animated, {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { StitchRow } from "@/components/ui/stitch-loader";
 
 const SUBMIT_CONTENT_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ scale: motion.scale.pressed }] },
@@ -206,10 +206,7 @@ function SpaceForm(props: SpaceFormProps) {
             style={styles.saveButtonState}
           >
             {saving ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryForeground}
-              />
+              <StitchRow color={theme.colors.primaryForeground} />
             ) : (
               <Text style={styles.saveButtonText}>
                 {editing ? t("common.saveChanges") : t("spaces.create")}

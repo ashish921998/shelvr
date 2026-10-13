@@ -1,14 +1,13 @@
 import { test } from "@e2e-dev/mobile";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { chooseAddOption, startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
 // Every control on this path is in the accessibility tree, so the steps are
 // plain locators and only the result needs a model.
 test("saves a link as an article", async ({ agent, screen }) => {
-  await screen.getByRole("button", "Add").tap();
-  await screen.getByTestId("add-option-article").tap();
+  await chooseAddOption(screen, screen.getByTestId("add-option-article"));
   await screen
     .getByTestId("add-article-input")
     .fill("https://en.wikipedia.org/wiki/Sourdough");
