@@ -29,7 +29,7 @@ import { logEvent } from "./model/log";
  *
  * `_id` is the same value `requireUserId` returns server-side, so passing it to
  * RevenueCat keeps the webhook mapping consistent. Only the two fields the
- * client needs are projected out — not the full auth document — so the contract
+ * client needs are projected out, not the full auth document, so the contract
  * doesn't drift with Convex Auth's `users` schema (phone, verification state,
  * …).
  */
@@ -54,7 +54,7 @@ export const getCurrentUser = query({
 /**
  * Deletes the currently authenticated user's Shelvr account and all owned data.
  *
- * Identity is always derived from Convex Auth — never from a client-supplied
+ * Identity is always derived from Convex Auth, never from a client-supplied
  * user id. Cleanup covers:
  *  - items (and their image storage blobs)
  *  - space memberships
@@ -237,8 +237,8 @@ async function deleteAccountBatch(
 }
 
 /** Deletes up to one batch of domain data keyed by the Convex Auth user id.
- * Returns true when everything is gone. Tables drain strictly in order —
- * memberships fully first so join rows never dangle mid-deletion — and a full
+ * Returns true when everything is gone. Tables drain strictly in order:
+ * memberships fully first so join rows never dangle mid-deletion, and a full
  * batch from any table ends the pass so the continuation resumes there.
  * Storage is deleted with the rows that reference it. */
 async function deleteUserOwnedDataBatch(
@@ -285,7 +285,7 @@ async function deleteUserOwnedDataBatch(
   }
   if (items.length === DELETE_BATCH) return false;
 
-  // Pending rows may still hold an unfinalized upload — delete that storage.
+  // Pending rows may still hold an unfinalized upload: delete that storage.
   const operations = await ctx.db
     .query("itemOperations")
     .withIndex("by_user_operation", (q) => q.eq("userId", userKey))
@@ -343,7 +343,7 @@ async function deleteUserOwnedDataBatch(
   // (see docs/architecture/feedback.md); it only removes the Convex copy.
   if (!(await deleteFeedbackBatch(ctx, userKey))) return false;
 
-  // Does not cancel the App Store subscription — only the local entitlement row.
+  // Does not cancel the App Store subscription: only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")
     .withIndex("by_user", (q) => q.eq("userId", userKey))
@@ -406,7 +406,7 @@ async function deleteSentNotificationsBatch(
  * when the table is fully drained for this user. Feedback rows hold the
  * user's authored messages, so they drain with the account; deleting a row
  * cannot retract an already-delivered inbox email
- * (see docs/architecture/feedback.md) — it only removes the Convex copy. */
+ * (see docs/architecture/feedback.md). It only removes the Convex copy. */
 async function deleteFeedbackBatch(
   ctx: MutationCtx,
   userKey: string,

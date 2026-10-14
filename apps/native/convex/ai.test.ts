@@ -759,7 +759,7 @@ describe("linkEnrichment", () => {
   });
   // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
   // failed (retryable, classified from the URL alone), the page read but had
-  // no article body (terminal — e.g. an oEmbed-only TikTok read), a fully
+  // no article body (terminal, e.g. an oEmbed-only TikTok read), a fully
   // read article, and no page at all (images/notes never fetch).
   it("flags an unreadable page as partial so the client offers a retry", () => {
     expect(linkEnrichment({ status: "unreadable" })).toBe("partial");

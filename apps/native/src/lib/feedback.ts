@@ -122,7 +122,7 @@ export function parseInvitationState(
 // --- review-prompt coordination --------------------------------------------
 // `useReviewPrompt` fires on the same 3-ready-saves threshold. It marks here
 // when it claims the moment; the invitation defers while the mark is fresh.
-// Session scope is enough — the native review flow only exists in-session.
+// Session scope is enough: the native review flow only exists in-session.
 
 let reviewPromptedAt: number | null = null;
 let reviewAttemptInFlight = false;

@@ -12,7 +12,7 @@ import {
 import { AnimatedSplash } from "./animated-splash";
 
 // Holds the launch animation over the app for one cold start. The app mounts
-// and boots underneath it — auth restore, query hydration, the first route —
+// and boots underneath it (auth restore, query hydration, the first route),
 // so the splash covers real startup work rather than adding a delay in front
 // of it, and hands off with a cross-fade to whatever is already there.
 //
@@ -33,7 +33,7 @@ let hasPlayed = false;
 
 /**
  * Whether a tapped notification is about to take the user somewhere.
- * `useNotificationObserver` navigates only on a truthy `url` — so an
+ * `useNotificationObserver` navigates only on a truthy `url`, so an
  * informational push, or one carrying an empty string, goes nowhere and is not
  * a reason to skip the animation. The truthiness test is what keeps this in
  * step with the observer.
@@ -61,7 +61,7 @@ export function useSplashGate() {
   // Expo Router resolves the initial URL asynchronously, so a share or deep
   // link can land at any point: before this hook first runs, between its
   // render and its commit, or a frame or two into the animation. Reading the
-  // flag as an external store covers all three — a subscription set up in an
+  // flag as an external store covers all three: a subscription set up in an
   // effect would miss anything that arrived before the effect ran, since the
   // store does not replay.
   const directLaunch = useSyncExternalStore(
@@ -74,8 +74,8 @@ export function useSplashGate() {
       !hasPlayed &&
       !isDirectLaunch() &&
       !launchedByNotificationRoute() &&
-      // A share the OS just delivered — or one left over from a launch that
-      // died before the share screen consumed it — is a launch heading
+      // A share the OS just delivered, or one left over from a launch that
+      // died before the share screen consumed it, is a launch heading
       // somewhere specific. The same resumable-batch read the resume path
       // uses settles the question synchronously at gate init, and a batch
       // the user explicitly discarded is not "heading somewhere": it stays

@@ -8,7 +8,7 @@ export function isProbablyUrl(text: string) {
 
 const TRAILING_PUNCTUATION = /[.,;:!?'"]/;
 
-/** A closing bracket only ends the URL when the text never opened it — a caption
+/** A closing bracket only ends the URL when the text never opened it: a caption
  * like "(see https://example.com/a)" borrows the paren, whereas
  * "https://en.wikipedia.org/wiki/Function_(mathematics)" needs its own. */
 function closesMoreThanItOpens(url: string, open: string, close: string) {

@@ -156,8 +156,8 @@ export function AppTabs() {
   // Unistyles theme (appearance-runtime.ts), so the render the scheme change
   // triggers still resolves styles.* to the outgoing theme, and nothing
   // renders again after the rebuild. Subscribing here re-renders on the
-  // rebuild — reading `theme` during render is what registers the
-  // dependency — and the inline colour hands the view the new value.
+  // rebuild. Reading `theme` during render is what registers the
+  // dependency, and the inline colour hands the view the new value.
   // Without it the backdrop the bar floats over keeps the outgoing theme's
   // background: a cream band under a dark theme.
   const { theme } = useUnistyles();

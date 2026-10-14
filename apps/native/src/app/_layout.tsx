@@ -43,7 +43,7 @@ function NotificationSetup() {
 }
 
 /** Owns analytics identify/reset and the Convex cache clearing on the auth
- * edge. See useAnalyticsIdentity — the one session boundary. */
+ * edge. See useAnalyticsIdentity, the one session boundary. */
 function AnalyticsIdentity() {
   useAnalyticsIdentity();
   return null;
@@ -79,7 +79,7 @@ function EntitlementSync() {
 export default function RootLayout() {
   const router = useRouter();
   const { rt } = useUnistyles();
-  // The launch animation plays once per process, over the booting app — and
+  // The launch animation plays once per process, over the booting app, and
   // not at all when a share intent, deep link or notification is taking the
   // user somewhere specific.
   const { showSplash, finishSplash } = useSplashGate();

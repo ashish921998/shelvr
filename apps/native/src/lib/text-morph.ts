@@ -2,7 +2,7 @@
 // Reanimated or Skia imports, so the transition logic tests in isolation.
 // The rendering half lives in components/animated-text.tsx.
 
-// One cap, two bounded layers — both matter for long or rapidly swapped
+// One cap, two bounded layers: both matter for long or rapidly swapped
 // titles, and both keep the Skia/worklet scene from allocating unbounded
 // glyph nodes:
 // - The laid-out run: layoutMorphText stops adding glyphs at this count and
@@ -38,8 +38,8 @@ type MorphRender = {
  * no canvas. Painting the title natively in that gap and then morphing it in
  * would blank text the reader can already see, so an untouched slot `hold`s
  * blank and the letters rise into it. `paintedNative` latches once native text
- * has been shown — the hold expired, the font failed, or native shaping owns
- * this string — and from then on the canvas mounts opaque.
+ * has been shown (the hold expired, the font failed, or native shaping owns
+ * this string) and from then on the canvas mounts opaque.
  */
 export function resolveMorphRender(
   fontReady: boolean,

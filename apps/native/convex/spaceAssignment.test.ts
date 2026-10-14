@@ -49,7 +49,7 @@ describe("explicit space assignment vs classification", () => {
         .withIndex("by_item", (q) => q.eq("itemId", itemId))
         .collect();
       const bySpace = new Map(joins.map((j) => [j.spaceId, j.status]));
-      // The explicit assignment is untouched — never downgraded to suggested.
+      // The explicit assignment is untouched, never downgraded to suggested.
       expect(bySpace.get(dynamicSpace)).toBe("saved");
       // The AI's pick landed as a suggestion only.
       expect(bySpace.get(otherSpace)).toBe("suggested");

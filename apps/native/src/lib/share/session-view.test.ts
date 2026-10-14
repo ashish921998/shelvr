@@ -1,5 +1,5 @@
 // Tests for the share screen's pure derivations. No React renderer and no
-// native share module — these are plain functions of a session (or of the
+// native share module: these are plain functions of a session (or of the
 // resolution outputs), which is the point of keeping them out of the screen.
 import { describe, expect, it } from "vitest";
 

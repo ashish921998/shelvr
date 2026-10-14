@@ -47,7 +47,7 @@ const SPLASH_HOLD = 0.2;
 const SPLASH_EXIT = 0.22;
 
 /**
- * Total time the splash owns the screen, after which it hands off — 2.5s.
+ * Total time the splash owns the screen, after which it hands off: 2.5s.
  *
  * Retiming means moving `TIMELINE` and `SCHEDULE` together, not cutting this
  * short: the duration is derived from the last beat, so trimming it here would
@@ -60,7 +60,7 @@ export const SPLASH_DURATION =
 export const SPLASH_EXIT_FROM = SPLASH_DURATION - SPLASH_EXIT;
 
 /**
- * The composition and the lockup share this anchor — a fraction of screen
+ * The composition and the lockup share this anchor: a fraction of screen
  * height, slightly above true centre, which is where a lockup wants to sit.
  */
 export const SPLASH_ANCHOR_Y = 0.46;
@@ -68,9 +68,9 @@ export const SPLASH_ANCHOR_Y = 0.46;
 export type SplashPalette = {
   /** Most of the sketched saves, and every dust mote. */
   ink: string;
-  /** The warm minority — roughly one save in eight. */
+  /** The warm minority: roughly one save in eight. */
   accent: string;
-  /** The cool minority — rarer still. */
+  /** The cool minority: rarer still. */
   cool: string;
   /** The thread itself, and the burst. */
   thread: string;
@@ -96,7 +96,7 @@ type SplashTheme = {
  * buys. Both dark themes share the dark pair; the neutral one is a reading
  * preference, not a second brand.
  *
- * The amber mark is common to both — it carries against either ground, and it
+ * The amber mark is common to both. It carries against either ground, and it
  * is the one colour a viewer is meant to recognise.
  */
 export const SPLASH_THEMES: Record<"light" | "dark", SplashTheme> = {

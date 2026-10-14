@@ -7,7 +7,7 @@ import { v } from "convex/values";
  * instead of restating the ids. Nothing but `convex/values` is imported here,
  * so the client never pulls the server runtime in behind it.
  *
- * Each id is an analytics contract — the `save_source` property on the
+ * Each id is an analytics contract: the `save_source` property on the
  * `item_saved` event, which PostHog dashboards group on. Adding one is additive;
  * renaming one splits an existing funnel in two without saying so.
  */

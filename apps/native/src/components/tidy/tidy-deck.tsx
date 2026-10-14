@@ -14,7 +14,7 @@ type Props = {
 // One CardAnimationProvider per card keeps pan shared values scoped to a
 // single stack element (the Slack Catch Up structure). The photos array is
 // frozen per batch and this component depends only on stable props, so it
-// never re-renders on a swipe — each card tracks its own visibility off the
+// never re-renders on a swipe: each card tracks its own visibility off the
 // shared currentIndex instead. That keeps rapid swiping smooth.
 const TidyDeckComponent: FC<Props> = ({ photos, onDecision }) => {
   const topStart = photos.length - 1;

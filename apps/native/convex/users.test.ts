@@ -354,7 +354,7 @@ describe("deleteCurrentUserAccount", () => {
     }
   });
 
-  // Regression: the onboarding demo table must drain with the account — no
+  // Regression: the onboarding demo table must drain with the account: no
   // orphan allowance row (or dangling item reference) may survive deletion.
   it("removes the onboarding demo allowance with the account", async () => {
     const backend = newConvexTest();

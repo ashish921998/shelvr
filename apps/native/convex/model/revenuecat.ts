@@ -12,7 +12,7 @@ export type RevenueCatEvent = {
 };
 
 /** Parse the subset of a RevenueCat webhook used by the entitlement sync.
- * Returns `undefined` only when the body is not a readable object — the caller
+ * Returns `undefined` only when the body is not a readable object: the caller
  * then returns HTTP 400. A readable event missing `type` or `app_user_id`
  * returns a partial object with those fields as `undefined` so the caller can
  * respond HTTP 200 (acknowledging the event so RevenueCat stops retrying)

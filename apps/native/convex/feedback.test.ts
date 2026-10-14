@@ -245,7 +245,7 @@ describe("delivery retries", () => {
       deliveryError: "provider_error:500",
     });
 
-    // The log line carries category/status/attempt only — never the message
+    // The log line carries category/status/attempt only, never the message
     // or the account email.
     const logged = errorSpy.mock.calls
       .map((call) => String(call[0]))

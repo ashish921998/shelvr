@@ -72,7 +72,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Email-keyed limit still stops one address from looping. IP and global
   // buckets stop a client from rotating emails (or one IP from flooding).
   // The global bucket gates every signup site-wide, so it must sit well
-  // above a legitimate launch spike — err high.
+  // above a legitimate launch spike. Err high.
   waitlistJoin: { kind: "token bucket", rate: 5, period: HOUR, capacity: 3 },
   waitlistJoinIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   waitlistJoinGlobal: {

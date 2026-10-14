@@ -188,7 +188,7 @@ export const listSpaces = query({
   returns: v.array(
     v.object({
       ...spaceFields,
-      // Saved memberships only — pending suggestions don't inflate the count.
+      // Saved memberships only: pending suggestions don't inflate the count.
       itemCount: v.number(),
       suggestionCount: v.number(),
       previews: v.array(
@@ -233,7 +233,7 @@ export const getSpace = query({
     v.object({
       ...spaceFields,
       // Saved items additionally carry this membership's purpose-steered
-      // intents — the same item can act differently on a different shelf.
+      // intents: the same item can act differently on a different shelf.
       items: v.array(
         v.object({
           ...enrichedItemValidator.fields,
@@ -664,7 +664,7 @@ export const acceptAllSuggestions = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Internal — maintenance
+// Internal: maintenance
 // ---------------------------------------------------------------------------
 
 /**
@@ -775,7 +775,7 @@ export const backfillSpaceCounters = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Internal — used by the AI actions
+// Internal: used by the AI actions
 // ---------------------------------------------------------------------------
 
 export const listSpacesInternal = internalQuery({
@@ -928,7 +928,7 @@ export const claimPlanInternal = internalMutation({
 });
 
 /**
- * Item ids that already have any membership row for a space — the
+ * Item ids that already have any membership row for a space. The
  * recommendation pass excludes them up front so the model's picks aren't
  * wasted on items the user already filed or dismissed.
  */
@@ -965,7 +965,7 @@ export const listSavedSpaceIdsForItemInternal = internalQuery({
 
 /**
  * The steering pass's write path: intents scoped to one membership row. Only
- * `saved` rows carry them — steering never runs for pending suggestions.
+ * `saved` rows carry them. Steering never runs for pending suggestions.
  * Intents do not affect the space summary, so this is the one spaceItems
  * patch that bypasses model/memberships.ts on purpose.
  */

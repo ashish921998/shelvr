@@ -8,7 +8,7 @@ const BADGE_SIZE = 26;
 /**
  * The "suggested" marker: a sparkles symbol in a glass circle,
  * overlaid on a corner of the item image. When `onPress` is given, tapping
- * the badge IS the accept gesture — one tap files the item into the space.
+ * the badge IS the accept gesture: one tap files the item into the space.
  */
 export function SuggestedBadge({
   size = BADGE_SIZE,
