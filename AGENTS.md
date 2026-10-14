@@ -136,7 +136,7 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   which the PostHog project setting must also enable server-side.
 - Convex backend: `logEvent(level, event, fields)` from `convex/model/log.ts`
   emits one JSON line per event into the Convex log stream. Fields are scalars
-  only (categories, codes, ids, counts) — never messages, URLs, or user content.
+  only (categories, codes, ids, counts), never messages, URLs, or user content.
 - Web: server code uses `serverLog` from `apps/web/src/lib/serverLog.ts`; client
   render failures report via `captureWebException` from `app/error.tsx` and
   `app/global-error.tsx`.
@@ -169,12 +169,12 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   fingerprint (a native dependency added or removed, a native config change,
   or `version` in `app.json`) makes new updates invisible to binaries built
   from the old fingerprint: cut a fresh store build before resuming OTA
-  publishes. The version is the easy one to miss — a bump must land on
+  publishes. The version is the easy one to miss: a bump must land on
   `main` before any OTA aimed at the build carrying it. The build number is
   not an input.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
-  that needs them. Breaking changes go out as expand/contract — an installed
+  that needs them. Breaking changes go out as expand/contract, so an installed
   client must never reach a missing function or a stricter validator.
 
 ## Non-negotiable boundaries

@@ -4,14 +4,14 @@
 and control tokens; `apps/native/src/lib/motion.ts` is the motion vocabulary;
 `src/components/ui/themed-text.tsx` and `src/components/ui/button.tsx` are the
 primitives that consume them. New UI reaches for these names instead of
-literals. Existing layouts keep their literal styles — migrate them when a
-file is touched for other reasons, not in bulk.
+literals. Existing layouts keep their literal styles. Migrate them when you
+touch a file for other reasons, not in bulk.
 
 ## Type
 
 The type ramp is `theme.type`: 23 named steps from `hero` (48) down to `badge`
-(10), each pairing a font family with a size. The steps were not invented —
-each one names a family/size pair the app already renders as a literal, so the
+(10), each pairing a font family with a size. The steps were not invented.
+Each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
@@ -21,8 +21,8 @@ Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.
 Use variants in new UI; a `fontSize` literal in a new component is a smell.
-The census is not complete — bold 14, regular 12, medium 11, bold 11, and bold
-26 are rendered as literals with no step yet — so migrating a file may mean
+The census is not complete. Bold 14, regular 12, medium 11, bold 11, and bold
+26 are rendered as literals with no step yet, so migrating a file may mean
 naming the step it needs instead of overriding sizes at the call site.
 
 ## Spacing, radius, and controls
@@ -34,7 +34,7 @@ couple of dozen literal paddings remain in older files, a few of them off the
 grid entirely (`intent-chip` pads 7 and 12), and they migrate when the file is
 touched for other reasons. A parallel set of named steps was tried and removed:
 it could express nothing `gap` could not, and it left two vocabularies for one
-concept — reach for a fraction rather than a name. `theme.radius` is `sm` 8,
+concept. Reach for a fraction rather than a name. `theme.radius` is `sm` 8,
 `md` 11, `lg` 16, and `xl` 24. `theme.control` holds the minimum touch target
 height (48) and `pressRetentionOffset` (12); `Button` consumes both, so
 interactive rows that roll their own `Pressable` should match them.
@@ -48,7 +48,7 @@ are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `foreground`, `muted`, `faint`, `primary`, `primaryForeground`, `primarySoft`,
 `primaryText`, `border`, `imageBorder`, `danger`, `overlay`, `onOverlay`,
 `onTint`, `keep`, `onKeep`, and `tabTint`. Content drawn on a filled tint
-uses the paired `on*` role: `onTint` on `primary` (a dark label — white on
+uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
 `tabTint` is the tab bar tint. iOS `NativeTabs` paints the selected tab's icon
 and its label with it, so it carries normal-size text: the light theme darkens
@@ -56,10 +56,10 @@ it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
 4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the
 same accessible color for small captions; `primaryText` and `danger` just over
-4.5:1 — the rationale sits in comments next to each value). Any new light-theme
+4.5:1, with the rationale in comments next to each value). Any new light-theme
 text color must clear 4.5:1 for body text or 3:1 for large text against every
-surface it renders on — including `surfaceMuted` and `primarySoft`, not the
-paper background alone; check the dark themes for legibility too.
+surface it renders on, including `surfaceMuted` and `primarySoft`, not the
+paper background alone. Check the dark themes for legibility too.
 
 ## Themes and appearance
 
@@ -76,9 +76,9 @@ declared in the same file for `useBreakpoints`.
 ## Motion
 
 `lib/motion.ts` is a shared vocabulary, not a set of per-screen constants.
-Durations form a budget — `feedback` 120ms for press/hover swaps, `state` 180
-for in-place content changes, `enter` 250 / `exit` 200 for layout animations —
-and the curves (`out`, `inOut`) match Expo's easing exactly, with `out`
+Durations form a budget: `feedback` 120ms for press/hover swaps, `state` 180
+for in-place content changes, and `enter` 250 / `exit` 200 for layout animations.
+The curves (`out`, `inOut`) match Expo's easing exactly, with `out`
 published in CSS form too, so Reanimated timing and gesture-captured CSS
 transitions feel identical (`motionCSS` exists because CSS easing objects
 must stay outside `motion` or gesture capturing a spring tries to serialize
@@ -90,7 +90,7 @@ them to the UI runtime). Reach for `motion.timing.*` in `withTiming` calls
 budget composes it from `motion.duration.*` and `motion.easing.*` instead of
 a preset added ahead of its first use. The `fadeIn`/`fadeOut` builders
 animate opacity only and stay gentle under Reduce Motion; never attach them
-(or any `entering`) to recycled list rows — rows recycle constantly, so every
+(or any `entering`) to recycled list rows. Rows recycle constantly, so every
 bind would replay an entrance. `REDUCED_FADE_*` covers reduced-motion state
 swaps. The header text morph (`motion.textMorph`) is a deliberate signature
 effect with its own budget, bounded scenes, and interruption handling; see
@@ -154,7 +154,7 @@ genuinely cannot express.
 ## Adding tokens
 
 Shared tokens go in `shared` (every theme inherits them); values that differ
-per theme go in each theme's `colors`. Keep the `as const` annotations — the
+per theme go in each theme's `colors`. Keep the `as const` annotations, because the
 generated types flow through the `UnistylesThemes` module augmentation into
 `StyleSheet.create` factories and `useUnistyles`. Knip fails the build on
 unused exports, so a new exported token or builder needs a consumer in the
@@ -162,6 +162,6 @@ same change. It cannot see properties inside the theme or `motion` objects, so
 those are pruned by hand, and the bar differs by kind. A motion or radius token
 is a tuned number: an unused preset reads to the next person as a measured
 choice when nobody has ever watched it run, so add one when a call site needs
-it, not before. The type ramp is the opposite case — its steps document sizes
+it, not before. The type ramp is the opposite case. Its steps document sizes
 the app already renders, so they stay whether or not a `variant` caller exists
 yet.
