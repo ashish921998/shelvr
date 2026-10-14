@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 8, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 14, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -124,6 +124,12 @@ export default function PrivacyPage() {
           only happens when you tap it.
         </p>
         <p className="mt-2">
+          If you save a cooking TikTok or Instagram reel whose caption has no
+          recipe, its public link is sent to Treg (treg.to), which returns what
+          is said in the video. That transcript is then sent to Gemini to write
+          the recipe.
+        </p>
+        <p className="mt-2">
           Transient AI failures do not delete content you already captured.
         </p>
       </section>
@@ -155,6 +161,10 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>SerpAPI:</strong> shopping search for “Find links”.
+          </li>
+          <li>
+            <strong>Treg:</strong> video transcripts for recipes from cooking
+            TikToks and reels.
           </li>
           <li>
             <strong>Convex:</strong> database, file storage, and backend
