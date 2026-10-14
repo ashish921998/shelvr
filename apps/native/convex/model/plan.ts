@@ -120,13 +120,20 @@ const GENERIC_WORDS = new Set([
 ]);
 
 /** What a save offers as evidence: its text squashed whole, its separate
- * words, and its space-separated chunks squashed, for names that run
- * together ("@parici_cafe"). */
-type Evidence = { text: string; words: Set<string>; chunks: string[] };
+ * words, its space-separated chunks squashed, for names that run together
+ * ("@parici_cafe"), and the chunks that are handles or hashtags. */
+type Evidence = {
+  text: string;
+  words: Set<string>;
+  chunks: string[];
+  tags: string[];
+};
 
-/** Squashed words in any script; punctuation and spaces split them. */
+/** Squashed words in any script; punctuation and spaces split them, but an
+ * apostrophe does not, so "Joe's" and "Joes" are the same word. */
 function wordsOf(text: string): string[] {
   return text
+    .replace(/['’]/g, "")
     .split(/[^\p{L}\p{N}\p{M}]+/u)
     .map(squash)
     .filter(Boolean);
@@ -142,19 +149,26 @@ function evidenceOf(source: PlanSource): Evidence {
   ]
     .filter(Boolean)
     .join(" ");
+  const rawChunks = raw.split(/\s+/);
   return {
     text: squash(raw),
     words: new Set(wordsOf(raw)),
-    chunks: raw.split(/\s+/).map(squash).filter(Boolean),
+    chunks: rawChunks.map(squash).filter(Boolean),
+    tags: rawChunks
+      .filter((chunk) => /^[#@]/.test(chunk))
+      .map(squash)
+      .filter(Boolean),
   };
 }
 
-/** A distinctive word of a name the save has: as a whole word, or, in
- * scripts written without spaces (Japanese), anywhere in its text. A Latin
- * word inside another one proves nothing: "Oro" is not in "Toronto". */
+/** A distinctive word of a name the save has: as a whole word, at the start
+ * of a handle or hashtag ("#carbonenyc"), or, in scripts written without
+ * spaces (Japanese), anywhere in its text. A Latin word inside another one
+ * proves nothing: "Oro" is not in "Toronto". */
 function hasWord(word: string, evidence: Evidence): boolean {
   return (
     evidence.words.has(word) ||
+    evidence.tags.some((tag) => tag.startsWith(word)) ||
     (!/^[a-z0-9]+$/.test(word) && evidence.text.includes(word))
   );
 }

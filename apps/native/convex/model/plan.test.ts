@@ -74,6 +74,19 @@ describe("isGrounded", () => {
     );
   });
 
+  it("grounds a name opening a hashtag or written with an apostrophe", () => {
+    expect(
+      isGrounded("Carbone", source({ title: "date night #carbonenyc" })),
+    ).toBe(true);
+    expect(isGrounded("Carbone", source({ title: "dinner @carbonenyc" }))).toBe(
+      true,
+    );
+    expect(
+      isGrounded("Joe's Pizza", source({ title: "Joes Pizza slice" })),
+    ).toBe(true);
+    expect(isGrounded("Oro", source({ title: "#torontofood" }))).toBe(false);
+  });
+
   it("rejects a name the save never mentions", () => {
     expect(isGrounded("Carbone", source({ title: "Best pasta in NYC" }))).toBe(
       false,
