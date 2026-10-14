@@ -85,6 +85,16 @@ describe("isGrounded", () => {
       isGrounded("Joe's Pizza", source({ title: "Joes Pizza slice" })),
     ).toBe(true);
     expect(isGrounded("Oro", source({ title: "#torontofood" }))).toBe(false);
+    expect(isGrounded("Carbone", source({ title: "Carbone's rigatoni" }))).toBe(
+      true,
+    );
+    expect(isGrounded("Artusi", source({ title: "Pasta at L'Artusi" }))).toBe(
+      true,
+    );
+    expect(isGrounded("L'Artusi", source({ title: "Artusi pasta" }))).toBe(
+      true,
+    );
+    expect(isGrounded("Joe's", source({ title: "Slice at Joe" }))).toBe(true);
   });
 
   it("rejects a name the save never mentions", () => {

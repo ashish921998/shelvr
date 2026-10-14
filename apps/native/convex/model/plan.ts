@@ -129,11 +129,9 @@ type Evidence = {
   tags: string[];
 };
 
-/** Squashed words in any script; punctuation and spaces split them, but an
- * apostrophe does not, so "Joe's" and "Joes" are the same word. */
+/** Squashed words in any script; punctuation and spaces split them. */
 function wordsOf(text: string): string[] {
   return text
-    .replace(/['’]/g, "")
     .split(/[^\p{L}\p{N}\p{M}]+/u)
     .map(squash)
     .filter(Boolean);
@@ -152,7 +150,8 @@ function evidenceOf(source: PlanSource): Evidence {
   const rawChunks = raw.split(/\s+/);
   return {
     text: squash(raw),
-    words: new Set(wordsOf(raw)),
+    // Both sides of an apostrophe: "Carbone's" gives "carbone" and "carbones".
+    words: new Set([...wordsOf(raw), ...wordsOf(raw.replace(/['’]/g, ""))]),
     chunks: rawChunks.map(squash).filter(Boolean),
     tags: rawChunks
       .filter((chunk) => /^[#@]/.test(chunk))
@@ -161,13 +160,15 @@ function evidenceOf(source: PlanSource): Evidence {
   };
 }
 
-/** A distinctive word of a name the save has: as a whole word, at the start
- * of a handle or hashtag ("#carbonenyc"), or, in scripts written without
+/** A distinctive word of a name the save has: as a whole word, a possessive
+ * one ("Joe" in "Joes Pizza"), at the start of a handle or hashtag
+ * ("#carbonenyc"), or, in scripts written without
  * spaces (Japanese), anywhere in its text. A Latin word inside another one
  * proves nothing: "Oro" is not in "Toronto". */
 function hasWord(word: string, evidence: Evidence): boolean {
   return (
     evidence.words.has(word) ||
+    evidence.words.has(`${word}s`) ||
     evidence.tags.some((tag) => tag.startsWith(word)) ||
     (!/^[a-z0-9]+$/.test(word) && evidence.text.includes(word))
   );
