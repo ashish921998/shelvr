@@ -144,20 +144,35 @@ function evidenceOf(source: PlanSource): Evidence {
   return { text: squash(raw), words: new Set(wordsOf(raw)) };
 }
 
+/** A distinctive word of a name the save has: as a whole word, or, in
+ * scripts written without spaces (Japanese), anywhere in its text. A Latin
+ * word inside another one proves nothing: "Oro" is not in "Toronto". */
+function hasWord(word: string, evidence: Evidence): boolean {
+  return (
+    evidence.words.has(word) ||
+    (!/^[a-z0-9]+$/.test(word) && evidence.text.includes(word))
+  );
+}
+
 /**
  * True when the save names the place. The model may only pick places a save
  * names; this drops one it made up. A name made only of generic words
  * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
- * every distinctive word must appear in the squashed text, so "@parici_cafe"
- * grounds "Par Ici Café" while "Great pasta tonight" does not ground "Pasta
- * Palace". A name with no distinctive word ("Si Si", "Au 79") must appear
- * word for word.
+ * every distinctive word must be a word of the save, so "Great pasta
+ * tonight" does not ground "Pasta Palace" and "Started the party" does not
+ * ground "Art Bar". A name of several words may also appear run together,
+ * so "@parici_cafe" grounds "Par Ici Café". A name with no distinctive word
+ * ("Si Si", "Au 79") must appear word for word.
  */
 function namesPlace(name: string, evidence: Evidence): boolean {
-  const specific = wordsOf(name).filter((word) => !GENERIC_WORDS.has(word));
+  const all = wordsOf(name);
+  const specific = all.filter((word) => !GENERIC_WORDS.has(word));
   const strong = specific.filter(distinctive);
   if (strong.length > 0) {
-    return strong.every((word) => evidence.text.includes(word));
+    return (
+      strong.every((word) => hasWord(word, evidence)) ||
+      (all.length > 1 && evidence.text.includes(all.join("")))
+    );
   }
   // The whole name must still be long enough to prove anything, so a word
   // like "Go" or "A" never grounds on its own.
