@@ -1,6 +1,7 @@
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
+  firstSaveReminderTicket,
   reminderOptions,
   scheduleFirstSaveReminder,
   type ReminderSlot,
@@ -129,6 +130,9 @@ export function NotificationsStep({
     if (done.current || saved === null || expired()) return;
     done.current = true;
     setBusy(true);
+    // Taken before the permission prompt: a sign-out while it waits clears
+    // the reminder, and this save must not be scheduled after that.
+    const ticket = firstSaveReminderTicket();
     let granted = false;
     try {
       granted = await requestNotificationPermission();
@@ -142,6 +146,7 @@ export function NotificationsStep({
           itemId: saved.itemId,
           title: title || t("onboarding.remindFallbackTitle"),
           at: choice.at,
+          ticket,
         });
       }
     } catch (error) {

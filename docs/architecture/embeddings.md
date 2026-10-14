@@ -337,15 +337,19 @@ export const searchItemsHybrid = action({
 });
 ```
 
-Flow, kept to one query round trip per the guidelines' "as few calls as possible":
+Flow, kept to two query round trips per the guidelines' "as few calls as possible":
 
-1. `requireUserId(ctx)` — already accepts `ActionCtx` (`model/auth.ts:22`).
-   The vector filter uses that id. Never a client argument.
+1. A small `internalQuery` derives the caller with `requireUserId`
+   (`model/auth.ts`). It takes a query or mutation context, so the action gets
+   the id through that query rather than directly, and before the vector
+   search that filters on it. Never a client argument.
 2. Embed the query string.
 3. `ctx.vectorSearch(..., filter: q => q.eq("userId", userId))` → `{_id, _score}`.
-4. One `internalQuery` that runs the lexical `search_text` search, fuses it with
-   the vector ids by reciprocal rank fusion (`1/(k + rank)`, k = 60), drops
-   non-`ready` rows, hydrates through `enrichItem`, and returns in fused order.
+4. One `internalQuery` that derives the caller again and checks it matches,
+   runs the lexical `search_text` search, fuses it with the vector ids by
+   reciprocal rank fusion (`1/(k + rank)`, k = 60), drops non-`ready` rows and
+   rows the caller does not own, hydrates through `enrichItem`, and returns in
+   fused order.
 
 Client: the search tab (`(tabs)/(search)/index.tsx:36`) moves from
 `convexQuery(api.items.searchItems)` to the action. This is the one real

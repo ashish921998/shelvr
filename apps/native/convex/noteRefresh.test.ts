@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 const generateObject = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (original) => ({
@@ -39,15 +39,10 @@ afterEach(() => {
 
 async function setup(status: "ready" | "processing") {
   const t = newConvexTest();
+  const { t: owner, userId } = await signedInUser(t, { pro: true });
   const itemId = await t.run(async (ctx) => {
-    await ctx.db.insert("subscriptions", {
-      userId: "audit-owner",
-      status: "pro",
-      expiresAt: Date.now() + 86_400_000,
-      updatedAt: Date.now(),
-    });
     return ctx.db.insert("items", {
-      userId: "audit-owner",
+      userId,
       type: "note",
       status,
       note: "Plan a trip to Paris",
@@ -58,19 +53,15 @@ async function setup(status: "ready" | "processing") {
       processingStartedAt: Date.now(),
     });
   });
-  return {
-    t,
-    owner: t.withIdentity({ subject: "audit-owner|session" }),
-    itemId,
-  };
+  return { t, owner, userId, itemId };
 }
 
 describe("merged note refresh regression audit", () => {
   it("withdraws old suggestions when edited text has no matching spaces", async () => {
-    const { t, owner, itemId } = await setup("ready");
+    const { t, owner, userId, itemId } = await setup("ready");
     const spaceId = await t.run((ctx) =>
       ctx.db.insert("spaces", {
-        userId: "audit-owner",
+        userId,
         name: "Travel",
         dynamic: true,
       }),

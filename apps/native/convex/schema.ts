@@ -30,14 +30,19 @@ export default defineSchema({
   // include a session suffix.
   ...authTables,
 
-  // Convex Auth's own users table with one field added; the indexes must stay
+  // Convex Auth's own users table with two fields added; the indexes must stay
   // the ones `authTables` declares. Convex Auth writes everything the Apple
   // profile callback returns onto this row, so the refresh token has to be a
   // legal field for that write. `keepAppleRefreshToken` moves it to
   // `appleTokens` in the same transaction, so no stored row carries it.
+  // `deleting` is set by the mutation that starts account deletion and stays
+  // on the row until the final batch removes it; `model/auth.ts` treats such
+  // an owner as gone. Rows carry it only mid-deletion, but it must stay
+  // declared (optional) while any row does, or the deploy is rejected.
   users: defineTable({
     ...authTables.users.validator.fields,
     appleRefreshToken: v.optional(v.string()),
+    deleting: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"]),
@@ -52,6 +57,15 @@ export default defineSchema({
     clientId: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // A web-flow Apple refresh token that arrived while its owner was already
+  // deleting, so it could not be kept in `appleTokens`. Held only until the
+  // revoke job has asked Apple to revoke it, so the token never travels in a
+  // scheduled job's arguments. No owner: the account is going away.
+  detachedAppleTokens: defineTable({
+    refreshToken: v.string(),
+    createdAt: v.number(),
+  }),
 
   // One row per user: their answer to the third-party AI processing
   // disclosure. No row means they have not answered.

@@ -3,7 +3,11 @@ import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
+import {
+  isDevelopmentAnonymousUser,
+  liveOwner,
+  requireUserId,
+} from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
 import { saveError } from "./model/saveErrors";
 
@@ -163,13 +167,11 @@ export const upsertSubscription = internalMutation({
     // expiration events for the deleted account. Acknowledge the event (so
     // RevenueCat stops retrying) but do not insert or patch a row — otherwise
     // a renewal webhook resurrects an entitlement for a user who no longer
-    // exists. The userId here is the Convex Auth users-table document id.
-    const ownerId = ctx.db.normalizeId("users", args.userId);
-    if (ownerId === null) {
-      return null;
-    }
-    const owner = await ctx.db.get(ownerId);
-    if (owner === null) {
+    // exists. An owner mid-deletion counts as gone for the same reason: its
+    // subscription row is about to drain, and a write here would race the
+    // drain or outlive it. The userId here is the Convex Auth users-table
+    // document id.
+    if ((await liveOwner(ctx, args.userId)) === null) {
       return null;
     }
 
@@ -248,14 +250,17 @@ export const upsertSubscription = internalMutation({
   },
 });
 
+/** The live owners among RevenueCat's app user ids. Anonymous RevenueCat ids,
+ * removed accounts and accounts mid-deletion are dropped, so the reconciler
+ * neither asks RevenueCat about them nor writes access back for them. */
 export const liveOwners = internalQuery({
   args: { userIds: v.array(v.string()) },
   returns: v.array(v.id("users")),
   handler: async (ctx, { userIds }) => {
     const owners: Id<"users">[] = [];
     for (const userId of new Set(userIds)) {
-      const id = ctx.db.normalizeId("users", userId);
-      if (id !== null && (await ctx.db.get(id)) !== null) owners.push(id);
+      const owner = await liveOwner(ctx, userId);
+      if (owner !== null) owners.push(owner._id);
     }
     return owners;
   },
