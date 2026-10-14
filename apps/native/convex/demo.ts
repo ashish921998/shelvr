@@ -155,6 +155,10 @@ export const createDemoItem = mutation({
     // Same run stamp as every other save, so finalizeItem/failItem fence this
     // run and the stale sweeper measures from now rather than creation.
     const run = beginProcessingRun();
+    // The heading the onboarding preview showed for a sample the person
+    // picked, kept as theirs so the save matches what they chose. The client
+    // sends it only for that sample's own URL. A title past the limit is a
+    // hint lost, not an error: the classifier names the save instead.
     const title = args.title?.trim() ?? "";
     const keptTitle =
       title !== "" && title.length <= MAX_ITEM_TITLE_CHARS
