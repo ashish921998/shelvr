@@ -3151,29 +3151,41 @@ export const failStaleProcessingItems = internalMutation({
 /**
  * The classifier's per-item output: which dynamic spaces this new save fits.
  * Writes are `suggested`-only, except into a space the user set to
- * auto-file, where a new match is inserted as `saved`. Existing rows the user
+ * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
  * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
  * or removed here, so the pipeline cannot clobber a user decision by
  * construction. Existing suggestions not in the new set are withdrawn.
  */
+/** True when the space auto-files this save: on, and the save is newer. */
+function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
+  return (
+    space.autoFile === true &&
+    space.autoFileSince !== undefined &&
+    item._creationTime >= space.autoFileSince
+  );
+}
+
 export const setSpacesForItem = internalMutation({
   args: {
     itemId: v.id("items"),
     spaceIds: v.array(v.id("spaces")),
     runId: v.optional(v.string()),
   },
-  returns: v.null(),
+  // Spaces this call auto-filed the item into, so a caller that skips the
+  // usual steering pass can still steer them.
+  returns: v.array(v.id("spaces")),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (
       item === null ||
       (args.runId !== undefined && !ownsRun(item, args.runId))
     ) {
-      return null;
+      return [];
     }
     // Only AI passes call this, so an owner who has turned AI off since the
     // pass started gets no new suggestions from it.
-    if (!(await aiAllowed(ctx, item.userId))) return null;
+    if (!(await aiAllowed(ctx, item.userId))) return [];
+    const autoFiled: Id<"spaces">[] = [];
     const wanted = new Set(args.spaceIds);
     const existing = await ctx.db
       .query("spaceItems")
@@ -3201,15 +3213,17 @@ export const setSpacesForItem = internalMutation({
         space.userId === item.userId &&
         space.dynamic === true
       ) {
+        const status = autoFiles(space, item) ? "saved" : "suggested";
         await insertMembership(ctx, {
           userId: item.userId,
           spaceId,
           itemId: args.itemId,
-          status: space.autoFile === true ? "saved" : "suggested",
+          status,
         });
+        if (status === "saved") autoFiled.push(spaceId);
       }
     }
-    return null;
+    return autoFiled;
   },
 });
 

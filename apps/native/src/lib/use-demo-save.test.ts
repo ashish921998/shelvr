@@ -320,7 +320,7 @@ describe("useDemoSave", () => {
       itemId: ITEM_ID,
       savedSpaceNames: [],
     });
-    expect(mock.queryArgs).toEqual({ id: ITEM_ID });
+    await waitFor(() => expect(mock.queryArgs).toEqual({ id: ITEM_ID }));
     expect(captured("onboarding_demo_submitted")).toHaveLength(1);
   });
 

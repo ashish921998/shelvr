@@ -417,7 +417,8 @@ needed at runtime by the features that use them:
 - The classifier and recommendation passes may only create or remove `suggested` memberships in
   `spaceItems`. The one exception is a space the user set to auto-file (`spaces.autoFile`, only
   while `dynamic` is on): the classifier inserts its new matches there as `saved`, the user's
-  standing opt-in replacing the per-item accept. It never touches an existing row. Purpose
+  standing opt-in replacing the per-item accept. It applies only to saves made after auto-file was
+  turned on, and never changes an existing `saved`, `dismissed` or legacy row. Purpose
   steering (`steerItemForSpace`) may update `intents` on `saved` memberships without changing
   their status. `saved` and `dismissed` statuses are user-owned, so no AI pass ever overwrites a
   user decision.

@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { newConvexTest, signedInUser } from "./test.setup";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { TestConvexForDataModel } from "convex-test";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -215,6 +215,55 @@ describe("auto-file spaces", () => {
     });
 
     expect((await joinStatuses(t, itemId)).get(space)).toBe("dismissed");
+  });
+
+  it("leaves saves made before auto-file was turned on as suggestions", async () => {
+    // Pin the clock so the older save is strictly older than the switch.
+    vi.useFakeTimers({ now: 1_000_000 });
+    const t = await entitledUser();
+    const space = await t.mutation(api.spaces.createSpace, {
+      name: "Recipes",
+      dynamic: true,
+    });
+    const olderItem = await t.mutation(api.items.createLinkItem, {
+      url: "https://example.com/old-recipe",
+    });
+    vi.setSystemTime(2_000_000);
+    await t.mutation(api.spaces.updateSpace, { id: space, autoFile: true });
+    vi.setSystemTime(3_000_000);
+    const newerItem = await t.mutation(api.items.createLinkItem, {
+      url: "https://example.com/new-recipe",
+    });
+
+    // A retry of the older save classifies it after the switch.
+    for (const itemId of [olderItem, newerItem]) {
+      await t.mutation(internal.items.setSpacesForItem, {
+        itemId,
+        spaceIds: [space],
+      });
+    }
+
+    expect((await joinStatuses(t, olderItem)).get(space)).toBe("suggested");
+    expect((await joinStatuses(t, newerItem)).get(space)).toBe("saved");
+    vi.useRealTimers();
+  });
+
+  it("clears auto-file when dynamic goes off, so an older build cannot revive it", async () => {
+    const t = await entitledUser();
+    const space = await t.mutation(api.spaces.createSpace, {
+      name: "Recipes",
+      dynamic: true,
+      autoFile: true,
+    });
+
+    // An older build only knows `dynamic`.
+    await t.mutation(api.spaces.updateSpace, { id: space, dynamic: false });
+    await t.mutation(api.spaces.updateSpace, { id: space, dynamic: true });
+
+    const doc = await t.run(async (ctx) => await ctx.db.get(space));
+    expect(doc?.dynamic).toBe(true);
+    expect(doc?.autoFile).toBe(false);
+    expect(doc?.autoFileSince).toBeUndefined();
   });
 
   it("lets a lapsed user turn auto-file off but not on", async () => {

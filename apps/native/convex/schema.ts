@@ -272,6 +272,10 @@ export default defineSchema({
     // case where an AI pass writes a saved row. Only takes effect while
     // `dynamic` is on. Absent means false.
     autoFile: v.optional(v.boolean()),
+    // When auto-file was last turned on. Only saves created at or after it
+    // are auto-filed, so reclassifying an older save (a retry or a note edit)
+    // still only suggests.
+    autoFileSince: v.optional(v.number()),
     // Denormalized membership summary so the spaces list never has to walk
     // `spaceItems`. Counts mirror the spaceItems status vocabulary: `saved`
     // rows (user-owned memberships) and `suggested` rows (pending AI picks);
