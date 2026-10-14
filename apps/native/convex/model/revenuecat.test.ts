@@ -216,7 +216,7 @@ describe("RevenueCat project entitlement isolation", () => {
   });
 });
 
-// Stryker (`pnpm --filter native-app mutate`) showed these rules could be
+// A mutation-testing pass (Stryker) showed these rules could be
 // removed without any test failing.
 describe("RevenueCat parsing edge cases", () => {
   const now = Date.parse("2026-09-08T12:00:00Z");

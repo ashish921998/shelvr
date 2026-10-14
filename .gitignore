@@ -116,7 +116,3 @@ design_handoff_*/
 # App Store listing working copy for the asc CLI. App Store Connect is the
 # source of truth; listing history belongs in shelvr-notes.
 metadata/
-
-# Stryker mutation testing (pnpm --filter native-app mutate)
-.stryker-tmp
-apps/native/reports/mutation

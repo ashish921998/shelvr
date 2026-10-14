@@ -15,8 +15,6 @@
         "babel.config.js",
         "metro.config.js",
         "generateKeys.mjs",
-        "stryker.config.mjs",
-        "vitest.mutation.config.ts",
         "goldie/goldie.config.ts",
         "plugins/with-widget-localization.js",
         "plugins/with-android-share-new-intent.js"

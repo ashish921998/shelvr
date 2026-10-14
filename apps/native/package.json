@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "mutate": "stryker run",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
@@ -92,8 +91,6 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
-    "@stryker-mutator/core": "^9.6.1",
-    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@testing-library/react": "^16.3.3",
     "@types/react": "~19.2.2",
     "@vitest/coverage-v8": "4.1.11",

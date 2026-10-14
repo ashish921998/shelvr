@@ -9,12 +9,7 @@ module.exports = defineConfig([
     // Globally ignored: build output and generated Convex code (the generated
     // files carry their own eslint-disable headers, which only produce
     // unused-directive warnings when linted).
-    ignores: [
-      "dist/*",
-      "convex/_generated/**",
-      ".stryker-tmp/**",
-      "reports/**",
-    ],
+    ignores: ["dist/*", "convex/_generated/**"],
   },
   {
     files: ["**/*.{ts,tsx}"],
