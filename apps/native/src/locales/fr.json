@@ -329,7 +329,8 @@
   "item.partial": "Enregistré à partir du lien uniquement — la page n'a pas chargé, ces détails sont donc estimés.",
   "item.noArticle": "Cette page ne contient pas d'article lisible — enregistrée comme simple lien.",
   "recipe.ingredients": "Ingrédients",
-  "recipe.steps": "Étapes",
+  "recipe.steps": "Préparation",
+  "recipe.stepNumber": "Étape %{number}",
   "recipe.serves": {
     "one": "Pour %{formattedCount} portion",
     "many": "Pour %{formattedCount} portions",

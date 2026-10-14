@@ -331,6 +331,7 @@ export type MessageParams = {
   "item.noArticle": undefined;
   "recipe.ingredients": undefined;
   "recipe.steps": undefined;
+  "recipe.stepNumber": { number: string };
   "recipe.serves": { count: number };
   "presets.articles": undefined;
   "presets.recipes": undefined;
