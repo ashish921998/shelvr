@@ -187,6 +187,28 @@ jobs:
           } >> .env.local
           cat .env.local
 
+      # Every flow so far ended on the dev launcher's "Searching for
+      # development servers" screen: the app never asked Metro for a bundle.
+      # The launcher gives the manifest request 10 s, so time it here against
+      # a Metro started the way the run starts it.
+      - name: Time the dev manifest
+        working-directory: apps/native
+        run: |
+          nohup pnpm exec expo start --dev-client --port 8091 > "$RUNNER_TEMP/metro-probe.log" 2>&1 &
+          for _ in $(seq 1 90); do curl -s localhost:8091/status | grep -q running && break; sleep 2; done
+          for url in http://localhost:8091 http://127.0.0.1:8091; do
+            for _ in 1 2 3; do
+              curl -sS -m 60 -o "$RUNNER_TEMP/manifest.out" \
+                -w "$url %{http_code} %{content_type} %{time_total}s\n" \
+                -H 'expo-platform: ios' -H 'accept: multipart/mixed,application/expo+json,application/json' \
+                "$url" || echo "$url request failed"
+            done
+          done
+          head -c 400 "$RUNNER_TEMP/manifest.out"; echo
+          cat "$RUNNER_TEMP/metro-probe.log"
+          pkill -f -- "--port 8091" || true
+          for _ in $(seq 1 15); do curl -s localhost:8091/status > /dev/null || break; sleep 1; done
+
       - name: Run the model-free flows
         working-directory: tools/e2e
         run: >-
@@ -235,6 +257,11 @@ jobs:
             echo "::group::$f"; cat "$f"; echo "::endgroup::"
           done
           echo "::group::metro.log (last 200 lines)"; tail -200 .e2e/metro.log 2>/dev/null || true; echo "::endgroup::"
+          echo "::group::app log (dev launcher and network errors)"
+          xcrun simctl spawn "$E2E_DEVICE" log show --last 60m --style compact \
+            --predicate 'process == "ShelvrDev"' 2>/dev/null \
+            | grep -iE "devlauncher|manifest|NSURLError|bundle|error" | tail -150 || true
+          echo "::endgroup::"
 
       - name: Copy the backend log
         if: ${{ !cancelled() }}
