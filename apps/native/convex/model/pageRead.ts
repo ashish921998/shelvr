@@ -232,6 +232,14 @@ export function extractBodyText(html: string, url: string): string | undefined {
     )) {
       element.remove();
     }
+    // MediaWiki chrome (Wikipedia, Fandom): the fact box would otherwise open
+    // the body as one line per row, and citation marks and edit links would
+    // interrupt the prose.
+    for (const element of document.querySelectorAll(
+      ".infobox, .navbox, .mw-editsection, sup.reference",
+    )) {
+      element.remove();
+    }
     // A skip link is an in-page anchor, so it sits outside nav and banner and
     // reads to Readability as ordinary body text.
     for (const anchor of document.querySelectorAll('a[href^="#"]')) {
