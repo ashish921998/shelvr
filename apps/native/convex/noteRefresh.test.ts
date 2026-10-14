@@ -90,6 +90,38 @@ describe("merged note refresh regression audit", () => {
     expect(suggestions).toEqual([]);
   });
 
+  it("steers an edited note that newly lands in an auto-file space", async () => {
+    const { t, owner, userId, itemId } = await setup("ready");
+    const spaceId = await t.run((ctx) =>
+      ctx.db.insert("spaces", {
+        userId,
+        name: "Groceries",
+        dynamic: true,
+        autoFile: true,
+        // On since before the note was saved, so the edit still auto-files.
+        autoFileSince: 0,
+      }),
+    );
+    generateObject.mockResolvedValue({
+      object: { ...NEW_CLASSIFICATION, spaceNames: ["Groceries"] },
+    });
+    await owner.mutation(api.items.updateNoteItem, {
+      id: itemId,
+      title: "",
+      text: "Buy milk and eggs",
+    });
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    const joins = await t.run((ctx) =>
+      ctx.db
+        .query("spaceItems")
+        .withIndex("by_item", (q) => q.eq("itemId", itemId))
+        .collect(),
+    );
+    expect(joins).toMatchObject([{ spaceId, status: "saved" }]);
+    // Classification, then the steering pass for the new saved row.
+    expect(generateObject).toHaveBeenCalledTimes(2);
+  });
+
   it("eventually classifies the latest text edited during the first model call", async () => {
     const { t, owner, itemId } = await setup("processing");
     let markStarted = () => {};

@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Lista de compras para o apartamento",
   "spaces.dynamic": "Dinâmica",
   "spaces.dynamicHelp": "O Shelvr continua sugerindo conteúdos que combinam",
+  "spaces.autoFile": "Adicionar automaticamente",
+  "spaces.autoFileHelp": "Novos conteúdos que combinam entram direto. Remova quando quiser.",
   "common.saveChanges": "Salvar alterações",
   "spaces.create": "Criar coleção",
   "common.continue": "Continuar",
@@ -330,6 +332,7 @@
   "item.noArticle": "Esta página não tem um artigo legível — salva como um link simples.",
   "recipe.ingredients": "Ingredientes",
   "recipe.steps": "Modo de preparo",
+  "recipe.stepNumber": "Passo %{number}",
   "recipe.serves": {
     "one": "Rende %{formattedCount} porção",
     "many": "Rende %{formattedCount} porções",
