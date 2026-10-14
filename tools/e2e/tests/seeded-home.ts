@@ -54,6 +54,7 @@ export function startOnSeededHome(): void {
     });
     if (await openerSignIn.isVisible()) await openerSignIn.tap();
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
+    await answerAiConsent(screen, profile);
 
     // A Profile tap has been lost with nothing on screen to say why: the
     // engine reported the tap, Profile never opened, and Home looked ready
@@ -100,17 +101,41 @@ async function openApp(
   ready: () => Promise<boolean>,
 ): Promise<void> {
   const launcher = screen.getByText("Searching for development servers...");
+  const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
   await app.open();
   await expect
     .poll(
       async () => {
         if (await ready()) return true;
         if (await launcher.isVisible()) await app.open();
+        else if (await keepAi.isVisible()) await keepAi.tap();
         return false;
       },
       { timeout: BUNDLE_TIMEOUT },
     )
     .toBe(true);
+}
+
+/** The AI consent card's yes (`aiConsent.allow` in en.json). */
+const AI_CONSENT_ALLOW = "Keep it on";
+
+/**
+ * Answers the AI consent card if it covers the app. Signing in grants
+ * consent on its own, but if that write fails the card stays up for this
+ * user in every later test (all five flows stopped on it in one CI run), so
+ * the flows answer it the way a person would.
+ */
+async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
+  const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
+  await expect
+    .poll(async () => (await home.isVisible()) || (await keepAi.isVisible()), {
+      timeout: 60_000,
+    })
+    .toBe(true);
+  if (await keepAi.isVisible()) {
+    await keepAi.tap();
+    await expect(home).toBeVisible({ timeout: 30_000 });
+  }
 }
 
 /**
