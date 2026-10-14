@@ -62,21 +62,23 @@ const instagramSchema = z.object({
 /** TikTok's caption track is WebVTT. Its cue timings, the header and the
  * repeats a rolling caption leaves behind are noise to the model. */
 export function vttToText(vtt: string): string {
+  const raw = vtt.split(/\r?\n/).map((line) => line.trim());
   const lines: string[] = [];
-  for (const raw of vtt.split(/\r?\n/)) {
-    const line = raw.trim();
+  raw.forEach((line, index) => {
+    // A digit-only line is a cue id only when its cue's timing follows; on
+    // its own it is something said, such as "350".
+    const cueId = /^\d+$/.test(line) && raw[index + 1]?.includes("-->");
     if (
       line === "" ||
       line === "WEBVTT" ||
-      /^\d+$/.test(line) ||
-      line.includes("-->")
+      cueId ||
+      line.includes("-->") ||
+      lines[lines.length - 1] === line
     ) {
-      continue;
+      return;
     }
-    if (lines[lines.length - 1] !== line) {
-      lines.push(line);
-    }
-  }
+    lines.push(line);
+  });
   return lines.join(" ");
 }
 

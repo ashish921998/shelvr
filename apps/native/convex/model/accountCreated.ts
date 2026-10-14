@@ -7,7 +7,10 @@ type AfterUserSaved = NonNullable<
 
 export const recordAccountCreated = async (
   ctx: Parameters<AfterUserSaved>[0],
-  { userId, existingUserId }: Pick<Parameters<AfterUserSaved>[1], "userId" | "existingUserId">,
+  {
+    userId,
+    existingUserId,
+  }: Pick<Parameters<AfterUserSaved>[1], "userId" | "existingUserId">,
 ) => {
   if (existingUserId !== null) return;
   const user = await ctx.db.get(userId);

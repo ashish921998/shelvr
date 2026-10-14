@@ -49,6 +49,20 @@ describe("vttToText", () => {
       "Drizzle some olive oil, then a third of a cup of heavy cream.",
     );
   });
+  it("keeps a number said on its own", () => {
+    const vtt = [
+      "WEBVTT",
+      "",
+      "1",
+      "00:00:01.000 --> 00:00:02.000",
+      "Bake at",
+      "",
+      "2",
+      "00:00:02.000 --> 00:00:03.000",
+      "350",
+    ].join("\n");
+    expect(vttToText(vtt)).toBe("Bake at 350");
+  });
 });
 
 describe("transcriptToken", () => {

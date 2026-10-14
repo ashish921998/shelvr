@@ -642,26 +642,59 @@ async function recipeFromSpeech(
 ): Promise<LinkAnalysis["recipe"]> {
   const site = speechRecipeSite(read, result);
   const token = transcriptToken();
-  if (
-    site === undefined ||
-    token === undefined ||
-    read.status !== "ok" ||
-    !item.url
-  ) {
+  if (site === undefined || token === undefined || read.status !== "ok") {
+    return undefined;
+  }
+  // A share or short link resolved to the post itself, which the transcript
+  // service is sure to know.
+  const url = read.page.postUrl ?? item.url;
+  if (!url) {
     return undefined;
   }
   const log = (outcome: string) =>
     logEvent("info", "speech_recipe", { item_id: item._id, site, outcome });
+  try {
+    return await readSpeechRecipe(ctx, item, aiAllowed, {
+      site,
+      url,
+      token,
+      page: read.page,
+      log,
+    });
+  } catch (error) {
+    log(isModelTimeout(error) ? "model_timeout" : "failed");
+    return undefined;
+  }
+}
+
+/** The steps of `recipeFromSpeech`, any of which may throw: the consent
+ * checks, the claim, the transcript and the model call. */
+async function readSpeechRecipe(
+  ctx: ActionCtx,
+  item: Doc<"items">,
+  aiAllowed: boolean,
+  video: {
+    site: TranscriptSite;
+    url: string;
+    token: string;
+    page: PageData;
+    log: (outcome: string) => void;
+  },
+): Promise<LinkAnalysis["recipe"]> {
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
   }
   if (!(await claimTranscript(ctx, item.userId))) {
-    log("rate_limited");
+    video.log("rate_limited");
     return undefined;
   }
-  const transcript = await fetchVideoTranscript(site, item.url, token);
+  const transcript = await fetchVideoTranscript(
+    video.site,
+    video.url,
+    video.token,
+  );
   if (transcript.status !== "ok") {
-    log(
+    video.log(
       transcript.status === "none"
         ? "no_transcript"
         : `transcript_${transcript.errorCategory}`,
@@ -673,21 +706,16 @@ async function recipeFromSpeech(
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
   }
-  try {
-    const { object } = await generateObject({
-      model: MODEL,
-      ...modelCallOptions(SMALL_TIMEOUT_MS),
-      system: SYSTEM_PROMPT,
-      schema: speechRecipeSchema,
-      prompt: speechRecipePrompt(read.page, transcript.text),
-    });
-    const found = sanitizeRecipe(object.recipe) !== undefined;
-    log(found ? "recipe" : "no_recipe");
-    return found ? object.recipe : undefined;
-  } catch (error) {
-    log(isModelTimeout(error) ? "model_timeout" : "model_failed");
-    return undefined;
-  }
+  const { object } = await generateObject({
+    model: MODEL,
+    ...modelCallOptions(SMALL_TIMEOUT_MS),
+    system: SYSTEM_PROMPT,
+    schema: speechRecipeSchema,
+    prompt: speechRecipePrompt(video.page, transcript.text),
+  });
+  const found = sanitizeRecipe(object.recipe) !== undefined;
+  video.log(found ? "recipe" : "no_recipe");
+  return found ? object.recipe : undefined;
 }
 
 /** Upper bound on the Siri context a classification prompt carries. */

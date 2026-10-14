@@ -928,6 +928,7 @@ describe("fetchInstagram", () => {
     await expect(
       fetchInstagram("https://www.instagram.com/reel/DHVrPLrIyQ_/?igsh=abc"),
     ).resolves.toEqual({
+      postUrl: "https://www.instagram.com/reel/DHVrPLrIyQ_/",
       title: "Meet the National Geographic 33!",
       description: "National Geographic (@natgeo) • Instagram reel",
       siteName: "Instagram",
@@ -953,6 +954,7 @@ describe("fetchInstagram", () => {
     await expect(
       fetchInstagram("https://www.instagram.com/p/DHVrPLrIyQ_/"),
     ).resolves.toEqual({
+      postUrl: "https://www.instagram.com/p/DHVrPLrIyQ_/",
       title: "National Geographic (@natgeo) • Instagram reel",
       description: undefined,
       siteName: "Instagram",

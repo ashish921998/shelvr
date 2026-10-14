@@ -40,6 +40,7 @@ function serveTikTok() {
             JSON.stringify({
               title: "Best creamy pasta ever 🍝",
               author_unique_id: "cook",
+              embed_product_id: "7350000000000000000",
             }),
           ),
         }
@@ -199,6 +200,58 @@ describe("processItem recipe from a video's speech", () => {
 
     expect(item?.status).toBe("ready");
     expect(item?.recipe).toBeUndefined();
+  });
+
+  it("asks for a short link's transcript by the video it resolved to", async () => {
+    model(true);
+    transcript("Butter and cream.");
+    const t = newConvexTest();
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        url: "https://vm.tiktok.com/ZMabc123/",
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.searchParams.get("url")).toBe(TIKTOK);
+  });
+
+  it("keeps the save ready when the transcript claim throws", async () => {
+    model(true);
+    const t = newConvexTest();
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        url: TIKTOK,
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+      }),
+    );
+    const { rateLimiter } = await import("./model/rateLimiter");
+    const limit = vi
+      .spyOn(rateLimiter, "limit")
+      .mockRejectedValue(new Error("contention"));
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    limit.mockRestore();
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item?.status).toBe("ready");
+    expect(item?.recipe).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("stops fetching transcripts for one user past the daily burst", async () => {
