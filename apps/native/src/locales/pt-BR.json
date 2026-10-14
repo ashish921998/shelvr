@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Lista de compras para o apartamento",
   "spaces.dynamic": "Dinâmica",
   "spaces.dynamicHelp": "O Shelvr continua sugerindo conteúdos que combinam",
+  "spaces.autoFile": "Adicionar automaticamente",
+  "spaces.autoFileHelp": "Novos conteúdos que combinam entram direto. Remova quando quiser.",
   "common.saveChanges": "Salvar alterações",
   "spaces.create": "Criar coleção",
   "common.continue": "Continuar",

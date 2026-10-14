@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "집 꾸미기 쇼핑 목록",
   "spaces.dynamic": "자동 추천",
   "spaces.dynamicHelp": "Shelvr가 어울리는 항목을 계속 추천해요",
+  "spaces.autoFile": "자동으로 추가",
+  "spaces.autoFileHelp": "어울리는 새 저장 항목이 바로 들어가요. 언제든 뺄 수 있어요.",
   "common.saveChanges": "변경 사항 저장",
   "spaces.create": "공간 만들기",
   "common.continue": "계속",

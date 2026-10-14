@@ -3150,9 +3150,10 @@ export const failStaleProcessingItems = internalMutation({
 
 /**
  * The classifier's per-item output: which dynamic spaces this new save fits.
- * Writes are strictly `suggested`-only — rows the user owns (`saved`,
- * `dismissed`, or legacy status-less rows) are never created, changed, or
- * removed here, so the pipeline cannot clobber a user decision by
+ * Writes are `suggested`-only, except into a space the user set to
+ * auto-file, where a new match is inserted as `saved`. Existing rows the user
+ * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
+ * or removed here, so the pipeline cannot clobber a user decision by
  * construction. Existing suggestions not in the new set are withdrawn.
  */
 export const setSpacesForItem = internalMutation({
@@ -3193,6 +3194,8 @@ export const setSpacesForItem = internalMutation({
       }
       const space = await ctx.db.get(spaceId);
       // Only suggest into dynamic spaces that exist and belong to the owner.
+      // A space the user set to auto-file takes the match as saved instead:
+      // their standing opt-in replaces the per-item accept.
       if (
         space !== null &&
         space.userId === item.userId &&
@@ -3202,7 +3205,7 @@ export const setSpacesForItem = internalMutation({
           userId: item.userId,
           spaceId,
           itemId: args.itemId,
-          status: "suggested",
+          status: space.autoFile === true ? "saved" : "suggested",
         });
       }
     }

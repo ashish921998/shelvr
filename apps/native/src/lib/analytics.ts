@@ -245,8 +245,8 @@ type AnalyticsEventProperties = {
   item_deleted: { item_type: AnalyticsItem["type"] };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
-  space_created: { dynamic: boolean };
-  space_updated: { dynamic: boolean };
+  space_created: { dynamic: boolean; auto_file: boolean };
+  space_updated: { dynamic: boolean; auto_file: boolean };
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
   onboarding_completed: {

@@ -37,6 +37,7 @@ const spaceFields = {
   name: v.string(),
   description: v.optional(v.string()),
   dynamic: v.optional(v.boolean()),
+  autoFile: v.optional(v.boolean()),
   // Denormalized membership summary (see schema.ts). Optional until the
   // backfill has visited every legacy row.
   savedCount: v.optional(v.number()),
@@ -271,6 +272,7 @@ export const createSpace = mutation({
     name: v.string(),
     description: v.optional(v.string()),
     dynamic: v.optional(v.boolean()),
+    autoFile: v.optional(v.boolean()),
   },
   returns: v.id("spaces"),
   handler: async (ctx, args) => {
@@ -306,6 +308,7 @@ export const createSpace = mutation({
       name,
       description: args.description,
       dynamic: args.dynamic ?? false,
+      autoFile: args.autoFile ?? false,
       // Born with an exact (empty) summary so it never takes the legacy path.
       savedCount: 0,
       suggestedCount: 0,
@@ -330,6 +333,7 @@ export const updateSpace = mutation({
     id: v.id("spaces"),
     name: v.optional(v.string()),
     dynamic: v.optional(v.boolean()),
+    autoFile: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -340,6 +344,7 @@ export const updateSpace = mutation({
     }
     const wasDynamic = space.dynamic === true;
     const enablingDynamic = args.dynamic === true && !wasDynamic;
+    const enablingAutoFile = args.autoFile === true && space.autoFile !== true;
     // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
     // saves into the space). A lapsed user editing a space's name or turning
     // dynamic off is allowed, but enabling it requires an active trial/pro.
@@ -352,8 +357,11 @@ export const updateSpace = mutation({
         key: userId,
         throws: true,
       });
+    } else if (enablingAutoFile) {
+      // Auto-filing is part of the same Pro feature as dynamic.
+      await requireProEntitlement(ctx, userId);
     }
-    const patch: { name?: string; dynamic?: boolean } = {};
+    const patch: { name?: string; dynamic?: boolean; autoFile?: boolean } = {};
     // The edit form always submits the name, changed or not. Only a changed
     // name is validated, so a space named before the length limit existed can
     // still have its other settings edited.
@@ -362,6 +370,9 @@ export const updateSpace = mutation({
     }
     if (args.dynamic !== undefined) {
       patch.dynamic = args.dynamic;
+    }
+    if (args.autoFile !== undefined) {
+      patch.autoFile = args.autoFile;
     }
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.

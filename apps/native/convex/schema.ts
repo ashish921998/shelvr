@@ -267,6 +267,11 @@ export default defineSchema({
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
+    // Auto-file = new saves the classifier matches to this space land as
+    // `saved` instead of `suggested`. The user's own opt-in, so it is the one
+    // case where an AI pass writes a saved row. Only takes effect while
+    // `dynamic` is on. Absent means false.
+    autoFile: v.optional(v.boolean()),
     // Denormalized membership summary so the spaces list never has to walk
     // `spaceItems`. Counts mirror the spaceItems status vocabulary: `saved`
     // rows (user-owned memberships) and `suggested` rows (pending AI picks);
