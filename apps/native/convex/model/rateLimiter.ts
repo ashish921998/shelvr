@@ -49,6 +49,22 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "Make a plan" sends up to 60 saves in one prompt and gets 5 places back.
   // A user re-rolls a few times while deciding; a loop gets cut off.
   makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  // A spoken transcript of a recipe video whose caption had no recipe (one
+  // paid Treg call, about $0.002, plus one model call). Per user: room for a
+  // cooking binge, fatal to a loop. Global: about $4 a day at most, whatever
+  // the number of accounts.
+  videoTranscript: {
+    kind: "token bucket",
+    rate: 20,
+    period: DAY,
+    capacity: 10,
+  },
+  videoTranscriptGlobal: {
+    kind: "token bucket",
+    rate: 2000,
+    period: DAY,
+    capacity: 200,
+  },
   // The onboarding demo's Pro-free retry of a FAILED demo classification.
   // Tighter than reprocessItem: the demo is the one uncapped-price save a
   // non-paying user gets, so retries stay strictly bounded.

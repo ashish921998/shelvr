@@ -211,7 +211,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships (`saved` in a space set to auto-file). The file also holds
+  matches become `suggested` memberships (`saved` in a space set to auto-file). A cooking
+  TikTok or reel whose caption and linked page gave no recipe has its speech read through Treg
+  (`model/videoTranscript.ts`) for a second, recipe-only call. The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
@@ -382,6 +384,10 @@ needed at runtime by the features that use them:
   ones included, without a deploy. See
   [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
+- `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED` — Treg token for the spoken transcript of a
+  cooking TikTok or reel whose caption has no recipe (`model/videoTranscript.ts`, about $0.002
+  each, rate limited per user and globally). Transcripts are fetched only while the switch is
+  `"true"` and the key is set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent
 - `RESEND_SEGMENT_ID` — Resend segment for `shelvr` waitlist signups
