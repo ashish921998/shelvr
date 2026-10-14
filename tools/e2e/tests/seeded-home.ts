@@ -13,6 +13,9 @@ const BUNDLE_TIMEOUT = 180_000;
  */
 export const SHEET_TRANSITION_MS = 1000;
 
+/** Long enough for the Add sheet to be up after a tap that was accepted. */
+const ADD_SHEET_WAIT_MS = 3000;
+
 /**
  * Starts every test on Home as the anonymous dev user with the fixture data:
  * 4 saves, 3 spaces and a Pro entitlement. Needs AUTH_ENABLE_ANONYMOUS on the
@@ -55,6 +58,13 @@ export function startOnSeededHome(): void {
       .getByRole("button", "Settings")
       .tap({ timeout: BUNDLE_TIMEOUT });
     const reset = screen.getByTestId("reset-flow-fixtures");
+    // A swipe sent while the Settings sheet is still rising moves nothing,
+    // and the scroll gives up on the first swipe that moves nothing.
+    await expect(screen.getByRole("button", "Sheet Grabber")).toHaveValue(
+      "Expanded",
+      { timeout: 30_000 },
+    );
+    await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
     await screen.scrollUntilVisible(reset);
     await reset.tap();
     await screen.getByRole("button", "Reset").tap();
@@ -72,15 +82,30 @@ export function startOnSeededHome(): void {
 }
 
 /**
- * Opens Add and taps one of its options. The options are disabled until the
- * entitlement has loaded, which right after a launch can be after the sheet
- * is up, and a tap on a disabled option does nothing.
+ * Opens Add and taps one of its options.
+ *
+ * Home's Add drops a tap while the entitlement is still loading, and nothing
+ * on Home says when that is over, so Add is tapped again if its sheet has not
+ * come up. An accepted tap has the sheet up well inside the wait between
+ * taps. The options are in turn disabled until the entitlement has loaded,
+ * and a tap on a disabled option does nothing.
  */
 export async function chooseAddOption(
   screen: Screen,
   option: Locator,
 ): Promise<void> {
-  await screen.getByRole("button", "Add").tap();
+  const add = screen.getByRole("button", "Add");
+  await expect
+    .poll(
+      async () => {
+        if (await option.isVisible()) return true;
+        await add.tap();
+        await new Promise((resolve) => setTimeout(resolve, ADD_SHEET_WAIT_MS));
+        return option.isVisible();
+      },
+      { timeout: 60_000 },
+    )
+    .toBe(true);
   await expect(option).toBeEnabled({ timeout: 30_000 });
   await option.tap();
 }
