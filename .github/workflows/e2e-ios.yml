@@ -109,7 +109,8 @@ jobs:
 
       # agent-device compiles its XCUITest runner on first use.
       - name: Restore the agent-device runner
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: runner-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.agent-device
           key: agent-device-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -126,6 +127,24 @@ jobs:
           xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" apps/native/build/e2e/ShelvrDev.app
           echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
+
+      # A cold runner build can outlast the budget e2e gives the engine to
+      # start (seen: "boot failed: Daemon request timed out"), so it is built
+      # here with a budget of its own. The daemon is stopped afterwards so it
+      # does not hold the runner the run's own daemon needs.
+      - name: Prepare the XCTest runner
+        id: prepare-runner
+        run: |
+          node node_modules/agent-device/bin/agent-device.mjs prepare ios-runner \
+            --platform ios --udid "$E2E_DEVICE" --timeout 900000
+          node node_modules/agent-device/bin/agent-device.mjs daemon stop
+
+      - name: Save the agent-device runner
+        if: ${{ !cancelled() && steps.prepare-runner.outcome == 'success' && steps.runner-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.agent-device
+          key: agent-device-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       # A throwaway deployment on this machine. The first `convex dev --once`
       # creates it and writes its URLs to .env.local, then stops at the push,
