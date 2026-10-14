@@ -25,7 +25,9 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
+  useUnistyles: () => ({
+    theme: { colors: {}, control: { pressRetentionOffset: 12 } },
+  }),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 
@@ -33,7 +35,7 @@ const itemId = "item-1" as Id<"items">;
 
 it("shows nothing for a save in no space", () => {
   const { container } = render(<ItemSpaces itemId={itemId} spaces={[]} />);
-  expect(container.textContent).toBe("");
+  expect(container.firstChild).toBeNull();
 });
 
 it("names the save's spaces and opens the space picker when tapped", () => {

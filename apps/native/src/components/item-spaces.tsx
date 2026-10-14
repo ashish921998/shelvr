@@ -32,13 +32,19 @@ export function ItemSpaces({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={t("spaces.membershipHelp")}
-      hitSlop={8}
+      // The row is one line of small text; the slop brings the target up to
+      // the control minimum without spacing out the page.
+      hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+      pressRetentionOffset={theme.control.pressRetentionOffset}
       onPress={() =>
         router.push({ pathname: "/manage-spaces", params: { itemId } })
       }
       style={[styles.row, centered && styles.centered]}
     >
-      <Text style={styles.label} numberOfLines={2}>
+      <Text
+        style={[styles.label, centered && styles.centeredLabel]}
+        numberOfLines={2}
+      >
         {label}
       </Text>
       <AppSymbolIcon
@@ -60,6 +66,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   centered: {
     alignSelf: "center",
+  },
+  centeredLabel: {
+    textAlign: "center",
   },
   label: {
     flexShrink: 1,

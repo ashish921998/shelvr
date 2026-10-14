@@ -130,9 +130,8 @@ export function ArticleReaderView({
     .join(" · ");
 
   // A save with no picture shows its site's first letter, like a book spine.
-  const monogram = item.url
-    ? displayHost(item.url)?.charAt(0).toLocaleUpperCase()
-    : undefined;
+  // Array.from keeps an emoji or other astral first character whole.
+  const monogram = Array.from(displayHost(item.url))[0]?.toLocaleUpperCase();
   const thumbnail =
     heroUri && heroUri !== failedUri ? (
       <Image
@@ -147,7 +146,11 @@ export function ArticleReaderView({
       // the fallback as an empty box.
       <View collapsable={false} style={styles.thumbnailFallback}>
         {monogram ? (
-          <Text style={styles.monogram} maxFontSizeMultiplier={1}>
+          <Text
+            style={styles.monogram}
+            maxFontSizeMultiplier={1}
+            accessible={false}
+          >
             {monogram}
           </Text>
         ) : (
