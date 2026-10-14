@@ -165,7 +165,9 @@ export function PlanDeck({
             <Animated.View style={[styles.top, size, topStyle]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={flipped ? place.why : cardLabel(place)}
+                accessibilityLabel={
+                  flipped ? backLabel(place, titleFor(place)) : cardLabel(place)
+                }
                 accessibilityHint={t("plan.flipHint")}
                 accessibilityActions={[
                   { name: "activate" },
@@ -212,6 +214,12 @@ export function PlanDeck({
       })}
     </View>
   );
+}
+
+/** The back read aloud: the place, why, and the save it came from. */
+function backLabel(place: PlanPlace, sourceTitle?: string): string {
+  const from = sourceTitle ? t("plan.from", { title: sourceTitle }) : null;
+  return [place.name, place.why, from].filter(Boolean).join(". ");
 }
 
 function cardLabel(place: PlanPlace): string {
