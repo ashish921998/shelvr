@@ -5,6 +5,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import {
   useMakePlan,
   usePlaceVisits,
+  usePlanDeck,
   usePlanPicker,
   type PlanPlace,
 } from "./make-plan";
@@ -205,6 +206,8 @@ describe("usePlanPicker", () => {
     spinToEnd();
     expect(onPicked).toHaveBeenCalledTimes(1);
     expect(result.current.picked).not.toBeNull();
+    // The deck brings the dealt card to the top by its index.
+    expect(onPicked).toHaveBeenCalledWith(result.current.picked);
   });
 
   it("clears its timers on unmount", () => {
@@ -244,5 +247,38 @@ describe("usePlanPicker", () => {
     expect(vi.getTimerCount()).toBe(1);
     spinToEnd();
     expect(onPicked).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("usePlanDeck", () => {
+  it("sends the top card to the back and turns the new one face up", () => {
+    const { result } = renderHook(() => usePlanDeck(1, 3));
+    act(() => result.current.flip());
+    expect(result.current.flipped).toBe(true);
+
+    act(() => result.current.next());
+    expect(result.current).toMatchObject({ front: 1, flipped: false });
+    act(() => result.current.next());
+    act(() => result.current.next());
+    expect(result.current.front).toBe(0);
+  });
+
+  it("brings a dealt card to the top", () => {
+    const { result } = renderHook(() => usePlanDeck(1, 5));
+    act(() => result.current.show(3));
+    expect(result.current).toMatchObject({ front: 3, flipped: false });
+  });
+
+  it("starts a new plan on its first card", () => {
+    const { result, rerender } = renderHook(
+      ({ planId }) => usePlanDeck(planId, 5),
+      { initialProps: { planId: 1 } },
+    );
+    act(() => result.current.show(4));
+    act(() => result.current.flip());
+
+    rerender({ planId: 2 });
+
+    expect(result.current).toMatchObject({ front: 0, flipped: false });
   });
 });

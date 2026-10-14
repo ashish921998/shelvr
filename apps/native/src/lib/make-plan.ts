@@ -128,6 +128,51 @@ export function usePlaceVisits() {
   return { isVisited, toggle };
 }
 
+type Deck = { planId: number | null; front: number; flipped: boolean };
+
+/**
+ * The plan as a deck of cards: which card is on top and whether it is turned
+ * over to show why it was picked. A new plan starts on its first card, face
+ * up. `next` sends the top card to the back; `show` brings a card to the top.
+ */
+export function usePlanDeck(planId: number | null, count: number) {
+  const [deck, setDeck] = useState<Deck>({
+    planId,
+    front: 0,
+    flipped: false,
+  });
+  const current =
+    deck.planId === planId ? deck : { planId, front: 0, flipped: false };
+  const front = count > 0 ? current.front % count : 0;
+
+  const next = useCallback(() => {
+    if (count === 0) return;
+    setDeck({ planId, front: (front + 1) % count, flipped: false });
+  }, [planId, front, count]);
+  const show = useCallback(
+    (index: number) => setDeck({ planId, front: index, flipped: false }),
+    [planId],
+  );
+  const flip = useCallback(
+    () => setDeck({ planId, front, flipped: !current.flipped }),
+    [planId, front, current.flipped],
+  );
+
+  return { front, flipped: current.flipped, next, show, flip };
+}
+
+/**
+ * Indexes of the cards to draw, back to front: up to `depth` cards, ending
+ * with `front`, so the top card renders last.
+ */
+export function deckOrder(count: number, front: number, depth = 4): number[] {
+  const shown = Math.min(count, depth);
+  return Array.from(
+    { length: shown },
+    (_, i) => (front + shown - 1 - i) % count,
+  );
+}
+
 type Pick = {
   planId: number;
   highlight: number | null;
@@ -146,7 +191,7 @@ export function usePlanPicker(
   options: {
     reducedMotion: boolean;
     onStep?: () => void;
-    onPicked?: () => void;
+    onPicked?: (index: number) => void;
   },
 ) {
   const [pick, setPick] = useState<Pick | null>(null);
@@ -193,7 +238,7 @@ export function usePlanPicker(
       setTimeout(() => {
         spinningPlan.current = null;
         setPick({ planId, highlight: winner, picked: winner, spinning: false });
-        onPicked?.();
+        onPicked?.(winner);
       }, at),
     );
   }, [planId, places.length, reducedMotion, onStep, onPicked]);
