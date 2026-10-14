@@ -54,8 +54,10 @@ pnpm exec e2e run tests/smoke.e2e.ts        # Metro up, app opens, dev sign-in, 
 worktree root). `run` failing in the `beforeEach` before Profile appears is the
 bundle or the simulator: read `.e2e/metro.log` and check that the app is a
 Debug dev client (local-qa.md, "Confirm the bundle is yours"). No
-`dev-login-button` means anonymous sign-in is off in `.env.local` or on the
-deployment. The smoke test needs no model. Run Doctor first whenever anything
+`dev-login-button` means the build is not the development variant or
+`EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` is not `true` in `.env.local`
+(`src/lib/anonymous-auth.ts`). A button that shows but never signs in is
+`AUTH_ENABLE_ANONYMOUS` missing on the dev deployment. The smoke test needs no model. Run Doctor first whenever anything
 looks off.
 
 A known setup flake (seen 2026-10-14, once in three runs): the `Profile` tap
@@ -91,8 +93,10 @@ Every run writes `.e2e/report.json`; a failed test gets its trace under
 an MP4 per attempt (topic `running`). The next run clears `.e2e/results/`,
 Doctor included, so a proof that must outlive it runs with
 `--output .e2e/proof/<name>`. All of `.e2e/` is gitignored
-(`tools/e2e/.gitignore`). Keep screenshots and videos out of the repo; a pull
-request quotes the run's summary lines instead.
+(`tools/e2e/.gitignore`). Never commit screenshots or videos. A pull request
+that touches UI files still needs a screenshot or recording embedded in its
+description (`tools/verify-pr-evidence.mjs`): upload it there, quote the run's
+summary lines beside it, then delete the local copy.
 
 A proof goes through the user's path: Home's Add, the tab bar, the labelled
 fields and buttons, never a Convex function called directly. It captures the

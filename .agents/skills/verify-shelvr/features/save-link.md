@@ -23,9 +23,10 @@ then one `agent.waitFor` with `vision: "only"` to read the card. Needs
 
 ## Proof
 
-Home shows exactly one finished save about the saved page
-(`https://en.wikipedia.org/wiki/Sourdough`) next to the four seeded ones, with
-no card still processing. The row is an `items` row of type link on the dev
+The model judges, from a screenshot, that Home shows exactly one finished save
+about the saved page (`https://en.wikipedia.org/wiki/Sourdough`). The test does
+not check that the seeded saves remain or that no other card is processing;
+look at the screen for that. The row is an `items` row of type link on the dev
 deployment.
 
 ## Charters

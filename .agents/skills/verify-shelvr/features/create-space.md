@@ -11,7 +11,8 @@ that proposes existing saves as `suggested` members.
 
 ## How to get to it (user POV)
 
-The `Spaces` tab, then `New space`. Any signed-in user.
+The `Spaces` tab, then `New space`. Needs Pro (seeded); without it, Create
+space opens the paywall.
 
 ## Driving it with e2e
 
