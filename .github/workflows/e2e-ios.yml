@@ -89,12 +89,12 @@ jobs:
         working-directory: apps/native
         run: |
           npx expo prebuild -p ios --clean
+          mkdir -p build/e2e
           xcodebuild -workspace ios/ShelvrDev.xcworkspace -scheme ShelvrDev \
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/derived CODE_SIGNING_ALLOWED=NO \
             > build/xcodebuild.log 2>&1 || { tail -200 build/xcodebuild.log; exit 1; }
-          mkdir -p build/e2e
           cp -R build/derived/Build/Products/Debug-iphonesimulator/ShelvrDev.app build/e2e/
 
       # agent-device compiles its XCUITest runner on first use.
@@ -168,6 +168,32 @@ jobs:
           tests/create-space.e2e.ts
           tests/paywall.e2e.ts
           --reporter list,junit
+
+      # tapUntilVisible taps again when a tap was lost. The run still passes
+      # then, so a recovered tap is surfaced here as a warning on the pull
+      # request instead of disappearing into the report.
+      - name: Flag recovered taps
+        if: ${{ !cancelled() }}
+        working-directory: tools/e2e
+        run: |
+          node -e '
+            const report = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8"));
+            const watched = /name: "(Profile|Add|New space)"/;
+            const walk = (node) => {
+              if (Array.isArray(node)) return node.forEach(walk);
+              if (!node || typeof node !== "object") return;
+              if (Array.isArray(node.steps)) {
+                const taps = {};
+                for (const step of node.steps)
+                  if (step.api === "locator.tap" && watched.test(step.label ?? ""))
+                    taps[step.label] = (taps[step.label] ?? 0) + 1;
+                for (const [label, count] of Object.entries(taps))
+                  if (count > 1) console.log(`::warning title=Recovered tap::${count} taps on ${label} in one test; a tap was lost`);
+              }
+              Object.values(node).forEach(walk);
+            };
+            walk(report);
+          '
 
       - name: Copy the backend log
         if: ${{ !cancelled() }}
