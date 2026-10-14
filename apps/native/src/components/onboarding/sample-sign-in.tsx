@@ -15,8 +15,8 @@ import { StyleSheet } from "react-native-unistyles";
  *
  * Nothing has read the page yet, so the save shows only what is already
  * known: the page's own heading (which the save keeps), its site, and the
- * space it goes to. Tags come
- * from the classifier and appear on the step after sign-in. */
+ * space it goes to. Tags come from the classifier and appear on the step
+ * after sign-in. */
 export function SampleSignIn({
   sample,
   space,

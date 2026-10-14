@@ -73,7 +73,6 @@ vi.mock("@/lib/onboarding-demo", () => ({
     url === "https://sample.test/ready-made"
       ? "recipes"
       : null,
-  isDemoSample: (url: string) => url === "https://sample.test/ready-made",
   findSample: (url: string) =>
     url === "https://sample.test/ready-made"
       ? { pageHeading: "Ready-made heading" }
