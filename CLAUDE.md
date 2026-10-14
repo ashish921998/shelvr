@@ -211,7 +211,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships. The file also holds
+  matches become `suggested` memberships (`saved` in a space set to auto-file). The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
@@ -421,9 +421,13 @@ needed at runtime by the features that use them:
   error tracking in a queryable shape. Keep messages, URLs, and user content out of log
   fields — log categories and codes instead.
 - The classifier and recommendation passes may only create or remove `suggested` memberships in
-  `spaceItems`. Purpose steering (`steerItemForSpace`) may update `intents` on `saved`
-  memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
-  no AI pass ever overwrites a user decision.
+  `spaceItems`. The one exception is a space the user set to auto-file (`spaces.autoFile`, only
+  while `dynamic` is on): the classifier inserts its new matches there as `saved`, the user's
+  standing opt-in replacing the per-item accept. It applies only to saves made after auto-file was
+  turned on, and never changes an existing `saved`, `dismissed` or legacy row. Purpose
+  steering (`steerItemForSpace`) may update `intents` on `saved` memberships without changing
+  their status. `saved` and `dismissed` statuses are user-owned, so no AI pass ever overwrites a
+  user decision.
 - Deploy backend changes in a compatible order: the Convex deploy lands before
   the client update that needs it. `.github/workflows/deploy.yml` deploys the
   backend alone, and `.github/workflows/release.yml` deploys the selected

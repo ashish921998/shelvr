@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Einkaufsliste für die Wohnung",
   "spaces.dynamic": "Dynamisch",
   "spaces.dynamicHelp": "Shelvr schlägt laufend passende Inhalte vor",
+  "spaces.autoFile": "Automatisch hinzufügen",
+  "spaces.autoFileHelp": "Neue passende Inhalte landen direkt hier. Du kannst sie jederzeit entfernen.",
   "common.saveChanges": "Änderungen speichern",
   "spaces.create": "Sammlung erstellen",
   "common.continue": "Weiter",
@@ -345,7 +347,8 @@
   "item.partial": "Nur anhand des Links gespeichert — die Seite ließ sich nicht laden, daher sind diese Angaben geschätzt.",
   "item.noArticle": "Diese Seite enthält keinen lesbaren Artikel — als einfacher Link gespeichert.",
   "recipe.ingredients": "Zutaten",
-  "recipe.steps": "Schritte",
+  "recipe.steps": "Zubereitung",
+  "recipe.stepNumber": "Schritt %{number}",
   "recipe.serves": {
     "one": "Für %{formattedCount} Portion",
     "other": "Für %{formattedCount} Portionen"

@@ -107,6 +107,8 @@ export type MessageParams = {
   "spaces.titlePlaceholder": undefined;
   "spaces.dynamic": undefined;
   "spaces.dynamicHelp": undefined;
+  "spaces.autoFile": undefined;
+  "spaces.autoFileHelp": undefined;
   "common.saveChanges": undefined;
   "spaces.create": undefined;
   "common.continue": undefined;
@@ -347,6 +349,7 @@ export type MessageParams = {
   "item.noArticle": undefined;
   "recipe.ingredients": undefined;
   "recipe.steps": undefined;
+  "recipe.stepNumber": { number: string };
   "recipe.serves": { count: number };
   "presets.articles": undefined;
   "presets.recipes": undefined;
