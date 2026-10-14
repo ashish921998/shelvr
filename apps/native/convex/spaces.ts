@@ -10,6 +10,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
+import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -313,9 +314,13 @@ export const createSpace = mutation({
     });
     // Every new space gets one recommendation pass off its title; the dynamic
     // toggle only governs whether future saves keep getting suggested.
-    await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
-      spaceId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.aiRecommendForSpace.recommendForSpace,
+      {
+        spaceId,
+      },
+    );
     return spaceId;
   },
 });
@@ -361,9 +366,13 @@ export const updateSpace = mutation({
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
     if (enablingDynamic) {
-      await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
-        spaceId: space._id,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.aiRecommendForSpace.recommendForSpace,
+        {
+          spaceId: space._id,
+        },
+      );
     }
     return null;
   },
@@ -748,6 +757,60 @@ export const getSpaceInternal = internalQuery({
   returns: v.union(v.object(spaceFields), v.null()),
   handler: async (ctx, args) => {
     return await ctx.db.get(args.spaceId);
+  },
+});
+
+/** Read the space, permission and exclusions in one pre-embedding snapshot. */
+export const recommendationContext = internalQuery({
+  args: { spaceId: v.id("spaces") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      space: v.object(spaceFields),
+      memberIds: v.array(v.id("items")),
+    }),
+  ),
+  handler: async (ctx, { spaceId }) => {
+    const space = await ctx.db.get(spaceId);
+    if (space === null || !(await aiAllowed(ctx, space.userId))) return null;
+    const joins = await ctx.db
+      .query("spaceItems")
+      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+      .collect();
+    return { space, memberIds: joins.map((join) => join.itemId) };
+  },
+});
+
+/** Revalidate hydrated recommendation identities before classification. */
+export const survivingCandidates = internalQuery({
+  args: {
+    userId: v.string(),
+    spaceId: v.id("spaces"),
+    itemIds: v.array(v.id("items")),
+  },
+  returns: v.union(v.null(), v.array(v.id("items"))),
+  handler: async (ctx, args) => {
+    if (args.itemIds.length === 0) throw new Error("No candidates");
+    if (args.itemIds.length > RECOMMEND_CANDIDATES)
+      throw new Error("Too many candidates");
+    const space = await ctx.db.get(args.spaceId);
+    if (
+      space === null ||
+      space.userId !== args.userId ||
+      !(await aiAllowed(ctx, args.userId))
+    )
+      return null;
+    const surviving = [];
+    for (const itemId of args.itemIds) {
+      const item = await ctx.db.get(itemId);
+      if (
+        item !== null &&
+        item.userId === args.userId &&
+        item.status === "ready"
+      )
+        surviving.push(itemId);
+    }
+    return surviving;
   },
 });
 

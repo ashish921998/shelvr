@@ -11,6 +11,8 @@
 import type * as accountTelemetry from "../accountTelemetry.js";
 import type * as ai from "../ai.js";
 import type * as aiConsent from "../aiConsent.js";
+import type * as aiEmbeddingSweep from "../aiEmbeddingSweep.js";
+import type * as aiRecommendForSpace from "../aiRecommendForSpace.js";
 import type * as analytics from "../analytics.js";
 import type * as appIntents from "../appIntents.js";
 import type * as appleProfile from "../appleProfile.js";
@@ -28,6 +30,7 @@ import type * as legalConsent from "../legalConsent.js";
 import type * as legalConsentSync from "../legalConsentSync.js";
 import type * as model_accountCreated from "../model/accountCreated.js";
 import type * as model_aiConsent from "../model/aiConsent.js";
+import type * as model_aiProvider from "../model/aiProvider.js";
 import type * as model_appleClient from "../model/appleClient.js";
 import type * as model_appleIdToken from "../model/appleIdToken.js";
 import type * as model_appleJws from "../model/appleJws.js";
@@ -90,6 +93,8 @@ declare const fullApi: ApiFromModules<{
   accountTelemetry: typeof accountTelemetry;
   ai: typeof ai;
   aiConsent: typeof aiConsent;
+  aiEmbeddingSweep: typeof aiEmbeddingSweep;
+  aiRecommendForSpace: typeof aiRecommendForSpace;
   analytics: typeof analytics;
   appIntents: typeof appIntents;
   appleProfile: typeof appleProfile;
@@ -107,6 +112,7 @@ declare const fullApi: ApiFromModules<{
   legalConsentSync: typeof legalConsentSync;
   "model/accountCreated": typeof model_accountCreated;
   "model/aiConsent": typeof model_aiConsent;
+  "model/aiProvider": typeof model_aiProvider;
   "model/appleClient": typeof model_appleClient;
   "model/appleIdToken": typeof model_appleIdToken;
   "model/appleJws": typeof model_appleJws;
