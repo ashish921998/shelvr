@@ -527,7 +527,7 @@
   "onboarding.remindSavedNow": "방금 저장함",
   "onboarding.remindFallbackTitle": "첫 번째 저장",
   "onboarding.remindPledge": "일요일마다 저장한 것을 다시 볼게요.",
-  "onboarding.remindConsent": "저장하고 아직 열어 보지 않은 것도 Shelvr가 알려 드릴 수 있어요. 설정에서 끌 수 있어요.",
+  "onboarding.remindConsent": "일요일 주간 책장도 함께 켜져요. 저장하고 아직 열어 보지 않은 것도 Shelvr가 알려 드릴 수 있어요. 설정에서 끌 수 있어요.",
   "demo.privacyNote": "로그인하는 데에만 사용해요.",
   "demo.stepSaved": "책장에 저장됨",
   "demo.stepReading": "게시물 읽는 중",

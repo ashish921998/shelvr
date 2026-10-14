@@ -563,7 +563,7 @@
   "onboarding.remindSavedNow": "guardado hace un momento",
   "onboarding.remindFallbackTitle": "Tu primer guardado",
   "onboarding.remindPledge": "Los domingos voy a repasar lo que guardé.",
-  "onboarding.remindConsent": "Shelvr también puede recordarte lo que guardaste y aún no abres. Puedes desactivarlo en Configuración.",
+  "onboarding.remindConsent": "Esto también activa tu Estantería semanal de los domingos, y Shelvr puede recordarte lo que guardaste y aún no abres. Puedes desactivarlo en Configuración.",
   "demo.privacyNote": "Solo lo usamos para iniciar tu sesión.",
   "demo.stepSaved": "Guardado en tu estantería",
   "demo.stepReading": "Leyendo la publicación",

@@ -563,7 +563,7 @@
   "onboarding.remindSavedNow": "salvo agora mesmo",
   "onboarding.remindFallbackTitle": "Seu primeiro salvamento",
   "onboarding.remindPledge": "Aos domingos, vou rever o que salvei.",
-  "onboarding.remindConsent": "O Shelvr também pode lembrar você do que salvou e ainda não abriu. Você pode desativar isso em Configurações.",
+  "onboarding.remindConsent": "Isso também ativa sua Estante semanal de domingo, e o Shelvr pode lembrar você do que salvou e ainda não abriu. Você pode desativar isso em Configurações.",
   "demo.privacyNote": "Usamos isso apenas para fazer seu login.",
   "demo.stepSaved": "Salvo na sua estante",
   "demo.stepReading": "Lendo o post",
