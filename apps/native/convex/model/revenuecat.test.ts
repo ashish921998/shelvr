@@ -216,9 +216,9 @@ describe("RevenueCat project entitlement isolation", () => {
   });
 });
 
-// Cases below were added after a mutation-testing pass (Stryker) showed the
-// suite still passed with these rules removed.
-describe("rules found unguarded by mutation testing", () => {
+// Stryker (`pnpm --filter native-app mutate`) showed these rules could be
+// removed without any test failing.
+describe("RevenueCat parsing edge cases", () => {
   const now = Date.parse("2026-09-08T12:00:00Z");
   function customer(entitlement: unknown, extra: Record<string, unknown> = {}) {
     return {
@@ -248,6 +248,22 @@ describe("rules found unguarded by mutation testing", () => {
         productId: "annual",
       });
     }
+  });
+
+  it("keeps the later subscription expiry over an earlier grace expiry", () => {
+    expect(
+      parseRevenueCatSnapshot(
+        customer({
+          product_identifier: "annual",
+          expires_date: "2026-09-10T12:00:00Z",
+          grace_period_expires_date: "2026-09-09T12:00:00Z",
+        }),
+      ),
+    ).toEqual({
+      status: "pro",
+      expiresAt: Date.parse("2026-09-10T12:00:00Z"),
+      productId: "annual",
+    });
   });
 
   it("lapses when the grace period has also ended", () => {
