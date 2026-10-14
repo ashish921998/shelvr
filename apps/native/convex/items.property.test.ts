@@ -4,7 +4,7 @@ import * as fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -29,24 +29,26 @@ afterEach(() => {
 const USERS = ["user-a", "user-b"] as const;
 type User = (typeof USERS)[number];
 
-function signedIn(
-  base: ReturnType<typeof newConvexTest>,
-): Record<User, TestCtx> {
-  return {
-    "user-a": base.withIdentity({ subject: "user-a|session-1" }),
-    "user-b": base.withIdentity({ subject: "user-b|session-1" }),
-  };
-}
+type SignedIn = {
+  as: Record<User, TestCtx>;
+  ids: Record<User, Id<"users">>;
+  /** The test's name for the owner of a stored `userId`. */
+  nameOf: (userId: string) => User | undefined;
+};
 
-async function seedPro(t: TestCtx, userId: string): Promise<void> {
-  await t.run(async (ctx) => {
-    await ctx.db.insert("subscriptions", {
-      userId,
-      status: "pro",
-      expiresAt: NOW + 365 * DAY_MS,
-      updatedAt: NOW,
-    });
-  });
+/** Both users, backed by real users rows; `pro` gives each a live plan. */
+async function signedIn(
+  base: ReturnType<typeof newConvexTest>,
+  options: { pro?: boolean } = {},
+): Promise<SignedIn> {
+  const a = await signedInUser(base, options);
+  const b = await signedInUser(base, options);
+  const ids = { "user-a": a.userId, "user-b": b.userId };
+  return {
+    as: { "user-a": a.t, "user-b": b.t },
+    ids,
+    nameOf: (userId) => USERS.find((user) => ids[user] === userId),
+  };
 }
 
 async function snapshot(t: TestCtx) {
@@ -117,8 +119,7 @@ describe("saving links and notes", () => {
         fc.array(command, { maxLength: 20 }),
         async (commands) => {
           const base = newConvexTest();
-          const as = signedIn(base);
-          for (const user of USERS) await seedPro(base, user);
+          const { as, nameOf } = await signedIn(base, { pro: true });
 
           // What should exist: each user's saves, and which save each of
           // their operation ids produced.
@@ -170,14 +171,14 @@ describe("saving links and notes", () => {
             new Map(
               stored.items.map((item) => [
                 item._id,
-                { user: item.userId, kind: item.type },
+                { user: nameOf(item.userId), kind: item.type },
               ]),
             ),
           ).toEqual(saves);
           expect(
             new Map(
               stored.operations.map((op) => [
-                `${op.userId}/${op.operationId}`,
+                `${nameOf(op.userId)}/${op.operationId}`,
                 { kind: op.kind, itemId: op.itemId },
               ]),
             ),
@@ -228,11 +229,12 @@ describe("the Pro gate on saves", () => {
     await fc.assert(
       fc.asyncProperty(subscription, async (sub) => {
         const base = newConvexTest();
-        const t = signedIn(base)["user-a"];
+        const { as, ids } = await signedIn(base);
+        const t = as["user-a"];
         if (sub !== null) {
           await base.run(async (ctx) => {
             await ctx.db.insert("subscriptions", {
-              userId: "user-a",
+              userId: ids["user-a"],
               ...sub,
               updatedAt: NOW,
             });
@@ -332,8 +334,7 @@ describe("searching saves", () => {
         typed,
         async (titles, query) => {
           const base = newConvexTest();
-          const as = signedIn(base);
-          for (const user of USERS) await seedPro(base, user);
+          const { as, ids } = await signedIn(base, { pro: true });
 
           // Both users save the same titles, so only ownership tells their
           // saves apart.
@@ -353,7 +354,9 @@ describe("searching saves", () => {
               .map(([itemId]) => itemId)
               .sort(),
           );
-          expect(found.every((item) => item.userId === "user-a")).toBe(true);
+          expect(found.every((item) => item.userId === ids["user-a"])).toBe(
+            true,
+          );
         },
       ),
     );
@@ -361,8 +364,7 @@ describe("searching saves", () => {
 
   it("returns nothing for a blank search", async () => {
     const base = newConvexTest();
-    const t = signedIn(base)["user-a"];
-    await seedPro(base, "user-a");
+    const t = (await signedIn(base, { pro: true })).as["user-a"];
     await saveFinished(base, t, "https://example.com/a", ["ramen"]);
 
     await fc.assert(
