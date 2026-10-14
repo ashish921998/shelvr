@@ -1,5 +1,5 @@
 import { beforeEach } from "@e2e-dev/mobile";
-import { expect, type Locator, type Screen } from "e2e";
+import { type App, expect, type Locator, type Screen } from "e2e";
 
 const BUNDLE_TIMEOUT = 180_000;
 
@@ -30,8 +30,6 @@ const PROFILE_WAIT_MS = 15_000;
  */
 export function startOnSeededHome(): void {
   beforeEach(async ({ app, screen }) => {
-    await app.open();
-
     // Three ways the app can open: already signed in (Profile), on the
     // sign-in screen (dev login), or, on a fresh install, on the onboarding
     // opener, whose "Sign in" link leads to the same dev login.
@@ -41,15 +39,14 @@ export function startOnSeededHome(): void {
       "button",
       /^Already have an account\?/,
     );
-    await expect
-      .poll(
-        async () =>
-          (await profile.isVisible()) ||
-          (await devLogin.isVisible()) ||
-          (await openerSignIn.isVisible()),
-        { timeout: BUNDLE_TIMEOUT },
-      )
-      .toBe(true);
+    await openApp(
+      app,
+      screen,
+      async () =>
+        (await profile.isVisible()) ||
+        (await devLogin.isVisible()) ||
+        (await openerSignIn.isVisible()),
+    );
     // The app mounts under the launch splash, so its controls can appear in
     // the accessibility tree before they can receive touches.
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
@@ -84,12 +81,37 @@ export function startOnSeededHome(): void {
     });
     await screen.getByRole("button", "OK").tap();
 
-    await app.open();
-    await expect(profile).toBeVisible({ timeout: BUNDLE_TIMEOUT });
+    await openApp(app, screen, () => profile.isVisible());
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
   });
+}
+
+/**
+ * Opens the app and waits until `ready`. The dev launcher gives Metro's
+ * manifest 10 seconds, then shows its server list instead of the app, and
+ * the manifest resolves the native fingerprint on every request: a few
+ * seconds on a Mac, 5 to 15 on a GitHub runner. So the app is opened again
+ * whenever the launcher shows.
+ */
+async function openApp(
+  app: App,
+  screen: Screen,
+  ready: () => Promise<boolean>,
+): Promise<void> {
+  const launcher = screen.getByText("Searching for development servers...");
+  await app.open();
+  await expect
+    .poll(
+      async () => {
+        if (await ready()) return true;
+        if (await launcher.isVisible()) await app.open();
+        return false;
+      },
+      { timeout: BUNDLE_TIMEOUT },
+    )
+    .toBe(true);
 }
 
 /**
