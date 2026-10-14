@@ -279,7 +279,10 @@ export default function PlanScreen() {
               accessibilityRole="button"
               onPress={again}
               hitSlop={8}
-              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.shuffle,
+                pressed && styles.pressed,
+              ]}
             >
               <ThemedText variant="secondaryLabel" style={styles.muted}>
                 {t("plan.again")}
@@ -421,6 +424,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: theme.gap(1),
+  },
+  // Sits on the title's last line, not centred against the whole heading.
+  shuffle: {
+    paddingBottom: theme.gap(0.75),
   },
   heading: {
     flexShrink: 1,

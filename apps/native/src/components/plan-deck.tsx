@@ -230,16 +230,21 @@ function CardFace({
 }) {
   return (
     <>
+      {/* Under the photo, so a save with no image, or one that fails to
+          load, still shows a card rather than a blank block. */}
+      <View style={[styles.fill, styles.noImage]}>
+        <ThemedText variant="hero" style={styles.initial}>
+          {place.name.trim().charAt(0).toUpperCase()}
+        </ThemedText>
+      </View>
       {imageUrl ? (
         <Image
           source={{ uri: imageUrl }}
-          style={styles.fill}
+          style={styles.photo}
           contentFit="cover"
           accessible={false}
         />
-      ) : (
-        <View style={[styles.fill, styles.noImage]} />
-      )}
+      ) : null}
       <View style={styles.caption}>
         <ThemedText
           variant="largeTitle"
@@ -369,7 +374,20 @@ const styles = StyleSheet.create((theme) => ({
     height: "100%",
   },
   noImage: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: theme.gap(8),
     backgroundColor: theme.colors.primarySoft,
+  },
+  initial: {
+    color: theme.colors.primaryText,
+  },
+  photo: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   caption: {
     position: "absolute",
