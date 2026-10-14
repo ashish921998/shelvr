@@ -1,15 +1,20 @@
-import { Text } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { StyleSheet } from 'react-native-unistyles';
+import { Text } from "react-native";
+import Animated from "react-native-reanimated";
+import { StyleSheet } from "react-native-unistyles";
+import { fadeIn } from "@/lib/motion";
 
 type Props = {
   title: string;
   message: string;
+  animateEntrance?: boolean;
 };
 
-export function EmptyState({ title, message }: Props) {
+export function EmptyState({ title, message, animateEntrance = true }: Props) {
   return (
-    <Animated.View entering={FadeIn.duration(400)} style={styles.container}>
+    <Animated.View
+      entering={animateEntrance ? fadeIn : undefined}
+      style={styles.container}
+    >
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
     </Animated.View>
@@ -19,8 +24,8 @@ export function EmptyState({ title, message }: Props) {
 const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: theme.gap(4),
     paddingBottom: rt.insets.bottom + theme.gap(2),
     gap: theme.gap(1),
@@ -34,7 +39,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     color: theme.colors.muted,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 21,
   },
 }));
