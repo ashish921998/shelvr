@@ -20,7 +20,7 @@ import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Standard OpenGraph image shape (1200×630) — the default when a link's real
+// Standard OpenGraph image shape (1200×630), the default when a link's real
 // hero dimensions weren't captured. Mirrors item-card so covers match the feed.
 const OG_RATIO = 1.91;
 
@@ -380,7 +380,7 @@ const styles = StyleSheet.create((theme) => ({
   content: {
     padding: theme.gap(1),
   },
-  // Grid cell — no panel of its own (like the home feed); the stacked covers are
+  // Grid cell, no panel of its own (like the home feed); the stacked covers are
   // the visual. The margin creates the gutters between the two columns and rows.
   cell: {
     flex: 1,
@@ -423,7 +423,7 @@ const styles = StyleSheet.create((theme) => ({
     // behind it, matching the matte instead of a grey block.
     backgroundColor: "#ffffff",
   },
-  // The blank cards behind — same white stock as the cover matte so the pile
+  // The blank cards behind, same white stock as the cover matte so the pile
   // reads as a stack of identical cards.
   cardBlank: {
     backgroundColor: "#ffffff",

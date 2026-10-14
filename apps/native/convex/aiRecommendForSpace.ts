@@ -27,7 +27,7 @@ const recommendSchema = z.object({
 });
 
 // A recommendation pass surfaces "a couple of good picks", not an exhaustive
-// sweep — the user can always add more by hand or ask again later.
+// sweep: the user can always add more by hand or ask again later.
 const MAX_RECOMMENDATIONS = 8;
 
 /**
@@ -57,7 +57,7 @@ type RecommendationCandidate = FunctionReturnType<
  *
  * Returns an empty list rather than throwing on any failure. The outer action
  * catches and logs, so an error escaping here would turn a transient search
- * hiccup into no recommendations at all — strictly worse than the recency read
+ * hiccup into no recommendations at all, strictly worse than the recency read
  * this replaced. An empty list is the fallback signal.
  */
 async function searchCandidates(
@@ -102,14 +102,14 @@ async function searchCandidates(
  * Semantic first: the space's own name and description are embedded as a
  * query and matched against the item vector index, so a user with a thousand
  * saves is judged on the hundred most *relevant* rather than the hundred most
- * *recent*. That difference is the whole point — the saves worth resurfacing
+ * *recent*. That difference is the whole point: the saves worth resurfacing
  * when someone finally makes a "Recipes" space are the old ones they have
  * forgotten, and those are exactly the ones a recency read cannot see.
  *
  * Recency is not an alternative to that, it is the floor underneath it, and
  * it is not optional. A user whose backfill has not drained, whose items all
  * failed to embed, or whose query text could not be embedded at all has no
- * vectors — or too few — to match; unaided, the feature would hand such a
+ * vectors, or too few, to match; unaided, the feature would hand such a
  * user a shorter list than the "newest 100" read it replaced. So the two are
  * combined rather than chosen between: ranked hits first, recency filling
  * whatever is left of the candidate budget. Both halves return the same shape
@@ -147,8 +147,8 @@ async function recommendationCandidates(
   // index can only ever offer the fifty. Returning those alone would hand the
   // prompt less than the newest-100 read this replaced, so partial coverage
   // would be a regression for exactly the users the feature is for. The
-  // ranked hits lead — they are the relevant ones, and the prompt numbers
-  // what it is given — and recency fills the rest of the list behind them.
+  // ranked hits lead (they are the relevant ones, and the prompt numbers
+  // what it is given), and recency fills the rest of the list behind them.
   const seen = new Set(ranked.map((item) => item._id));
   const recent = (
     await ctx.runQuery(internal.items.listReadyItemsInternal, {
@@ -170,7 +170,7 @@ async function recommendationCandidates(
  * Recommend existing items for a space, off nothing but its name and
  * description. Runs when a space is created, and again whenever its dynamic
  * toggle turns on. Writes
- * `suggested` rows only — the user decides what actually enters the space —
+ * `suggested` rows only (the user decides what actually enters the space),
  * and never re-suggests anything they already filed or dismissed.
  */
 export const recommendForSpace = internalAction({

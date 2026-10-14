@@ -226,7 +226,7 @@ describe("RecentSavesWidget", () => {
       { ...smallLight, date: new Date(2_000) },
     );
 
-    // The lapsed entitlement collapses to the Pro upsell — no saved content.
+    // The lapsed entitlement collapses to the Pro upsell: no saved content.
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
     expect(widgetUrl(tree)).toBe("shelvr:///paywall");
     expect(JSON.stringify(tree)).not.toContain("Chair");

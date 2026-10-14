@@ -32,7 +32,7 @@ const mock = vi.hoisted(() => ({
     }) => ({ accepted: true }),
   ),
   capture: vi.fn(),
-  // useMutation call counter — see the convex/react mock below.
+  // useMutation call counter; see the convex/react mock below.
   mutationCalls: 0,
 }));
 vi.mock("react-native", () => ({
@@ -68,7 +68,7 @@ vi.mock("convex/react", () => ({
   // A dynamic import inside a vi.mock factory resolves to a different
   // _generated/api instance than the hook's import, so the mutation cannot
   // be routed by reference. Route by call order instead: the hook calls
-  // useMutation for markShown, then respond, on every render — exactly two
+  // useMutation for markShown, then respond, on every render: exactly two
   // calls per render keeps the parity stable.
   useMutation: () => {
     mock.mutationCalls += 1;
@@ -111,7 +111,7 @@ const react = {
     rendered = undefined;
   },
 };
-/** mount/rerender return a fresh result object per render — always read the
+/** mount/rerender return a fresh result object per render: always read the
  * current one after an await. */
 const latest = (): Survey => react.rerender();
 
@@ -351,7 +351,7 @@ describe("useCancelSurvey", () => {
     latest().presented();
     await flush();
 
-    // A failed verdict never committed, so the ask is unspent — but this
+    // A failed verdict never committed, so the ask is unspent, but this
     // mount cannot cite a win. Fail closed and let a later mount re-ask.
     expect(latest().visible).toBe(false);
     expect(

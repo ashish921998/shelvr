@@ -5,7 +5,7 @@ import { api } from "./_generated/api";
 
 // Server-enforced "ask once per account": the row is the authority across
 // devices and reinstalls, so these tests drive the mutation/query contract
-// the client hook relies on — idempotent markShown, first-response-wins
+// the client hook relies on: idempotent markShown, first-response-wins
 // respond, and strict per-user isolation. Fresh backend per test (the
 // repo convention) so rows never leak between cases.
 describe("cancelSurvey", () => {
@@ -121,7 +121,7 @@ describe("cancelSurvey", () => {
       user.mutation(api.cancelSurvey.respond, {
         outcome: "submitted",
         // Deliberately invalid: the validator must reject it at runtime.
-        // @ts-expect-error — the point of the test is the runtime rejection
+        // @ts-expect-error: the point of the test is the runtime rejection
         reason: "because the app crashed when I opened it",
       }),
     ).rejects.toThrow();

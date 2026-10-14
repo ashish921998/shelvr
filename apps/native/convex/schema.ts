@@ -199,7 +199,7 @@ export default defineSchema({
     //
     // Deliberately NOT part of `itemFields`. That object is spread into
     // `enrichedItemValidator`, the return shape of `listItems`, `getItem`,
-    // `searchItems`, the weekly digest, and `getSpace` — adding ~6 KB of
+    // `searchItems`, the weekly digest, and `getSpace`. Adding ~6 KB of
     // floats to every feed row is exactly the cost the card/detail split
     // exists to avoid. `enrichItem` strips it at the single chokepoint those
     // reads share.
@@ -239,7 +239,7 @@ export default defineSchema({
     .index("by_storage", ["storageId"])
     // Embedding backfill/refresh sweeper: `ready` rows whose embeddingVersion
     // is below the current generation, oldest generation first. Scoped to
-    // `ready` because nothing else is worth embedding — a `processing` row has
+    // `ready` because nothing else is worth embedding: a `processing` row has
     // no final text yet and a `failed` one has no text at all.
     .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
@@ -250,7 +250,7 @@ export default defineSchema({
     //
     // `userId` is the only filter field on purpose. Convex vector filters
     // support equality and `q.or(...)` but have no AND across different
-    // fields, so exactly one field can be pushed into the index — and it has
+    // fields, so exactly one field can be pushed into the index, and it has
     // to be the one whose failure would leak another account's saves. Status
     // is filtered after hydration instead, where a plain predicate is free.
     .vectorIndex("by_embedding", {
@@ -267,6 +267,15 @@ export default defineSchema({
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
+    // Auto-file = new saves the classifier matches to this space land as
+    // `saved` instead of `suggested`. The user's own opt-in, so it is the one
+    // case where an AI pass writes a saved row. Only takes effect while
+    // `dynamic` is on. Absent means false.
+    autoFile: v.optional(v.boolean()),
+    // When auto-file was last turned on. Only saves created at or after it
+    // are auto-filed, so reclassifying an older save (a retry or a note edit)
+    // still only suggests.
+    autoFileSince: v.optional(v.number()),
     // Denormalized membership summary so the spaces list never has to walk
     // `spaceItems`. Counts mirror the spaceItems status vocabulary: `saved`
     // rows (user-owned memberships) and `suggested` rows (pending AI picks);
@@ -326,7 +335,7 @@ export default defineSchema({
   //
   //   begin (pending) -> upload bytes -> attach storageId -> finalize (complete)
   //
-  // `complete` rows are the permanent idempotency record — a retry reads the
+  // `complete` rows are the permanent idempotency record: a retry reads the
   // same itemId back. `pending` rows older than 24h whose attached upload was
   // never finalized are swept by a bounded cleanup cron; their storage object
   // is deleted first. A completed row whose item was explicitly deleted is
@@ -345,7 +354,7 @@ export default defineSchema({
     uploadClaimedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
-    // The logical unique key — every mutation loads the row through this index.
+    // The logical unique key: every mutation loads the row through this index.
     .index("by_user_operation", ["userId", "operationId"])
     .index("by_user_and_kind_and_status", ["userId", "kind", "status"])
     .index("by_upload_token_hash", ["uploadTokenHash"])
@@ -354,8 +363,8 @@ export default defineSchema({
     // itemId and so are never returned by this index lookup.
     .index("by_item", ["itemId"])
     // Lets isStorageUnreferenced see storage held by pending operations (an
-    // uploaded-but-unfinalized blob), not just storage referenced by items —
-    // otherwise the same blob could be adopted into two operations and later
+    // uploaded-but-unfinalized blob), not just storage referenced by items.
+    // Otherwise the same blob could be adopted into two operations and later
     // deleted out from under a live item.
     .index("by_storage", ["storageId"])
     // Stale-pending cleanup cron, bounded per run. kind leads so the sweep
@@ -386,7 +395,7 @@ export default defineSchema({
     ),
     expiresAt: v.number(),
     productId: v.optional(v.string()),
-    // RevenueCat `event_timestamp_ms` — a monotonic event timestamp from the
+    // RevenueCat `event_timestamp_ms`, a monotonic event timestamp from the
     // webhook payload. Used to order events so a newer event can move expiry in
     // either direction (e.g. a refund shortens the period). Optional for
     // backward compatibility with rows created before this field existed.
@@ -399,7 +408,7 @@ export default defineSchema({
   // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
   // row is the durable, cross-install record: its existence is the ask, and
   // the first recorded outcome wins. Local (MMKV) state can never enforce
-  // once-per-account across devices or reinstalls — only this row can.
+  // once-per-account across devices or reinstalls: only this row can.
   cancelSurveys: defineTable({
     userId: v.string(),
     askedAt: v.number(),
@@ -414,7 +423,7 @@ export default defineSchema({
   // Authenticated in-app feedback (convex/feedback.ts). Convex is the source
   // of truth; the support-inbox email is only a projection, so a Resend
   // outage or missing operator configuration can never lose a submission.
-  // The message never reaches PostHog — client telemetry carries surface,
+  // The message never reaches PostHog. Client telemetry carries surface,
   // char count, and a content-free delivery category only. Deleting a row
   // does not retract an already-delivered email (see
   // docs/architecture/feedback.md).
@@ -435,7 +444,7 @@ export default defineSchema({
     // cap stays `failed` for manual inspection instead of occupying the
     // retry window forever.
     attempts: v.number(),
-    // `<category>[:<http status>]` — why the last delivery failed, without
+    // `<category>[:<http status>]`: why the last delivery failed, without
     // any provider text (which can echo the message back).
     deliveryError: v.optional(v.string()),
     deliveredAt: v.optional(v.number()),
@@ -549,7 +558,7 @@ export default defineSchema({
     // When Expo first accepted a push for this notification, stamped at the
     // first finish that sees a ticket in hand. Separate from `deliveredAt`
     // (the confirmation time) because `notification_sent` telemetry timestamps
-    // the send itself — otherwise a notification open can precede the
+    // the send itself. Otherwise a notification open can precede the
     // notification's own "sent" event. Absent on rows that never sent.
     deliverySentAt: v.optional(v.number()),
   })

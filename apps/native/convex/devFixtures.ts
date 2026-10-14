@@ -123,7 +123,7 @@ export const resetCurrentUser = mutation({
       url: "https://example.com/recipes/weeknight-miso-ramen",
       siteName: "Example Kitchen",
       tags: ["recipes", "dinner"],
-      // The page loaded but had no extractable article — demonstrates the
+      // The page loaded but had no extractable article. Demonstrates the
       // "no_article" enrichment state on the detail screen.
       enrichment: "no_article",
       intents: [

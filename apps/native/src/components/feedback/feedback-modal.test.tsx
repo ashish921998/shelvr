@@ -138,7 +138,7 @@ describe("FeedbackModal", () => {
     );
     expect(mocks.markSubmitted).toHaveBeenCalledWith("user-1");
     expect(mocks.submit).toHaveBeenCalledOnce();
-    // Only bounded shape metadata reaches analytics — never the message.
+    // Only bounded shape metadata reaches analytics, never the message.
     expect(mocks.capture).toHaveBeenCalledWith("feedback_submitted", {
       surface: "home",
       char_count: 12,
@@ -166,7 +166,7 @@ describe("FeedbackModal", () => {
     // ...and Contact Support is still offered. The invitation is NOT marked.
     expect(screen.getByLabelText("support.email")).toBeTruthy();
     expect(mocks.markSubmitted).not.toHaveBeenCalled();
-    // The failure reaches error tracking as the fixed, content-free Error —
+    // The failure reaches error tracking as the fixed, content-free Error,
     // exactly the sanitized message, never the raw reject reason ("boom").
     expect(mocks.captureError).toHaveBeenCalledWith(
       "feedback_submit_failed",

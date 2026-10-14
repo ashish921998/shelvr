@@ -82,7 +82,7 @@ export function cardTitles(item: FeedItem): (string | undefined)[] {
   ];
 }
 
-// Standard OpenGraph image shape (1200×630) — the default when a link's real
+// Standard OpenGraph image shape (1200×630), the default when a link's real
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
 
@@ -285,7 +285,7 @@ export function ItemCardFace({
 
       {suggested && (
         // The badge pops off with a spring when the suggestion resolves
-        // (accepted here or anywhere else — the prop flip unmounts it).
+        // (accepted here or anywhere else: the prop flip unmounts it).
         <Animated.View
           exiting={
             reducedMotion
@@ -311,7 +311,7 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: "continuous",
     overflow: "hidden",
   },
-  // Stickers are transparent die-cut PNGs — let the drop shadow spill past the
+  // Stickers are transparent die-cut PNGs. Let the drop shadow spill past the
   // tile bounds instead of being clipped by the card's overflow.
   cardSticker: {
     overflow: "visible",

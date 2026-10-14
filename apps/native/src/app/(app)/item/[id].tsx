@@ -78,7 +78,7 @@ function searchQueryArg(from?: string, q?: string): "skip" | { query: string } {
 }
 
 // The undo notice shows only while the accepted item is really a member of
-// this space — the accept may have raced a swipe away or an unmount.
+// this space: the accept may have raced a swipe away or an unmount.
 function acceptedNoticeVisible(
   accepted: { itemId: Id<"items">; spaceId: Id<"spaces"> } | null,
   activeItem: DetailItem | undefined,
@@ -203,7 +203,7 @@ export default function ItemScreen() {
 // Owns the item pager's route-param sync: deduped writes through the owning
 // screen's navigation, a blur-cancelled pending write, and a refocus resync.
 // expo-router's generated param types don't cover imperative setParams, and
-// @react-navigation/native isn't a direct dependency — owning writes only
+// @react-navigation/native isn't a direct dependency: owning writes only
 // need these two members.
 function usePagerParamSync(initialId: string) {
   const navigation = useNavigation() as {
@@ -559,7 +559,7 @@ function ItemScreenContent() {
   );
 
   // Keeping the route `id` param in sync writes navigation state, which
-  // re-renders the entire native-stack tree — a ~16ms cascade profiled as the
+  // re-renders the entire native-stack tree, a ~16ms cascade profiled as the
   // single most expensive JS event per swipe. `activeId` (local state) already
   // drives the header/toolbar/actions, so only the deep-link/restore URL needs
   // the param (debounced so a run of swipes writes once, after it settles).
@@ -568,7 +568,7 @@ function ItemScreenContent() {
       const first = viewableItems[0]?.item as DetailItem | undefined;
       if (!first) return;
       // Offscreen layout passes and scroll corrections re-emit viewability
-      // for the page already shown — and while a pushed screen or a dismiss
+      // for the page already shown, and while a pushed screen or a dismiss
       // animation holds focus, position changes aren't the user's intent.
       if (first._id === activeIdRef.current) return;
       if (!navigation.isFocused()) return;
@@ -637,7 +637,7 @@ function ItemScreenContent() {
   }, [activeItem, router]);
 
   // Suggested items (opened from a space) trade the normal footer for an
-  // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
+  // Add / Dismiss decision bar. Accepting keeps the page open: the bar just
   // drops away as the suggestion becomes a real membership.
   const activeIsSuggested =
     from === "space" &&
@@ -927,7 +927,7 @@ function ItemScreenContent() {
       <PagerHeaderBackdrop onMedia={media.onMedia} browserOpen={browserOpen} />
 
       {activeIsSuggested ? (
-        // SlideInDown (not a fade) so the bar never mounts at opacity 0 — a
+        // SlideInDown (not a fade) so the bar never mounts at opacity 0: a
         // GlassView whose parent starts fully transparent silently fails to
         // render the liquid glass (expo/expo#41024).
         <Animated.View
@@ -1059,8 +1059,8 @@ const styles = StyleSheet.create((theme) => ({
   acceptWrap: {
     flex: 2,
   },
-  // Shared glass surface for both decision buttons. No backgroundColor/border —
-  // the liquid glass provides the material; the CTA sets it via tintColor.
+  // Shared glass surface for both decision buttons. No backgroundColor/border.
+  // The liquid glass provides the material; the CTA sets it via tintColor.
   decisionButton: {
     flexDirection: "row",
     alignItems: "center",

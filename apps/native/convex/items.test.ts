@@ -215,7 +215,7 @@ describe("listItemsPage", () => {
   });
 
   it("only returns the caller's items", async () => {
-    // One shared backend, so the userId scope — not database isolation — is
+    // One shared backend, so the userId scope, not database isolation, is
     // what keeps the two feeds apart.
     const backend = newConvexTest();
     const { t: ta, userId: aId } = await signedInUser(backend);
@@ -800,7 +800,7 @@ describe("similarItems", () => {
       const oldAgeMs = 8 * 24 * 60 * 60 * 1000; // past the 7-day reserve threshold
 
       // convex-test's virtual clock anchors to the real Date.now() at the
-      // first write on a test context, then ticks forward from there — so
+      // first write on a test context, then ticks forward from there, so
       // the backdated write has to be the very first thing this context
       // does. `as()` seeds a Pro row first, which similarItems doesn't need,
       // so build the identity directly instead.
@@ -951,7 +951,7 @@ describe("canonical save telemetry", () => {
 // Each test gets its own authenticated user: a real users row, signed in as
 // `${userId}|session`, so different rows model different users. Every save and
 // Pro mutation is gated behind an active subscription, so `as` seeds an active
-// Pro row for the user — the existing tests model the entitled (paying) path.
+// Pro row for the user. The existing tests model the entitled (paying) path.
 // The lapsed/not-entitled path is covered by the gating tests further down.
 async function as(): Promise<{ t: TestCtx; userId: string }> {
   return await signedInUser(newConvexTest(), { pro: true });
@@ -959,7 +959,7 @@ async function as(): Promise<{ t: TestCtx; userId: string }> {
 
 /** Insert an active Pro subscription for `userId` so gated mutations succeed.
  * Idempotent: if a row already exists it is patched, otherwise a new one is
- * inserted — so calling `seedPro` twice (e.g. in a shared helper) doesn't
+ * inserted, so calling `seedPro` twice (e.g. in a shared helper) doesn't
  * violate the `by_user` unique index. */
 async function seedPro(t: TestCtx, userId: string): Promise<void> {
   await t.run(async (ctx) => {
@@ -1222,7 +1222,7 @@ describe("image import lifecycle", () => {
 
   it("keeps the same operation id independent across users", async () => {
     // Both users must operate against ONE shared backend so the (userId,
-    // operationId) pair — not database isolation — is what distinguishes them.
+    // operationId) pair, not database isolation, is what distinguishes them.
     const backend = newConvexTest();
     const { t: ta } = await signedInUser(backend, { pro: true });
     const { t: tb } = await signedInUser(backend, { pro: true });
@@ -1239,7 +1239,7 @@ describe("image import lifecycle", () => {
     });
 
     // user-b using the same operation id is a separate operation and a separate
-    // item — the (userId, operationId) pair is the unique key.
+    // item: the (userId, operationId) pair is the unique key.
     await tb.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const sb = await storeBlob(tb);
     await tb.mutation(api.items.attachImageUpload, {
@@ -1263,7 +1263,7 @@ describe("image import lifecycle", () => {
 
   it("returns the completed itemId to a lapsed user without checking Pro", async () => {
     // A user who saved an image while Pro, then lapsed, must still retrieve
-    // the completed itemId — the idempotent read path is not gated on Pro.
+    // the completed itemId: the idempotent read path is not gated on Pro.
     const { t, userId } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
@@ -1453,7 +1453,7 @@ describe("image import lifecycle", () => {
       });
     });
 
-    // A fresh pending operation (well within the 24h window) — must survive.
+    // A fresh pending operation (well within the 24h window) must survive.
     const freshStorageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -1502,7 +1502,7 @@ describe("image import lifecycle", () => {
 
     // A malicious/buggy second operation tries to attach victimStorageId (which
     // is already referenced by user-a's completed item). attach must REJECT it
-    // rather than adopt it — otherwise finalize/deleteItem could delete the
+    // rather than adopt it. Otherwise finalize/deleteItem could delete the
     // victim's storage. Defense: only unreferenced storage is adoptable.
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID_2 });
     await expect(
@@ -1533,7 +1533,7 @@ describe("image import lifecycle", () => {
     });
 
     // A retry that resends an impossible aspectRatio must still return the
-    // existing item — the idempotent read path is not gated on re-validation.
+    // existing item: the idempotent read path is not gated on re-validation.
     const retriedId = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
       aspectRatio: -1,
@@ -1544,7 +1544,7 @@ describe("image import lifecycle", () => {
   it("deletes the redundant re-upload when attach lands on an already-complete op", async () => {
     // The headline retry race: the original attempt finalizes while a retry's
     // re-upload is in flight. The retry's attach must return the canonical id
-    // AND delete its own redundant blob — nothing else references it, so the
+    // AND delete its own redundant blob: nothing else references it, so the
     // pending-only cleanup cron would otherwise never reclaim it.
     const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
@@ -1741,7 +1741,7 @@ describe("image import lifecycle", () => {
 
   it("recycles an inconsistent complete op (no itemId) and clears its stale storageId", async () => {
     // Defensive branch: a complete row with no itemId. Recycling must clear
-    // the stale storageId — left in place, attach would treat it as canonical
+    // the stale storageId. Left in place, attach would treat it as canonical
     // and delete the fresh re-upload as "redundant".
     const { t, userId } = await as();
     const staleBlob = await storeBlob(t);
@@ -1900,7 +1900,7 @@ describe("shared link/note operation idempotency", () => {
 
   it("rejects reusing an image operation id for a link", async () => {
     // Seed a completed image operation directly, then attempt a link create with
-    // the same operation id — the kind guard must reject it.
+    // the same operation id: the kind guard must reject it.
     const { t, userId } = await as();
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -1996,7 +1996,7 @@ describe("shared link/note operation idempotency", () => {
     // (which schedules processItem) AND then schedule processItem again itself,
     // running the AI pipeline twice and racing two concurrent classifications.
     // Both the guarded (operationId) and ordinary paths must schedule exactly
-    // one processItem job for the created item — no more.
+    // one processItem job for the created item, no more.
     const { t } = await as();
 
     // Guarded path (share flow).
@@ -2013,7 +2013,7 @@ describe("shared link/note operation idempotency", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     const processJobs = scheduled.filter((j) => j.name === "ai:processItem");
-    // Exactly two jobs total — one per create — and each targets its own item.
+    // Exactly two jobs total: one per create, and each targets its own item.
     expect(processJobs).toHaveLength(2);
     const targeted = processJobs.flatMap((j) =>
       // args is stored as a single-element array wrapping the mutation args.
@@ -2023,7 +2023,7 @@ describe("shared link/note operation idempotency", () => {
     expect(targeted).toContain(plainId);
 
     // A repeat create on the completed guarded operation (idempotent hit) must
-    // NOT schedule processItem again — the item already exists and was processed.
+    // NOT schedule processItem again: the item already exists and was processed.
     await t.mutation(api.items.createLinkItem, {
       url: "example.com/guarded",
       operationId: LINK_OP,
@@ -2111,7 +2111,7 @@ describe("shared link/note operation idempotency", () => {
 // ---------------------------------------------------------------------------
 
 describe("Pro entitlement gate", () => {
-  // A user with no subscription row at all — the brand-new-user case. Every
+  // A user with no subscription row at all (the brand-new-user case). Every
   // save and Pro mutation must throw `Pro required` so the client can route
   // to the paywall; reads (listItems, getItem, searchItems) stay open.
   it("blocks saves for a user with no subscription", async () => {
@@ -2604,7 +2604,7 @@ describe("failed saves and retry", () => {
   });
 
   it("does not retry a no-article link (the URL itself is the save)", async () => {
-    // A no-article page read fine — a retry cannot change the outcome, so the
+    // A no-article page read fine: a retry cannot change the outcome, so the
     // backend must refuse the retry the way it refuses a 404.
     const { t, userId } = await as();
     const itemId = await seedLink(t, userId, {
@@ -3010,7 +3010,7 @@ describe("stale processing runs", () => {
 
   /** Insert a `processing` link for `userId` whose run started `ageMs` ago.
    * `legacy` rows omit the run fields the way pre-fencing rows do, so their
-   * age has to come from `_creationTime` — which convex-test stamps from
+   * age has to come from `_creationTime`, which convex-test stamps from
    * Date.now(), hence the faked clock below. convex-test also keeps
    * `_creationTime` monotonic per instance, so legacy rows must be inserted
    * before newer rows, oldest first. */

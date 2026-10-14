@@ -22,7 +22,7 @@ const subscriptionStatusValidator = v.union(
  * The entitlement a client renders. `status` is the stored subscription state
  * (or `"none"` if the user has never started a trial); `expiresAt` is the raw
  * stored period end. The client computes `entitled` from `expiresAt` against
- * its own clock — this query deliberately does NOT read the wall clock, because
+ * its own clock: this query deliberately does NOT read the wall clock, because
  * queries are not rerun as time advances and a `Date.now()` read here would go
  * stale at the exact trial-expiry moment. The server re-checks expiry with
  * `Date.now()` inside gated mutations (see {@link requireProEntitlement}), so
@@ -53,7 +53,7 @@ export const getEntitlement = query({
 /**
  * Server-side entitlement gate for Pro mutations. Reads the wall clock
  * (`Date.now()` is allowed in mutations) so a trial that expired between the
- * client's last fetch and this call is correctly rejected — the client's
+ * client's last fetch and this call is correctly rejected: the client's
  * `entitled` is advisory; this is the source of truth. Throws
  * {@link saveError}`("pro_required")` when the user has no active trial or
  * subscription, which the client decodes to present the paywall instead of a
@@ -128,7 +128,7 @@ export async function hasProEntitlementStatus(
  * downgrades an active subscriber. Newer events CAN move expiry in either
  * direction (e.g. a refund shortens the period).
  *
- * `status` is optional — when omitted (e.g. a CANCELLATION that still has
+ * `status` is optional: when omitted (e.g. a CANCELLATION that still has
  * access until period end) the existing status is preserved and only
  * `expiresAt` is refreshed. When `expiresAt` is 0 and no existing row is found,
  * the event is acknowledged but no row is created unless it is authoritative
@@ -150,7 +150,7 @@ export const upsertSubscription = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .unique();
 
-    // Stale/duplicate event? Drop it before doing anything else — cheapest exit.
+    // Stale/duplicate event? Drop it before doing anything else: cheapest exit.
     // Once a row has an ordering timestamp, an event without one is also unsafe
     // to apply because its age is unknown.
     if (
@@ -165,7 +165,7 @@ export const upsertSubscription = internalMutation({
     // Account deletion removes the users row but deliberately does NOT cancel
     // the App Store subscription, so RevenueCat keeps sending renewal/
     // expiration events for the deleted account. Acknowledge the event (so
-    // RevenueCat stops retrying) but do not insert or patch a row — otherwise
+    // RevenueCat stops retrying) but do not insert or patch a row. Otherwise
     // a renewal webhook resurrects an entitlement for a user who no longer
     // exists. An owner mid-deletion counts as gone for the same reason: its
     // subscription row is about to drain, and a write here would race the
@@ -175,7 +175,7 @@ export const upsertSubscription = internalMutation({
       return null;
     }
 
-    // A lifetime row is sticky unless an authoritative snapshot replaces it — a
+    // A lifetime row is sticky unless an authoritative snapshot replaces it: a
     // stray CANCELLATION or an EXPIRATION for an unrelated product (this table
     // is one row per user, not per-product) is preserved as-is. Refunds and
     // reversals reconcile the current Pro entitlement instead. The webhook
@@ -198,7 +198,7 @@ export const upsertSubscription = internalMutation({
     }
 
     // Nothing to record: an event with no expiry and no prior state (e.g. a
-    // lapsed non-lifetime event). A lifetime purchase is exempt — it reports
+    // lapsed non-lifetime event). A lifetime purchase is exempt: it reports
     // `expiresAt: 0` (non-renewing) but is a real entitlement.
     // An authoritative lapse records the ordering timestamp even before a
     // purchase arrives, so a delayed purchase cannot resurrect refunded access.

@@ -9,7 +9,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
 // Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched
-// from the toolbar's action menu (an idle item renders no inline chip — it
+// from the toolbar's action menu (an idle item renders no inline chip: it
 // made every sparse detail page noisier). Post-search states still render
 // inline: results as product cards, a spinner while searching, and a retry
 // chip when the search failed.
@@ -107,7 +107,7 @@ export function ProductsSection({
     );
   }
 
-  // Idle (never searched): nothing inline — the trigger lives in the action
+  // Idle (never searched): nothing inline. The trigger lives in the action
   // menu. Only a failed search (retry affordance) or a completed empty search
   // ("No matches") needs a chip here.
   if (item.productsStatus === undefined) {

@@ -138,7 +138,7 @@ auth.addHttpRoutes(http);
  *
  * The Convex Auth user id is configured as the RevenueCat app user id (the
  * client calls `Purchases.logIn(convexUserId)` on sign-in), so the event's
- * current `app_user_id` is the same `userId` every other table keys on — no
+ * current `app_user_id` is the same `userId` every other table keys on. No
  * client-supplied id is trusted.
  */
 http.route({
@@ -160,12 +160,12 @@ http.route({
     try {
       body = await req.json();
     } catch {
-      // Unreadable/non-JSON body — RevenueCat should not retry these.
+      // Unreadable/non-JSON body: RevenueCat should not retry these.
       return new Response("Bad payload", { status: 400 });
     }
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
-      // Body was not a readable object — reject so RevenueCat doesn't retry.
+      // Body was not a readable object: reject so RevenueCat doesn't retry.
       return new Response("Bad payload", { status: 400 });
     }
 
@@ -193,7 +193,7 @@ http.route({
     }
 
     // A readable event missing required identity or ordering fields is
-    // malformed but acknowledged — return 200 so RevenueCat stops retrying a
+    // malformed but acknowledged: return 200 so RevenueCat stops retrying a
     // non-actionable event rather than hammering the endpoint.
     if (
       event.type === undefined ||

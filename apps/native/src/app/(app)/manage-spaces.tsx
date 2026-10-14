@@ -13,7 +13,7 @@ import { analytics } from "@/lib/analytics";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
 // Per-space membership toggles for one item. Every write here is the user's
-// hand — `saved` rows only; flipping a space on also overrides a dismissal.
+// hand: `saved` rows only; flipping a space on also overrides a dismissal.
 export default function ManageSpacesScreen() {
   useAppLocale();
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
@@ -105,7 +105,7 @@ export default function ManageSpacesScreen() {
     }
   };
 
-  // The item may be `null` (deleted, or not ours) — distinct from `undefined`
+  // The item may be `null` (deleted, or not ours), distinct from `undefined`
   // (still loading). A null item renders a non-interactive state instead of an
   // all-off switch list, since every toggle would fire a failing mutation.
   const loading = spaces === undefined || item === undefined;

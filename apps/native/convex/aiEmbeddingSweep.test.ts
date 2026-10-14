@@ -179,7 +179,7 @@ describe("sweepItemEmbeddings", () => {
   it("spends an attempt when the provider answers with nothing usable", async () => {
     // A completed call whose vectors are all malformed is not an outage. Read
     // as one, every row would defer, and because the same rows lead the sweep
-    // range every run the page would be re-read forever — wedging the sweep
+    // range every run the page would be re-read forever, wedging the sweep
     // behind items it can never embed, with every later ready item stuck
     // behind them. These spend an attempt instead, and the cap clears them.
     const t = await seedReady(3);
@@ -194,7 +194,7 @@ describe("sweepItemEmbeddings", () => {
     const rows = await t.run((ctx) => ctx.db.query("items").collect());
     for (const row of rows) {
       expect(row.embeddingAttempts).toBe(1);
-      // Still unstamped, so the sweep will retry — up to the cap.
+      // Still unstamped, so the sweep will retry (up to the cap).
       expect(row.embeddingVersion).toBeUndefined();
     }
   });

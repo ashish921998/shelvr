@@ -1,5 +1,5 @@
-// Tracks whether this launch is taking the user somewhere specific — a Share
-// Sheet intent, a deep link, a universal link, a tapped notification — rather
+// Tracks whether this launch is taking the user somewhere specific (a Share
+// Sheet intent, a deep link, a universal link, a tapped notification) rather
 // than simply opening the app.
 //
 // The launch animation is for the second case only. In front of "save this
@@ -30,7 +30,7 @@ function normalizeUrl(url: string): string | null {
  * Whether a native-intent path is a link into somewhere in the app, rather
  * than a plain launch.
  *
- * This needs `rootUrl` — `Linking.createURL('/')` — because Expo Router does
+ * This needs `rootUrl` (`Linking.createURL('/')`) because Expo Router does
  * not hand us nothing when the app is opened from the home screen: its
  * `getInitialURL` falls back to that root URL and passes it through
  * `redirectSystemPath` exactly like a real link. Testing for "parses as an

@@ -14,8 +14,8 @@ export default function HomeStackLayout() {
   });
   const { guard, loading: entitlementLoading } = usePaywallGuard("home");
 
-  // Add and Map are Pro features — route to the paywall unless entitled.
-  // Suppress haptic until entitlement resolves — firing it during loading
+  // Add and Map are Pro features: route to the paywall unless entitled.
+  // Suppress haptic until entitlement resolves: firing it during loading
   // would imply the action is about to run when the guard will drop it.
   const guardedTap = (href: "/add") => () => {
     if (entitlementLoading) return;

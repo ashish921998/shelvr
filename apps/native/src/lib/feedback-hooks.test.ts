@@ -207,7 +207,7 @@ describe("useFeedbackInvitation", () => {
     const items = threeReady();
     react.mount(() => useFeedbackInvitation(items, { defer: true }));
 
-    // Long past the settle delay — no claim, no shown event, no gate burn.
+    // Long past the settle delay: no claim, no shown event, no gate burn.
     vi.advanceTimersByTime(2000);
     vi.advanceTimersByTime(2000);
     expect(react.rerender<Result>().invitationVisible).toBe(false);

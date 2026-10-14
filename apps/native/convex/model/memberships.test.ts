@@ -34,7 +34,7 @@ describe("effectiveStatus", () => {
 });
 
 // Convex smoke test: loads the schema and module map and performs a database
-// operation through the mocked backend — no live Convex deployment or
+// operation through the mocked backend with no live Convex deployment or
 // credentials required. Verifies the test harness, schema, and module map can
 // all resolve under @edge-runtime/vm.
 const modules = import.meta.glob("../**/*.ts");

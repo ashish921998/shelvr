@@ -8,7 +8,7 @@ export async function observePaywallPresentation(
   /** Extra properties for a purchase/restore outcome, resolved before that
    * outcome is captured. Reads the store product behind the entitlement right
    * after the sheet resolves, when RevenueCat's customer info is fresh. A
-   * rejection resolves to nothing — the outcome event still fires. */
+   * rejection resolves to nothing: the outcome event still fires. */
   purchaseContext?: () => Promise<{ product_id?: string }>,
 ): Promise<RevenueCatPaywallResult> {
   const startedAt = Date.now();
