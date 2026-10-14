@@ -264,6 +264,7 @@ export default function HomeScreen() {
 
   const recallCard = recall.visible ? (
     <SaveRecallCard
+      savedTitle={recall.saved?.title}
       matches={recall.matches}
       onOpen={recall.opened}
       onDismiss={recall.dismiss}

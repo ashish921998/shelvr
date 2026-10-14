@@ -59,6 +59,27 @@ describe("resetCurrentUser", () => {
     ).resolves.toBe(false);
   });
 
+  it("reports no reset eligibility for a deleting or removed anonymous account", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, client, userId } = await anonymousFixtureUser();
+    await expect(
+      client.query(api.devFixtures.canResetCurrentUser, {}),
+    ).resolves.toBe(true);
+
+    await backend.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    await expect(
+      client.query(api.devFixtures.canResetCurrentUser, {}),
+    ).resolves.toBe(false);
+    await expect(
+      client.mutation(api.devFixtures.resetCurrentUser, {}),
+    ).rejects.toThrow(/Not authenticated/);
+
+    await backend.run((ctx) => ctx.db.delete(userId));
+    await expect(
+      client.query(api.devFixtures.canResetCurrentUser, {}),
+    ).resolves.toBe(false);
+  });
+
   it("is unavailable unless anonymous development auth is enabled", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "false");
     const { client } = await anonymousFixtureUser();
@@ -71,8 +92,9 @@ describe("resetCurrentUser", () => {
   it("rejects a non-anonymous account", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
     const backend = newConvexTest();
-    const userId = await backend.run(async (ctx) =>
-      await ctx.db.insert("users", { email: "oauth@example.com" }),
+    const userId = await backend.run(
+      async (ctx) =>
+        await ctx.db.insert("users", { email: "oauth@example.com" }),
     );
     const client = backend.withIdentity({ subject: `${userId}|session-1` });
 
@@ -113,11 +135,12 @@ describe("resetCurrentUser", () => {
   it("replaces only the caller's data and is idempotent", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
     const { backend, userId, client } = await anonymousFixtureUser();
-    const otherUserId = await backend.run(async (ctx) =>
-      await ctx.db.insert("users", { email: "other@example.com" }),
+    const otherUserId = await backend.run(
+      async (ctx) =>
+        await ctx.db.insert("users", { email: "other@example.com" }),
     );
-    const storageId = await backend.run(async (ctx) =>
-      await ctx.storage.store(new Blob(["old fixture"])),
+    const storageId = await backend.run(
+      async (ctx) => await ctx.storage.store(new Blob(["old fixture"])),
     );
     const otherItemId = await backend.run(async (ctx) => {
       await ctx.db.insert("items", {

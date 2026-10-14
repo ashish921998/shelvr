@@ -10,7 +10,8 @@ import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_DIMENSIONS,
 } from "./model/embedding";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
+import { aiAllowed } from "./aiConsent";
 
 const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
@@ -28,15 +29,18 @@ vi.mock("./model/safeFetch", async (original) => ({
   safeFetch,
 }));
 
-const USER = "consent-user";
+/** The id of the account the current test signed in; set by `signedIn`. */
+let USER: string;
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
   i === 0 ? 1 : 0,
 );
 
 type T = TestConvexForDataModel<DataModel>;
 
-function signedIn(backend = newConvexTest()): T {
-  return backend.withIdentity({ subject: `${USER}|session-1` });
+async function signedIn(backend = newConvexTest()): Promise<T> {
+  const { t, userId } = await signedInUser(backend);
+  USER = userId;
+  return t;
 }
 
 async function expectNoThirdPartyCall() {
@@ -125,7 +129,7 @@ afterEach(() => {
 
 describe("getStatus and setConsent", () => {
   it("reads unset until the user answers, then their answer", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const unset = { status: "unset", version: AI_CONSENT_VERSION };
     expect(await t.query(api.aiConsent.getStatus, {})).toEqual(unset);
 
@@ -145,7 +149,7 @@ describe("getStatus and setConsent", () => {
   });
 
   it("asks again when the answer was to an older disclosure", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     await t.run((ctx) =>
       ctx.db.insert("aiConsents", {
         userId: USER,
@@ -159,18 +163,16 @@ describe("getStatus and setConsent", () => {
 
   it("keeps one user's answer away from another", async () => {
     const backend = newConvexTest();
-    await signedIn(backend).mutation(api.aiConsent.setConsent, {
+    await (
+      await signedIn(backend)
+    ).mutation(api.aiConsent.setConsent, {
       granted: false,
     });
-    const other = backend.withIdentity({ subject: "someone-else|session-1" });
+    const { t: other, userId: otherId } = await signedInUser(backend);
     expect((await other.query(api.aiConsent.getStatus, {})).status).toBe(
       "unset",
     );
-    expect(
-      await backend.query(internal.aiConsent.isAllowed, {
-        userId: "someone-else",
-      }),
-    ).toBe(true);
+    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(true);
   });
 
   it("requires a signed-in user", async () => {
@@ -184,7 +186,7 @@ describe("getStatus and setConsent", () => {
 
 describe("a user who has not answered", () => {
   it("is still classified, so builds without the consent card keep working", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
     expect(generateObject).toHaveBeenCalledTimes(1);
@@ -199,7 +201,7 @@ describe("a user who has not answered", () => {
 
 describe("a save that is gone", () => {
   it("is not allowed to be sent, whatever the consent answer", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     expect(
       await t.query(internal.aiConsent.isAllowed, { userId: USER, itemId }),
@@ -210,15 +212,13 @@ describe("a save that is gone", () => {
     expect(
       await t.query(internal.aiConsent.isAllowed, { userId: USER, itemId }),
     ).toBe(false);
-    expect(await t.query(internal.aiConsent.isAllowed, { userId: USER })).toBe(
-      true,
-    );
+    expect(await t.run((ctx) => aiAllowed(ctx, USER))).toBe(true);
   });
 });
 
 describe("a user who declined", () => {
   async function declined() {
-    const t = signedIn();
+    const t = await signedIn();
     await t.mutation(api.aiConsent.setConsent, { granted: false });
     return t;
   }
@@ -414,7 +414,7 @@ describe("a user who declined", () => {
   });
 
   it("fails a product search that was already scheduled", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await ready(t);
     await t.run((ctx) => ctx.db.patch(itemId, { productsStatus: "searching" }));
     await t.mutation(api.aiConsent.setConsent, { granted: false });
@@ -426,7 +426,7 @@ describe("a user who declined", () => {
   });
 
   it("has stored vectors removed, and the sweep leaves the items alone", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const embedded = await ready(t, { embedding: VECTOR });
     const neverEmbedded = await ready(t);
 
@@ -445,7 +445,7 @@ describe("a user who declined", () => {
   });
 
   it("is skipped by a sweep that reaches an item before the cleanup does", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await ready(t);
     await t.run((ctx) =>
       ctx.db.insert("aiConsents", {
@@ -466,7 +466,7 @@ describe("a user who declined", () => {
   });
 
   it("is embedded again after changing their mind", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await ready(t, { embedding: VECTOR });
     await t.mutation(api.aiConsent.setConsent, { granted: false });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -483,7 +483,7 @@ describe("a user who declined", () => {
 
 describe("the onboarding demo save", () => {
   it("finishes without the model for a user who declined", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     await t.mutation(api.aiConsent.setConsent, { granted: false });
     const { itemId } = await t.mutation(api.demo.createDemoItem, {
       url: "https://example.com/blocked",
@@ -496,7 +496,7 @@ describe("the onboarding demo save", () => {
 
 describe("account deletion", () => {
   it("removes the consent row", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     await t.mutation(api.aiConsent.setConsent, { granted: false });
     await t.mutation(api.users.deleteCurrentUserAccount, {});
     expect(await t.run((ctx) => ctx.db.query("aiConsents").collect())).toEqual(
@@ -507,7 +507,7 @@ describe("account deletion", () => {
 
 describe("a decline that lands while a run is still out", () => {
   it("keeps the save's title, tags and description when the model's result arrives late", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await ready(t);
     await t.mutation(api.aiConsent.setConsent, { granted: false });
 
@@ -528,7 +528,7 @@ describe("a decline that lands while a run is still out", () => {
   });
 
   it("keeps an existing title when a run without the model has none to offer", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     await t.mutation(api.aiConsent.setConsent, { granted: false });
     const itemId = await ready(t);
 
@@ -545,7 +545,7 @@ describe("a decline that lands while a run is still out", () => {
   });
 
   it("discards the model's answer and skips the embedding when AI goes off mid-save", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     generateObject.mockImplementationOnce(async () => {
       await t.mutation(api.aiConsent.setConsent, { granted: false });
@@ -577,7 +577,7 @@ describe("a decline that lands while a run is still out", () => {
   });
 
   it("discards the model's answer when AI goes off during the embedding call", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     embedMany.mockImplementationOnce(async () => {
       await t.mutation(api.aiConsent.setConsent, { granted: false });
@@ -593,7 +593,7 @@ describe("a decline that lands while a run is still out", () => {
   });
 
   it("sends no saves for a new space when AI goes off while candidates are picked", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     await ready(t, { embedding: VECTOR });
     const spaceId = await t.run((ctx) =>
       ctx.db.insert("spaces", { userId: USER, name: "Recipes", dynamic: true }),
@@ -609,7 +609,7 @@ describe("a decline that lands while a run is still out", () => {
   });
 
   it("drops suggestions the model made for a new space", async () => {
-    const t = signedIn();
+    const t = await signedIn();
     const itemId = await ready(t);
     const spaceId = await t.run((ctx) =>
       ctx.db.insert("spaces", { userId: USER, name: "Recipes" }),

@@ -39,7 +39,7 @@ const ON_TOPIC = vec({ 0: 1 });
 const NEARBY = vec({ 0: 0.8, 1: 0.6 });
 const OFF_TOPIC = vec({ 1: 1 });
 
-const USER = "chef";
+let USER: string;
 
 type SeedItem = {
   title: string;
@@ -58,6 +58,7 @@ type SeedItem = {
 async function seed(items: SeedItem[]) {
   const t = newConvexTest();
   const ids = await t.run(async (ctx) => {
+    USER = await ctx.db.insert("users", {});
     const spaceId = await ctx.db.insert("spaces", {
       userId: USER,
       name: "Pasta",

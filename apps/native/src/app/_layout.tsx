@@ -21,6 +21,7 @@ import { NavThemeProvider } from "@/lib/nav-theme";
 import { useAnalyticsIdentity } from "@/lib/analytics-identity";
 import { useAppIntentsSignOutReset } from "@/lib/app-intents";
 import { useConvexQueryHealing } from "@/lib/convex-query-healing";
+import { useSignOutWhenAccountGone } from "@/lib/account-gone";
 import { posthog } from "@/lib/posthog";
 
 // Expo Router reads the root boundary from this module's exports.
@@ -52,6 +53,12 @@ function AnalyticsIdentity() {
  * Convex Auth reports signed out. */
 function AppIntentsSignOutReset() {
   useAppIntentsSignOutReset();
+  return null;
+}
+
+/** Signs out a device whose account was deleted from another device. */
+function AccountGoneSignOut() {
+  useSignOutWhenAccountGone();
   return null;
 }
 
@@ -127,6 +134,7 @@ export default function RootLayout() {
           <PostHogScreenTracking />
           <NotificationSetup />
           <ConvexQueryHealer />
+          <AccountGoneSignOut />
           <NotificationSessionProvider>
             {posthog ? (
               <PostHogProvider client={posthog} autocapture={false}>

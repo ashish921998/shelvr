@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { newConvexTest } from "@convex/test.setup";
+import { newConvexTest, signedInUser } from "@convex/test.setup";
 import { api } from "@convex/_generated/api";
 import {
   clearPending,
@@ -34,7 +34,7 @@ afterEach(() => vi.useRealTimers());
 
 it("reuses the demo space after a language change and persisted-step resume", async () => {
   const backend = newConvexTest();
-  const owner = backend.withIdentity({ subject: "onboarding-owner|session" });
+  const { t: owner } = await signedInUser(backend);
   setOnboardingProgress({
     saveKinds: ["Recipes"],
     spaces: ["Recipes"],

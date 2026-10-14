@@ -9,15 +9,20 @@ import {
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { requireUserId } from "./model/auth";
+import { liveOwner } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
-import { appleTokenId, storeAppleToken } from "./model/appleTokens";
+import {
+  APPLE_TOKEN_MAX_LIFE_MS,
+  appleTokenId,
+  storeAppleToken,
+} from "./model/appleTokens";
 import { logEvent } from "./model/log";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
- * unauthenticated. The client uses this for:
+ * unauthenticated or when the account is being deleted. The client uses this
+ * for:
  *  - the profile screen (email display)
  *  - RevenueCat identity sync (`_id` is passed to `Purchases.logIn` so the
  *    webhook's `app_user_id` matches the `userId` every table keys on)
@@ -40,7 +45,7 @@ export const getCurrentUser = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    const user = await ctx.db.get(userId);
+    const user = await liveOwner(ctx, userId);
     if (user === null) return null;
     return { _id: user._id, email: user.email };
   },
@@ -72,20 +77,35 @@ export const getCurrentUser = query({
  * accounts finish synchronously in this first call; large ones complete in
  * the background moments later. The auth identity is only removed by the
  * final batch, after all domain data is confirmed gone.
+ *
+ * The first transaction also marks the users row `deleting`. From then on
+ * `requireUserId` and every other owner check treat the account as gone, so
+ * a JWT retained on another device, an in-flight capture-token mint, a
+ * billing webhook or a late Apple token exchange cannot write data back into
+ * an account that is draining. The marker is why this mutation reads the
+ * identity directly instead of through `requireUserId`: a retry has to get
+ * past the fence it set, so it can resume the drain (or do nothing once the
+ * row is gone) instead of failing.
  */
 export const deleteCurrentUserAccount = mutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
-    await revoke(ctx, userId, true);
-    await scheduleAppleRevoke(ctx, userId);
-    await deleteAccountBatch(ctx, userId);
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    // Already removed: the identity is a leftover token. Nothing to resume,
+    // nothing to report.
+    if (user === null) return null;
+    if (user.deleting !== true) {
+      await ctx.db.patch(user._id, { deleting: true });
+      await revoke(ctx, user._id, true);
+      await scheduleAppleRevoke(ctx, user._id);
+    }
+    await deleteAccountBatch(ctx, user._id);
     return null;
   },
 });
-
-const APPLE_TOKEN_MAX_LIFE_MS = 60 * 60_000;
 
 /** Apple requires an app that offers Sign in with Apple to revoke the user's
  * token when the account is deleted. The job gets the token row's id, not the
@@ -134,23 +154,43 @@ export const appleTokenForRevoke = internalQuery({
   },
 });
 
+/** The parked token a detached revoke job was pointed at, or null once gone. */
+export const detachedAppleTokenForRevoke = internalQuery({
+  args: { tokenId: v.id("detachedAppleTokens") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    return (await ctx.db.get(args.tokenId))?.refreshToken ?? null;
+  },
+});
+
+export const forgetDetachedAppleToken = internalMutation({
+  args: { tokenId: v.id("detachedAppleTokens") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if ((await ctx.db.get(args.tokenId)) !== null) {
+      await ctx.db.delete(args.tokenId);
+    }
+    return null;
+  },
+});
+
 /** Stores the refresh token the native Apple sheet's code was traded for.
- * Internal-only: the sign-in that calls it has just verified the user. */
+ * Internal-only: the sign-in that calls it has just verified the user.
+ * Deletion can start while Apple is still answering; `storeAppleToken` then
+ * keeps whatever token the revoke job was already pointed at and returns false
+ * so the action can revoke the freshly exchanged token without storing it. */
 export const keepNativeAppleToken = internalMutation({
   args: {
     userId: v.id("users"),
     refreshToken: v.string(),
     clientId: v.string(),
   },
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, args) => {
-    // The account can be deleted while Apple is still answering.
-    if ((await ctx.db.get(args.userId)) === null) return null;
-    await storeAppleToken(ctx, args.userId, {
+    return await storeAppleToken(ctx, args.userId, {
       refreshToken: args.refreshToken,
       clientId: args.clientId,
     });
-    return null;
   },
 });
 

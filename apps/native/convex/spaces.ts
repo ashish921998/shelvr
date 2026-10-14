@@ -17,6 +17,7 @@ import {
   planSourceValidator,
   type PlanSource,
 } from "./model/plan";
+import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -320,9 +321,13 @@ export const createSpace = mutation({
     });
     // Every new space gets one recommendation pass off its title; the dynamic
     // toggle only governs whether future saves keep getting suggested.
-    await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
-      spaceId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.aiRecommendForSpace.recommendForSpace,
+      {
+        spaceId,
+      },
+    );
     return spaceId;
   },
 });
@@ -368,9 +373,13 @@ export const updateSpace = mutation({
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
     if (enablingDynamic) {
-      await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
-        spaceId: space._id,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.aiRecommendForSpace.recommendForSpace,
+        {
+          spaceId: space._id,
+        },
+      );
     }
     return null;
   },
@@ -758,6 +767,60 @@ export const getSpaceInternal = internalQuery({
   },
 });
 
+/** Read the space, permission and exclusions in one pre-embedding snapshot. */
+export const recommendationContext = internalQuery({
+  args: { spaceId: v.id("spaces") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      space: v.object(spaceFields),
+      memberIds: v.array(v.id("items")),
+    }),
+  ),
+  handler: async (ctx, { spaceId }) => {
+    const space = await ctx.db.get(spaceId);
+    if (space === null || !(await aiAllowed(ctx, space.userId))) return null;
+    const joins = await ctx.db
+      .query("spaceItems")
+      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+      .collect();
+    return { space, memberIds: joins.map((join) => join.itemId) };
+  },
+});
+
+/** Revalidate hydrated recommendation identities before classification. */
+export const survivingCandidates = internalQuery({
+  args: {
+    userId: v.string(),
+    spaceId: v.id("spaces"),
+    itemIds: v.array(v.id("items")),
+  },
+  returns: v.union(v.null(), v.array(v.id("items"))),
+  handler: async (ctx, args) => {
+    if (args.itemIds.length === 0) throw new Error("No candidates");
+    if (args.itemIds.length > RECOMMEND_CANDIDATES)
+      throw new Error("Too many candidates");
+    const space = await ctx.db.get(args.spaceId);
+    if (
+      space === null ||
+      space.userId !== args.userId ||
+      !(await aiAllowed(ctx, args.userId))
+    )
+      return null;
+    const surviving = [];
+    for (const itemId of args.itemIds) {
+      const item = await ctx.db.get(itemId);
+      if (
+        item !== null &&
+        item.userId === args.userId &&
+        item.status === "ready"
+      )
+        surviving.push(itemId);
+    }
+    return surviving;
+  },
+});
+
 /**
  * The gate and the input for "Make a plan" (`plans.makePlan`), in one
  * transaction: the caller owns the space, is Pro, has not declined AI
@@ -766,18 +829,21 @@ export const getSpaceInternal = internalQuery({
  * space spends no token, since no model call follows.
  */
 export const claimPlanInternal = internalMutation({
-  args: { spaceId: v.id("spaces"), userId: v.id("users") },
+  args: { spaceId: v.id("spaces") },
   returns: v.object({
     spaceName: v.string(),
     sources: v.array(planSourceValidator),
   }),
   handler: async (ctx, args) => {
+    // Convex forwards the action caller's identity, so authorization and the
+    // claim are one transaction.
+    const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.spaceId);
-    if (space === null || space.userId !== args.userId) {
+    if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
     }
-    await requireProEntitlement(ctx, args.userId);
-    if (!(await aiAllowed(ctx, args.userId))) {
+    await requireProEntitlement(ctx, userId);
+    if (!(await aiAllowed(ctx, userId))) {
       throw aiConsentRequiredError();
     }
     // Saved rows plus legacy rows (no status reads as saved), each newest
@@ -799,7 +865,7 @@ export const claimPlanInternal = internalMutation({
     const sources: PlanSource[] = [];
     for (const join of joins) {
       const item = await ctx.db.get(join.itemId);
-      if (item === null || item.userId !== args.userId) continue;
+      if (item === null || item.userId !== userId) continue;
       if (item.status !== "ready") continue;
       sources.push({
         itemId: item._id,
@@ -822,7 +888,7 @@ export const claimPlanInternal = internalMutation({
     }
     if (sources.length > 0) {
       await rateLimiter.limit(ctx, "makePlan", {
-        key: args.userId,
+        key: userId,
         throws: true,
       });
     }

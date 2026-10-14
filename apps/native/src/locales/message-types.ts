@@ -12,10 +12,12 @@ export type MessageParams = {
   "spaces.dismissSuggestion": undefined;
   "common.share": undefined;
   "spaces.changeMembership": undefined;
+  "spaces.removeFromSpace": undefined;
   "common.delete": undefined;
   "item.actions": undefined;
   "item.deleteTitle": undefined;
   "item.deleteBody": undefined;
+  "item.deleteEverywhere": undefined;
   "common.cancel": undefined;
   "errors.photoUnavailable": undefined;
   "item.stillWorking": undefined;
@@ -53,6 +55,7 @@ export type MessageParams = {
   "common.save": undefined;
   "errors.saveTitle": undefined;
   "errors.tryAgain": undefined;
+  "errors.notALink": undefined;
   "errors.batchSaveTitle": undefined;
   "capture.retryFailed": undefined;
   "common.done": undefined;
@@ -226,6 +229,8 @@ export type MessageParams = {
   "demo.reading": undefined;
   "demo.slow": undefined;
   "demo.keepWaiting": undefined;
+  "demo.submissionTitle": undefined;
+  "demo.submissionUnconfirmed": undefined;
   "demo.continueWaiting": undefined;
   "demo.skip": undefined;
   "demo.pastePlaceholder": undefined;
@@ -504,7 +509,6 @@ export type MessageParams = {
   "onboarding.remindFallbackTitle": undefined;
   "onboarding.remindPledge": undefined;
   "onboarding.remindConsent": undefined;
-  "demo.shareHelp": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
   "demo.stepReading": undefined;
@@ -544,8 +548,11 @@ export type MessageParams = {
   "home.progressShareHelp": undefined;
   "home.progressPhotos": undefined;
   "home.progressNote": undefined;
-  "home.recallTitle": undefined;
   "home.recallBody": { count: number };
+  "home.recallKicker": undefined;
+  "home.recallStackTitle": { count: number; title: string };
+  "home.recallSavedOn": { date: string };
+  "home.recallOldest": { date: string };
   "home.nextUpTitle": undefined;
   "home.nextUpRead": undefined;
   "home.nextUpCook": undefined;
@@ -556,8 +563,11 @@ export type MessageParams = {
   "demo.samplesOr": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
+  "sharePractice.eyebrow": undefined;
+  "sharePractice.coachTap": undefined;
+  "sharePractice.stepShare": undefined;
+  "sharePractice.stepShelvr": undefined;
   "sharePractice.title": undefined;
-  "sharePractice.body": undefined;
   "sharePractice.tipIos": undefined;
   "sharePractice.tipAndroid": undefined;
   "sharePractice.savedTitle": undefined;

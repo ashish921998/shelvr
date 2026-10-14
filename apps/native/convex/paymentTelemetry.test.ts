@@ -307,13 +307,28 @@ describe("server-confirmed payments", () => {
     ]);
   });
 
-  it("ignores unknown or deleted accounts", async () => {
+  it("ignores unknown, deleted, and deleting accounts", async () => {
     const t = newConvexTest();
-    const payment = parsePaymentTelemetry({ event });
-    if (!payment) throw new Error("Invalid fixture");
-    await t.mutation(internal.paymentTelemetry.enqueue, { payment });
+    const deleting = await t.run((ctx) =>
+      ctx.db.insert("users", { deleting: true }),
+    );
+    for (const [eventId, appUserId] of [
+      ["rc-event-1", "user-1"],
+      ["rc-event-2", deleting as string],
+    ]) {
+      const payment = parsePaymentTelemetry({
+        event: { ...event, id: eventId, app_user_id: appUserId },
+      });
+      if (!payment) throw new Error("Invalid fixture");
+      await t.mutation(internal.paymentTelemetry.enqueue, { payment });
+    }
     expect(
       await t.run((ctx) => ctx.db.query("paymentAnalyticsReceipts").collect()),
+    ).toHaveLength(0);
+    expect(
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      ),
     ).toHaveLength(0);
   });
 

@@ -1,3 +1,6 @@
+/** The bounded candidate budget shared by recommendation selection and validation. */
+export const RECOMMEND_CANDIDATES = 100;
+
 /**
  * Shared embedding constants and text composition. Lives in `model/` for the
  * same reason as `itemFields.ts`: `schema.ts` needs the dimension count, the

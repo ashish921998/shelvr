@@ -5,8 +5,8 @@ import { ConvexError, v } from "convex/values";
 import { z } from "zod";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { MODEL, modelCallOptions, summarizeError } from "./ai";
-import { requireUserId } from "./model/auth";
+import { summarizeError } from "./ai";
+import { MODEL, modelCallOptions } from "./model/aiProvider";
 import { logEvent } from "./model/log";
 import {
   MAX_PLAN_PLACES,
@@ -67,12 +67,10 @@ export const makePlan = action({
     ctx,
     args,
   ): Promise<{ places: PlanPlace[]; considered: number }> => {
-    const userId = await requireUserId(ctx);
     // Annotated: inferring through `internal` is circular for an action.
     const { spaceName, sources }: { spaceName: string; sources: PlanSource[] } =
       await ctx.runMutation(internal.spaces.claimPlanInternal, {
         spaceId: args.spaceId,
-        userId,
       });
     if (sources.length === 0) {
       return { places: [], considered: 0 };

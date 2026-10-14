@@ -25,6 +25,7 @@ function deferred<T>() {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   mocks.makePlan.mockReset();
 });
 

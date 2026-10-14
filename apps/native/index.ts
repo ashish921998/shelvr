@@ -7,4 +7,7 @@ import "./src/unistyles";
 // before the router boots instead of as a hidden side effect of whatever
 // imports lib/notifications first.
 import "./src/boot/notifications";
+// An e2e run keeps the development error banner off the screen
+// (src/lib/e2e-log-box.ts).
+import "./src/boot/e2e-log-box";
 import "expo-router/entry";

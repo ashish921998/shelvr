@@ -29,7 +29,7 @@ import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
 import type { ArticleMedia, PostMedia } from "./model/itemFields";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const parseJson = vi.hoisted(() => vi.fn());
@@ -491,10 +491,10 @@ describe("processItem for X posts", () => {
     url: string,
     fields: { media?: PostMedia[]; articleMedia?: ArticleMedia[] } = {},
   ) {
-    const t = newConvexTest().withIdentity({ subject: "x-user|session-1" });
+    const { t, userId } = await signedInUser(newConvexTest());
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "x-user",
+        userId,
         type: "link",
         url,
         status: "processing",
@@ -1170,9 +1170,10 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "ig-user",
+        userId,
         type: "link",
         url: "https://www.instagram.com/reel/DHVrPLrIyQ_/",
         status: "processing",
@@ -1426,10 +1427,10 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
       bytes: new TextEncoder().encode(html),
       ...(truncated ? { truncated: true as const } : {}),
     }));
-    const t = newConvexTest().withIdentity({ subject: "page-user|session-1" });
+    const { t, userId } = await signedInUser(newConvexTest());
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "page-user",
+        userId,
         type: "link",
         url: RECIPE_URL,
         status: "processing",
