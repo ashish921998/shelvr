@@ -1,6 +1,12 @@
 // @vitest-environment edge-runtime
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { gate, newConvexTest, seedNotes } from "./test.setup";
+import {
+  gate,
+  newConvexTest,
+  revenuecatSnapshot,
+  seedNotes,
+  stubRevenueCatFetch,
+} from "./test.setup";
 import { api, internal } from "./_generated/api";
 import { DELETE_BATCH } from "./users";
 
@@ -45,32 +51,18 @@ describe("transfer webhook reconciliation", () => {
       });
     const rows = () =>
       t.run(async (ctx) => await ctx.db.query("subscriptions").collect());
-    const now = Date.now();
-    const empty = {
-      request_date_ms: now,
-      subscriber: { entitlements: {}, subscriptions: {} },
-    };
-    const active = {
-      request_date_ms: now,
-      subscriber: {
-        entitlements: {
-          "Shelvr Pro": {
-            product_identifier: "annual",
-            expires_date: new Date(now + 60_000).toISOString(),
-          },
-        },
-        subscriptions: { annual: { period_type: "trial" } },
-      },
-    };
+    const empty = revenuecatSnapshot();
+    const active = revenuecatSnapshot({
+      productId: "annual",
+      periodType: "trial",
+    });
     return { t, ids, send, rows, empty, active };
   }
   it("moves access to the receiving account, revokes even lifetime on the source, and ignores anonymous IDs", async () => {
     const f = await fixture();
-    const fetchMock = vi
-      .fn()
+    const fetchMock = stubRevenueCatFetch(f.empty)
       .mockResolvedValueOnce(Response.json(f.empty))
       .mockResolvedValueOnce(Response.json(f.active));
-    vi.stubGlobal("fetch", fetchMock);
     expect((await f.send()).status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const rows = await f.rows();
@@ -85,13 +77,9 @@ describe("transfer webhook reconciliation", () => {
   });
   it("retries a failed lookup without partially revoking the source account", async () => {
     const f = await fixture();
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(Response.json(f.empty))
-        .mockResolvedValueOnce(new Response(null, { status: 503 })),
-    );
+    stubRevenueCatFetch(f.empty)
+      .mockResolvedValueOnce(Response.json(f.empty))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }));
     expect((await f.send()).status).toBe(503);
     expect(await f.rows()).toMatchObject([
       { userId: f.ids.from, status: "lifetime", eventTimestampMs: 1 },
@@ -105,7 +93,7 @@ describe("transfer webhook reconciliation", () => {
       expiresAt: Date.now() + 90_000,
       eventTimestampMs: 3,
     });
-    await f.t.mutation(internal.subscriptions.reconcileTransfer, {
+    await f.t.mutation(internal.subscriptions.applySnapshots, {
       eventTimestampMs: 2,
       snapshots: [{ userId: f.ids.to, status: "lapsed", expiresAt: 0 }],
     });

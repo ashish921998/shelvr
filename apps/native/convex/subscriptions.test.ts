@@ -235,7 +235,7 @@ describe("transfer owner selection", () => {
     });
 
     await expect(
-      t.query(internal.subscriptions.transferOwners, {
+      t.query(internal.subscriptions.liveOwners, {
         userIds: [
           ids.live,
           ids.deleting,

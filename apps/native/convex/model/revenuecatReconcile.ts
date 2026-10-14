@@ -2,22 +2,13 @@ import { internal } from "../_generated/api";
 import { env, type ActionCtx } from "../_generated/server";
 import { parseRevenueCatSnapshot } from "./revenuecat";
 
-export async function reconcileRevenueCatTransfer(
-  ctx: ActionCtx,
-  from: string[],
-  to: string[],
-  eventTimestampMs: number,
-): Promise<void> {
-  await reconcileRevenueCatCustomers(ctx, [...from, ...to], eventTimestampMs);
-}
-
-/** Refunds and transfers both replace local access with the current Pro entitlement. */
+/** Authoritative events (transfer, refund, billing issue) replace local access with the current Pro entitlement. */
 export async function reconcileRevenueCatCustomers(
   ctx: ActionCtx,
   userIds: string[],
   eventTimestampMs: number,
 ): Promise<void> {
-  const owners = await ctx.runQuery(internal.subscriptions.transferOwners, {
+  const owners = await ctx.runQuery(internal.subscriptions.liveOwners, {
     userIds: [...new Set(userIds)],
   });
   if (owners.length === 0) return;
@@ -42,7 +33,7 @@ export async function reconcileRevenueCatCustomers(
       ),
     });
   }
-  await ctx.runMutation(internal.subscriptions.reconcileTransfer, {
+  await ctx.runMutation(internal.subscriptions.applySnapshots, {
     snapshots,
     eventTimestampMs,
   });

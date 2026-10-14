@@ -253,7 +253,7 @@ export const upsertSubscription = internalMutation({
 /** The live owners among RevenueCat's app user ids. Anonymous RevenueCat ids,
  * removed accounts and accounts mid-deletion are dropped, so the reconciler
  * neither asks RevenueCat about them nor writes access back for them. */
-export const transferOwners = internalQuery({
+export const liveOwners = internalQuery({
   args: { userIds: v.array(v.string()) },
   returns: v.array(v.id("users")),
   handler: async (ctx, { userIds }) => {
@@ -266,7 +266,7 @@ export const transferOwners = internalQuery({
   },
 });
 
-export const reconcileTransfer = internalMutation({
+export const applySnapshots = internalMutation({
   args: {
     eventTimestampMs: v.number(),
     snapshots: v.array(

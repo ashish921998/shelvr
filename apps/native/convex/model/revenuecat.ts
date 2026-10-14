@@ -2,7 +2,6 @@ export type RevenueCatEvent = {
   type?: string;
   userId?: string;
   expiresAt?: number;
-  gracePeriodExpiresAt?: number;
   productId?: string;
   periodType?: string;
   cancelReason?: string;
@@ -29,7 +28,6 @@ export function parseRevenueCatEvent(
   const type = readString(event?.type);
   const userId = readString(event?.app_user_id);
   const expiresAt = readNumber(event?.expiration_at_ms);
-  const gracePeriodExpiresAt = readNumber(event?.grace_period_expiration_at_ms);
   const productId = readString(event?.product_id);
   const periodType = readString(event?.period_type);
   const eventTimestampMs = readNumber(event?.event_timestamp_ms);
@@ -38,7 +36,6 @@ export function parseRevenueCatEvent(
     type,
     userId,
     expiresAt,
-    gracePeriodExpiresAt,
     productId,
     periodType,
     cancelReason: readString(event.cancel_reason),
@@ -77,22 +74,26 @@ export function mapRevenueCatStatus(
   }
 }
 
-/** The instant Pro access should actually end for a webhook event.
- * A BILLING_ISSUE reports the original, already-past expiry in
- * `expiration_at_ms` and the store's billing retry window in a separate
- * `grace_period_expiration_at_ms`, so writing the former revokes access while
- * the charge is still being retried. The grace field is read only for that
- * event type, because an unconditional maximum of the two would extend an
- * entitlement past its end if the field ever rode along on an EXPIRATION, and
- * over-granting Pro is the worse failure.
- */
-export function resolveExpiresAt(event: RevenueCatEvent): number {
-  if (
-    event.type === "BILLING_ISSUE" &&
-    event.gracePeriodExpiresAt !== undefined
-  )
-    return event.gracePeriodExpiresAt;
-  return event.expiresAt ?? 0;
+/** Events whose current access must come from RevenueCat, not the webhook body. */
+export function requiresAuthoritativeReconciliation(
+  event: RevenueCatEvent,
+): boolean {
+  switch (event.type) {
+    case "BILLING_ISSUE":
+    case "REFUND_REVERSED":
+      return true;
+    case "CANCELLATION":
+      // A failed charge sends BILLING_ERROR with the already-past expiry; only
+      // the snapshot knows the billing grace window.
+      return (
+        event.cancelReason === "CUSTOMER_SUPPORT" ||
+        event.cancelReason === "BILLING_ERROR"
+      );
+    case "EXPIRATION":
+      return event.expirationReason === "CUSTOMER_SUPPORT";
+    default:
+      return false;
+  }
 }
 
 function readStringArray(value: unknown): string[] | undefined {
@@ -112,7 +113,9 @@ type RevenueCatSnapshot = {
   productId?: string;
 };
 
-/** Read only the project's Pro entitlement; malformed responses must not revoke access. */
+/** Read only the project's Pro entitlement; malformed responses must not revoke access.
+ * Billing grace is honoured only from this authoritative snapshot, never the webhook body.
+ */
 export function parseRevenueCatSnapshot(
   body: unknown,
   entitlementIdentifier = "Shelvr Pro",

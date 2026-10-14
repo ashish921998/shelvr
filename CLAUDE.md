@@ -137,7 +137,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `acceptAllSuggestions`), plus internal join helpers.
 - **`subscriptions.ts`** — `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
-  `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
+  `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
 - **`aiConsent.ts`** — consent to third-party AI processing (App Store guideline 5.1.2(i)):
   `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
@@ -367,7 +367,7 @@ needed at runtime by the features that use them:
 - `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts.
   The route answers 500 when it is unset
 - `REVENUECAT_API_KEY` — RevenueCat REST key used to re-read subscribers when reconciling a
-  `TRANSFER`, refund, or `REFUND_REVERSED` webhook event. Refund reconciliation returns
+  `TRANSFER`, `BILLING_ISSUE`, refund, or `REFUND_REVERSED` webhook event. Billing-issue and refund reconciliation return
   503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`

@@ -6,13 +6,9 @@ import { auth } from "./auth";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
-  resolveExpiresAt,
-  type RevenueCatEvent,
+  requiresAuthoritativeReconciliation,
 } from "./model/revenuecat";
-import {
-  reconcileRevenueCatCustomers,
-  reconcileRevenueCatTransfer,
-} from "./model/revenuecatTransfer";
+import { reconcileRevenueCatCustomers } from "./model/revenuecatReconcile";
 import { bearerToken, sha256Hex } from "./model/captureTokens";
 import {
   parseImageBegin,
@@ -182,10 +178,9 @@ http.route({
         return new Response("Invalid transfer event", { status: 400 });
       }
       try {
-        await reconcileRevenueCatTransfer(
+        await reconcileRevenueCatCustomers(
           ctx,
-          event.transferredFrom,
-          event.transferredTo,
+          [...event.transferredFrom, ...event.transferredTo],
           event.eventTimestampMs,
         );
       } catch {
@@ -210,31 +205,28 @@ http.route({
 
     const { type, userId, productId, periodType, eventTimestampMs } = event;
 
-    if (requiresRefundReconciliation(event)) {
+    if (requiresAuthoritativeReconciliation(event)) {
       try {
         await reconcileRevenueCatCustomers(ctx, [userId], eventTimestampMs);
       } catch (error) {
-        logEvent("error", "revenuecat_refund_reconciliation_failed", {
+        logEvent("error", "revenuecat_reconciliation_failed", {
+          event_type: type,
           error_name: errorName(error),
         });
-        return new Response("Refund reconciliation unavailable", {
+        return new Response("Subscription reconciliation unavailable", {
           status: 503,
         });
       }
-      const payment = parsePaymentTelemetry(body);
-      if (payment)
-        await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
-      return new Response(null, { status: 200 });
+    } else {
+      const status = mapRevenueCatStatus(type, periodType);
+      await ctx.runMutation(internal.subscriptions.upsertSubscription, {
+        userId,
+        status,
+        expiresAt: event.expiresAt ?? 0,
+        productId,
+        eventTimestampMs,
+      });
     }
-
-    const status = mapRevenueCatStatus(type, periodType);
-    await ctx.runMutation(internal.subscriptions.upsertSubscription, {
-      userId,
-      status,
-      expiresAt: resolveExpiresAt(event),
-      productId,
-      eventTimestampMs,
-    });
     const payment = parsePaymentTelemetry(body);
     if (payment)
       await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
@@ -642,15 +634,6 @@ http.route({
     }
   }),
 });
-
-function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
-  if (event.type === "REFUND_REVERSED") return true;
-  if (event.type === "CANCELLATION")
-    return event.cancelReason === "CUSTOMER_SUPPORT";
-  if (event.type === "EXPIRATION")
-    return event.expirationReason === "CUSTOMER_SUPPORT";
-  return false;
-}
 
 export default http;
 
