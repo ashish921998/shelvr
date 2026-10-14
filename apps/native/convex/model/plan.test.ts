@@ -72,7 +72,7 @@ describe("isGrounded", () => {
     expect(isGrounded("Мир", source({ title: "Владимир" }))).toBe(false);
   });
 
-  it("matches a name at the start of a handle or hashtag", () => {
+  it("matches a name in a handle or hashtag", () => {
     expect(isGrounded("Tigre", source({ title: "#tigre on the LES" }))).toBe(
       true,
     );
@@ -85,7 +85,41 @@ describe("isGrounded", () => {
     expect(
       isGrounded("Smith & Wollensky", source({ author: "@smithandwollensky" })),
     ).toBe(true);
-    expect(isGrounded("Tigre", source({ author: "@nyctigre" }))).toBe(false);
+    expect(
+      isGrounded("Lilia", source({ content: "Dinner at @eatatlilia" })),
+    ).toBe(true);
+    // A short word must start the handle: "@toronto_eats" is not "Oro".
+    expect(isGrounded("Oro", source({ author: "@toronto_eats" }))).toBe(false);
+  });
+
+  it("matches a name written without its apostrophe", () => {
+    expect(
+      isGrounded(
+        "McSorley's Old Ale House",
+        source({ content: "Beers at McSorleys Old Ale House" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "D’Amico & Sons",
+        source({ content: "Lunch at DAmico & Sons" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a Korean name with a particle written onto it", () => {
+    expect(
+      isGrounded(
+        "쵸리상경",
+        source({ content: "성수동 쵸리상경에서 점심 먹었어요" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "쵸리상경",
+        source({ content: "성수동 맛집에서 점심 먹었어요" }),
+      ),
+    ).toBe(false);
   });
 
   it("rejects a name the save never mentions", () => {

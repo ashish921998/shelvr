@@ -124,9 +124,11 @@ const GENERIC_WORDS = new Set([
  * "paricicafe"), which run a name together with other words. */
 type Evidence = { text: string; words: Set<string>; handles: string[] };
 
-/** Squashed words in any script; punctuation and spaces split them. */
+/** Squashed words in any script; punctuation and spaces split them, but an
+ * apostrophe does not, so "McSorley's" and "McSorleys" are one word. */
 function wordsOf(text: string): string[] {
   return text
+    .replace(/['\u2019\u02bc]/g, "")
     .split(/[^\p{L}\p{N}\p{M}]+/u)
     .map(squash)
     .filter(Boolean);
@@ -153,12 +155,23 @@ function evidenceOf(source: PlanSource): Evidence {
 const UNSPACED_SCRIPT =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 
-/** A whole word of the save, the start of one of its handles ("@tigrenyc"),
- * or, in a script written without spaces, anywhere in its text. */
+// Korean spaces its words but writes particles onto them ("쵸리상경에서").
+const HANGUL = /\p{Script=Hangul}/u;
+
+/** A whole word of the save; part of one of its handles, at the start
+ * ("@tigrenyc") or, for a word of 4 letters or more, anywhere ("@eatatlilia");
+ * in Korean, the start of a word, before a particle ("쵸리상경에서"); or, in a
+ * script written without spaces, anywhere in its text. */
 function saveSays(piece: string, evidence: Evidence): boolean {
   return (
     evidence.words.has(piece) ||
-    evidence.handles.some((handle) => handle.startsWith(piece)) ||
+    evidence.handles.some(
+      (handle) =>
+        handle.startsWith(piece) ||
+        (piece.length >= 4 && handle.includes(piece)),
+    ) ||
+    (HANGUL.test(piece) &&
+      [...evidence.words].some((word) => word.startsWith(piece))) ||
     (UNSPACED_SCRIPT.test(piece) && evidence.text.includes(piece))
   );
 }
