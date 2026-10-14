@@ -231,7 +231,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
 
     // The sign-in lands while the owner row is deleting: the token is still
-    // moved off the users row, but storing it is refused — and it must not
+    // moved off the users row, but storing it is refused, and it must not
     // be dropped unrevoked.
     await signIn(t, "web-during-deletion");
     expect(await tokenRows(t)).toEqual([retained]);

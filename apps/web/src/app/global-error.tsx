@@ -6,7 +6,7 @@ import { captureWebException } from "@/lib/analytics";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
 // Replaces the root layout when it throws, so this file must render its own
-// <html>/<body> and cannot rely on the layout's global styles — inline styles
+// <html>/<body> and cannot rely on the layout's global styles: inline styles
 // only, no Tailwind classes.
 export default function GlobalError({
   error,

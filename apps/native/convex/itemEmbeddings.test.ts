@@ -65,7 +65,7 @@ async function embeddedText(t: TestCtx, itemId: Id<"items">): Promise<string> {
 describe("the retrieval vector stays inside the backend", () => {
   it("is absent from every client-facing item read", async () => {
     // `itemFields` omits the vector and Convex enforces `returns` at runtime,
-    // so a leak here does not merely ship 6 KB per row — it throws and takes
+    // so a leak here does not merely ship 6 KB per row. It throws and takes
     // the whole read down. These four are the reads that share enrichItem.
     const { t, userId } = await as();
     await seedItem(t, userId, {
@@ -99,7 +99,7 @@ describe("the retrieval vector stays inside the backend", () => {
 
   it("is absent from the internal reads the AI actions use", async () => {
     // These return raw documents under `v.object(itemFields)`, so they would
-    // also fail validation — and would drag a vector per row into the action.
+    // also fail validation and would drag a vector per row into the action.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, {
       embedding: vector(),
@@ -233,7 +233,7 @@ describe("updateNoteItem invalidates the vector", () => {
 
   it("clears the stamp and the attempt budget on a title-only edit", async () => {
     // A title-only edit schedules no re-classify, so the sweep is the only
-    // thing that will re-embed this row — it has to be handed back to it. And
+    // thing that will re-embed this row: it has to be handed back to it. And
     // the budget has to go with the stamp: kept, one failure on the edited
     // note would reach the cap and stamp the row current with a vector
     // describing the old title.
@@ -397,7 +397,7 @@ describe("the embedding sweep", () => {
 
   it("leaves a deferred item completely alone so an outage cannot strand it", async () => {
     // Stamping here would delete the item from the vector index permanently.
-    // Across a whole outage that is not one row — it is the entire table.
+    // Across a whole outage that is not one row. It is the entire table.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, { title: "Embeddable" });
 
@@ -624,7 +624,7 @@ describe("the embedding sweep", () => {
 
 describe("similar items", () => {
   it("scores on the summary, not the indexed article body", async () => {
-    // searchText now carries the body, and searchTokens has no stopword list —
+    // searchText now carries the body, and searchTokens has no stopword list:
     // scoring over it would have every pair of English articles share "that",
     // "with", "from" and clear SIMILAR_MIN_SCORE on filler alone.
     const { t, userId } = await as();

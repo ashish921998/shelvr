@@ -75,7 +75,7 @@ describe("normalizeExternalUrl - credentials", () => {
 
 describe("normalizeExternalUrl - host", () => {
   it("rejects a missing host", () => {
-    // "https://" declares an http(s) scheme but has no host — reported as
+    // "https://" declares an http(s) scheme but has no host, reported as
     // invalid_host, distinct from genuinely unparseable input.
     expectCode("https://", "invalid_host");
   });

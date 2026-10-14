@@ -155,7 +155,7 @@ async function fetchImageAspectRatio(
     },
   });
   if (!result.ok) {
-    // A blocked or oversized hero image is best-effort — no aspect ratio.
+    // A blocked or oversized hero image is best-effort: no aspect ratio.
     return undefined;
   }
   const size = readImageSize(result.bytes);
@@ -210,7 +210,7 @@ function htmlToText(html: string): string {
  * Extract the readable article body. Mozilla Readability (the engine behind
  * Firefox Reader View) scores DOM blocks by text density and link ratio to
  * isolate the real article, discarding nav, ads, share widgets, comment
- * counts, captions, and other boilerplate — so it works across arbitrary
+ * counts, captions, and other boilerplate, so it works across arbitrary
  * article pages rather than one site's markup. We feed its cleaned article
  * HTML through htmlToText to get the paragraph-separated plain text the client
  * renders. Pages without a readable article do not store a body.
@@ -267,7 +267,7 @@ export function extractBodyText(html: string, url: string): string | undefined {
       base.setAttribute("href", url);
       document.head?.appendChild(base);
     } catch {
-      // Non-fatal — Readability still parses without a <base>.
+      // Non-fatal: Readability still parses without a <base>.
     }
     const article = new Readability(document).parse();
     if (article?.content) {
@@ -314,10 +314,12 @@ export type PageData = {
    * rather than the display text. Readers that don't set it fall back to
    * scanning the caption in `withLinkedRecipe`. */
   linkedUrl?: string;
+  /** The post's own address, once a share or short link has named it. */
+  postUrl?: string;
 };
 
-/** Hosts whose pages are link hubs or the social network itself — never the
- * recipe write-up — so a caption pointing there is not worth a fetch. */
+/** Hosts whose pages are link hubs or the social network itself, never the
+ * recipe write-up, so a caption pointing there is not worth a fetch. */
 const LINK_HUB_HOSTS = new Set([
   "linktr.ee",
   "linkin.bio",
@@ -354,10 +356,28 @@ export function firstLinkedUrl(text: string | undefined): string | undefined {
 
 /**
  * TikTok refuses bot page loads, but its public oEmbed endpoint answers with
- * the caption, creator, and a 9:16 poster — everything the card needs. TikTok
+ * the caption, creator, and a 9:16 poster: everything the card needs. TikTok
  * also returns 400 for unsupported URL shapes, so only true 404/410 responses
  * are treated as permanently gone by the shared page reader.
  */
+/** A short link (vm.tiktok.com, tiktok.com/t/) resolved to the video it
+ * names, from the oEmbed author and video id. */
+function tikTokPostUrl(
+  handle: string | undefined,
+  videoId: string | undefined,
+): string | undefined {
+  return handle &&
+    videoId &&
+    /^[A-Za-z0-9._]+$/.test(handle) &&
+    /^\d+$/.test(videoId)
+    ? `https://www.tiktok.com/@${handle}/video/${videoId}`
+    : undefined;
+}
+
+function postField(postUrl: string | undefined): { postUrl?: string } {
+  return postUrl ? { postUrl } : {};
+}
+
 async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
   const result = await safeFetch(endpoint, {
@@ -379,6 +399,7 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const handle = str("author_unique_id");
   const caption = str("title");
   return {
+    ...postField(tikTokPostUrl(handle, str("embed_product_id"))),
     title: caption,
     siteName: "TikTok",
     author: handle ? `@${handle}` : str("author_name"),
@@ -859,7 +880,13 @@ async function fetchInstagramPost(url: string) {
       error_category: embed.errorCategory,
     });
   }
-  return { page, html, kind: (post ?? linked)?.kind, embed };
+  return {
+    page,
+    html,
+    kind: (post ?? linked)?.kind,
+    embed,
+    postUrl: post && instagramPostUrl(post),
+  };
 }
 
 /**
@@ -871,7 +898,7 @@ async function fetchInstagramPost(url: string) {
  * incomplete so the save can retry.
  */
 export async function fetchInstagram(url: string): Promise<PageData> {
-  const { page, html, kind, embed } = await fetchInstagramPost(url);
+  const { page, html, kind, embed, postUrl } = await fetchInstagramPost(url);
   const embedded: InstagramEmbedFields =
     embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
   const card = instagramCard(html);
@@ -900,6 +927,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
       (kind === "p" ? 1 : 9 / 16))
     : undefined;
   return {
+    ...postField(postUrl),
     title:
       Array.from(caption?.split("\n")[0] ?? "")
         .slice(0, 100)
@@ -1212,7 +1240,7 @@ function isPageFetchError(e: unknown): e is PageFetchError {
 /**
  * Reduce a caught fetch error to a safe log category. Fetch-policy errors
  * expose only their stable code; anything else retains the error's constructor
- * name (e.g. TypeError) for observability without leaking data — never the
+ * name (e.g. TypeError) for observability without leaking data, never the
  * error's message or cause, which may carry a URL, response body, or resolved
  * address.
  */
@@ -1235,7 +1263,7 @@ export function fetchErrorCategory(error: unknown): string {
 }
 
 /** True when the page will never be readable: the resource is gone (404/410).
- * Such an item must NOT be classified from its URL alone — the model would
+ * Such an item must NOT be classified from its URL alone. The model would
  * invent content from the slug. Exported pure for unit testing. */
 export function pageGone(status: number | undefined): boolean {
   return status === 404 || status === 410;
@@ -1244,11 +1272,11 @@ export function pageGone(status: number | undefined): boolean {
 /**
  * Pure decision for the enrichment flag a finalized item earns from one
  * pipeline run, taken straight from the page-read outcome: "partial" when the
- * page could not be read at all (retryable — the classifier worked from the
+ * page could not be read at all (retryable: the classifier worked from the
  * URL alone), "no_article" when the page read fine but yielded no extractable
  * article body (the URL itself is the save; a retry cannot change the
  * outcome), undefined when fully enriched. A missing read (images/notes never
- * fetch a page) is fully enriched; "gone" never reaches finalize — a gone
+ * fetch a page) is fully enriched; "gone" never reaches finalize: a gone
  * page fails the item instead. Exported pure for unit testing.
  */
 export function linkEnrichment(
@@ -1271,7 +1299,7 @@ const PAGE_FETCH_OPTIONS = {
   timeoutMs: 15000,
   // Hard cap on the streamed page body. Generous for real articles; bounded
   // to deny a malicious/buggy server from exhausting memory. Truncate instead
-  // of failing — a large page's first 1 MiB is still enough for extraction.
+  // of failing: a large page's first 1 MiB is still enough for extraction.
   maxBytes: 1024 * 1024,
   onOverflow: "truncate",
   allowContentType: (ct: string) =>
@@ -1291,7 +1319,7 @@ const PAGE_FETCH_OPTIONS = {
  *
  * A read cut off at `maxBytes` yields nothing, because a cut document still
  * parses. Microdata's ingredient and step lists simply stop early, and a recipe
- * whose method stops after step 1 reads exactly like a recipe with one step —
+ * whose method stops after step 1 reads exactly like a recipe with one step.
  * `sanitizeRecipe` checks that the lists are non-empty and within budget, which
  * a prefix satisfies. JSON-LD survives a cut only by accident, since
  * `JSON.parse` rejects a half-written object, so the guard belongs here where
@@ -1442,7 +1470,7 @@ type PageReadOk = {
 export type ShortFormSource = NonNullable<ReturnType<typeof shortFormSource>>;
 
 /** The read outcomes that reach finalizeItem: "gone" fails the item before
- * classification, and the fetch error is dropped — nothing downstream of the
+ * classification, and the fetch error is dropped. Nothing downstream of the
  * sanitized log rereads it. */
 export type LinkRead = PageReadOk | { status: "unreadable" };
 
@@ -1477,6 +1505,13 @@ async function asCaption(read: Promise<PageData>): Promise<PageData> {
   return { ...(await read), caption: true };
 }
 
+/** An Instagram read's content is only ever the captioned embed's caption,
+ * the whole of it; a post read from its card alone has none. */
+async function asInstagramCaption(read: Promise<PageData>): Promise<PageData> {
+  const page = await read;
+  return page.content === undefined ? page : { ...page, caption: true };
+}
+
 /** The reader for each platform with its own, each following its caption's
  * link to a recipe. Pinterest does that only for a pin it read from the
  * widget: its page fallback is not a caption, so it neither is marked one nor
@@ -1485,7 +1520,8 @@ const SOURCE_READERS = {
   tiktok: async (url) =>
     withLinkedRecipe(await asCaption(fetchTikTokOEmbed(url))),
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
-  instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
+  instagram: async (url) =>
+    withLinkedRecipe(await asInstagramCaption(fetchInstagram(url))),
   pinterest: fetchPinterestPin,
   youtube: fetchYouTube,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;

@@ -9,13 +9,13 @@ import { getSharedPayloads } from "expo-sharing";
  * True when the native share store holds a batch the app owes the user a save
  * for. The store is the handoff between the OS share sheet and the share
  * screen: a batch stays readable until the share screen clears it after a
- * durable outcome, so "readable" alone means "a share is waiting" — with one
+ * durable outcome, so "readable" alone means "a share is waiting", with one
  * exception. A batch the user explicitly discarded whose native clear threw
  * stays in the store, and the resume path would route it straight back to the
  * share screen, re-saving the discarded batch under new operation ids. So the
  * batch's fingerprint is matched against the discard record first: the
- * leftover of a Cancel is not resumable, while any other batch — including a
- * later deliberate re-share, once the record was cleared — is.
+ * leftover of a Cancel is not resumable, while any other batch, including a
+ * later deliberate re-share, once the record was cleared, is.
  *
  * The launch URL alone cannot guarantee the handoff. On Android, a cold start
  * from the share sheet depends on `Linking.getInitialURL()` beating a 150ms

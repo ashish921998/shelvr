@@ -784,7 +784,7 @@ describe("linkEnrichment", () => {
   });
   // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
   // failed (retryable, classified from the URL alone), the page read but had
-  // no article body (terminal — e.g. an oEmbed-only TikTok read), a fully
+  // no article body (terminal, e.g. an oEmbed-only TikTok read), a fully
   // read article, and no page at all (images/notes never fetch).
   it("flags an unreadable page as partial so the client offers a retry", () => {
     expect(linkEnrichment({ status: "unreadable" })).toBe("partial");
@@ -953,6 +953,7 @@ describe("fetchInstagram", () => {
     await expect(
       fetchInstagram("https://www.instagram.com/reel/DHVrPLrIyQ_/?igsh=abc"),
     ).resolves.toEqual({
+      postUrl: "https://www.instagram.com/reel/DHVrPLrIyQ_/",
       title: "Meet the National Geographic 33!",
       description: "National Geographic (@natgeo) • Instagram reel",
       siteName: "Instagram",
@@ -978,6 +979,7 @@ describe("fetchInstagram", () => {
     await expect(
       fetchInstagram("https://www.instagram.com/p/DHVrPLrIyQ_/"),
     ).resolves.toEqual({
+      postUrl: "https://www.instagram.com/p/DHVrPLrIyQ_/",
       title: "National Geographic (@natgeo) • Instagram reel",
       description: undefined,
       siteName: "Instagram",
@@ -1582,19 +1584,24 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
-  it("marks an Instagram reel short-form without asking for a recipe", async () => {
-    // Short-form, but its caption is not a caption source the model may
-    // transcribe a recipe from.
+  it("marks an Instagram reel short-form and asks for a recipe from its caption", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({
       status: "ok",
-      askForRecipe: false,
+      askForRecipe: true,
       shortForm: { site: "Instagram", video: true },
     });
     expect(read.status === "ok" && read.page.content).toContain(
       "Meet the National Geographic 33!",
     );
+  });
+
+  it("does not ask for a recipe when only the Instagram card was read", async () => {
+    // The card's og:description is a cut summary, not the caption.
+    instagramAnswers(REEL_PAGE_WITH_DESCRIPTION, SHELL_PAGE);
+    const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
+    expect(read).toMatchObject({ status: "ok", askForRecipe: false });
   });
 
   it("does not ask for an ordinary web page", async () => {

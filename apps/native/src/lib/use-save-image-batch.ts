@@ -49,7 +49,7 @@ export type ImageBatchDeps = {
 /**
  * Runs a batch of image requests, handing an all-saved batch to the host and
  * otherwise reporting a partial outcome. Only failed requests are retained for
- * a retry — successful ones are never resubmitted — and each retry replays the
+ * a retry; successful ones are never resubmitted, and each retry replays the
  * failed request's existing operation id so the backend `itemOperations` ledger
  * resumes that operation instead of starting a second one per image.
  *
@@ -110,7 +110,7 @@ export async function runImageBatch(
           text: t("capture.retryFailed"),
           onPress: () => {
             void runImageBatch(
-              // Reuse each failed operation id on retry — never mint fresh ones.
+              // Reuse each failed operation id on retry: never mint fresh ones.
               failed.map((r) => ({
                 image: r.image,
                 operationId: r.operationId,

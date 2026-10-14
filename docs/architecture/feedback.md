@@ -4,9 +4,9 @@ The Home invitation and the Profile entry open the same `FeedbackModal`
 (`apps/native/src/components/feedback/feedback-modal.tsx`). Sending is
 persist-first: the client calls the public `submitFeedback` mutation in
 `convex/feedback.ts`, which writes a `feedbackSubmissions` row and returns
-`deliveryState` — `scheduled` when the inbox is configured (the row starts
+`deliveryState`: `scheduled` when the inbox is configured (the row starts
 `pending`), `unconfigured` when it is not (the row starts `unconfigured`).
-Only then does the client treat the send as accepted — the modal says
+Only then does the client treat the send as accepted. The modal says
 "thanks" because Convex persisted the submission, never because an email went
 out. The projection to the support inbox is server-side work the client cannot
 observe.
@@ -14,7 +14,7 @@ observe.
 ## Projection to the support inbox
 
 Each new submission is scheduled into the internal `deliver` action, one
-claim → send → finish cycle sharing its Resend boundary with the waitlist
+claim, send, and finish cycle sharing its Resend boundary with the waitlist
 (`convex/model/resend.ts`):
 
 - `claimDelivery` loads the row and its safe reply context. There is no
@@ -23,7 +23,7 @@ claim → send → finish cycle sharing its Resend boundary with the waitlist
   nothing to send. Claiming persists the attempt immediately, so a delivery
   that crashes mid-flight still counts toward the cap instead of retrying for
   free. The rare retry racing a still-queued immediate action can at worst
-  duplicate one email to the operator — never lose a row.
+  duplicate one email to the operator. It never loses a row.
 - The action sends the email through Resend and calls `finishDelivery` with
   the result. The outcome only ever lands through `finishDelivery`, so a
   crash in between leaves a spent attempt and an unchanged status for the
@@ -41,8 +41,8 @@ claim → send → finish cycle sharing its Resend boundary with the waitlist
 Operator configuration lives in the Convex deployment environment
 (declared in `convex/convex.config.ts`):
 
-- `RESEND_FEEDBACK_INBOX_EMAIL` — where feedback lands.
-- `RESEND_FEEDBACK_FROM_EMAIL` — the verified sending address.
+- `RESEND_FEEDBACK_INBOX_EMAIL`: where feedback lands.
+- `RESEND_FEEDBACK_FROM_EMAIL`: the verified sending address.
 
 With any of the three missing (including no `RESEND_API_KEY`), submissions
 are stored with status `unconfigured` and no attempt is spent; the retry
@@ -58,15 +58,15 @@ The typed message is user content and stops at Convex and the support inbox:
   (`src/lib/feedback.ts`). Session replays mask all text inputs globally
   (see `src/lib/posthog.ts`).
 - Backend `logEvent` lines carry category/status codes, attempt counts, and
-  ids — never message bodies, emails, or URLs.
+  ids, never message bodies, emails, or URLs.
 - Client errors go through `analytics.captureError("feedback_submit_failed", …)`
   with a sanitized message.
 
 ## Retention boundary
 
 Deleting a `feedbackSubmissions` row removes the Convex copy only. It cannot
-retract an email already delivered to the support inbox — treat the inbox as
-the retention surface for anything that has landed there. Account deletion
+retract an email already delivered to the support inbox, so treat the inbox as
+the place that retains anything that has landed there. Account deletion
 (`convex/users.ts`) drains feedback rows in batches with the rest of the
 account's data, for exactly this reason: the user-authored message does not
 outlive the account in Convex.
@@ -83,7 +83,7 @@ build; it never guesses context.
 
 ## Client contract
 
-- `available` is `user !== null` — analytics availability no longer gates
+- `available` is `user !== null`. Analytics availability no longer gates
   anything. Without an account the modal offers the support mailto instead
   of a Send that does nothing.
 - A failed send keeps the draft on screen, editable and re-sendable, with the

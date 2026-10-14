@@ -33,10 +33,10 @@ export async function readFreshTrialCancellation(purchases: {
 }
 
 /**
- * - `cancelled` — show the next-visit cancel survey.
- * - `none` — definitely not a cancelled-in-window trial (renewing, paid,
+ * - `cancelled`: show the next-visit cancel survey.
+ * - `none`: definitely not a cancelled-in-window trial (renewing, paid,
  *   lapsed, or no active entitlement). Suppress the survey.
- * - `unknown` — the answer could not be trusted (SDK not linked, identity
+ * - `unknown`: the answer could not be trusted (SDK not linked, identity
  *   sync not ready, fetch failure). Never show the survey on `unknown`; the
  *   check simply runs again on the next launch.
  */

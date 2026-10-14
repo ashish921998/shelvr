@@ -145,7 +145,7 @@ const itemStatusValidator = v.union(
 );
 
 // A real product result from the user-triggered "Find links" pass. Mirrors
-// the schema; price stays a display string ("$1,299.00") — no math happens.
+// the schema; price stays a display string ("$1,299.00"). No math happens.
 export const productValidator = v.object({
   title: v.string(),
   url: v.string(),
@@ -226,7 +226,7 @@ const runWriteOutcomeValidator = v.union(
   v.literal("missing"),
 );
 
-// Exported so spaces.ts reuses the exact same shape — a second hand-written
+// Exported so spaces.ts reuses the exact same shape: a second hand-written
 // copy is how `capturedAt`/`intents` drifted out of getSpace's validator.
 export const enrichedItemValidator = v.object({
   ...itemFields,
@@ -245,7 +245,7 @@ const enrichedItemWithSpacesValidator = v.object({
 });
 
 // The feed row. Everything a card, the masonry layout, the widget, and the
-// detail pager's first paint read — and nothing that only the detail body
+// detail pager's first paint read, and nothing that only the detail body
 // shows. `content` is the extracted article (up to ai.ts's
 // MAX_STORED_CONTENT_CHARS, 100k, per link) and `searchText` its index copy;
 // `products` is the shopping result list.
@@ -269,8 +269,8 @@ export type ItemCard = Infer<typeof itemCardValidator>;
  * Drops the retrieval vector before a row crosses any function boundary.
  *
  * `embedding` is ~6 KB of floats and `itemFields` is spread into
- * `enrichedItemValidator` — the return shape of `listItems`, `getItem`,
- * `searchItems`, the weekly digest, and `getSpace`. Left in, every one of
+ * `enrichedItemValidator` (the return shape of `listItems`, `getItem`,
+ * `searchItems`, the weekly digest, and `getSpace`). Left in, every one of
  * those reads would ship the vector to the client (and Convex would reject
  * the response outright, since the field is not in their validators).
  *
@@ -415,7 +415,7 @@ export const saveProgress = query({
   },
 });
 
-/** The home feed, newest first, one page at a time. Card shape only — see
+/** The home feed, newest first, one page at a time. Card shape only: see
  * `itemCardValidator`. The cursor fields of `paginationOpts` pass through
  * untouched so the client's reactive page splitting keeps working; the size
  * fields are bounded here so no argument can make one page read more than the
@@ -598,7 +598,7 @@ export const getItem = query({
       .collect();
     const spaces: { _id: Id<"spaces">; name: string }[] = [];
     for (const join of joins) {
-      // Only real memberships appear as chips — suggestions and dismissals
+      // Only real memberships appear as chips: suggestions and dismissals
       // are space-screen concerns, not part of the item's identity.
       if (effectiveStatus(join) !== "saved") {
         continue;
@@ -856,8 +856,8 @@ export const similarItems = query({
 // ---------------------------------------------------------------------------
 
 /**
- * Adding from inside a space files the new item there immediately — a real
- * `saved` membership, the user's own act, never subject to AI review.
+ * Adding from inside a space files the new item there immediately: a real
+ * `saved` membership (the user's own act), never subject to AI review.
  */
 async function saveIntoSpace(
   ctx: MutationCtx,
@@ -915,7 +915,7 @@ function requireOperationId(operationId: string): void {
 type OperationKind = "image" | "link" | "note";
 
 /** Loads the caller's item operation for `operationId`, or null. The (userId,
- * operationId) pair is the logical unique key — never look one up without both.
+ * operationId) pair is the logical unique key. Never look one up without both.
  * Callers that expect a specific `kind` must pass it so a reused operation ID
  * can't silently switch from image to link/note. */
 async function loadItemOperation(
@@ -943,7 +943,7 @@ const STORAGE_IN_USE = "Storage object is already in use";
 
 /** True iff neither an item nor any OTHER operation references `storageId`.
  * attach/cleanup use this to make a storage id deletable/adoptable ONLY when it
- * is a fresh, unreferenced upload (a redundant retry re-upload) — never a blob
+ * is a fresh, unreferenced upload (a redundant retry re-upload), never a blob
  * an item or another in-flight operation depends on. Checking `itemOperations`
  * too closes the double-adopt hole: without it the same blob could be adopted
  * into two operations, finalize into two items sharing one blob, and then be
@@ -951,12 +951,12 @@ const STORAGE_IN_USE = "Storage object is already in use";
  *
  * KNOWN RESIDUAL (plan 003 STOP condition): this does NOT bind a storage id to
  * (userId, operationId). A blob that a client has POSTed but not yet attached
- * is referenced by nothing, so it passes here — meaning an authenticated
+ * is referenced by nothing, so it passes here, meaning an authenticated
  * caller who somehow learns another user's still-un-attached storage id could
  * adopt or delete it within the brief upload→attach window. The direct-upload
  * API gives no server-verifiable binding to close this; exposure is limited by
  * Convex storage ids being unguessable and never surfaced to other users. A
- * true fix requires server-mediated upload completion — tracked, not done. */
+ * true fix requires server-mediated upload completion. Tracked, not done. */
 async function isStorageUnreferenced(
   ctx: MutationCtx,
   storageId: Id<"_storage">,
@@ -1074,7 +1074,7 @@ export async function beginImageImportForUser(
   const now = Date.now();
 
   // Idempotent read path: a complete operation whose item still exists
-  // returns the itemId WITHOUT a Pro check — a lapsed user must still
+  // returns the itemId WITHOUT a Pro check: a lapsed user must still
   // retrieve an already-completed save. Hoisted before the gate so every
   // path below is new or recycled work and can be gated uniformly.
   if (op?.status === "complete" && op.itemId !== undefined) {
@@ -1084,7 +1084,7 @@ export async function beginImageImportForUser(
     }
   }
 
-  // Every remaining path creates, recycles, or refreshes work — gate once.
+  // Every remaining path creates, recycles, or refreshes work. Gate once.
   // Quota here saves the client an upload it could never finalize.
   await requireProEntitlement(ctx, userId);
   const photoCount = await requirePhotoQuota(ctx, userId);
@@ -1123,7 +1123,7 @@ export async function beginImageImportForUser(
     // transactions: if two begins race on an empty index range, only one
     // insert commits; the other's transaction is retried and will observe
     // the row above as a pending op. No application-level unique index exists
-    // because Convex has no unique secondary indexes — this OCC + retry is
+    // because Convex has no unique secondary indexes. This OCC + retry is
     // the supported idiom.
     await ctx.db.insert("itemOperations", {
       userId,
@@ -1146,7 +1146,7 @@ export async function beginImageImportForUser(
     // inconsistent (no itemId). Release the orphaned storage object before
     // resetting, otherwise the blob leaks (the cleanup cron only sweeps
     // pending rows, and this row is currently complete). Guarded so a blob
-    // some other item/operation still depends on — or one already deleted —
+    // some other item/operation still depends on, or one already deleted,
     // can't corrupt them or wedge this recycle path. Clearing itemId is
     // redundant for the no-itemId case but harmless.
     if (
@@ -1315,7 +1315,7 @@ export async function attachImageUploadForUser(
     // only if the blob actually exists (a swept id must not become an item
     // with a permanently dead image) and isn't referenced by an item or
     // another operation. NOTE: existence + unreferenced is NOT proof the
-    // caller owns this blob during the un-attached window — see the residual
+    // caller owns this blob during the un-attached window. See the residual
     // documented on isStorageUnreferenced.
     if (metadata === null) {
       throw new Error("Storage object not found");
@@ -1336,8 +1336,8 @@ export async function attachImageUploadForUser(
 
   if (op.status === "complete") {
     // Already finalized (a racing retry lost to the original's finalize).
-    // Return the canonical id, and delete the retry's redundant re-upload —
-    // otherwise it is referenced by nothing (no item, no ledger row) and the
+    // Return the canonical id and delete the retry's redundant re-upload.
+    // Otherwise it is referenced by nothing (no item, no ledger row) and the
     // pending-only cleanup cron would never reclaim it. The unreferenced
     // guard keeps a blob some other item/operation owns safe.
     if (
@@ -1350,7 +1350,7 @@ export async function attachImageUploadForUser(
   }
 
   // First attachment wins. A racing retry that supplies a different storageId
-  // has re-uploaded redundantly; delete the REDUNDANT (incoming) blob — but
+  // has re-uploaded redundantly; delete the REDUNDANT (incoming) blob, but
   // only if it is unreferenced, so a client can never delete storage it
   // doesn't own (e.g. another user's blob or another operation's pending
   // upload).
@@ -1413,19 +1413,19 @@ export async function finalizeImageImportForUser(
 
   const op = await loadItemOperation(ctx, userId, args.operationId);
 
-  // Already complete — return the original live item id WITHOUT validating
+  // Already complete: return the original live item id WITHOUT validating
   // the resubmitted metadata. The idempotent read path must not be gated on
   // the caller resending identical valid fields; a completed import is final.
   // (A complete row pointing at a deleted item should have been recycled by
   // begin; if we reach here, treat it as complete with the recorded id.)
-  // Entitlement is NOT checked here — a lapsed user must still retrieve an
+  // Entitlement is NOT checked here: a lapsed user must still retrieve an
   // already-completed itemId.
   if (op !== null && op.status === "complete" && op.itemId !== undefined) {
     return op.itemId;
   }
 
   // Gate only new work (creating an item from a pending operation). Rate limit
-  // sits here too — after the idempotent completed-return above, so a retry of
+  // sits here too (after the idempotent completed-return above), so a retry of
   // an already-finished import is never charged against the bucket.
   await requireProEntitlement(ctx, userId);
   const photoCount = await requirePhotoQuota(ctx, userId);
@@ -1493,7 +1493,7 @@ export async function finalizeImageImportForUser(
 
 /** Read-only probe of an operation's server-side state. Used by client recovery
  * (e.g. plan 005's Tidy undo) to learn whether an operation completed. It MUST
- * NOT create, refresh, or patch a row and must not touch updatedAt — probing on
+ * NOT create, refresh, or patch a row and must not touch updatedAt: probing on
  * every launch through begin would create pending rows whose only exit is the
  * 24h cleanup and refresh their updatedAt, deferring cleanup indefinitely. */
 export const getImportOperation = query({
@@ -1554,7 +1554,7 @@ export const cleanupStaleImageImports = internalMutation({
     for (const op of stale) {
       // Guarded delete: a pending row's blob is normally referenced by nothing
       // else, but if it ever is (item or sibling operation), deleting it would
-      // destroy a live image — drop only the ledger row in that case. And a
+      // destroy a live image: drop only the ledger row in that case. And a
       // blob already gone must not throw and wedge the sweep (this mutation is
       // transactional and re-reads the same oldest page every run).
       if (
@@ -1639,7 +1639,7 @@ export async function createItemWithOperation(
 
   // Operation-guarded path (durable share operations). Reads & writes happen in
   // the same mutation transaction, so a retry that races itself resolves to one
-  // item via Convex's serializable OCC — no application-level unique index.
+  // item via Convex's serializable OCC, with no application-level unique index.
   if (options.operationId !== undefined) {
     requireOperationId(options.operationId);
     const op = await loadItemOperation(ctx, userId, options.operationId, kind);
@@ -1662,8 +1662,8 @@ export async function createItemWithOperation(
 
     // New work is now certain (the idempotent completed-return above already
     // exited). Charge the itemCreate bucket HERE, not in the mutation handler,
-    // so a retry of an already-finished operation is never billed a token —
-    // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
+    // so a retry of an already-finished operation is never billed a token.
+    // This mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
     const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options);
     if (op === null) {
@@ -1682,7 +1682,7 @@ export async function createItemWithOperation(
         updatedAt: now,
       });
     }
-    // processItem is scheduled exactly once per create — inside
+    // processItem is scheduled exactly once per create, inside
     // insertLinkOrNote above. Do NOT schedule it again here: a second schedule
     // would run the AI pipeline twice on the same item, wasting cost and racing
     // two concurrent classifications against each other.
@@ -1789,8 +1789,8 @@ async function scheduleSaveTelemetry(
  * Schedules the one processing-outcome event per applied transition: the save
  * funnel's last leg, `did the persisted item become usable`, joined to
  * `item_saved` by `item_id`. Called only for processing -> terminal writes
- * that own the row — `finalizeItem`, `failItem`, and the stale-processing
- * sweeper — so note refreshes and superseded runs never land in the funnel.
+ * that own the row: `finalizeItem`, `failItem`, and the stale-processing
+ * sweeper, so note refreshes and superseded runs never land in the funnel.
  * `processingMs` measures the run that just settled, from its own start rather
  * than `_creationTime`, so a `reprocessItem` retry is timed on its own.
  */
@@ -2114,7 +2114,7 @@ export const updateNoteItem = mutation({
       }),
       // The note's own words are most of what it is embedded from, so an edit
       // invalidates the vector. A text change also schedules a re-classify
-      // that re-embeds, but a title-only edit does not — clearing the stamp
+      // that re-embeds, but a title-only edit does not. Clearing the stamp
       // covers both by handing the row back to the sweep either way.
       //
       // The attempt count goes with it: it is a budget for embedding one
@@ -2190,7 +2190,7 @@ export const findLinks = mutation({
  * fully succeed: a `failed` item, a `ready` one flagged `enrichment: "partial"`
  * (classified from its URL because the page body was unreadable), or a
  * `processing` one whose run is older than PROCESSING_STALE_MS (its action is
- * dead — see the constant's rationale — and the sweeper has not reached it
+ * dead, per the constant's rationale, and the sweeper has not reached it
  * yet). Re-runs the same pipeline, so it is rate-limited like a create.
  *
  * A fresh `processing` item is refused: its action may still finish, and
@@ -2229,7 +2229,7 @@ export const reprocessItem = mutation({
     await ctx.db.patch(args.id, {
       ...run,
       failureReason: undefined,
-      // Dropped up front so an in-flight retry — and a retry that fails again —
+      // Dropped up front so an in-flight retry (and a retry that fails again)
       // never carries the previous run's "partial" marker.
       enrichment: undefined,
     });
@@ -2256,7 +2256,7 @@ export const deleteItem = mutation({
     // operationId can be re-performed after an explicit delete (Tidy undo).
     // Pending rows have no itemId and are excluded by the index; this only
     // touches completed operations whose result was this item. AI processing
-    // failures do NOT release the operation — the item still exists.
+    // failures do NOT release the operation: the item still exists.
     const operations = await ctx.db
       .query("itemOperations")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
@@ -2379,7 +2379,7 @@ function isShareable(item: Doc<"items">): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Internal — used by the AI actions
+// Internal: used by the AI actions
 // ---------------------------------------------------------------------------
 
 export const getItemInternal = internalQuery({
@@ -2388,14 +2388,14 @@ export const getItemInternal = internalQuery({
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     // `itemFields` deliberately omits the vector, and Convex enforces
-    // `returns` exactly — the raw document would fail validation here.
+    // `returns` exactly: the raw document would fail validation here.
     return item === null ? null : stripEmbedding(item);
   },
 });
 
 /** Bounded preview for the public branded share page, looked up by the token
  * `createShareLink` minted. Deliberately narrow: no `userId`, no article
- * body, no tags — just enough to render an OG card and a landing page for
+ * body, no tags, just enough to render an OG card and a landing page for
  * someone who doesn't have the app yet. */
 export const getSharePreview = internalQuery({
   args: { token: v.string() },
@@ -2490,7 +2490,7 @@ export const listReadyItemsInternal = internalQuery({
  * Rows that are not `ready` are dropped rather than returned: the vector index
  * has no `status` filter field (Convex vector filters cannot AND across
  * fields), so a stale vector belonging to an item that has since failed can
- * still match. The `userId` re-check is defence in depth — the search is
+ * still match. The `userId` re-check is defence in depth: the search is
  * already filtered to one owner, and this is the one field whose failure would
  * cross accounts.
  *
@@ -2614,7 +2614,7 @@ export const finalizeItem = internalMutation({
     // The retrieval vector for the text this run classified, already
     // normalized and width-checked by the action. Optional because embedding
     // is best-effort: a run whose embed call failed still finalizes the item,
-    // and the sweeper fills the vector in later. Never `null` — absent means
+    // and the sweeper fills the vector in later. Never `null`: absent means
     // "this run produced none".
     embedding: v.optional(v.array(v.float64())),
     // True when the title, description, tags and intents came from the model.
@@ -2644,11 +2644,11 @@ export const finalizeItem = internalMutation({
     // result with ours (or flip a newer `processing` back to `ready` with
     // stale content). Status is deliberately NOT checked: a run the sweeper
     // failed by timestamp still owns the row, so if it does finish it may
-    // repair the item — a late success beats a presumed failure.
+    // repair the item: a late success beats a presumed failure.
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    // Intents are actions, not descriptive text — deliberately kept out of
+    // Intents are actions, not descriptive text, and deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
     // A title the owner typed outranks the classifier's, and so does the one a
     // refreshed note already has; the rest of the classification still lands.
@@ -2692,7 +2692,7 @@ export const finalizeItem = internalMutation({
       // disagrees with the text beside it.
       // Re-checked here even though the action already validated: Convex
       // rejects a vector whose width differs from the index at write time, and
-      // that would fail this whole transaction — losing the classification
+      // that would fail this whole transaction, losing the classification
       // over a field that is optional by design.
       ...(embedAllowed &&
       args.embedding !== undefined &&
@@ -2703,7 +2703,7 @@ export const finalizeItem = internalMutation({
             embeddingAttempts: undefined,
           }
         : // This run could not embed. Keep whatever vector the row already
-          // carried — a slightly stale semantic match beats none — but drop
+          // carried: a slightly stale semantic match beats none, but drop
           // the generation stamp so the sweeper re-embeds it against the text
           // just written. Patching `embedding: undefined` instead would
           // delete a good vector over a transient provider failure.
@@ -2766,14 +2766,14 @@ export const deleteStorageIfUnreferenced = internalMutation({
  * result is bounded even when the source article is not.
  *
  * The read side is bounded separately and explicitly. Rows are streamed rather
- * than `take`n so the loop can stop on a byte budget as well as a row count —
+ * than `take`n so the loop can stop on a byte budget as well as a row count:
  * a `ready` link can carry 100k characters of `content`, and a page of those
  * would blow the transaction read limit. That failure would not be a one-off:
  * the same oversized rows sit at the front of the range on every run, so the
  * sweep would wedge on them forever instead of making progress.
  *
  * Rows with nothing to embed are returned too, with an empty `text`. The
- * caller needs to see them to mark them finished — otherwise an item that can
+ * caller needs to see them to mark them finished. Otherwise an item that can
  * never produce text would sit at the front of the range forever.
  */
 export const listItemsNeedingEmbeddingInternal = internalQuery({
@@ -2861,7 +2861,7 @@ const embeddingOutcomeValidator = v.union(
   // The provider answered for the rest of the batch but not usefully for this
   // item: its own content is the problem, so it spends an attempt.
   v.literal("failed"),
-  // The whole batch came back empty — the provider is down. Costs nothing and
+  // The whole batch came back empty: the provider is down. Costs nothing and
   // changes nothing; the row is retried on a later tick.
   v.literal("deferred"),
 );
@@ -2878,7 +2878,7 @@ const embeddingOutcomeValidator = v.union(
  *
  * It also rebuilds `searchText`, but only when the value actually changes.
  * The rebuild is what makes the article body reach the full-text index for
- * saves classified before it was indexed, without re-running the model — and
+ * saves classified before it was indexed, without re-running the model, and
  * skipping no-op writes keeps a drained sweep from invalidating every
  * subscribed feed query on a timer.
  */
@@ -2888,7 +2888,7 @@ export const setEmbeddingsInternal = internalMutation({
       v.object({
         itemId: v.id("items"),
         // The exact text the action embedded. Echoed back so the write can
-        // check it still describes the row — see the staleness fence below.
+        // check it still describes the row (see the staleness fence below).
         text: v.string(),
         embedding: v.optional(v.array(v.float64())),
         outcome: embeddingOutcomeValidator,
@@ -2946,7 +2946,7 @@ export const setEmbeddingsInternal = internalMutation({
 
       // Staleness fence. The version guard above catches a pipeline run that
       // embedded successfully, but not one that re-classified this item and
-      // then failed to embed — that clears the stamp, so the row looks
+      // then failed to embed: that clears the stamp, so the row looks
       // unembedded while its text is newer than what the action read. Writing
       // then would pin a vector describing text the item no longer has, at the
       // current generation, where nothing would revisit it. Comparing the
@@ -3089,7 +3089,7 @@ const STALE_PROCESSING_PAGE_SIZE = 100;
 
 /**
  * Sweep `processing` items whose run started more than PROCESSING_STALE_MS ago
- * and mark them `failed` with reason `error` — the reason the client already
+ * and mark them `failed` with reason `error`, the reason the client already
  * renders as "couldn't read this" with a Try again button. Their action died
  * outside its try block (runtime kill, timeout, OOM, deploy), so nothing else
  * will ever flip them; without this they spin forever and reprocessItem used
@@ -3098,7 +3098,7 @@ const STALE_PROCESSING_PAGE_SIZE = 100;
  * Pre-fencing rows carry no `processingStartedAt`. They sort at the front of
  * the index range (undefined precedes every number) and are judged by
  * `_creationTime` instead, so no backfill migration is needed. Such a row that
- * is not yet stale is skipped — it becomes stale on its own within the
+ * is not yet stale is skipped: it becomes stale on its own within the
  * threshold and the next tick takes it. The chain-on-full-page rule therefore
  * also requires progress: a full page of skipped rows must not loop at
  * scheduler speed until they age.
@@ -3128,7 +3128,7 @@ export const failStaleProcessingItems = internalMutation({
         failureReason: "error",
       });
       // The action died outside its try block, so this sweep is the only
-      // witness of the outcome — the funnel event fires here or never. The
+      // witness of the outcome: the funnel event fires here or never. The
       // run id is deliberately left so a late finish can still repair the
       // item, which its own finalize will then report.
       await scheduleProcessedTelemetry(ctx, item, {
@@ -3150,29 +3150,42 @@ export const failStaleProcessingItems = internalMutation({
 
 /**
  * The classifier's per-item output: which dynamic spaces this new save fits.
- * Writes are strictly `suggested`-only — rows the user owns (`saved`,
- * `dismissed`, or legacy status-less rows) are never created, changed, or
- * removed here, so the pipeline cannot clobber a user decision by
+ * Writes are `suggested`-only, except into a space the user set to
+ * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
+ * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
+ * or removed here, so the pipeline cannot clobber a user decision by
  * construction. Existing suggestions not in the new set are withdrawn.
  */
+/** True when the space auto-files this save: on, and the save is newer. */
+function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
+  return (
+    space.autoFile === true &&
+    space.autoFileSince !== undefined &&
+    item._creationTime >= space.autoFileSince
+  );
+}
+
 export const setSpacesForItem = internalMutation({
   args: {
     itemId: v.id("items"),
     spaceIds: v.array(v.id("spaces")),
     runId: v.optional(v.string()),
   },
-  returns: v.null(),
+  // Spaces this call auto-filed the item into, so a caller that skips the
+  // usual steering pass can still steer them.
+  returns: v.array(v.id("spaces")),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (
       item === null ||
       (args.runId !== undefined && !ownsRun(item, args.runId))
     ) {
-      return null;
+      return [];
     }
     // Only AI passes call this, so an owner who has turned AI off since the
     // pass started gets no new suggestions from it.
-    if (!(await aiAllowed(ctx, item.userId))) return null;
+    if (!(await aiAllowed(ctx, item.userId))) return [];
+    const autoFiled: Id<"spaces">[] = [];
     const wanted = new Set(args.spaceIds);
     const existing = await ctx.db
       .query("spaceItems")
@@ -3187,26 +3200,30 @@ export const setSpacesForItem = internalMutation({
     }
     for (const spaceId of wanted) {
       // Any pre-existing row wins: already saved, already suggested, or
-      // dismissed (the user said no — never re-suggest).
+      // dismissed (the user said no: never re-suggest).
       if (touched.has(spaceId)) {
         continue;
       }
       const space = await ctx.db.get(spaceId);
       // Only suggest into dynamic spaces that exist and belong to the owner.
+      // A space the user set to auto-file takes the match as saved instead:
+      // their standing opt-in replaces the per-item accept.
       if (
         space !== null &&
         space.userId === item.userId &&
         space.dynamic === true
       ) {
+        const status = autoFiles(space, item) ? "saved" : "suggested";
         await insertMembership(ctx, {
           userId: item.userId,
           spaceId,
           itemId: args.itemId,
-          status: "suggested",
+          status,
         });
+        if (status === "saved") autoFiled.push(spaceId);
       }
     }
-    return null;
+    return autoFiled;
   },
 });
 
@@ -3227,7 +3244,7 @@ export const suggestItemsForSpace = internalMutation({
     if (space === null || !(await aiAllowed(ctx, space.userId))) {
       return null;
     }
-    // Any existing row blocks a new suggestion — saved and dismissed are
+    // Any existing row blocks a new suggestion: saved and dismissed are
     // user decisions, and a live suggestion needn't be re-written. Checked
     // per item (the model returns at most a handful) instead of loading the
     // whole space's join list.

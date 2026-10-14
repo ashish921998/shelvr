@@ -1,5 +1,5 @@
 // Tests for the pure share processor. No React/Convex/storage imports are
-// exercised — save operations and persistence are fakes. Runs in the Node
+// exercised: save operations and persistence are fakes. Runs in the Node
 // default env. The orchestration correctness (per-entry isolation, retry-only-
 // failed, idempotent re-process) lives here.
 import { describe, expect, it, vi } from "vitest";
@@ -679,7 +679,7 @@ describe("processSession", () => {
     // Regression for the crash window: an entry classified image in-memory but
     // whose placeholder kind:'link' was persisted (the entry never settled
     // before the crash). On resume, processOne must re-derive 'image' from the
-    // resolved payload and call saveImage — NOT saveLink.
+    // resolved payload and call saveImage, NOT saveLink.
     const session = makeSession(1);
     const resolved = [imagePayload("file://img.jpg")];
     // Simulate the persisted state: kind='link' placeholder, status='pending'.
@@ -712,7 +712,7 @@ describe("processSession", () => {
     // already settled so fresh=false), a pending entry may still carry its
     // placeholder kind:'link'. processOne re-derives the real kind; processSession
     // must merge that kind into the settled entry so the persisted record is
-    // corrected — otherwise a crash here would leave a permanently wrong kind.
+    // corrected; otherwise a crash here would leave a permanently wrong kind.
     const session = makeSession(1);
     const resolved = [imagePayload("file://img.jpg")];
     // Persisted state: placeholder kind:'link', still pending.

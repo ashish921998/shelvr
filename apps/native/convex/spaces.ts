@@ -10,6 +10,13 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
+import { aiConsentRequiredError } from "./model/aiConsent";
+import {
+  MAX_PLAN_ITEMS,
+  PLAN_CONTENT_CHARS,
+  planSourceValidator,
+  type PlanSource,
+} from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
@@ -37,6 +44,8 @@ const spaceFields = {
   name: v.string(),
   description: v.optional(v.string()),
   dynamic: v.optional(v.boolean()),
+  autoFile: v.optional(v.boolean()),
+  autoFileSince: v.optional(v.number()),
   // Denormalized membership summary (see schema.ts). Optional until the
   // backfill has visited every legacy row.
   savedCount: v.optional(v.number()),
@@ -179,7 +188,7 @@ export const listSpaces = query({
   returns: v.array(
     v.object({
       ...spaceFields,
-      // Saved memberships only — pending suggestions don't inflate the count.
+      // Saved memberships only: pending suggestions don't inflate the count.
       itemCount: v.number(),
       suggestionCount: v.number(),
       previews: v.array(
@@ -224,7 +233,7 @@ export const getSpace = query({
     v.object({
       ...spaceFields,
       // Saved items additionally carry this membership's purpose-steered
-      // intents — the same item can act differently on a different shelf.
+      // intents: the same item can act differently on a different shelf.
       items: v.array(
         v.object({
           ...enrichedItemValidator.fields,
@@ -271,6 +280,7 @@ export const createSpace = mutation({
     name: v.string(),
     description: v.optional(v.string()),
     dynamic: v.optional(v.boolean()),
+    autoFile: v.optional(v.boolean()),
   },
   returns: v.id("spaces"),
   handler: async (ctx, args) => {
@@ -306,6 +316,10 @@ export const createSpace = mutation({
       name,
       description: args.description,
       dynamic: args.dynamic ?? false,
+      // Auto-file only means anything on a dynamic space.
+      ...(args.dynamic === true && args.autoFile === true
+        ? { autoFile: true, autoFileSince: Date.now() }
+        : { autoFile: false }),
       // Born with an exact (empty) summary so it never takes the legacy path.
       savedCount: 0,
       suggestedCount: 0,
@@ -330,6 +344,7 @@ export const updateSpace = mutation({
     id: v.id("spaces"),
     name: v.optional(v.string()),
     dynamic: v.optional(v.boolean()),
+    autoFile: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -340,6 +355,13 @@ export const updateSpace = mutation({
     }
     const wasDynamic = space.dynamic === true;
     const enablingDynamic = args.dynamic === true && !wasDynamic;
+    // Auto-file lives only while dynamic does: turning dynamic off clears it
+    // here, so an older build that never sends autoFile cannot bring it back
+    // by switching dynamic on again.
+    const nextDynamic = args.dynamic ?? wasDynamic;
+    const nextAutoFile =
+      nextDynamic && (args.autoFile ?? space.autoFile === true);
+    const enablingAutoFile = nextAutoFile && space.autoFile !== true;
     // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
     // saves into the space). A lapsed user editing a space's name or turning
     // dynamic off is allowed, but enabling it requires an active trial/pro.
@@ -352,8 +374,16 @@ export const updateSpace = mutation({
         key: userId,
         throws: true,
       });
+    } else if (enablingAutoFile) {
+      // Auto-filing is part of the same Pro feature as dynamic.
+      await requireProEntitlement(ctx, userId);
     }
-    const patch: { name?: string; dynamic?: boolean } = {};
+    const patch: {
+      name?: string;
+      dynamic?: boolean;
+      autoFile?: boolean;
+      autoFileSince?: number;
+    } = {};
     // The edit form always submits the name, changed or not. Only a changed
     // name is validated, so a space named before the length limit existed can
     // still have its other settings edited.
@@ -362,6 +392,13 @@ export const updateSpace = mutation({
     }
     if (args.dynamic !== undefined) {
       patch.dynamic = args.dynamic;
+    }
+    if (enablingAutoFile) {
+      patch.autoFile = true;
+      patch.autoFileSince = Date.now();
+    } else if (!nextAutoFile && space.autoFile === true) {
+      patch.autoFile = false;
+      patch.autoFileSince = undefined;
     }
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
@@ -627,7 +664,7 @@ export const acceptAllSuggestions = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Internal — maintenance
+// Internal: maintenance
 // ---------------------------------------------------------------------------
 
 /**
@@ -738,7 +775,7 @@ export const backfillSpaceCounters = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Internal — used by the AI actions
+// Internal: used by the AI actions
 // ---------------------------------------------------------------------------
 
 export const listSpacesInternal = internalQuery({
@@ -815,7 +852,83 @@ export const survivingCandidates = internalQuery({
 });
 
 /**
- * Item ids that already have any membership row for a space — the
+ * The gate and the input for "Make a plan" (`plans.makePlan`), in one
+ * transaction: the caller owns the space, is Pro, has not declined AI
+ * processing, and has a token left. Returns the space's saved, ready items,
+ * newest filed first and bounded, as the text the model reads. An empty
+ * space spends no token, since no model call follows.
+ */
+export const claimPlanInternal = internalMutation({
+  args: { spaceId: v.id("spaces") },
+  returns: v.object({
+    spaceName: v.string(),
+    sources: v.array(planSourceValidator),
+  }),
+  handler: async (ctx, args) => {
+    // Convex forwards the action caller's identity, so authorization and the
+    // claim are one transaction.
+    const userId = await requireUserId(ctx);
+    const space = await ctx.db.get(args.spaceId);
+    if (space === null || space.userId !== userId) {
+      throw new Error("Space not found");
+    }
+    await requireProEntitlement(ctx, userId);
+    if (!(await aiAllowed(ctx, userId))) {
+      throw aiConsentRequiredError();
+    }
+    // Saved rows plus legacy rows (no status reads as saved), each newest
+    // filed first and bounded, then merged.
+    const [saved, legacy] = await Promise.all(
+      (["saved", undefined] as const).map((status) =>
+        ctx.db
+          .query("spaceItems")
+          .withIndex("by_space_and_status", (q) =>
+            q.eq("spaceId", args.spaceId).eq("status", status),
+          )
+          .order("desc")
+          .take(MAX_PLAN_ITEMS),
+      ),
+    );
+    const joins = [...saved, ...legacy]
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, MAX_PLAN_ITEMS);
+    const sources: PlanSource[] = [];
+    for (const join of joins) {
+      const item = await ctx.db.get(join.itemId);
+      if (item === null || item.userId !== userId) continue;
+      if (item.status !== "ready") continue;
+      sources.push({
+        itemId: item._id,
+        title: item.title,
+        description: item.description,
+        // A note's words live in `note`; a link can carry the user's note
+        // too, and either may be what names the place.
+        content:
+          [item.note, item.content]
+            .filter(Boolean)
+            .join("\n")
+            .slice(0, PLAN_CONTENT_CHARS) || undefined,
+        url: item.url,
+        siteName: item.siteName,
+        author: item.author,
+        // The save's own Maps actions plus any steered for this space.
+        places: [...(item.intents ?? []), ...(join.intents ?? [])]
+          .filter((intent) => intent.kind === "open_maps")
+          .map((intent) => intent.value),
+      });
+    }
+    if (sources.length > 0) {
+      await rateLimiter.limit(ctx, "makePlan", {
+        key: userId,
+        throws: true,
+      });
+    }
+    return { spaceName: space.name, sources };
+  },
+});
+
+/**
+ * Item ids that already have any membership row for a space. The
  * recommendation pass excludes them up front so the model's picks aren't
  * wasted on items the user already filed or dismissed.
  */
@@ -852,7 +965,7 @@ export const listSavedSpaceIdsForItemInternal = internalQuery({
 
 /**
  * The steering pass's write path: intents scoped to one membership row. Only
- * `saved` rows carry them — steering never runs for pending suggestions.
+ * `saved` rows carry them. Steering never runs for pending suggestions.
  * Intents do not affect the space summary, so this is the one spaceItems
  * patch that bypasses model/memberships.ts on purpose.
  */

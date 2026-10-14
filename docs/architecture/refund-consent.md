@@ -8,7 +8,7 @@ requires a recorded choice in `legalConsents` and a matching RevenueCat policy.
 
 On iOS, Profile offers the review of terms version `2026-09-19`. It
 highlights the optional Apple disclosure and links to Terms and Privacy.
-“Agree and allow sharing” records acceptance; “Not now” records that the version
+"Agree and allow sharing" records acceptance; "Not now" records that the version
 was reviewed without authorizing sharing. No acceptance is inferred from
 existing accounts, purchases, or opening Customer Center. Android does not show
 the Apple consent flow.
@@ -41,13 +41,13 @@ No saved content or product analytics is sent. RevenueCat's built-in Apple
 response uses purchase/delivery information and the sample-content flag.
 
 The monotonic `changedAt` timestamp identifies each decision for stale-worker
-checks and supplies RevenueCat’s `updated_at_ms` value. RevenueCat ignores
+checks and supplies RevenueCat's `updated_at_ms` value. RevenueCat ignores
 older attribute updates. One claimed worker per record also serializes delivery;
 a changed decision schedules another pass after the current worker finishes.
-Failures retry with backoff up to twenty attempts — roughly ten hours —
+Failures retry with backoff up to twenty attempts, roughly ten hours,
 then stop as `failed` for manual inspection (logging
 `refund_consent_sync_exhausted`); a later consent change revives the record
-with a fresh budget. Withdrawals never cap — any sync that revokes remote
+with a fresh budget. Withdrawals never cap. Any sync that revokes remote
 sharing (sharing off, obsolete terms acceptance, or deletion) retries until
 RevenueCat accepts it. A bounded minute cron recovers lost jobs
 and claims older than the maximum action runtime. Missing credentials cannot

@@ -1,7 +1,7 @@
 type ServerLogLevel = "warn" | "error";
 
 /** Only scalars: a field is a category, code, status, or flag. Never a URL
- * or user input — those stay out of the hosting platform's log drain. */
+ * or user input: those stay out of the hosting platform's log drain. */
 type ServerLogFields = Record<
   string,
   string | number | boolean | null | undefined

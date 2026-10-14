@@ -34,7 +34,7 @@ export function useTabStackChrome({
   };
 
   // Per-layout extras (tint, title style) compose at the call site via
-  // spread — React Navigation merges them over these shared defaults.
+  // spread; React Navigation merges them over these shared defaults.
   const screenOptions = {
     headerTransparent,
     headerStyle:

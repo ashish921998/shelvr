@@ -57,8 +57,8 @@ describe("onboarding demo allowance", () => {
     expect(second.urlMatchesRequest).toBe(false);
     expect(second.reused).toBe(true);
 
-    // Client honesty: the original save — original URL and its real current
-    // destinations — is what comes back, never the newly typed input.
+    // Client honesty: the original save (original URL and its real current
+    // destinations) is what comes back, never the newly typed input.
     const item = await t.query(api.items.getItem, { id: second.itemId });
     expect(item?.url).toBe(URL);
     expect(second.savedSpaceNames).toEqual([]);
@@ -219,7 +219,7 @@ describe("onboarding demo allowance", () => {
         spaceName: "x".repeat(61),
       }),
     ).rejects.toThrow();
-    // Nothing was written — no item, no space, no demo row.
+    // Nothing was written: no item, no space, no demo row.
     await t.run(async (ctx) => {
       const demos = await ctx.db.query("onboardingDemos").collect();
       expect(demos).toHaveLength(0);

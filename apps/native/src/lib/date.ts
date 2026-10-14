@@ -3,7 +3,7 @@ import { formattingLocale } from "./i18n";
 /**
  * Reads the original capture time from an image picker asset's EXIF data.
  * EXIF `DateTimeOriginal` is formatted `"YYYY:MM:DD HH:MM:SS"` (colons in the
- * date portion), which `Date.parse` won't accept — swap the first two colons
+ * date portion), which `Date.parse` won't accept. Swap the first two colons
  * for dashes first. Returns epoch ms, or `undefined` if the tag is missing or
  * unparseable.
  */

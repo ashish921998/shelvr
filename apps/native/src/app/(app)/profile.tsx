@@ -61,8 +61,8 @@ export default function ProfileScreen() {
               ? "…"
               : t("pro.viewPlans");
 
-  // Customer Center is only relevant to users who have (or had) a subscription
-  // — any non-`none` status. A `none` user has nothing to manage and should see
+  // Customer Center is only relevant to users who have (or had) a subscription:
+  // any non-`none` status. A `none` user has nothing to manage and should see
   // the "View Pro plans" paywall row instead.
   const hasSubscription = status !== "none" && !loading;
   // A lapsed trial or subscription has nothing left to manage: the way back is
