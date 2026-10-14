@@ -67,7 +67,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # The development build only changes when its native fingerprint does,
-      # so the key is that fingerprint plus the Xcode that compiled it.
+      # so the key is that fingerprint plus the Xcode that compiled it, plus
+      # how it was signed.
       - name: Native fingerprint
         id: fingerprint
         working-directory: apps/native
@@ -75,7 +76,7 @@ jobs:
           hash=$(node "$(dirname "$(node -p 'require.resolve("expo-updates/package.json")')")/bin/cli.js" \
             fingerprint:generate --platform ios | node -p 'JSON.parse(require("fs").readFileSync(0)).hash')
           xcode=$(xcodebuild -version | head -1 | tr -d ' ')
-          echo "key=e2e-ios-dev-$hash-$xcode" >> "$GITHUB_OUTPUT"
+          echo "key=e2e-ios-dev-adhoc-$hash-$xcode" >> "$GITHUB_OUTPUT"
 
       # Restore and save are split so a build is kept even when a flow fails
       # later in the job; actions/cache saves only after a successful job.
@@ -93,10 +94,16 @@ jobs:
         run: |
           npx expo prebuild -p ios --clean
           mkdir -p build/e2e
+          # Signed ad hoc, not unsigned: an unsigned app carries no
+          # entitlements, and the simulator then refuses its Keychain reads
+          # ("A required entitlement isn't present"), which expo-secure-store
+          # and so sign-in depend on. Ad hoc needs no team or profile.
           xcodebuild -workspace ios/ShelvrDev.xcworkspace -scheme ShelvrDev \
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build/derived CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath build/derived \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
+            PROVISIONING_PROFILE_SPECIFIER= \
             > build/xcodebuild.log 2>&1 || { tail -200 build/xcodebuild.log; exit 1; }
           cp -R build/derived/Build/Products/Debug-iphonesimulator/ShelvrDev.app build/e2e/
 
