@@ -150,7 +150,8 @@ function evidenceOf(source: PlanSource): Evidence {
   ]
     .filter(Boolean)
     .join(" ");
-  const tagged = raw.match(/[@#][\p{L}\p{N}\p{M}_.]+/gu) ?? [];
+  // A pin marks a place the way a handle does ("📍dishoomlondon").
+  const tagged = raw.match(/(?:[@#]|\u{1F4CD}\s*)[\p{L}\p{N}\p{M}_.]+/gu) ?? [];
   // The author is a handle even when written without the "@".
   const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
   // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
@@ -174,7 +175,8 @@ const UNSPACED_SCRIPT =
 const HANGUL = /\p{Script=Hangul}/u;
 
 /** A whole word of the save; part of one of its handles, at the start
- * ("@tigrenyc") or, for a word of 4 letters or more, anywhere ("@eatatlilia");
+ * ("@tigrenyc"), at the end ("#londonbao") or, for a word of 4 letters or
+ * more, anywhere ("@eatatlilia");
  * in Korean, the start of a word, before a particle ("쵸리상경에서"); or, in a
  * script written without spaces, anywhere in its text. */
 function saveSays(piece: string, evidence: Evidence): boolean {
@@ -183,6 +185,7 @@ function saveSays(piece: string, evidence: Evidence): boolean {
     evidence.handles.some(
       (handle) =>
         handle.startsWith(piece) ||
+        handle.endsWith(piece) ||
         (piece.length >= 4 && handle.includes(piece)),
     ) ||
     (HANGUL.test(piece) &&

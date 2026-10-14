@@ -159,6 +159,18 @@ describe("isGrounded", () => {
     expect(isGrounded("BAO", source({ content: "Cold tea #LondonBAO" }))).toBe(
       true,
     );
+    expect(
+      isGrounded("BAO", source({ content: "Buns!! #londonbao #soho" })),
+    ).toBe(true);
+    expect(
+      isGrounded("Dishoom", source({ content: "📍dishoomlondon, the daal" })),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "Gymkhana",
+        source({ content: "📍GYMKHANALONDON. Lamb chops" }),
+      ),
+    ).toBe(true);
   });
 
   it("matches a Korean name with a particle written onto it", () => {
