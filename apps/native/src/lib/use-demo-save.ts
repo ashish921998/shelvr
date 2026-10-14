@@ -3,7 +3,11 @@ import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
 import { releaseSavedShare } from "@/lib/use-incoming-share-url";
-import { demoDestination, isDemoSample } from "@/lib/onboarding-demo";
+import {
+  demoDestination,
+  findSample,
+  isDemoSample,
+} from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -361,6 +365,8 @@ export function useDemoSave({
       try {
         const result = await createDemoItem({
           url,
+          // A sample keeps the heading its preview showed.
+          title: findSample(url)?.pageHeading,
           spaceName: trimmed.destination ?? undefined,
           analyticsSessionId: analytics.sessionId(),
         });

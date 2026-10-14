@@ -3,7 +3,6 @@ import { analytics } from "@/lib/analytics";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { sampleImage } from "@/components/onboarding/sample-card";
 import { SaveSummary } from "@/components/onboarding/save-summary";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { useEffect } from "react";
@@ -15,7 +14,8 @@ import { StyleSheet } from "react-native-unistyles";
  * button is the way out.
  *
  * Nothing has read the page yet, so the save shows only what is already
- * known: the page's own heading, its site, and the space it goes to. Tags come
+ * known: the page's own heading (which the save keeps), its site, and the
+ * space it goes to. Tags come
  * from the classifier and appear on the step after sign-in. */
 export function SampleSignIn({
   sample,
@@ -44,8 +44,10 @@ export function SampleSignIn({
         <Text style={styles.verdictMuted}>{t("reveal.previewSubtitle")}</Text>
       </Text>
 
+      {/* No picture yet: the save takes the page's own picture once it is
+          read, and a stand-in here would change under the person. */}
       <SaveSummary
-        image={sampleImage(sample)}
+        image={null}
         title={sample.pageHeading}
         meta={sample.domain}
       />
