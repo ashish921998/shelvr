@@ -58,8 +58,8 @@ export function PlanDeck({
   useAppLocale();
   const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
-  const cardWidth = Math.min(width - 96, 300);
-  const cardHeight = Math.round(cardWidth * 1.38);
+  const cardWidth = Math.min(width - 96, 270);
+  const cardHeight = Math.round(cardWidth * 1.32);
   const order = deckOrder(places.length, front);
 
   const panX = useSharedValue(0);
@@ -136,6 +136,7 @@ export function PlanDeck({
           return (
             <View
               key={key}
+              accessible={false}
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
               style={[
