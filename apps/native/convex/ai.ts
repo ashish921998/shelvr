@@ -180,6 +180,20 @@ const MAX_CONTENT_CHARS = 8000;
  * TypeError) for observability without leaking data — never the error's message
  * or cause, which may carry a URL, response body, or resolved address.
  */
+/** Queues the purpose-steering pass for an item in each given space. */
+async function scheduleSteeringFor(
+  ctx: ActionCtx,
+  itemId: Id<"items">,
+  spaceIds: Id<"spaces">[],
+): Promise<void> {
+  for (const spaceId of spaceIds) {
+    await ctx.scheduler.runAfter(0, internal.ai.steerItemForSpace, {
+      itemId,
+      spaceId,
+    });
+  }
+}
+
 function summarizeError(error: unknown): string {
   if (error instanceof StoredImageError) return `stored_image:${error.code}`;
   // A model call that hit its AbortSignal.timeout deadline. Its own stable
@@ -1148,15 +1162,18 @@ export const processItem = internalAction({
         }
         return null;
       }
-      if (aiAllowed) {
-        await ctx.runMutation(internal.items.setSpacesForItem, {
-          itemId: args.itemId,
-          spaceIds,
-          runId: args.runId,
-        });
-      }
+      const autoFiled = aiAllowed
+        ? await ctx.runMutation(internal.items.setSpacesForItem, {
+            itemId: args.itemId,
+            spaceIds,
+            runId: args.runId,
+          })
+        : [];
 
       if (args.refresh === true || !aiAllowed) {
+        // An edited note can newly land in an auto-file space; steer that
+        // fresh saved row, which the original save never saw.
+        await scheduleSteeringFor(ctx, args.itemId, autoFiled);
         // An edited note: search and suggestions are updated. Steering and
         // categorization telemetry already ran when the note was saved.
         // A save finished without the model has nothing to steer or count.
@@ -1170,12 +1187,7 @@ export const processItem = internalAction({
           itemId: args.itemId,
         },
       );
-      for (const spaceId of savedSpaceIds) {
-        await ctx.scheduler.runAfter(0, internal.ai.steerItemForSpace, {
-          itemId: args.itemId,
-          spaceId,
-        });
-      }
+      await scheduleSteeringFor(ctx, args.itemId, savedSpaceIds);
       await captureCategorizationTelemetry(ctx, {
         outcome:
           linkEnrichment(linkRead) === "partial" ? "partial" : "succeeded",

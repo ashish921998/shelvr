@@ -1494,6 +1494,13 @@ async function asCaption(read: Promise<PageData>): Promise<PageData> {
   return { ...(await read), caption: true };
 }
 
+/** An Instagram read's content is only ever the captioned embed's caption,
+ * the whole of it; a post read from its card alone has none. */
+async function asInstagramCaption(read: Promise<PageData>): Promise<PageData> {
+  const page = await read;
+  return page.content === undefined ? page : { ...page, caption: true };
+}
+
 /** The reader for each platform with its own, each following its caption's
  * link to a recipe. Pinterest does that only for a pin it read from the
  * widget: its page fallback is not a caption, so it neither is marked one nor
@@ -1502,7 +1509,8 @@ const SOURCE_READERS = {
   tiktok: async (url) =>
     withLinkedRecipe(await asCaption(fetchTikTokOEmbed(url))),
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
-  instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
+  instagram: async (url) =>
+    withLinkedRecipe(await asInstagramCaption(fetchInstagram(url))),
   pinterest: fetchPinterestPin,
   youtube: fetchYouTube,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;

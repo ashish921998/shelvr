@@ -86,7 +86,7 @@ export default function NewSpaceScreen() {
   return <SpaceForm key="new" mode="create" />;
 }
 
-type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic">;
+type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic" | "autoFile">;
 
 // A discriminated union makes the two modes impossible to confuse: in edit
 // mode `space` is guaranteed present, so `save` switches on `mode` and the
@@ -117,15 +117,22 @@ function SpaceForm(props: SpaceFormProps) {
   const [dynamic, setDynamic] = useState(
     props.mode === "edit" ? (props.space.dynamic ?? false) : true,
   );
+  // Auto-file only matters while dynamic is on; off by default.
+  const [autoFile, setAutoFile] = useState(
+    props.mode === "edit" ? (props.space.autoFile ?? false) : false,
+  );
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed || saving) return;
-    // Creating any space is Pro; editing is Pro only when turning dynamic on.
+    // Creating any space is Pro; editing is Pro only when turning dynamic or
+    // auto-file on.
     const needsPro =
       props.mode === "create" ||
-      (props.mode === "edit" && dynamic && !(props.space.dynamic ?? false));
+      (props.mode === "edit" &&
+        ((dynamic && !(props.space.dynamic ?? false)) ||
+          (dynamic && autoFile && !(props.space.autoFile ?? false))));
     if (needsPro) {
       const ok = await guard();
       if (!ok) return;
@@ -133,12 +140,22 @@ function SpaceForm(props: SpaceFormProps) {
     setSaving(true);
     try {
       if (props.mode === "edit") {
-        await updateSpace({ id: props.space._id, name: trimmed, dynamic });
+        await updateSpace({
+          id: props.space._id,
+          name: trimmed,
+          dynamic,
+          autoFile: dynamic && autoFile,
+        });
       } else {
-        await createSpace({ name: trimmed, dynamic });
+        await createSpace({
+          name: trimmed,
+          dynamic,
+          autoFile: dynamic && autoFile,
+        });
       }
       analytics.capture(editing ? "space_updated" : "space_created", {
         dynamic,
+        auto_file: dynamic && autoFile,
       });
       if (process.env.EXPO_OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -180,12 +197,23 @@ function SpaceForm(props: SpaceFormProps) {
         autoFocus={!editing}
       />
 
-      <View style={styles.dynamicRow}>
-        <View style={styles.dynamicText}>
-          <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
-          <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
+      <View style={styles.settingsCard}>
+        <View style={styles.dynamicRow}>
+          <View style={styles.dynamicText}>
+            <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
+            <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
+          </View>
+          <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
         </View>
-        <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
+        {dynamic ? (
+          <View style={[styles.dynamicRow, styles.rowDivider]}>
+            <View style={styles.dynamicText}>
+              <Text style={styles.dynamicLabel}>{t("spaces.autoFile")}</Text>
+              <Text style={styles.dynamicHint}>{t("spaces.autoFileHelp")}</Text>
+            </View>
+            <AnimatedSwitch value={autoFile} onValueChange={setAutoFile} />
+          </View>
+        ) : null}
       </View>
 
       <Pressable
@@ -251,16 +279,22 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 17,
     color: theme.colors.foreground,
   },
-  dynamicRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
+  settingsCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  dynamicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
     padding: theme.gap(1.5),
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
   dynamicText: {
     flex: 1,
