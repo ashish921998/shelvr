@@ -119,9 +119,10 @@ const GENERIC_WORDS = new Set([
   "spot",
 ]);
 
-/** What a save offers as evidence: its text squashed whole, for names that
- * run together ("@parici_cafe"), and its separate words. */
-type Evidence = { text: string; words: Set<string> };
+/** What a save offers as evidence: its text squashed whole, its separate
+ * words, and its space-separated chunks squashed, for names that run
+ * together ("@parici_cafe"). */
+type Evidence = { text: string; words: Set<string>; chunks: string[] };
 
 /** Squashed words in any script; punctuation and spaces split them. */
 function wordsOf(text: string): string[] {
@@ -141,7 +142,11 @@ function evidenceOf(source: PlanSource): Evidence {
   ]
     .filter(Boolean)
     .join(" ");
-  return { text: squash(raw), words: new Set(wordsOf(raw)) };
+  return {
+    text: squash(raw),
+    words: new Set(wordsOf(raw)),
+    chunks: raw.split(/\s+/).map(squash).filter(Boolean),
+  };
 }
 
 /** A distinctive word of a name the save has: as a whole word, or, in
@@ -160,8 +165,9 @@ function hasWord(word: string, evidence: Evidence): boolean {
  * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
  * every distinctive word must be a word of the save, so "Great pasta
  * tonight" does not ground "Pasta Palace" and "Started the party" does not
- * ground "Art Bar". A name of several words may also appear run together,
- * so "@parici_cafe" grounds "Par Ici Café". A name with no distinctive word
+ * ground "Art Bar". A name of several words may also open one run-together
+ * chunk, so "@parici_cafe" grounds "Par Ici Café" while "Smart Bar" does
+ * not ground "Art Bar". A name with no distinctive word
  * ("Si Si", "Au 79") must appear word for word.
  */
 function namesPlace(name: string, evidence: Evidence): boolean {
@@ -171,7 +177,8 @@ function namesPlace(name: string, evidence: Evidence): boolean {
   if (strong.length > 0) {
     return (
       strong.every((word) => hasWord(word, evidence)) ||
-      (all.length > 1 && evidence.text.includes(all.join("")))
+      (all.length > 1 &&
+        evidence.chunks.some((chunk) => chunk.startsWith(all.join(""))))
     );
   }
   // The whole name must still be long enough to prove anything, so a word

@@ -66,6 +66,12 @@ describe("isGrounded", () => {
     expect(isGrounded("Oro", source({ title: "Dinner at Oro, Toronto" }))).toBe(
       true,
     );
+    expect(isGrounded("Art Bar", source({ title: "Smart Bar downtown" }))).toBe(
+      false,
+    );
+    expect(isGrounded("Ten Bells", source({ title: "often bells ring" }))).toBe(
+      false,
+    );
   });
 
   it("rejects a name the save never mentions", () => {
