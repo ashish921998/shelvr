@@ -301,7 +301,7 @@ describe("rules found unguarded by mutation testing", () => {
     ).toThrow("Invalid RevenueCat expiry");
   });
 
-  it.each([null, "event", 42, []])(
+  it.each([[null], ["event"], [42], [[]]])(
     "returns undefined for an unreadable body %j",
     (body) => {
       expect(parseRevenueCatEvent(body)).toBeUndefined();
