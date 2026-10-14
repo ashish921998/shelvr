@@ -77,14 +77,17 @@ jobs:
           xcode=$(xcodebuild -version | head -1 | tr -d ' ')
           echo "key=e2e-ios-dev-$hash-$xcode" >> "$GITHUB_OUTPUT"
 
+      # Restore and save are split so a build is kept even when a flow fails
+      # later in the job; actions/cache saves only after a successful job.
       - name: Restore the development build
         id: build-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/native/build/e2e/ShelvrDev.app
           key: ${{ steps.fingerprint.outputs.key }}
 
       - name: Build the development build
+        id: build
         if: steps.build-cache.outputs.cache-hit != 'true'
         working-directory: apps/native
         run: |
@@ -96,6 +99,13 @@ jobs:
             -derivedDataPath build/derived CODE_SIGNING_ALLOWED=NO \
             > build/xcodebuild.log 2>&1 || { tail -200 build/xcodebuild.log; exit 1; }
           cp -R build/derived/Build/Products/Debug-iphonesimulator/ShelvrDev.app build/e2e/
+
+      - name: Save the development build
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/native/build/e2e/ShelvrDev.app
+          key: ${{ steps.fingerprint.outputs.key }}
 
       # agent-device compiles its XCUITest runner on first use.
       - name: Restore the agent-device runner
@@ -195,6 +205,17 @@ jobs:
             };
             walk(report);
           '
+
+      # The screen each failed test ended on, and Metro's last lines, in the
+      # job log itself, so a failure reads without downloading the artifact.
+      - name: Print what failed tests saw
+        if: ${{ failure() }}
+        working-directory: tools/e2e
+        run: |
+          find .e2e/artifacts -path '*/failure/screen.txt' 2>/dev/null | while read -r f; do
+            echo "::group::$f"; cat "$f"; echo "::endgroup::"
+          done
+          echo "::group::metro.log (last 200 lines)"; tail -200 .e2e/metro.log 2>/dev/null || true; echo "::endgroup::"
 
       - name: Copy the backend log
         if: ${{ !cancelled() }}
