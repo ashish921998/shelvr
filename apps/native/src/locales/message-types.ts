@@ -291,6 +291,9 @@ export type MessageParams = {
   "plan.pick": undefined;
   "plan.again": undefined;
   "plan.tonight": { name: string };
+  "plan.weWent": undefined;
+  "plan.been": undefined;
+  "plan.beenHint": { name: string };
   "plan.from": { title: string };
   "plan.emptyTitle": undefined;
   "plan.emptyBody": undefined;

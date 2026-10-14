@@ -78,6 +78,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationPreferences` — weekly shelf opt-in, save reminder opt-out, timezone, and the
     next digest and reminder instants
   - `itemReads` — per-user read state, kept out of the item row
+  - `placeVisits` — places the user marked "We went" on a plan, one row per place name, so
+    later plans rank them last
   - `shareLinks` — one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
@@ -239,7 +241,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   items and makes one model call that returns a shortlist of up to five places the saves
   name, each with a reason and its source item. Nothing is stored. Pro, AI consent and the
   `makePlan` rate limit are claimed first in `spaces.claimPlanInternal`; the pure prompt and
-  sanitizing half (which drops a place no save names) is `model/plan.ts`.
+  sanitizing half (which drops a place no save names) is `model/plan.ts`. Places marked
+  "We went" (`placeVisits.ts`, `setVisited`) go into the prompt and come back last, tagged
+  `been`.
 - **`demo.ts`** — the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`.
 - **`cancelSurvey.ts`** — the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the

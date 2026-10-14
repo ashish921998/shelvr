@@ -144,6 +144,36 @@ describe("makePlan", () => {
     });
   });
 
+  it("ranks a place the user marked We went last, tagged been", async () => {
+    const { t, spaceId, itemIds } = await setup([
+      { title: "Tigre is the moodiest bar in town" },
+      { title: "Sweet Linda for natural wine" },
+      { title: "Third save" },
+    ]);
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: itemIds[0],
+      name: "Tigre",
+      visited: true,
+    });
+    // Newest filed first: Sweet Linda is save 2, Tigre save 3.
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          { saveNumber: 3, name: "TIGRE", area: "", why: "Moody" },
+          { saveNumber: 2, name: "Sweet Linda", area: "", why: "Wine" },
+        ],
+      },
+    });
+
+    const plan = await t.action(api.plans.makePlan, { spaceId });
+
+    expect(promptOf()).toContain("They have already been to: Tigre.");
+    expect(plan.places).toEqual([
+      { name: "Sweet Linda", why: "Wine", itemId: itemIds[1] },
+      { name: "TIGRE", why: "Moody", itemId: itemIds[0], been: true },
+    ]);
+  });
+
   it("asks for reasons in the app's language", async () => {
     const { t, spaceId } = await setup([{ title: "Reel" }]);
     generateObject.mockResolvedValue({ object: { places: [] } });

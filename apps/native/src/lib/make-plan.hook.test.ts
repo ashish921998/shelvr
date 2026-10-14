@@ -2,11 +2,21 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
-import { useMakePlan, usePlanPicker, type PlanPlace } from "./make-plan";
+import {
+  useMakePlan,
+  usePlaceVisits,
+  usePlanPicker,
+  type PlanPlace,
+} from "./make-plan";
 
-const mocks = vi.hoisted(() => ({ makePlan: vi.fn() }));
-vi.mock("convex/react", () => ({ useAction: () => mocks.makePlan }));
-vi.mock("@convex/_generated/api", () => ({ api: { plans: {} } }));
+const mocks = vi.hoisted(() => ({ makePlan: vi.fn(), setVisited: vi.fn() }));
+vi.mock("convex/react", () => ({
+  useAction: () => mocks.makePlan,
+  useMutation: () => mocks.setVisited,
+}));
+vi.mock("@convex/_generated/api", () => ({
+  api: { plans: {}, placeVisits: {} },
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
@@ -27,6 +37,51 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   mocks.makePlan.mockReset();
+  mocks.setVisited.mockReset();
+});
+
+describe("usePlaceVisits", () => {
+  it("shows a tap at once and saves it", async () => {
+    mocks.setVisited.mockResolvedValue(null);
+    const tigre = place("Tigre");
+    const { result } = renderHook(() => usePlaceVisits());
+    expect(result.current.isVisited(tigre)).toBe(false);
+
+    act(() => result.current.toggle(tigre));
+
+    expect(result.current.isVisited(tigre)).toBe(true);
+    // The same place spelled another way is the same visit.
+    expect(result.current.isVisited(place("TIGRE"))).toBe(true);
+    expect(mocks.setVisited).toHaveBeenCalledWith({
+      itemId: tigre.itemId,
+      name: "Tigre",
+      visited: true,
+    });
+  });
+
+  it("takes back a place the plan already tagged been", () => {
+    mocks.setVisited.mockResolvedValue(null);
+    const tigre = { ...place("Tigre"), been: true };
+    const { result } = renderHook(() => usePlaceVisits());
+    expect(result.current.isVisited(tigre)).toBe(true);
+
+    act(() => result.current.toggle(tigre));
+
+    expect(result.current.isVisited(tigre)).toBe(false);
+    expect(mocks.setVisited).toHaveBeenCalledWith(
+      expect.objectContaining({ visited: false }),
+    );
+  });
+
+  it("goes back when the save fails", async () => {
+    mocks.setVisited.mockRejectedValue(new Error("offline"));
+    const tigre = place("Tigre");
+    const { result } = renderHook(() => usePlaceVisits());
+
+    act(() => result.current.toggle(tigre));
+
+    await waitFor(() => expect(result.current.isVisited(tigre)).toBe(false));
+  });
 });
 
 describe("useMakePlan", () => {

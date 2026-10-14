@@ -507,6 +507,19 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_item", ["itemId"]),
 
+  // Places the user marked "We went" from a plan. One row per place per user,
+  // keyed by the squashed name, so the next plan ranks it last. `itemId` is
+  // the save the place came from and may since have been deleted.
+  placeVisits: defineTable({
+    userId: v.string(),
+    key: v.string(),
+    name: v.string(),
+    itemId: v.id("items"),
+    visitedAt: v.number(),
+  })
+    .index("by_user_and_key", ["userId", "key"])
+    .index("by_user_and_visited", ["userId", "visitedAt"]),
+
   // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
   // intents save without launching the JavaScript app, so they have no Convex
   // Auth JWT. Only the SHA-256 hex hash is stored; the raw token lives in the

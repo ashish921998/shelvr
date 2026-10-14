@@ -255,6 +255,7 @@ type AnalyticsEventProperties = {
   plan_failed: { reason: "ai_consent" | "error" };
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
+  plan_place_visited: { visited: boolean };
   plan_shared: { place_count: number; picked: boolean };
   onboarding_completed: {
     // Always empty since the pileup question was removed. Kept so existing

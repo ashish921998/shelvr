@@ -15,6 +15,8 @@ type Props = {
   /** Shown instead when the save has no image, such as a note. */
   sourceTitle?: string;
   highlighted: boolean;
+  /** The user marked it "We went"; it is ranked last on the next plan. */
+  visited: boolean;
   onOpenMaps: () => void;
 };
 
@@ -25,6 +27,7 @@ export function PlanPlaceCard({
   sourceImageUrl,
   sourceTitle,
   highlighted,
+  visited,
   onOpenMaps,
 }: Props) {
   useAppLocale();
@@ -45,6 +48,16 @@ export function PlanPlaceCard({
           <ThemedText variant="header" numberOfLines={2}>
             {place.name}
           </ThemedText>
+          {visited ? (
+            <View style={styles.been}>
+              <AppSymbolIcon
+                name="checkmark"
+                size={11}
+                tintColor={theme.colors.foreground}
+              />
+              <ThemedText variant="captionStrong">{t("plan.been")}</ThemedText>
+            </View>
+          ) : null}
           {place.area ? (
             <ThemedText variant="caption" style={styles.muted}>
               {place.area}
@@ -125,6 +138,17 @@ const styles = StyleSheet.create((theme) => ({
   },
   muted: {
     color: theme.colors.muted,
+  },
+  been: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: theme.gap(0.5),
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: 999,
+    paddingVertical: theme.gap(0.25),
+    paddingHorizontal: theme.gap(1),
+    marginVertical: theme.gap(0.25),
   },
   why: {
     marginTop: theme.gap(0.5),

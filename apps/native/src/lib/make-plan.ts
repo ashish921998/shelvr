@@ -3,8 +3,8 @@ import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isAiConsentRequired } from "@convex/model/aiConsent";
-import type { PlanPlace } from "@convex/model/plan";
-import { useAction } from "convex/react";
+import { placeKey, type PlanPlace } from "@convex/model/plan";
+import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type { PlanPlace };
@@ -83,6 +83,45 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
 
   const state = result?.key === key ? result.state : LOADING;
   return { state, retry };
+}
+
+/**
+ * "We went" for the places on a plan. A tap shows at once and is saved in the
+ * background; if the save fails the place goes back to how it was. A place
+ * the server already tagged `been` reads as visited until the user takes the
+ * mark back.
+ */
+export function usePlaceVisits() {
+  const setVisited = useMutation(api.placeVisits.setVisited);
+  const [marks, setMarks] = useState<ReadonlyMap<string, boolean>>(new Map());
+
+  const isVisited = useCallback(
+    (place: PlanPlace) =>
+      marks.get(placeKey(place.name)) ?? place.been === true,
+    [marks],
+  );
+
+  const toggle = useCallback(
+    (place: PlanPlace) => {
+      const key = placeKey(place.name);
+      const was = marks.get(key) ?? place.been === true;
+      const mark = (value: boolean) =>
+        setMarks((current) => new Map(current).set(key, value));
+      mark(!was);
+      analytics.capture("plan_place_visited", { visited: !was });
+      setVisited({
+        itemId: place.itemId,
+        name: place.name,
+        visited: !was,
+      }).catch((error: unknown) => {
+        mark(was);
+        analytics.captureError("plan_visit_failed", error);
+      });
+    },
+    [marks, setVisited],
+  );
+
+  return { isVisited, toggle };
 }
 
 type Pick = {
@@ -165,7 +204,6 @@ export function usePlanPicker(
   };
 }
 
-/** `name` plus its area, for display and for the Maps query. */
 /** Ready saves a space needs before it offers a plan. */
 const PLAN_MIN_SAVES = 3;
 
@@ -192,6 +230,7 @@ export function canMakePlan(items: PlanCandidate[]): boolean {
   );
 }
 
+/** `name` plus its area, for display and for the Maps query. */
 export function placeLabel(place: PlanPlace): string {
   return place.area ? `${place.name}, ${place.area}` : place.name;
 }

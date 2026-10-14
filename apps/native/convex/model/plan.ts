@@ -14,6 +14,10 @@ export const PLAN_CONTENT_CHARS = 600;
 const MAX_NAME_CHARS = 80;
 const MAX_AREA_CHARS = 60;
 const MAX_WHY_CHARS = 140;
+/** Places marked "We went" that the claim hands the prompt, newest first. */
+export const MAX_BEEN_PLACES = 100;
+/** Longest place name a "We went" row stores. */
+export const MAX_PLACE_NAME_CHARS = MAX_NAME_CHARS;
 
 /** What the claim mutation hands the action for one saved item. */
 export const planSourceValidator = v.object({
@@ -35,6 +39,8 @@ export const planPlaceValidator = v.object({
   area: v.optional(v.string()),
   why: v.string(),
   itemId: v.id("items"),
+  // The user marked this place "We went", so it is ranked last.
+  been: v.optional(v.boolean()),
 });
 
 export type PlanPlace = Infer<typeof planPlaceValidator>;
@@ -167,6 +173,19 @@ function namesPlace(name: string, evidence: Evidence): boolean {
   );
 }
 
+/** What identifies a place across plans: "Caffé Dante" and "caffe dante"
+ * are the same visit. Empty when the name has no letters or digits. */
+export function placeKey(name: string): string {
+  return squash(clip(name, MAX_NAME_CHARS));
+}
+
+/** The prompt line for places already visited, or "" when there are none. */
+export function planBeenLine(names: string[]): string {
+  if (names.length === 0) return "";
+  const list = names.map((name) => clip(name, MAX_NAME_CHARS)).join("; ");
+  return `They have already been to: ${list}. Prefer places they have not been to yet.`;
+}
+
 export function isGrounded(name: string, source: PlanSource): boolean {
   return namesPlace(name, evidenceOf(source));
 }
@@ -203,11 +222,13 @@ function groundedArea(area: string, evidence: Evidence): string {
 
 /**
  * Keep the model's picks that point at a real save, name a place that save
- * carries, and are not repeats. Order is the model's (best first).
+ * carries, and are not repeats. Order is the model's (best first), except
+ * that places in `been` (keys from `placeKey`) move to the end, tagged.
  */
 export function sanitizePlan(
   raw: RawPlanPlace[],
   sources: PlanSource[],
+  been: ReadonlySet<string> = new Set(),
 ): PlanPlace[] {
   const places: PlanPlace[] = [];
   const seen = new Set<string>();
@@ -230,9 +251,14 @@ export function sanitizePlan(
       ...(area !== "" ? { area } : {}),
       why,
       itemId: source.itemId,
+      ...(been.has(key) ? { been: true } : {}),
     });
   }
-  return places;
+  // Stable: each group keeps the model's order.
+  return [
+    ...places.filter((place) => !place.been),
+    ...places.filter((place) => place.been),
+  ];
 }
 
 // The model writes each reason in the app's language. Keys are the app's

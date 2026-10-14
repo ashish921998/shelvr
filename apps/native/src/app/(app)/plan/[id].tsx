@@ -11,6 +11,7 @@ import {
   placeLabel,
   planShareText,
   useMakePlan,
+  usePlaceVisits,
   usePlanPicker,
   type PlanPlace,
 } from "@/lib/make-plan";
@@ -113,6 +114,7 @@ export default function PlanScreen() {
       onStep: tick,
       onPicked,
     });
+  const { isVisited, toggle: toggleVisited } = usePlaceVisits();
 
   const { imageById, titleById } = useMemo(() => {
     const images = new Map<string, string>();
@@ -216,6 +218,7 @@ export default function PlanScreen() {
                   sourceImageUrl={imageById.get(place.itemId)}
                   sourceTitle={titleById.get(place.itemId)}
                   highlighted={(picked ?? highlight) === i}
+                  visited={isVisited(place)}
                   onOpenMaps={() => openMaps(place, i + 1)}
                 />
               ))}
@@ -281,22 +284,90 @@ export default function PlanScreen() {
         // Pinned under the list so the pick and its result stay on screen
         // however long the shortlist is.
         <View style={styles.footer}>
-          {pickedPlace ? (
-            <Animated.View
-              entering={FadeIn}
-              style={styles.tonight}
-              accessibilityLiveRegion="polite"
-              accessibilityRole="text"
-            >
-              <AppSymbolIcon
-                name="sparkles"
-                size={16}
-                tintColor={theme.colors.onTint}
-              />
-              <ThemedText variant="headline" style={styles.tonightText}>
-                {t("plan.tonight", { name: pickedPlace.name })}
-              </ThemedText>
+          {pickedPlace && picked !== null ? (
+            <Animated.View entering={FadeIn} style={styles.tonight}>
+              <View
+                style={styles.tonightRow}
+                accessibilityLiveRegion="polite"
+                accessibilityRole="text"
+              >
+                <AppSymbolIcon
+                  name="sparkles"
+                  size={16}
+                  tintColor={theme.colors.onTint}
+                />
+                <ThemedText variant="headline" style={styles.tonightText}>
+                  {t("plan.tonight", { name: pickedPlace.name })}
+                </ThemedText>
+              </View>
+              <View style={styles.tonightActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("plan.openMapsFor", {
+                    name: pickedPlace.name,
+                  })}
+                  onPress={() => openMaps(pickedPlace, picked + 1)}
+                  hitSlop={4}
+                  style={({ pressed }) => [
+                    styles.tonightPill,
+                    styles.tonightPillFilled,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <AppSymbolIcon
+                    name="map"
+                    size={14}
+                    tintColor={theme.colors.primaryText}
+                  />
+                  <ThemedText
+                    variant="labelStrong"
+                    style={styles.tonightPillText}
+                  >
+                    {t("plan.openMaps")}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isVisited(pickedPlace) }}
+                  onPress={() => toggleVisited(pickedPlace)}
+                  hitSlop={4}
+                  style={({ pressed }) => [
+                    styles.tonightPill,
+                    isVisited(pickedPlace) && styles.tonightPillFilled,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <AppSymbolIcon
+                    name="checkmark"
+                    size={14}
+                    tintColor={
+                      isVisited(pickedPlace)
+                        ? theme.colors.foreground
+                        : theme.colors.onTint
+                    }
+                  />
+                  <ThemedText
+                    variant="labelStrong"
+                    style={
+                      isVisited(pickedPlace)
+                        ? styles.wentText
+                        : styles.tonightText
+                    }
+                  >
+                    {isVisited(pickedPlace) ? t("plan.been") : t("plan.weWent")}
+                  </ThemedText>
+                </Pressable>
+              </View>
             </Animated.View>
+          ) : null}
+          {pickedPlace && isVisited(pickedPlace) ? (
+            <ThemedText
+              variant="caption"
+              style={styles.muted}
+              accessibilityLiveRegion="polite"
+            >
+              {t("plan.beenHint", { name: pickedPlace.name })}
+            </ThemedText>
           ) : null}
           <Button
             title={t("plan.pick")}
@@ -365,17 +436,45 @@ const styles = StyleSheet.create((theme, rt) => ({
     height: "100%",
   },
   tonight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
+    gap: theme.gap(1.25),
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.lg,
     paddingVertical: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
   },
+  tonightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+  },
   tonightText: {
-    flex: 1,
+    flexShrink: 1,
     color: theme.colors.onTint,
+  },
+  tonightActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.gap(1),
+  },
+  tonightPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.75),
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: theme.colors.onTint,
+    paddingVertical: theme.gap(0.75),
+    paddingHorizontal: theme.gap(1.5),
+  },
+  tonightPillFilled: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.surface,
+  },
+  tonightPillText: {
+    color: theme.colors.primaryText,
+  },
+  wentText: {
+    color: theme.colors.foreground,
   },
   list: {
     gap: theme.gap(1.5),
