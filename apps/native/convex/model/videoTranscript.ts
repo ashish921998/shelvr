@@ -153,6 +153,10 @@ export async function fetchVideoTranscript(
   }
   let body: unknown;
   try {
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_RESPONSE_CHARS) {
+      return { status: "failed", errorCategory: "too_large" };
+    }
     const raw = await response.text();
     if (raw.length > MAX_RESPONSE_CHARS) {
       return { status: "failed", errorCategory: "too_large" };

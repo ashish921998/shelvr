@@ -182,6 +182,19 @@ describe("fetchVideoTranscript", () => {
     });
   });
 
+  it("refuses a body that declares itself too large before reading it", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("{}", {
+        status: 200,
+        headers: { "Content-Length": String(10 * 1024 * 1024) },
+      }),
+    );
+    await expect(fetchVideoTranscript("TikTok", TIKTOK, "t")).resolves.toEqual({
+      status: "failed",
+      errorCategory: "too_large",
+    });
+  });
+
   it("fails on a timeout without throwing", async () => {
     fetchMock.mockRejectedValue(
       Object.assign(new Error("slow"), { name: "TimeoutError" }),

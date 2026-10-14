@@ -74,8 +74,8 @@ describe("readStoredImage", () => {
     "recognizes HEIC with missing or incorrect metadata (%s)",
     async (type) => {
       const bytes = Uint8Array.from([
-        0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 0, 0, 0, 0, 104,
-        101, 105, 99, 109, 105, 102, 49,
+        0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 0, 0, 0, 0, 104, 101,
+        105, 99, 109, 105, 102, 49,
       ]);
       const result = await readStoredImage(
         { get: async () => new Blob([bytes], { type }) },
