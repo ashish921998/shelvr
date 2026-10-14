@@ -332,6 +332,7 @@
   "item.noArticle": "読み取れる記事がないため、通常のリンクとして保存しました。",
   "recipe.ingredients": "材料",
   "recipe.steps": "作り方",
+  "recipe.stepNumber": "手順 %{number}",
   "recipe.serves": {
     "other": "%{formattedCount}人分"
   },
