@@ -141,17 +141,18 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   RevenueCat webhook.
 - **`aiConsent.ts`**: consent to third-party AI processing (App Store guideline 5.1.2(i)):
   `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
-  every path sending user content to Gemini or SerpAPI asks first. Missing/deleting owners
-  are refused before consent is read; item-aware checks also require an existing owned save.
-  Among live owners, only an explicit decline blocks; unset stays allowed, because builds without the consent card
-  must keep working. A declined user's saves still finish `ready` from what Shelvr read
+  every path sending user content to Gemini or SerpAPI asks first. It refuses an owner whose
+  row is missing or `deleting` before it reads consent, and item-aware checks also require an
+  existing owned save. Among live owners, only an explicit decline blocks; unset stays
+  allowed, because builds without the consent card must keep working. A declined user's saves still finish `ready` from what Shelvr read
   itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
   client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
-  and `survivingCandidates` (up to 100 hydrated identities, revalidated before classification).
-  The embedding sweep revalidates each cached save in one batch and maps vectors to the surviving
-  list. These are pre-dispatch fences, not cancellation or recall of already-sent requests:
-  a database check and an external provider call cannot be atomic.
+  and `survivingCandidates` (up to 100 candidate saves, loaded and checked again before
+  classification). The embedding sweep checks each cached save again in one batch and maps
+  vectors to the surviving list. These checks run before a request goes out. They cannot
+  cancel or recall a request already sent, because a database check and an external provider
+  call cannot share a transaction.
 - **`appleRevoke.ts`** (`"use node"` action): revokes a Sign in with Apple refresh token
   after `deleteCurrentUserAccount` hands it over. Best effort: it never throws, skips with
   one log line when the `APPLE_REVOKE_*` variables are unset, and retries only when Apple
@@ -161,12 +162,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   sign-in that lands while the owner row is already `deleting` cannot store its token, so
   `keepAppleRefreshToken` parks it in `detachedAppleTokens` and schedules
   `revokeDetachedToken` with the row id under the same policy instead of dropping it; the
-  job deletes the row on every terminal outcome, and a scheduled forget bounds its life.
-  If deletion wins the native exchange-to-persistence race, `auth.ts` revokes the
-  freshly exchanged, ownership-verified token immediately through the shared
-  runtime-neutral `model/appleClient.ts` request. This is one bounded best-effort
-  attempt, with no persistence or scheduled token arguments; retained-token
-  revocation keeps its existing retries.
+  job deletes the row on every terminal outcome. A `forgetDetachedAppleToken` call
+  scheduled an hour out deletes the row if the job died. If the deletion lands after the
+  native sheet's code is exchanged but before the token is stored, `auth.ts` checks the new
+  token belongs to that user and revokes it at once through the shared `model/appleClient.ts`
+  request. It makes one attempt, stores nothing and schedules nothing; a stored token keeps
+  its retries.
 - **`legalConsent.ts`**, **`legalConsentSync.ts`**: versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
