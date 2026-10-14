@@ -4,8 +4,9 @@ import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 /** The saved link, as the reading view and the sign-in sheet show it. */
 export function DemoLinkRow({
@@ -31,9 +32,7 @@ export function DemoLinkRow({
           {url}
         </Text>
       </View>
-      {busy ? (
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-      ) : null}
+      {busy ? <StitchRing /> : null}
     </View>
   );
 }
@@ -204,7 +203,7 @@ function ReadingSteps({
                 tintColor={theme.colors.primaryForeground}
               />
             ) : index === active ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <StitchRing />
             ) : null}
           </View>
           <Text style={[styles.stepText, index === active && styles.stepNow]}>

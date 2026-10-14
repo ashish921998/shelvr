@@ -1,5 +1,6 @@
 packages:
   - "apps/*"
+  - "tools/e2e"
 allowBuilds:
   '@shopify/react-native-skia': true
   browser-tabs-lock: true

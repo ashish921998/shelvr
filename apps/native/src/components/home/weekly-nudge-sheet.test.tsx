@@ -12,6 +12,10 @@ const mock = vi.hoisted(() => ({
   shelfEnabled: false,
   pending: true,
   queries: [] as unknown[],
+  reducedMotion: false,
+}));
+vi.mock("react-native-reanimated", () => ({
+  useReducedMotion: () => mock.reducedMotion,
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
@@ -114,6 +118,7 @@ beforeEach(() => {
   mock.setWeeklyShelf.mockReset().mockResolvedValue(true);
   mock.shelfEnabled = false;
   mock.pending = true;
+  mock.reducedMotion = false;
   mock.queries.length = 0;
 });
 

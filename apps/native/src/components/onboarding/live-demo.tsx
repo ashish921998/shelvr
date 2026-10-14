@@ -20,12 +20,14 @@ import {
 import { GhostButton } from "@/components/onboarding/parts";
 import { SampleCard, SampleRow } from "@/components/onboarding/sample-card";
 import { SampleSignIn } from "@/components/onboarding/sample-sign-in";
+import { SubmissionRecovery } from "@/components/onboarding/submission-recovery";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, Pressable, Text, TextInput, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The first save is a pasted, typed or ready-made link; a link shared from
@@ -151,6 +153,15 @@ export function LiveDemoStep({
         title={findSample(url)?.pageHeading ?? displayHost(url)}
         url={url}
         onDone={demo.previewed}
+      />
+    );
+  }
+
+  if (demo.submissionTimedOut) {
+    return (
+      <SubmissionRecovery
+        onKeepWaiting={demo.keepWaiting}
+        onContinue={demo.continueAfterTimeout}
       />
     );
   }
@@ -371,6 +382,7 @@ function DemoAuthSheet({
 }) {
   useAppLocale();
   const oauth = useOAuthSignIn("demo_sheet");
+  const reducedMotion = useReducedMotion();
   const busy = oauth.pendingProvider !== null;
 
   useEffect(() => {
@@ -397,7 +409,7 @@ function DemoAuthSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reducedMotion ? "fade" : "slide"}
       onRequestClose={busy ? undefined : dismiss}
     >
       <Pressable
