@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearFirstSaveReminder,
   FIRST_SAVE_REMINDER_ID,
+  firstSaveReminderTicket,
   reminderOptions,
   scheduleFirstSaveReminder,
 } from "./first-save-reminder";
@@ -112,6 +113,46 @@ describe("scheduleFirstSaveReminder", () => {
       },
       trigger: { type: "date", date: at(7, 20), channelId: "save-reminders" },
     });
+  });
+});
+
+describe("first-save reminder ticket", () => {
+  const remind = (ticket: number) =>
+    scheduleFirstSaveReminder({
+      itemId: "item-1",
+      title: "Lemon pasta",
+      at: at(7, 20),
+      ticket,
+    });
+
+  it("schedules nothing once a clear has run since the ticket", async () => {
+    const ticket = firstSaveReminderTicket();
+    await clearFirstSaveReminder();
+    vi.clearAllMocks();
+    await remind(ticket);
+    expect(notifications.cancel).not.toHaveBeenCalled();
+    expect(notifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it("drops a reminder a clear overtook mid-schedule", async () => {
+    const ticket = firstSaveReminderTicket();
+    let clearing: Promise<void> | undefined;
+    notifications.schedule.mockImplementationOnce(async () => {
+      clearing = clearFirstSaveReminder();
+    });
+    await remind(ticket);
+    await clearing;
+    expect(notifications.schedule).toHaveBeenCalledTimes(1);
+    expect(notifications.cancel).toHaveBeenLastCalledWith(
+      FIRST_SAVE_REMINDER_ID,
+    );
+    // replace cancel, the clear's cancel, and the drop after the late schedule
+    expect(notifications.cancel).toHaveBeenCalledTimes(3);
+  });
+
+  it("schedules normally with a current ticket", async () => {
+    await remind(firstSaveReminderTicket());
+    expect(notifications.schedule).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -4,6 +4,7 @@
 // what's under test: undefined items until the first page, exact load-more
 // gating, and one context instance shared by every consumer.
 import { render, screen } from "@testing-library/react";
+import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { HomeFeedProvider, useHomeFeed } from "./home-feed";
@@ -147,5 +148,33 @@ describe("HomeFeedProvider", () => {
     expect(screen.getByText("onboarding")).toBeTruthy();
     expect(screen.queryByText("loader")).toBeNull();
     vi.restoreAllMocks();
+  });
+
+  it("keeps the tree under it mounted when the user signs in", () => {
+    mocks.useConvexAuth.mockReturnValue({ isAuthenticated: false });
+    mocks.usePaginatedQuery.mockReturnValue({
+      results: [],
+      status: "LoadingFirstPage",
+      loadMore: vi.fn(),
+    });
+    let mounts = 0;
+    function Onboarding() {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return <div>onboarding</div>;
+    }
+    const tree = () => (
+      <HomeFeedProvider>
+        <Onboarding />
+      </HomeFeedProvider>
+    );
+    const { rerender } = render(tree());
+
+    // Onboarding's sign-in step lands; its local state must survive.
+    stubFeed("LoadingFirstPage");
+    rerender(tree());
+    expect(screen.getByText("onboarding")).toBeTruthy();
+    expect(mounts).toBe(1);
   });
 });

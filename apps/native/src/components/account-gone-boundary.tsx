@@ -12,17 +12,26 @@ import { t } from "@/lib/i18n";
  * home feed's `usePaginatedQuery` rethrows that during render. The fallback
  * asks the server whether the account still exists. While the answer is
  * pending or the account is gone it shows the app loader, and
- * `useSignOutWhenAccountGone` moves the app to sign-in, which unmounts this
- * boundary. Any other error is rethrown to the root boundary unchanged.
+ * `useSignOutWhenAccountGone` signs the app out. That usually unmounts this
+ * boundary; mid-onboarding the tree stays mounted, so the sign-out edge clears
+ * the failure and remounts the children with their queries skipped. Only that
+ * edge resets: signing in must not remount the tree under it. Any other error
+ * is rethrown to the root boundary unchanged.
  */
 export class AccountGoneBoundary extends Component<
-  { children: ReactNode },
+  { signedIn: boolean; children: ReactNode },
   { error: unknown; failed: boolean }
 > {
   state = { error: undefined as unknown, failed: false };
 
   static getDerivedStateFromError(error: unknown) {
     return { error, failed: true };
+  }
+
+  componentDidUpdate(previous: { signedIn: boolean }) {
+    if (previous.signedIn && !this.props.signedIn && this.state.failed) {
+      this.setState({ error: undefined, failed: false });
+    }
   }
 
   render() {
