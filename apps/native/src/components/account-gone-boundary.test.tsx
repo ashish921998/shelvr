@@ -43,7 +43,7 @@ class Root extends Component<{ children: ReactNode }, { error?: unknown }> {
 function renderFailingTree() {
   return render(
     <Root>
-      <AccountGoneBoundary>
+      <AccountGoneBoundary signedIn>
         <Throws />
       </AccountGoneBoundary>
     </Root>,
@@ -60,7 +60,7 @@ describe("AccountGoneBoundary", () => {
 
   it("renders its children when nothing throws", () => {
     render(
-      <AccountGoneBoundary>
+      <AccountGoneBoundary signedIn>
         <div>feed</div>
       </AccountGoneBoundary>,
     );

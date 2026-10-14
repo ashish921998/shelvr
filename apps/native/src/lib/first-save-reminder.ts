@@ -82,20 +82,35 @@ function addDays(day: Date, days: number): Date {
   return at;
 }
 
+// Bumped by every clear. A schedule that began before a clear (an onboarding
+// handler still waiting on the permission prompt when the account signs out)
+// lands on a stale ticket and leaves nothing behind.
+let generation = 0;
+
+/** Taken before any await that a sign-out could overtake. */
+export function firstSaveReminderTicket(): number {
+  return generation;
+}
+
 /**
  * Schedules (or replaces) the reminder for one save. The caller has already
- * got notification permission; without it nothing would be shown.
+ * got notification permission; without it nothing would be shown. Pass the
+ * ticket taken before that permission prompt; a clear since then wins.
  */
 export async function scheduleFirstSaveReminder({
   itemId,
   title,
   at,
+  ticket = generation,
 }: {
   itemId: string;
   title: string;
   at: Date;
+  ticket?: number;
 }): Promise<void> {
+  if (ticket !== generation) return;
   await Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID);
+  if (ticket !== generation) return;
   await Notifications.scheduleNotificationAsync({
     identifier: FIRST_SAVE_REMINDER_ID,
     content: {
@@ -115,6 +130,13 @@ export async function scheduleFirstSaveReminder({
       channelId: CHANNEL_ID,
     },
   });
+  // A clear that ran while the schedule was in flight may have cancelled
+  // before it landed; drop it again so it cannot outlive that clear.
+  if (ticket !== generation) {
+    await Notifications.cancelScheduledNotificationAsync(
+      FIRST_SAVE_REMINDER_ID,
+    );
+  }
 }
 
 /**
@@ -122,6 +144,7 @@ export async function scheduleFirstSaveReminder({
  * not outlive the account that made it.
  */
 export async function clearFirstSaveReminder(): Promise<void> {
+  generation += 1;
   // Settled independently: a failed cancel must not leave a delivered
   // reminder in the tray, and cleanup must never fail a sign-out.
   await Promise.allSettled([
