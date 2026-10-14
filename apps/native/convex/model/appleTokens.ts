@@ -4,6 +4,11 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
 
+/** How long a token row may outlive its revoke job's first attempt. Past the
+ * job's last retry, so a scheduled forget only cleans up after a job that
+ * died. */
+export const APPLE_TOKEN_MAX_LIFE_MS = 60 * 60_000;
+
 type AfterUserSaved = NonNullable<
   NonNullable<ConvexAuthConfig["callbacks"]>["afterUserCreatedOrUpdated"]
 >;
@@ -21,9 +26,9 @@ async function tokenRow(ctx: MutationCtx, userId: Id<"users">) {
  * transaction, so the users row is never stored with it.
  *
  * When storing is refused — the sign-in landed while the owner row was
- * already `deleting` — the token must not be dropped unrevoked, so it is
- * handed to the same best-effort revocation the deletion path uses, mirroring
- * the native sheet's late-token path in `auth.ts`.
+ * already `deleting` — the token must not be dropped unrevoked. A mutation
+ * cannot call Apple, so it is parked in `detachedAppleTokens` and the revoke
+ * job gets that row's id, never the token, like the deletion path's job.
  */
 export const keepAppleRefreshToken = async (
   authCtx: Parameters<AfterUserSaved>[0],
@@ -39,9 +44,18 @@ export const keepAppleRefreshToken = async (
   await ctx.db.patch(user, { appleRefreshToken: undefined });
   const stored = await storeAppleToken(ctx, user, { refreshToken });
   if (!stored) {
-    await ctx.scheduler.runAfter(0, internal.appleRevoke.revokeDetachedToken, {
+    const tokenId = await ctx.db.insert("detachedAppleTokens", {
       refreshToken,
+      createdAt: Date.now(),
     });
+    await ctx.scheduler.runAfter(0, internal.appleRevoke.revokeDetachedToken, {
+      tokenId,
+    });
+    await ctx.scheduler.runAfter(
+      APPLE_TOKEN_MAX_LIFE_MS,
+      internal.users.forgetDetachedAppleToken,
+      { tokenId },
+    );
   }
 };
 

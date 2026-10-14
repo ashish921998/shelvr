@@ -95,6 +95,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
     disclosure (`granted` or `declined`) and the disclosure version it answered
   - `appleTokens` — the latest Sign in with Apple refresh token per user, kept only to
     revoke it on account deletion; never returned to a client or logged
+  - `detachedAppleTokens` — a web-flow Apple refresh token that arrived while its owner was
+    already `deleting`, parked only until `revokeDetachedToken` has revoked it, so no
+    scheduled job argument ever carries a token
 
   `schema.ts` also redeclares Convex Auth's `users` table with two optional fields.
   `appleRefreshToken`: Convex Auth writes the Apple profile onto that row, and
@@ -150,8 +153,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `auth.ts`, via `model/appleClient.ts`) carries the bundle id it was issued to as
   `clientId`, and is revoked as that client instead of the web Service ID. A web-flow
   sign-in that lands while the owner row is already `deleting` cannot store its token, so
-  `keepAppleRefreshToken` schedules `revokeDetachedToken` to revoke it under the same
-  policy instead of dropping it.
+  `keepAppleRefreshToken` parks it in `detachedAppleTokens` and schedules
+  `revokeDetachedToken` with the row id under the same policy instead of dropping it; the
+  job deletes the row on every terminal outcome, and a scheduled forget bounds its life.
   If deletion wins the native exchange-to-persistence race, `auth.ts` revokes the
   freshly exchanged, ownership-verified token immediately through the shared
   runtime-neutral `model/appleClient.ts` request. This is one bounded best-effort

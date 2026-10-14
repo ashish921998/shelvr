@@ -82,6 +82,19 @@ async function tokenRows(t: Backend) {
   return await t.run((ctx) => ctx.db.query("appleTokens").collect());
 }
 
+async function detachedRows(t: Backend) {
+  return await t.run((ctx) => ctx.db.query("detachedAppleTokens").collect());
+}
+
+async function parkToken(t: Backend) {
+  return await t.run((ctx) =>
+    ctx.db.insert("detachedAppleTokens", {
+      refreshToken: "parked",
+      createdAt: Date.now(),
+    }),
+  );
+}
+
 function as(t: Backend, userId: Id<"users">): T {
   return t.withIdentity({ subject: `${userId}|session-1` });
 }
@@ -225,16 +238,96 @@ describe("capturing Apple's refresh token at sign-in", () => {
     const users = await t.run((ctx) => ctx.db.query("users").collect());
     expect(users[0]).not.toHaveProperty("appleRefreshToken");
 
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    // Run the revoke job alone: draining every timer would also fire the
+    // hour-later fallback forget before the action has read the row.
+    const job = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).find((entry) => entry.name === "appleRevoke:revokeDetachedToken");
+    await t.action(internal.appleRevoke.revokeDetachedToken, job!.args[0]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://appleid.apple.com/auth/revoke");
     const body = new URLSearchParams(String(init.body));
     expect(body.get("token")).toBe("web-during-deletion");
+    expect(await detachedRows(t)).toEqual([]);
     expect(body.get("client_id")).toBe("app.shelvr.signin");
     expect(body.get("token_type_hint")).toBe("refresh_token");
     // The retained row belongs to the deletion's own revoke job; untouched.
     expect(await tokenRows(t)).toEqual([retained]);
+  });
+
+  it("parks a mid-deletion web token in a row and never puts it in a job argument", async () => {
+    await configure();
+    const t = newConvexTest();
+    await signIn(t, "web-first");
+    const [retained] = await tokenRows(t);
+    await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
+
+    await signIn(t, "web-during-deletion");
+    const parked = await detachedRows(t);
+    expect(parked.map((row) => row.refreshToken)).toEqual([
+      "web-during-deletion",
+    ]);
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(JSON.stringify(jobs)).not.toContain("web-during-deletion");
+    expect(
+      jobs.find((job) => job.name === "appleRevoke:revokeDetachedToken")?.args,
+    ).toEqual([{ tokenId: parked[0]._id }]);
+    expect(
+      jobs.find((job) => job.name === "users:forgetDetachedAppleToken")?.args,
+    ).toEqual([{ tokenId: parked[0]._id }]);
+  });
+
+  it.each([
+    ["Apple revokes it", 200],
+    ["Apple refuses it", 400],
+  ])("forgets the parked token once %s", async (_, status) => {
+    await configure();
+    fetchMock.mockResolvedValue(new Response(null, { status }));
+    const t = newConvexTest();
+    const tokenId = await parkToken(t);
+
+    await t.action(internal.appleRevoke.revokeDetachedToken, { tokenId });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await detachedRows(t)).toEqual([]);
+  });
+
+  it("forgets the parked token when revocation is not configured", async () => {
+    const t = newConvexTest();
+    const tokenId = await parkToken(t);
+
+    await t.action(internal.appleRevoke.revokeDetachedToken, { tokenId });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await detachedRows(t)).toEqual([]);
+  });
+
+  it("retries a parked token by id and forgets it after the last attempt", async () => {
+    await configure();
+    fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
+    const t = newConvexTest();
+    const tokenId = await parkToken(t);
+
+    await t.action(internal.appleRevoke.revokeDetachedToken, { tokenId });
+    expect(await detachedRows(t)).toHaveLength(1);
+    const retries = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).filter((job) => job.name === "appleRevoke:revokeDetachedToken");
+    expect(retries.map((job) => job.args)).toEqual([[{ tokenId, attempt: 2 }]]);
+
+    await t.action(internal.appleRevoke.revokeDetachedToken, {
+      tokenId,
+      attempt: 3,
+    });
+    expect(await detachedRows(t)).toEqual([]);
+    // A job that runs after the row is gone does nothing.
+    await t.action(internal.appleRevoke.revokeDetachedToken, { tokenId });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("refuses the native sheet's token for a deleting or missing owner and never replaces a retained row", async () => {

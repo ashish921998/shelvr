@@ -12,7 +12,11 @@ import { internal } from "./_generated/api";
 import { liveOwner } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
-import { appleTokenId, storeAppleToken } from "./model/appleTokens";
+import {
+  APPLE_TOKEN_MAX_LIFE_MS,
+  appleTokenId,
+  storeAppleToken,
+} from "./model/appleTokens";
 import { logEvent } from "./model/log";
 
 /**
@@ -103,8 +107,6 @@ export const deleteCurrentUserAccount = mutation({
   },
 });
 
-const APPLE_TOKEN_MAX_LIFE_MS = 60 * 60_000;
-
 /** Apple requires an app that offers Sign in with Apple to revoke the user's
  * token when the account is deleted. The job gets the token row's id, not the
  * token: job arguments stay readable in the dashboard long after they run.
@@ -149,6 +151,26 @@ export const appleTokenForRevoke = internalQuery({
     const row = await ctx.db.get(args.tokenId);
     if (row === null) return null;
     return { refreshToken: row.refreshToken, clientId: row.clientId };
+  },
+});
+
+/** The parked token a detached revoke job was pointed at, or null once gone. */
+export const detachedAppleTokenForRevoke = internalQuery({
+  args: { tokenId: v.id("detachedAppleTokens") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    return (await ctx.db.get(args.tokenId))?.refreshToken ?? null;
+  },
+});
+
+export const forgetDetachedAppleToken = internalMutation({
+  args: { tokenId: v.id("detachedAppleTokens") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if ((await ctx.db.get(args.tokenId)) !== null) {
+      await ctx.db.delete(args.tokenId);
+    }
+    return null;
   },
 });
 
