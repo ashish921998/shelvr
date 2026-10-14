@@ -69,6 +69,43 @@ describe("onboarding demo allowance", () => {
     expect(jobs.filter((job) => job.name === "ai:processItem")).toHaveLength(1);
   });
 
+  it("keeps the sample's heading as the save's own title", async () => {
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
+    const { itemId } = await t.mutation(api.demo.createDemoItem, {
+      url: URL,
+      title: "  Easy classic lasagne  ",
+    });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      title: "Easy classic lasagne",
+      titleSource: "user",
+    });
+  });
+
+  it("leaves the title to the classifier when none, a blank or an overlong one is sent", async () => {
+    for (const title of [undefined, "   ", "x".repeat(201)]) {
+      const { t } = await signedInUser(newConvexTest(), { pro: true });
+      const { itemId } = await t.mutation(api.demo.createDemoItem, {
+        url: URL,
+        title,
+      });
+      const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+      expect(item?.title).toBeUndefined();
+      expect(item?.titleSource).toBeUndefined();
+    }
+  });
+
+  it("does not retitle the original save on a repeat", async () => {
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
+    const first = await t.mutation(api.demo.createDemoItem, {
+      url: URL,
+      title: "Easy classic lasagne",
+    });
+    await t.mutation(api.demo.createDemoItem, { url: URL, title: "Other" });
+    const item = await t.run(async (ctx) => await ctx.db.get(first.itemId));
+    expect(item?.title).toBe("Easy classic lasagne");
+  });
+
   it("matches a canonicalized repeat of the original URL", async () => {
     const { t } = await signedInUser(newConvexTest(), { pro: true });
     await t.mutation(api.demo.createDemoItem, { url: "example.com/path" });
