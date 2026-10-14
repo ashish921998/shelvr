@@ -26,7 +26,6 @@ export type MessageParams = {
   "errors.retrySoon": undefined;
   "item.savedPhoto": undefined;
   "item.untitled": undefined;
-  "item.inbox": undefined;
   "pro.viewPlans": undefined;
   "errors.productPhoto": undefined;
   "products.finding": undefined;
