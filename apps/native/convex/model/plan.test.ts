@@ -119,6 +119,30 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("matches a name with an apostrophe in it", () => {
+    expect(
+      isGrounded("L'Artusi", source({ content: "L'Artusi's olive oil cake" })),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "L'Industrie Pizzeria",
+        source({ places: ["L Industrie Pizzeria, Williamsburg"] }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "D'Angelo",
+        source({ content: "D\u2019Angelo\u2019s steak sandwich" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "McSorley's Old Ale House",
+        source({ content: "McSorley s Old Ale House" }),
+      ),
+    ).toBe(true);
+  });
+
   it("matches a Korean name with a particle written onto it", () => {
     expect(
       isGrounded(

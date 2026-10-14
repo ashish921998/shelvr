@@ -193,10 +193,17 @@ function saveSays(piece: string, evidence: Evidence): boolean {
  * so "Great pasta tonight" does not ground "Pasta Palace" and "Toronto" does
  * not ground "Oro", while "#TigreNYC" grounds "Tigre". A name may also be
  * written run together, so "@barlola_nyc" grounds "Bar Lola". A name with no
- * distinctive word ("Si Si", "Au 79") must appear word for word.
+ * distinctive word ("Si Si", "Au 79") must appear word for word. A name with
+ * an apostrophe is read both ways, so "L'Artusi" is "lartusi" or "artusi".
  */
 function namesPlace(name: string, evidence: Evidence): boolean {
-  const words = wordsOf(name.replace(/&/g, " and "));
+  const spelled = name.replace(/&/g, " and ");
+  return [wordsOf(spelled), splitWords(spelled)].some((words) =>
+    wordsName(words, evidence),
+  );
+}
+
+function wordsName(words: string[], evidence: Evidence): boolean {
   const specific = words.filter((word) => !GENERIC_WORDS.has(word));
   const strong = specific.filter(distinctive);
   if (strong.length > 0) {
