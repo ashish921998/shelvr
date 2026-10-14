@@ -119,9 +119,10 @@ const GENERIC_WORDS = new Set([
   "spot",
 ]);
 
-/** What a save offers as evidence: its text squashed whole, for names that
- * run together ("@parici_cafe"), and its separate words. */
-type Evidence = { text: string; words: Set<string> };
+/** What a save offers as evidence: its text squashed whole, its separate
+ * words, and its handles and hashtags squashed ("@parici_cafe" is
+ * "paricicafe"), which run a name together with other words. */
+type Evidence = { text: string; words: Set<string>; handles: string[] };
 
 /** Squashed words in any script; punctuation and spaces split them. */
 function wordsOf(text: string): string[] {
@@ -141,31 +142,49 @@ function evidenceOf(source: PlanSource): Evidence {
   ]
     .filter(Boolean)
     .join(" ");
-  return { text: squash(raw), words: new Set(wordsOf(raw)) };
+  const tagged = raw.match(/[@#][\p{L}\p{N}\p{M}_.]+/gu) ?? [];
+  // The author is a handle even when written without the "@".
+  const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
+  return { text: squash(raw), words: new Set(wordsOf(raw)), handles };
+}
+
+// Scripts written without spaces between words, where a name sits inside a
+// longer run of text ("四谷のすし匠で").
+const UNSPACED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+
+/** A whole word of the save, the start of one of its handles ("@tigrenyc"),
+ * or, in a script written without spaces, anywhere in its text. */
+function saveSays(piece: string, evidence: Evidence): boolean {
+  return (
+    evidence.words.has(piece) ||
+    evidence.handles.some((handle) => handle.startsWith(piece)) ||
+    (UNSPACED_SCRIPT.test(piece) && evidence.text.includes(piece))
+  );
 }
 
 /**
  * True when the save names the place. The model may only pick places a save
  * names; this drops one it made up. A name made only of generic words
  * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
- * every distinctive word must be a whole word of the save, so "Great pasta
- * tonight" does not ground "Pasta Palace" and "Toronto" does not ground
- * "Oro". Two exceptions read the squashed text instead: a name of several
- * words run together, so "@barlola_nyc" grounds "Bar Lola", and a word in
- * a script written without spaces, so "四谷のすし匠で" grounds "すし匠". A name
- * with no distinctive word ("Si Si", "Au 79") must appear word for word.
+ * every distinctive word must be something the save says (see `saveSays`),
+ * so "Great pasta tonight" does not ground "Pasta Palace" and "Toronto" does
+ * not ground "Oro", while "#TigreNYC" grounds "Tigre". A name may also be
+ * written run together, so "@barlola_nyc" grounds "Bar Lola". A name with no
+ * distinctive word ("Si Si", "Au 79") must appear word for word.
  */
 function namesPlace(name: string, evidence: Evidence): boolean {
-  const words = wordsOf(name);
+  const words = wordsOf(name.replace(/&/g, " and "));
   const specific = words.filter((word) => !GENERIC_WORDS.has(word));
   const strong = specific.filter(distinctive);
   if (strong.length > 0) {
-    const named = (word: string) =>
-      evidence.words.has(word) ||
-      (!/^[a-z0-9]+$/.test(word) && evidence.text.includes(word));
+    const runTogether = [words.join(""), specific.join("")];
     return (
-      strong.every(named) ||
-      (words.length > 1 && evidence.text.includes(words.join("")))
+      strong.every((word) => saveSays(word, evidence)) ||
+      (words.length > 1 &&
+        runTogether.some(
+          (joined) => distinctive(joined) && saveSays(joined, evidence),
+        ))
     );
   }
   // The whole name must still be long enough to prove anything, so a word

@@ -63,9 +63,29 @@ describe("isGrounded", () => {
         source({ title: "Tender ribs, church bells at noon" }),
       ),
     ).toBe(false);
+    expect(
+      isGrounded("Art Bar", source({ title: "A smart barista made this" })),
+    ).toBe(false);
+    expect(
+      isGrounded("Oro Bar", source({ title: "Toronto: Rob arrives" })),
+    ).toBe(false);
+    expect(isGrounded("Мир", source({ title: "Владимир" }))).toBe(false);
+  });
+
+  it("matches a name at the start of a handle or hashtag", () => {
     expect(isGrounded("Tigre", source({ title: "#tigre on the LES" }))).toBe(
       true,
     );
+    expect(isGrounded("Tigre", source({ author: "@tigrenyc" }))).toBe(true);
+    expect(isGrounded("Tigre", source({ content: "#TigreNYC" }))).toBe(true);
+    expect(isGrounded("Dôme", source({ author: "@domenyc" }))).toBe(true);
+    expect(isGrounded("Par Ici Café", source({ author: "@parici" }))).toBe(
+      true,
+    );
+    expect(
+      isGrounded("Smith & Wollensky", source({ author: "@smithandwollensky" })),
+    ).toBe(true);
+    expect(isGrounded("Tigre", source({ author: "@nyctigre" }))).toBe(false);
   });
 
   it("rejects a name the save never mentions", () => {
