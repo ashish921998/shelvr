@@ -73,6 +73,30 @@ describe("usePlaceVisits", () => {
     );
   });
 
+  it("keeps a newer tap when an older save fails", async () => {
+    let failFirst!: (error: Error) => void;
+    mocks.setVisited
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          failFirst = reject;
+        }),
+      )
+      .mockResolvedValue(null);
+    const tigre = place("Tigre");
+    const { result } = renderHook(() => usePlaceVisits());
+
+    act(() => result.current.toggle(tigre));
+    act(() => result.current.toggle(tigre));
+    act(() => result.current.toggle(tigre));
+    expect(result.current.isVisited(tigre)).toBe(true);
+
+    await act(async () => {
+      failFirst(new Error("offline"));
+      await Promise.resolve();
+    });
+    expect(result.current.isVisited(tigre)).toBe(true);
+  });
+
   it("goes back when the save fails", async () => {
     mocks.setVisited.mockRejectedValue(new Error("offline"));
     const tigre = place("Tigre");

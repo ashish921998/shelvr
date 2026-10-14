@@ -94,6 +94,8 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
 export function usePlaceVisits() {
   const setVisited = useMutation(api.placeVisits.setVisited);
   const [marks, setMarks] = useState<ReadonlyMap<string, boolean>>(new Map());
+  // The latest tap per place: an older save failing must not undo a newer tap.
+  const latest = useRef(new Map<string, number>());
 
   const isVisited = useCallback(
     (place: PlanPlace) =>
@@ -105,6 +107,8 @@ export function usePlaceVisits() {
     (place: PlanPlace) => {
       const key = placeKey(place.name);
       const was = marks.get(key) ?? place.been === true;
+      const tap = (latest.current.get(key) ?? 0) + 1;
+      latest.current.set(key, tap);
       const mark = (value: boolean) =>
         setMarks((current) => new Map(current).set(key, value));
       mark(!was);
@@ -114,7 +118,7 @@ export function usePlaceVisits() {
         name: place.name,
         visited: !was,
       }).catch((error: unknown) => {
-        mark(was);
+        if (latest.current.get(key) === tap) mark(was);
         analytics.captureError("plan_visit_failed", error);
       });
     },
