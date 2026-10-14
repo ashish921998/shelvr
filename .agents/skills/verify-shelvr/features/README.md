@@ -17,7 +17,7 @@ notifications. Map them when a change touches them.
 | [Paywall](paywall.md)             | Home > Add or "View Pro plans", without Pro | `tests/paywall.e2e.ts`                                  | tested                                     |
 
 `tests/smoke.e2e.ts` is the Doctor, not a feature. The `e2e ios` workflow
-(`.github/workflows/e2e-ios.yml`) runs smoke, search, search-no-results,
+(`.github/workflows/e2e-ios.yml`) runs search, search-no-results,
 create-space and the paywall on pull requests that touch the app, against a
 local Convex backend with no model; the save flows need the model and run by
 hand.

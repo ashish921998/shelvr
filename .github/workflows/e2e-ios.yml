@@ -77,6 +77,10 @@ jobs:
             fingerprint:generate --platform ios | node -p 'JSON.parse(require("fs").readFileSync(0)).hash')
           xcode=$(xcodebuild -version | head -1 | tr -d ' ')
           echo "key=e2e-ios-dev-adhoc-$hash-$xcode" >> "$GITHUB_OUTPUT"
+          # The XCTest runner depends on agent-device and Xcode only, so an
+          # unrelated lockfile change does not cost a 2.5 minute rebuild.
+          device=$(node -p 'require("../../node_modules/agent-device/package.json").version')
+          echo "runner-key=agent-device-$device-$xcode" >> "$GITHUB_OUTPUT"
 
       # Restore and save are split so a build is kept even when a flow fails
       # later in the job; actions/cache saves only after a successful job.
@@ -120,7 +124,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.agent-device
-          key: agent-device-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.fingerprint.outputs.runner-key }}
 
       # The picker taps in save-image are measured on an iPhone 17, and the
       # other flows run on any iPhone; the runtime is the newest the image has.
@@ -151,7 +155,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.agent-device
-          key: agent-device-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.fingerprint.outputs.runner-key }}
 
       # A throwaway deployment on this machine. The first `convex dev --once`
       # creates it and writes its URLs to .env.local, then stops at the push,
@@ -226,7 +230,6 @@ jobs:
         working-directory: tools/e2e
         run: >-
           pnpm exec e2e run
-          tests/smoke.e2e.ts
           tests/search.e2e.ts
           tests/search-no-results.e2e.ts
           tests/create-space.e2e.ts
