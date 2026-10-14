@@ -89,11 +89,10 @@ export function startOnSeededHome(): void {
 }
 
 /**
- * Opens the app and waits until `ready`. The dev launcher gives Metro's
- * manifest 10 seconds, then shows its server list instead of the app, and
- * the manifest resolves the native fingerprint on every request: a few
- * seconds on a Mac, 5 to 15 on a GitHub runner. So the app is opened again
- * whenever the launcher shows.
+ * Opens the app and waits until `ready`. The dev launcher gives Metro 10
+ * seconds to answer for the bundle (BUNDLE_URL in launch.ts), then shows its
+ * server list instead of the app; a cold Metro can take longer, so the app is
+ * opened again whenever the launcher shows.
  */
 async function openApp(
   app: App,
