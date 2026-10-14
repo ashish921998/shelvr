@@ -1,14 +1,14 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome, tapUntilVisible } from "./seeded-home.ts";
+import { startOnSeededHome, tapTab, tapUntilVisible } from "./seeded-home.ts";
 
 startOnSeededHome();
 
 test("creates a space", async ({ screen }) => {
   const name = `Pilot ${Date.now()}`;
 
-  await screen.getByRole("tab", "Spaces").tap();
+  await tapTab(screen, "Spaces");
   // "New space" has been tapped and its form never opened, once before #351
   // and once after, with no cause found.
   const field = screen.getByRole("textbox");

@@ -2,6 +2,7 @@ import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
 import {
+  tapTab,
   chooseAddOption,
   SHEET_TRANSITION_MS,
   startOnSeededHome,
@@ -27,7 +28,7 @@ test("saves a note and finds it by its own words", async ({ screen }) => {
   });
   await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
 
-  await screen.getByRole("tab", "Search").tap();
+  await tapTab(screen, "Search");
   await screen.getByRole("textbox", "Search your saves").fill("quokka");
 
   // The model titles the note, so the result's label is not known ahead of

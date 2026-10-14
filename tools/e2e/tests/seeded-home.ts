@@ -114,6 +114,19 @@ async function openApp(
 }
 
 /**
+ * Taps a tab bar item. The native tabs usually reach the accessibility tree
+ * as `tab`, but have come through as `button` (on CI, the first test after a
+ * fresh install), so the tab bar is searched for either.
+ */
+export async function tapTab(screen: Screen, name: string): Promise<void> {
+  const tabBar = screen.getByRole("tablist");
+  const tab = tabBar.getByRole("tab", name);
+  await (
+    (await tab.isVisible()) ? tab : tabBar.getByRole("button", name)
+  ).tap();
+}
+
+/**
  * Taps `control` until `result` is on screen, for a control whose tap can be
  * lost: an accepted tap shows `result` well inside `waitMs`, so it is tapped
  * again only after that. Each tap is its own step in the run's report, so a
