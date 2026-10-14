@@ -1,0 +1,183 @@
+name: e2e ios
+
+# Runs the model-free flows in tools/e2e on an iOS simulator against a local
+# Convex backend built from the same commit. Not a required check yet: it
+# reports, and a failure does not block a merge. Once it has a clean record it
+# moves into ci.yml, so deploys wait on it too.
+#
+# No secrets: the backend is a throwaway local deployment (CONVEX_AGENT_MODE
+# anonymous), so a fork's pull request runs it the same way. Three flows are
+# left out because they need the model: save-link and save-image judge the
+# screen with it, and save-note searches for words that only reach the index
+# once the model has processed the note.
+
+on:
+  pull_request:
+    paths:
+      - "apps/native/**"
+      - "tools/e2e/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/e2e-ios.yml"
+  # A push to main refreshes the cached build that pull requests restore.
+  push:
+    branches: [main]
+    paths:
+      - "apps/native/**"
+      - "tools/e2e/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/e2e-ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  E2E_TELEMETRY_DISABLED: "1"
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8
+
+jobs:
+  ios:
+    name: e2e ios
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.33.0
+
+      # e2e needs Node 22.12 or later, above the root package's minimum.
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The development build only changes when its native fingerprint does,
+      # so the key is that fingerprint plus the Xcode that compiled it.
+      - name: Native fingerprint
+        id: fingerprint
+        working-directory: apps/native
+        run: |
+          hash=$(node "$(dirname "$(node -p 'require.resolve("expo-updates/package.json")')")/bin/cli.js" \
+            fingerprint:generate --platform ios | node -p 'JSON.parse(require("fs").readFileSync(0)).hash')
+          xcode=$(xcodebuild -version | head -1 | tr -d ' ')
+          echo "key=e2e-ios-dev-$hash-$xcode" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the development build
+        id: build-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/native/build/e2e/ShelvrDev.app
+          key: ${{ steps.fingerprint.outputs.key }}
+
+      - name: Build the development build
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        working-directory: apps/native
+        run: |
+          npx expo prebuild -p ios --clean
+          xcodebuild -workspace ios/ShelvrDev.xcworkspace -scheme ShelvrDev \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/derived CODE_SIGNING_ALLOWED=NO \
+            > build/xcodebuild.log 2>&1 || { tail -200 build/xcodebuild.log; exit 1; }
+          mkdir -p build/e2e
+          cp -R build/derived/Build/Products/Debug-iphonesimulator/ShelvrDev.app build/e2e/
+
+      # agent-device compiles its XCUITest runner on first use.
+      - name: Restore the agent-device runner
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.agent-device
+          key: agent-device-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # The picker taps in save-image are measured on an iPhone 17, and the
+      # other flows run on any iPhone; the runtime is the newest the image has.
+      - name: Boot a simulator and install the build
+        run: |
+          runtime=$(xcrun simctl list runtimes available -j | node -p '
+            JSON.parse(require("fs").readFileSync(0)).runtimes
+              .filter((r) => r.platform === "iOS").at(-1).identifier')
+          echo "runtime $runtime"
+          udid=$(xcrun simctl create e2e "iPhone 17" "$runtime")
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" apps/native/build/e2e/ShelvrDev.app
+          echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
+
+      # A throwaway deployment on this machine. The first `convex dev --once`
+      # creates it and writes its URLs to .env.local, then stops at the push,
+      # which needs the required model key; the env is set after that. The key
+      # is a placeholder, so any model call fails, and none of these flows
+      # needs one.
+      - name: Start a local Convex backend
+        working-directory: apps/native
+        env:
+          CONVEX_AGENT_MODE: anonymous
+        run: |
+          keys=$(node --input-type=module -e '
+            import { exportJWK, exportPKCS8, generateKeyPair } from "jose";
+            const { privateKey, publicKey } = await generateKeyPair("RS256", { extractable: true });
+            const jwk = await exportJWK(publicKey);
+            console.log(JSON.stringify({
+              privateKey: (await exportPKCS8(privateKey)).trimEnd().replace(/\n/g, " "),
+              jwks: JSON.stringify({ keys: [{ use: "sig", ...jwk }] }),
+            }));')
+          npx convex dev --once --typecheck disable --codegen disable || true
+          test -f .env.local
+          npx convex env set GOOGLE_GENERATIVE_AI_API_KEY ci-no-model
+          npx convex env set AUTH_ENABLE_ANONYMOUS true
+          npx convex env set JWT_PRIVATE_KEY -- "$(node -p 'JSON.parse(process.argv[1]).privateKey' "$keys")"
+          npx convex env set JWKS -- "$(node -p 'JSON.parse(process.argv[1]).jwks' "$keys")"
+          nohup npx convex dev --typecheck disable --codegen disable --tail-logs always \
+            > "$RUNNER_TEMP/convex.log" 2>&1 &
+          for _ in $(seq 1 120); do
+            grep -q "Convex functions ready" "$RUNNER_TEMP/convex.log" && break
+            sleep 2
+          done
+          grep -q "Convex functions ready" "$RUNNER_TEMP/convex.log" || { cat "$RUNNER_TEMP/convex.log"; exit 1; }
+          # The push wrote the local URLs into .env.local, which Metro reads.
+          # The run's Metro gets no other environment from this job, so the
+          # dev sign-in flag and the Development Test Store key (pinned in
+          # app.config.js) go into the same file.
+          {
+            echo "EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true"
+            echo "EXPO_PUBLIC_REVENUECAT_TEST_KEY=test_VOYicTvOGPXCBFMVdHzyxRndiRi"
+          } >> .env.local
+          cat .env.local
+
+      - name: Run the model-free flows
+        working-directory: tools/e2e
+        run: >-
+          pnpm exec e2e run
+          tests/smoke.e2e.ts
+          tests/search.e2e.ts
+          tests/search-no-results.e2e.ts
+          tests/create-space.e2e.ts
+          tests/paywall.e2e.ts
+          --reporter list,junit
+
+      - name: Copy the backend log
+        if: ${{ !cancelled() }}
+        run: cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
+
+      - name: Upload the run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-ios
+          path: tools/e2e/.e2e
+          if-no-files-found: warn
+          retention-days: 14

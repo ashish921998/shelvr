@@ -1,7 +1,7 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { startOnSeededHome, tapUntilVisible } from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -9,8 +9,14 @@ test("creates a space", async ({ screen }) => {
   const name = `Pilot ${Date.now()}`;
 
   await screen.getByRole("tab", "Spaces").tap();
-  await screen.getByRole("button", "New space").tap();
-  await screen.getByRole("textbox").fill(name);
+  // "New space" has been tapped and its form never opened, once before #351
+  // and once after, with no cause found.
+  const field = screen.getByRole("textbox");
+  await tapUntilVisible(screen.getByRole("button", "New space"), field, {
+    waitMs: 5000,
+    timeout: 60_000,
+  });
+  await field.fill(name);
   // The app gives this control a label but no button role.
   await screen.getByLabel("Create space").tap();
 

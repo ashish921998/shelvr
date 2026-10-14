@@ -17,6 +17,13 @@ export const SHEET_TRANSITION_MS = 1000;
 const ADD_SHEET_WAIT_MS = 3000;
 
 /**
+ * Long enough for Profile to be up after a tap that was accepted, even right
+ * after a cold start, when it opens slowest. A normal open takes under two
+ * seconds.
+ */
+const PROFILE_WAIT_MS = 15_000;
+
+/**
  * Starts every test on Home as the anonymous dev user with the fixture data:
  * 4 saves, 3 spaces and a Pro entitlement. Needs AUTH_ENABLE_ANONYMOUS on the
  * dev Convex deployment; the reset button does not exist otherwise.
@@ -51,12 +58,16 @@ export function startOnSeededHome(): void {
     if (await openerSignIn.isVisible()) await openerSignIn.tap();
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
 
-    await profile.tap({ timeout: BUNDLE_TIMEOUT });
-    // Right after a cold start the first Profile open has taken longer than
-    // a locator's default wait.
-    await screen
-      .getByRole("button", "Settings")
-      .tap({ timeout: BUNDLE_TIMEOUT });
+    // A Profile tap has been lost with nothing on screen to say why: the
+    // engine reported the tap, Profile never opened, and Home looked ready
+    // (seen 2026-10-14, once in three runs; tapping the moment the splash
+    // leaves did not reproduce it in 13 tries).
+    const settings = screen.getByRole("button", "Settings");
+    await tapUntilVisible(profile, settings, {
+      waitMs: PROFILE_WAIT_MS,
+      timeout: BUNDLE_TIMEOUT,
+    });
+    await settings.tap();
     const reset = screen.getByTestId("reset-flow-fixtures");
     // A swipe sent while the Settings sheet is still rising moves nothing,
     // and the scroll gives up on the first swipe that moves nothing.
@@ -82,30 +93,47 @@ export function startOnSeededHome(): void {
 }
 
 /**
+ * Taps `control` until `result` is on screen, for a control whose tap can be
+ * lost: an accepted tap shows `result` well inside `waitMs`, so it is tapped
+ * again only after that. Each tap is its own step in the run's report, so a
+ * lost tap stays visible there instead of passing unseen.
+ */
+export async function tapUntilVisible(
+  control: Locator,
+  result: Locator,
+  { waitMs, timeout }: { waitMs: number; timeout: number },
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        if (await result.isVisible()) return true;
+        await control.tap({ timeout });
+        await expect(result)
+          .toBeVisible({ timeout: waitMs })
+          .catch(() => undefined);
+        return result.isVisible();
+      },
+      { timeout },
+    )
+    .toBe(true);
+}
+
+/**
  * Opens Add and taps one of its options.
  *
  * Home's Add drops a tap while the entitlement is still loading, and nothing
  * on Home says when that is over, so Add is tapped again if its sheet has not
- * come up. An accepted tap has the sheet up well inside the wait between
- * taps. The options are in turn disabled until the entitlement has loaded,
- * and a tap on a disabled option does nothing.
+ * come up. The options are in turn disabled until the entitlement has
+ * loaded, and a tap on a disabled option does nothing.
  */
 export async function chooseAddOption(
   screen: Screen,
   option: Locator,
 ): Promise<void> {
-  const add = screen.getByRole("button", "Add");
-  await expect
-    .poll(
-      async () => {
-        if (await option.isVisible()) return true;
-        await add.tap();
-        await new Promise((resolve) => setTimeout(resolve, ADD_SHEET_WAIT_MS));
-        return option.isVisible();
-      },
-      { timeout: 60_000 },
-    )
-    .toBe(true);
+  await tapUntilVisible(screen.getByRole("button", "Add"), option, {
+    waitMs: ADD_SHEET_WAIT_MS,
+    timeout: 60_000,
+  });
   await expect(option).toBeEnabled({ timeout: 30_000 });
   await option.tap();
 }
