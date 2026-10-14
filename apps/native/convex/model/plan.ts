@@ -148,16 +148,25 @@ function evidenceOf(source: PlanSource): Evidence {
  * True when the save names the place. The model may only pick places a save
  * names; this drops one it made up. A name made only of generic words
  * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
- * every distinctive word must appear in the squashed text, so "@parici_cafe"
- * grounds "Par Ici Café" while "Great pasta tonight" does not ground "Pasta
- * Palace". A name with no distinctive word ("Si Si", "Au 79") must appear
- * word for word.
+ * every distinctive word must be a whole word of the save, so "Great pasta
+ * tonight" does not ground "Pasta Palace" and "Toronto" does not ground
+ * "Oro". Two exceptions read the squashed text instead: a name of several
+ * words run together, so "@barlola_nyc" grounds "Bar Lola", and a word in
+ * a script written without spaces, so "四谷のすし匠で" grounds "すし匠". A name
+ * with no distinctive word ("Si Si", "Au 79") must appear word for word.
  */
 function namesPlace(name: string, evidence: Evidence): boolean {
-  const specific = wordsOf(name).filter((word) => !GENERIC_WORDS.has(word));
+  const words = wordsOf(name);
+  const specific = words.filter((word) => !GENERIC_WORDS.has(word));
   const strong = specific.filter(distinctive);
   if (strong.length > 0) {
-    return strong.every((word) => evidence.text.includes(word));
+    const named = (word: string) =>
+      evidence.words.has(word) ||
+      (!/^[a-z0-9]+$/.test(word) && evidence.text.includes(word));
+    return (
+      strong.every(named) ||
+      (words.length > 1 && evidence.text.includes(words.join("")))
+    );
   }
   // The whole name must still be long enough to prove anything, so a word
   // like "Go" or "A" never grounds on its own.

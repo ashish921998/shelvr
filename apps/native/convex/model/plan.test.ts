@@ -50,6 +50,24 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("does not ground a name hidden inside other words", () => {
+    expect(isGrounded("Oro", source({ title: "Best tacos in Toronto" }))).toBe(
+      false,
+    );
+    expect(
+      isGrounded("Art Bar", source({ title: "Started the party early" })),
+    ).toBe(false);
+    expect(
+      isGrounded(
+        "Ten Bells",
+        source({ title: "Tender ribs, church bells at noon" }),
+      ),
+    ).toBe(false);
+    expect(isGrounded("Tigre", source({ title: "#tigre on the LES" }))).toBe(
+      true,
+    );
+  });
+
   it("rejects a name the save never mentions", () => {
     expect(isGrounded("Carbone", source({ title: "Best pasta in NYC" }))).toBe(
       false,

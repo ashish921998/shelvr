@@ -165,7 +165,6 @@ export function usePlanPicker(
   };
 }
 
-/** `name` plus its area, for display and for the Maps query. */
 /** Ready saves a space needs before it offers a plan. */
 const PLAN_MIN_SAVES = 3;
 
@@ -192,6 +191,7 @@ export function canMakePlan(items: PlanCandidate[]): boolean {
   );
 }
 
+/** `name` plus its area, for display and for the Maps query. */
 export function placeLabel(place: PlanPlace): string {
   return place.area ? `${place.name}, ${place.area}` : place.name;
 }
