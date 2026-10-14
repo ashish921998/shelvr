@@ -13,7 +13,11 @@ notifications. Map them when a change touches them.
 | [Save a note](save-note.md)       | Home > Add > Note                           | `tests/save-note.e2e.ts`                                | tested                                     |
 | [Save a photo](save-photo.md)     | Home > Add > Photos                         | `tests/save-image.e2e.ts`                               | tested (iPhone 17 only, needs a model key) |
 | [Search](search.md)               | Search tab                                  | `tests/search.e2e.ts`, `tests/search-no-results.e2e.ts` | tested                                     |
-| [Create a space](create-space.md) | Spaces tab > New space                      | `tests/create-space.e2e.ts`                             | tested, one unexplained flake              |
+| [Create a space](create-space.md) | Spaces tab > New space                      | `tests/create-space.e2e.ts`                             | tested                                     |
 | [Paywall](paywall.md)             | Home > Add or "View Pro plans", without Pro | `tests/paywall.e2e.ts`                                  | tested                                     |
 
-`tests/smoke.e2e.ts` is the Doctor, not a feature.
+`tests/smoke.e2e.ts` is the Doctor, not a feature. The `e2e ios` workflow
+(`.github/workflows/e2e-ios.yml`) runs smoke, search, search-no-results,
+create-space and the paywall on pull requests that touch the app, against a
+local Convex backend with no model; the save flows need the model and run by
+hand.

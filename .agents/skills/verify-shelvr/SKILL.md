@@ -60,12 +60,12 @@ Debug dev client (local-qa.md, "Confirm the bundle is yours"). No
 `AUTH_ENABLE_ANONYMOUS` missing on the dev deployment. The smoke test needs no model. Run Doctor first whenever anything
 looks off.
 
-A known setup flake (seen 2026-10-14, once in three runs): the `Profile` tap
-reports success, Profile never opens, and the test fails in `beforeEach` with
-`LOCATOR_NOT_FOUND` on `getByRole("button", "Settings")`
-(`tests/seeded-home.ts`) after 180 seconds, on a Home that looks normal. A
-rerun passed. Rerun once before calling it a regression; if it repeats, it is
-a lost tap, not your change.
+Taps that can be lost (Home's `Add` and `Profile`, Spaces' `New space`) go
+through `tapUntilVisible` in `tests/seeded-home.ts`: it taps again only when
+the result has not appeared after a wait an accepted tap never needs. Each tap
+is its own step in `.e2e/report.json`, so count them there: more than one tap
+on one of those controls in a test means a tap was lost. A flow that still
+fails is a failure to explain, not a flake to rerun away.
 
 ## Drive
 
