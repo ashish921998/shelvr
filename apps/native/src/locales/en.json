@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Apartment shopping list",
   "spaces.dynamic": "Dynamic",
   "spaces.dynamicHelp": "Shelvr keeps suggesting things that fit",
+  "spaces.autoFile": "Add automatically",
+  "spaces.autoFileHelp": "New saves that fit go straight in. Remove any anytime.",
   "common.saveChanges": "Save changes",
   "spaces.create": "Create space",
   "common.continue": "Continue",
@@ -329,7 +331,8 @@
   "item.partial": "Saved from the link alone — the page wouldn't load, so these details are a guess.",
   "item.noArticle": "This page has no readable article — saved as a plain link.",
   "recipe.ingredients": "Ingredients",
-  "recipe.steps": "Steps",
+  "recipe.steps": "Directions",
+  "recipe.stepNumber": "Step %{number}",
   "recipe.serves": {
     "one": "Serves %{formattedCount}",
     "other": "Serves %{formattedCount}"

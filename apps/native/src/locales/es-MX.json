@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Lista de compras para el departamento",
   "spaces.dynamic": "Dinámica",
   "spaces.dynamicHelp": "Shelvr sigue sugiriendo contenido que encaja",
+  "spaces.autoFile": "Agregar automáticamente",
+  "spaces.autoFileHelp": "Lo nuevo que encaje entra directamente. Puedes quitarlo cuando quieras.",
   "common.saveChanges": "Guardar cambios",
   "spaces.create": "Crear colección",
   "common.continue": "Continuar",
@@ -329,7 +331,8 @@
   "item.partial": "Guardado solo a partir del enlace — la página no cargó, así que estos detalles son estimados.",
   "item.noArticle": "Esta página no contiene un artículo legible — guardada como enlace simple.",
   "recipe.ingredients": "Ingredientes",
-  "recipe.steps": "Pasos",
+  "recipe.steps": "Preparación",
+  "recipe.stepNumber": "Paso %{number}",
   "recipe.serves": {
     "one": "Para %{formattedCount} porción",
     "many": "Para %{formattedCount} porciones",

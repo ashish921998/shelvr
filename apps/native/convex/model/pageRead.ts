@@ -303,6 +303,8 @@ export type PageData = {
    * rather than the display text. Readers that don't set it fall back to
    * scanning the caption in `withLinkedRecipe`. */
   linkedUrl?: string;
+  /** The post's own address, once a share or short link has named it. */
+  postUrl?: string;
 };
 
 /** Hosts whose pages are link hubs or the social network itself — never the
@@ -347,6 +349,24 @@ export function firstLinkedUrl(text: string | undefined): string | undefined {
  * also returns 400 for unsupported URL shapes, so only true 404/410 responses
  * are treated as permanently gone by the shared page reader.
  */
+/** A short link (vm.tiktok.com, tiktok.com/t/) resolved to the video it
+ * names, from the oEmbed author and video id. */
+function tikTokPostUrl(
+  handle: string | undefined,
+  videoId: string | undefined,
+): string | undefined {
+  return handle &&
+    videoId &&
+    /^[A-Za-z0-9._]+$/.test(handle) &&
+    /^\d+$/.test(videoId)
+    ? `https://www.tiktok.com/@${handle}/video/${videoId}`
+    : undefined;
+}
+
+function postField(postUrl: string | undefined): { postUrl?: string } {
+  return postUrl ? { postUrl } : {};
+}
+
 async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
   const result = await safeFetch(endpoint, {
@@ -368,6 +388,7 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const handle = str("author_unique_id");
   const caption = str("title");
   return {
+    ...postField(tikTokPostUrl(handle, str("embed_product_id"))),
     title: caption,
     siteName: "TikTok",
     author: handle ? `@${handle}` : str("author_name"),
@@ -848,7 +869,13 @@ async function fetchInstagramPost(url: string) {
       error_category: embed.errorCategory,
     });
   }
-  return { page, html, kind: (post ?? linked)?.kind, embed };
+  return {
+    page,
+    html,
+    kind: (post ?? linked)?.kind,
+    embed,
+    postUrl: post && instagramPostUrl(post),
+  };
 }
 
 /**
@@ -860,7 +887,7 @@ async function fetchInstagramPost(url: string) {
  * incomplete so the save can retry.
  */
 export async function fetchInstagram(url: string): Promise<PageData> {
-  const { page, html, kind, embed } = await fetchInstagramPost(url);
+  const { page, html, kind, embed, postUrl } = await fetchInstagramPost(url);
   const embedded: InstagramEmbedFields =
     embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
   const card = instagramCard(html);
@@ -889,6 +916,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
       (kind === "p" ? 1 : 9 / 16))
     : undefined;
   return {
+    ...postField(postUrl),
     title:
       Array.from(caption?.split("\n")[0] ?? "")
         .slice(0, 100)
@@ -1466,6 +1494,13 @@ async function asCaption(read: Promise<PageData>): Promise<PageData> {
   return { ...(await read), caption: true };
 }
 
+/** An Instagram read's content is only ever the captioned embed's caption,
+ * the whole of it; a post read from its card alone has none. */
+async function asInstagramCaption(read: Promise<PageData>): Promise<PageData> {
+  const page = await read;
+  return page.content === undefined ? page : { ...page, caption: true };
+}
+
 /** The reader for each platform with its own, each following its caption's
  * link to a recipe. Pinterest does that only for a pin it read from the
  * widget: its page fallback is not a caption, so it neither is marked one nor
@@ -1474,7 +1509,8 @@ const SOURCE_READERS = {
   tiktok: async (url) =>
     withLinkedRecipe(await asCaption(fetchTikTokOEmbed(url))),
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
-  instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
+  instagram: async (url) =>
+    withLinkedRecipe(await asInstagramCaption(fetchInstagram(url))),
   pinterest: fetchPinterestPin,
   youtube: fetchYouTube,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;
