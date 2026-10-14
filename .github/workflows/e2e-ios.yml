@@ -184,6 +184,12 @@ jobs:
             sleep 2
           done
           grep -q "Convex functions ready" "$RUNNER_TEMP/convex.log" || { cat "$RUNNER_TEMP/convex.log"; exit 1; }
+          # The first anonymous sign-in on a cold backend has run past the
+          # 1 s function limit and failed the first flow's setup. Sign in
+          # once here, as a throwaway user, so the flows meet a warm backend.
+          for _ in 1 2; do
+            npx convex run auth:signIn '{"provider":"anonymous","params":{}}' > /dev/null || true
+          done
           # The push wrote the local URLs into .env.local, which Metro reads.
           # The run's Metro gets no other environment from this job, so the
           # dev sign-in flag and the Development Test Store key (pinned in
