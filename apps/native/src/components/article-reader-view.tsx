@@ -234,7 +234,7 @@ export function ArticleReaderView({
             article's own images go with that story, since their positions are
             paragraph-relative and the paragraphs are gone. */}
         {item.recipe ? (
-          <RecipeSection recipe={item.recipe} />
+          <RecipeSection key={item._id} recipe={item.recipe} />
         ) : (
           <View style={styles.article}>
             {paragraphs.map((paragraph, index) => (

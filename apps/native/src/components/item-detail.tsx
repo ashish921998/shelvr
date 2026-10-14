@@ -583,9 +583,10 @@ function DetailSections({
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
           the ingredients and steps out of the story around them. A social post
           keeps its caption above and gains the recipe its caption described or
-          linked to; a recipe screenshot gets the card under the photo. */}
+          linked to; a recipe screenshot gets the card under the photo. Keyed
+          by item so a recycled pager page opens a new recipe on Ingredients. */}
       {detail.recipe ? (
-        <RecipeSection recipe={detail.recipe} />
+        <RecipeSection key={item._id} recipe={detail.recipe} />
       ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
