@@ -51,7 +51,7 @@ export default function NewSpaceScreen() {
   const editing = id !== undefined;
 
   // 'skip' (not `enabled`) keeps create mode from subscribing with an empty
-  // id — see item/[id].tsx for why `enabled` is not enough here.
+  // id. See item/[id].tsx for why `enabled` is not enough here.
   const {
     data: space,
     isLoading,
@@ -101,7 +101,7 @@ function SpaceForm(props: SpaceFormProps) {
   const reducedMotion = useReducedMotion();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
-  // Creating a space and enabling dynamic are Pro — route to the paywall if
+  // Creating a space and enabling dynamic are Pro: route to the paywall if
   // not entitled. Editing a name or turning dynamic off stays open to lapsed
   // users (managing existing data).
   const { guard } = usePaywallGuard("new_space");
@@ -112,7 +112,7 @@ function SpaceForm(props: SpaceFormProps) {
   const [name, setName] = useState(
     props.mode === "edit" ? props.space.name : "",
   );
-  // Dynamic is the marquee behavior — on by default for a new space; an edit
+  // Dynamic is the marquee behavior: on by default for a new space; an edit
   // mirrors the server, treating a legacy status-less space as off.
   const [dynamic, setDynamic] = useState(
     props.mode === "edit" ? (props.space.dynamic ?? false) : true,

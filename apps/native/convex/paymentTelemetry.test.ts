@@ -459,7 +459,7 @@ describe("cancellation lifecycle telemetry", () => {
   it("maps inherited-property reasons like 'constructor' to unknown instead of poisoning the event", () => {
     // `in` would pass (inherited from Object.prototype) and surface the
     // constructor function as cancel_category, which the enqueue validator
-    // would reject — dropping the whole webhook event. Own-property check
+    // would reject, dropping the whole webhook event. Own-property check
     // must fall back to unknown.
     const parsed = parsePaymentTelemetry({
       event: { ...lifecycle, cancel_reason: "constructor" },

@@ -47,7 +47,7 @@ function captureEntitlementActivation(
 
 /** Records a purchase or restore that just succeeded natively, so its
  * `entitlement_activated` event fires when the Convex entitlement row becomes
- * visible. The webhook can win the race with the native promise — when it
+ * visible. The webhook can win the race with the native promise. When it
  * does, the row is already visible and the event fires immediately. */
 export function recordAccess(source: "purchase" | "restore"): void {
   const at = Date.now();
@@ -105,7 +105,7 @@ let blockedAction: {
   purchased: boolean;
 } | null = null;
 
-/** A blocked action older than this no longer counts as resumed — the person
+/** A blocked action older than this no longer counts as resumed: the person
  * came back for their own reasons, not to finish the blocked step. */
 const BLOCKED_ACTION_RESUME_MS = 30 * 60_000;
 
@@ -120,7 +120,7 @@ export function recordBlockedAction(
 }
 
 /** Reports a gated action that later went through after a paywall block at
- * the same placement, then clears the memory — one resumed event per block. */
+ * the same placement, then clears the memory: one resumed event per block. */
 export function resumeBlockedAction(placement: string): void {
   const blocked = blockedAction;
   if (blocked === null || blocked.placement !== placement) return;
@@ -147,8 +147,8 @@ type IntroEligibilityStatuses = NonNullable<
 /** Folds the offering's per-product intro-eligibility answers into the one
  * bounded word the funnel reports: any eligible product makes the offering
  * eligible; an offering where every answer says no intro offer exists reports
- * `no_intro`; any ineligible answer reports `ineligible`; anything else —
- * missing answers included — reports `unknown`. */
+ * `no_intro`; any ineligible answer reports `ineligible`; anything else,
+ * missing answers included, reports `unknown`. */
 function foldTrialEligibility(
   statuses: (number | undefined)[],
   intro: IntroEligibilityStatuses,
@@ -175,7 +175,7 @@ function foldTrialEligibility(
 /** Reads the paywall context from RevenueCat's caches. Both calls are cache
  * reads in practice, but one shared timeout caps the worst case so a cold SDK
  * can never hold the sheet open for them. Each part is empty when its read
- * fails — the events carry no guess. */
+ * fails: the events carry no guess. */
 const PAYWALL_CONTEXT_TIMEOUT_MS = 2_000;
 
 export async function readPaywallContext(): Promise<PaywallContext> {
@@ -202,7 +202,7 @@ export async function readPaywallContext(): Promise<PaywallContext> {
 
 /** The offering the paywall is about to show and the free trial on it, so the
  * timeline dates describe the plan being sold. Call it once RevenueCat
- * identity sync is ready — offerings can be targeted per account — and present
+ * identity sync is ready (offerings can be targeted per account) and present
  * the returned offering, so the sheet and its dates come from one snapshot.
  * Empty when the read fails or stalls: the sheet then resolves its own
  * offering and shows no dates. */

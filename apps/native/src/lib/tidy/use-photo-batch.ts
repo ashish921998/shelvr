@@ -15,7 +15,7 @@ const BATCH_SIZE = 24;
 const PAGE_SIZE = 48;
 
 export type TidyPhoto = {
-  /** `ph://…` on iOS, `content://…` on Android — renderable by expo-image and
+  /** `ph://…` on iOS, `content://…` on Android, renderable by expo-image and
    * usable to re-instantiate a `MediaLibrary.Asset`. */
   id: string;
   width: number | null;
@@ -40,7 +40,7 @@ type Params = {
 
 /**
  * Pages a photo source (newest first) and yields fixed batches of unreviewed
- * photos. The deck array is REVERSED — newest photo at the highest index —
+ * photos. The deck array is REVERSED: newest photo at the highest index,
  * because the card stack renders the top card last and counts its index down.
  * Switching source resets paging and loads a fresh batch.
  *
@@ -54,7 +54,7 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
   const [batch, setBatch] = useState<TidyPhoto[] | null>(null);
   const [batchId, setBatchId] = useState(0);
   // Which source `batch` reflects. A mismatch with the active sourceId means
-  // a reload is in flight — the screen derives its loading state from this
+  // a reload is in flight: the screen derives its loading state from this
   // rather than a synchronous setState in the effect below.
   const [loadedSourceId, setLoadedSourceId] = useState<string | null>(null);
   // How many assets we've paged past in the media store. Deletions shrink the
@@ -68,7 +68,7 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
 
   // Pages the media store until BATCH_SIZE unreviewed photos are collected or
   // the source is exhausted. Kept separate so the caller's setState is always
-  // after this `await` — no synchronous render cascade when run from an effect.
+  // after this `await`: no synchronous render cascade when run from an effect.
   const collectBatch = useCallback(
     async (epoch: number): Promise<TidyPhoto[]> => {
       const collected: TidyPhoto[] = [];
@@ -83,7 +83,7 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
         }
         const page = await query.exeForMetadata();
 
-        // Source switched while we were awaiting — stop mutating shared refs.
+        // Source switched while we were awaiting: stop mutating shared refs.
         if (epochRef.current !== epoch) return collected.reverse();
 
         // Advance the offset by the number of assets actually consumed from

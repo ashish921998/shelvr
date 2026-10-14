@@ -32,7 +32,7 @@ const PAYWALL_RECHECK_MS = 2000;
  * and never asks while the row's state is unknown (still loading) or asked.
  * The markShown verdict arbitrates alone: an accepted verdict emits `shown`
  * and keeps the card up; a rejected one (another device consumed the ask
- * first) takes it down without emitting anything — only the call that
+ * first) takes it down without emitting anything: only the call that
  * consumed the ask may count a `shown`.
  *
  * A failed markShown leaves the ask unspent for the next episode. Responses
@@ -40,7 +40,7 @@ const PAYWALL_RECHECK_MS = 2000;
  * after markShown has consumed the ask. Neither retry emits another shown.
  *
  * The ask is consumed only when the card actually renders (`presented`),
- * never at detection time — closing the app on Home's loading screen leaves
+ * never at detection time: closing the app on Home's loading screen leaves
  * the ask unspent for the next visit. While the card is up, a later check
  * that finds renewal resumed (UNCANCELLATION) takes it down: its premise,
  * "auto-renew is off", no longer holds.
@@ -91,18 +91,18 @@ export function useCancelSurvey(): {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const attempt = async () => {
       const state = await readRcTrialCancellation();
-      // Interrupted (left Home mid-read): the episode is NOT consumed — the
+      // Interrupted (left Home mid-read): the episode is NOT consumed: the
       // flag below is only set on a completed check, so returning Home
       // retries detection in the same foreground session.
       if (cancelled) return;
-      // Never compete with a paywall sheet for the moment — including one
+      // Never compete with a paywall sheet for the moment, including one
       // that opened during the read. Poll until it clears rather than
       // spending the ask under a sheet (feedback-invitation's discipline).
       if (isPaywallPending()) {
         timer = setTimeout(() => void attempt(), PAYWALL_RECHECK_MS);
         return;
       }
-      // Completed: the episode is spent only now, never at effect start —
+      // Completed: the episode is spent only now, never at effect start:
       // an interrupted attempt must not block a retry.
       episodeChecked.current = true;
       if (state === "cancelled" && !surveyStatus.asked) {
@@ -122,14 +122,14 @@ export function useCancelSurvey(): {
 
   // The ask is presented once per mount: a remount of the card (feed
   // refresh, empty-feed ↔ feed branch switch) must not emit a second
-  // `cancel_survey_shown` — the server markShown is idempotent, analytics
+  // `cancel_survey_shown`: the server markShown is idempotent, analytics
   // is not. A plain boolean suffices: an identity change unmounts Home (the
   // (app) layout redirects to sign-in), so this ref never outlives a user.
   const askPresented = useRef(false);
   const presented = useCallback(() => {
     if (!userId || askPresented.current) return;
     askPresented.current = true;
-    // Only now is the ask spent — the card is on screen. Fire-and-forget:
+    // Only now is the ask spent: the card is on screen. Fire-and-forget:
     // the Convex client queues and retries the mutation if offline. The
     // verdict arbitrates the cross-device race: only the call that consumed
     // the ask may emit `shown`; a loser (another device got there first)

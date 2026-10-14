@@ -201,8 +201,8 @@ export const createDemoItem = mutation({
  * the `demoRetry` rate limiter (cooldown) and `retryCount` (total cap).
  *
  * Same gate as `reprocessItem`: a terminal failure (the page is gone) is
- * refused outright — it would spend a classification without changing the
- * result — and consumes neither the retry cap nor the rate-limit bucket.
+ * refused outright (it would spend a classification without changing the
+ * result) and consumes neither the retry cap nor the rate-limit bucket.
  */
 export const retryDemoItem = mutation({
   args: {},

@@ -1,7 +1,7 @@
 /**
  * The canonical entitlement gate, shared by the server-side mutation guard
  * (`requireProEntitlement`) and the client-side `useEntitlement` hook so both
- * agree on what "entitled" means. Pure — no Convex imports — so it bundles
+ * agree on what "entitled" means. Pure: no Convex imports, so it bundles
  * safely into the React Native client via the `@convex/model/entitlement`
  * alias.
  *

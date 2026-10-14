@@ -218,7 +218,7 @@ function notificationField(
 
 /**
  * The route a notification carries, if any. Exported because the splash gate
- * decides whether to stand down from the same rule this navigates by — a push
+ * decides whether to stand down from the same rule this navigates by. A push
  * with no `url` goes nowhere, so it is not a reason to skip the animation.
  */
 export function getNotificationUrl(

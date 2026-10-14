@@ -72,7 +72,7 @@ export function isEntryPoint(relPath, readSource) {
   // A TypeScript file with no top-level import or export is not a module, so
   // Convex drops it after the path rules rather than during them. `readSource`
   // is a thunk because every rule above decides on the path alone, and most
-  // files never get this far — no reason to read them off disk.
+  // files never get this far: no reason to read them off disk.
   if (
     (relPath.endsWith(".ts") || relPath.endsWith(".tsx")) &&
     !/^\s{0,100}(import|export)/m.test(readSource())

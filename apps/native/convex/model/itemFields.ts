@@ -4,7 +4,7 @@ import { type Infer, v } from "convex/values";
  * Item-field validators shared by `schema.ts` (the document shape) and
  * `items.ts` (the `returns:` validators). Defining them once here is the point:
  * `items.ts` carries a comment about `capturedAt`/`intents` drifting out of its
- * hand-copied validator — these two fields must not become the next instance.
+ * hand-copied validator. These two fields must not become the next instance.
  */
 
 // The closed set of intent kinds the model may emit and the client can run.
@@ -81,7 +81,7 @@ export type Recipe = Infer<typeof recipeValidator>;
 // How much of the item could be enriched. "partial" = classified from the URL
 // alone because the page body was unreadable (retryable); "no_article" = the
 // page loaded but no article body could be extracted (a landing page or docs
-// URL, say — nothing a retry would change); absent = fully enriched.
+// URL, say: nothing a retry would change); absent = fully enriched.
 export const enrichmentValidator = v.union(
   v.literal("partial"),
   v.literal("no_article"),

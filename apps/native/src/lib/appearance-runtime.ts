@@ -10,12 +10,12 @@ import { useCallback, useState } from "react";
 
 /**
  * Imperative appearance application. Lives apart from `appearance.ts` (which
- * must not import react-native-unistyles — see the note there) and is the only
+ * must not import react-native-unistyles: see the note there) and is the only
  * place that drives the Unistyles runtime.
  *
  * `system` re-arms adaptive theming so the app follows the OS again. Pinned
  * modes disable adaptivity (otherwise the OS scheme would override the user's
- * choice) and select the theme directly — the OS itself can stay light while
+ * choice) and select the theme directly: the OS itself can stay light while
  * the app renders dark.
  */
 function setAppearanceMode(mode: AppearanceMode): void {

@@ -149,7 +149,7 @@ const SYSTEM_PROMPT =
   "sentence, and never end with a period.";
 
 // The closed set of intent kinds the model may emit is INTENT_KINDS from
-// model/itemFields — the same tuple the Convex validators derive from, so the
+// model/itemFields, the same tuple the Convex validators derive from, so the
 // zod enum below and the DB shape cannot drift. Anything outside it is
 // dropped in sanitizeIntents before finalize.
 
@@ -171,13 +171,13 @@ const intentsPromptBlock = (maxIntents: number): string =>
   ].join("\n");
 
 // How much extracted text to feed the classifier. The model only needs enough
-// to understand the piece — it doesn't read the whole thing.
+// to understand the piece. It doesn't read the whole thing.
 const MAX_CONTENT_CHARS = 8000;
 
 /**
  * Reduce a caught error to a safe log category. Fetch-policy errors expose only
  * their stable code; anything else retains the error's constructor name (e.g.
- * TypeError) for observability without leaking data — never the error's message
+ * TypeError) for observability without leaking data, never the error's message
  * or cause, which may carry a URL, response body, or resolved address.
  */
 /** Queues the purpose-steering pass for an item in each given space. */
@@ -274,7 +274,7 @@ const recipeSchema = z
 
 /** The classifier output for sources where the model is the only way to get
  * a recipe: captions, screenshots, notes. Web pages classify with the base
- * schema — their recipe comes from schema.org markup, so asking the model
+ * schema: their recipe comes from schema.org markup, so asking the model
  * again would only cost output tokens and invite a truncated guess. */
 const itemAnalysisWithRecipeSchema = itemAnalysisSchema.extend({
   recipe: recipeSchema,
@@ -303,7 +303,7 @@ const ALLOWED_INTENT_KINDS = new Set<string>(INTENT_KINDS);
  * Clean the model's proposed intents before they're persisted: drop unknown
  * kinds, trim/limit text, require a plausible payload per kind (open_url must
  * be http(s); email needs an @; call/message need a digit), dedupe, and cap the
- * count. A rejected intent is simply omitted — never fails the whole finalize.
+ * count. A rejected intent is simply omitted, never fails the whole finalize.
  */
 function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
   const seen = new Set<string>();
@@ -500,7 +500,7 @@ function linkAnalysisPrompt(
 /**
  * Links read the page first. A gone URL (404/410) is terminal: the item is
  * failed here and `terminal` tells the caller to stop. An unreadable read is
- * not terminal — the item still classifies from the URL alone.
+ * not terminal: the item still classifies from the URL alone.
  */
 async function analyzeLinkItem(
   ctx: ActionCtx,
@@ -839,7 +839,7 @@ export function finalRecipe(
 }
 
 /** Map the model's returned space names back to ids (case-insensitive,
- * trimmed). Unknown names are dropped — the classifier only ever suggests
+ * trimmed). Unknown names are dropped: the classifier only ever suggests
  * spaces it was shown. */
 function spaceNameIds(
   spaceNames: string[],
@@ -899,8 +899,8 @@ async function failItemAndRecordOutcome(
  * to its own reason; a timed-out model call is an expected operational
  * condition, so it warns (not errors) and fails with the retryable `error`
  * reason. Returns the sanitized error category for the caller to rethrow, or
- * null when the failure is fully handled — rethrowing would page on provider
- * slowness.
+ * null when the failure is fully handled (rethrowing would page on provider
+ * slowness).
  */
 async function handleProcessingFailure(
   ctx: ActionCtx,
@@ -913,7 +913,7 @@ async function handleProcessingFailure(
   },
 ): Promise<string | null> {
   // Sanitized error log. For fetch-policy failures (PageFetchError,
-  // SafeFetchError) log only the stable policy code + item id — never the
+  // SafeFetchError) log only the stable policy code + item id, never the
   // error object, its cause, URLs, headers, response bodies, or resolved
   // addresses. For other errors log a generic category so a thrown Error's
   // message (which may include a URL) is not leaked either.
@@ -939,7 +939,7 @@ async function handleProcessingFailure(
     });
   }
   // failItem is run-fenced: if a retry already superseded this run the write
-  // is skipped, which is exactly right — the newer run owns the item's status
+  // is skipped, which is exactly right: the newer run owns the item's status
   // now, and its outcome is the one worth counting.
   await failItemAndRecordOutcome(ctx, args, run, {
     reason: "error",
@@ -976,8 +976,8 @@ async function refreshClaimed(
  * what lets it ride the same run-fenced write as the text it describes, so a
  * superseded run can never leave a vector disagreeing with the row beside it.
  *
- * The title is resolved with finalizeItem's own rule — a title the owner typed
- * (or one a note refresh keeps) outranks the classifier's — so the vector
+ * The title is resolved with finalizeItem's own rule: a title the owner typed
+ * (or one a note refresh keeps) outranks the classifier's, so the vector
  * describes the title the row actually ends up with, not one this run proposed
  * and the mutation then discarded.
  */
@@ -1154,7 +1154,7 @@ export const processItem = internalAction({
         // this run was awaiting the model). Either way this run's output is
         // discarded: release the poster it stored and stop without touching
         // memberships or telemetry for a result nobody will see. Not an
-        // error — the fence working is the expected outcome of that race.
+        // error: the fence working is the expected outcome of that race.
         if (posterStorageId !== undefined) {
           await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
             storageId: posterStorageId,
@@ -1396,7 +1396,7 @@ export const findProductLinks = internalAction({
       }
 
       if (query === "") {
-        // Not a product — an empty, successful result (the UI says so).
+        // Not a product: an empty, successful result (the UI says so).
         await ctx.runMutation(internal.items.setProductsInternal, {
           itemId: args.itemId,
           products: [],
@@ -1427,7 +1427,7 @@ export const findProductLinks = internalAction({
           ct === "application/json" || ct.startsWith("application/json;"),
       });
       if (!result.ok) {
-        // Log only the policy code — never the URL (it carries the API key),
+        // Log only the policy code, never the URL (it carries the API key),
         // never a response body or resolved address.
         logEvent("error", "find_product_links_blocked", {
           item_id: args.itemId,

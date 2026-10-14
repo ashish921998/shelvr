@@ -30,7 +30,7 @@ export const MODEL = wrapLanguageModel({
 // not retry an abort), so each figure is the per-call worst case. Per action
 // the budget is one model call plus the safeFetch deadlines around it (15 s
 // page + 10 s hero image + 10 s poster), so the longest processItem run ends
-// in about 100 s — far under both the action limit and PROCESSING_STALE_MS.
+// in about 100 s, far under both the action limit and PROCESSING_STALE_MS.
 // One retry on retryable provider errors (429/5xx). The default of 2 would let
 // a flaky provider triple the wall-clock spend inside a single deadline.
 const MODEL_MAX_RETRIES = 1;

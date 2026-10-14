@@ -21,8 +21,8 @@ export function redirectSystemPath({
   // animation learns to stand down: a user opening a share or a deep link is
   // on their way somewhere and should not wait out a splash first.
   //
-  // A plain home-screen launch reaches this too — Expo Router falls back to
-  // the app's root URL when there is no real link — so the root is compared
+  // A plain home-screen launch reaches this too, Expo Router falls back to
+  // the app's root URL when there is no real link, so the root is compared
   // against rather than merely checking that the path is an absolute URL.
   if (isDeepLink(path, Linking.createURL("/"))) markDirectLaunch();
 
@@ -50,13 +50,13 @@ export function redirectSystemPath({
       try {
         markPendingShareOnDevice();
       } catch {
-        // Best-effort: a SecureStore failure loses only the resume flag —
+        // Best-effort: a SecureStore failure loses only the resume flag:
         // it must not stop this recognized share from routing to /share.
       }
       return "/share";
     }
   } catch {
-    // Relative/malformed paths aren't share intents — fall through.
+    // Relative/malformed paths aren't share intents: fall through.
   }
   return path;
 }

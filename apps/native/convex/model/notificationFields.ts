@@ -91,8 +91,8 @@ export function truncateTitle(title: string): string | undefined {
   if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
   const clipped = trimmed.slice(0, MAX_TITLE_LENGTH);
   const boundary = clipped.lastIndexOf(" ");
-  // A title with no space near the end — a long slug, or a script that does
-  // not space-separate — keeps the hard clip instead of losing most of its
+  // A title with no space near the end (a long slug, or a script that does
+  // not space-separate) keeps the hard clip instead of losing most of its
   // characters to a boundary early in the string.
   const body =
     boundary > MAX_TITLE_LENGTH / 2 ? clipped.slice(0, boundary) : clipped;
@@ -121,7 +121,7 @@ const catalogs: Record<
  *
  * Without a usable title it falls back to counting, which is what every build
  * before this one sent. The title is user content, so it is substituted
- * through a replacer function — a plain string replacement would let `$&` and
+ * through a replacer function: a plain string replacement would let `$&` and
  * its siblings inside a title expand into the surrounding copy.
  */
 export function digestCopy(

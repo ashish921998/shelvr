@@ -116,7 +116,7 @@ describe("isValidEmbedding", () => {
 
   it("rejects what normalizeEmbedding produces from a zero vector", () => {
     // The two helpers are always composed in production, so the composition is
-    // what has to be safe — neither one alone catches this.
+    // what has to be safe: neither one alone catches this.
     const zero = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0);
     expect(isValidEmbedding(normalizeEmbedding(zero))).toBe(false);
   });

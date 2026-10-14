@@ -146,7 +146,7 @@ export default function MapScreen() {
     return <ScreenLoader label={t("loading.map")} />;
   }
 
-  // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
+  // Map is a Pro feature: a lapsed user who deep-links here is bounced to the
   // paywall instead of seeing the map. ProGate's CTA presents the paywall
   // under this screen's own placement, so its attempts stay separable from
   // Tidy's in the paywall funnel.

@@ -182,7 +182,7 @@ type AnalyticsEventProperties = {
     package_id: string;
   };
   // A purchase or restore made the Convex `subscriptions` row visible to the
-  // client — the webhook delivered, the query updated. `delay_ms` measures
+  // client: the webhook delivered, the query updated. `delay_ms` measures
   // the purchase-to-entitlement path, not the whole funnel.
   entitlement_activated: {
     status: "trialing" | "pro" | "lifetime";
@@ -201,7 +201,7 @@ type AnalyticsEventProperties = {
   item_action: ItemProperties & { action: ItemAction };
   // The first-save funnel's client legs. `save_attempt_started` fires when a
   // submission actually begins (a composer save tap, a share entry, or an
-  // image operation) — after the auth and Pro gates, which the paywall and
+  // image operation), after the auth and Pro gates, which the paywall and
   // auth events already cover. `save_source` matches the server's
   // `item_saved`, and idempotent operations join on `operation_id`.
   // `save_failed` carries the bounded stage; content, URLs, and error text
@@ -273,7 +273,7 @@ type AnalyticsEventProperties = {
     $set: { save_pileup: string[]; save_types: string[] };
   };
   // Feedback events never carry message text; see lib/feedback.ts. The
-  // submission event fires only after Convex acknowledges persistence — the
+  // submission event fires only after Convex acknowledges persistence. The
   // message itself lives in Convex and the support inbox, never in PostHog.
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
@@ -284,7 +284,7 @@ type AnalyticsEventProperties = {
     delivery: "scheduled" | "unconfigured";
   };
   // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
-  // space names — only the outcome of the user's one real demo save.
+  // space names. Only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
   // A first-save pick, before any sign-in. `sample` is a ready-made link
@@ -352,8 +352,8 @@ type AnalyticsEventProperties = {
   exit_offer_reminder_opt_out: Record<string, never>;
   exit_offer_expired_open: Record<string, never>;
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
-  // never free text. A response is stated intent, NOT proof of cancellation —
-  // only the server-side webhook events (trial_cancelled, …) count as
+  // never free text. A response is stated intent, NOT proof of cancellation.
+  // Only the server-side webhook events (trial_cancelled, …) count as
   // cancellations; funnels must never divide by survey responses.
   // Only the prompted outcome: a cold start that finds an existing grant is
   // not a decision the user just made.

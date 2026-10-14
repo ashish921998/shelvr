@@ -53,7 +53,7 @@ const modules = import.meta.glob("./**/*.ts");
 
 /**
  * Build a convex-test instance with the rate-limiter component registered.
- * Every test must go through this — mutations that call `rateLimiter.limit`
+ * Every test must go through this: mutations that call `rateLimiter.limit`
  * fail with "Component not registered" against a bare `convexTest(schema, ...)`.
  */
 export function newConvexTest() {
@@ -136,7 +136,7 @@ export async function seedNotes(
  * A one-shot barrier for race tests. Hand `hold` to the seam under test (a
  * stubbed fetch, an exchange): when the code reaches it, `reached` resolves
  * and the seam waits; the test then arranges the racing state and calls
- * `open()`, and `hold` resolves with its value. Single use — arm a fresh gate
+ * `open()`, and `hold` resolves with its value. Single use: arm a fresh gate
  * per held call.
  */
 export function gate(): {

@@ -14,7 +14,7 @@ import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
 // Convex Auth OAuth sign-in (React Native), extracted from the sign-in screen
-// so the onboarding demo step can authenticate inline — without navigating
+// so the onboarding demo step can authenticate inline, without navigating
 // away and losing the user's in-progress onboarding state.
 //
 // The flow is provider-agnostic: `signIn(provider)` returns a `redirect` URL
@@ -168,7 +168,7 @@ async function webSignIn(
   // never exchanged.
   const { redirect } = await signIn(provider, { redirectTo: oauthRedirectTo });
   // `redirect` is undefined for providers that sign in immediately
-  // (Anonymous) — nothing more to do, the session is established.
+  // (Anonymous). Nothing more to do: the session is established.
   if (!redirect) return { type: "completed" };
   progress.stage = "browser";
   const { result, browserMs } = await openSession(redirect, progress);

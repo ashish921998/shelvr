@@ -30,8 +30,8 @@ const isDevDeployment = () =>
   process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
   "https://amicable-antelope-639.convex.site";
 
-// A token that was verified but never stored — deletion won the persistence
-// race — is revoked here, while it is still in memory: never in a row or a
+// A token that was verified but never stored (deletion won the persistence
+// race) is revoked here, while it is still in memory: never in a row or a
 // scheduled job argument. Best effort, like the rest of the flow.
 async function revokeUnstoredToken(
   signing: {
@@ -163,7 +163,7 @@ const AppleNative = ConvexCredentials<DataModel>({
 //
 // Anonymous is an instant sign-in (no credentials) used only for local
 // development. It is gated behind AUTH_ENABLE_ANONYMOUS so a production
-// deployment never exposes a passwordless back door — set it to "true" on
+// deployment never exposes a passwordless back door. Set it to "true" on
 // the dev deployment only.
 const providers: AuthProviderConfig[] = [
   Google,
