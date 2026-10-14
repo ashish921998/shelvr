@@ -154,8 +154,14 @@ function evidenceOf(source: PlanSource): Evidence {
   // The author is a handle even when written without the "@".
   const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
   // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
-  // "McSorleys" names "McSorley's".
-  const words = new Set([...wordsOf(raw), ...splitWords(raw)]);
+  // "McSorleys" names "McSorley's". A capital inside a word also starts one,
+  // so "GymkhanaLondon" and "#LondonBAO" name "Gymkhana" and "BAO".
+  const camel = raw
+    .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
+    .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2");
+  const words = new Set(
+    [raw, camel].flatMap((text) => [...wordsOf(text), ...splitWords(text)]),
+  );
   return { text: squash(raw), words, handles };
 }
 

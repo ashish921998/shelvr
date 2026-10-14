@@ -143,6 +143,24 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("matches a name run together in CamelCase", () => {
+    expect(
+      isGrounded(
+        "Gymkhana",
+        source({ content: "📍GymkhanaLondon, best dinner" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "L'Industrie Pizzeria",
+        source({ content: "📍LIndustrieNYC burrata slice" }),
+      ),
+    ).toBe(true);
+    expect(isGrounded("BAO", source({ content: "Cold tea #LondonBAO" }))).toBe(
+      true,
+    );
+  });
+
   it("matches a Korean name with a particle written onto it", () => {
     expect(
       isGrounded(
