@@ -303,7 +303,7 @@ const ALLOWED_INTENT_KINDS = new Set<string>(INTENT_KINDS);
  * Clean the model's proposed intents before they're persisted: drop unknown
  * kinds, trim/limit text, require a plausible payload per kind (open_url must
  * be http(s); email needs an @; call/message need a digit), dedupe, and cap the
- * count. A rejected intent is simply omitted, never fails the whole finalize.
+ * count. A rejected intent is simply omitted and never fails the whole finalize.
  */
 function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
   const seen = new Set<string>();

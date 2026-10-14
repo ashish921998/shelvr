@@ -206,7 +206,7 @@ type Closed = {
  * this code can observe a send, not the later receipt check that runs a delay
  * after the push went out. Without the stamp, a notification open can precede
  * the notification's own "sent" event. Undefined when no recipient shows
- * provider acceptance, so the event falls back to the terminal time, for a
+ * provider acceptance, so the event falls back to the terminal time. For a
  * legacy row without a stamp, that observation is the only timestamp left. */
 function firstSendAt(
   recorded: number | undefined,

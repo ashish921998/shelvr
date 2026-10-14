@@ -199,7 +199,7 @@ export default defineSchema({
     //
     // Deliberately NOT part of `itemFields`. That object is spread into
     // `enrichedItemValidator`, the return shape of `listItems`, `getItem`,
-    // `searchItems`, the weekly digest, and `getSpace`, adding ~6 KB of
+    // `searchItems`, the weekly digest, and `getSpace`. Adding ~6 KB of
     // floats to every feed row is exactly the cost the card/detail split
     // exists to avoid. `enrichItem` strips it at the single chokepoint those
     // reads share.
