@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Lista de compras para el piso",
   "spaces.dynamic": "Dinámica",
   "spaces.dynamicHelp": "Shelvr sigue sugiriendo contenido que encaja",
+  "spaces.autoFile": "Añadir automáticamente",
+  "spaces.autoFileHelp": "Lo nuevo que encaje entra directamente. Puedes quitarlo cuando quieras.",
   "common.saveChanges": "Guardar cambios",
   "spaces.create": "Crear colección",
   "common.continue": "Continuar",

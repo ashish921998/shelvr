@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Liste d'achats pour l'appartement",
   "spaces.dynamic": "Dynamique",
   "spaces.dynamicHelp": "Shelvr continue à proposer des contenus adaptés",
+  "spaces.autoFile": "Ajouter automatiquement",
+  "spaces.autoFileHelp": "Les nouveaux contenus adaptés arrivent directement ici. Retirez-les à tout moment.",
   "common.saveChanges": "Enregistrer les modifications",
   "spaces.create": "Créer une collection",
   "common.continue": "Continuer",

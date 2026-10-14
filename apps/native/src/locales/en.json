@@ -106,6 +106,8 @@
   "spaces.titlePlaceholder": "Apartment shopping list",
   "spaces.dynamic": "Dynamic",
   "spaces.dynamicHelp": "Shelvr keeps suggesting things that fit",
+  "spaces.autoFile": "Add automatically",
+  "spaces.autoFileHelp": "New saves that fit go straight in. Remove any anytime.",
   "common.saveChanges": "Save changes",
   "spaces.create": "Create space",
   "common.continue": "Continue",

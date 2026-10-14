@@ -107,6 +107,8 @@ export type MessageParams = {
   "spaces.titlePlaceholder": undefined;
   "spaces.dynamic": undefined;
   "spaces.dynamicHelp": undefined;
+  "spaces.autoFile": undefined;
+  "spaces.autoFileHelp": undefined;
   "common.saveChanges": undefined;
   "spaces.create": undefined;
   "common.continue": undefined;
