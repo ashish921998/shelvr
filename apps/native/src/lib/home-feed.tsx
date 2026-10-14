@@ -23,11 +23,14 @@ const HomeFeedContext = createContext<HomeFeed | null>(null);
 /**
  * Mounted once around the signed-in tree. The boundary keeps a feed that
  * fails because this account was deleted elsewhere on the loader, not the
- * crash screen, until sign-out lands.
+ * crash screen, until sign-out lands. Keyed on auth so sign-out remounts it:
+ * mid-onboarding the tree stays mounted signed out, and a held loader would
+ * otherwise never clear.
  */
 export function HomeFeedProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useConvexAuth();
   return (
-    <AccountGoneBoundary>
+    <AccountGoneBoundary key={isAuthenticated ? "signed-in" : "signed-out"}>
       <FeedSubscription>{children}</FeedSubscription>
     </AccountGoneBoundary>
   );

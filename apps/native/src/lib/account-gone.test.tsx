@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
   },
   signOut: vi.fn(() => Promise.resolve()),
   captureError: vi.fn(),
+  cleared: [] as string[],
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.isAuthenticated }),
@@ -22,6 +23,15 @@ vi.mock("@convex-dev/auth/react", () => ({
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => mock.currentUser,
+}));
+vi.mock("@/lib/exit-offer-reminder", () => ({
+  clearExitOfferReminder: vi.fn(async () => mock.cleared.push("exit-offer")),
+}));
+vi.mock("@/lib/first-save-reminder", () => ({
+  clearFirstSaveReminder: vi.fn(async () => mock.cleared.push("first-save")),
+}));
+vi.mock("@/lib/trial-reminder", () => ({
+  clearTrialReminder: vi.fn(async () => mock.cleared.push("trial")),
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError },
@@ -37,6 +47,7 @@ describe("useSignOutWhenAccountGone", () => {
     mock.isAuthenticated = true;
     mock.signOut.mockReset().mockResolvedValue(undefined);
     mock.captureError.mockReset();
+    mock.cleared = [];
   });
 
   it("signs out once when a signed-in device's account no longer exists", () => {
@@ -44,6 +55,22 @@ describe("useSignOutWhenAccountGone", () => {
     const { rerender } = renderHook(() => useSignOutWhenAccountGone());
     rerender();
     expect(mock.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the local reminders after signing out", async () => {
+    mock.signOut.mockImplementation(async () => {
+      mock.cleared.push("signed-out");
+    });
+    state(null);
+    renderHook(() => useSignOutWhenAccountGone());
+    await vi.waitFor(() =>
+      expect(mock.cleared).toEqual([
+        "signed-out",
+        "exit-offer",
+        "first-save",
+        "trial",
+      ]),
+    );
   });
 
   it.each([
