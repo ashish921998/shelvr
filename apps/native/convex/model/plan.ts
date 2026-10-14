@@ -124,14 +124,20 @@ const GENERIC_WORDS = new Set([
  * "paricicafe"), which run a name together with other words. */
 type Evidence = { text: string; words: Set<string>; handles: string[] };
 
-/** Squashed words in any script; punctuation and spaces split them, but an
- * apostrophe does not, so "McSorley's" and "McSorleys" are one word. */
-function wordsOf(text: string): string[] {
+/** Squashed words in any script; punctuation and spaces split them. */
+function splitWords(text: string): string[] {
   return text
-    .replace(/['\u2019\u02bc]/g, "")
     .split(/[^\p{L}\p{N}\p{M}]+/u)
     .map(squash)
     .filter(Boolean);
+}
+
+const APOSTROPHES = /['\u2019\u02bc]/g;
+
+/** Words of a name, an apostrophe kept inside its word, so "McSorley's"
+ * reads as "mcsorleys". */
+function wordsOf(text: string): string[] {
+  return splitWords(text.replace(APOSTROPHES, ""));
 }
 
 function evidenceOf(source: PlanSource): Evidence {
@@ -147,7 +153,10 @@ function evidenceOf(source: PlanSource): Evidence {
   const tagged = raw.match(/[@#][\p{L}\p{N}\p{M}_.]+/gu) ?? [];
   // The author is a handle even when written without the "@".
   const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
-  return { text: squash(raw), words: new Set(wordsOf(raw)), handles };
+  // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
+  // "McSorleys" names "McSorley's".
+  const words = new Set([...wordsOf(raw), ...splitWords(raw)]);
+  return { text: squash(raw), words, handles };
 }
 
 // Scripts written without spaces between words, where a name sits inside a

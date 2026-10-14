@@ -92,6 +92,18 @@ describe("isGrounded", () => {
     expect(isGrounded("Oro", source({ author: "@toronto_eats" }))).toBe(false);
   });
 
+  it("matches a name before a possessive", () => {
+    expect(
+      isGrounded(
+        "Lilia",
+        source({ content: "Lilia\u2019s pasta is worth it" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded("Tigre", source({ content: "Tigre's cocktails are great" })),
+    ).toBe(true);
+  });
+
   it("matches a name written without its apostrophe", () => {
     expect(
       isGrounded(
