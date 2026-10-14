@@ -58,6 +58,7 @@ export function SetupStep({
       <Text style={styles.headline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
         {t("onboarding.setupTitle")}
       </Text>
+      <Text style={styles.lede}>{t("onboarding.setupHint")}</Text>
 
       <View style={styles.grid}>
         {SAVE_KINDS.map((kind) => {
@@ -188,6 +189,13 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 28,
     lineHeight: 34,
     color: theme.colors.foreground,
+  },
+  lede: {
+    marginTop: -theme.gap(1),
+    fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    lineHeight: 21,
+    color: theme.colors.muted,
   },
   grid: {
     flexDirection: "row",

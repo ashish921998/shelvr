@@ -1,7 +1,17 @@
 import { beforeEach } from "@e2e-dev/mobile";
-import { expect } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
 
 const BUNDLE_TIMEOUT = 180_000;
+
+/**
+ * How long an iOS sheet takes to finish moving. As the engine's `transition`
+ * budget it only delays a tap on a control that appeared or moved with the
+ * last action: the default allows half a second, and a tap on a control
+ * inside a sheet that is still rising lands on the screen behind it. A
+ * control that was already on screen under a closing sheet is tapped at once,
+ * so a flow that taps one must wait for the close itself.
+ */
+export const SHEET_TRANSITION_MS = 1000;
 
 /**
  * Starts every test on Home as the anonymous dev user with the fixture data:
@@ -39,7 +49,11 @@ export function startOnSeededHome(): void {
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
 
     await profile.tap({ timeout: BUNDLE_TIMEOUT });
-    await screen.getByRole("button", "Settings").tap();
+    // Right after a cold start the first Profile open has taken longer than
+    // a locator's default wait.
+    await screen
+      .getByRole("button", "Settings")
+      .tap({ timeout: BUNDLE_TIMEOUT });
     const reset = screen.getByTestId("reset-flow-fixtures");
     await screen.scrollUntilVisible(reset);
     await reset.tap();
@@ -55,4 +69,18 @@ export function startOnSeededHome(): void {
       timeout: 30_000,
     });
   });
+}
+
+/**
+ * Opens Add and taps one of its options. The options are disabled until the
+ * entitlement has loaded, which right after a launch can be after the sheet
+ * is up, and a tap on a disabled option does nothing.
+ */
+export async function chooseAddOption(
+  screen: Screen,
+  option: Locator,
+): Promise<void> {
+  await screen.getByRole("button", "Add").tap();
+  await expect(option).toBeEnabled({ timeout: 30_000 });
+  await option.tap();
 }

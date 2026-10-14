@@ -15,10 +15,11 @@ import type { Infer } from "convex/values";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ActivityIndicator, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import Animated, { useReducedMotion, ZoomOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -227,7 +228,7 @@ function CardStatusCorner({
       style={styles.processing}
     >
       {item.status === "processing" ? (
-        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <StitchRing size={16} />
       ) : (
         <AppSymbolIcon
           name="exclamationmark.triangle.fill"

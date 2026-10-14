@@ -19,6 +19,10 @@ vi.mock("convex/react", () => ({
 vi.mock("@convex/_generated/api", () => ({
   api: { items: { listItemsPage: "listItemsPage" } },
 }));
+// The real account-gone boundary wraps the provider; its loader is native UI.
+vi.mock("@/components/ui/screen-loader", () => ({
+  ScreenLoader: vi.fn(() => null),
+}));
 
 type HomeFeed = ReturnType<typeof useHomeFeed>;
 
