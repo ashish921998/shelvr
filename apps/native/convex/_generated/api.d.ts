@@ -72,6 +72,7 @@ import type * as model_secureCompare from "../model/secureCompare.js";
 import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
+import type * as model_videoTranscript from "../model/videoTranscript.js";
 import type * as model_weeklyShelf from "../model/weeklyShelf.js";
 import type * as notificationDelivery from "../notificationDelivery.js";
 import type * as notifications from "../notifications.js";
@@ -154,6 +155,7 @@ declare const fullApi: ApiFromModules<{
   "model/spaceName": typeof model_spaceName;
   "model/storage": typeof model_storage;
   "model/storedImage": typeof model_storedImage;
+  "model/videoTranscript": typeof model_videoTranscript;
   "model/weeklyShelf": typeof model_weeklyShelf;
   notificationDelivery: typeof notificationDelivery;
   notifications: typeof notifications;
