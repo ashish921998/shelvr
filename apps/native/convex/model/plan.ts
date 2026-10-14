@@ -156,10 +156,19 @@ function evidenceOf(source: PlanSource): Evidence {
   const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
   // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
   // "McSorleys" names "McSorley's". A capital inside a word also starts one,
-  // so "GymkhanaLondon" and "#LondonBAO" name "Gymkhana" and "BAO".
+  // so "GymkhanaLondon" and "#LondonBAO" name "Gymkhana" and "BAO", and so
+  // does a change between Latin and Japanese or Chinese ("東京でTsujihanの").
   const camel = raw
     .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
-    .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2");
+    .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
+    .replace(
+      /(\p{Script=Latin})(?=[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/gu,
+      "$1 ",
+    )
+    .replace(
+      /([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])(?=\p{Script=Latin})/gu,
+      "$1 ",
+    );
   const words = new Set(
     [raw, camel].flatMap((text) => [...wordsOf(text), ...splitWords(text)]),
   );

@@ -173,6 +173,15 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("matches a Latin name written inside Japanese text", () => {
+    expect(
+      isGrounded(
+        "Tsujihan",
+        source({ content: "東京でTsujihanの海鮮丼を食べた" }),
+      ),
+    ).toBe(true);
+  });
+
   it("matches a Korean name with a particle written onto it", () => {
     expect(
       isGrounded(
