@@ -51,6 +51,7 @@ const mock = vi.hoisted(() => {
     manualGesture,
     theme: light as typeof light,
     tabsStyle: undefined as unknown,
+    routes: [] as string[],
   };
 });
 
@@ -82,13 +83,18 @@ vi.mock("react-native", () => {
 vi.mock("expo-router/ui", () => ({
   // Rendering no children keeps this test on the backdrop: the bar drawn inside
   // has its own theme subscription.
-  Tabs: vi.fn(({ style }: { style: unknown }) => {
-    mock.tabsStyle = style;
+  Tabs: vi.fn(
+    ({ style, children }: { style: unknown; children: ReactNode[] }) => {
+      mock.tabsStyle = style;
+      return <>{children[1]}</>;
+    },
+  ),
+  TabList: vi.fn(({ children }: { children?: ReactNode }) => <>{children}</>),
+  TabSlot: vi.fn(() => null),
+  TabTrigger: vi.fn(({ name }: { name: string }) => {
+    mock.routes.push(name);
     return null;
   }),
-  TabList: vi.fn(() => null),
-  TabSlot: vi.fn(() => null),
-  TabTrigger: vi.fn(() => null),
   useTabTrigger: () => ({ triggerProps: { isFocused: false } }),
 }));
 
@@ -133,6 +139,12 @@ describe("AppTabs", () => {
   beforeEach(() => {
     mock.theme = mock.light;
     mock.tabsStyle = undefined;
+    mock.routes = [];
+  });
+
+  it("registers only Home, Spaces and Search", () => {
+    render(<AppTabs />);
+    expect(mock.routes).toEqual(["(home)", "(spaces)", "(search)"]);
   });
 
   it("paints the backdrop the bar floats over from the active theme", () => {

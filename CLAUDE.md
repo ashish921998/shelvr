@@ -278,10 +278,13 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
+- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `import`, `onboarding`, `paywall`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`
+  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`,
+  `tidy` (edge-back disabled for Camera Roll deletion safety) and `map`. Profile
+  always offers Tidy; Map appears only when the additive `hasLocatedItems` query
+  finds an owned image with both coordinates. Deploy that query before the client.
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides

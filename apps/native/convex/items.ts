@@ -542,6 +542,25 @@ export const nextUp = query({
   },
 });
 
+/** Lightweight Profile eligibility, bounded by the same photo quota as Map. */
+export const hasLocatedItems = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const photos = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_type", (q) =>
+        q.eq("userId", userId).eq("type", "image"),
+      )
+      .order("desc")
+      .take(MAX_PHOTOS_PER_ACCOUNT);
+    return photos.some(
+      (item) => item.latitude !== undefined && item.longitude !== undefined,
+    );
+  },
+});
+
 /** Every photo with a location, for the map. Only image imports carry
  * coordinates, so the scan is bounded by the photo quota rather than the whole
  * library, and the row is just what a marker needs. */
