@@ -127,6 +127,27 @@ describe("useReplayOnboarding retries", () => {
     expect(hasPending()).toBe(false);
   });
 
+  it("retries when the entitlement changes while a pass is in flight", async () => {
+    let failFirst: (error: Error) => void = () => {};
+    createSpace.mockImplementationOnce(
+      () => new Promise((_, reject) => (failFirst = reject)),
+    );
+    setPendingSpaces(["Trips"]);
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+
+    entitlement.entitled = false;
+    hook.rerender();
+    entitlement.entitled = true;
+    hook.rerender();
+    createSpace.mockResolvedValue("space");
+    await act(async () => failFirst(new Error("server error")));
+    await settle();
+
+    expect(createSpace).toHaveBeenCalledTimes(2);
+    expect(hasPending()).toBe(false);
+  });
+
   it("runs new pending work without a remount", async () => {
     createSpace.mockImplementation(failingServer());
     setPendingSpaces(["Trips"]);

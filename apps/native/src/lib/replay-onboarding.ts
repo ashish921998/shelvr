@@ -191,8 +191,11 @@ export function useReplayOnboarding() {
         ranRef.current = true;
         clearPending();
       } finally {
-        if (attempted) settledWorkRef.current = pendingWorkKey();
         const shouldRerun = rerunRef.current;
+        // An entitlement change during the run asked for a fresh pass; marking
+        // this work settled would make that pass skip it.
+        if (attempted && !shouldRerun)
+          settledWorkRef.current = pendingWorkKey();
         rerunRef.current = false;
         runningRef.current = false;
         if (shouldRerun) {
