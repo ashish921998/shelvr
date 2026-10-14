@@ -1,6 +1,6 @@
 // Tests for the incoming-share session store. The reconciliation rules are the
 // load-bearing correctness logic for plan 004, so every remount window is
-// exercised with an in-memory adapter — no MMKV, no React Native runtime.
+// exercised with an in-memory adapter: no MMKV, no React Native runtime.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -188,12 +188,12 @@ describe("reconcileSession", () => {
     expect(result.kind).toBe("clear");
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // Second remount: clear still failing — still 'clear', record still there.
+    // Second remount: clear still failing; still 'clear', record still there.
     result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // Third remount: clear finally succeeds, caller deletes — record is gone.
+    // Third remount: clear finally succeeds, caller deletes; record is gone.
     result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     deleteSession(store);
@@ -293,7 +293,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
 
   it("does not ghost-check an active or completed session match", () => {
     // A matching existing session follows the resume/clear rules regardless of
-    // any tombstone — those paths reuse stable operation ids.
+    // any tombstone: those paths reuse stable operation ids.
     const store = memoryStore();
     completedBatchA(store);
     // Directly start the active session (bypasses the ghost branch).
@@ -317,7 +317,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
 
   it("never matches a tombstone left by a different user", () => {
     // Account switch: user A completed this batch, user B shares identical
-    // content. The ghost check is user-scoped — B's share is genuine.
+    // content. The ghost check is user-scoped: B's share is genuine.
     const store = memoryStore();
     completedBatchA(store);
     expect(reconcileSession(store, OTHER_USER, BATCH_A, id).kind).toBe("new");
@@ -532,7 +532,7 @@ describe("deleteSession", () => {
     const second = reconcileSession(store, USER, BATCH_B, () => "sess-2");
     if (second.kind !== "new") throw new Error("expected new");
 
-    // The old session tries to delete by its (now-stale) id — must be a no-op.
+    // The old session tries to delete by its (now-stale) id, which must be a no-op.
     deleteSession(store, firstSessionId);
     expect(loadSession(store)?.sessionId).toBe("sess-2");
   });
@@ -541,7 +541,7 @@ describe("deleteSession", () => {
 describe("user-scoped sessions (account switching)", () => {
   it("starts a fresh session when a different user reconciles an identical batch", () => {
     // user-a completes a batch; user-b (same device) sharing the SAME content
-    // must NOT match user-a's stale record — otherwise the new share is dropped.
+    // must NOT match user-a's stale record; otherwise the new share is dropped.
     const store = memoryStore();
     const a = reconcileSession(store, USER, BATCH_A, id);
     if (a.kind !== "new") throw new Error("expected new");

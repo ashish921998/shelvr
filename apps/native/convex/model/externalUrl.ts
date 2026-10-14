@@ -3,7 +3,7 @@
  *
  * This module is runtime-agnostic: it has no Node-only imports, so it can be
  * used from Convex mutations (default V8 runtime) and from Node actions alike.
- * It validates only the *form* of a URL — scheme, host, port, credentials,
+ * It validates only the *form* of a URL: scheme, host, port, credentials,
  * length. It does NOT resolve DNS or inspect the destination address; that is
  * the job of `safeFetch.ts` at request time, bound to the actual connection.
  *
@@ -83,7 +83,7 @@ export function normalizeExternalUrl(raw: string): string {
 
   let parsed: URL;
   if (hasScheme) {
-    // Input has a scheme — parse as-is so we can report its real scheme.
+    // Input has a scheme: parse as-is so we can report its real scheme.
     try {
       parsed = new URL(trimmed);
     } catch {
@@ -92,7 +92,7 @@ export function normalizeExternalUrl(raw: string): string {
       throw new UrlPolicyErrorClass("invalid_host", "URL has no host");
     }
   } else {
-    // Schemeless — prepend https:// and parse the canonical form.
+    // Schemeless: prepend https:// and parse the canonical form.
     try {
       parsed = new URL(`https://${trimmed}`);
     } catch {
@@ -119,7 +119,7 @@ export function normalizeExternalUrl(raw: string): string {
   }
   // An explicit non-default port survives in parsed.port (the URL serializer
   // strips only the *default* port for the scheme). Any remaining port is
-  // non-default and is rejected — we only ever fetch standard web endpoints.
+  // non-default and is rejected: we only ever fetch standard web endpoints.
   if (parsed.port !== "") {
     throw new UrlPolicyErrorClass(
       "invalid_port",
@@ -135,7 +135,7 @@ export function normalizeExternalUrl(raw: string): string {
 }
 
 /** True for a TikTok video link (any subdomain, including the `vm`/`vt` short
- * hosts). Shared by the pipeline (oEmbed instead of a page fetch — TikTok
+ * hosts). Shared by the pipeline (oEmbed instead of a page fetch: TikTok
  * refuses bot page loads) and the client (video card/detail treatment). */
 export function isTikTokUrl(url: string | undefined): boolean {
   if (!url) return false;

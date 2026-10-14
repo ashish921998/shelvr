@@ -17,7 +17,7 @@ export const feedbackPlatformValidator = v.union(
 );
 
 /** Delivery state of a feedback submission row. `unconfigured` means the
- * support-inbox env vars are missing — an operator condition, not a row
+ * support-inbox env vars are missing: an operator condition, not a row
  * failure; the retry cron picks the row up once they are set. */
 export const feedbackDeliveryStatusValidator = v.union(
   v.literal("pending"),

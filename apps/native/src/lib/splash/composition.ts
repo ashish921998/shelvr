@@ -1,7 +1,7 @@
 // Deterministic layout for the launch animation ("thread" composition).
 //
-// A thread draws down the screen, hand-sketched saves — notes, recipes,
-// articles, photos, products — fade in scattered along it, then glide onto a
+// A thread draws down the screen, hand-sketched saves (notes, recipes,
+// articles, photos, products) fade in scattered along it, then glide onto a
 // shelf row at the centre where each one settles into a stitch.
 //
 // Everything here is pure geometry in a fixed 390x844 design space, generated
@@ -17,7 +17,7 @@
  */
 export const DESIGN_WIDTH = 390;
 
-/** Composition centre — the lockup sits on this point too. */
+/** Composition centre: the lockup sits on this point too. */
 export const CENTER_X = 195;
 export const CENTER_Y = 388;
 
@@ -31,7 +31,7 @@ export const DUST_COUNT = 56;
 /**
  * When each save appears and travels, in seconds from the start of the
  * animation. These share a clock with `components/splash/timeline.ts` and are
- * retimed with it — the ring, the mark pop and the canvas fade are all placed
+ * retimed with it: the ring, the mark pop and the canvas fade are all placed
  * against when the last save lands.
  *
  * `APPEAR_FROM + APPEAR_SPREAD` must stay below `TRAVEL_FROM`, or a save could
@@ -122,7 +122,7 @@ export type Composition = {
 };
 
 /**
- * Lehmer / Park-Miller generator. Small, fast, and — unlike `Math.random` —
+ * Lehmer / Park-Miller generator. Small, fast, and, unlike `Math.random`,
  * reproducible, which is what keeps the scatter stable across launches.
  */
 function createRandom(seed = 7): () => number {
@@ -169,7 +169,7 @@ function sampleThread(
   return points;
 }
 
-/** Horizontal position of the thread at a given height — the scatter's spine. */
+/** Horizontal position of the thread at a given height: the scatter's spine. */
 function threadXAt(above: Point[], below: Point[], y: number): number {
   const points = y < CENTER_Y ? above : below;
   let nearest = points[0];
@@ -456,7 +456,7 @@ export function glyphStrokes(mark: Mark): Stroke[] {
   }
 }
 
-/** Sine-waved run of points — the scribbled "text" on a note. */
+/** Sine-waved run of points: the scribbled "text" on a note. */
 function squiggle(
   x0: number,
   x1: number,

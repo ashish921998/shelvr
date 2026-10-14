@@ -25,8 +25,8 @@ async function tokenRow(ctx: MutationCtx, userId: Id<"users">) {
  * the users row Convex Auth just wrote it to, into `appleTokens`. Same
  * transaction, so the users row is never stored with it.
  *
- * When storing is refused — the sign-in landed while the owner row was
- * already `deleting` — the token must not be dropped unrevoked. A mutation
+ * When storing is refused (the sign-in landed while the owner row was
+ * already `deleting`), the token must not be dropped unrevoked. A mutation
  * cannot call Apple, so it is parked in `detachedAppleTokens` and the revoke
  * job gets that row's id, never the token, like the deletion path's job.
  */

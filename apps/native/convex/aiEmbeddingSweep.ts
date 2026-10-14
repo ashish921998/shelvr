@@ -53,8 +53,8 @@ const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
  * What one embedding batch produced.
  *
  * `callFailed` is reported separately from an empty `vectors` slot on purpose.
- * A slot is `undefined` for two unrelated reasons — the call never completed,
- * or the call completed and that particular vector was unusable — and the two
+ * A slot is `undefined` for two unrelated reasons: the call never completed,
+ * or the call completed and that particular vector was unusable. The two
  * demand opposite handling. The first is nobody's fault and must be retried
  * for free; the second is that item's own problem and has to spend an
  * attempt, or a row the provider can never embed leads the sweep range
@@ -71,7 +71,7 @@ type EmbedBatchResult = {
  * Embeds a batch of texts, in input order.
  *
  * Best effort by contract: it never throws and never rejects. Every failure
- * mode — provider outage, timeout, a malformed vector, an empty input —
+ * mode (provider outage, timeout, a malformed vector, an empty input)
  * collapses to `undefined` in that text's slot, because an item is worth
  * saving whether or not it could be embedded. Callers write the vectors they
  * got and leave the rest to the sweeper; `callFailed` tells them which kind
@@ -200,8 +200,8 @@ export const sweepItemEmbeddings = internalAction({
 
     // Whether the provider answered at all, taken from the call itself rather
     // than inferred from its output. Both directions matter. A real outage
-    // must not march the whole table stamping items as done with no vector —
-    // that is what the `deferred` outcome prevents. But a call that completes
+    // must not march the whole table stamping items as done with no vector.
+    // That is what the `deferred` outcome prevents. But a call that completes
     // and returns nothing usable is not an outage, and deferring those rows
     // would wedge the sweep: they lead the range every run, so the page would
     // be re-read forever and every ready item behind it would never be

@@ -87,8 +87,8 @@ describe("useResumePendingShare", () => {
 
   it("stays home over the leftover of an explicitly discarded share", () => {
     // The P2 review case: Cancel tolerated a throwing native clear and left
-    // the payload behind. The batch is unread but not resumable — the
-    // predicate (see resumable-payloads.test.ts) reports it as such — so the
+    // the payload behind. The batch is unread but not resumable: the
+    // predicate (see resumable-payloads.test.ts) reports it as such, so the
     // hook must not route back to /share and re-save it. Routing stays off
     // until a genuinely new share flips the predicate.
     const { rerender } = renderResume();

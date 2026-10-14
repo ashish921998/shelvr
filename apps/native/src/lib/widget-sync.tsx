@@ -235,7 +235,7 @@ async function loadWidgetHost(): Promise<WidgetHost | null> {
 // Publishes the widget for `items` (empty + `locked` clears it) and prunes
 // thumbnails the snapshot no longer references. With a `validUntil` it schedules
 // a timeline that locks itself at the expiry instead of a single snapshot.
-// Resolves to `true` once the widget is published, or `false` if it bailed — the
+// Resolves to `true` once the widget is published, or `false` if it bailed: the
 // widget module is missing, or a session boundary bumped the generation past
 // this call.
 async function syncWidget(
@@ -341,8 +341,8 @@ async function syncWidget(
  * The session-boundary widget clear, owned by `useAnalyticsIdentity` and run
  * when Convex Auth reports signed out. A widget snapshot and its thumbnails
  * outlive both the app and the auth session, so without this the previous
- * account's saved titles and photos stay readable on the Home Screen — and on
- * disk in the shared container — until a later sign-in. Bumps the sync
+ * account's saved titles and photos stay readable on the Home Screen, and on
+ * disk in the shared container, until a later sign-in. Bumps the sync
  * generation first so a `syncWidget` queued or in flight before this boundary
  * cannot republish the cleared snapshot, then publishes the empty locked
  * snapshot (which also drops every thumbnail). Resolves to `true` once the

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // The paywall funnel's session memory: purchase -> entitlement activation
 // (including the webhook-wins race), blocked action -> resume, and the
-// sign-out drop. The memory is module-level by design — the sheet, the guard,
-// and the entitlement query live in different call sites — so each test
+// sign-out drop. The memory is module-level by design: the sheet, the guard,
+// and the entitlement query live in different call sites, so each test
 // re-imports a fresh copy; the only mocked boundary is analytics.
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

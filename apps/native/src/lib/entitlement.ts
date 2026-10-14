@@ -58,8 +58,8 @@ import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
  *
  * The source of truth for "is this user entitled" is the Convex
  * `subscriptions` row, written by the RevenueCat webhook. The RevenueCat SDK is
- * used only to present offerings and drive purchases — never to gate features
- * directly — so a spoofed client can't unlock Pro without a real subscription.
+ * used only to present offerings and drive purchases, never to gate features
+ * directly, so a spoofed client can't unlock Pro without a real subscription.
  *
  * Model: the yearly plan carries a 7-day free trial (payment method upfront,
  * auto-charges at day 7 unless cancelled); the monthly plan has no trial and
@@ -69,7 +69,7 @@ import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
  *
  * The paywall UI itself is rendered natively by RevenueCat's SDK (designed in
  * the RevenueCat dashboard Paywall Editor). We call `presentPaywall()` which
- * presents a native sheet — no custom paywall view code needed.
+ * presents a native sheet: no custom paywall view code needed.
  */
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ export type Entitlement = {
 
 /**
  * Tracks which Convex user RevenueCat is targeting and which user has actually
- * been synced. The paywall is ready only when both ids match — otherwise a
+ * been synced. The paywall is ready only when both ids match. Otherwise a
  * purchase could be attributed to an anonymous RevenueCat user instead of the
  * Convex user id the webhook keys on. This is a module-level state so any caller
  * of `presentPaywall` can observe it without a direct hook dependency.
@@ -132,7 +132,7 @@ function isRcSyncReady() {
  * `SYNC_READY_TIMEOUT_MS`. A purchase/management action before login would be
  * attributed to an anonymous RC user, breaking the webhook's userId mapping.
  * The timeout caps the wait so a missing/unconfigured RC SDK (Expo Go, unset
- * key, logIn failure, RC outage) cannot wedge the UI forever — callers fall
+ * key, logIn failure, RC outage) cannot wedge the UI forever: callers fall
  * back to a safe route. Shared by `presentPaywall` and `presentCustomerCenter`.
  */
 async function awaitRcSyncReady(): Promise<boolean> {
@@ -297,8 +297,8 @@ export function useEntitlement(): Entitlement {
   // The clock is seeded once and refreshed on an interval so a trial expiring
   // between Convex updates flips `entitled` without a server push. Seeding via
   // a useState initializer (and updating inside the effect) keeps Date.now
-  // out of the render body — the React compiler flags impure calls there.
-  // The interval only runs while there's an expiry to count down — a user with
+  // out of the render body: the React compiler flags impure calls there.
+  // The interval only runs while there's an expiry to count down: a user with
   // no subscription never ticks, avoiding a per-screen 60s rerender.
   const [now, setNow] = useState(() => Date.now());
   const hasExpiry = data?.expiresAt !== undefined;
@@ -329,7 +329,7 @@ export function useEntitlement(): Entitlement {
     };
   }
   const expiresAt = data.expiresAt;
-  // The shared gate — same logic the server uses in requireProEntitlement, so
+  // The shared gate: same logic the server uses in requireProEntitlement, so
   // the client's advisory view can never grant access the server denies.
   const active = isEntitled(data.status, expiresAt, now);
   return {
@@ -732,7 +732,7 @@ async function presentPaywall(
 /**
  * Present the RevenueCat paywall. On real unavailability (SDK not linked, sync
  * timed out, ERROR), fall back to the paywall route. On cancellation, return
- * to the caller without routing — cancel must not look like an outage. Returns
+ * to the caller without routing: cancel must not look like an outage. Returns
  * `true` only on purchase/restore. Shared by every Pro-gated affordance.
  */
 export async function openPaywall(
@@ -745,7 +745,7 @@ export async function openPaywall(
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
-  // The gated action did not run — whatever the sheet resolved to, the caller
+  // The gated action did not run. Whatever the sheet resolved to, the caller
   // re-taps. Remember the block so the guard that later lets the action
   // through can report the resume, and whether a purchase sits between.
   recordBlockedAction(placement, outcome === "success");
@@ -803,7 +803,7 @@ export async function openPaywallKeepingExitOffer(
  * Present the RevenueCat Customer Center natively (sheet on iOS), where the
  * user can manage their subscription: change plan, request a refund (iOS),
  * restore purchases, cancel, or open a configured deeplink/URL. Like the
- * paywall, this is NOT presented until RC identity sync is ready — management
+ * paywall, this is NOT presented until RC identity sync is ready: management
  * actions (restore, refund, plan change) must be attributed to the signed-in
  * Convex user so the webhook's `app_user_id` matches.
  *
@@ -856,7 +856,7 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
     if (Object.keys(customerInfo.entitlements.active).length === 0)
       return "none";
     // A Profile restore arms the same activation measurement a sheet restore
-    // does — but only while nothing is entitled: restoring an already-visible
+    // does, but only while nothing is entitled: restoring an already-visible
     // entitlement made nothing new visible, so it reports nothing.
     if (!hasActiveEntitlement()) recordAccess("restore");
     return "restored";
@@ -911,8 +911,8 @@ export async function readTrialEligible(): Promise<boolean> {
  * than blocking the whole app. The server re-checks entitlement on every gated
  * mutation, so this client guard is advisory only.
  *
- * While entitlement is loading, the guard returns `false` without acting —
- * callers should disable the affordance or show a loading state. The hook also
+ * While entitlement is loading, the guard returns `false` without acting.
+ * Callers should disable the affordance or show a loading state. The hook also
  * returns `loading` so callers can read it without a second `useEntitlement`.
  */
 export function usePaywallGuard(placement = "pro_gate"): {
@@ -926,7 +926,7 @@ export function usePaywallGuard(placement = "pro_gate"): {
       if (loading) return false;
       if (entitled) {
         // A pass at the same placement that a paywall recently blocked reports
-        // the resume — the funnel's last leg after purchase/restore.
+        // the resume: the funnel's last leg after purchase/restore.
         resumeBlockedAction(placement);
         action?.();
         return true;

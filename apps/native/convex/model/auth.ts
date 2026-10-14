@@ -23,7 +23,7 @@ export async function liveOwner(
 
 /**
  * Returns the authenticated user's stable users-table id, or throws. Every
- * public function derives its userId from this — never from an argument.
+ * public function derives its userId from this, never from an argument.
  *
  * Convex Auth puts both the user id and session id in the JWT `sub` claim
  * (`userId|sessionId`). `getAuthUserId` removes the session suffix; using the

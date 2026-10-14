@@ -152,7 +152,7 @@ function ItemCardView({
 
   // What a screen reader reads instead of the card's contents. The classifier
   // can hand back a title that is empty or only spaces, and an accessibilityLabel
-  // replaces the child text rather than falling back to it — so a blank one
+  // replaces the child text rather than falling back to it, so a blank one
   // would leave the card announcing nothing at all. Take the first title with
   // visible characters, then describe the item's state.
   const accessibilityLabel =
@@ -162,7 +162,7 @@ function ItemCardView({
       : t("item.untitledItem"));
 
   // The primary accept gesture: tap the sparkle, the item is in. The badge's
-  // exit animation is the confirmation — no navigation, no dialog.
+  // exit animation is the confirmation: no navigation, no dialog.
   const accept = () => {
     if (spaceId === undefined) return;
     if (process.env.EXPO_OS === "ios") {

@@ -7,7 +7,7 @@ import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 const embedMany = vi.hoisted(() => vi.fn());
 
 // `ai.ts` builds its language model at module load, so the mock has to supply
-// wrapLanguageModel too — only embedMany is under test here.
+// wrapLanguageModel too. Only embedMany is under test here.
 vi.mock("ai", () => ({
   embedMany,
   generateObject: vi.fn(),
@@ -44,7 +44,7 @@ describe("embedTexts", () => {
   it("keeps results aligned with the input positions", async () => {
     // Empty texts are never sent upstream, so the provider's Nth vector does
     // NOT correspond to the Nth input. Mis-mapping here would file every
-    // save's vector under a different save — silently, and only visible as
+    // save's vector under a different save, silently, and only visible as
     // bad recommendations much later.
     //
     // The two vectors are basis vectors so they stay distinguishable after

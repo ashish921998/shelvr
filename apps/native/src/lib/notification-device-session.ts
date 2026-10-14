@@ -209,7 +209,7 @@ export class NotificationDeviceSession {
             await this.deps.signOut();
           } catch (error) {
             // Local sign-out failed, so no unauthenticated auth edge may
-            // follow promptly and the identity hook would not fire — clear
+            // follow promptly and the identity hook would not fire. Clear
             // the PostHog identity here so events stop attributing to the
             // deleted account.
             this.deps.resetAnalytics();

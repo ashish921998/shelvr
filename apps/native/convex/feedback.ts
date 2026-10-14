@@ -31,13 +31,13 @@ import {
  *
  * Convex is the source of truth: `submitFeedback` persists the row first,
  * then the support-inbox email is projected out of it. A Resend outage,
- * timeout, or missing operator configuration can never lose feedback — the
+ * timeout, or missing operator configuration can never lose feedback: the
  * row simply waits (status `pending` / `failed` / `unconfigured`) for the
  * bounded, index-backed retry worker, sharing its provider boundary with the
  * waitlist (`model/resend.ts`).
  *
- * Privacy boundary: the message is user content. It lives in Convex and —
- * once delivered — in the operator's inbox (the authorized feedback
+ * Privacy boundary: the message is user content. It lives in Convex and,
+ * once delivered, in the operator's inbox (the authorized feedback
  * channel). It never appears in backend logs (only categories, status codes,
  * ids, and attempt counts) nor in PostHog (client telemetry carries surface,
  * char count, and a content-free delivery category only).
@@ -109,7 +109,7 @@ function boundContext(value: string | undefined): string | undefined {
 /**
  * Persist one authenticated feedback submission. The user is always derived
  * from the session (never an argument) and per-user rate limited, so this
- * cannot become an email relay. Returns only after the row is durable — the
+ * cannot become an email relay. Returns only after the row is durable: the
  * scheduled inbox delivery is a projection the client never claims as done.
  */
 export const submitFeedback = mutation({
@@ -169,7 +169,7 @@ export const submitFeedback = mutation({
  * Load one deliverable row plus the safe context the email needs. No lease:
  * the immediate post-submit action runs once per row and the retry worker
  * schedules one bounded action per row, so the only concurrent-claim window
- * is a retry racing a still-queued immediate action — a rare duplicate email
+ * is a retry racing a still-queued immediate action: a rare duplicate email
  * to the operator, never a lost row or a user-visible failure. Claiming
  * spends the attempt immediately (persisted before the send), so a delivery
  * that crashes mid-flight still counts toward the cap instead of retrying
@@ -200,7 +200,7 @@ export const claimDelivery = internalMutation({
     const attempt = row.attempts + 1;
     await ctx.db.patch(args.submissionId, { attempts: attempt });
     // The authenticated account's email is safe reply context, read from the
-    // users table — never a client-supplied address.
+    // users table, never a client-supplied address.
     const user = await ctx.db.get(row.userId as Id<"users">);
     return {
       attempt,
@@ -253,8 +253,8 @@ export const finishDelivery = internalMutation({
   },
 });
 
-/** The support email. The message is included — this is the authorized
- * feedback channel — but the subject stays content-free (a bounded surface
+/** The support email. The message is included (this is the authorized
+ * feedback channel), but the subject stays content-free (a bounded surface
  * word) so notification previews cannot leak user content. */
 function buildFeedbackEmail(
   submissionId: Id<"feedbackSubmissions">,
@@ -336,7 +336,7 @@ async function attemptDelivery(
       status: "delivered",
     });
   } catch (error) {
-    // Log and persist only the shape of the failure — never the message,
+    // Log and persist only the shape of the failure, never the message,
     // account email, or provider text.
     const { category, status } = classifyResendError(error, "invalid_request");
     logEvent("error", "feedback_delivery_failed", {

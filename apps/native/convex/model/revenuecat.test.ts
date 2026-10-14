@@ -30,7 +30,7 @@ describe("parseRevenueCatEvent", () => {
   it("returns other event types without an expiration timestamp (handler decides)", () => {
     // The parser returns any readable event; the HTTP handler decides whether
     // to act on it or acknowledge it. A RENEWAL with null expiration is still
-    // parsed — the handler will pass expiresAt: 0 to upsert, which preserves
+    // parsed: the handler will pass expiresAt: 0 to upsert, which preserves
     // the existing row's expiry.
     expect(
       parseRevenueCatEvent({

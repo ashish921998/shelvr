@@ -1,4 +1,4 @@
-// Unistyles config MUST run before expo-router boots the app — otherwise
+// Unistyles config MUST run before expo-router boots the app. Otherwise
 // components' StyleSheet.create calls execute before StyleSheet.configure,
 // adaptive theming never arms (hasAdaptiveThemes stays false), and freshly
 // mounted screens intermittently paint in the default (light) theme.

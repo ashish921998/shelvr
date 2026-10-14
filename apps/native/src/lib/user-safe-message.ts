@@ -8,7 +8,7 @@ const MAX_MESSAGE_LENGTH = 200;
  * server puts the sentence straight in `data`; the structured form (see
  * `@convex/model/saveErrors`) nests it under `data.message`. Reading both lets
  * this client ship before the server switches. A plain Error carries nothing
- * usable — production redacts its message to "Server Error". */
+ * usable: production redacts its message to "Server Error". */
 function convexErrorMessage(error: unknown): string | undefined {
   if (!(error instanceof ConvexError)) return undefined;
   const data: unknown = error.data;

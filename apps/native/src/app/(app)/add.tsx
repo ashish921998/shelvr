@@ -151,7 +151,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro — route to the paywall before composing if not entitled.
+  // Saving is Pro: route to the paywall before composing if not entitled.
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
 
