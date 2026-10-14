@@ -22,9 +22,9 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { usePaywallGuard } from "@/lib/entitlement";
+import { canMakePlan } from "@/lib/make-plan";
 
 /** Saved items a space needs before "Make a plan" shows. */
-const PLAN_MIN_SAVES = 3;
 
 export default function SpaceScreen() {
   useAppLocale();
@@ -93,15 +93,7 @@ export default function SpaceScreen() {
   };
 
   const suggestionCount = space.suggestions.length;
-  // The planner reads ready saves only; still-processing ones don't count.
-  // At least one must already carry a place (an "Open in Maps" action), so a
-  // reading list never offers a plan.
-  const readySaves = space.items.filter((item) => item.status === "ready");
-  const canPlan =
-    readySaves.length >= PLAN_MIN_SAVES &&
-    readySaves.some((item) =>
-      item.intents?.some((intent) => intent.kind === "open_maps"),
-    );
+  const canPlan = canMakePlan(space.items);
 
   const makePlan = () => {
     void planGuard(() =>
@@ -116,11 +108,7 @@ export default function SpaceScreen() {
       hitSlop={8}
       style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
     >
-      <AppSymbolIcon
-        name="sparkles"
-        size={14}
-        tintColor={theme.colors.onTint}
-      />
+      <AppSymbolIcon name="map" size={14} tintColor={theme.colors.onTint} />
       <Text style={styles.planText}>{t("plan.make")}</Text>
     </Pressable>
   ) : null;
@@ -288,8 +276,13 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
+  // One row under the title; wraps only when the text is too wide.
   headerPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: theme.gap(2),
     gap: theme.gap(1),
     marginTop: theme.gap(0.5),
     marginBottom: theme.gap(1),
@@ -312,7 +305,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
-    alignSelf: "center",
     backgroundColor: theme.colors.primarySoft,
     borderRadius: 50,
     paddingVertical: theme.gap(1),

@@ -61,6 +61,26 @@ describe("isGrounded", () => {
       isGrounded("The Wine Bar", source({ title: "the best bar for wine" })),
     ).toBe(false);
     expect(isGrounded("The Cafe", source({ title: "Cute cafe" }))).toBe(false);
+    expect(
+      isGrounded("Cafe", source({ title: "Cute cafe with good coffee" })),
+    ).toBe(false);
+  });
+
+  it("grounds a short name the save spells out word for word", () => {
+    expect(
+      isGrounded(
+        "Si Si",
+        source({ title: "Si Si", places: ["Si Si, Brooklyn, NY"] }),
+      ),
+    ).toBe(true);
+    expect(isGrounded("Au 79", source({ title: "Bubble tea at Au 79" }))).toBe(
+      true,
+    );
+    expect(isGrounded("Si Si", source({ title: "This is it" }))).toBe(false);
+    expect(isGrounded("Go", source({ title: "Go try the vodka pasta" }))).toBe(
+      false,
+    );
+    expect(isGrounded("A", source({ title: "A great night out" }))).toBe(false);
   });
 });
 
@@ -84,15 +104,72 @@ describe("sanitizePlan", () => {
   it("keeps an area only when the save mentions it", () => {
     const sources = [source({ title: "Balthazar in SoHo" })];
     const [kept] = sanitizePlan(
-      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, NYC", why: "Go" }],
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo", why: "Go" }],
       sources,
     );
-    expect(kept.area).toBe("SoHo, NYC");
+    expect(kept.area).toBe("SoHo");
     const [dropped] = sanitizePlan(
       [{ saveNumber: 1, name: "Balthazar", area: "Brooklyn", why: "Go" }],
       sources,
     );
     expect(dropped.area).toBeUndefined();
+  });
+
+  it("drops a city the save does not name", () => {
+    const sources = [source({ title: "Balthazar, SoHo, New York" })];
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, London", why: "Go" }],
+      sources,
+    );
+    expect(pick.area).toBe("SoHo");
+    const [whole] = sanitizePlan(
+      [{ saveNumber: 1, name: "Balthazar", area: "SoHo, New York", why: "Go" }],
+      sources,
+    );
+    expect(whole.area).toBe("SoHo, New York");
+  });
+
+  it("drops the region and country a save never names", () => {
+    const [pick] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Lola",
+          area: "London, Ontario, Canada",
+          why: "Go",
+        },
+      ],
+      [source({ title: "Lola in London" })],
+    );
+    expect(pick.area).toBe("London");
+  });
+
+  it("keeps a short state code only when the save names it", () => {
+    const sources = [source({ title: "Balthazar in Springfield, IL" })];
+    const [kept] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Balthazar",
+          area: "Springfield, IL",
+          why: "Go",
+        },
+      ],
+      sources,
+    );
+    expect(kept.area).toBe("Springfield, IL");
+    const [dropped] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Balthazar",
+          area: "Springfield, MO",
+          why: "Go",
+        },
+      ],
+      sources,
+    );
+    expect(dropped.area).toBe("Springfield");
   });
 
   it("drops picks with an empty reason and trims long fields", () => {

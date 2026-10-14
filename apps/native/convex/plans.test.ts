@@ -23,6 +23,7 @@ type Save = {
   status?: "saved" | "suggested" | "dismissed";
   itemStatus?: "ready" | "processing";
   maps?: string;
+  spaceMaps?: string;
 };
 
 async function setup(
@@ -74,6 +75,15 @@ async function setup(
         spaceId,
         itemId,
         status: save.status ?? "saved",
+        intents: save.spaceMaps
+          ? [
+              {
+                kind: "open_maps",
+                label: "Open in Maps",
+                value: save.spaceMaps,
+              },
+            ]
+          : undefined,
       });
       itemIds.push(itemId);
     }
@@ -125,7 +135,7 @@ describe("makePlan", () => {
       places: [
         {
           name: "Balthazar",
-          area: "SoHo, NYC",
+          area: "SoHo",
           why: "The vodka pasta",
           itemId: itemIds[0],
         },
@@ -163,6 +173,17 @@ describe("makePlan", () => {
     expect(prompt).not.toContain("Suggested reel");
     expect(prompt).not.toContain("Dismissed reel");
     expect(prompt).not.toContain("Still reading");
+  });
+
+  it("reads a place steered for this space", async () => {
+    const { t, spaceId } = await setup([
+      { title: "Date idea", spaceMaps: "Tigre, Brooklyn" },
+    ]);
+    generateObject.mockResolvedValue({ object: { places: [] } });
+
+    await t.action(api.plans.makePlan, { spaceId });
+
+    expect(promptOf()).toContain("Places: Tigre, Brooklyn");
   });
 
   it("reads a note's own text", async () => {

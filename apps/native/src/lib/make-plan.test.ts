@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
+  canMakePlan,
   PLAN_SHARE_URL,
   placeLabel,
   planShareText,
@@ -70,5 +71,29 @@ describe("spinSteps", () => {
 
   it("is empty with nothing to pick", () => {
     expect(spinSteps(0, 0)).toEqual([]);
+  });
+});
+
+describe("canMakePlan", () => {
+  const maps = [{ kind: "open_maps" }];
+  const ready = { status: "ready" };
+
+  it("needs three ready saves and one with a place", () => {
+    expect(canMakePlan([{ ...ready, intents: maps }, ready, ready])).toBe(true);
+    expect(canMakePlan([{ ...ready, intents: maps }, ready])).toBe(false);
+    expect(canMakePlan([ready, ready, ready])).toBe(false);
+    expect(
+      canMakePlan([
+        { ...ready, intents: maps },
+        ready,
+        { status: "processing" },
+      ]),
+    ).toBe(false);
+  });
+
+  it("counts a place steered for this space", () => {
+    expect(canMakePlan([{ ...ready, spaceIntents: maps }, ready, ready])).toBe(
+      true,
+    );
   });
 });

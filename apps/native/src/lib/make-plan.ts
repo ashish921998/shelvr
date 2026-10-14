@@ -166,6 +166,32 @@ export function usePlanPicker(
 }
 
 /** `name` plus its area, for display and for the Maps query. */
+/** Ready saves a space needs before it offers a plan. */
+const PLAN_MIN_SAVES = 3;
+
+type PlanCandidate = {
+  status: string;
+  intents?: { kind: string }[];
+  spaceIntents?: { kind: string }[];
+};
+
+/**
+ * Whether a space offers "Make a plan". The planner reads ready saves only,
+ * and at least one must already carry a place (an "Open in Maps" action, on
+ * the save or steered for this space), so a reading list never offers one.
+ */
+export function canMakePlan(items: PlanCandidate[]): boolean {
+  const ready = items.filter((item) => item.status === "ready");
+  return (
+    ready.length >= PLAN_MIN_SAVES &&
+    ready.some((item) =>
+      [...(item.intents ?? []), ...(item.spaceIntents ?? [])].some(
+        (intent) => intent.kind === "open_maps",
+      ),
+    )
+  );
+}
+
 export function placeLabel(place: PlanPlace): string {
   return place.area ? `${place.name}, ${place.area}` : place.name;
 }

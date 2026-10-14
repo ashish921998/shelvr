@@ -911,7 +911,8 @@ export const claimPlanInternal = internalMutation({
         url: item.url,
         siteName: item.siteName,
         author: item.author,
-        places: (item.intents ?? [])
+        // The save's own Maps actions plus any steered for this space.
+        places: [...(item.intents ?? []), ...(join.intents ?? [])]
           .filter((intent) => intent.kind === "open_maps")
           .map((intent) => intent.value),
       });
