@@ -125,9 +125,9 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           If you save a cooking TikTok or Instagram reel whose caption has no
-          recipe, its public link is sent to Treg (treg.to), which returns what
-          is said in the video. That transcript is then sent to Gemini to write
-          the recipe.
+          recipe, its public link is sent to Treg (treg.to), which uses
+          ScrapeCreators to return what is said in the video. That transcript is
+          then sent to Gemini to write the recipe.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
@@ -163,8 +163,8 @@ export default function PrivacyPage() {
             <strong>SerpAPI:</strong> shopping search for “Find links”.
           </li>
           <li>
-            <strong>Treg:</strong> video transcripts for recipes from cooking
-            TikToks and reels.
+            <strong>Treg and ScrapeCreators:</strong> video transcripts for
+            recipes from cooking TikToks and reels.
           </li>
           <li>
             <strong>Convex:</strong> database, file storage, and backend
