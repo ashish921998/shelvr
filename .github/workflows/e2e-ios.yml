@@ -194,27 +194,27 @@ jobs:
           } >> .env.local
           cat .env.local
 
-      # Every flow so far ended on the dev launcher's "Searching for
-      # development servers" screen: the app never asked Metro for a bundle.
-      # The launcher gives the manifest request 10 s, so time it here against
-      # a Metro started the way the run starts it.
-      - name: Time the dev manifest
+      # The app opens Metro's bundle URL directly (tests/launch.ts), and the
+      # dev launcher gives it 10 s. Build the bundle once beforehand, so the
+      # run's Metro starts from a warm transform cache, and log how long a
+      # cold build takes on this runner.
+      - name: Warm the bundle
         working-directory: apps/native
         run: |
-          nohup pnpm exec expo start --dev-client --port 8091 > "$RUNNER_TEMP/metro-probe.log" 2>&1 &
+          nohup pnpm exec expo start --dev-client --port 8091 > "$RUNNER_TEMP/metro-warm.log" 2>&1 &
           for _ in $(seq 1 90); do curl -s localhost:8091/status | grep -q running && break; sleep 2; done
-          for url in http://localhost:8091 http://127.0.0.1:8091; do
-            for _ in 1 2 3; do
-              curl -sS -m 60 -o "$RUNNER_TEMP/manifest.out" \
-                -w "$url %{http_code} %{content_type} %{time_total}s\n" \
-                -H 'expo-platform: ios' -H 'accept: multipart/mixed,application/expo+json,application/json' \
-                "$url" || echo "$url request failed"
-            done
+          url=$(node --input-type=module -e '
+            const { LAUNCH_ARGUMENTS } = await import(process.argv[1]);
+            console.log(LAUNCH_ARGUMENTS[LAUNCH_ARGUMENTS.indexOf("--initialUrl") + 1]);
+          ' "$GITHUB_WORKSPACE/tools/e2e/tests/launch.ts")
+          for pass in cold warm; do
+            curl -sS -m 600 -o /dev/null -w "$pass bundle %{http_code} %{size_download} bytes %{time_total}s\n" "$url"
           done
-          head -c 400 "$RUNNER_TEMP/manifest.out"; echo
-          cat "$RUNNER_TEMP/metro-probe.log"
           pkill -f -- "--port 8091" || true
-          for _ in $(seq 1 15); do curl -s localhost:8091/status > /dev/null || break; sleep 1; done
+          for _ in $(seq 1 30); do curl -s localhost:8091/status > /dev/null || exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/metro-warm.log"
+          echo "::error::Metro on 8091 did not stop; the run could not start its own"
+          exit 1
 
       - name: Run the model-free flows
         working-directory: tools/e2e

@@ -36,7 +36,8 @@ nothing is started by hand. Before a run:
   the dev Convex deployment, with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true`.
   The dev deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
   `GOOGLE_GENERATIVE_AI_API_KEY` (an AI Studio key, never committed) is needed
-  only by flows with `agent.*` steps: `save-link` and `save-image`.
+  by `save-link` and `save-image`, which call the model from the test, and by
+  `save-note`, whose note is searchable only after the backend's model pass.
 - **Data.** Every test's `beforeEach` (`startOnSeededHome` in
   `tests/seeded-home.ts`) signs in as the anonymous dev user and taps Settings >
   "Reset flow fixtures": 4 saves (`fixture-item-ramen`, `-belem-tower`,
@@ -89,8 +90,8 @@ same Metro on 8091, so never run one beside a test run.
 ## Evidence
 
 Every run writes `.e2e/report.json`; a failed test gets its trace under
-`.e2e/results/`; `--trace on` adds one for passing tests, `--video on` records
-an MP4 per attempt (topic `running`). The next run clears `.e2e/results/`,
+`.e2e/artifacts/`; `--trace on` adds one for passing tests, `--video on` records
+an MP4 per attempt (topic `running`). The next run clears `.e2e/artifacts/`,
 Doctor included, so a proof that must outlive it runs with
 `--output .e2e/proof/<name>`. All of `.e2e/` is gitignored
 (`tools/e2e/.gitignore`). Never commit screenshots or videos. A pull request

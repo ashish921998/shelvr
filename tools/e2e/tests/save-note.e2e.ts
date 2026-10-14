@@ -11,8 +11,9 @@ startOnSeededHome();
 
 const NOTE = "Ask the landlord about the quokka mural";
 
-// A note's own words are searchable, so the check needs no model: the word
-// below is in no seeded save, and only the new note can answer for it.
+// The word below is in no seeded save, so only the new note can answer for
+// it. The test makes no model call itself, but the backend does: a note's
+// words reach the search index only once the model has processed it.
 test("saves a note and finds it by its own words", async ({ screen }) => {
   await chooseAddOption(screen, screen.getByTestId("add-option-note"));
   await screen.getByTestId("add-note-input").fill(NOTE);
