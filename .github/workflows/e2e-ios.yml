@@ -17,6 +17,8 @@ on:
       - "apps/native/**"
       - "tools/e2e/**"
       - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
       - ".github/workflows/e2e-ios.yml"
   # A push to main refreshes the cached build that pull requests restore.
   push:
@@ -25,6 +27,8 @@ on:
       - "apps/native/**"
       - "tools/e2e/**"
       - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
       - ".github/workflows/e2e-ios.yml"
   workflow_dispatch:
 
@@ -75,7 +79,7 @@ jobs:
         run: |
           hash=$(node "$(dirname "$(node -p 'require.resolve("expo-updates/package.json")')")/bin/cli.js" \
             fingerprint:generate --platform ios | node -p 'JSON.parse(require("fs").readFileSync(0)).hash')
-          xcode=$(xcodebuild -version | head -1 | tr -d ' ')
+          xcode=$(xcodebuild -version | tr -d ' \n')
           echo "key=e2e-ios-dev-adhoc-$hash-$xcode" >> "$GITHUB_OUTPUT"
           # The XCTest runner depends on agent-device and Xcode only, so an
           # unrelated lockfile change does not cost a 2.5 minute rebuild.
@@ -191,9 +195,9 @@ jobs:
           # The first anonymous sign-in on a cold backend has run past the
           # 1 s function limit and failed the first flow's setup. Sign in
           # once here, as a throwaway user, so the flows meet a warm backend.
-          for _ in 1 2; do
-            npx convex run auth:signIn '{"provider":"anonymous","params":{}}' > /dev/null || true
-          done
+          # The first attempt may time out; the second must succeed.
+          npx convex run auth:signIn '{"provider":"anonymous","params":{}}' > /dev/null ||
+            npx convex run auth:signIn '{"provider":"anonymous","params":{}}' > /dev/null
           # The push wrote the local URLs into .env.local, which Metro reads.
           # The run's Metro gets no other environment from this job, so the
           # dev sign-in flag and the Development Test Store key (pinned in
@@ -213,12 +217,13 @@ jobs:
         run: |
           nohup pnpm exec expo start --dev-client --port 8091 > "$RUNNER_TEMP/metro-warm.log" 2>&1 &
           for _ in $(seq 1 90); do curl -s localhost:8091/status | grep -q running && break; sleep 2; done
+          curl -s localhost:8091/status | grep -q running || { cat "$RUNNER_TEMP/metro-warm.log"; exit 1; }
           url=$(node --input-type=module -e '
             const { LAUNCH_ARGUMENTS } = await import(process.argv[1]);
             console.log(LAUNCH_ARGUMENTS[LAUNCH_ARGUMENTS.indexOf("--initialUrl") + 1]);
           ' "$GITHUB_WORKSPACE/tools/e2e/tests/launch.ts")
           for pass in cold warm; do
-            curl -sS -m 600 -o /dev/null -w "$pass bundle %{http_code} %{size_download} bytes %{time_total}s\n" "$url"
+            curl -sS --fail -m 600 -o /dev/null -w "$pass bundle %{http_code} %{size_download} bytes %{time_total}s\n" "$url"
           done
           pkill -f -- "--port 8091" || true
           for _ in $(seq 1 30); do curl -s localhost:8091/status > /dev/null || exit 0; sleep 1; done
