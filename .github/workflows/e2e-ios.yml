@@ -168,10 +168,17 @@ jobs:
       # which needs the required model key; the env is set after that. The key
       # is a placeholder, so any model call fails, and none of these flows
       # needs one.
+      #
+      # The runner is several times slower than Convex's servers, and its
+      # queries have run past the 1 s production limit (`legalConsent:get`,
+      # the first sign-in), failing a flow on a timeout no user would see.
+      # The local backend reads its limits from the environment the CLI
+      # passes it, so this one allows 10 s.
       - name: Start a local Convex backend
         working-directory: apps/native
         env:
           CONVEX_AGENT_MODE: anonymous
+          DATABASE_UDF_USER_TIMEOUT_SECONDS: "10"
         run: |
           keys=$(node --input-type=module -e '
             import { exportJWK, exportPKCS8, generateKeyPair } from "jose";
