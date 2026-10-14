@@ -3,6 +3,7 @@ import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ItemDetail, type DetailItem } from "@/components/item-detail";
 import { ItemHeader } from "@/components/item-header";
 import { convexQuery } from "@convex-dev/react-query";
@@ -18,6 +19,7 @@ import { useMutation } from "convex/react";
 import { AppEntityView } from "expo-app-intents";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "@/components/glass";
+import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import {
   Stack,
@@ -26,7 +28,14 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   Alert,
   type LayoutChangeEvent,
@@ -38,14 +47,20 @@ import {
 } from "react-native";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ProgressiveBlurHeader } from "progressive-blur";
-import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
+import Animated, {
+  FadeOutDown,
+  SlideInDown,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
+import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
+import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
 
 // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
 // React Query still subscribes through the Convex adapter, and an invalid
@@ -87,6 +102,97 @@ function pagerEndReached(
   return items === homeFeed.items && homeFeed.canLoadMore
     ? homeFeed.loadMore
     : undefined;
+}
+
+// The pager header's colors for the page in view: white over a media save's
+// black stage, the app's own otherwise, including once that save's light
+// details sheet has scrolled up under the header.
+function pagerHeaderColors(
+  activeItem: DetailItem | undefined,
+  sheetsUnder: ReadonlySet<string>,
+  theme: ReturnType<typeof useUnistyles>["theme"],
+): { onMedia: boolean; tint: string; background: string } {
+  const onMedia =
+    isMediaSave(activeItem) && !sheetsUnder.has(activeItem?._id ?? "");
+  return onMedia
+    ? { onMedia, tint: "white", background: MEDIA_CANVAS }
+    : {
+        onMedia,
+        tint: theme.colors.primary,
+        background: theme.colors.background,
+      };
+}
+
+/**
+ * What sits behind the transparent iOS header, plus the status bar style.
+ *
+ * Over a media save's black stage the blur band would read as a grey bar; a
+ * black fade keeps the white header legible over bright photos and over the
+ * details sheet as it scrolls up beneath. The light status bar holds only
+ * while this screen is focused: on blur or unmount expo-status-bar falls back
+ * to the root layout's theme-driven bar.
+ */
+function PagerHeaderBackdrop({
+  onMedia,
+  browserOpen,
+}: {
+  onMedia: boolean;
+  // The in-app browser is up over a media save: its page is light, so the
+  // bar falls back to the root layout's until it closes.
+  browserOpen: boolean;
+}) {
+  const { theme } = useUnistyles();
+  // Typed to the events used here: the native stack's transitionStart and
+  // gestureCancel aren't in expo-router's generic navigation type.
+  const navigation = useNavigation() as {
+    addListener: (
+      type: "beforeRemove" | "transitionStart" | "gestureCancel",
+      callback: (e: { data?: { closing?: boolean } }) => void,
+    ) => () => void;
+    isFocused: () => boolean;
+  };
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+  // Blur only lands once the pop animation ends, leaving a white clock over
+  // the feed while it plays; drop the light bar as the pop starts instead.
+  // A native back (button or swipe) skips beforeRemove, so the closing
+  // transition's start is what catches it. A swipe back the user lets go of
+  // keeps the screen focused, so no focus event brings the light bar back;
+  // gestureCancel does.
+  useEffect(() => {
+    const drop = () => setFocused(false);
+    // A back tap landing mid-swipe cancels the gesture as the pop starts;
+    // the screen is no longer focused then, and the bar stays dropped.
+    const offCancel = navigation.addListener("gestureCancel", () =>
+      setFocused(navigation.isFocused()),
+    );
+    const offRemove = navigation.addListener("beforeRemove", drop);
+    const offTransition = navigation.addListener(
+      "transitionStart",
+      (e: { data?: { closing?: boolean } }) => {
+        if (e.data?.closing) drop();
+      },
+    );
+    return () => {
+      offRemove();
+      offTransition();
+      offCancel();
+    };
+  }, [navigation]);
+  if (!onMedia) {
+    return <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />;
+  }
+  return (
+    <>
+      <HeaderScrim color={MEDIA_CANVAS} />
+      {focused && !browserOpen ? <StatusBar style="light" /> : null}
+    </>
+  );
 }
 
 export default function ItemScreen() {
@@ -175,6 +281,186 @@ function usePageStyle(width: number, windowHeight: number) {
   return { pageStyle, onListLayout };
 }
 
+const pagerKey = (item: DetailItem) => item._id;
+// Module-level so the pager sees one stable object across renders.
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
+
+// The list can reorder under the pager (an accepted suggestion moves behind
+// the remaining ones). The pager keeps its offset, so without this it shows
+// a neighbour while the header and the action menu still target this save.
+function usePagerFollowsActive(
+  listRef: RefObject<FlashListRef<DetailItem> | null>,
+  items: DetailItem[] | undefined,
+  activeIdRef: RefObject<string>,
+) {
+  const previousItems = useRef(items);
+  useEffect(() => {
+    const index = pagerResyncIndex(
+      previousItems.current,
+      items,
+      activeIdRef.current,
+    );
+    previousItems.current = items;
+    if (index !== null) {
+      listRef.current?.scrollToIndex({ index, animated: false });
+    }
+  }, [listRef, items, activeIdRef]);
+}
+
+/**
+ * The pager's page renderer. Stable across swipes for the same reason as
+ * usePageStyle. A page whose bottom the pager covers with the suggestion bar
+ * or its undo notice is told so, so a media caption can sit above it.
+ */
+function usePagerPages({
+  width,
+  windowHeight,
+  pushedId,
+  suggestedIds,
+  accepted,
+}: {
+  width: number;
+  windowHeight: number;
+  pushedId: string;
+  suggestedIds: Set<string>;
+  accepted: { itemId: string } | null;
+}) {
+  const acceptedId = accepted?.itemId;
+  const { pageStyle, onListLayout } = usePageStyle(width, windowHeight);
+  // The media saves whose details sheet is up under the header: the header
+  // goes back to the light page's colors over them. Tracked per save, since
+  // a swipe leaves each page's sheet where it was.
+  const [sheetsUnder, setSheetsUnder] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const onSheetUnderHeader = useCallback(
+    (itemId: string, under: boolean) =>
+      setSheetsUnder((current) => {
+        if (current.has(itemId) === under) return current;
+        const next = new Set(current);
+        if (under) next.add(itemId);
+        else next.delete(itemId);
+        return next;
+      }),
+    [],
+  );
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const renderItem = useCallback(
+    ({ item }: { item: DetailItem }) => (
+      // AppEntityView tells Siri which save is on screen ("send this to Sam").
+      <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
+        <ItemDetail
+          item={item}
+          isZoomTarget={item._id === pushedId}
+          pageHeight={pageStyle.height}
+          reserveFooter={suggestedIds.has(item._id) || item._id === acceptedId}
+          onSheetUnderHeader={onSheetUnderHeader}
+          onSourceBrowser={setBrowserOpen}
+        />
+      </AppEntityView>
+    ),
+    [pageStyle, pushedId, suggestedIds, acceptedId, onSheetUnderHeader],
+  );
+  return { renderItem, onListLayout, sheetsUnder, browserOpen };
+}
+
+// Takes the save in view out of the space it was opened from, and only that
+// space: Home and its other spaces keep it. The page leaves the space's list,
+// so slide to a neighbour first, the way dismiss and delete do. A suggested
+// page has its own Dismiss, so only a saved one offers this, and Delete then
+// has to say it reaches every space.
+function useRemoveFromSpace({
+  from,
+  spaceId,
+  activeId,
+  space,
+  items,
+  listRef,
+  goTo,
+  writeParams,
+  cancelParamWrite,
+}: {
+  from: string | undefined;
+  spaceId: string | undefined;
+  activeId: string;
+  space: { items: { _id: string }[] } | null | undefined;
+  items: DetailItem[] | undefined;
+  listRef: RefObject<FlashListRef<DetailItem> | null>;
+  goTo: (id: string) => void;
+  writeParams: (id: string) => void;
+  cancelParamWrite: () => void;
+}) {
+  const router = useRouter();
+  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
+  // Read live from the space's saved list, not the route: the save may have
+  // left the space in Change spaces while this screen stayed open.
+  const available =
+    from === "space" &&
+    !!spaceId &&
+    !!space?.items.some((item) => item._id === activeId);
+  // A second tap while the first is in flight would navigate twice.
+  const pending = useRef(false);
+  const remove = useCallback(async () => {
+    if (!spaceId || !activeId || !items || pending.current) return;
+    pending.current = true;
+    cancelParamWrite();
+    const idx = items.findIndex((i) => i._id === activeId);
+    const neighbor = items[idx + 1] ?? items[idx - 1];
+    const membership = {
+      itemId: activeId as Id<"items">,
+      spaceId: spaceId as Id<"spaces">,
+    };
+    try {
+      await removeItemFromSpace(membership);
+      analytics.capture("item_space_membership_changed", {
+        membership_added: false,
+        item_id: membership.itemId,
+        space_id: membership.spaceId,
+        undone: false,
+      });
+      if (neighbor) {
+        listRef.current?.scrollToIndex({
+          index: Math.min(idx, items.length - 2),
+          animated: true,
+        });
+        goTo(neighbor._id);
+        writeParams(neighbor._id);
+      } else if (router.canGoBack()) router.back();
+      else router.replace("/");
+    } catch {
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    } finally {
+      pending.current = false;
+    }
+  }, [
+    spaceId,
+    activeId,
+    items,
+    listRef,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+    removeItemFromSpace,
+    router,
+  ]);
+  return {
+    available,
+    remove,
+    deleteLabel: available ? t("item.deleteEverywhere") : t("common.delete"),
+    // Spread straight into the Android header menu.
+    menuActions: available
+      ? [{ label: t("spaces.removeFromSpace"), onPress: remove }]
+      : [],
+  };
+}
+
+// The pager's list ref and whether its programmatic scrolls should animate.
+function usePagerScroll() {
+  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const reducedMotion = useReducedMotion();
+  return { listRef, reducedMotion };
+}
+
 function ItemScreenContent() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
@@ -197,7 +483,7 @@ function ItemScreenContent() {
   } | null>(null);
   const decisionPending = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const listRef = useRef<FlashListRef<DetailItem>>(null);
+  const { listRef, reducedMotion } = usePagerScroll();
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
   // The home feed is paginated and shared through HomeFeedProvider, so every
@@ -291,24 +577,22 @@ function ItemScreenContent() {
     },
     [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
-  const viewabilityConfig = useMemo(
-    () => ({ itemVisiblePercentThreshold: 60 }),
-    [],
-  );
 
-  const { pageStyle, onListLayout } = usePageStyle(width, height);
-  const keyExtractor = useCallback((item: DetailItem) => item._id, []);
-  const renderItem = useCallback(
-    ({ item }: { item: DetailItem }) => (
-      // AppEntityView tells Siri which save is on screen ("send this to Sam").
-      <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
-        <ItemDetail item={item} isZoomTarget={item._id === pushedId} />
-      </AppEntityView>
-    ),
-    [pageStyle, pushedId],
-  );
+  const { renderItem, onListLayout, sheetsUnder, browserOpen } = usePagerPages({
+    width,
+    windowHeight: height,
+    pushedId,
+    suggestedIds,
+    accepted,
+  });
+
+  usePagerFollowsActive(listRef, items, activeIdRef);
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
+
+  // A photo or social post opens in the black media viewer, so the chrome
+  // over it (header, status bar) turns light while it is the page in view.
+  const media = pagerHeaderColors(activeItem, sheetsUnder, theme);
 
   // List rows are card-shaped (no article body, no shopping status), so the
   // toolbar reads those from getItem. `single` follows the debounced `id`
@@ -422,7 +706,7 @@ function ItemScreenContent() {
     if (neighbor) {
       listRef.current?.scrollToIndex({
         index: items.indexOf(neighbor),
-        animated: true,
+        animated: !reducedMotion,
       });
       goTo(neighbor._id);
       writeParams(neighbor._id);
@@ -443,6 +727,8 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
+    reducedMotion,
   ]);
 
   const onDelete = useCallback(async () => {
@@ -459,7 +745,7 @@ function ItemScreenContent() {
         writeParams(neighbor._id);
         listRef.current?.scrollToIndex({
           index: Math.min(idx, items.length - 2),
-          animated: true,
+          animated: !reducedMotion,
         });
       } else if (router.canGoBack()) router.back();
       else router.replace("/");
@@ -474,7 +760,21 @@ function ItemScreenContent() {
     goTo,
     writeParams,
     cancelParamWrite,
+    listRef,
+    reducedMotion,
   ]);
+
+  const removeFromSpace = useRemoveFromSpace({
+    from,
+    spaceId,
+    activeId,
+    space: spaceQ.data,
+    items,
+    listRef,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  });
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
@@ -494,6 +794,9 @@ function ItemScreenContent() {
         options={{
           headerShown: true,
           headerBackButtonDisplayMode: "minimal",
+          // Always set: Stack.Screen merges options, so leaving the key out
+          // would keep a media page's white tint on the next article.
+          headerTintColor: media.tint,
           ...(Platform.OS === "android"
             ? {
                 // Android has no progressive-blur band, so a transparent
@@ -501,7 +804,7 @@ function ItemScreenContent() {
                 // text. Give the toolbar the opaque treatment the space
                 // screen uses; content then starts below it natively.
                 headerTransparent: false,
-                headerStyle: { backgroundColor: theme.colors.background },
+                headerStyle: { backgroundColor: media.background },
                 headerTitleAlign: "center",
                 headerRight: () => (
                   <HeaderActionMenu
@@ -528,8 +831,9 @@ function ItemScreenContent() {
                             },
                           ]
                         : []),
+                      ...removeFromSpace.menuActions,
                       {
-                        label: t("common.delete"),
+                        label: removeFromSpace.deleteLabel,
                         destructive: true,
                         onPress: onDelete,
                       },
@@ -541,7 +845,7 @@ function ItemScreenContent() {
         }}
       />
       <Stack.Title asChild>
-        <ItemHeader item={activeItem} />
+        <ItemHeader item={activeItem} onMedia={media.onMedia} />
       </Stack.Title>
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="right">
@@ -575,11 +879,18 @@ function ItemScreenContent() {
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
+              icon="minus.circle"
+              hidden={!removeFromSpace.available}
+              onPress={removeFromSpace.remove}
+            >
+              {t("spaces.removeFromSpace")}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
               icon="trash"
               destructive
               onPress={onDelete}
             >
-              {t("common.delete")}
+              {removeFromSpace.deleteLabel}
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
@@ -593,11 +904,11 @@ function ItemScreenContent() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={keyExtractor}
+        keyExtractor={pagerKey}
         initialScrollIndex={startIndex >= 0 ? startIndex : 0}
         renderItem={renderItem}
         onViewableItemsChanged={onViewable}
-        viewabilityConfig={viewabilityConfig}
+        viewabilityConfig={VIEWABILITY_CONFIG}
         onEndReached={onEndReached}
         onEndReachedThreshold={2}
       />
@@ -613,7 +924,7 @@ function ItemScreenContent() {
           blur across the whole band and land the fade where the reader
           layout's content begins — the same gap(1.5) — so nothing at rest is
           hazed. */}
-      <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />
+      <PagerHeaderBackdrop onMedia={media.onMedia} browserOpen={browserOpen} />
 
       {activeIsSuggested ? (
         // SlideInDown (not a fade) so the bar never mounts at opacity 0 — a

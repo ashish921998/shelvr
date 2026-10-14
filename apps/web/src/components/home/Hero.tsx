@@ -21,7 +21,7 @@ export default function Hero() {
           <StoreButton source="hero" />
         </div>
         <p className="text-[13px] font-medium text-muted">
-          Private by design · iPhone ·{" "}
+          No ads, data isn’t sold · iPhone ·{" "}
           <a href="#android" className="text-ember-deep underline">
             Android? Join the waitlist
           </a>

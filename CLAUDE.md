@@ -20,10 +20,11 @@ dismisses each suggestion.
 
 ## Monorepo layout
 
-| Path          | Role                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists |
-| `apps/native` | Expo Router native app (includes `convex/` backend)                           |
+| Path          | Role                                                                               |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists      |
+| `apps/native` | Expo Router native app (includes `convex/` backend)                                |
+| `tools/e2e`   | End-to-end flow tests for the iOS simulator (pilot; see the README's Test section) |
 
 Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
 
@@ -90,6 +91,25 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `cancelSurveys` — one next-visit cancel-survey ask per user; the first recorded outcome wins
   - `captureTokens` — hashed per-device tokens the iOS App Intents use in place of a JWT
   - `onboardingDemos` — the one pre-payment demo save each user is allowed
+  - `aiConsents` — one row per user: their answer to the third-party AI processing
+    disclosure (`granted` or `declined`) and the disclosure version it answered
+  - `appleTokens` — the latest Sign in with Apple refresh token per user, kept only to
+    revoke it on account deletion; never returned to a client or logged
+  - `detachedAppleTokens` — a web-flow Apple refresh token that arrived while its owner was
+    already `deleting`, parked only until `revokeDetachedToken` has revoked it, so no
+    scheduled job argument ever carries a token
+
+  `schema.ts` also redeclares Convex Auth's `users` table with two optional fields.
+  `appleRefreshToken`: Convex Auth writes the Apple profile onto that row, and
+  `keepAppleRefreshToken` (`model/appleTokens.ts`) moves the token to `appleTokens` in the
+  same transaction, so no stored users row carries it. `deleting`: a one-way marker
+  `deleteCurrentUserAccount` sets in its first transaction, so the account stops owning
+  data before the batched cleanup finishes. `liveOwner` (`model/auth.ts`)
+  is the one definition of an account that may still own data (row present, `deleting`
+  unset), used by `requireUserId`, `getCurrentUser`, the capture-token, Apple-token and
+  billing writes, and `canResetCurrentUser`. The marker is never cleared; the cleanup
+  deletes the row. It stays declared `v.optional(...)` through any rollback while a row
+  still carries it (see the one-way-door rule under Working conventions).
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -105,7 +125,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   work. Successful upload retries return the same storage ID.
   Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
-  `reprocessItem` (retry a failed or partially enriched save), and `deleteItem`. The rest of the
+  `reprocessItem` (retry a failed or partially enriched save), `deleteItem`, and the share
+  link pair `createShareLink` / `settleShareLink` (a cancelled share sheet withdraws a
+  fresh, never-confirmed link). The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
   `suggestItemsForSpace`, `cleanupStaleImageImports`, and others). `enrichItem` resolves
   `storageId` to an `imageUrl` at read time.
@@ -115,8 +137,36 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `acceptAllSuggestions`), plus internal join helpers.
 - **`subscriptions.ts`** — `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
-  `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
+  `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
+- **`aiConsent.ts`** — consent to third-party AI processing (App Store guideline 5.1.2(i)):
+  `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
+  every path sending user content to Gemini or SerpAPI asks first. Missing/deleting owners
+  are refused before consent is read; item-aware checks also require an existing owned save.
+  Among live owners, only an explicit decline blocks; unset stays allowed, because builds without the consent card
+  must keep working. A declined user's saves still finish `ready` from what Shelvr read
+  itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
+  client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+  `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
+  and `survivingCandidates` (up to 100 hydrated identities, revalidated before classification).
+  The embedding sweep revalidates each cached save in one batch and maps vectors to the surviving
+  list. These are pre-dispatch fences, not cancellation or recall of already-sent requests:
+  a database check and an external provider call cannot be atomic.
+- **`appleRevoke.ts`** (`"use node"` action) — revokes a Sign in with Apple refresh token
+  after `deleteCurrentUserAccount` hands it over. Best effort: it never throws, skips with
+  one log line when the `APPLE_REVOKE_*` variables are unset, and retries only when Apple
+  could not be reached. A token from the native sheet (traded for the sheet's code in
+  `auth.ts`, via `model/appleClient.ts`) carries the bundle id it was issued to as
+  `clientId`, and is revoked as that client instead of the web Service ID. A web-flow
+  sign-in that lands while the owner row is already `deleting` cannot store its token, so
+  `keepAppleRefreshToken` parks it in `detachedAppleTokens` and schedules
+  `revokeDetachedToken` with the row id under the same policy instead of dropping it; the
+  job deletes the row on every terminal outcome, and a scheduled forget bounds its life.
+  If deletion wins the native exchange-to-persistence race, `auth.ts` revokes the
+  freshly exchanged, ownership-verified token immediately through the shared
+  runtime-neutral `model/appleClient.ts` request. This is one bounded best-effort
+  attempt, with no persistence or scheduled token arguments; retained-token
+  revocation keeps its existing retries.
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
@@ -146,7 +196,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
   `image: null` Apple's provider emits, which the users schema rejects.
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
-  identity sync, plus `deleteCurrentUserAccount` and its batched internal deletion.
+  identity sync (null once deletion has begun), plus `deleteCurrentUserAccount` and its batched
+  internal deletion. Deletion is idempotent: the first call marks the row `deleting`, revokes
+  the Apple token and starts the cleanup; a repeat resumes the cleanup without a second revoke
+  job; a call after the row is gone is a no-op.
 - **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
   `AUTH_ENABLE_ANONYMOUS` is `"true"` and the caller is a development anonymous user.
 - **`analytics.ts`**, **`accountTelemetry.ts`**, **`paymentTelemetry.ts`** — server-side PostHog
@@ -158,13 +211,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships. The file also holds `recommendForSpace` (one pass over
-  existing items, scheduled by `createSpace`), `steerItemForSpace` (per-space intents, scheduled
+  matches become `suggested` memberships. The file also holds
+  `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
-  `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
-  [embeddings](docs/architecture/embeddings.md)).
+  `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
+- **`aiEmbeddingSweep.ts`** (`"use node"`) — the embedding sweep cron and best-effort
+  `embedTexts` / `embedQuery` provider calls. See [embeddings](docs/architecture/embeddings.md).
+- **`aiRecommendForSpace.ts`** (`"use node"`) — ranked-plus-recency recommendations,
+  scheduled by space creation and dynamic enabling; creates suggestions only.
+  Both modules and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
 - **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
-  one entry point: it picks the reader for the host (TikTok oEmbed, X syndication, Instagram
+  one entry point: it picks the reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
   embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
   image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
   schema.org recipe. Host-specific knowledge stays in this file, not in `ai.ts`.
@@ -185,7 +242,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
-  argument.**
+  argument.** It takes a query or mutation context; an action derives the caller through the
+  internal mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`),
+  so authorization and the write stay in one transaction.
 - **`model/log.ts`** — `logEvent(level, event, fields)` structured logging: one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
@@ -292,6 +351,10 @@ needed at runtime by the features that use them:
 - `APPLE_RETENTION_MESSAGE_ID` — id of the Apple-approved retention message
   `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
   the default message configured for the product
+- `APPLE_REVOKE_PRIVATE_KEY` / `APPLE_REVOKE_KEY_ID` / `APPLE_REVOKE_TEAM_ID` — the Sign in
+  with Apple key (`.p8` contents), its key id, and the Apple team id. `appleRevoke.ts` signs
+  the client secret with them to revoke a deleted account's Apple token. All optional:
+  without them deletion still completes and the revocation is skipped with a log line
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by
@@ -304,7 +367,7 @@ needed at runtime by the features that use them:
 - `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts.
   The route answers 500 when it is unset
 - `REVENUECAT_API_KEY` — RevenueCat REST key used to re-read subscribers when reconciling a
-  `TRANSFER`, refund, or `REFUND_REVERSED` webhook event. Refund reconciliation returns
+  `TRANSFER`, `BILLING_ISSUE`, refund, or `REFUND_REVERSED` webhook event. Billing-issue and refund reconciliation return
   503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
@@ -382,6 +445,13 @@ needed at runtime by the features that use them:
   naming it. So reverting the commit that added the field fails the deploy instead
   of rolling it back. To back a field out, stop writing it and leave it declared
   `v.optional(...)`; drop the declaration only once no row still has it.
+- Every pull request (Renovate and Dependabot aside) fills in the template's Verification section: what was run and its result,
+  the evidence, and what was not verified. Never call work "done" or "verified" without evidence
+  a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
+  assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
+  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
+  never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
+  branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 - A new schema table, top-level Convex module or `(app)` route needs a line in this file.

@@ -5,10 +5,10 @@ import Logo from "./common/Logo";
 import StoreButton from "./home/StoreButton";
 
 const navigation = [
-  { name: "Spaces", href: "#shelves" },
-  { name: "Search", href: "#find" },
-  { name: "Photo tidy", href: "#tidy" },
-  { name: "FAQ", href: "#faq" },
+  { name: "Spaces", href: "/#shelves" },
+  { name: "Search", href: "/#find" },
+  { name: "Photo tidy", href: "/#tidy" },
+  { name: "FAQ", href: "/#faq" },
 ];
 
 export default function Header() {
@@ -34,7 +34,7 @@ export default function Header() {
               <li key={item.name}>
                 <a
                   href={item.href}
-                  className="flex h-10 items-center px-3.5 text-sm font-medium text-muted transition-colors hover:text-ember-deep"
+                  className="flex h-11 items-center px-3.5 text-sm font-medium text-muted transition-colors hover:text-ember-deep"
                 >
                   {item.name}
                 </a>

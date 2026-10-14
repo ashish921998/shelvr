@@ -48,9 +48,10 @@ async function photo(
   blob = new Blob([bytes], { type: "image/png" }),
 ) {
   return t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", {});
     const storageId = await ctx.storage.store(blob);
     const itemId = await ctx.db.insert("items", {
-      userId: "photo-user",
+      userId,
       type: "image",
       status: "processing",
       storageId,
@@ -59,16 +60,16 @@ async function photo(
       aspectRatio: 1.5,
     });
     const spaceId = await ctx.db.insert("spaces", {
-      userId: "photo-user",
+      userId,
       name: "Saved photos",
     });
     await ctx.db.insert("spaceItems", {
-      userId: "photo-user",
+      userId,
       itemId,
       spaceId,
       status: "saved",
     });
-    return { itemId, storageId, spaceId };
+    return { itemId, storageId, spaceId, userId };
   });
 }
 
@@ -208,7 +209,7 @@ describe("stored photo processing", () => {
     "bounds %s prompt space data including JSON escapes and multibyte text",
     async (type) => {
       const t = newConvexTest();
-      const { itemId } = await photo(t);
+      const { itemId, userId } = await photo(t);
       if (type !== "image") {
         await t.run((ctx) =>
           ctx.db.patch(itemId, {
@@ -228,7 +229,7 @@ describe("stored photo processing", () => {
       await t.run(async (ctx) => {
         for (let i = 0; i < 100; i++)
           await ctx.db.insert("spaces", {
-            userId: "photo-user",
+            userId,
             dynamic: true,
             name: `Space ${i}`,
             description: "\u0000😀".repeat(10000),
@@ -262,10 +263,10 @@ describe("stored photo processing", () => {
 
   it("does not split emoji when shortening space descriptions", async () => {
     const t = newConvexTest();
-    const { itemId } = await photo(t);
+    const { itemId, userId } = await photo(t);
     await t.run((ctx) =>
       ctx.db.insert("spaces", {
-        userId: "photo-user",
+        userId,
         dynamic: true,
         name: "Emoji",
         description: "a".repeat(511) + "😀end",

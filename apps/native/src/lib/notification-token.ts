@@ -30,36 +30,61 @@ function permissionOutcome(
   return canReceiveNotifications(permission) ? "granted" : "denied";
 }
 
+// Android 13 cannot request notification permission before a channel exists.
+// Each push kind gets its own channel so Android users can mute one alone.
+async function ensureChannels(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync("weekly-shelf", {
+    name: t("notifications.weeklyShelf"),
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 150],
+  });
+  await Notifications.setNotificationChannelAsync("save-reminders", {
+    name: t("notifications.remindersChannel"),
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 150],
+  });
+}
+
+async function askForPermission(
+  permission: Notifications.NotificationPermissionsStatus,
+): Promise<boolean> {
+  if (canReceiveNotifications(permission)) return true;
+  // Once the user has refused for good the OS shows no prompt, so a request
+  // would only replay the old denial as if it were a fresh decision.
+  if (permission.canAskAgain === false) return false;
+  const answer = await Notifications.requestPermissionsAsync();
+  analytics.capture("notification_permission_result", {
+    outcome: permissionOutcome(answer),
+  });
+  return canReceiveNotifications(answer);
+}
+
+/** Whether a screen asking for notifications has anything left to ask. */
+export async function notificationPermissionState(): Promise<
+  "granted" | "ask" | "blocked"
+> {
+  const permission = await Notifications.getPermissionsAsync();
+  if (canReceiveNotifications(permission)) return "granted";
+  return permission.canAskAgain === false ? "blocked" : "ask";
+}
+
+/** Shows the OS prompt when it can still appear. Needs no account. */
+export async function requestNotificationPermission(): Promise<boolean> {
+  await ensureChannels();
+  return askForPermission(await Notifications.getPermissionsAsync());
+}
+
 export async function getExpoPushToken(
   requestPermission: boolean,
   devicePushToken?: Notifications.DevicePushToken,
 ): Promise<string | null> {
-  // Android 13 cannot request notification permission before a channel exists.
-  // Each push kind gets its own channel so Android users can mute one alone.
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("weekly-shelf", {
-      name: t("notifications.weeklyShelf"),
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 150],
-    });
-    await Notifications.setNotificationChannelAsync("save-reminders", {
-      name: t("notifications.remindersChannel"),
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 150],
-    });
-  }
-  let permission = await Notifications.getPermissionsAsync();
-  // Once the user has refused for good the OS shows no prompt, so a request
-  // would only replay the old denial as if it were a fresh decision.
-  if (permission.canAskAgain === false && !canReceiveNotifications(permission))
-    return null;
-  if (!canReceiveNotifications(permission) && requestPermission) {
-    permission = await Notifications.requestPermissionsAsync();
-    analytics.capture("notification_permission_result", {
-      outcome: permissionOutcome(permission),
-    });
-  }
-  if (!canReceiveNotifications(permission)) return null;
+  await ensureChannels();
+  const permission = await Notifications.getPermissionsAsync();
+  const allowed = requestPermission
+    ? await askForPermission(permission)
+    : canReceiveNotifications(permission);
+  if (!allowed) return null;
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??

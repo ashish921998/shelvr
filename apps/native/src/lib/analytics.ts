@@ -3,7 +3,6 @@ import {
   posthog,
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
-import type { AcquisitionSource } from "@/lib/acquisition-source";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
@@ -43,7 +42,10 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * apart, because the onboarding route renders both the full-page view and the
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
-export type OAuthSurface = "sign_in_view" | "demo_sheet";
+export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
+/** How a sign-in ran: the system's Sign in with Apple sheet on iOS, or a web
+ * session, which is every other provider and Apple where the sheet is missing. */
+export type AuthMethod = "native" | "web";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -78,6 +80,8 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 /** The funnel stage vocabulary for `save_kind`. */
 type SaveKind = "link" | "note" | "image";
 
+type NextUpKind = "read" | "cook" | "watch" | "open";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
@@ -95,11 +99,16 @@ type AnalyticsEventProperties = {
   // ended it and count repeat starts by one person without guessing on time.
   auth_started: {
     provider: string;
+    method: AuthMethod;
     surface: OAuthSurface;
     auth_attempt_id: string;
   };
   auth_cancelled: {
     provider: string;
+    method: AuthMethod;
+    // Set when a web session ended before its sheet could have shown and was
+    // reopened once. The outcome is the second session's.
+    auto_retry?: true;
     elapsed_ms: number;
     browser_ms: number;
     surface: OAuthSurface;
@@ -115,7 +124,12 @@ type AnalyticsEventProperties = {
   };
   auth_failed: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     stage: "request" | "browser" | "exchange";
+    // The native module's own code (ERR_REQUEST_FAILED and the like), when the
+    // failure came from one. A fixed vocabulary, never a message.
+    error_code?: string;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -124,6 +138,8 @@ type AnalyticsEventProperties = {
   // identify-time signal and also fires on every signed-in cold start.
   auth_succeeded: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -239,6 +255,8 @@ type AnalyticsEventProperties = {
     save_pileup: string[];
     // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
+    // The interests step's picked topics. Each is also one of the spaces.
+    interests: string[];
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
@@ -247,15 +265,6 @@ type AnalyticsEventProperties = {
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
-  // Onboarding "How did you hear about Shelvr?" (lib/acquisition-source.ts).
-  // `source` is a fixed id; `position` is the row it sat in (0-based), since
-  // the social rows are shuffled. The person property keeps the first answer.
-  acquisition_source_answered: {
-    source: AcquisitionSource;
-    position: number;
-    $set_once: { acquisition_source: AcquisitionSource };
-  };
-  acquisition_source_skipped: Record<string, never>;
   // Feedback events never carry message text; see lib/feedback.ts. The
   // submission event fires only after Convex acknowledges persistence — the
   // message itself lives in Convex and the support inbox, never in PostHog.
@@ -271,12 +280,28 @@ type AnalyticsEventProperties = {
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
-  // The share sheet closed without Shelvr receiving the sample. `fallback` is
-  // true when this miss saved the sample directly instead of asking again.
-  onboarding_share_missed: {
-    reason: "dismissed" | "other_app";
-    misses: number;
-    fallback: boolean;
+  // A first-save pick, before any sign-in. `sample` is a ready-made link
+  // (previewed when signed out); otherwise a pasted, typed or shared one.
+  onboarding_demo_picked: { sample: boolean; signed_in: boolean };
+  // The onboarding sign-in ask: the demo's sheet (a pasted or typed link) or
+  // the screen after a previewed sample. "dismissed" is the sheet's scrim or
+  // back, or that screen's back button; a sign-in itself shows as auth_started.
+  onboarding_signin_prompt: {
+    surface: "demo_sheet" | "sample_preview";
+    action: "shown" | "dismissed";
+  };
+  // The share-sheet practice before the paywall (onboarding/share-practice.tsx).
+  // "received" is a share that reached Shelvr, saved later by the share
+  // screen. "other_app" can repeat; the other outcomes fire once per mount.
+  onboarding_share_practice: {
+    outcome: "received" | "other_app" | "skipped" | "sheet_failed";
+  };
+  // The onboarding notifications step's answer. `granted` is what the OS
+  // reported after the tap; a skipped step (nothing to ask) sends nothing.
+  onboarding_reminder: {
+    action: "remind" | "skip";
+    slot: "tonight" | "tomorrow" | "weekend" | "nextWeek";
+    granted: boolean;
   };
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
@@ -290,6 +315,11 @@ type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
+  // "Open this next" card on Home (lib/next-up.ts). The kind only: never the
+  // save's title or URL.
+  next_up_shown: { kind: NextUpKind };
+  next_up_opened: { kind: NextUpKind };
+  next_up_dismissed: { kind: NextUpKind };
   // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
   // per account per launch. `saved` is the real-save count, demo excluded.
   save_progress_card_shown: { saved: number };
@@ -326,6 +356,13 @@ type AnalyticsEventProperties = {
   notification_opened: { notification_kind: string; notification_id: string };
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
+  };
+  // Third-party AI consent (lib/ai-consent.ts). `shown` is the card;
+  // `answered` also covers the Settings switch.
+  ai_consent_shown: Record<string, never>;
+  ai_consent_answered: {
+    granted: boolean;
+    surface: "card" | "settings" | "sign_in";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;

@@ -7,11 +7,11 @@ Status: **Phases 0-2 implemented.** Phases 3-4 remain proposed.
 Three shipped features are capped by the amount of the shelf they can see, and the
 caps tighten exactly as a shelf becomes worth having:
 
-| Feature                     | Today                                                             | Cap                                                                |
-| --------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `ai.ts` `recommendForSpace` | newest 100 `ready` items (`listReadyItemsInternal`, `limit: 100`) | a user with 600 saves gets picks drawn from 100                    |
-| `items.ts` `similarItems`   | newest 300 rows, tag + token overlap                              | `SIMILAR_CANDIDATES = 300`                                         |
-| `items.ts` `searchItems`    | `search_text` index over `buildSearchText`                        | title + description + tags + siteName + note — **never `content`** |
+| Feature                                      | Today                                                             | Cap                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `aiRecommendForSpace.ts` `recommendForSpace` | newest 100 `ready` items (`listReadyItemsInternal`, `limit: 100`) | a user with 600 saves gets picks drawn from 100                    |
+| `items.ts` `similarItems`                    | newest 300 rows, tag + token overlap                              | `SIMILAR_CANDIDATES = 300`                                         |
+| `items.ts` `searchItems`                     | `search_text` index over `buildSearchText`                        | title + description + tags + siteName + note — **never `content`** |
 
 `finalizeItem` stores the extracted article body (`content`, up to 100k chars) and
 then indexes only the classifier's summary of it. A saved essay is searchable by
@@ -153,7 +153,7 @@ Follows the file's existing deadline convention:
 const EMBED_TIMEOUT_MS = 20_000;
 ```
 
-The per-action budget comment (`ai.ts:53-59`) gains one line; ~100 s worst case
+The per-action budget comment (`model/aiProvider.ts`) gains one line; ~100 s worst case
 is unchanged in practice.
 
 **Embedding failure must never fail the item.** Wrap the call; on error log via
@@ -199,7 +199,7 @@ so the sweep hands it a whole page and does no chunking itself.
 
 ### Backfill
 
-`internalAction` (`sweepItemEmbeddings` in `ai.ts`), paged by
+`internalAction` (`sweepItemEmbeddings` in `aiEmbeddingSweep.ts`), paged by
 the new index, batching through `embedMany`:
 
 - a page of `ready` rows with `embeddingVersion < CURRENT_EMBEDDING_VERSION`
@@ -256,7 +256,7 @@ Watch the provider's embedding rate limit; the page size is the throttle.
 The highest-value change, and it needed **no client release**.
 
 `recommendForSpace` replaced its "newest 100" read with
-`recommendationCandidates()` in `ai.ts`:
+`recommendationCandidates()` in `aiRecommendForSpace.ts`:
 
 1. Embed `space.name` + `space.description`, composed through
    `buildEmbeddingText` so the query sits where the corpus summaries sit, and
@@ -337,15 +337,19 @@ export const searchItemsHybrid = action({
 });
 ```
 
-Flow, kept to one query round trip per the guidelines' "as few calls as possible":
+Flow, kept to two query round trips per the guidelines' "as few calls as possible":
 
-1. `requireUserId(ctx)` — already accepts `ActionCtx` (`model/auth.ts:22`).
-   The vector filter uses that id. Never a client argument.
+1. A small `internalQuery` derives the caller with `requireUserId`
+   (`model/auth.ts`). It takes a query or mutation context, so the action gets
+   the id through that query rather than directly, and before the vector
+   search that filters on it. Never a client argument.
 2. Embed the query string.
 3. `ctx.vectorSearch(..., filter: q => q.eq("userId", userId))` → `{_id, _score}`.
-4. One `internalQuery` that runs the lexical `search_text` search, fuses it with
-   the vector ids by reciprocal rank fusion (`1/(k + rank)`, k = 60), drops
-   non-`ready` rows, hydrates through `enrichItem`, and returns in fused order.
+4. One `internalQuery` that derives the caller again and checks it matches,
+   runs the lexical `search_text` search, fuses it with the vector ids by
+   reciprocal rank fusion (`1/(k + rank)`, k = 60), drops non-`ready` rows and
+   rows the caller does not own, hydrates through `enrichItem`, and returns in
+   fused order.
 
 Client: the search tab (`(tabs)/(search)/index.tsx:36`) moves from
 `convexQuery(api.items.searchItems)` to the action. This is the one real

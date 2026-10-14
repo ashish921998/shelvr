@@ -1,11 +1,25 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import {
-  env,
-  type ActionCtx,
-  type MutationCtx,
-  type QueryCtx,
-} from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+
+const NOT_AUTHENTICATED = "Not authenticated";
+
+/**
+ * The live owner row behind `userId`, or null when the id is not a users id,
+ * the row is gone, or deletion has begun: a row may still own data only while
+ * it exists and account deletion has not started on it. The one definition
+ * every fence in the backend shares. Takes the raw string form because
+ * webhook app user ids and the string `userId` columns are not typed ids.
+ */
+export async function liveOwner(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+): Promise<Doc<"users"> | null> {
+  const id = ctx.db.normalizeId("users", userId);
+  if (id === null) return null;
+  const user = await ctx.db.get(id);
+  return user !== null && user.deleting !== true ? user : null;
+}
 
 /**
  * Returns the authenticated user's stable users-table id, or throws. Every
@@ -16,15 +30,27 @@ import type { Id } from "../_generated/dataModel";
  * raw `identity.subject` would make ownership session-scoped and would not
  * match RevenueCat's user id or `getCurrentUser`.
  *
+ * A valid JWT is not enough on its own: the owner row must still be live.
+ * Account deletion marks the row in its first transaction, so a retained
+ * token on another device stops authorizing the moment deletion starts, not
+ * only once the batched cleanup reaches the auth tables. The rejection is the
+ * same unauthenticated error either way.
+ *
  * This stays provider-agnostic: it works identically whether the user signed in
- * via OAuth or Anonymous.
+ * via OAuth or Anonymous. Query and mutation contexts only: an action derives
+ * the caller through the internal mutation or query it runs (Convex forwards
+ * the caller's identity to it), so the authorization and the write stay in one
+ * transaction.
  */
 export async function requireUserId(
-  ctx: QueryCtx | MutationCtx | ActionCtx,
+  ctx: QueryCtx | MutationCtx,
 ): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (userId === null) {
-    throw new Error("Not authenticated");
+    throw new Error(NOT_AUTHENTICATED);
+  }
+  if ((await liveOwner(ctx, userId)) === null) {
+    throw new Error(NOT_AUTHENTICATED);
   }
   return userId;
 }

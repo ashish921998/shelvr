@@ -2,7 +2,7 @@ import { analytics, type AnalyticsItem } from "@/lib/analytics";
 import { t } from "@/lib/i18n";
 import { displayHost } from "@/lib/url";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import * as WebBrowser from "expo-web-browser";
+import { openInAppBrowser } from "@/lib/in-app-browser";
 import {
   Pressable,
   Text,
@@ -17,11 +17,13 @@ type SourceItem = AnalyticsItem & {
   siteName?: string;
 };
 
-export function openItemSource(item: SourceItem): void {
+// `onClosed` runs once the in-app browser is dismissed (or failed to open).
+export function openItemSource(item: SourceItem, onClosed?: () => void): void {
   if (!item.url) return;
-  void WebBrowser.openBrowserAsync(item.url)
+  void openInAppBrowser(item.url)
     .then(() => analytics.itemAction(item, "open_source"))
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => onClosed?.());
 }
 
 type Props = {
@@ -36,6 +38,8 @@ type Props = {
     | StyleProp<ViewStyle>
     | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
   textStyle?: StyleProp<TextStyle>;
+  // Replaces the default open, for a caller that wraps it.
+  onPress?: () => void;
 };
 
 export function ItemSourceLink({
@@ -48,6 +52,7 @@ export function ItemSourceLink({
   label,
   style,
   textStyle,
+  onPress,
 }: Props) {
   if (!item.url) return null;
   const site = label ?? item.siteName ?? displayHost(item.url);
@@ -56,9 +61,10 @@ export function ItemSourceLink({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={t("item.openSite", { site })}
-      hitSlop={6}
+      // A single text line is ~18pt tall; the slop lifts the target to 48.
+      hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
       style={style}
-      onPress={() => openItemSource(item)}
+      onPress={onPress ?? (() => openItemSource(item))}
     >
       <AppSymbolIcon name={icon} size={iconSize} tintColor={iconTintColor} />
       <Text numberOfLines={1} style={textStyle}>

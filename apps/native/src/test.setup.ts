@@ -1,6 +1,8 @@
 // Testing Library only auto-cleans under vitest `globals: true`. Dynamic
 // import so Node and edge-runtime suites never load react-dom.
 import { createRequire } from "node:module";
+
+import * as fc from "fast-check";
 import { afterEach, vi } from "vitest";
 
 // Components load bundled photos with Metro's `require("x.jpg")`, which Node
@@ -32,4 +34,12 @@ afterEach(async () => {
   if (typeof document === "undefined") return;
   const { cleanup } = await import("@testing-library/react");
   cleanup();
+});
+
+// Property tests run on a fixed seed so CI is deterministic: a failure
+// reproduces on every run and points at a real bug, never a lucky draw. Set
+// FC_SEED to explore other inputs locally; a failure prints its seed and path.
+fc.configureGlobal({
+  seed: Number(process.env.FC_SEED ?? 20261005),
+  numRuns: Number(process.env.FC_RUNS ?? 200),
 });

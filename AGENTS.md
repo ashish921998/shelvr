@@ -59,8 +59,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, per-host readers) on
   top of `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
-- **Large files:** `convex/items.ts` (about 2,800 lines), `convex/ai.ts` and
-  `convex/model/pageRead.ts` (about 1,650 each). Search for the export name
+- **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
+  and `convex/model/pageRead.ts` (about 1,650). Embedding and recommendation actions
+  live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
+  Search for the export name
   first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
   subscription for the anonymous dev user.

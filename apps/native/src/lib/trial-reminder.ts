@@ -22,15 +22,24 @@ import { Platform } from "react-native";
  * trial feel safe. It is scheduled on the device, so it works without the
  * weekly shelf opt-in or a push token, and it ships over the air.
  *
- * Two earlier nudges ride along with it: day 1 asks for the next save and day
- * 3 points back to the shelf. Trials that ended in cancellation mostly held a
- * single save, so the week has to show the app doing something before the
- * day-5 reminder asks the user to decide.
+ * Two earlier nudges go out only to a user who has Save reminders on: day 1
+ * asks for the next save and day 3 points back to the shelf. Trials that ended
+ * in cancellation mostly held a single save, so the week has to show the app
+ * doing something before the day-5 reminder asks the user to decide. The
+ * primer promises the billing reminder alone, so its yes does not cover them.
+ *
+ * The decision itself mostly happens on the last day, so one more reminder
+ * goes out the day before the trial ends, while cancelling still avoids the
+ * charge.
  */
 
 export const TRIAL_REMINDER_ID = "shelvr.trial-ending";
+export const TRIAL_LAST_DAY_ID = "shelvr.trial-last-day";
 const CHANNEL_ID = "trial-reminder";
 const LEAD_MS = 2 * 24 * 60 * 60 * 1000;
+// The App Store renews in the 24 hours before a trial ends, so the last-day
+// reminder lands at least an hour before that window opens.
+const RENEWAL_WINDOW_MS = 25 * 60 * 60 * 1000;
 // A reminder due within this window is pointless: the trial ends first.
 const MIN_LEAD_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,6 +91,31 @@ export function trialReminderAt(expiresAt: number, now: number): number | null {
 }
 
 /**
+ * When to say the trial ends tomorrow: on the calendar day before it ends,
+ * in daytime hours, and before the store's renewal window. Null when no such
+ * moment exists (a trial ending before 11 am leaves none) or it has passed.
+ */
+export function trialLastDayAt(expiresAt: number, now: number): number | null {
+  const at = new Date(expiresAt - RENEWAL_WINDOW_MS);
+  const ends = new Date(expiresAt);
+  const dayBefore = new Date(expiresAt);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  if (at.toDateString() !== dayBefore.toDateString()) return null;
+  // A trial ending at 11 am or later always gets one. The night clocks
+  // spring forward, 25 hours before an 11 am end reads 9 am, so the morning
+  // cutoff gives way there rather than skip the reminder.
+  if (
+    at.getHours() < NUDGE_EARLIEST_HOUR &&
+    ends.getHours() < NUDGE_EARLIEST_HOUR + 1
+  )
+    return null;
+  if (at.getHours() >= NUDGE_LATEST_HOUR)
+    at.setHours(NUDGE_LATEST_HOUR, 0, 0, 0);
+  const fireAt = at.getTime();
+  return fireAt - now > MIN_LEAD_MS ? fireAt : null;
+}
+
+/**
  * When the nudge for `day` of a 7-day trial ending at `expiresAt` goes out:
  * that many days after the trial started, moved into daytime local hours.
  * Null once that moment has passed, which is also every trial shorter than a
@@ -103,19 +137,22 @@ export function trialNudgeAt(
 }
 
 /**
- * The nudges follow the Save reminders switch in Profile. `getPreferences`
- * reports reminders off both for a user who turned them off and for one with
- * no preferences row yet (no device ever registered), and only the first is
- * an opt-out. A row always carries a timezone, so that tells them apart.
+ * The nudges are opt-in: they follow the Save reminders switch in Settings.
+ * `getPreferences` reports reminders off for a user with no preferences row
+ * (no device ever registered), and that user never agreed to them, so a
+ * missing row means no. The trial primer asks only about the billing
+ * reminder, and its grant must not carry marketing nudges along.
  */
 export function trialNudgesAllowed(preferences: {
   remindersEnabled: boolean;
-  timezone: string | null;
 }): boolean {
-  return preferences.remindersEnabled || preferences.timezone === null;
+  return preferences.remindersEnabled;
 }
 
+// The last-day reminder rides along: every path that clears the nudges
+// schedules it again when it still applies.
 async function cancelTrialNudges(): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(TRIAL_LAST_DAY_ID);
   for (const nudge of TRIAL_NUDGES) {
     await Notifications.cancelScheduledNotificationAsync(nudge.id);
   }
@@ -149,7 +186,9 @@ export async function scheduleTrialReminder(
   nudges = false,
 ): Promise<boolean> {
   const fireAt = trialReminderAt(expiresAt, now);
-  if (fireAt === null) {
+  // Within two days of the end only the last-day reminder may still apply.
+  const lastDayAt = trialLastDayAt(expiresAt, now);
+  if (fireAt === null && lastDayAt === null) {
     await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
     await cancelTrialNudges();
     return false;
@@ -174,26 +213,49 @@ export async function scheduleTrialReminder(
   if (!canNotify(permission) || !isCurrent()) return false;
 
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
-  await Notifications.scheduleNotificationAsync({
-    identifier: TRIAL_REMINDER_ID,
-    content: {
-      title: t("notifications.trialEndingTitle"),
-      body: t("notifications.trialEndingBody"),
-      // `kind` and `notificationId` ride along so `notification_opened` can
-      // attribute the tap to this reminder, the same way push notifications
-      // carry theirs. Without them the open records as kind `unknown`.
-      data: {
-        url: "/profile",
-        kind: "trial_reminder",
-        notificationId: TRIAL_REMINDER_ID,
+  if (fireAt !== null) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: TRIAL_REMINDER_ID,
+      content: {
+        title: t("notifications.trialEndingTitle"),
+        body: t("notifications.trialEndingBody"),
+        // `kind` and `notificationId` ride along so `notification_opened` can
+        // attribute the tap to this reminder, the same way push notifications
+        // carry theirs. Without them the open records as kind `unknown`.
+        data: {
+          url: "/profile",
+          kind: "trial_reminder",
+          notificationId: TRIAL_REMINDER_ID,
+        },
       },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(fireAt),
-      channelId: CHANNEL_ID,
-    },
-  });
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(fireAt),
+        channelId: CHANNEL_ID,
+      },
+    });
+  }
+  if (lastDayAt !== null) {
+    // Like the day-5 reminder, it is about the charge, so it does not follow
+    // the Save reminders switch.
+    await Notifications.scheduleNotificationAsync({
+      identifier: TRIAL_LAST_DAY_ID,
+      content: {
+        title: t("notifications.trialLastDayTitle"),
+        body: t("notifications.trialLastDayBody"),
+        data: {
+          url: "/profile",
+          kind: "trial_reminder",
+          notificationId: TRIAL_LAST_DAY_ID,
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(lastDayAt),
+        channelId: CHANNEL_ID,
+      },
+    });
+  }
   if (nudges) {
     for (const nudge of TRIAL_NUDGES) {
       const nudgeAt = trialNudgeAt(expiresAt, nudge.day, now);
@@ -323,6 +385,18 @@ async function cancelTrialReminder(): Promise<void> {
   await cancelTrialNudges();
   // A reminder already delivered is wrong once the trial converts or ends.
   await Notifications.dismissNotificationAsync(TRIAL_REMINDER_ID);
+  await Notifications.dismissNotificationAsync(TRIAL_LAST_DAY_ID);
+}
+
+/**
+ * Sign-out and account deletion: nothing about this account's trial may
+ * arrive once it has left the device. The hook below clears on a status
+ * change, but it unmounts with the signed-in screens before it sees one.
+ */
+export async function clearTrialReminder(): Promise<void> {
+  await serial(cancelTrialReminder).catch((error) =>
+    analytics.captureError("trial_reminder_cancel_failed", error),
+  );
 }
 
 /**

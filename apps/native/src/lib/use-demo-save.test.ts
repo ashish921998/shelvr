@@ -14,6 +14,7 @@ import {
 
 const mock = vi.hoisted(() => ({
   authenticated: true,
+  consentBlocked: false,
   create: vi.fn(),
   retry: vi.fn(),
   query: {
@@ -27,12 +28,17 @@ const mock = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
+  clearLegacyDemo: vi.fn(),
   recordShareSaved: vi.fn(),
+  releaseSavedShare: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
   useMutation: (ref: string) => (ref === "create" ? mock.create : mock.retry),
+}));
+vi.mock("@/lib/ai-consent", () => ({
+  useAiConsent: () => ({ savesBlocked: mock.consentBlocked }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -58,15 +64,22 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   setPendingDemo: mock.setPendingDemo,
-  clearLegacyDemoUrlIfSaved: vi.fn(),
+  clearLegacyDemoUrlIfSaved: mock.clearLegacyDemo,
   resolveOnboardingSpaceName: (id: string) => `name:${id}`,
 }));
 vi.mock("@/lib/onboarding-demo", () => ({
   demoDestination: (url: string) =>
-    url === "https://sample.test/recipe" ? "recipes" : null,
+    url === "https://sample.test/recipe" ||
+    url === "https://sample.test/ready-made"
+      ? "recipes"
+      : null,
+  isDemoSample: (url: string) => url === "https://sample.test/ready-made",
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
+}));
+vi.mock("@/lib/use-incoming-share-url", () => ({
+  releaseSavedShare: mock.releaseSavedShare,
 }));
 
 const ITEM_ID = "item-1";
@@ -108,16 +121,177 @@ function captured(event: string) {
 
 beforeEach(() => {
   mock.authenticated = true;
+  mock.consentBlocked = false;
   mock.create.mockReset();
   mock.retry.mockReset();
   mock.capture.mockReset();
   mock.setPendingDemo.mockReset();
+  mock.clearLegacyDemo.mockReset();
   mock.recordShareSaved.mockReset();
   mock.query = { data: undefined, isError: false, isSuccess: false };
   mock.queryArgs = undefined;
 });
 
 describe("useDemoSave", () => {
+  it.each(["direct", "preview"] as const)(
+    "times out an unresolved %s submission and rearms without resubmitting",
+    async (path) => {
+      vi.useFakeTimers();
+      try {
+        mock.create.mockReturnValue(new Promise(() => {}));
+        mock.authenticated = path === "direct";
+        const { result, rerender, onAdvance } = renderDemo();
+        act(() =>
+          result.current.submitUrl(
+            path === "preview"
+              ? "https://sample.test/ready-made"
+              : "https://example.com/",
+          ),
+        );
+        if (path === "preview") {
+          act(() => result.current.previewed());
+          act(() => vi.advanceTimersByTime(30_000));
+          expect(result.current.submissionTimedOut).toBe(false);
+          expect(mock.create).not.toHaveBeenCalled();
+          mock.authenticated = true;
+          rerender();
+        }
+        act(() => vi.advanceTimersByTime(14_999));
+        expect(result.current.submissionTimedOut).toBe(false);
+        act(() => vi.advanceTimersByTime(1));
+        expect(result.current.submissionTimedOut).toBe(true);
+        if (path === "preview") expect(result.current.view).toBe("auth");
+        act(() => result.current.keepWaiting());
+        expect(result.current.submissionTimedOut).toBe(false);
+        act(() => vi.advanceTimersByTime(14_999));
+        expect(result.current.submissionTimedOut).toBe(false);
+        act(() => vi.advanceTimersByTime(1));
+        expect(result.current.submissionTimedOut).toBe(true);
+        expect(mock.create).toHaveBeenCalledTimes(1);
+        expect(mock.retry).not.toHaveBeenCalled();
+        expect(onAdvance).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not count AI consent waiting toward the submission deadline", () => {
+    vi.useFakeTimers();
+    try {
+      mock.consentBlocked = true;
+      mock.create.mockReturnValue(new Promise(() => {}));
+      const { result, rerender } = renderDemo();
+      act(() => result.current.submitUrl("https://example.com/"));
+      act(() => vi.advanceTimersByTime(30_000));
+      expect(result.current.submissionTimedOut).toBe(false);
+      expect(mock.create).not.toHaveBeenCalled();
+      mock.consentBlocked = false;
+      rerender();
+      act(() => vi.advanceTimersByTime(14_999));
+      expect(result.current.submissionTimedOut).toBe(false);
+      act(() => vi.advanceTimersByTime(1));
+      expect(result.current.submissionTimedOut).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ["continue", "resolve"],
+    ["continue", "reject"],
+    ["unmount", "resolve"],
+    ["unmount", "reject"],
+  ] as const)(
+    "fences late %s / %s submission results",
+    async (exit, outcome) => {
+      let resolve!: (value: ReturnType<typeof saved>) => void;
+      let reject!: (error: Error) => void;
+      mock.create.mockReturnValue(
+        new Promise((yes, no) => {
+          resolve = yes;
+          reject = no;
+        }),
+      );
+      const { result, unmount, onSaved, onAdvance } = renderDemo();
+      act(() => result.current.submitSharedUrl("https://example.com/"));
+      expect(mock.setPendingDemo).toHaveBeenCalledTimes(1);
+      if (exit === "continue") {
+        act(() => {
+          result.current.continueAfterTimeout();
+          result.current.continueAfterTimeout();
+        });
+        expect(onAdvance).toHaveBeenCalledTimes(1);
+        expect(mock.setPendingDemo).not.toHaveBeenCalledWith(null);
+        expect(captured("onboarding_demo_result")).toEqual([
+          ["onboarding_demo_result", { outcome: "timeout" }],
+        ]);
+      } else {
+        unmount();
+      }
+      // A newer incoming-share session (including the same URL) must retain
+      // ownership: the stale create result cannot release any share.
+      mock.setPendingDemo.mockClear();
+      mock.releaseSavedShare.mockClear();
+      mock.recordShareSaved.mockClear();
+      mock.capture.mockClear();
+      await flush(() =>
+        outcome === "resolve" ? resolve(saved()) : reject(new Error("offline")),
+      );
+      expect(onSaved).not.toHaveBeenCalled();
+      expect(onAdvance).toHaveBeenCalledTimes(exit === "continue" ? 1 : 0);
+      expect(mock.setPendingDemo).not.toHaveBeenCalled();
+      expect(mock.clearLegacyDemo).not.toHaveBeenCalled();
+      expect(mock.releaseSavedShare).not.toHaveBeenCalled();
+      expect(mock.recordShareSaved).not.toHaveBeenCalled();
+      expect(mock.capture).not.toHaveBeenCalled();
+      expect(mock.create).toHaveBeenCalledTimes(1);
+      expect(mock.retry).not.toHaveBeenCalled();
+    },
+  );
+
+  it("starts a fresh processing deadline when a slow submission finally lands", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolve!: (value: ReturnType<typeof saved>) => void;
+      mock.create.mockReturnValue(
+        new Promise((yes) => {
+          resolve = yes;
+        }),
+      );
+      const { result, onSaved, onAdvance } = renderDemo();
+      act(() => result.current.submitUrl("https://example.com/"));
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(result.current.submissionTimedOut).toBe(true);
+      await flush(() => resolve(saved()));
+      expect(result.current.submissionTimedOut).toBe(false);
+      expect(result.current.timedOut).toBe(false);
+      expect(onSaved).toHaveBeenCalledOnce();
+      act(() => vi.advanceTimersByTime(14_999));
+      expect(result.current.timedOut).toBe(false);
+      act(() => vi.advanceTimersByTime(1));
+      expect(result.current.timedOut).toBe(true);
+      expect(onAdvance).not.toHaveBeenCalled();
+      expect(mock.create).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still handles a live completion-side-effect failure", async () => {
+    mock.create.mockResolvedValue(saved());
+    mock.setPendingDemo
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error("storage unavailable");
+      });
+    const { result, onSaved } = renderDemo();
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.error).toBe("demo.saveFailed");
+    expect(result.current.submitting).toBe(false);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("asks for sign-in first, then saves the same link once signed in", async () => {
     mock.authenticated = false;
     mock.create.mockResolvedValue(saved());
@@ -174,6 +348,8 @@ describe("useDemoSave", () => {
     expect(captured("onboarding_demo_result")).toEqual([
       ["onboarding_demo_result", { outcome: "error" }],
     ]);
+    // Saving after sign-in resumes the pick; it is not a second one.
+    expect(captured("onboarding_demo_picked")).toHaveLength(1);
 
     mock.setPendingDemo.mockClear();
     act(() => result.current.skip());
@@ -327,6 +503,31 @@ describe("useDemoSave", () => {
     );
   });
 
+  it("lets go of a shared link only when the server saved that link", async () => {
+    mock.releaseSavedShare.mockReset();
+    // The demo save was already spent: the server hands back the old item.
+    mock.create.mockResolvedValue({
+      ...saved(),
+      reused: true,
+      urlMatchesRequest: false,
+    });
+    const spent = renderDemo();
+    await flush(() =>
+      spent.result.current.submitSharedUrl("https://mine.test/new"),
+    );
+    expect(mock.releaseSavedShare).not.toHaveBeenCalled();
+    spent.unmount();
+
+    mock.create.mockResolvedValue(saved());
+    const fresh = renderDemo();
+    await flush(() =>
+      fresh.result.current.submitSharedUrl("https://mine.test/new"),
+    );
+    expect(mock.releaseSavedShare).toHaveBeenCalledWith(
+      "https://mine.test/new",
+    );
+  });
+
   it("keeps an in-flight share's origin when a typed submit is rejected", async () => {
     let resolveSave!: (value: ReturnType<typeof saved>) => void;
     mock.create.mockReturnValue(
@@ -372,6 +573,37 @@ describe("useDemoSave", () => {
     expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
   });
 
+  it("holds a signed-in save until the AI consent answer, then sends it once", async () => {
+    mock.consentBlocked = true;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(mock.create).not.toHaveBeenCalled();
+
+    mock.consentBlocked = false;
+    rerender();
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(mock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/" }),
+    );
+  });
+
+  it("does not send a save resumed after sign-in while the answer is missing", async () => {
+    mock.authenticated = false;
+    mock.consentBlocked = true;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+    act(() => result.current.submitUrl("https://example.com/"));
+
+    mock.authenticated = true;
+    rerender();
+    await flush(() => {});
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+
   it("records a resumed share on a fresh mount, including a reused save", async () => {
     mock.create.mockResolvedValue(saved(true));
     const { result } = renderDemo({
@@ -400,6 +632,238 @@ describe("useDemoSave", () => {
       destination: null,
       source: "direct",
     });
+  });
+
+  it("previews a ready-made sample when signed out, without saving", () => {
+    mock.authenticated = false;
+    const { result, rerender, onAdvance } = renderDemo();
+
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    expect(result.current.view).toBe("preview");
+    expect(result.current.savingUrl).toBe("https://sample.test/ready-made");
+    expect(mock.setPendingDemo).toHaveBeenCalledWith({
+      url: "https://sample.test/ready-made",
+      destination: "name:recipes",
+      source: "direct",
+    });
+    expect(captured("onboarding_demo_picked")).toEqual([
+      ["onboarding_demo_picked", { sample: true, signed_in: false }],
+    ]);
+
+    expect(mock.create).not.toHaveBeenCalled();
+
+    // The preview's step timer depends on this staying the same.
+    const previewed = result.current.previewed;
+    rerender();
+    expect(result.current.previewed).toBe(previewed);
+
+    // The preview ends on the sign-in ask, with the same request.
+    act(() => result.current.previewed());
+    expect(result.current.view).toBe("auth");
+    expect(result.current.authRequest?.url).toBe(
+      "https://sample.test/ready-made",
+    );
+    expect(onAdvance).not.toHaveBeenCalled();
+    rerender();
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+
+  it("retries a previewed sample whose save failed after sign-in, without restarting", async () => {
+    mock.authenticated = false;
+    const { result, rerender, onSaved } = renderDemo();
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    act(() => result.current.previewed());
+
+    let reject!: (err: unknown) => void;
+    mock.create.mockReturnValueOnce(
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+    );
+    mock.authenticated = true;
+    rerender();
+    // Signed in: the preview already played the reading steps, so the
+    // sign-in ask stays up while the save is on its way.
+    expect(result.current.view).toBe("auth");
+    await flush(() => reject(new Error("network")));
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(result.current.view).toBe("share");
+    expect(result.current.error).toBe("demo.saveFailed");
+    expect(captured("onboarding_demo_result")).toEqual([
+      ["onboarding_demo_result", { outcome: "error" }],
+    ]);
+
+    mock.create.mockResolvedValueOnce(saved());
+    await flush(() =>
+      result.current.submitUrl("https://sample.test/ready-made"),
+    );
+    expect(mock.create).toHaveBeenCalledTimes(2);
+    expect(result.current.view).toBe("reading");
+    expect(onSaved).toHaveBeenCalledWith({
+      itemId: ITEM_ID,
+      savedSpaceNames: [],
+    });
+  });
+
+  it("keeps a previewed sample's sign-in screen up until the item is read, then moves on", async () => {
+    mock.authenticated = false;
+    const { result, rerender, onAdvance, onSaved } = renderDemo();
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    act(() => result.current.previewed());
+
+    const views: string[] = [];
+    let resolve!: (value: ReturnType<typeof saved>) => void;
+    mock.create.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    mock.authenticated = true;
+    rerender();
+    views.push(result.current.view);
+    expect(result.current.authRequest?.url).toBe(
+      "https://sample.test/ready-made",
+    );
+    expect(onAdvance).not.toHaveBeenCalled();
+
+    await flush(() => resolve(saved()));
+    views.push(result.current.view);
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledWith({
+      itemId: ITEM_ID,
+      savedSpaceNames: [],
+    });
+    // Still being read: leaving now would drop the retry a failure needs.
+    expect(onAdvance).not.toHaveBeenCalled();
+    // The demo save is spent, so a share arriving now is held, not consumed.
+    expect(result.current.view).toBe("auth");
+    expect(result.current.canAcceptShare()).toBe(false);
+
+    mock.query = {
+      data: { status: "ready" },
+      isError: false,
+      isSuccess: true,
+    };
+    rerender();
+    views.push(result.current.view);
+    expect(views).toEqual(["auth", "auth", "auth"]);
+    expect(onAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the sign-in screen for good once a previewed sample's read is slow", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.authenticated = false;
+      const { result, rerender } = renderDemo();
+      act(() => result.current.submitUrl("https://sample.test/ready-made"));
+      act(() => result.current.previewed());
+      mock.create.mockResolvedValueOnce(saved());
+      mock.authenticated = true;
+      rerender();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.view).toBe("auth");
+
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(result.current.view).toBe("reading");
+      act(() => result.current.keepWaiting());
+      expect(result.current.view).toBe("reading");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers the retry when a previewed sample fails after sign-in", async () => {
+    mock.authenticated = false;
+    const { result, rerender, onAdvance } = renderDemo();
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    act(() => result.current.previewed());
+    mock.create.mockResolvedValueOnce(saved());
+    mock.authenticated = true;
+    await flush(() => rerender());
+
+    mock.query = {
+      data: { status: "failed" },
+      isError: false,
+      isSuccess: true,
+    };
+    rerender();
+    expect(result.current.view).toBe("failed");
+    expect(onAdvance).not.toHaveBeenCalled();
+
+    // Retrying watches the item on the reading view, not the sign-in screen.
+    mock.retry.mockResolvedValueOnce(null);
+    await flush(() => void result.current.retry());
+    mock.query = {
+      data: { status: "processing" },
+      isError: false,
+      isSuccess: true,
+    };
+    rerender();
+    expect(result.current.view).toBe("reading");
+  });
+
+  it("returns to the sign-in ask without a replay when a previewed sample is picked again after going back", () => {
+    mock.authenticated = false;
+    const { result } = renderDemo();
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    act(() => result.current.previewed());
+    act(() => result.current.cancelAuth());
+    expect(result.current.view).toBe("share");
+
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    expect(result.current.view).toBe("auth");
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+
+  it("restores a sample picked before a relaunch to the same sign-in ask", async () => {
+    mock.authenticated = false;
+    const request = {
+      url: "https://sample.test/ready-made",
+      destination: null,
+      source: "direct" as const,
+    };
+    // Killed during the preview: only the request was persisted.
+    const { result, rerender } = renderDemo(request);
+    expect(result.current.view).toBe("auth");
+    expect(result.current.authRequest).toEqual(request);
+    expect(mock.create).not.toHaveBeenCalled();
+
+    // A fresh run reaches the same state once its preview ends.
+    const fresh = renderDemo();
+    act(() => fresh.result.current.submitUrl(request.url));
+    act(() => fresh.result.current.previewed());
+    expect(fresh.result.current.view).toBe(result.current.view);
+
+    mock.create.mockResolvedValue(saved());
+    mock.authenticated = true;
+    await flush(() => rerender());
+    expect(mock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ url: request.url }),
+    );
+  });
+
+  it("saves a ready-made sample at once when already signed in", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo();
+    await flush(() =>
+      result.current.submitUrl("https://sample.test/ready-made"),
+    );
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(captured("onboarding_demo_picked")).toEqual([
+      ["onboarding_demo_picked", { sample: true, signed_in: true }],
+    ]);
+  });
+
+  it("still asks for sign-in first for a pasted link", () => {
+    mock.authenticated = false;
+    const { result } = renderDemo();
+    act(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(captured("onboarding_demo_picked")).toEqual([
+      ["onboarding_demo_picked", { sample: false, signed_in: false }],
+    ]);
   });
 
   it("returns to picking when sign-in is cancelled", () => {
@@ -490,6 +954,7 @@ describe("demoSaveReducer", () => {
           source: "direct",
         },
         authenticated: true,
+        preview: false,
         lost: true,
       }),
     ).toMatchObject({

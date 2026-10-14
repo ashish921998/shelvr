@@ -162,7 +162,7 @@ export default function Search() {
           <span className="h-[22px] w-0.5 flex-none bg-ink motion-safe:animate-[blink_1s_steps(1)_infinite]" />
         </div>
         <div
-          className={`flex justify-between px-1.5 text-xs font-medium text-muted-soft transition-opacity duration-300 ${hidden ? "opacity-0" : ""}`}
+          className={`flex justify-between px-1.5 text-xs font-medium text-muted transition-opacity duration-300 ${hidden ? "opacity-0" : ""}`}
         >
           <span>{results.length} results</span>
           <span>full text · notes · photos</span>

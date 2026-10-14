@@ -1,5 +1,5 @@
 export const fieldClass =
-  "min-h-12 w-full min-w-0 rounded-xl border border-line-strong bg-white px-4 text-base text-ink outline-none transition placeholder:text-muted-soft focus:border-ember-deep focus:ring-2 focus:ring-ember/25";
+  "min-h-12 w-full min-w-0 rounded-xl border border-line-strong bg-white px-4 text-base text-ink outline-none transition placeholder:text-muted focus:border-ember-deep focus:ring-2 focus:ring-ember/25";
 
 export function SubmitButton({
   busy,

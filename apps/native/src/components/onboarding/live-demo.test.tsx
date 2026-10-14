@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-// The iOS share step: one Share button, and the paste field tucked behind a
-// text link. The save hooks are stubbed, so these tests pin what the step
-// itself owns: what is visible, and what each control hands to the hooks.
+// The first-save picker: a featured sample saved in one tap, the other
+// samples below it, and the paste field. The save hooks are stubbed, so these
+// tests pin what the step itself owns: what is visible, and what each control
+// hands to the hooks.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,7 +16,9 @@ const mock = vi.hoisted(() => {
     item: undefined,
     savingUrl: null,
     authUrl: "",
+    authRequest: null,
     submitting: false,
+    submissionTimedOut: false,
     timedOut: false,
     demoUsed: false,
     canSkip: false,
@@ -23,6 +26,10 @@ const mock = vi.hoisted(() => {
   };
   return {
     demo,
+    reducedMotion: false,
+    pendingProvider: null as "google" | null,
+    signInWith: vi.fn(),
+    modalProps: vi.fn(),
     actions: {
       setError: vi.fn(),
       submitUrl: vi.fn(),
@@ -35,13 +42,18 @@ const mock = vi.hoisted(() => {
       retry: vi.fn(),
       keepWaiting: vi.fn(),
       continueAfterTimeout: vi.fn(),
+      previewed: vi.fn(),
     },
-    shareSample: vi.fn(),
+    intake: { canAccept: (): boolean => true },
     nothing: () => null,
     view: ({ children }: Children) => <div>{children}</div>,
     text: ({ children }: Children) => <span>{children}</span>,
-    modal: ({ visible, children }: Children & { visible: boolean }) =>
-      visible ? <div>{children}</div> : null,
+    modal: (
+      props: Children & { visible: boolean; onRequestClose?: () => void },
+    ) => {
+      mock.modalProps(props);
+      return props.visible ? <div>{props.children}</div> : null;
+    },
     pressable: ({
       children,
       onPress,
@@ -91,14 +103,20 @@ const mock = vi.hoisted(() => {
   };
 });
 
+vi.mock("@/components/ui/stitch-loader", () => ({
+  StitchRing: vi.fn(() => null),
+  StitchRow: vi.fn(() => null),
+}));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   View: mock.view,
   Text: mock.text,
-  ActivityIndicator: mock.nothing,
   Modal: mock.modal,
   Pressable: mock.pressable,
   TextInput: mock.textInput,
+}));
+vi.mock("react-native-reanimated", () => ({
+  useReducedMotion: () => mock.reducedMotion,
 }));
 vi.mock("react-native-unistyles", () => {
   const anyStyle = new Proxy({}, { get: () => ({}) });
@@ -115,10 +133,12 @@ vi.mock("expo-clipboard", () => ({
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.nothing }));
 vi.mock("@/components/onboarding/parts", () => ({
+  CtaButton: mock.ghostButton,
   GhostButton: mock.ghostButton,
 }));
 vi.mock("@/components/onboarding/demo-reading-view", () => ({
   DemoLinkRow: mock.nothing,
+  DemoPreviewView: mock.reading,
   DemoReadingView: mock.reading,
 }));
 vi.mock("@/lib/i18n", () => ({
@@ -133,8 +153,8 @@ vi.mock("@/lib/anonymous-auth", () => ({
 }));
 vi.mock("@/lib/oauth-sign-in", () => ({
   useOAuthSignIn: () => ({
-    signInWith: vi.fn(),
-    pendingProvider: null,
+    signInWith: mock.signInWith,
+    pendingProvider: mock.pendingProvider,
     lastError: null,
     interrupted: false,
   }),
@@ -145,10 +165,12 @@ vi.mock("@/lib/use-demo-save", () => ({
   useDemoSave: () => ({ ...mock.demo, ...mock.actions }),
 }));
 vi.mock("@/lib/use-incoming-share-url", () => ({
-  useIncomingShareUrl: () => ({
-    shareSheetOpen: false,
-    shareSample: mock.shareSample,
-  }),
+  useIncomingShareUrl: (options: { canAccept: () => boolean }) => {
+    mock.intake.canAccept = options.canAccept;
+  },
+}));
+vi.mock("@/components/onboarding/save-summary", () => ({
+  SaveSummary: mock.nothing,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
@@ -156,14 +178,17 @@ const { DEMO_SAMPLES } = await import("@/lib/onboarding-demo");
 
 const props = {
   samples: [...DEMO_SAMPLES],
+  titleKind: null,
   spaces: [],
   resume: null,
+  alreadySaved: false,
   onSaved: vi.fn(),
   onReadingChange: vi.fn(),
+  onBackChange: vi.fn(),
+  onExit: vi.fn(),
   onAdvance: vi.fn(),
 };
 const step = () => <LiveDemoStep {...props} />;
-const pasteLink = () => screen.getByRole("button", { name: "demo.pasteOwn" });
 const linkField = () =>
   screen.queryByLabelText("demo.linkLabel") as HTMLInputElement | null;
 
@@ -171,27 +196,118 @@ beforeEach(() => {
   mock.demo.view = "pick";
   mock.demo.error = null;
   mock.demo.demoUsed = false;
+  mock.demo.authUrl = "";
+  mock.demo.submitting = false;
+  mock.demo.submissionTimedOut = false;
+  mock.demo.isAuthenticated = false;
+  mock.reducedMotion = false;
+  mock.pendingProvider = null;
   vi.clearAllMocks();
   mock.actions.canAcceptShare.mockReturnValue(true);
 });
 
-describe("iOS share step", () => {
-  it("shares the featured sample from the one Share button", () => {
-    render(step());
-    fireEvent.click(screen.getByRole("button", { name: /^demo\.shareThis/ }));
-    expect(mock.shareSample).toHaveBeenCalledWith(DEMO_SAMPLES[0].url);
+describe("submission recovery", () => {
+  it.each(["share", "reading", "auth"])(
+    "offers truthful enabled recovery from %s without saved claims",
+    (view) => {
+      mock.demo.view = view;
+      mock.demo.submitting = true;
+      mock.demo.submissionTimedOut = true;
+      mock.demo.isAuthenticated = true;
+      mock.demo.authUrl = DEMO_SAMPLES[0].url;
+      render(step());
+      expect(screen.getByText("demo.submissionUnconfirmed")).toBeTruthy();
+      expect(screen.queryByText(/reveal\.previewTitle/)).toBeNull();
+      expect(screen.queryByText("reveal.filedIn")).toBeNull();
+      expect(screen.queryByText("reading")).toBeNull();
+      expect(linkField()).toBeNull();
+      const wait = screen.getByRole("button", { name: "demo.keepWaiting" });
+      const proceed = screen.getByRole("button", { name: "common.continue" });
+      expect((wait as HTMLButtonElement).disabled).toBe(false);
+      expect((proceed as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(wait);
+      expect(mock.actions.keepWaiting).toHaveBeenCalledOnce();
+      fireEvent.click(proceed);
+      expect(mock.actions.continueAfterTimeout).toHaveBeenCalledOnce();
+      expect(mock.actions.skip).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe.each([false, true])("demo auth reduced motion %s", (reduced) => {
+  it("uses the native transition and keeps idle cancellation and the draft", () => {
+    mock.reducedMotion = reduced;
+    const { rerender } = render(step());
+    expect(mock.modalProps.mock.lastCall?.[0].visible).toBe(false);
+    fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
+    mock.demo.view = "auth";
+    mock.demo.authUrl = "https://a.test/p";
+    rerender(step());
+    expect(mock.modalProps.mock.lastCall?.[0]).toMatchObject({
+      visible: true,
+      transparent: true,
+      animationType: reduced ? "fade" : "slide",
+    });
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    expect(screen.getByText("demo.signInHelp")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "common.back" }));
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(2);
+    mock.demo.view = "pick";
+    rerender(step());
+    expect(screen.queryByText("demo.signInTitle")).toBeNull();
+    expect(linkField()?.value).toBe("https://a.test/p");
+    fireEvent.click(screen.getByRole("button", { name: "demo.save" }));
+    expect(mock.actions.submitTyped).toHaveBeenCalledWith("https://a.test/p");
   });
 
-  it("keeps the paste field hidden until its link is tapped", () => {
+  it("blocks scrim and native close while the provider is pending, then allows cancellation", () => {
+    mock.reducedMotion = reduced;
+    mock.demo.view = "auth";
+    mock.demo.authUrl = "https://a.test/p";
+    const { rerender } = render(step());
+    fireEvent.click(screen.getByRole("button", { name: "account.google" }));
+    expect(mock.signInWith).toHaveBeenCalledWith("google");
+    mock.pendingProvider = "google";
+    rerender(step());
+    expect(mock.modalProps.mock.lastCall?.[0].onRequestClose).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "common.back" }));
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).not.toHaveBeenCalled();
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    mock.pendingProvider = null;
+    rerender(step());
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("first-save picker", () => {
+  it("saves the featured sample in one tap", () => {
     render(step());
-    expect(linkField()).toBeNull();
-    fireEvent.click(pasteLink());
+    fireEvent.click(screen.getByRole("button", { name: /^demo\.save, / }));
+    expect(mock.actions.submitUrl).toHaveBeenCalledWith(DEMO_SAMPLES[0].url);
+  });
+
+  it("saves another sample from its row", () => {
+    render(step());
+    const second = DEMO_SAMPLES[1];
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `${second.pageHeading}, ${second.domain}`,
+      }),
+    );
+    expect(mock.actions.submitUrl).toHaveBeenCalledWith(second.url);
+  });
+
+  it("shows the paste field without an extra tap", () => {
+    render(step());
     expect(linkField()).not.toBeNull();
   });
 
   it("saves a typed link", () => {
     render(step());
-    fireEvent.click(pasteLink());
     fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
     fireEvent.click(screen.getByRole("button", { name: "demo.save" }));
     expect(mock.actions.submitTyped).toHaveBeenCalledWith("https://a.test/p");
@@ -199,7 +315,6 @@ describe("iOS share step", () => {
 
   it("keeps the field and its text after the sign-in sheet is cancelled", () => {
     const { rerender } = render(step());
-    fireEvent.click(pasteLink());
     fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
 
     mock.demo.view = "auth";
@@ -213,22 +328,83 @@ describe("iOS share step", () => {
   });
 
   it("clears an old error as soon as the user edits the field", () => {
-    mock.demo.error = "demo.shareDismissed";
+    mock.demo.error = "demo.saveFailed";
     render(step());
-    fireEvent.click(pasteLink());
     fireEvent.change(linkField()!, { target: { value: "h" } });
     expect(mock.actions.setError).toHaveBeenCalledWith(null);
   });
 
-  it("relabels the Share button, visibly and for screen readers, after a dismissed sheet", () => {
-    mock.demo.error = "demo.shareDismissed";
+  it("keeps a link-field error next to the field, and a save error away from it", () => {
+    mock.demo.error = "demo.clipboardNoLink";
+    const { rerender } = render(step());
+    const fieldBlock = linkField()!.parentElement!.parentElement!;
+    expect(fieldBlock.contains(screen.getByText("demo.clipboardNoLink"))).toBe(
+      true,
+    );
+
+    mock.demo.error = "demo.saveFailed";
+    rerender(step());
+    expect(fieldBlock.contains(screen.getByText("demo.saveFailed"))).toBe(
+      false,
+    );
+  });
+
+  it("asks for sign-in on the sample's own screen, and in a sheet for a pasted link", () => {
+    mock.demo.view = "auth";
+    mock.demo.authUrl = DEMO_SAMPLES[0].url;
+    const { rerender } = render(step());
+    expect(screen.getByText("reveal.previewSubtitle")).toBeTruthy();
+    expect(linkField()).toBeNull();
+
+    mock.demo.authUrl = "https://a.test/p";
+    rerender(step());
+    expect(screen.queryByText("reveal.previewSubtitle")).toBeNull();
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+  });
+  it("gives the screen a way back from the picker and from a sample's sign-in ask, and none while reading", () => {
+    mock.demo.view = "share";
+    const { rerender } = render(step());
+    // From the picker, back leaves the step.
+    expect(props.onBackChange).toHaveBeenLastCalledWith(props.onExit);
+
+    mock.demo.view = "auth";
+    mock.demo.authUrl = DEMO_SAMPLES[0].url;
+    rerender(step());
+    const back = props.onBackChange.mock.lastCall?.[0] as (() => void) | null;
+    expect(back).toBeTypeOf("function");
+    back?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+
+    mock.demo.view = "reading";
+    mock.demo.authUrl = "";
+    rerender(step());
+    expect(props.onBackChange).toHaveBeenLastCalledWith(null);
+  });
+  it("lets the first save be skipped", () => {
+    mock.demo.view = "share";
     render(step());
-    expect(
-      screen.getByRole("button", { name: /^demo\.shareRetry/ }),
-    ).not.toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /^demo\.shareThis/ }),
-    ).toBeNull();
-    expect(screen.getByText("demo.shareDismissed")).not.toBeNull();
+    fireEvent.click(screen.getByText("demo.skip"));
+    expect(mock.actions.skip).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops taking shared links once the first save exists", () => {
+    mock.demo.view = "share";
+    const { rerender } = render(step());
+    expect(mock.intake.canAccept()).toBe(true);
+
+    // Back from a later step: the one demo save is spent, so a held share
+    // is left for the share screen.
+    rerender(<LiveDemoStep {...props} alreadySaved />);
+    expect(mock.intake.canAccept()).toBe(false);
+  });
+
+  it("offers the way on when the first save already exists", () => {
+    mock.demo.view = "share";
+    const { rerender } = render(step());
+    expect(screen.queryByText("common.continue")).toBeNull();
+
+    rerender(<LiveDemoStep {...props} alreadySaved />);
+    fireEvent.click(screen.getByText("common.continue"));
+    expect(mock.actions.advance).toHaveBeenCalledTimes(1);
   });
 });

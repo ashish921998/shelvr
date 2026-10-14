@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getExpoPushToken } from "./notification-token";
+import {
+  getExpoPushToken,
+  notificationPermissionState,
+  requestNotificationPermission,
+} from "./notification-token";
 
 const mock = vi.hoisted(() => ({
   platform: { OS: "android" },
@@ -156,5 +160,35 @@ describe("notification permission telemetry", () => {
       "notification_permission_result",
       { outcome: "provisional" },
     );
+  });
+});
+
+describe("onboarding permission ask", () => {
+  it.each([
+    [{ granted: true }, "granted"],
+    [{ granted: false, canAskAgain: true }, "ask"],
+    [{ granted: false, canAskAgain: false }, "blocked"],
+  ] as const)("reads %o as %s", async (permission, state) => {
+    mock.permission.mockResolvedValue(permission);
+    expect(await notificationPermissionState()).toBe(state);
+    expect(mock.request).not.toHaveBeenCalled();
+  });
+
+  it("asks once channels exist, without fetching a token", async () => {
+    mock.permission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mock.request.mockResolvedValue({ granted: true });
+    expect(await requestNotificationPermission()).toBe(true);
+    expect(mock.channel).toHaveBeenCalledBefore(mock.request);
+    expect(mock.token).not.toHaveBeenCalled();
+    expect(mock.capture).toHaveBeenCalledWith(
+      "notification_permission_result",
+      { outcome: "granted" },
+    );
+  });
+
+  it("does not replay a denial the OS will no longer prompt for", async () => {
+    mock.permission.mockResolvedValue({ granted: false, canAskAgain: false });
+    expect(await requestNotificationPermission()).toBe(false);
+    expect(mock.request).not.toHaveBeenCalled();
   });
 });

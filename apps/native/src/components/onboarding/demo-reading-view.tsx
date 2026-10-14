@@ -3,8 +3,10 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ActivityIndicator, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 /** The saved link, as the reading view and the sign-in sheet show it. */
 export function DemoLinkRow({
@@ -30,9 +32,7 @@ export function DemoLinkRow({
           {url}
         </Text>
       </View>
-      {busy ? (
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-      ) : null}
+      {busy ? <StitchRing /> : null}
     </View>
   );
 }
@@ -133,24 +133,80 @@ const READING_STEPS: TextMessageKey[] = [
   "demo.stepFiling",
 ];
 
-function ReadingSteps() {
+// Nothing is saved before sign-in, so the preview leaves out "Saved".
+const PREVIEW_STEPS: TextMessageKey[] = READING_STEPS.slice(1);
+const PREVIEW_STEP_MS = 700;
+
+/**
+ * A signed-out sample before sign-in: the same steps a real save shows,
+ * played on a short timer, then on to the reveal. Nothing reaches the
+ * server until the reveal's sign-in.
+ */
+export function DemoPreviewView({
+  title,
+  url,
+  onDone,
+}: {
+  title: string;
+  url: string;
+  onDone: () => void;
+}) {
+  useAppLocale();
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const id = setTimeout(
+      () =>
+        active < PREVIEW_STEPS.length - 1 ? setActive(active + 1) : onDone(),
+      PREVIEW_STEP_MS,
+    );
+    return () => clearTimeout(id);
+  }, [active, onDone]);
+
+  return (
+    <View style={styles.wrap}>
+      <DemoLinkRow title={title} url={url} busy />
+      <View style={[styles.head, styles.centered]}>
+        <Text
+          style={[styles.headline, styles.center]}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+        >
+          {t("demo.reading")}
+        </Text>
+        <ReadingSteps steps={PREVIEW_STEPS} active={active} />
+      </View>
+    </View>
+  );
+}
+
+function ReadingSteps({
+  steps = READING_STEPS,
+  active = 1,
+}: {
+  steps?: TextMessageKey[];
+  /** Steps before it are done, steps after it are still to come. */
+  active?: number;
+}) {
   const { theme } = useUnistyles();
   return (
     <View style={styles.steps}>
-      {READING_STEPS.map((key, index) => (
-        <View key={key} style={[styles.stepRow, index > 1 && styles.stepTodo]}>
-          <View style={[styles.stepDot, index === 0 && styles.stepDotDone]}>
-            {index === 0 ? (
+      {steps.map((key, index) => (
+        <View
+          key={key}
+          style={[styles.stepRow, index > active && styles.stepTodo]}
+        >
+          <View style={[styles.stepDot, index < active && styles.stepDotDone]}>
+            {index < active ? (
               <AppSymbolIcon
                 name="checkmark"
                 size={10}
                 tintColor={theme.colors.primaryForeground}
               />
-            ) : index === 1 ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : index === active ? (
+              <StitchRing />
             ) : null}
           </View>
-          <Text style={[styles.stepText, index === 1 && styles.stepNow]}>
+          <Text style={[styles.stepText, index === active && styles.stepNow]}>
             {t(key)}
           </Text>
         </View>
@@ -176,10 +232,9 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
   },
   headline: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.4,
+    fontFamily: theme.fonts.display,
+    fontSize: 28,
+    lineHeight: 34,
     color: theme.colors.foreground,
   },
   support: {

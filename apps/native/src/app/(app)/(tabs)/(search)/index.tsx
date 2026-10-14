@@ -56,6 +56,15 @@ export default function SearchScreen() {
       query.length > 0 ? { query } : "skip",
     ),
   });
+  const emptyCopy =
+    query.length === 0
+      ? { title: t("search.emptyTitle"), message: t("search.emptyBody") }
+      : results?.length === 0
+        ? {
+            title: t("search.noResultsTitle"),
+            message: t("search.noResults", { query }),
+          }
+        : null;
 
   return (
     <View style={styles.container}>
@@ -72,16 +81,8 @@ export default function SearchScreen() {
         // The header is transparent, so results start below it.
         <View style={{ height: headerHeight }} />
       )}
-      {query.length === 0 ? (
-        <EmptyState
-          title={t("search.emptyTitle")}
-          message={t("search.emptyBody")}
-        />
-      ) : results && results.length === 0 ? (
-        <EmptyState
-          title={t("search.noResultsTitle")}
-          message={t("search.noResults", { query })}
-        />
+      {emptyCopy ? (
+        <EmptyState animateEntrance={false} {...emptyCopy} />
       ) : (
         <MasonryFeed
           items={results ?? []}

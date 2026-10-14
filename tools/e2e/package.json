@@ -1,0 +1,22 @@
+{
+  "name": "e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "e2e run",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@ai-sdk/google": "^4.0.39",
+    "@e2e-dev/mobile": "0.9.1",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^25.6.0",
+    "ai": "7.0.51",
+    "e2e": "0.16.0",
+    "eslint": "^9.0.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.59.0"
+  }
+}

@@ -1,5 +1,6 @@
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { liveOwner } from "./model/auth";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
 import { v } from "convex/values";
 
@@ -13,8 +14,9 @@ export const enqueue = internalMutation({
   args: { payment: paymentTelemetryValidator },
   returns: v.null(),
   handler: async (ctx, { payment }) => {
-    const owner = ctx.db.normalizeId("users", payment.userId);
-    if (!owner || !(await ctx.db.get(owner))) return null;
+    // Same fence as the entitlement writes this webhook drives: an owner
+    // mid-deletion counts as gone, so its payment telemetry is skipped too.
+    if ((await liveOwner(ctx, payment.userId)) === null) return null;
     const duplicate = await ctx.db
       .query("paymentAnalyticsReceipts")
       .withIndex("by_event", (q) => q.eq("eventId", payment.eventId))

@@ -7,6 +7,12 @@ const app = defineApp({
     // Id of the Apple-approved message POST /retention-messaging names on the
     // cancel sheet. Unset, the reply is empty and Apple shows its default.
     APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
+    // Signs the client secret for Apple's token revocation on account
+    // deletion (convex/appleRevoke.ts): the .p8 contents, its key id, and the
+    // team id. Without all three the revocation is skipped.
+    APPLE_REVOKE_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_REVOKE_KEY_ID: v.optional(v.string()),
+    APPLE_REVOKE_TEAM_ID: v.optional(v.string()),
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
     GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),

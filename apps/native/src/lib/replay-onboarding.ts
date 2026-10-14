@@ -21,7 +21,7 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 
-// The onboarding reveal opens its own paywall. A purchase there can finish
+// Onboarding opens its own paywall at the end. A purchase there can finish
 // onboarding before the webhook marks the user entitled, so replay must wait
 // for the entitlement instead of showing the paywall a second time. A user
 // who declined it there shouldn't see it again the moment Home appears; the
@@ -30,6 +30,29 @@ let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
 
 export function notePurchasedDuringOnboarding() {
   onboardingPaywall = "purchased";
+}
+
+const PURCHASE_LANDING_MS = 10_000;
+
+/**
+ * True while a purchase made in onboarding is still on its way to Convex (the
+ * webhook lags the store by a moment), so a screen can wait instead of asking
+ * for Pro again. The wait is bounded: a webhook that never lands, or a
+ * subscription that lapses later in the session, must still reach the Pro
+ * gate. Once the entitlement has been seen, the purchase is no longer news.
+ */
+export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
+  const [waitedOut, setWaitedOut] = useState(false);
+  const awaiting = !entitled && onboardingPaywall === "purchased" && !waitedOut;
+  useEffect(() => {
+    if (entitled && onboardingPaywall === "purchased") {
+      onboardingPaywall = "unseen";
+    }
+    if (!awaiting) return;
+    const id = setTimeout(() => setWaitedOut(true), PURCHASE_LANDING_MS);
+    return () => clearTimeout(id);
+  }, [entitled, awaiting]);
+  return awaiting;
 }
 
 export function noteDeclinedDuringOnboarding() {
