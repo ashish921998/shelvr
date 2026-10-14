@@ -148,6 +148,51 @@ describe("useReplayOnboarding retries", () => {
     expect(hasPending()).toBe(false);
   });
 
+  it("runs a new submission of the same spaces", async () => {
+    createSpace.mockImplementation(failingServer());
+    setPendingSpaces(["Trips"]);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    createSpace.mockResolvedValue("space");
+    act(() => setPendingSpaces(["Trips"]));
+    await settle();
+
+    expect(createSpace).toHaveBeenCalledTimes(2);
+    expect(hasPending()).toBe(false);
+  });
+
+  it("runs work that arrives while a pass is in flight", async () => {
+    // An older build's queued link keeps the replay busy after the spaces.
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Trips"],
+        demoUrl: "https://example.com/a",
+      }),
+    );
+    createSpace.mockImplementation(failingServer());
+    let failLink: (error: Error) => void = () => {};
+    createLinkItem.mockImplementationOnce(
+      () => new Promise((_, reject) => (failLink = reject)),
+    );
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    createSpace.mockResolvedValue("space");
+    await act(async () => {
+      setPendingSpaces(["Books"]);
+      failLink(new Error("server error"));
+    });
+    await settle();
+
+    expect(createSpace).toHaveBeenLastCalledWith({
+      name: "Books",
+      dynamic: true,
+    });
+  });
+
   it("runs new pending work without a remount", async () => {
     createSpace.mockImplementation(failingServer());
     setPendingSpaces(["Trips"]);
