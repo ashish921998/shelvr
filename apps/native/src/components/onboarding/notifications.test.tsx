@@ -149,6 +149,7 @@ describe("NotificationsStep", () => {
       itemId: "item-1",
       title: "Lemon pasta",
       at: new Date(2026, 9, 10, 10, 0),
+      ticket: expect.any(Number),
     });
     expect(mock.capture).toHaveBeenCalledWith("onboarding_reminder", {
       action: "remind",

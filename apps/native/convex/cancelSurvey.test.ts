@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from "vitest";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { api } from "./_generated/api";
 
 // Server-enforced "ask once per account": the row is the authority across
@@ -11,7 +11,7 @@ import { api } from "./_generated/api";
 describe("cancelSurvey", () => {
   it("reports unasked, then asked, after markShown", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: "survey-user|session-1" });
+    const { t: user } = await signedInUser(t);
 
     expect(await user.query(api.cancelSurvey.getStatus, {})).toEqual({
       asked: false,
@@ -26,7 +26,7 @@ describe("cancelSurvey", () => {
 
   it("markShown is idempotent — the ask is consumed exactly once, and the loser is told so", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: "survey-user|session-1" });
+    const { t: user } = await signedInUser(t);
 
     const first = await user.mutation(api.cancelSurvey.markShown, {});
     const second = await user.mutation(api.cancelSurvey.markShown, {});
@@ -41,7 +41,7 @@ describe("cancelSurvey", () => {
 
   it("first response wins; a stale second response is ignored", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: "survey-user|session-1" });
+    const { t: user, userId } = await signedInUser(t);
 
     await user.mutation(api.cancelSurvey.markShown, {});
     await user.mutation(api.cancelSurvey.respond, {
@@ -56,7 +56,7 @@ describe("cancelSurvey", () => {
     );
     expect(rows.length).toBe(1);
     expect(rows[0]).toMatchObject({
-      userId: "survey-user",
+      userId,
       outcome: "submitted",
       reason: "too_expensive",
     });
@@ -64,7 +64,7 @@ describe("cancelSurvey", () => {
 
   it("accepts a response that arrives before markShown (offline flush order)", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: "survey-user|session-1" });
+    const { t: user } = await signedInUser(t);
 
     const result = await user.mutation(api.cancelSurvey.respond, {
       outcome: "dismissed",
@@ -83,10 +83,10 @@ describe("cancelSurvey", () => {
 
   it("never lets one user read or spend another user's ask", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: "survey-user|session-1" });
+    const { t: user, userId } = await signedInUser(t);
     await user.mutation(api.cancelSurvey.markShown, {});
 
-    const stranger = t.withIdentity({ subject: "survey-stranger|session-1" });
+    const { t: stranger, userId: strangerId } = await signedInUser(t);
     expect(await stranger.query(api.cancelSurvey.getStatus, {})).toEqual({
       asked: false,
     });
@@ -100,8 +100,8 @@ describe("cancelSurvey", () => {
       async (ctx) => await ctx.db.query("cancelSurveys").collect(),
     );
     expect(rows.length).toBe(2);
-    const userRow = rows.find((row) => row.userId === "survey-user");
-    const strangerRow = rows.find((row) => row.userId === "survey-stranger");
+    const userRow = rows.find((row) => row.userId === userId);
+    const strangerRow = rows.find((row) => row.userId === strangerId);
     // The stranger's response created its own row; the first user's ask is
     // untouched (no outcome yet).
     expect(userRow).toBeDefined();
@@ -114,7 +114,7 @@ describe("cancelSurvey", () => {
 
   it("bounds the reason to the survey's ids — free text is rejected", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: "survey-user|session-1" });
+    const { t: user } = await signedInUser(t);
     await user.mutation(api.cancelSurvey.markShown, {});
 
     await expect(

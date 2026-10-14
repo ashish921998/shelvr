@@ -1,18 +1,8 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import type { DataModel } from "./_generated/dataModel";
-
-type TestCtx = TestConvexForDataModel<DataModel>;
-
-function signedInAs(userId: string): TestCtx {
-  return newConvexTest().withIdentity({
-    subject: `${userId}|session-1`,
-  });
-}
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -20,17 +10,19 @@ afterEach(() => {
 
 describe("Convex Auth identity boundaries", () => {
   it("uses the stable users-table id instead of the session-bearing subject", async () => {
-    const t = signedInAs("user-a");
+    const { t, userId } = await signedInUser(newConvexTest());
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
-        userId: "user-a",
+        userId,
         status: "pro",
         expiresAt: Date.now() + 60_000,
         updatedAt: Date.now(),
       });
     });
 
-    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+    await expect(
+      t.query(api.subscriptions.getEntitlement, {}),
+    ).resolves.toEqual({
       status: "pro",
       expiresAt: expect.any(Number),
     });
@@ -50,7 +42,9 @@ describe("Convex Auth identity boundaries", () => {
     });
     const t = backend.withIdentity({ subject: `${userId}|session-1` });
 
-    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+    await expect(
+      t.query(api.subscriptions.getEntitlement, {}),
+    ).resolves.toEqual({
       status: "lifetime",
     });
     await expect(
@@ -72,7 +66,9 @@ describe("Convex Auth identity boundaries", () => {
     });
     const t = backend.withIdentity({ subject: `${userId}|session-1` });
 
-    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+    await expect(
+      t.query(api.subscriptions.getEntitlement, {}),
+    ).resolves.toEqual({
       status: "none",
     });
     await expect(
@@ -83,7 +79,7 @@ describe("Convex Auth identity boundaries", () => {
 
 describe("RevenueCat subscription webhook writes", () => {
   it("acknowledges a non-Convex app user id without creating a row", async () => {
-    const t = signedInAs("user-a");
+    const t = newConvexTest();
 
     await expect(
       t.mutation(internal.subscriptions.upsertSubscription, {
@@ -94,30 +90,34 @@ describe("RevenueCat subscription webhook writes", () => {
       }),
     ).resolves.toBeNull();
 
-    const rows = await t.run(async (ctx) => await ctx.db.query("subscriptions").collect());
+    const rows = await t.run(
+      async (ctx) => await ctx.db.query("subscriptions").collect(),
+    );
     expect(rows).toEqual([]);
   });
 
   it("does not create Pro for a first-seen advisory event", async () => {
-    const t = signedInAs("user-a");
+    const t = newConvexTest();
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
 
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "user-a",
+      userId,
       expiresAt: Date.now() + 60_000,
       eventTimestampMs: 1,
     });
 
-    const row = await t.run(async (ctx) =>
-      await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
-        .unique(),
+    const row = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .unique(),
     );
     expect(row).toBeNull();
   });
 
   it("writes a subscription for a user that exists", async () => {
-    const t = signedInAs("user-live");
+    const t = newConvexTest();
 
     // The webhook's userId is the Convex Auth users-table document id.
     const userId = await t.run(async (ctx) => {
@@ -131,17 +131,18 @@ describe("RevenueCat subscription webhook writes", () => {
       eventTimestampMs: 1,
     });
 
-    const row = await t.run(async (ctx) =>
-      await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId as string))
-        .unique(),
+    const row = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", userId as string))
+          .unique(),
     );
     expect(row?.status).toBe("trialing");
   });
 
   it("does not resurrect a deleted user's row on a renewal webhook", async () => {
-    const t = signedInAs("user-gone");
+    const t = newConvexTest();
     const originalExpiresAt = Date.now() + 60_000;
 
     const userId = await t.run(async (ctx) => {
@@ -168,11 +169,12 @@ describe("RevenueCat subscription webhook writes", () => {
       eventTimestampMs: 2,
     });
 
-    const row = await t.run(async (ctx) =>
-      await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId as string))
-        .unique(),
+    const row = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", userId as string))
+          .unique(),
     );
     // The stale row is neither patched nor a fresh one inserted.
     expect(row).toMatchObject({
@@ -180,5 +182,68 @@ describe("RevenueCat subscription webhook writes", () => {
       expiresAt: originalExpiresAt,
       eventTimestampMs: 1,
     });
+  });
+
+  it("neither patches nor inserts for an owner whose deletion has begun", async () => {
+    const t = newConvexTest();
+    const originalExpiresAt = Date.now() + 60_000;
+    const { withRow, withoutRow } = await t.run(async (ctx) => {
+      const withRow = await ctx.db.insert("users", { deleting: true });
+      await ctx.db.insert("subscriptions", {
+        userId: withRow as string,
+        status: "trialing",
+        expiresAt: originalExpiresAt,
+        updatedAt: Date.now(),
+        eventTimestampMs: 1,
+      });
+      const withoutRow = await ctx.db.insert("users", { deleting: true });
+      return { withRow, withoutRow };
+    });
+
+    for (const userId of [withRow, withoutRow]) {
+      await expect(
+        t.mutation(internal.subscriptions.upsertSubscription, {
+          userId: userId as string,
+          status: "pro",
+          expiresAt: Date.now() + 120_000,
+          eventTimestampMs: 2,
+          authoritative: true,
+        }),
+      ).resolves.toBeNull();
+    }
+
+    const rows = await t.run((ctx) => ctx.db.query("subscriptions").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      userId: withRow,
+      status: "trialing",
+      expiresAt: originalExpiresAt,
+      eventTimestampMs: 1,
+    });
+  });
+});
+
+describe("transfer owner selection", () => {
+  it("selects live owners only, dropping deleting, missing and foreign ids", async () => {
+    const t = newConvexTest();
+    const ids = await t.run(async (ctx) => {
+      const live = await ctx.db.insert("users", {});
+      const deleting = await ctx.db.insert("users", { deleting: true });
+      const missing = await ctx.db.insert("users", {});
+      await ctx.db.delete(missing);
+      return { live, deleting, missing };
+    });
+
+    await expect(
+      t.query(internal.subscriptions.transferOwners, {
+        userIds: [
+          ids.live,
+          ids.deleting,
+          ids.missing,
+          "$RCAnonymousID:abc",
+          ids.live,
+        ],
+      }),
+    ).resolves.toEqual([ids.live]);
   });
 });
