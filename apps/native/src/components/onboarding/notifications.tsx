@@ -156,12 +156,22 @@ export function NotificationsStep({
     }
     // The pledge above the button is a Sunday look-back, so the same yes turns
     // the Weekly shelf on. Skipped if the account changed during the prompt.
+    // Not awaited: it needs the network, and an offline mutation waits for a
+    // reconnect instead of failing, which would hold this step.
     if (granted && firstSaveReminderTicket() === ticket) {
-      try {
-        await session.setWeeklyShelf(true);
-      } catch (error) {
-        analytics.captureError("weekly_shelf_preference_failed", error);
-      }
+      void session.setWeeklyShelf(true).then(
+        (enabled) => {
+          // false: no push token; undefined: another operation was running.
+          if (enabled !== true) {
+            analytics.captureError(
+              "weekly_shelf_preference_failed",
+              new Error(enabled === false ? "not_registered" : "busy"),
+            );
+          }
+        },
+        (error: unknown) =>
+          analytics.captureError("weekly_shelf_preference_failed", error),
+      );
     }
     analytics.capture("onboarding_reminder", {
       action: "remind",

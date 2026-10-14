@@ -186,9 +186,32 @@ describe("NotificationsStep", () => {
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
     await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
     expect(mock.schedule).toHaveBeenCalledOnce();
-    expect(mock.captureError).toHaveBeenCalledWith(
-      "weekly_shelf_preference_failed",
-      expect.any(Error),
+    await waitFor(() =>
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "weekly_shelf_preference_failed",
+        expect.any(Error),
+      ),
+    );
+  });
+
+  it("moves on without waiting for the Weekly shelf while offline", async () => {
+    // An offline Convex mutation neither resolves nor rejects.
+    mock.weekly.mockReturnValue(new Promise(() => {}));
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+  });
+
+  it("reports a Weekly shelf that could not be turned on", async () => {
+    mock.weekly.mockResolvedValue(false);
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "weekly_shelf_preference_failed",
+        expect.any(Error),
+      ),
     );
   });
 
