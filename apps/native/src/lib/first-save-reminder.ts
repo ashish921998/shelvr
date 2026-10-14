@@ -87,6 +87,16 @@ function addDays(day: Date, days: number): Date {
 // lands on a stale ticket and leaves nothing behind.
 let generation = 0;
 
+// Every schedule and clear of the one reminder id runs in call order, so a
+// clear always lands after a schedule already in flight, and an older
+// schedule can never act after a newer one.
+let tail: Promise<unknown> = Promise.resolve();
+function serial(task: () => Promise<void>): Promise<void> {
+  const run = tail.then(task, task);
+  tail = run.catch(() => {});
+  return run;
+}
+
 /** Taken before any await that a sign-out could overtake. */
 export function firstSaveReminderTicket(): number {
   return generation;
@@ -97,7 +107,7 @@ export function firstSaveReminderTicket(): number {
  * got notification permission; without it nothing would be shown. Pass the
  * ticket taken before that permission prompt; a clear since then wins.
  */
-export async function scheduleFirstSaveReminder({
+export function scheduleFirstSaveReminder({
   itemId,
   title,
   at,
@@ -108,47 +118,45 @@ export async function scheduleFirstSaveReminder({
   at: Date;
   ticket?: number;
 }): Promise<void> {
-  if (ticket !== generation) return;
-  await Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID);
-  if (ticket !== generation) return;
-  await Notifications.scheduleNotificationAsync({
-    identifier: FIRST_SAVE_REMINDER_ID,
-    content: {
-      title: t("reminder.readTitle"),
-      body: t("reminder.readBody", { title }),
-      // `kind` and `notificationId` let `notification_opened` attribute the
-      // tap, the same way the trial reminder and pushes carry theirs.
-      data: {
-        url: `/item/${itemId}`,
-        kind: "first_save_reminder",
-        notificationId: FIRST_SAVE_REMINDER_ID,
-      },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: at,
-      channelId: CHANNEL_ID,
-    },
-  });
-  // A clear that ran while the schedule was in flight may have cancelled
-  // before it landed; drop it again so it cannot outlive that clear.
-  if (ticket !== generation) {
+  return serial(async () => {
+    if (ticket !== generation) return;
     await Notifications.cancelScheduledNotificationAsync(
       FIRST_SAVE_REMINDER_ID,
     );
-  }
+    await Notifications.scheduleNotificationAsync({
+      identifier: FIRST_SAVE_REMINDER_ID,
+      content: {
+        title: t("reminder.readTitle"),
+        body: t("reminder.readBody", { title }),
+        // `kind` and `notificationId` let `notification_opened` attribute the
+        // tap, the same way the trial reminder and pushes carry theirs.
+        data: {
+          url: `/item/${itemId}`,
+          kind: "first_save_reminder",
+          notificationId: FIRST_SAVE_REMINDER_ID,
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: at,
+        channelId: CHANNEL_ID,
+      },
+    });
+  });
 }
 
 /**
  * Drops the reminder, scheduled or already shown. It names a save, so it must
  * not outlive the account that made it.
  */
-export async function clearFirstSaveReminder(): Promise<void> {
+export function clearFirstSaveReminder(): Promise<void> {
   generation += 1;
-  // Settled independently: a failed cancel must not leave a delivered
-  // reminder in the tray, and cleanup must never fail a sign-out.
-  await Promise.allSettled([
-    Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID),
-    Notifications.dismissNotificationAsync(FIRST_SAVE_REMINDER_ID),
-  ]);
+  return serial(async () => {
+    // Settled independently: a failed cancel must not leave a delivered
+    // reminder in the tray, and cleanup must never fail a sign-out.
+    await Promise.allSettled([
+      Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID),
+      Notifications.dismissNotificationAsync(FIRST_SAVE_REMINDER_ID),
+    ]);
+  });
 }
