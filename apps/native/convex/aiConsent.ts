@@ -53,7 +53,9 @@ export const isAllowed = internalQuery({
 });
 
 /** One snapshot for the whole page, immediately before provider inputs are built.
- * Deleting owners get empty slots so their rows cannot wedge the sweep. */
+ * Deleting or missing owners read as declined: their rows are stamped without
+ * sending any text, so they cannot wedge the sweep. Only a save that is itself
+ * gone is skipped, and it has already left the range. */
 export const revalidateEmbeddingBatch = internalQuery({
   args: {
     entries: v.array(v.object({ itemId: v.id("items"), userId: v.string() })),
@@ -88,11 +90,9 @@ export const revalidateEmbeddingBatch = internalQuery({
         const ownerId = ctx.db.normalizeId("users", userId);
         const owner = ownerId === null ? null : await ctx.db.get(ownerId);
         disposition =
-          owner === null
-            ? "gone"
-            : (await aiAllowed(ctx, userId))
-              ? "allowed"
-              : "declined";
+          owner !== null && (await aiAllowed(ctx, userId))
+            ? "allowed"
+            : "declined";
         owners.set(userId, disposition);
       }
       results.push({ itemId, disposition });

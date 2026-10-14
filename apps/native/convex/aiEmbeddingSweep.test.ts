@@ -97,6 +97,34 @@ describe("sweepItemEmbeddings", () => {
     expect(rows.filter((row) => row.embedding !== undefined)).toHaveLength(1);
   });
 
+  it("advances past more than one page whose owner row is missing", async () => {
+    const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
+    await t.run(async (ctx) => {
+      const owner = (await ctx.db.query("users").collect())[0];
+      await ctx.db.delete(owner._id);
+      const userId = await ctx.db.insert("users", {});
+      await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        title: "Live owner's save",
+        tags: [],
+        searchText: "",
+      });
+    });
+    embedMany.mockImplementation(async ({ values }) => ({
+      embeddings: values.map(() => unitVector()),
+    }));
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).toHaveBeenCalledOnce();
+    expect(embedMany.mock.calls[0][0].values).toEqual(["Live owner's save"]);
+    const rows = await t.run((ctx) => ctx.db.query("items").collect());
+    expect(
+      rows.every((row) => row.embeddingVersion === CURRENT_EMBEDDING_VERSION),
+    ).toBe(true);
+  });
+
   it("embeds a page, stamps it, and chains while there is more to do", async () => {
     const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
     embedMany.mockImplementation(async ({ values }) => ({
