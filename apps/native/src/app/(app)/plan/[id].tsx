@@ -124,6 +124,7 @@ function TonightActions({
       </Pressable>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${place.name}, ${visited ? t("plan.been") : t("plan.weWent")}`}
         accessibilityState={{ selected: visited }}
         onPress={onToggleVisited}
         style={({ pressed }) => [
