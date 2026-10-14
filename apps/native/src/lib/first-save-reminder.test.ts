@@ -143,11 +143,43 @@ describe("first-save reminder ticket", () => {
     await remind(ticket);
     await clearing;
     expect(notifications.schedule).toHaveBeenCalledTimes(1);
-    expect(notifications.cancel).toHaveBeenLastCalledWith(
-      FIRST_SAVE_REMINDER_ID,
+    // The clear waits for the schedule in flight, then cancels after it.
+    expect(notifications.cancel).toHaveBeenCalledTimes(2);
+    expect(notifications.cancel.mock.invocationCallOrder[1]).toBeGreaterThan(
+      notifications.schedule.mock.invocationCallOrder[0],
     );
-    // replace cancel, the clear's cancel, and the drop after the late schedule
-    expect(notifications.cancel).toHaveBeenCalledTimes(3);
+  });
+
+  it("never lets an older schedule act after a newer one", async () => {
+    const events: string[] = [];
+    let releaseFirst: () => void = () => {};
+    notifications.schedule
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseFirst = () => {
+              events.push("A");
+              resolve();
+            };
+          }),
+      )
+      .mockImplementationOnce(async () => {
+        events.push("B");
+      });
+    notifications.cancel.mockImplementation(async () => {
+      events.push("cancel");
+    });
+    const first = remind(firstSaveReminderTicket());
+    await Promise.resolve();
+    const clearing = clearFirstSaveReminder();
+    const second = remind(firstSaveReminderTicket());
+    await vi.waitFor(() => expect(notifications.schedule).toHaveBeenCalled());
+    releaseFirst();
+    await Promise.all([first, clearing, second]);
+    // A, then the clear's cancel, then B's replace-cancel and B: nothing
+    // cancels after B, so the newer reminder stays scheduled.
+    expect(events.at(-1)).toBe("B");
+    expect(events.indexOf("A")).toBeLessThan(events.indexOf("B"));
   });
 
   it("schedules normally with a current ticket", async () => {
