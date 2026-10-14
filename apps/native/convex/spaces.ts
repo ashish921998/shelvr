@@ -10,6 +10,13 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
+import { aiConsentRequiredError } from "./model/aiConsent";
+import {
+  MAX_PLAN_ITEMS,
+  PLAN_CONTENT_CHARS,
+  planSourceValidator,
+  type PlanSource,
+} from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
@@ -841,6 +848,82 @@ export const survivingCandidates = internalQuery({
         surviving.push(itemId);
     }
     return surviving;
+  },
+});
+
+/**
+ * The gate and the input for "Make a plan" (`plans.makePlan`), in one
+ * transaction: the caller owns the space, is Pro, has not declined AI
+ * processing, and has a token left. Returns the space's saved, ready items,
+ * newest filed first and bounded, as the text the model reads. An empty
+ * space spends no token, since no model call follows.
+ */
+export const claimPlanInternal = internalMutation({
+  args: { spaceId: v.id("spaces") },
+  returns: v.object({
+    spaceName: v.string(),
+    sources: v.array(planSourceValidator),
+  }),
+  handler: async (ctx, args) => {
+    // Convex forwards the action caller's identity, so authorization and the
+    // claim are one transaction.
+    const userId = await requireUserId(ctx);
+    const space = await ctx.db.get(args.spaceId);
+    if (space === null || space.userId !== userId) {
+      throw new Error("Space not found");
+    }
+    await requireProEntitlement(ctx, userId);
+    if (!(await aiAllowed(ctx, userId))) {
+      throw aiConsentRequiredError();
+    }
+    // Saved rows plus legacy rows (no status reads as saved), each newest
+    // filed first and bounded, then merged.
+    const [saved, legacy] = await Promise.all(
+      (["saved", undefined] as const).map((status) =>
+        ctx.db
+          .query("spaceItems")
+          .withIndex("by_space_and_status", (q) =>
+            q.eq("spaceId", args.spaceId).eq("status", status),
+          )
+          .order("desc")
+          .take(MAX_PLAN_ITEMS),
+      ),
+    );
+    const joins = [...saved, ...legacy]
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, MAX_PLAN_ITEMS);
+    const sources: PlanSource[] = [];
+    for (const join of joins) {
+      const item = await ctx.db.get(join.itemId);
+      if (item === null || item.userId !== userId) continue;
+      if (item.status !== "ready") continue;
+      sources.push({
+        itemId: item._id,
+        title: item.title,
+        description: item.description,
+        // A note's words live in `note`; a link can carry the user's note
+        // too, and either may be what names the place.
+        content:
+          [item.note, item.content]
+            .filter(Boolean)
+            .join("\n")
+            .slice(0, PLAN_CONTENT_CHARS) || undefined,
+        url: item.url,
+        siteName: item.siteName,
+        author: item.author,
+        // The save's own Maps actions plus any steered for this space.
+        places: [...(item.intents ?? []), ...(join.intents ?? [])]
+          .filter((intent) => intent.kind === "open_maps")
+          .map((intent) => intent.value),
+      });
+    }
+    if (sources.length > 0) {
+      await rateLimiter.limit(ctx, "makePlan", {
+        key: userId,
+        throws: true,
+      });
+    }
+    return { spaceName: space.name, sources };
   },
 });
 
