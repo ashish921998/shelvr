@@ -11,6 +11,7 @@ import {
   EMBEDDING_DIMENSIONS,
 } from "./model/embedding";
 import { newConvexTest, signedInUser } from "./test.setup";
+import { aiAllowed } from "./aiConsent";
 
 const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
@@ -171,9 +172,7 @@ describe("getStatus and setConsent", () => {
     expect((await other.query(api.aiConsent.getStatus, {})).status).toBe(
       "unset",
     );
-    expect(
-      await backend.query(internal.aiConsent.isAllowed, { userId: otherId }),
-    ).toBe(true);
+    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(true);
   });
 
   it("requires a signed-in user", async () => {
@@ -213,9 +212,7 @@ describe("a save that is gone", () => {
     expect(
       await t.query(internal.aiConsent.isAllowed, { userId: USER, itemId }),
     ).toBe(false);
-    expect(await t.query(internal.aiConsent.isAllowed, { userId: USER })).toBe(
-      true,
-    );
+    expect(await t.run((ctx) => aiAllowed(ctx, USER))).toBe(true);
   });
 });
 

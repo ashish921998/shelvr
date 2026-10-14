@@ -1041,7 +1041,7 @@ describe("steering spend controls", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     expect(
-      jobs.filter((job) => job.name === "ai:recommendForSpace"),
+      jobs.filter((j) => j.name === "aiRecommendForSpace:recommendForSpace"),
     ).toHaveLength(10);
   });
 });

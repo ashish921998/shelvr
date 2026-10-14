@@ -141,11 +141,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   RevenueCat webhook.
 - **`aiConsent.ts`** — consent to third-party AI processing (App Store guideline 5.1.2(i)):
   `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
-  every path sending user content to Gemini or SerpAPI asks first. Only an explicit decline
-  blocks; a user who has not answered stays allowed, because builds without the consent card
+  every path sending user content to Gemini or SerpAPI asks first. Missing/deleting owners
+  are refused before consent is read; item-aware checks also require an existing owned save.
+  Among live owners, only an explicit decline blocks; unset stays allowed, because builds without the consent card
   must keep working. A declined user's saves still finish `ready` from what Shelvr read
   itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
   client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+  `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
+  and `survivingCandidates` (up to 100 hydrated identities, revalidated before classification).
+  The embedding sweep revalidates each cached save in one batch and maps vectors to the surviving
+  list. These are pre-dispatch fences, not cancellation or recall of already-sent requests:
+  a database check and an external provider call cannot be atomic.
 - **`appleRevoke.ts`** (`"use node"` action) — revokes a Sign in with Apple refresh token
   after `deleteCurrentUserAccount` hands it over. Best effort: it never throws, skips with
   one log line when the `APPLE_REVOKE_*` variables are unset, and retries only when Apple
@@ -205,11 +211,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships. The file also holds `recommendForSpace` (one pass over
-  existing items, scheduled by `createSpace`), `steerItemForSpace` (per-space intents, scheduled
+  matches become `suggested` memberships. The file also holds
+  `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
-  `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
-  [embeddings](docs/architecture/embeddings.md)).
+  `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
+- **`aiEmbeddingSweep.ts`** (`"use node"`) — the embedding sweep cron and best-effort
+  `embedTexts` / `embedQuery` provider calls. See [embeddings](docs/architecture/embeddings.md).
+- **`aiRecommendForSpace.ts`** (`"use node"`) — ranked-plus-recency recommendations,
+  scheduled by space creation and dynamic enabling; creates suggestions only.
+  Both modules and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
 - **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
   one entry point: it picks the reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
   embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
