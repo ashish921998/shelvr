@@ -111,6 +111,7 @@ describe("authoritative event policy", () => {
     [{ type: "REFUND_REVERSED" }, true],
     [{ type: "CANCELLATION", cancelReason: "CUSTOMER_SUPPORT" }, true],
     [{ type: "EXPIRATION", expirationReason: "CUSTOMER_SUPPORT" }, true],
+    [{ type: "CANCELLATION", cancelReason: "BILLING_ERROR" }, true],
     [{ type: "CANCELLATION", cancelReason: "UNSUBSCRIBE" }, false],
     [{ type: "EXPIRATION", expirationReason: "BILLING_ERROR" }, false],
     [{ type: "RENEWAL" }, false],

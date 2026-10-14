@@ -52,14 +52,15 @@ async function fixture() {
     signedIn.mutation(api.items.createNoteItem, {
       text: "Synthetic grace test",
     });
-  const send = (timestamp = 2) =>
+  const send = (timestamp = 2, fields: Record<string, string> = {}) =>
     t.fetch("/webhooks/revenuecat", {
       method: "POST",
       headers: { Authorization: "Bearer test-secret" },
       body: JSON.stringify({
         event: {
-          id: "billing-test",
+          id: `billing-test-${timestamp}`,
           type: "BILLING_ISSUE",
+          ...fields,
           app_user_id: userId,
           product_id: "untrusted-product",
           period_type: "NORMAL",
@@ -187,6 +188,33 @@ describe("billing issue webhook", () => {
       ).toEqual([]);
     },
   );
+
+  it("keeps grace when a newer billing-error cancellation follows the billing issue", async () => {
+    const f = await fixture();
+    const grace = Date.now() + 60_000;
+    stubRevenueCatFetch(
+      revenuecatSnapshot({
+        productId: "monthly_499",
+        expiresAt: Date.now() - 1,
+        graceUntil: grace,
+      }),
+    );
+    expect((await f.send(2)).status).toBe(200);
+    expect(
+      (
+        await f.send(3, {
+          type: "CANCELLATION",
+          cancel_reason: "BILLING_ERROR",
+        })
+      ).status,
+    ).toBe(200);
+    expect(await f.row()).toMatchObject({
+      status: "pro",
+      expiresAt: grace,
+      eventTimestampMs: 3,
+    });
+    await expect(f.save()).resolves.toBeDefined();
+  });
 
   it("cannot overwrite newer revocation when an older lookup is in flight", async () => {
     const f = await fixture();

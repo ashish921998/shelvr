@@ -83,7 +83,12 @@ export function requiresAuthoritativeReconciliation(
     case "REFUND_REVERSED":
       return true;
     case "CANCELLATION":
-      return event.cancelReason === "CUSTOMER_SUPPORT";
+      // A failed charge sends BILLING_ERROR with the already-past expiry; only
+      // the snapshot knows the billing grace window.
+      return (
+        event.cancelReason === "CUSTOMER_SUPPORT" ||
+        event.cancelReason === "BILLING_ERROR"
+      );
     case "EXPIRATION":
       return event.expirationReason === "CUSTOMER_SUPPORT";
     default:
