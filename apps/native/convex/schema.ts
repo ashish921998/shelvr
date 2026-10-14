@@ -58,6 +58,15 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // A web-flow Apple refresh token that arrived while its owner was already
+  // deleting, so it could not be kept in `appleTokens`. Held only until the
+  // revoke job has asked Apple to revoke it, so the token never travels in a
+  // scheduled job's arguments. No owner: the account is going away.
+  detachedAppleTokens: defineTable({
+    refreshToken: v.string(),
+    createdAt: v.number(),
+  }),
+
   // One row per user: their answer to the third-party AI processing
   // disclosure. No row means they have not answered.
   aiConsents: defineTable({

@@ -128,24 +128,36 @@ export const revoke = internalAction({
 });
 
 /**
- * Revokes a refresh token that was never stored: a web-flow sign-in landed
+ * Revokes a web-flow refresh token that was never kept: the sign-in landed
  * while the owner row was already `deleting`, so `storeAppleToken` refused it
- * and there is no row for `revoke` to point at. The token travels in the job
- * arguments — the one place it may, since nothing else will ever ask Apple
- * about it. Same best-effort policy as `revoke`, with nothing to forget.
+ * and `keepAppleRefreshToken` parked it in `detachedAppleTokens`. Same
+ * best-effort policy as `revoke`; the parked row goes once Apple has answered
+ * or the attempts run out.
  */
 export const revokeDetachedToken = internalAction({
-  args: { refreshToken: v.string(), attempt: v.optional(v.number()) },
+  args: {
+    tokenId: v.id("detachedAppleTokens"),
+    attempt: v.optional(v.number()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const refreshToken = await ctx.runQuery(
+      internal.users.detachedAppleTokenForRevoke,
+      { tokenId: args.tokenId },
+    );
+    if (refreshToken === null) return null;
     const attempt = args.attempt ?? 1;
-    const result = await revokeOnce(args.refreshToken, undefined);
+    const result = await revokeOnce(refreshToken, undefined);
     if (classify(result, attempt) === "retry") {
       await ctx.scheduler.runAfter(
         RETRY_DELAY_MS * attempt,
         internal.appleRevoke.revokeDetachedToken,
-        { refreshToken: args.refreshToken, attempt: attempt + 1 },
+        { tokenId: args.tokenId, attempt: attempt + 1 },
       );
+    } else {
+      await ctx.runMutation(internal.users.forgetDetachedAppleToken, {
+        tokenId: args.tokenId,
+      });
     }
     return null;
   },
