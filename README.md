@@ -180,7 +180,8 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 save a photo, create a space, search, a search with no match, and the paywall.
 Search, save-a-note, create-a-space and the paywall use plain locators and need
 no model. The paywall flow relaunches the app with `-E2EHidePro YES`, which makes
-a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check` or CI yet.
+a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check` or CI yet. Every flow launches with `-E2EHideLogBox YES`, which keeps the
+development error banner from covering the controls the flows tap.
 
 It needs a booted iOS simulator with the development build
 (`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev

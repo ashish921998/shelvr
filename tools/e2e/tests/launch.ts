@@ -5,9 +5,9 @@ export const METRO_URL = `http://localhost:${METRO_PORT}`;
 
 export const BUNDLE_ID = "app.shelvr.save.dev";
 
-// Skip the dev launcher and keep the dev menu from covering the app. The
-// locators match English labels, so run the app in English whatever the
-// simulator's language.
+// Skip the dev launcher and keep the dev menu and the development error
+// banner from covering the app (src/lib/e2e-log-box.ts). The locators match
+// English labels, so run the app in English whatever the simulator's language.
 export const LAUNCH_ARGUMENTS = [
   "--initialUrl",
   METRO_URL,
@@ -21,4 +21,6 @@ export const LAUNCH_ARGUMENTS = [
   "YES",
   "-EXDevMenuShowFloatingActionButton",
   "NO",
+  "-E2EHideLogBox",
+  "YES",
 ];
