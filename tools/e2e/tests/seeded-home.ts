@@ -107,7 +107,7 @@ export async function tapUntilVisible(
     .poll(
       async () => {
         if (await result.isVisible()) return true;
-        await control.tap({ timeout });
+        await control.tap({ timeout: Math.min(waitMs, timeout) });
         await expect(result)
           .toBeVisible({ timeout: waitMs })
           .catch(() => undefined);
