@@ -59,6 +59,10 @@ export function noteDeclinedDuringOnboarding() {
   onboardingPaywall = "declined";
 }
 
+function pendingWorkKey(): string {
+  return JSON.stringify([getPendingSpaces(), getPendingDemoUrl()]);
+}
+
 /**
  * After onboarding is finished and the user signs in, replay the deferred
  * onboarding spaces, then present the paywall. Runs once.
@@ -80,6 +84,12 @@ export function useReplayOnboarding() {
   const startedEntitledRef = useRef(false);
   const rerunRef = useRef(false);
   const awaitingEntitlementRef = useRef(false);
+  // The pending work this mount already tried and could not finish. Saving
+  // the failed remainder notifies the store, which re-runs this effect; without
+  // this the replay would retry its own failure in a tight loop. A remount, an
+  // entitlement change, or different pending work starts a fresh attempt.
+  const settledWorkRef = useRef<string | null>(null);
+  const settledEntitledRef = useRef(entitled);
   const [retryNonce, setRetryNonce] = useState(0);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
@@ -91,6 +101,10 @@ export function useReplayOnboarding() {
   );
 
   useEffect(() => {
+    if (entitled !== settledEntitledRef.current) {
+      settledEntitledRef.current = entitled;
+      settledWorkRef.current = null;
+    }
     if (!isAuthenticated || ranRef.current) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
@@ -104,6 +118,7 @@ export function useReplayOnboarding() {
       return;
     }
     if (!hasPending()) return;
+    if (pendingWorkKey() === settledWorkRef.current) return;
     if (
       !entitled &&
       (awaitingEntitlementRef.current || onboardingPaywall !== "unseen")
@@ -117,6 +132,7 @@ export function useReplayOnboarding() {
     runningRef.current = true;
     startedEntitledRef.current = entitled;
 
+    let attempted = false;
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -138,6 +154,7 @@ export function useReplayOnboarding() {
         awaitingEntitlementRef.current = false;
         onboardingPaywall = "unseen";
 
+        attempted = true;
         // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
           spaces.map((name) => createSpace({ name, dynamic: true })),
@@ -174,6 +191,7 @@ export function useReplayOnboarding() {
         ranRef.current = true;
         clearPending();
       } finally {
+        if (attempted) settledWorkRef.current = pendingWorkKey();
         const shouldRerun = rerunRef.current;
         rerunRef.current = false;
         runningRef.current = false;
