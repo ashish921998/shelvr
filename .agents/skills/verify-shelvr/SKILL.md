@@ -1,0 +1,129 @@
+---
+name: verify-shelvr
+description: Launch, check, drive, and prove the Shelvr iOS app (apps/native development build on the iOS simulator) with the e2e suite in tools/e2e. Use before claiming a change to saving, search, spaces, or the paywall works on a device, when asked to verify or screenshot the app, or to bug bash it.
+---
+
+# Verify Shelvr
+
+Read the e2e guide first (`pnpm exec e2e guide` from `tools/e2e`, topics with
+`pnpm exec e2e guide <topic>`). This skill only says what is true of Shelvr.
+The config is `tools/e2e/e2e.config.ts` (one target, `ios`; tests
+`tools/e2e/tests/**/*.e2e.ts`). Run every command below from `tools/e2e`.
+Getting a worktree onto a simulator at all (dependencies, `.env.local`, the
+dev client, building it) is in
+[docs/architecture/local-qa.md](../../../docs/architecture/local-qa.md); read
+it rather than guessing.
+
+## Launch
+
+The target's `app.command` starts its own Metro
+(`expo start --dev-client --port 8091` in `apps/native`), waits for
+`http://localhost:8091/status`, and stops it after the run. Its log goes to
+`.e2e/metro.log`. The app is the installed development build
+`app.shelvr.save.dev`, opened with `--initialUrl` pointing at that Metro, so
+nothing is started by hand. Before a run:
+
+- **One simulator.** `xcrun simctl list devices booted` first. Reuse a booted
+  simulator that has `app.shelvr.save.dev`; boot one only when none is booted.
+  A simulator or a Metro on 8081 from another project is not yours: leave it.
+  `E2E_DEVICE=<name or udid>` picks the simulator when more than one is booted.
+- **Screen size.** `save-image.e2e.ts` taps the photo picker by position and
+  stops unless the screen is 402 x 874 points (iPhone 17). The other flows run
+  on any iPhone.
+- **Port.** 8091 by default; `E2E_METRO_PORT` moves it. A Metro already on the
+  port makes the run fail to start its own.
+- **Env.** `apps/native/.env.local` copied from the main checkout, pointing at
+  the dev Convex deployment, with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true`.
+  The dev deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
+  `GOOGLE_GENERATIVE_AI_API_KEY` (an AI Studio key, never committed) is needed
+  only by flows with `agent.*` steps: `save-link` and `save-image`.
+- **Data.** Every test's `beforeEach` (`startOnSeededHome` in
+  `tests/seeded-home.ts`) signs in as the anonymous dev user and taps Settings >
+  "Reset flow fixtures": 4 saves (`fixture-item-ramen`, `-belem-tower`,
+  `-apartment-checklist`, `-value-of-craft`), 3 spaces, and Pro. That wipes the
+  dev user's data, so never point it at an account you care about.
+
+## Doctor
+
+```bash
+pnpm exec e2e list                          # loads the config, starts nothing; exit 0, one line per test file
+pnpm exec e2e run tests/smoke.e2e.ts        # Metro up, app opens, dev sign-in, fixture reset, Home lists the ramen save; exit 0
+```
+
+`list` failing is the config or a dependency (`pnpm install` from the
+worktree root). `run` failing in the `beforeEach` before Profile appears is the
+bundle or the simulator: read `.e2e/metro.log` and check that the app is a
+Debug dev client (local-qa.md, "Confirm the bundle is yours"). No
+`dev-login-button` means anonymous sign-in is off in `.env.local` or on the
+deployment. The smoke test needs no model. Run Doctor first whenever anything
+looks off.
+
+A known setup flake (seen 2026-10-14, once in three runs): the `Profile` tap
+reports success, Profile never opens, and the test fails in `beforeEach` with
+`LOCATOR_NOT_FOUND` on `getByRole("button", "Settings")`
+(`tests/seeded-home.ts`) after 180 seconds, on a Home that looks normal. A
+rerun passed. Rerun once before calling it a regression; if it repeats, it is
+a lost tap, not your change.
+
+## Drive
+
+Scripted, the normal lane: each core feature has a test under `tests/`
+(see [features/](features/README.md)). Write new ones the same way:
+`startOnSeededHome()` at the top, `chooseAddOption` to open an Add option,
+plain `screen` locators, and `agent.waitFor` with `vision: "only"` only where
+the model writes the label (a link's or photo's title). Stable handles in this
+app: test ids `add-option-note`, `add-option-article`, `add-note-input`,
+`add-article-input`, `fixture-item-*`, `dev-login-button`,
+`reset-flow-fixtures`; tabs by role (`Search`, `Spaces`); the `Profile` and
+`Add` buttons on Home.
+
+Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for
+your client with `--config tools/e2e/e2e.config.ts` (topic `mcp`), then
+`open_session`, `observe`, and `locate` before writing a locator. The catalog
+gets `open_app`, `swipe`, and `alert` from `mobileTools`; there are no
+credentials or secrets, sign-in is the dev button. A live session starts the
+same Metro on 8091, so never run one beside a test run.
+
+## Evidence
+
+Every run writes `.e2e/report.json`; a failed test gets its trace under
+`.e2e/results/`; `--trace on` adds one for passing tests, `--video on` records
+an MP4 per attempt (topic `running`). The next run clears `.e2e/results/`,
+Doctor included, so a proof that must outlive it runs with
+`--output .e2e/proof/<name>`. All of `.e2e/` is gitignored
+(`tools/e2e/.gitignore`). Keep screenshots and videos out of the repo; a pull
+request quotes the run's summary lines instead.
+
+A proof goes through the user's path: Home's Add, the tab bar, the labelled
+fields and buttons, never a Convex function called directly. It captures the
+action and the state after it. Side effects live in the dev Convex deployment
+(`items`, `spaces`, `spaceItems`), and the flows read them back through the app:
+a saved note is found by Search, a new space shows in the Spaces list. Nothing
+is mocked; link reads and titles go through the real backend and model.
+
+## Bug bash
+
+Not set up yet; this skill was generated without one, so the bug bash is
+unproven. The charters are in [features/](features/README.md), one block per
+feature, in the `slug|target|agent|charter` format topic `bug-bash` reads. To
+run one, write an untracked `tools/e2e/e2e.bugbash.config.ts` that spreads
+`e2e.config.ts`, adds `tests/bugbash/**` to the glob and the personas, and says
+in its `context` that the seeded fixtures, the anonymous dev user, and the
+development build are not bugs. Output goes to `.e2e/bugbash/`, already
+ignored. Only one explorer at a time: there is one simulator and one Metro
+port. A finding is a bug once `tests/bugbash/<slug>.e2e.ts` fails with
+`ASSERTION_FAILED` on the assertion that encodes it.
+
+## Cleanup
+
+The runner stops the Metro it started; `close_session` stops the one a
+session started. A simulator you booted, shut down with
+`xcrun simctl shutdown <udid>` when done; one that was already booted stays.
+Stop processes by the pid you started, never by name. The dev user's data is
+reset by the next run, so there is nothing to undo there. Keep `.e2e/proof/`
+and `.e2e/report.json` until the result is reported, then delete the
+screenshots and videos under `.e2e/`.
+
+## Helpers
+
+None. The e2e CLI is the helper.

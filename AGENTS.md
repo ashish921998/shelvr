@@ -74,6 +74,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
   setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
   paywall.
+- **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
+  drives the `tools/e2e` suite and maps each core feature to its test.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 
 ## Naming conventions

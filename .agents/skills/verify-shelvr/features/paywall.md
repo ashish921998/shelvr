@@ -1,0 +1,45 @@
+# Paywall
+
+Someone without Pro who tries a Pro action gets the RevenueCat paywall
+instead.
+
+## Sub-features
+
+- Home's `Add` opens the paywall, not the Add sheet.
+- Home's "View Pro plans" prompt opens the same paywall.
+- The paywall lists Monthly and Annual, Continue, and Restore Purchases;
+  closing it returns to Home unchanged.
+
+## How to get to it (user POV)
+
+Without Pro, Home > `Add` or "View Pro plans". The dev user is always Pro on
+the server, so the test relaunches with `-E2EHidePro YES`, which makes a
+development build show them as not Pro and skips the exit offer
+(`src/lib/e2e-hide-pro.ts`).
+
+## Driving it with e2e
+
+`tests/paywall.e2e.ts`, no model: `device.openApp` with the extra launch
+argument, `screen.getByRole("button", "View Pro plans")`,
+`screen.getByText("Shelvr Pro")`, `screen.getByRole("button", /^Monthly, /)`,
+`/^Annual, /`, `Continue`, `Restore Purchases`; the close control is the first
+unlabelled button.
+
+## Proof
+
+Both entry points show the paywall with both plans; after each close Home
+shows the four seeded saves, no Add sheet, and nothing processing. No
+purchase is made; the server entitlement is untouched.
+
+## Charters
+
+```
+paywall-flow|ios|skeptic|Launched with -E2EHidePro YES, reach the paywall from every Pro entry point on Home and close it each time; check Home is unchanged and no save was started
+```
+
+## Gotchas
+
+- Prices come from the RevenueCat test store on a debug build; they are not
+  the App Store prices.
+- Purchases cannot be proved here. The dev user is Pro on the server whatever
+  the client shows.
