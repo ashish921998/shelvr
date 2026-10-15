@@ -16,6 +16,10 @@ Home, `Add`, the Article option. Needs Pro (seeded).
 
 ## Driving it with e2e
 
+`tests/save-link-fixture.e2e.ts` runs in the `e2e ios` CI job with no
+model and no network read: it saves a fixture page from
+`convex/model/fakeAi.ts` and finds it by its words. Elsewhere it skips.
+
 `tests/save-link.e2e.ts`: `screen.getByTestId("add-option-article")`,
 `screen.getByTestId("add-article-input")`, `screen.getByRole("button", "Save")`,
 then one `agent.waitFor` with `vision: "only"` to read the card. Needs

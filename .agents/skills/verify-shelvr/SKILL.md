@@ -40,7 +40,10 @@ nothing is started by hand. Before a run:
   `save-note`, whose note is searchable only after the backend's model pass.
   The `e2e ios` CI job runs `save-note` with no key: its local backend sets
   `E2E_FAKE_AI=local-v1`, and the fake in `convex/model/fakeAi.ts` classifies
-  the note instead. The fake refuses every deployment but a local one.
+  the note instead. It also runs `save-link-fixture`, which saves a fixture
+  page the fake serves (`https://fixtures.e2e.invalid/...`) and skips itself
+  unless the runner has `E2E_FAKE_AI=local-v1`. The fake refuses every
+  deployment but a local one.
 - **Data.** Every test's `beforeEach` (`startOnSeededHome` in
   `tests/seeded-home.ts`) signs in as the anonymous dev user and taps Settings >
   "Reset flow fixtures": 4 saves (`fixture-item-ramen`, `-belem-tower`,
