@@ -58,7 +58,11 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
-vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
+vi.mock("expo-image", () => ({
+  Image: vi.fn(({ onError }: { onError?: () => void }) => (
+    <img data-testid="hero" alt="" onError={onError} />
+  )),
+}));
 vi.mock("expo-router", () => ({
   Link: {
     AppleZoomTarget: vi.fn(({ children }: { children: ReactNode }) => children),
@@ -130,4 +134,53 @@ it("resets scroll and tags on a recycled item but preserves expansion on the sam
   expect(screen.getByRole("button", { expanded: false })).toBeTruthy();
   expect(screen.queryAllByTestId("tag")).toHaveLength(0);
   expect(scroll.to).toHaveBeenCalledWith({ y: 0, animated: false });
+});
+
+function readerProps(
+  overrides: Partial<ComponentProps<typeof ArticleReaderView>> = {},
+): ComponentProps<typeof ArticleReaderView> {
+  return {
+    item: {
+      _id: "article-a",
+      type: "link",
+      status: "ready",
+      url: "https://www.example.com/craft",
+      tags: [],
+    } as unknown as ComponentProps<typeof ArticleReaderView>["item"],
+    isZoomTarget: true,
+    headerHeight: 0,
+    spaces: [],
+    similar: undefined,
+    heroUri: undefined,
+    paragraphs: ["Test article"],
+    ...overrides,
+  };
+}
+
+it("shows the site's first letter when a save has no picture", () => {
+  render(<ArticleReaderView {...readerProps()} />);
+  expect(screen.queryByTestId("hero")).toBeNull();
+  expect(screen.getByText("E")).toBeTruthy();
+});
+
+it("falls back to the site's first letter when the picture fails to load", () => {
+  render(
+    <ArticleReaderView
+      {...readerProps({ heroUri: "https://example.com/hero.jpg" })}
+    />,
+  );
+  expect(screen.queryByText("E")).toBeNull();
+  fireEvent.error(screen.getByTestId("hero"));
+  expect(screen.queryByTestId("hero")).toBeNull();
+  expect(screen.getByText("E")).toBeTruthy();
+});
+
+it("tries a new picture after an earlier one failed", () => {
+  const props = readerProps({ heroUri: "https://example.com/broken.jpg" });
+  const { rerender } = render(<ArticleReaderView {...props} />);
+  fireEvent.error(screen.getByTestId("hero"));
+  rerender(
+    <ArticleReaderView {...props} heroUri="https://example.com/fixed.jpg" />,
+  );
+  expect(screen.getByTestId("hero")).toBeTruthy();
 });

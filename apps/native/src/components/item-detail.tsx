@@ -450,7 +450,9 @@ function ItemPageBody({
     return (
       <View style={styles.body}>
         <NoteEditor key={item._id} item={detail} />
-        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
@@ -467,7 +469,7 @@ function ItemPageBody({
       <SaveStatusNotice item={item} centered />
 
       {item.status === "ready" ? (
-        <ItemSpaces spaces={spaces} style={styles.centeredText} />
+        <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
       {item.url ? (
@@ -537,7 +539,9 @@ function ItemSheetBody({
   useAppLocale();
   return (
     <View style={styles.body}>
-      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+      {item.status === "ready" ? (
+        <ItemSpaces itemId={item._id} spaces={spaces} />
+      ) : null}
 
       {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
 
