@@ -41,6 +41,7 @@ export const PROMPT_CONTENT_CHARS = 6000;
 // HTML extraction
 // ---------------------------------------------------------------------------
 
+/** `&amp;` decodes last, so "&amp;lt;" becomes "&lt;" and never "<". */
 export function decodeEntities(text: string): string {
   return text
     .replace(/&#(\d+);/g, (_, code) => {
@@ -56,7 +57,6 @@ export function decodeEntities(text: string): string {
         : "";
     })
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -67,7 +67,8 @@ export function decodeEntities(text: string): string {
     .replace(/&rsquo;/g, "’")
     .replace(/&lsquo;/g, "‘")
     .replace(/&rdquo;/g, "”")
-    .replace(/&ldquo;/g, "“");
+    .replace(/&ldquo;/g, "“")
+    .replace(/&amp;/g, "&");
 }
 
 /** The page's `<link rel="canonical">` href, tolerant of attribute order. */

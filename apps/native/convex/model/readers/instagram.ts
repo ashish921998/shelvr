@@ -45,7 +45,9 @@ export function parseInstagramEmbed(html: string): InstagramEmbedFields {
         block
           .replace(/<a[^>]*class="CaptionUsername"[^>]*>[^<]*<\/a>/i, "")
           .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<[^>]+>/g, ""),
+          .replace(/<[^>]+>/g, "")
+          // An unclosed "<script" survives the tag strip; drop its "<".
+          .replace(/</g, ""),
       )
         .split("\n")
         .map((line) => line.replace(/[ \t]+/g, " ").trim())

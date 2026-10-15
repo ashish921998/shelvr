@@ -903,6 +903,14 @@ describe("parseInstagramEmbed", () => {
     expect(parseInstagramEmbed(REEL_EMBED).brokenMedia).toBeUndefined();
   });
 
+  it("keeps escaped markup as text and leaves no tag behind", () => {
+    const embed =
+      '<div class="Caption">Salt &amp;lt;3 and <b>pepper</b> <script<div class="CaptionComments">';
+    expect(parseInstagramEmbed(embed).caption).toBe(
+      "Salt &lt;3 and pepper script",
+    );
+  });
+
   it("returns nothing from a page without an embed", () => {
     expect(parseInstagramEmbed(SHELL_PAGE)).toEqual({
       caption: undefined,
