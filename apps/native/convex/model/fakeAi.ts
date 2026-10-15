@@ -94,7 +94,7 @@ const INTENTS_MARKER = "\n\nAlso propose up to ";
 const RECOMMEND_KEYS = "itemNumbers";
 const RECOMMEND_TASK = "The user just created a space";
 const SPACE_NAME = /^Space name: "(.*)"$/m;
-const NUMBERED_SAVE = /^(\d+)\. (.*)$/gm;
+const SAVES_MARKER = "Below is a numbered list of the user's saved items.";
 const TITLE_WORDS = 6;
 const MAX_TAGS = 6;
 
@@ -198,6 +198,23 @@ export function pageFromPrompt(prompt: string): PromptPage | undefined {
  * Undefined when the prompt is not a recommendation prompt. Exported pure for
  * unit testing.
  */
+/** The saves listed after the prompt's saves instruction. A save starts at
+ * the line numbered one past the last, so a blank or numbered line inside a
+ * description stays part of its save. */
+function savesFromPrompt(prompt: string): string[] {
+  const marker = prompt.indexOf(SAVES_MARKER);
+  if (marker === -1) return [];
+  const start = prompt.indexOf("\n\n", marker);
+  if (start === -1) return [];
+  const saves: string[] = [];
+  for (const line of prompt.slice(start + 2).split("\n")) {
+    const next = `${saves.length + 1}. `;
+    if (line.startsWith(next)) saves.push(line.slice(next.length));
+    else if (saves.length > 0) saves[saves.length - 1] += `\n${line}`;
+  }
+  return saves;
+}
+
 export function fakeRecommendation(
   prompt: string,
 ): { itemNumbers: number[] } | undefined {
@@ -206,12 +223,10 @@ export function fakeRecommendation(
     : undefined;
   if (name === undefined) return undefined;
   const nameWords = wordsOf(name);
-  // The saves are the prompt's last section, so a numbered line in the
-  // space's description is never read as one.
-  const saves = prompt.slice(prompt.lastIndexOf("\n\n") + 2);
-  const itemNumbers = [...saves.matchAll(NUMBERED_SAVE)]
-    .filter(([, , line]) => [...wordsOf(line)].some((w) => nameWords.has(w)))
-    .map(([, number]) => Number(number));
+  const itemNumbers = savesFromPrompt(prompt)
+    .map((save, i) => ({ save, number: i + 1 }))
+    .filter(({ save }) => [...wordsOf(save)].some((w) => nameWords.has(w)))
+    .map(({ number }) => number);
   return { itemNumbers };
 }
 

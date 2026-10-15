@@ -272,6 +272,14 @@ describe("fakeRecommendation", () => {
     ).toEqual({ itemNumbers: [1, 3] });
   });
 
+  it("keeps a blank or numbered line in a save's description inside it", () => {
+    const prompt = recommendPrompt("Lisbon 1760").replace(
+      "A fast ramen recipe",
+      "A fast ramen recipe\n\n5. Lisbon tram",
+    );
+    expect(fakeRecommendation(prompt)).toEqual({ itemNumbers: [1, 2] });
+  });
+
   it("picks nothing when no save shares one", () => {
     expect(fakeRecommendation(recommendPrompt("Pilot 1760"))).toEqual({
       itemNumbers: [],
