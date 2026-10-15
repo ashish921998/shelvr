@@ -14,7 +14,7 @@ import { env } from "../_generated/server";
 const CAPTURE_TIMEOUT_MS = 3000;
 
 /** First retry delay. Each further attempt multiplies it by ten: 1s, 10s,
- * 100s, ... — long enough for a provider incident to clear between tries. */
+ * 100s, ... Long enough for a provider incident to clear between tries. */
 const RETRY_BASE_MS = 1000;
 
 type PostHogDelivery =

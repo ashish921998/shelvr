@@ -29,7 +29,7 @@ import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
 import type { ArticleMedia, PostMedia } from "./model/itemFields";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const parseJson = vi.hoisted(() => vi.fn());
@@ -491,10 +491,10 @@ describe("processItem for X posts", () => {
     url: string,
     fields: { media?: PostMedia[]; articleMedia?: ArticleMedia[] } = {},
   ) {
-    const t = newConvexTest().withIdentity({ subject: "x-user|session-1" });
+    const { t, userId } = await signedInUser(newConvexTest());
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "x-user",
+        userId,
         type: "link",
         url,
         status: "processing",
@@ -716,6 +716,31 @@ describe("linkEnrichment", () => {
     );
   });
 
+  it("leaves a wiki infobox, citations and edit links out of the body", () => {
+    const paragraph =
+      "Prague is the capital and largest city of the Czech Republic, and the historical capital of Bohemia. ";
+    const content = extractBodyText(
+      `<html><head><title>Prague</title></head><body><main><h1>Prague</h1><div class="mw-parser-output"><table class="infobox"><tbody><tr><th>Country</th><td>Czech Republic</td></tr><tr><th>Founded</th><td>8th century</td></tr></tbody></table><p>${paragraph.repeat(3)}<sup class="reference"><a href="#cite_note-1">[1]</a></sup></p><h2>History<span class="mw-editsection">[<a href="/edit">edit</a>]</span></h2><p>${paragraph.repeat(2)}</p><div class="navbox"><a href="/a">Brno</a> <a href="/b">Ostrava</a></div></div></main></body></html>`,
+      "https://en.wikipedia.org/wiki/Prague",
+    );
+    expect(content).toContain("Prague is the capital");
+    expect(content).toContain("History");
+    expect(content).not.toContain("Founded");
+    expect(content).not.toContain("[1]");
+    expect(content).not.toContain("[edit]");
+    expect(content).not.toContain("Ostrava");
+  });
+
+  it("keeps an infobox's prose on a page that is not MediaWiki", () => {
+    const paragraph =
+      "The dough rests overnight in the fridge, which is what gives the crust its blistered, chewy edge. ";
+    const content = extractBodyText(
+      `<html><head><title>Pizza</title></head><body><article><h1>Pizza</h1><p>${paragraph.repeat(2)}</p><div class="infobox"><p>Rest the dough for at least twelve hours before you shape it into rounds.</p></div></article></body></html>`,
+      "https://example.com/recipes/pizza",
+    );
+    expect(content).toContain("Rest the dough for at least twelve hours");
+  });
+
   it("drops an extraction too thin to be a body", () => {
     const content = extractBodyText(
       "<html><head><title>Members only</title></head><body><article><p>Sign in to continue.</p></article></body></html>",
@@ -759,7 +784,7 @@ describe("linkEnrichment", () => {
   });
   // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
   // failed (retryable, classified from the URL alone), the page read but had
-  // no article body (terminal — e.g. an oEmbed-only TikTok read), a fully
+  // no article body (terminal, e.g. an oEmbed-only TikTok read), a fully
   // read article, and no page at all (images/notes never fetch).
   it("flags an unreadable page as partial so the client offers a retry", () => {
     expect(linkEnrichment({ status: "unreadable" })).toBe("partial");
@@ -928,6 +953,7 @@ describe("fetchInstagram", () => {
     await expect(
       fetchInstagram("https://www.instagram.com/reel/DHVrPLrIyQ_/?igsh=abc"),
     ).resolves.toEqual({
+      postUrl: "https://www.instagram.com/reel/DHVrPLrIyQ_/",
       title: "Meet the National Geographic 33!",
       description: "National Geographic (@natgeo) • Instagram reel",
       siteName: "Instagram",
@@ -953,6 +979,7 @@ describe("fetchInstagram", () => {
     await expect(
       fetchInstagram("https://www.instagram.com/p/DHVrPLrIyQ_/"),
     ).resolves.toEqual({
+      postUrl: "https://www.instagram.com/p/DHVrPLrIyQ_/",
       title: "National Geographic (@natgeo) • Instagram reel",
       description: undefined,
       siteName: "Instagram",
@@ -1170,9 +1197,10 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "ig-user",
+        userId,
         type: "link",
         url: "https://www.instagram.com/reel/DHVrPLrIyQ_/",
         status: "processing",
@@ -1426,10 +1454,10 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
       bytes: new TextEncoder().encode(html),
       ...(truncated ? { truncated: true as const } : {}),
     }));
-    const t = newConvexTest().withIdentity({ subject: "page-user|session-1" });
+    const { t, userId } = await signedInUser(newConvexTest());
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "page-user",
+        userId,
         type: "link",
         url: RECIPE_URL,
         status: "processing",
@@ -1556,19 +1584,24 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
-  it("marks an Instagram reel short-form without asking for a recipe", async () => {
-    // Short-form, but its caption is not a caption source the model may
-    // transcribe a recipe from.
+  it("marks an Instagram reel short-form and asks for a recipe from its caption", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({
       status: "ok",
-      askForRecipe: false,
+      askForRecipe: true,
       shortForm: { site: "Instagram", video: true },
     });
     expect(read.status === "ok" && read.page.content).toContain(
       "Meet the National Geographic 33!",
     );
+  });
+
+  it("does not ask for a recipe when only the Instagram card was read", async () => {
+    // The card's og:description is a cut summary, not the caption.
+    instagramAnswers(REEL_PAGE_WITH_DESCRIPTION, SHELL_PAGE);
+    const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
+    expect(read).toMatchObject({ status: "ok", askForRecipe: false });
   });
 
   it("does not ask for an ordinary web page", async () => {

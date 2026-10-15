@@ -3,12 +3,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { MAX_CAPTURE_TOKENS_PER_USER } from "./appIntents";
 import { sha256Hex } from "./model/captureTokens";
+import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
@@ -163,22 +164,13 @@ describe("bounded upload endpoint", () => {
   });
 });
 
-/** A signed-in user with a real users row, Pro unless `pro` is false, and a
- * freshly issued capture token. */
+/** A signed-in user with a freshly issued capture token, Pro unless `pro` is
+ * false. */
 async function setup(options: { pro?: boolean } = {}) {
   const base = newConvexTest();
-  const userId = await base.run((ctx) => ctx.db.insert("users", {}));
-  const t = base.withIdentity({ subject: `${userId}|session-1` });
-  if (options.pro !== false) {
-    await t.run(async (ctx) => {
-      await ctx.db.insert("subscriptions", {
-        userId,
-        status: "pro",
-        expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-        updatedAt: Date.now(),
-      });
-    });
-  }
+  const { userId, t } = await signedInUser(base, {
+    pro: options.pro !== false,
+  });
   const token = await t.action(api.appIntents.issueCaptureToken, {});
   return { base, t, userId, token };
 }
@@ -248,8 +240,7 @@ describe("capture tokens", () => {
 
   it("never revokes another user's token", async () => {
     const { base, t: owner, token } = await setup();
-    const otherId = await base.run((ctx) => ctx.db.insert("users", {}));
-    const other = base.withIdentity({ subject: `${otherId}|session-1` });
+    const { t: other } = await signedInUser(base);
     await other.mutation(api.appIntents.revokeCaptureToken, { token });
     const response = await post(
       owner,
@@ -503,5 +494,78 @@ describe("account deletion", () => {
       token,
     );
     expect(response.status).toBe(401);
+  });
+
+  /** Enough notes that the first deletion pass leaves the owner row behind,
+   * marked, so the mid-deletion state can be observed. */
+  async function leaveMidDeletion(t: TestCtx, userId: Id<"users">) {
+    await seedNotes(t, userId, DELETE_BATCH + 1);
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+    expect(await t.run((ctx) => ctx.db.get(userId))).toMatchObject({
+      deleting: true,
+    });
+  }
+
+  it("rejects issuing a token once the account is gone", async () => {
+    // Authorization and the write are one transaction inside
+    // storeCaptureToken, so there is no window to race: deleting first, then
+    // issuing, fails the same check every public function uses.
+    const { t } = await setup();
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+    await expect(
+      t.action(api.appIntents.issueCaptureToken, {}),
+    ).rejects.toThrow(/Not authenticated/);
+    expect(
+      await t.run((ctx) => ctx.db.query("captureTokens").collect()),
+    ).toEqual([]);
+  });
+
+  it("refuses direct persistence for a missing or deleting owner", async () => {
+    const { base, t, userId } = await setup();
+    await leaveMidDeletion(t, userId);
+    await expect(
+      t.mutation(internal.appIntents.storeCaptureToken, {
+        tokenHash: await sha256Hex("deleting-owner"),
+      }),
+    ).rejects.toThrow(/Not authenticated/);
+
+    await base.run((ctx) => ctx.db.delete(userId));
+    await expect(
+      t.mutation(internal.appIntents.storeCaptureToken, {
+        tokenHash: await sha256Hex("missing-owner"),
+      }),
+    ).rejects.toThrow(/Not authenticated/);
+
+    expect(
+      await base.run((ctx) => ctx.db.query("captureTokens").collect()),
+    ).toEqual([]);
+  });
+
+  it("rejects a residual token for a deleting or missing owner before marking it used", async () => {
+    const { base, t, userId, token } = await setup();
+    // Fresh token, never used, so a lastUsedAt write would be visible.
+    const rowId = await base.run(
+      async (ctx) => (await ctx.db.query("captureTokens").first())!._id,
+    );
+    await base.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    // A token that outlived the drain (deletion is batched) must be useless.
+    const body = { operationId: OP, kind: "note", text: "hi" };
+    expect((await post(t, "/app-intents/capture", body, token)).status).toBe(
+      401,
+    );
+    expect(await base.run((ctx) => ctx.db.get(rowId))).not.toHaveProperty(
+      "lastUsedAt",
+    );
+
+    await base.run((ctx) => ctx.db.delete(userId));
+    expect((await post(t, "/app-intents/capture", body, token)).status).toBe(
+      401,
+    );
+    expect(await base.run((ctx) => ctx.db.get(rowId))).not.toHaveProperty(
+      "lastUsedAt",
+    );
+    expect(await base.run((ctx) => ctx.db.query("items").collect())).toEqual(
+      [],
+    );
   });
 });

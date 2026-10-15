@@ -57,6 +57,9 @@ yarn-error.log*
 .agents/*
 !.agents/setup
 !.agents/resume
+!.agents/skills
+.agents/skills/*
+!.agents/skills/verify-shelvr
 .claude/
 .codex/
 .cursor/

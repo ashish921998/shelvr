@@ -1,6 +1,7 @@
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
+  firstSaveReminderTicket,
   reminderOptions,
   scheduleFirstSaveReminder,
   type ReminderSlot,
@@ -12,6 +13,7 @@ import {
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { SaveSummary } from "@/components/onboarding/save-summary";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
+import { useNotificationSession } from "@/lib/notifications";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
@@ -68,6 +70,7 @@ export function NotificationsStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const { session } = useNotificationSession();
   const [options, setOptions] = useState(() => reminderOptions(new Date()));
   const [picked, setPicked] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -129,6 +132,9 @@ export function NotificationsStep({
     if (done.current || saved === null || expired()) return;
     done.current = true;
     setBusy(true);
+    // Taken before the permission prompt: a sign-out while it waits clears
+    // the reminder, and this save must not be scheduled after that.
+    const ticket = firstSaveReminderTicket();
     let granted = false;
     try {
       granted = await requestNotificationPermission();
@@ -142,10 +148,30 @@ export function NotificationsStep({
           itemId: saved.itemId,
           title: title || t("onboarding.remindFallbackTitle"),
           at: choice.at,
+          ticket,
         });
       }
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
+    }
+    // The pledge above the button is a Sunday look-back, so the same yes turns
+    // the Weekly shelf on. Skipped if the account changed during the prompt.
+    // Not awaited: it needs the network, and an offline mutation waits for a
+    // reconnect instead of failing, which would hold this step.
+    if (granted && firstSaveReminderTicket() === ticket) {
+      void session.setWeeklyShelf(true).then(
+        (enabled) => {
+          // false: no push token; undefined: another operation was running.
+          if (enabled !== true) {
+            analytics.captureError(
+              "weekly_shelf_preference_failed",
+              new Error(enabled === false ? "not_registered" : "busy"),
+            );
+          }
+        },
+        (error: unknown) =>
+          analytics.captureError("weekly_shelf_preference_failed", error),
+      );
     }
     analytics.capture("onboarding_reminder", {
       action: "remind",
@@ -222,8 +248,8 @@ export function NotificationsStep({
       </View>
 
       <View style={styles.foot}>
-        {/* The person's own promise. Shelvr schedules nothing for Sundays
-            here, so the line promises nothing on the app's side. */}
+        {/* The person's promise; tapping the reminder turns the Weekly shelf
+            on to keep it. */}
         <Text style={styles.pledge}>{t("onboarding.remindPledge")}</Text>
         <CtaButton
           label={t(SLOT_CTA[choice.slot])}
@@ -235,8 +261,8 @@ export function NotificationsStep({
           onPress={skip}
           disabled={busy}
         />
-        {/* The same permission also lets save reminders arrive, so the screen
-            says so before the OS asks. */}
+        {/* The same yes also turns on the Weekly shelf and lets save
+            reminders arrive, so the screen says so before the OS asks. */}
         <Text style={styles.consent}>{t("onboarding.remindConsent")}</Text>
       </View>
     </View>

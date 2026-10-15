@@ -13,7 +13,7 @@ import { TIMELINE } from "./timeline";
 /**
  * The mark's outline, copied from `assets/shelvr-mark.svg` (viewBox 0 0 1024
  * 1024). Kept as a string because Metro has no SVG loader and the app carries
- * no SVG renderer — Skia parses it directly.
+ * no SVG renderer: Skia parses it directly.
  */
 const MARK_PATH =
   "M320 224h400c44.2 0 80 35.8 80 80v176c0 44.2-35.8 80-80 80H416v80h288c44.2 0 80 35.8 80 80s-35.8 80-80 80H304c-44.2 0-80-35.8-80-80V544c0-44.2 35.8-80 80-80h304v-80H320c-44.2 0-80-35.8-80-80s35.8-80 80-80Z";
@@ -122,7 +122,7 @@ export function SplashMark({
   );
 
   // The slot has no in-flow children, so a baseline-aligned row reads its
-  // bottom edge as its baseline — which is where the S stands.
+  // bottom edge as its baseline, which is where the S stands.
   return (
     <View style={{ width: size, height: size }} pointerEvents="none">
       <Canvas

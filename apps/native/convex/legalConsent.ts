@@ -138,7 +138,7 @@ export const retry = internalMutation({
         .take(50);
       for (const row of rows) {
         // A syncing row past its lease means the action died before finish
-        // could spend the attempt — spend it here so crash-recovery loops
+        // could spend the attempt. Spend it here so crash-recovery loops
         // cannot retry for free forever (mirrors feedback delivery).
         const attempts = state === "syncing" ? row.attempts + 1 : row.attempts;
         // Recovery must not outlive the cap either: a grant that keeps

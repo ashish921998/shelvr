@@ -1,4 +1,4 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import type { DemoKind, DemoSample } from "@/lib/onboarding-demo";
 import type { Interest } from "@/lib/onboarding-interests";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -9,7 +9,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // The ready-made sample cards onboarding shows: the first-save picker and the
 // share-sheet practice.
 
-const APP_ICON = require("../../../assets/icon.png");
 const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Articles: require("../../../assets/onboarding/demo-article.jpg"),
   Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
@@ -46,36 +45,6 @@ export function sampleImage(sample: DemoSample): number {
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
     : INTEREST_IMAGES[sample.interest];
-}
-
-/** An illustration of the share gesture, not a control. */
-export function ShareHint() {
-  useAppLocale();
-  const { theme } = useUnistyles();
-  return (
-    <View
-      style={styles.hint}
-      accessible
-      accessibilityLabel={t("demo.shareHelp")}
-    >
-      <View style={styles.hintArt}>
-        <View style={styles.hintShare}>
-          <AppSymbolIcon
-            name="square.and.arrow.up"
-            size={18}
-            tintColor={theme.colors.primaryForeground}
-          />
-        </View>
-        <AppSymbolIcon
-          name="chevron.right"
-          size={12}
-          tintColor={theme.colors.faint}
-        />
-        <Image source={APP_ICON} style={styles.hintIcon} />
-      </View>
-      <Text style={styles.hintText}>{t("demo.shareHelp")}</Text>
-    </View>
-  );
 }
 
 /** A large sample card. "save" saves it in one tap; "share" opens the real
@@ -172,20 +141,6 @@ export function SampleRow({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  hint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  hintArt: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-  },
   hintShare: {
     width: 36,
     height: 36,
@@ -193,19 +148,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
-  },
-  hintIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-  },
-  hintText: {
-    flex: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 19,
-    color: theme.colors.foreground,
   },
   post: {
     borderRadius: theme.radius.lg,

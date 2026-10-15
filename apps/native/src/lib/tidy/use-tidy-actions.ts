@@ -66,7 +66,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         const asset = new Asset(photo.id);
         const uri = await asset.getUri();
         // Best-effort: Android needs ACCESS_MEDIA_LOCATION, and not every
-        // photo has a GPS fix — a save must never fail over its location.
+        // photo has a GPS fix: a save must never fail over its location.
         const location = await asset.getLocation().catch(() => null);
         const [result] = await saveImages(
           [
@@ -150,7 +150,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         setPendingDeleteCount(pendingDeletesRef.current.length);
         break;
       case "save":
-        // The upload may still be running — chain the revert onto it.
+        // The upload may still be running: chain the revert onto it.
         if (isReviewed(entry.photo.id)) {
           unmarkReviewed(entry.photo.id);
         }

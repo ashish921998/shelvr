@@ -29,6 +29,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+import { typedLink } from "@/lib/url";
 
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
@@ -150,7 +151,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro — route to the paywall before composing if not entitled.
+  // Saving is Pro: route to the paywall before composing if not entitled.
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
 
@@ -202,6 +203,13 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const save = async () => {
     if (!canSave) return;
+    // Checked here so typed text that is not a link never reaches the server,
+    // whose refusal would only surface as the generic failure alert.
+    const link = mode === "article" ? typedLink(trimmed) : null;
+    if (mode === "article" && link === null) {
+      Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
+      return;
+    }
     setSaving(true);
     // The first-save funnel: the submission's attempt event, with the entry
     // source the server's `item_saved` will carry too.
@@ -216,7 +224,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
     try {
       if (mode === "article") {
         await createLinkItem({
-          url: trimmed,
+          url: link ?? trimmed,
           spaceId: pinnedSpaceId,
           operationId,
           analyticsSessionId: analytics.sessionId(),
@@ -295,7 +303,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
         }}
       />
       {/* Each platform mounts exactly one persistent title so changes cascade
-          between "Save something" / "New note" / "Save an article". */}
+          between "Save something" / "New note" / "Save a link". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
           <AnimatedText text={title} style={styles.heading} truncate />

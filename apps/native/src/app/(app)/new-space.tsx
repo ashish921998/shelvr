@@ -13,7 +13,6 @@ import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -29,6 +28,7 @@ import Animated, {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { StitchRow } from "@/components/ui/stitch-loader";
 
 const SUBMIT_CONTENT_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ scale: motion.scale.pressed }] },
@@ -51,7 +51,7 @@ export default function NewSpaceScreen() {
   const editing = id !== undefined;
 
   // 'skip' (not `enabled`) keeps create mode from subscribing with an empty
-  // id — see item/[id].tsx for why `enabled` is not enough here.
+  // id. See item/[id].tsx for why `enabled` is not enough here.
   const {
     data: space,
     isLoading,
@@ -86,7 +86,7 @@ export default function NewSpaceScreen() {
   return <SpaceForm key="new" mode="create" />;
 }
 
-type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic">;
+type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic" | "autoFile">;
 
 // A discriminated union makes the two modes impossible to confuse: in edit
 // mode `space` is guaranteed present, so `save` switches on `mode` and the
@@ -101,7 +101,7 @@ function SpaceForm(props: SpaceFormProps) {
   const reducedMotion = useReducedMotion();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
-  // Creating a space and enabling dynamic are Pro — route to the paywall if
+  // Creating a space and enabling dynamic are Pro: route to the paywall if
   // not entitled. Editing a name or turning dynamic off stays open to lapsed
   // users (managing existing data).
   const { guard } = usePaywallGuard("new_space");
@@ -112,20 +112,27 @@ function SpaceForm(props: SpaceFormProps) {
   const [name, setName] = useState(
     props.mode === "edit" ? props.space.name : "",
   );
-  // Dynamic is the marquee behavior — on by default for a new space; an edit
+  // Dynamic is the marquee behavior: on by default for a new space; an edit
   // mirrors the server, treating a legacy status-less space as off.
   const [dynamic, setDynamic] = useState(
     props.mode === "edit" ? (props.space.dynamic ?? false) : true,
+  );
+  // Auto-file only matters while dynamic is on; off by default.
+  const [autoFile, setAutoFile] = useState(
+    props.mode === "edit" ? (props.space.autoFile ?? false) : false,
   );
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed || saving) return;
-    // Creating any space is Pro; editing is Pro only when turning dynamic on.
+    // Creating any space is Pro; editing is Pro only when turning dynamic or
+    // auto-file on.
     const needsPro =
       props.mode === "create" ||
-      (props.mode === "edit" && dynamic && !(props.space.dynamic ?? false));
+      (props.mode === "edit" &&
+        ((dynamic && !(props.space.dynamic ?? false)) ||
+          (dynamic && autoFile && !(props.space.autoFile ?? false))));
     if (needsPro) {
       const ok = await guard();
       if (!ok) return;
@@ -133,12 +140,22 @@ function SpaceForm(props: SpaceFormProps) {
     setSaving(true);
     try {
       if (props.mode === "edit") {
-        await updateSpace({ id: props.space._id, name: trimmed, dynamic });
+        await updateSpace({
+          id: props.space._id,
+          name: trimmed,
+          dynamic,
+          autoFile: dynamic && autoFile,
+        });
       } else {
-        await createSpace({ name: trimmed, dynamic });
+        await createSpace({
+          name: trimmed,
+          dynamic,
+          autoFile: dynamic && autoFile,
+        });
       }
       analytics.capture(editing ? "space_updated" : "space_created", {
         dynamic,
+        auto_file: dynamic && autoFile,
       });
       if (process.env.EXPO_OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -180,12 +197,23 @@ function SpaceForm(props: SpaceFormProps) {
         autoFocus={!editing}
       />
 
-      <View style={styles.dynamicRow}>
-        <View style={styles.dynamicText}>
-          <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
-          <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
+      <View style={styles.settingsCard}>
+        <View style={styles.dynamicRow}>
+          <View style={styles.dynamicText}>
+            <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
+            <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
+          </View>
+          <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
         </View>
-        <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
+        {dynamic ? (
+          <View style={[styles.dynamicRow, styles.rowDivider]}>
+            <View style={styles.dynamicText}>
+              <Text style={styles.dynamicLabel}>{t("spaces.autoFile")}</Text>
+              <Text style={styles.dynamicHint}>{t("spaces.autoFileHelp")}</Text>
+            </View>
+            <AnimatedSwitch value={autoFile} onValueChange={setAutoFile} />
+          </View>
+        ) : null}
       </View>
 
       <Pressable
@@ -206,10 +234,7 @@ function SpaceForm(props: SpaceFormProps) {
             style={styles.saveButtonState}
           >
             {saving ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryForeground}
-              />
+              <StitchRow color={theme.colors.primaryForeground} />
             ) : (
               <Text style={styles.saveButtonText}>
                 {editing ? t("common.saveChanges") : t("spaces.create")}
@@ -254,16 +279,22 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 17,
     color: theme.colors.foreground,
   },
-  dynamicRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
+  settingsCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  dynamicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
     padding: theme.gap(1.5),
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
   dynamicText: {
     flex: 1,

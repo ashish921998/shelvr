@@ -86,7 +86,7 @@ crons.interval(
 crons.interval(
   "sweep item embeddings",
   { minutes: 30 },
-  internal.ai.sweepItemEmbeddings,
+  internal.aiEmbeddingSweep.sweepItemEmbeddings,
   {},
 );
 

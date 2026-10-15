@@ -3,7 +3,7 @@ import { t, useAppLocale } from "@/lib/i18n";
  * Paywall fallback screen. In production, the paywall is presented natively by
  * RevenueCat's `presentPaywall()` SDK (designed in the RevenueCat dashboard).
  * This screen only appears on real unavailability (SDK not linked, identity
- * sync timeout, network/config error) — user cancellation returns to the
+ * sync timeout, network/config error). User cancellation returns to the
  * previous screen without routing here.
  *
  * It deliberately avoids pricing copy because RevenueCat remains the source of
@@ -29,7 +29,7 @@ export default function PaywallScreen() {
         onPress={() => {
           void (async () => {
             router.back();
-            // This screen is a formSheet — UIKit refuses to present RC's
+            // This screen is a formSheet: UIKit refuses to present RC's
             // paywall while the dismissal is still animating, which would
             // map to 'unavailable' and bounce right back here.
             await waitForSheetTransition();

@@ -13,7 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
@@ -32,6 +32,7 @@ import {
   usePhotoOutput,
 } from "react-native-vision-camera";
 import { isAvailable as stickerLiftAvailable, liftSubject } from "subject-lift";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CaptureMode = "photo" | "sticker";
 
@@ -41,7 +42,7 @@ const INACTIVE = "rgba(255,255,255,0.55)";
 
 /** This screen is only reachable through add.tsx's entitlement guard, so a
  * `pro_required` refusal here means Pro lapsed mid-session. There is no client
- * gate to fall back on — route straight to the paywall. */
+ * gate to fall back on: route straight to the paywall. */
 const PAYWALL_PLACEMENT = "camera";
 
 export default function CameraScreen() {
@@ -126,7 +127,7 @@ export default function CameraScreen() {
 
   // Saves a single already-built request (used for the initial capture AND for
   // a retry), reusing the request's operation id verbatim. A retry never
-  // re-captures or mints a fresh id — it replays the exact failed request so
+  // re-captures or mints a fresh id: it replays the exact failed request so
   // the backend idempotency ledger resumes it.
   const saveSingle = async (request: ImageSaveRequest) => {
     setBusy(true);
@@ -325,7 +326,7 @@ export default function CameraScreen() {
             </Pressable>
             <Pressable style={styles.shutter} onPress={capture} disabled={busy}>
               {busy ? (
-                <ActivityIndicator color="#1a1712" />
+                <StitchRing size={22} color="#1a1712" />
               ) : (
                 <View style={styles.shutterInner} />
               )}

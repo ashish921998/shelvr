@@ -1,5 +1,5 @@
 // Pure coordinator that drives one share session's entries through their saves.
-// It has NO React, Convex, or storage imports — every side effect (link, note,
+// It has NO React, Convex, or storage imports: every side effect (link, note,
 // image save, persistence) is injected, so the orchestration is unit-testable
 // with fakes and so a partial failure can never erase sibling successes.
 //
@@ -189,7 +189,7 @@ export function shareGroups(
  * Builds processor payloads from RAW share payloads, for use when native
  * resolution failed or its results no longer align with the raw payloads. The
  * SDK's resolver probes shared URLs with a live request, so bot-hostile hosts
- * (TikTok, some shorteners) can fail the whole resolution — but for `url` and
+ * (TikTok, some shorteners) can fail the whole resolution. But for `url` and
  * `text` shares the raw value is everything the save needs: the backend does
  * its own fetch with its own user agent and degrades gracefully when the host
  * blocks it. Resolution-dependent kinds keep their content type but carry no
@@ -244,7 +244,7 @@ export function resolvedFromRawPayloads(
 
 /**
  * Stamps a fresh session's entries with the kind and (for malformed/unsaveable
- * payloads) terminal status derived from the resolved payloads — WITHOUT saving
+ * payloads) terminal status derived from the resolved payloads, WITHOUT saving
  * anything. Resolved payload order is assumed to match the raw payload order
  * used to build the session's operation ids; the caller guards the divergent-
  * count case (see processSession's raw/resolved count check).
@@ -383,7 +383,7 @@ async function processOne(
 
   // Re-derive kind + malformed-ness from the resolved payload. If the payload
   // is absent (raw/resolved divergence not caught earlier) or malformed, fail
-  // WITHOUT a backend call — no empty link/note item, no wasted round-trip.
+  // WITHOUT a backend call: no empty link/note item, no wasted round-trip.
   if (payload === undefined) {
     return {
       kind: entry.kind,

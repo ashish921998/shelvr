@@ -24,6 +24,7 @@ const mock = vi.hoisted(() => ({
   useQuery: vi.fn(),
   isEntitled: vi.fn(() => false),
   store: new Map<string, string>(),
+  hidePro: false,
   apiKey: {
     REVENUECAT_API_KEY: "appl_test" as string | undefined,
     REVENUECAT_DISABLED_BY_BUILD: false,
@@ -75,6 +76,9 @@ vi.mock("./exit-offer-sheet", () => ({
   whenExitSheetDismissed: () => mock.dismissed(),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
+vi.mock("@/lib/e2e-hide-pro", () => ({
+  isProHiddenForE2E: () => mock.hidePro,
+}));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
   setItem: (key: string, value: string) => void mock.store.set(key, value),
@@ -139,6 +143,7 @@ async function loadReady() {
 }
 
 beforeEach(() => {
+  mock.hidePro = false;
   mock.presentPaywall.mockReset();
   mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
@@ -416,6 +421,17 @@ describe("exit offer after a paywall close", () => {
         package_id: "annual_exit",
       }),
     );
+  });
+
+  it("skips the exit offer in an e2e run that hides Pro", async () => {
+    const { openPaywall } = await loadReady();
+    mock.hidePro = true;
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+
+    await expect(openPaywall(router, "home_card")).resolves.toBe(false);
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
   });
 
   it("waits a month before offering it again", async () => {

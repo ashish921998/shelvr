@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
@@ -23,20 +23,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** An identity on `base` with an active Pro subscription. */
+/** A real user on `base` with an active Pro subscription. */
 async function proUser(
   base: ReturnType<typeof newConvexTest>,
-  userId: string,
-): Promise<TestCtx> {
-  await base.run(async (ctx) => {
-    await ctx.db.insert("subscriptions", {
-      userId,
-      status: "pro",
-      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      updatedAt: Date.now(),
-    });
-  });
-  return base.withIdentity({ subject: `${userId}|session-1` });
+): Promise<{ t: TestCtx; userId: string }> {
+  return await signedInUser(base, { pro: true });
 }
 
 async function readyNote(
@@ -70,8 +61,8 @@ async function refreshJobs(t: TestCtx) {
 describe("updateNoteItem", () => {
   it("saves the text and a typed title, then schedules one quiet refresh", async () => {
     const base = newConvexTest();
-    const t = await proUser(base, "editor");
-    const id = await readyNote(t, "editor");
+    const { t, userId } = await proUser(base);
+    const id = await readyNote(t, userId);
     const before = Date.now();
 
     await t.mutation(api.items.updateNoteItem, {
@@ -104,8 +95,8 @@ describe("updateNoteItem", () => {
   });
 
   it("does not re-classify a title-only edit", async () => {
-    const t = await proUser(newConvexTest(), "renamer");
-    const id = await readyNote(t, "renamer");
+    const { t, userId } = await proUser(newConvexTest());
+    const id = await readyNote(t, userId);
 
     await t.mutation(api.items.updateNoteItem, {
       id,
@@ -122,8 +113,8 @@ describe("updateNoteItem", () => {
   });
 
   it("writes nothing when nothing changed", async () => {
-    const t = await proUser(newConvexTest(), "idle");
-    const id = await readyNote(t, "idle");
+    const { t, userId } = await proUser(newConvexTest());
+    const id = await readyNote(t, userId);
     const before = await t.run((ctx) => ctx.db.get(id));
 
     await t.mutation(api.items.updateNoteItem, {
@@ -137,8 +128,8 @@ describe("updateNoteItem", () => {
   });
 
   it("hands naming back to the classifier when a typed title is cleared", async () => {
-    const t = await proUser(newConvexTest(), "clearer");
-    const id = await readyNote(t, "clearer", {
+    const { t, userId } = await proUser(newConvexTest());
+    const id = await readyNote(t, userId, {
       title: "Mine",
       titleSource: "user",
     });
@@ -157,12 +148,12 @@ describe("updateNoteItem", () => {
 
   it("rejects other users' notes, other item types, empty or long text and long titles", async () => {
     const base = newConvexTest();
-    const owner = await proUser(base, "owner");
-    const intruder = await proUser(base, "intruder");
-    const id = await readyNote(owner, "owner");
+    const { t: owner, userId: ownerId } = await proUser(base);
+    const { t: intruder } = await proUser(base);
+    const id = await readyNote(owner, ownerId);
     const linkId = await owner.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "owner",
+        userId: ownerId,
         type: "link",
         status: "ready",
         url: "https://example.com",
@@ -214,8 +205,8 @@ describe("updateNoteItem", () => {
 
   it("requires Pro", async () => {
     const base = newConvexTest();
-    const id = await readyNote(base, "lapsed");
-    const lapsed = base.withIdentity({ subject: "lapsed|session-1" });
+    const { t: lapsed, userId } = await signedInUser(base);
+    const id = await readyNote(base, userId);
 
     await expect(
       lapsed.mutation(api.items.updateNoteItem, {
@@ -229,8 +220,8 @@ describe("updateNoteItem", () => {
   });
 
   it("updates only supplied fields while preserving newer body and title changes", async () => {
-    const owner = await proUser(newConvexTest(), "partial-editor");
-    const id = await readyNote(owner, "partial-editor");
+    const { t: owner, userId } = await proUser(newConvexTest());
+    const id = await readyNote(owner, userId);
     await owner.mutation(api.items.updateNoteItem, {
       id,
       text: "A newer body",

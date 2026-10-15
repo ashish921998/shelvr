@@ -109,7 +109,7 @@ function addStroke(path: SkPath, stroke: Stroke, seed: number) {
 }
 
 /**
- * A glyph's outline is fixed — only its transform and opacity animate — so both
+ * A glyph's outline is fixed: only its transform and opacity animate, so both
  * weights are built once and reused for the life of the splash.
  */
 function buildGlyphPaths(mark: Mark): { pen: SkPath; heavy: SkPath | null } {
