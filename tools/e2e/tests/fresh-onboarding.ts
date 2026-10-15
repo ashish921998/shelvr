@@ -2,6 +2,7 @@ import type { Device } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
+import { pollUntil } from "./poll.ts";
 
 /**
  * Starts the app as a first-time user on the onboarding opener. Onboarding
@@ -77,19 +78,17 @@ export async function relaunchWith(
     openedAt = Date.now();
   };
   await open();
-  await expect
-    .poll(
-      async () => {
-        if (await ready()) return true;
-        const sinceOpen = Date.now() - openedAt;
-        const stuckOnLauncher =
-          sinceOpen > LAUNCHER_GRACE_MS && (await launcher.isVisible());
-        if (sinceOpen > STALLED_LAUNCH_MS || stuckOnLauncher) await open();
-        return false;
-      },
-      { timeout: 180_000 },
-    )
-    .toBe(true);
+  await pollUntil(
+    async () => {
+      if (await ready()) return true;
+      const sinceOpen = Date.now() - openedAt;
+      const stuckOnLauncher =
+        sinceOpen > LAUNCHER_GRACE_MS && (await launcher.isVisible());
+      if (sinceOpen > STALLED_LAUNCH_MS || stuckOnLauncher) await open();
+      return false;
+    },
+    { timeout: 180_000 },
+  );
   await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
     timeout: 30_000,
   });
@@ -112,16 +111,14 @@ export async function signInAndSaveFirst(screen: Screen): Promise<void> {
   const keepAi = screen.getByRole("button", "Keep it on");
   const skipWait = screen.getByRole("button", "Continue without waiting");
   const afterFailure = screen.getByRole("button", "Continue");
-  await expect
-    .poll(
-      async () => {
-        if (await reminder.isVisible()) return true;
-        if (await keepAi.isVisible()) await keepAi.tap();
-        else if (await skipWait.isVisible()) await skipWait.tap();
-        else if (await afterFailure.isVisible()) await afterFailure.tap();
-        return false;
-      },
-      { timeout: 120_000 },
-    )
-    .toBe(true);
+  await pollUntil(
+    async () => {
+      if (await reminder.isVisible()) return true;
+      if (await keepAi.isVisible()) await keepAi.tap();
+      else if (await skipWait.isVisible()) await skipWait.tap();
+      else if (await afterFailure.isVisible()) await afterFailure.tap();
+      return false;
+    },
+    { timeout: 120_000 },
+  );
 }

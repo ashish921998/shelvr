@@ -39,9 +39,13 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run on its old commit. On main
+# every commit keeps its own run, in a group of its own: merges landing close
+# together used to cancel each other (four on 2026-10-15), so main never built
+# the record of clean runs this check needs before it can be required.
 concurrency:
-  group: e2e-ios-${{ github.ref }}
-  cancel-in-progress: true
+  group: e2e-ios-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   E2E_TELEMETRY_DISABLED: "1"
