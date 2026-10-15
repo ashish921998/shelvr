@@ -13,6 +13,10 @@ import {
 // tells Home the person already knows how to share, so the how-to card stays
 // away (PR #87 saved the shared demo link without saying so, and Home taught
 // sharing seconds after it).
+//
+// Not in the pull request run (e2e-ios.yml): it replays all of onboarding for
+// one flag, and fakes the share extension's hand-off rather than driving the
+// real share sheet. Run it by hand before a release that touches sharing.
 test("remembers a shared first save and skips the share how-to on Home", async ({
   device,
   screen,

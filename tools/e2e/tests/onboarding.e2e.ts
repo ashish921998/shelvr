@@ -9,6 +9,7 @@ import {
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
 import { LAUNCH_ARGUMENTS } from "./launch.ts";
+import { expectPaywall } from "./paywall-sheet.ts";
 
 // A first-time user who saved one link, relaunched on the reminder step and
 // declined the paywall at the end. Pro is hidden for this user from the
@@ -38,10 +39,7 @@ test("asks for the paywall at the end of onboarding, after a relaunch on the rem
   await screen.getByRole("button", "I'll try it later").tap({
     timeout: 30_000,
   });
-  await expect(screen.getByText("Shelvr Pro")).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeVisible();
+  await expectPaywall(screen);
 
   // A close is a decline, and onboarding ends on Home. No exit offer
   // follows: hiding Pro skips it.

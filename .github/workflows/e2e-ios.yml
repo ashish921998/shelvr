@@ -258,7 +258,6 @@ jobs:
           tests/save-note.e2e.ts
           tests/save-link-fixture.e2e.ts
           tests/onboarding.e2e.ts
-          tests/share.e2e.ts
           --reporter list,junit
 
       # tapUntilVisible taps again when a tap was lost. The run still passes

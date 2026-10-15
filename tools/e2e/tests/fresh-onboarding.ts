@@ -107,6 +107,12 @@ export async function shareLinkIntoApp(
 const STALLED_LAUNCH_MS = 75_000;
 
 /**
+ * The dev launcher's server list flashes briefly on a normal launch too, so
+ * seeing it only counts as a failed launch once this long has passed.
+ */
+const LAUNCHER_GRACE_MS = 15_000;
+
+/**
  * Relaunches the app with `launchArguments` and waits until `ready`. Like
  * `openApp`, it opens the app again when the dev launcher shows its server
  * list instead of the bundle, and also when a launch stalls on the splash.
@@ -128,8 +134,10 @@ export async function relaunchWith(
     .poll(
       async () => {
         if (await ready()) return true;
-        const stalled = Date.now() - openedAt > STALLED_LAUNCH_MS;
-        if (stalled || (await launcher.isVisible())) await open();
+        const sinceOpen = Date.now() - openedAt;
+        const stuckOnLauncher =
+          sinceOpen > LAUNCHER_GRACE_MS && (await launcher.isVisible());
+        if (sinceOpen > STALLED_LAUNCH_MS || stuckOnLauncher) await open();
         return false;
       },
       { timeout: 180_000 },

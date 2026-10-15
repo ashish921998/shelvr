@@ -2,19 +2,10 @@ import { test } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
+import { expectPaywall } from "./paywall-sheet.ts";
 import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
-
-async function expectPaywall(screen: Screen): Promise<void> {
-  await expect(screen.getByText("Shelvr Pro")).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(screen.getByRole("button", /^Monthly, /)).toBeVisible();
-  await expect(screen.getByRole("button", /^Annual, /)).toBeVisible();
-  await expect(screen.getByRole("button", "Continue")).toBeVisible();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeVisible();
-}
 
 /**
  * Closes the paywall and waits until Home is back. No exit offer follows the
