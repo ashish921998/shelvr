@@ -3,8 +3,9 @@ name: Claude Code Review
 on:
   pull_request:
     # Not on every push: one review when a PR is opened, reopened or marked
-    # ready. Codex reviews the final head on the Mac; rerun this job by hand
-    # when a later push needs another CI pass.
+    # ready. Codex reviews the final head on the Mac. For another CI pass on
+    # a later push, mark the PR draft and then ready again: a plain re-run
+    # replays the old event and reviews the old commit.
     types: [opened, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
