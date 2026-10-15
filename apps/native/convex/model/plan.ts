@@ -119,16 +119,25 @@ const GENERIC_WORDS = new Set([
   "spot",
 ]);
 
-/** What a save offers as evidence: its text squashed whole, for names that
- * run together ("@parici_cafe"), and its separate words. */
-type Evidence = { text: string; words: Set<string> };
+/** What a save offers as evidence: its text squashed whole, its separate
+ * words, and its handles and hashtags squashed ("@parici_cafe" is
+ * "paricicafe"), which run a name together with other words. */
+type Evidence = { text: string; words: Set<string>; handles: string[] };
 
 /** Squashed words in any script; punctuation and spaces split them. */
-function wordsOf(text: string): string[] {
+function splitWords(text: string): string[] {
   return text
     .split(/[^\p{L}\p{N}\p{M}]+/u)
     .map(squash)
     .filter(Boolean);
+}
+
+const APOSTROPHES = /['\u2019\u02bc]/g;
+
+/** Words of a name, an apostrophe kept inside its word, so "McSorley's"
+ * reads as "mcsorleys". */
+function wordsOf(text: string): string[] {
+  return splitWords(text.replace(APOSTROPHES, ""));
 }
 
 function evidenceOf(source: PlanSource): Evidence {
@@ -141,23 +150,89 @@ function evidenceOf(source: PlanSource): Evidence {
   ]
     .filter(Boolean)
     .join(" ");
-  return { text: squash(raw), words: new Set(wordsOf(raw)) };
+  // A pin marks a place the way a handle does ("📍dishoomlondon").
+  const tagged = raw.match(/(?:[@#]|\u{1F4CD}\s*)[\p{L}\p{N}\p{M}_.]+/gu) ?? [];
+  // The author is a handle even when written without the "@".
+  const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
+  // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
+  // "McSorleys" names "McSorley's". A capital inside a word also starts one,
+  // so "GymkhanaLondon" and "#LondonBAO" name "Gymkhana" and "BAO", and so
+  // does a change between Latin and Japanese or Chinese ("東京でTsujihanの").
+  const camel = raw
+    .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
+    .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
+    .replace(
+      /(\p{Script=Latin})(?=[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/gu,
+      "$1 ",
+    )
+    .replace(
+      /([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])(?=\p{Script=Latin})/gu,
+      "$1 ",
+    );
+  const words = new Set(
+    [raw, camel].flatMap((text) => [...wordsOf(text), ...splitWords(text)]),
+  );
+  return { text: squash(raw), words, handles };
+}
+
+// Scripts written without spaces between words, where a name sits inside a
+// longer run of text ("四谷のすし匠で").
+const UNSPACED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+
+// Korean spaces its words but writes particles onto them ("쵸리상경에서").
+const HANGUL = /\p{Script=Hangul}/u;
+
+/** A whole word of the save; part of one of its handles, at the start
+ * ("@tigrenyc"), at the end ("#londonbao") or, for a word of 4 letters or
+ * more, anywhere ("@eatatlilia");
+ * in Korean, the start of a word, before a particle ("쵸리상경에서"); or, in a
+ * script written without spaces, anywhere in its text. */
+function saveSays(piece: string, evidence: Evidence): boolean {
+  return (
+    evidence.words.has(piece) ||
+    evidence.handles.some(
+      (handle) =>
+        handle.startsWith(piece) ||
+        handle.endsWith(piece) ||
+        (piece.length >= 4 && handle.includes(piece)),
+    ) ||
+    (HANGUL.test(piece) &&
+      [...evidence.words].some((word) => word.startsWith(piece))) ||
+    (UNSPACED_SCRIPT.test(piece) && evidence.text.includes(piece))
+  );
 }
 
 /**
  * True when the save names the place. The model may only pick places a save
  * names; this drops one it made up. A name made only of generic words
  * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
- * every distinctive word must appear in the squashed text, so "@parici_cafe"
- * grounds "Par Ici Café" while "Great pasta tonight" does not ground "Pasta
- * Palace". A name with no distinctive word ("Si Si", "Au 79") must appear
- * word for word.
+ * every distinctive word must be something the save says (see `saveSays`),
+ * so "Great pasta tonight" does not ground "Pasta Palace" and "Toronto" does
+ * not ground "Oro", while "#TigreNYC" grounds "Tigre". A name may also be
+ * written run together, so "@barlola_nyc" grounds "Bar Lola". A name with no
+ * distinctive word ("Si Si", "Au 79") must appear word for word. A name with
+ * an apostrophe is read both ways, so "L'Artusi" is "lartusi" or "artusi".
  */
 function namesPlace(name: string, evidence: Evidence): boolean {
-  const specific = wordsOf(name).filter((word) => !GENERIC_WORDS.has(word));
+  const spelled = name.replace(/&/g, " and ");
+  return [wordsOf(spelled), splitWords(spelled)].some((words) =>
+    wordsName(words, evidence),
+  );
+}
+
+function wordsName(words: string[], evidence: Evidence): boolean {
+  const specific = words.filter((word) => !GENERIC_WORDS.has(word));
   const strong = specific.filter(distinctive);
   if (strong.length > 0) {
-    return strong.every((word) => evidence.text.includes(word));
+    const runTogether = [words.join(""), specific.join("")];
+    return (
+      strong.every((word) => saveSays(word, evidence)) ||
+      (words.length > 1 &&
+        runTogether.some(
+          (joined) => distinctive(joined) && saveSays(joined, evidence),
+        ))
+    );
   }
   // The whole name must still be long enough to prove anything, so a word
   // like "Go" or "A" never grounds on its own.

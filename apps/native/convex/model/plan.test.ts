@@ -50,6 +50,153 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("does not ground a name hidden inside other words", () => {
+    expect(isGrounded("Oro", source({ title: "Best tacos in Toronto" }))).toBe(
+      false,
+    );
+    expect(
+      isGrounded("Art Bar", source({ title: "Started the party early" })),
+    ).toBe(false);
+    expect(
+      isGrounded(
+        "Ten Bells",
+        source({ title: "Tender ribs, church bells at noon" }),
+      ),
+    ).toBe(false);
+    expect(
+      isGrounded("Art Bar", source({ title: "A smart barista made this" })),
+    ).toBe(false);
+    expect(
+      isGrounded("Oro Bar", source({ title: "Toronto: Rob arrives" })),
+    ).toBe(false);
+    expect(isGrounded("Мир", source({ title: "Владимир" }))).toBe(false);
+  });
+
+  it("matches a name in a handle or hashtag", () => {
+    expect(isGrounded("Tigre", source({ title: "#tigre on the LES" }))).toBe(
+      true,
+    );
+    expect(isGrounded("Tigre", source({ author: "@tigrenyc" }))).toBe(true);
+    expect(isGrounded("Tigre", source({ content: "#TigreNYC" }))).toBe(true);
+    expect(isGrounded("Dôme", source({ author: "@domenyc" }))).toBe(true);
+    expect(isGrounded("Par Ici Café", source({ author: "@parici" }))).toBe(
+      true,
+    );
+    expect(
+      isGrounded("Smith & Wollensky", source({ author: "@smithandwollensky" })),
+    ).toBe(true);
+    expect(
+      isGrounded("Lilia", source({ content: "Dinner at @eatatlilia" })),
+    ).toBe(true);
+    // A short word must start the handle: "@toronto_eats" is not "Oro".
+    expect(isGrounded("Oro", source({ author: "@toronto_eats" }))).toBe(false);
+  });
+
+  it("matches a name before a possessive", () => {
+    expect(
+      isGrounded(
+        "Lilia",
+        source({ content: "Lilia\u2019s pasta is worth it" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded("Tigre", source({ content: "Tigre's cocktails are great" })),
+    ).toBe(true);
+  });
+
+  it("matches a name written without its apostrophe", () => {
+    expect(
+      isGrounded(
+        "McSorley's Old Ale House",
+        source({ content: "Beers at McSorleys Old Ale House" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "D’Amico & Sons",
+        source({ content: "Lunch at DAmico & Sons" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a name with an apostrophe in it", () => {
+    expect(
+      isGrounded("L'Artusi", source({ content: "L'Artusi's olive oil cake" })),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "L'Industrie Pizzeria",
+        source({ places: ["L Industrie Pizzeria, Williamsburg"] }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "D'Angelo",
+        source({ content: "D\u2019Angelo\u2019s steak sandwich" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "McSorley's Old Ale House",
+        source({ content: "McSorley s Old Ale House" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a name run together in CamelCase", () => {
+    expect(
+      isGrounded(
+        "Gymkhana",
+        source({ content: "📍GymkhanaLondon, best dinner" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "L'Industrie Pizzeria",
+        source({ content: "📍LIndustrieNYC burrata slice" }),
+      ),
+    ).toBe(true);
+    expect(isGrounded("BAO", source({ content: "Cold tea #LondonBAO" }))).toBe(
+      true,
+    );
+    expect(
+      isGrounded("BAO", source({ content: "Buns!! #londonbao #soho" })),
+    ).toBe(true);
+    expect(
+      isGrounded("Dishoom", source({ content: "📍dishoomlondon, the daal" })),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "Gymkhana",
+        source({ content: "📍GYMKHANALONDON. Lamb chops" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a Latin name written inside Japanese text", () => {
+    expect(
+      isGrounded(
+        "Tsujihan",
+        source({ content: "東京でTsujihanの海鮮丼を食べた" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a Korean name with a particle written onto it", () => {
+    expect(
+      isGrounded(
+        "쵸리상경",
+        source({ content: "성수동 쵸리상경에서 점심 먹었어요" }),
+      ),
+    ).toBe(true);
+    expect(
+      isGrounded(
+        "쵸리상경",
+        source({ content: "성수동 맛집에서 점심 먹었어요" }),
+      ),
+    ).toBe(false);
+  });
+
   it("rejects a name the save never mentions", () => {
     expect(isGrounded("Carbone", source({ title: "Best pasta in NYC" }))).toBe(
       false,
