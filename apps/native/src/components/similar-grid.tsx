@@ -2,7 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { displayHost } from "@/lib/url";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -39,6 +39,7 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
 
 function SimilarItemCard({ item }: { item: DetailItem }) {
   useAppLocale();
+  const router = useRouter();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   const aspectRatio = Math.min(
     Math.max(item.aspectRatio ?? (item.type === "link" ? 1.91 : 1), 0.5),
@@ -50,47 +51,54 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
     (item.url ? displayHost(item.url) : t("item.untitledItem"));
 
   return (
-    <Link href={{ pathname: "/item/[id]", params: { id: item._id } }} asChild>
-      <Pressable
-        style={({ pressed }) => [
-          styles.similarCard,
-          item.isSticker && styles.similarCardSticker,
-          pressed && styles.similarCardPressed,
-        ]}
-      >
-        {imageUri ? (
-          item.isSticker ? (
+    // No `Link asChild`: its Slot drops a Pressable style function, which
+    // cost this card its clipping and press feedback (see save-recall-card).
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={title}
+      onPress={() =>
+        router.push({ pathname: "/item/[id]", params: { id: item._id } })
+      }
+      style={({ pressed }) => [
+        styles.similarCard,
+        item.isSticker && styles.similarCardSticker,
+        pressed && styles.similarCardPressed,
+      ]}
+    >
+      {imageUri ? (
+        item.isSticker ? (
+          <Image
+            source={{ uri: imageUri }}
+            recyclingKey={item._id}
+            contentFit="contain"
+            style={[styles.similarSticker, { aspectRatio }]}
+          />
+        ) : (
+          <View style={styles.similarImageFrame}>
             <Image
               source={{ uri: imageUri }}
-              contentFit="contain"
-              style={[styles.similarSticker, { aspectRatio }]}
+              recyclingKey={item._id}
+              contentFit="cover"
+              style={[styles.similarImage, { aspectRatio }]}
             />
-          ) : (
-            <View style={styles.similarImageFrame}>
-              <Image
-                source={{ uri: imageUri }}
-                contentFit="cover"
-                style={[styles.similarImage, { aspectRatio }]}
-              />
-            </View>
-          )
-        ) : (
-          <View
-            style={[
-              styles.similarTextFace,
-              item.type === "note" && styles.similarNoteFace,
-            ]}
-          >
-            <Text style={styles.similarTextFaceTitle} numberOfLines={4}>
-              {title}
-            </Text>
           </View>
-        )}
-        <Text style={styles.similarCardTitle} numberOfLines={2}>
-          {title}
-        </Text>
-      </Pressable>
-    </Link>
+        )
+      ) : (
+        <View
+          style={[
+            styles.similarTextFace,
+            item.type === "note" && styles.similarNoteFace,
+          ]}
+        >
+          <Text style={styles.similarTextFaceTitle} numberOfLines={4}>
+            {title}
+          </Text>
+        </View>
+      )}
+      <Text style={styles.similarCardTitle} numberOfLines={2}>
+        {title}
+      </Text>
+    </Pressable>
   );
 }
 

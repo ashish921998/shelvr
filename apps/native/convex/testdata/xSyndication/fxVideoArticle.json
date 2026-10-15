@@ -1,0 +1,1327 @@
+{
+  "code": 200,
+  "message": "OK",
+  "status": {
+    "id": "2099837130927427989",
+    "url": "https://x.com/jasonzhou1993/status/2099837130927427989",
+    "article": {
+      "id": "2099717697009553408",
+      "title": "How to run your first AI UGC campaign (step-by-step guide)",
+      "preview_text": "You've seen these videos on TikTok and Instagram. A normal-looking person, talking about an app they \"just found.\" Not posted by the brand. Posted by some personal account with 40 followers.\nThat's",
+      "cover_media": {
+        "id": "QXBpTWVkaWE6DAAFCgABHSPU9JYacAAKAAILsWDBUBXAAQAA",
+        "media_id": "2099755998240206848",
+        "media_info": {
+          "__typename": "ApiImage",
+          "original_img_height": 1024,
+          "original_img_url": "https://pbs.twimg.com/media/HSPU9JYacAApZ0Q.jpg",
+          "original_img_width": 2560
+        },
+        "media_key": "3_2099755998240206848"
+      },
+      "content": {
+        "blocks": [
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "alk45",
+            "text": "",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 0,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "2t6fa",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5vf39",
+            "text": "You've seen these videos on TikTok and Instagram. A normal-looking person, talking about an app they \"just found.\" Not posted by the brand. Posted by some personal account with 40 followers.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "d1ifq",
+            "text": "That's UGC. ",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 1,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "anugu",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "bpr7b",
+            "text": "Typically companies hire people who have time but no following -> spin up new accounts and create video content about your product.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "cghm2",
+            "text": "You are not paying for their audience, because they don't have one. You are paying for content that look like geniue user sharing a product they like.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "ekai3",
+            "text": "And normally you pay $20~50/video, so It gets expensive fast.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "3g40d",
+            "text": "I've spent past 2 days exploring whether we can use AI to fully generate those videos, and drive cost from $20~50/video to $4~6?",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "221u3",
+            "text": "I think I got a workflow that produce AI UGC actually works and hyper realistic, I will walk you through step by step",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 2,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "155pi",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6h5o9",
+            "text": "",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9b6ud",
+            "text": "Step 1: Find what's already working in your vertical",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "a57h5",
+            "text": "A UGC video is two parts:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 8,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "7lgcp",
+            "text": "The hook: the first 3 seconds. Probably the most important thing.",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 8,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "50it6",
+            "text": "The demo: showing the product.",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5b11l",
+            "text": "The way you scale it is one demo paired with 5 to 10 different hooks. Then you test which one lands.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 3,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "dav8n",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "3e49n",
+            "text": "So before generating anything, I pull trending videos in my vertical and study two things: how the hooks are built, and which faces/characters resonate. Same script, different person, completely different impression. That part surprised me.",
+            "type": "unstyled"
+          },
+          {
+            "data": {
+              "mentions": [
+                {
+                  "fromIndex": 6,
+                  "text": "treg_ai",
+                  "toIndex": 14
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "bhb56",
+            "text": "I use @treg_ai for this (context: I built it). It is like OpenRouter for data & tools, so you can connect to 3000+ premium data & tools. With no subscription, Pay for usage only. ",
+            "type": "unstyled"
+          },
+          {
+            "data": {
+              "urls": [
+                {
+                  "fromIndex": 15,
+                  "text": "https://treg.to/llms.txt",
+                  "toIndex": 39
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "efh1g",
+            "text": "Just paste the https://treg.to/llms.txt to your agent and it will setup in 1 min, then you can prompt it:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "dtb2b",
+            "text": "\"Pull recently trending toktok/instagram videos in our vertical.\"",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "af7ta",
+            "text": "A minute later I have a list of what's trending on TikTok for my niche, with hooks I can read and characters I can look at.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 4,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "inai",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 9,
+                "offset": 91,
+                "style": "Italic"
+              }
+            ],
+            "key": "3jiam",
+            "text": "Then it comes the hard part: take a person who exists and whose vibe works, and generate a different person with the same vibe. Then build an account around that character.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fba9d",
+            "text": "Step 2: Generate a character with certain vibe (the hard part)",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "bn7l1",
+            "text": "This is genuinely difficult, and it took me a while to understand why.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6plk2",
+            "text": "I tried GPT Image 2.5 and Gemini 3 Pro on a screenshot of a presenter from the Google Cloud channel. Both state of the art. Both looked wrong.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 5,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "eci9d",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {
+              "mentions": [
+                {
+                  "fromIndex": 15,
+                  "text": "henry19840301",
+                  "toIndex": 29
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "o2a7",
+            "text": "Then my friend @henry19840301 sent me a prompt that changed the output completely. Same models, and now the character looks like a real person, different from the reference, but with the same vibe.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 6,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "e4990",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "823at",
+            "text": "The trick:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "c32di",
+            "text": "Restrict the model's exploration space. Force it to define every detail it would otherwise fill in with default in JSON format",
+            "type": "blockquote"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4koom",
+            "text": "Every image model has out-of-box defaults. Eyes slightly too big. A doll-ish face. And if your prompt has \"4K, 8K, ultra detailed\" in it, you get that HDR, over-sharpened look that screams AI.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "8b9g",
+            "text": "The fix is a JSON-based prompt that specifies everything: face structure, skin texture, lighting, camera, expression, clothing, background. When the model has no room to revert to its defaults, you stop getting slop.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 7,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "58cu1",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "aeasc",
+            "text": "I tested it on a well-known Chinese tech vlogger, a Chinese podcaster, and Jin Yang from Silicon Valley. Each time: a new person, clearly different, same vibe, looks real.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 8,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "c24f8",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {
+              "mentions": [
+                {
+                  "fromIndex": 0,
+                  "text": "henry19840301",
+                  "toIndex": 14
+                }
+              ]
+            },
+            "entityRanges": [
+              {
+                "key": 9,
+                "length": 14,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "fr4uj",
+            "text": "@henry19840301 turned this into a reusable skill: feed it a screenshot, get a new character.",
+            "type": "unstyled"
+          },
+          {
+            "data": {
+              "urls": [
+                {
+                  "fromIndex": 7,
+                  "text": "https://github.com/agentara/skills/blob/main/skills/aigc/portrait-clone/SKILL.md",
+                  "toIndex": 87
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "cgr3g",
+            "text": "Skill: https://github.com/agentara/skills/blob/main/skills/aigc/portrait-clone/SKILL.md",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 59,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "49gpa",
+            "text": "Second trick: the model matters even with the right prompt. I ran the same JSON prompt across five models. GPT Image 2.5 should technically be the best, but its faces still have that doll-face pattern in the eyes. Gemini 3 Pro gave me the most realistic result.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 10,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "2vbv2",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {
+              "mentions": [
+                {
+                  "fromIndex": 44,
+                  "text": "treg_ai",
+                  "toIndex": 52
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "e6p89",
+            "text": "All the major image and video models are on @treg_ai with no markup, so I just tell Claude Code:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "bl8d6",
+            "text": "\"Generate the character with the portrait-clone skill on GPT Image 2.5, Gemini 3 Pro, and Seedream, so I can compare.\"",
+            "type": "blockquote"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "8g2ld",
+            "text": "It calls all three, I pick the winner.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9khcb",
+            "text": "Step 3: Make the character talk",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "atv2j",
+            "text": "Now feed the character image to Seedance 2.5 as an image reference and give it a script. It does a good job from a single image.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "b9p6n",
+            "text": "One problem: Seedance 2.5 refuses hyper-realistic reference images by default, to stop people from impersonating real humans.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "b0r6l",
+            "text": "Two ways around it:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "e8rdj",
+            "text": "Platforms like Higgsfield expose an endpoint that bypasses this, but they charge a margin that doubles or triples your cost.",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "ehdib",
+            "text": "The proper way is BytePlus directly. Their advanced creation rights (there's a premium creation package even on the free tier) let you upload an image, register it as a digital character, and generate from it. But it takes several hurdles to get approved.",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "am9nn",
+            "text": "On treg we wrapped that whole process: the Seedance 2.5 less-restricted endpoint takes your image, registers it as a character asset, and generates. Same price as buying from BytePlus directly.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 11,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "f8tgm",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 16,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "aq8bm",
+            "text": "The voice trick. The default voice sounds wrong. Not fake exactly, just off in rhythm. The shortcut: clip the audio from the original trending video you liked and pass it as an audio reference. The rhythm and delivery come through. There are too many details in speech to describe in text, so let the model copy them instead.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 12,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "aps1c",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fml0a",
+            "text": "Step 4: The demo, and why the character doesn't need to be in it",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "3c3jg",
+            "text": "To cut cost, the demo section doesn't show the character at all. I just recorded the product on my phone. In my case, treg getting Codex to do GTM work: find leads, run outreach.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "dets7",
+            "text": "Then I cloned a voice on Fish Audio from the same original audio clip, generated the voiceover, and stitched it with the screen recording plus captions.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "1sorm",
+            "text": "Now I have one demo clip. Time to pair it with hooks.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9nh6d",
+            "text": "Step 5: Generate hooks at scale",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "834uk",
+            "text": "Back to Claude Code with treg. I gave it a few reference accounts doing this well and asked it to pull their top videos and extract the hooks.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 152,
+                "offset": 100,
+                "style": "Italic"
+              }
+            ],
+            "key": "3gg7q",
+            "text": "Models are good at analyzing transcripts now. One Composio video with 3.3M impressions opened with: \"They emailed over five million people and asked each for one dollar. What if you emailed every millionaire in the world and asked for just one dollar?\" That's showing off a Gmail integration.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fcpri",
+            "text": "The pattern: a stunning claim, a specific number, and a result.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6ct8h",
+            "text": "I asked it to brainstorm in that pattern and picked this one:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4moni",
+            "text": "\"3 AM last night, my agent was researching hundreds of customers and emailing each of them to book meetings for me. I woke up to 12 replies and 4 meetings on my calendar. Here's exactly how I set it up.\"",
+            "type": "blockquote"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "dbh2l",
+            "text": "Then one prompt: use Seedance 2.5 with the character image and the audio reference, generate the video.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 22,
+                "offset": 10,
+                "style": "Bold"
+              }
+            ],
+            "key": "dp9j5",
+            "text": "I built a UGC talking-head skill for this. It takes the request, writes the script and sets the duration, grabs the voice reference, writes the Seedance prompt, and adds captions and headers to produce the final video. It's in the treg GitHub repo.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 28,
+                "offset": 21,
+                "style": "Bold"
+              }
+            ],
+            "key": "8dlub",
+            "text": "A few minutes later: 4 UGC clips for $2.67 total. Under 20 to $50 per video for a human creator.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "1b4o3",
+            "text": "What I'd do differently for harder videos",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "2v456",
+            "text": "Software demos are simple, so one character image is enough. If your video is more complex, the flow becomes: design the character from multiple angles, use an image model to build a storyboard, then feed storyboard plus character to Seedance 2.5 for the final cut. For most software UGC I never needed this.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 13,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "6b9pl",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "asgt",
+            "text": "The full loop",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7bcld",
+            "text": "Pull trending videos in your vertical, study hooks and faces",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "b1o88",
+            "text": "Generate a new character with the vibe you want (JSON prompt, Gemini 3 Pro)",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fq7ud",
+            "text": "Register the character on Seedance 2.5, use the original audio as reference",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "49gf2",
+            "text": "Record the demo yourself, clone the voice, stitch",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fiftk",
+            "text": "Extract hooks from top performers, generate 5 to 10 variants, A/B test",
+            "type": "ordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 6,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "4b59a",
+            "text": "Links:",
+            "type": "unstyled"
+          },
+          {
+            "data": {
+              "urls": [
+                {
+                  "fromIndex": 30,
+                  "text": "https://github.com/agentara/skills/blob/main/skills/aigc/portrait-clone/SKILL.md",
+                  "toIndex": 110
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "92l0q",
+            "text": "Henry's portrait-clone skill: https://github.com/agentara/skills/blob/main/skills/aigc/portrait-clone/SKILL.md",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {
+              "urls": [
+                {
+                  "fromIndex": 24,
+                  "text": "https://github.com/superdesigndev/treg",
+                  "toIndex": 62
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "1fr8h",
+            "text": "UGC talking-head skill: https://github.com/superdesigndev/treg",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {
+              "urls": [
+                {
+                  "fromIndex": 44,
+                  "text": "http://treg.to",
+                  "toIndex": 58
+                }
+              ]
+            },
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "3mnab",
+            "text": "treg (OpenRouter for data and agent tools): http://treg.to",
+            "type": "unordered-list-item"
+          }
+        ],
+        "entityMap": [
+          {
+            "key": "12",
+            "value": {
+              "data": {
+                "entityKey": "0997f005-f580-4c3b-94da-2f44254a28f2",
+                "mediaItems": [
+                  {
+                    "localMediaId": "19",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099722288908419072"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "8",
+            "value": {
+              "data": {
+                "entityKey": "9ba05b67-a7b8-4c10-8451-01b3064a6d25",
+                "mediaItems": [
+                  {
+                    "localMediaId": "13",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099721619010945024"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "4",
+            "value": {
+              "data": {
+                "entityKey": "e4c0bb4b-f83c-4235-a8e7-ca23beaf7050",
+                "mediaItems": [
+                  {
+                    "localMediaId": "3",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099719594017722368"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "11",
+            "value": {
+              "data": {
+                "entityKey": "5f001548-296d-4896-ae0d-8ecc5b303da5",
+                "mediaItems": [
+                  {
+                    "localMediaId": "17",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099722170557710336"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "9",
+            "value": {
+              "data": {
+                "entityKey": "0d5cfb26-8f5a-4856-9300-b4bb2735eb4c",
+                "url": "https://x.com/@henry19840301"
+              },
+              "mutability": "Mutable",
+              "type": "LINK"
+            }
+          },
+          {
+            "key": "13",
+            "value": {
+              "data": {
+                "entityKey": "49dab324-398e-4775-8a0d-c3fea1169a47",
+                "mediaItems": [
+                  {
+                    "localMediaId": "21",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099723069938176000"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "5",
+            "value": {
+              "data": {
+                "entityKey": "f7c4fd95-f301-4d4f-ab73-5aa1da4ffcfb",
+                "mediaItems": [
+                  {
+                    "localMediaId": "7",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099720562436444160"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "10",
+            "value": {
+              "data": {
+                "entityKey": "3d4f01f5-72c7-452e-bf4d-058944000ce6",
+                "mediaItems": [
+                  {
+                    "localMediaId": "15",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099721788674740224"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "6",
+            "value": {
+              "data": {
+                "entityKey": "fe05a2fa-2d26-4369-9889-4de17510cf40",
+                "mediaItems": [
+                  {
+                    "localMediaId": "9",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099720645257138176"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "1",
+            "value": {
+              "data": {
+                "caption": "Image source: Joma 2nd Channel",
+                "entityKey": "acce3877-f41f-4374-b156-9207e8f63682",
+                "mediaItems": [
+                  {
+                    "localMediaId": "23",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099723319960588288"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "0",
+            "value": {
+              "data": {
+                "entityKey": "fbe8fdbe-3481-44cd-9381-68f02f46194c",
+                "mediaItems": [
+                  {
+                    "localMediaId": "13",
+                    "mediaCategory": "AmplifyVideo",
+                    "mediaId": "2099832515431407616"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "2",
+            "value": {
+              "data": {
+                "entityKey": "e0d415e0-47ce-42d4-891c-f8d896c8301e",
+                "mediaItems": [
+                  {
+                    "localMediaId": "29",
+                    "mediaCategory": "AmplifyVideo",
+                    "mediaId": "2099726256006918145"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "7",
+            "value": {
+              "data": {
+                "entityKey": "b27966c5-261f-4f4a-a016-be5714c4896d",
+                "mediaItems": [
+                  {
+                    "localMediaId": "11",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099721339787722752"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "3",
+            "value": {
+              "data": {
+                "entityKey": "2e09c029-1d22-485b-9548-1da6d9494ad1",
+                "mediaItems": [
+                  {
+                    "localMediaId": "1",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2099718638949556224"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          }
+        ]
+      },
+      "media_entities": [
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO3Ad5bkAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099723069938176000",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 564,
+            "original_img_url": "https://pbs.twimg.com/media/HSO3Ad5bkAAllOi.jpg",
+            "original_img_width": 2450
+          },
+          "media_key": "3_2099723069938176000"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO1bwlawAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099721339787722752",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 1292,
+            "original_img_url": "https://pbs.twimg.com/media/HSO1bwlawAABDrI.jpg",
+            "original_img_width": 2022
+          },
+          "media_key": "3_2099721339787722752"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO2MHcawAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099722170557710336",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 404,
+            "original_img_url": "https://pbs.twimg.com/media/HSO2MHcawAAs2g6.png",
+            "original_img_width": 1806
+          },
+          "media_key": "3_2099722170557710336"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO1140bEAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099721788674740224",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 908,
+            "original_img_url": "https://pbs.twimg.com/media/HSO1140bEAA3-Ij.jpg",
+            "original_img_width": 2446
+          },
+          "media_key": "3_2099721788674740224"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO1sAxbAAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099721619010945024",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 1244,
+            "original_img_url": "https://pbs.twimg.com/media/HSO1sAxbAAAdIDG.jpg",
+            "original_img_width": 1716
+          },
+          "media_key": "3_2099721619010945024"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAECgABHSO5567acAEKAAIAAAAAAAAAAAAA",
+          "media_id": "2099726256006918145",
+          "media_info": {
+            "__typename": "ApiVideo",
+            "aspect_ratio": {
+              "denominator": 16,
+              "numerator": 9
+            },
+            "duration_millis": 20928,
+            "preview_image": {
+              "original_img_height": 1280,
+              "original_img_url": "https://pbs.twimg.com/amplify_video_thumb/2099726256006918145/img/a-PSxh1BV--3EMR3.jpg",
+              "original_img_width": 720
+            },
+            "variants": [
+              {
+                "bit_rate": 632000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099726256006918145/vid/avc1/320x568/kmalBPSgGWKu6ADQ.mp4?tag=29"
+              },
+              {
+                "bit_rate": 950000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099726256006918145/vid/avc1/480x852/Yaa75CuqqJsYjGmz.mp4?tag=29"
+              },
+              {
+                "bit_rate": 2176000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099726256006918145/vid/avc1/720x1280/nxZ3uzxAO5SbCRbC.mp4?tag=29"
+              },
+              {
+                "content_type": "application/x-mpegURL",
+                "url": "https://video.twimg.com/amplify_video/2099726256006918145/pl/W9RzBZeq_RDCz01t.m3u8?tag=29&v=c5d"
+              }
+            ]
+          },
+          "media_key": "13_2099726256006918145"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSOz2JFakAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099719594017722368",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 702,
+            "original_img_url": "https://pbs.twimg.com/media/HSOz2JFakAAVZXF.jpg",
+            "original_img_width": 904
+          },
+          "media_key": "3_2099719594017722368"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSOy+jLa4AAKAAILsWDBUBXAAQAA",
+          "media_id": "2099718638949556224",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 932,
+            "original_img_url": "https://pbs.twimg.com/media/HSOy-jLa4AATmLO.jpg",
+            "original_img_width": 792
+          },
+          "media_key": "3_2099718638949556224"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO3PBTa0AAKAAILsWDBUBXAAQAA",
+          "media_id": "2099723319960588288",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 1334,
+            "original_img_url": "https://pbs.twimg.com/media/HSO3PBTa0AAFXp6.jpg",
+            "original_img_width": 2452
+          },
+          "media_key": "3_2099723319960588288"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAECgABHSQajCIaoAAKAAIAAAAAAAAAAAAA",
+          "media_id": "2099832515431407616",
+          "media_info": {
+            "__typename": "ApiVideo",
+            "aspect_ratio": {
+              "denominator": 9,
+              "numerator": 16
+            },
+            "duration_millis": 826633,
+            "preview_image": {
+              "original_img_height": 1080,
+              "original_img_url": "https://pbs.twimg.com/amplify_video_thumb/2099832515431407616/img/Wp1ZhlvD-TyQAPiJ.jpg",
+              "original_img_width": 1920
+            },
+            "variants": [
+              {
+                "bit_rate": 256000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099832515431407616/vid/avc1/480x270/dqklYoL6uWlM5LhX.mp4?tag=29"
+              },
+              {
+                "bit_rate": 832000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099832515431407616/vid/avc1/640x360/bOHXyTVFzHnYKFFk.mp4?tag=29"
+              },
+              {
+                "bit_rate": 2176000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099832515431407616/vid/avc1/1280x720/Mcaqxwipw5-hY9bz.mp4?tag=29"
+              },
+              {
+                "content_type": "application/x-mpegURL",
+                "url": "https://video.twimg.com/amplify_video/2099832515431407616/pl/J7-uqjT_W65UsI8Z.m3u8?tag=29"
+              },
+              {
+                "bit_rate": 10368000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2099832515431407616/vid/avc1/1920x1080/sBPRFEUIQ_ifnsul.mp4?tag=29"
+              }
+            ]
+          },
+          "media_key": "13_2099832515431407616"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO2TAVbQAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099722288908419072",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 626,
+            "original_img_url": "https://pbs.twimg.com/media/HSO2TAVbQAAx5HA.jpg",
+            "original_img_width": 1294
+          },
+          "media_key": "3_2099722288908419072"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO0ugubkAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099720562436444160",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 936,
+            "original_img_url": "https://pbs.twimg.com/media/HSO0ugubkAAR41F.jpg",
+            "original_img_width": 2522
+          },
+          "media_key": "3_2099720562436444160"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHSO0zVQbEAAKAAILsWDBUBXAAQAA",
+          "media_id": "2099720645257138176",
+          "media_info": {
+            "__typename": "ApiImage",
+            "original_img_height": 726,
+            "original_img_url": "https://pbs.twimg.com/media/HSO0zVQbEAAph2y.jpg",
+            "original_img_width": 1900
+          },
+          "media_key": "3_2099720645257138176"
+        }
+      ]
+    }
+  }
+}

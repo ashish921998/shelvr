@@ -1,18 +1,18 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { AppTabs } from "@/components/ui/app-tab-bar";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { DynamicColorIOS, Platform, type ColorValue } from "react-native";
-
-const tint: ColorValue =
-  Platform.OS === "ios"
-    ? DynamicColorIOS({ light: "#c98a24", dark: "#e6a23c" })
-    : "#e6a23c";
+import { Platform } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 
 export default function TabsLayout() {
   useAppLocale();
+  const { theme } = useUnistyles();
   if (Platform.OS === "ios") {
     return (
-      <NativeTabs tintColor={tint} minimizeBehavior="onScrollDown">
+      <NativeTabs
+        tintColor={theme.colors.tabTint}
+        minimizeBehavior="onScrollDown"
+      >
         <NativeTabs.Trigger name="(home)">
           <NativeTabs.Trigger.Icon
             sf={{

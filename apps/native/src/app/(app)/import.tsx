@@ -106,14 +106,6 @@ export default function ImportScreen() {
 
       <Text style={styles.description}>{t("import.description")}</Text>
 
-      <View style={styles.hintBox}>
-        <View style={styles.hintHeader}>
-          <AppSymbolIcon name="link" size={16} tintColor={theme.colors.muted} />
-          <Text style={styles.hintTitle}>{t("import.xHintTitle")}</Text>
-        </View>
-        <Text style={styles.hintText}>{t("import.xHintBody")}</Text>
-      </View>
-
       {phase !== "done" ? (
         <TextInput
           style={styles.input}
@@ -236,31 +228,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 21,
     color: theme.colors.muted,
   },
-  hintBox: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.gap(2),
-    gap: theme.gap(1),
-  },
-  hintHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
-  },
-  hintTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 14,
-    color: theme.colors.foreground,
-  },
-  hintText: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 19,
-    color: theme.colors.muted,
-  },
   input: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,
@@ -343,7 +310,7 @@ const styles = StyleSheet.create((theme) => ({
   primaryButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
-    color: "#fff",
+    color: theme.colors.onTint,
   },
   importButton: {
     alignItems: "center",
@@ -355,6 +322,6 @@ const styles = StyleSheet.create((theme) => ({
   importButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: "#fff",
+    color: theme.colors.onTint,
   },
 }));

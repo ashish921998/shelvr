@@ -12,6 +12,12 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@convex": fileURLToPath(new URL("./convex", import.meta.url)),
+      "progressive-blur": fileURLToPath(
+        new URL("./modules/progressive-blur", import.meta.url),
+      ),
+      "recent-saves-widget": fileURLToPath(
+        new URL("./modules/recent-saves-widget", import.meta.url),
+      ),
     },
   },
   test: {

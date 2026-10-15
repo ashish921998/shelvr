@@ -14,20 +14,21 @@ for Shelvr.
 ## Stack
 
 - [Turborepo](https://turbo.build/repo) + [pnpm](https://pnpm.io/)
-- [Next.js](https://nextjs.org/) (`apps/web`) — marketing landing only
-- [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`) — product app
+- [Next.js](https://nextjs.org/) (`apps/web`): marketing landing only
+- [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`): product app
 - [Convex](https://convex.dev/) (`apps/native/convex/`)
 - [Convex Auth](https://labs.convex.dev/auth/) (Google + Apple OAuth, dev Anonymous)
 - Vercel AI SDK with the direct Google provider (`gemini-3.1-flash-lite`)
 - [Vitest](https://vitest.dev/) + [`convex-test`](https://docs.convex.dev/testing/convex-test)
   for the native app and the Convex backend
 
-## What’s inside
+## What's inside
 
-| Path          | Purpose                                            |
-| ------------- | -------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site                   |
-| `apps/native` | Expo native client (full product) + Convex backend |
+| Path          | Purpose                                             |
+| ------------- | --------------------------------------------------- |
+| `apps/web`    | Next.js marketing / landing site                    |
+| `apps/native` | Expo native client (full product) + Convex backend  |
+| `tools/e2e`   | End-to-end flow tests for the iOS simulator (pilot) |
 
 ## Quick start
 
@@ -123,11 +124,10 @@ EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=<android-sdk-key>
 cp apps/native/.example.env apps/native/.env.local
 ```
 
-- `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `apps/native/.env.local`
-- `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` → `true` to mirror the dev-only backend flag
-- `EXPO_PUBLIC_REVENUECAT_TEST_KEY` → isolated Shelvr Development Test Store key from `.example.env`, used by local development and preview on both platforms. Use the development Convex deployment (`amicable-antelope-639`), never production.
-- `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → production-only RevenueCat SDK keys
-- `ACTIVATION_PAL_IOS_KEY` → ActivationPal public app key embedded in iOS builds
+- `EXPO_PUBLIC_CONVEX_URL`: set to `CONVEX_URL` from `apps/native/.env.local`
+- `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`: set to `true` to mirror the dev-only backend flag
+- `EXPO_PUBLIC_REVENUECAT_TEST_KEY`: the isolated Shelvr Development Test Store key from `.example.env`, used by local development and preview on both platforms. Use the development Convex deployment (`amicable-antelope-639`), never production.
+- `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`: production-only RevenueCat SDK keys
 
 The web marketing site uses the Convex deployment for its Android waitlist;
 analytics are optional (copy `apps/web/.env.example` to
@@ -162,77 +162,164 @@ pnpm --filter native-app exec convex dev
 
 ```sh
 pnpm --filter native-app test    # vitest run
+pnpm --filter web-app test       # vitest run
+pnpm run coverage                 # native and web Vitest coverage gates
 pnpm --filter native-app check   # lint, then typecheck, then test
 ```
 
-Tests are `*.test.ts` files next to the code under `apps/native/convex/` and
-`apps/native/src/`. Convex function tests use `convex-test` and opt into the
-edge runtime per file with a `// @vitest-environment edge-runtime` pragma.
+Tests are `*.test.ts` files next to the code under `apps/native/convex/`,
+`apps/native/src/`, and `apps/web/src/`. Convex function tests use `convex-test`
+and opt into the edge runtime per file with a
+`// @vitest-environment edge-runtime` pragma. Web tests use Vitest's Node
+environment by default and opt into jsdom per file when browser APIs are needed.
+
+#### End-to-end flows on the iOS simulator (pilot)
+
+`tools/e2e` drives the development build through seven flows with the
+[e2e](https://github.com/tester-army/e2e) framework: save a link, save a note,
+save a photo, create a space, search, a search with no match, and the paywall,
+plus a smoke test (`tests/smoke.e2e.ts`) that only opens the seeded Home.
+Search, save-a-note, create-a-space and the paywall use plain locators and make
+no model call from the test; save-a-note still needs the backend's model, which
+makes the note searchable. The paywall flow relaunches the app with `-E2EHidePro YES`, which makes
+a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check`. The `e2e ios` workflow runs search, search-no-results, create-space and the paywall on pull requests that touch the app, against a local Convex backend and with no model, as a check that is not required yet. Every flow launches with `-E2EHideLogBox YES`, which keeps the
+development error banner from covering the controls the flows tap.
+
+It needs a booted iOS simulator with the development build
+(`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
+Convex deployment, and `AUTH_ENABLE_ANONYMOUS=true` on that deployment. The
+app runs in English whatever the simulator's language, and the save-a-photo
+flow adds its own photo (`tools/e2e/fixtures/photo.png`) to the simulator's
+library. Each
+test signs in as the anonymous dev user and resets its data through Settings >
+"Reset flow fixtures", so run it only against a throwaway dev user.
+
+```sh
+cd tools/e2e
+export GOOGLE_GENERATIVE_AI_API_KEY=...   # an AI Studio key; never commit it
+pnpm exec e2e run                         # all seven flows and the smoke test
+pnpm exec e2e run tests/search.e2e.ts     # one flow
+pnpm exec e2e run --video on              # record an MP4 per test under .e2e/
+```
+
+The run starts its own Metro on port 8091 and stops it afterwards. Set
+`E2E_METRO_PORT` to move it, `E2E_DEVICE` to pick a simulator by name or UDID,
+and `E2E_MODEL` to try another Gemini model.
+
+The first run of a step asks the model how to reach the goal and records the
+taps under `tools/e2e/.e2e/cache/`. Later runs replay that recording without a
+model call, and fall back to the model when the screen has changed. The
+recordings are gitignored for now, so each machine makes its own.
+`pnpm exec e2e run --no-cache` forces every step back through the model.
+
+Checks use plain locators wherever the label is known in advance; seeded
+saves carry `fixture-item-*` test IDs. Only the count of saves after a new link
+or photo, whose title the model writes, is judged from a screenshot
+(`agent.waitFor` with `vision`), at one model call per run.
 
 ## Domain model (Convex)
 
-- **`items`** — saved links / images / notes (`processing` → `ready` | `failed`)
-- **`spaces`** — themed collections owned by a user
-- **`spaceItems`** — join table, with a `suggested` / `saved` / `dismissed` status
-- **`itemOperations`** — per-import idempotency ledger
-- **`subscriptions`** — one Pro entitlement row per user
+- **`items`**: saved links, images, and notes (`processing`, then `ready` or `failed`)
+- **`spaces`**: themed collections owned by a user
+- **`spaceItems`**: join table, with a `suggested` / `saved` / `dismissed` status
+- **`itemOperations`**: per-import idempotency ledger
+- **`subscriptions`**: one Pro entitlement row per user
 - **`notificationDevices`** / **`notificationPreferences`** / **`weeklyDigests`** /
-  **`itemReads`** — push tokens, weekly shelf settings, shelves, and read state
-- **`waitlistSignups`** — platform availability waitlists and prior launch records
+  **`itemReads`**: push tokens, weekly shelf settings, shelves, and read state
+- **`waitlistSignups`**: platform availability waitlists and prior launch records
 
 Public product APIs live in `items.ts`, `spaces.ts`, `subscriptions.ts`,
 `notifications.ts`, and `users.ts`. The Node action pipeline is in `ai.ts`
 (`processItem`, `recommendForSpace`, `steerItemForSpace`, `findProductLinks`).
 Auth always derives `userId` from Convex Auth via
 `model/auth.ts` (the stable users-table id extracted from the session-bearing
-JWT `sub`) — never from a client argument.
+JWT `sub`), never from a client argument.
 
 ## Deploying
 
-**Web** deploys itself: Vercel's Git integration builds and publishes every
-commit on `main` (`apps/web/vercel.json` sets `turbo run build` as the build
-command). Android waitlist signup needs `CONVEX_URL` at runtime:
+**Web** deploys itself: Vercel's Git integration checks every commit on `main`
+(`apps/web/vercel.json` sets `turbo run build` as the build command). Its
+`ignoreCommand` runs `turbo-ignore`, so Vercel builds and publishes only when a
+push changes something the web app depends on, and cancels the deployment for
+the rest, such as a native-only change. Keep the `turbo-ignore` version in step with `turbo` in the root
+`package.json`. Android waitlist signup needs `CONVEX_URL` at runtime:
 
 ```sh
 pnpm --filter web-app build
 ```
 
-**Convex production + tester OTA** run through the Deploy workflow
-(`.github/workflows/deploy.yml`). After CI completes on `main`, the workflow:
+**Convex production** deploys through the Deploy workflow
+(`.github/workflows/deploy.yml`). After CI completes on `main` it deploys the
+backend, and nothing else. It does not ask for approval. Three checks guard
+it instead: CI, the freshness check in every job that acts, and the
+public-contract check on the pull request that got the commit onto `main`.
+One-time setup is a deploy key from the Convex dashboard (production
+deployment → Settings → Deploy keys), added as the `CONVEX_DEPLOY_KEY` repo
+secret.
 
-1. Deploys Convex to production. One-time setup, in this order: add a
-   required reviewer to the GitHub `production` environment **before** adding
-   secrets, then add a deploy key from the Convex dashboard (production
-   deployment → Settings → Deploy keys) as the `CONVEX_DEPLOY_KEY` repo
-   secret. The required reviewer queues each backend deploy until they
-   approve it.
-2. Publishes an EAS Update to the `internal-test` channel (one-time setup:
-   `EXPO_TOKEN` repo secret from a robot access token at expo.dev). Testers
-   get the update only after the approved deploy lands, so a client never
-   ships ahead of the backend it depends on.
+No client update ships from here. Testers and users get a build or an OTA from
+the Release workflow below, which deploys the same commit's backend first, so a
+client never reaches anyone ahead of the functions it calls.
 
 **Store builds and production OTA** run through the Release workflow
 (`.github/workflows/release.yml`), dispatched manually from `main`: mode
 `build` runs `eas build` for the chosen platform/profile (`--auto-submit`
 once store credentials are configured on EAS; Android submits also need the
-`EAS_GOOGLE_SERVICE_ACCOUNT_KEY` repo secret — the base64 of the Play API
+`EAS_GOOGLE_SERVICE_ACCOUNT_KEY` repo secret, which holds the base64 of the Play API
 JSON key), mode `ota` publishes an EAS Update to the `production` channel.
+Both manual workflows require successful push CI for the selected `main`
+commit. Release deploys that commit's Convex backend before building or
+publishing, and shares Deploy's concurrency group to prevent interleaving.
+Release therefore also requires `CONVEX_DEPLOY_KEY`.
+Non-main dispatches fail with a branch-selection error. Before queueing any
+build with iOS submission enabled, Release verifies that EAS has a submission
+API key assigned to the production bundle and Apple team. Configure it with
+`eas credentials --platform ios` under the production profile's App Store
+Connect / EAS Submit settings. This checks the assignment, not revocation
+or permissions on Apple's servers.
 
 **OTA publishes require the EAS `production` environment.** With
-`--environment production`, `app.config.js` is resolved on EAS servers with
-that environment's variables, and the production-value guards in
-`app.config.js` only run during `eas build`. Both workflows fail fast unless
-`EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` are declared
-there (`eas env:set --name <name> --value <value> --environment production`).
+`--environment production`, updates use that environment's plaintext and
+sensitive variables; Secret values are unavailable. Both workflows pull the
+readable values into a temporary file and validate the production Convex
+deployment/site URLs and the iOS/Android RevenueCat public keys before
+publishing. Set them with `eas env:set --name <name> --value <value>
+--environment production --visibility sensitive`. The temporary file is
+deleted after validation, and validation errors never include values.
+The verifier also requires readable, nonempty `GOOGLE_MAPS_API_KEY`,
+`POSTHOG_PROJECT_TOKEN`, and an HTTPS `POSTHOG_HOST`. Set these explicitly
+with plaintext or sensitive visibility in EAS production so builds and
+updates use the same config inputs. Both environment validation and OTA
+publication pin `APP_VARIANT=production`.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
-change that alters it — a native dependency added or removed, a native
-config change — makes new updates invisible to binaries built from the old
-fingerprint. Cut a fresh store build before resuming OTA publishes.
+change that alters it makes new updates invisible to binaries built from the
+old fingerprint. That includes a native dependency added or removed, a native
+config change, or the `version` in `app.json`. Cut a fresh store build before
+resuming OTA publishes.
+
+The app version is the surprising input. Bumping 1.0.3 to 1.0.4 moved the
+iOS fingerprint from `d2537f3a` to `890e5366`, measured across two local
+production builds of the same commit differing only in that field. So a
+version bump has to land on `main` before any OTA aimed at the build that
+carries it, or every publish is invisible to the app it was meant for. The
+build number is not an input.
+
+**Building outside the workflow.** `eas build --local` runs on your own
+machine when EAS cloud minutes run out, but it is not guaranteed to produce
+the same artifact as a cloud worker: it ignores the `build.production.ios.image`
+pin in `eas.json` and builds against whatever Xcode and CocoaPods are already
+installed, so a machine that doesn't match the pinned image can fail or
+produce a binary built against a different SDK. Two concrete differences: it
+runs plain `pod install`, never `--repo-update`, so a stale CocoaPods cache
+fails the build on an unsatisfiable dependency. Run `pod repo update` first.
+And secret-visibility EAS variables never leave the builder, so
+`GOOGLE_SERVICES_JSON` is unreadable locally and an Android production build
+refuses to start; build Android in the cloud or supply that file another way.
 
 Ordering rule: installed clients update on their own schedule, so deploy
 backend changes the clients can tolerate first. Never push a Convex change an
-installed client can't survive — ship breaking changes as expand/contract
+installed client can't survive. Ship breaking changes as expand/contract
 (add the tolerant version, tighten once old clients are gone).
 
 ## Adding dependencies
@@ -247,5 +334,19 @@ pnpm --filter native-app add mypackage@latest
 ## Notes
 
 - Native routes live under `apps/native/src/app`
-- Web is marketing only at `/` — no authenticated `/app` product surface
+- Web is marketing only at `/`, with no authenticated `/app` product pages
 - See root `CLAUDE.md` for architecture guidance when working with agents
+- `assets/splash-blank.png` is a 1x1 transparent PNG and is meant to stay that
+  way. On iOS the `expo-splash-screen` plugin applies `backgroundColor` only
+  from inside `applyImageToSplashScreenXML`, which it calls only when `image`
+  is set (`withIosSplashScreenStoryboardImage.js`, `Boolean(splash.image)`).
+  With no `image` the generated storyboard keeps the bare template's
+  `systemBackgroundColor`, which is white or black, and the plugin ignores the
+  configured colour without a warning, even though it still writes the
+  colorset. Shelvr wants the brand ground with no mark, because the animated
+  splash draws its own S at 1.05s and a static one here would appear, vanish,
+  then pop back. The blank image makes the plugin apply the background, and
+  `imageWidth: 1` keeps it invisible. Verify after changing it: the generated
+  `ios/Shelvr/SplashScreen.storyboard` must say
+  `<color key="backgroundColor" name="SplashScreenBackground"/>`, not
+  `systemBackgroundColor`.

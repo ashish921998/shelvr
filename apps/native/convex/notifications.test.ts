@@ -1,14 +1,31 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestConvexForDataModel } from "convex-test";
 import { api, internal } from "./_generated/api";
-import type { DataModel } from "./_generated/dataModel";
+import type { DataModel, Id } from "./_generated/dataModel";
 import { nextWeeklyDigestAt } from "./model/notificationSchedule";
 import { DUE_DIGEST_BATCH_SIZE } from "./notifications";
-import { newConvexTest } from "./test.setup";
+import { archiveCheckOrder, shelfCandidates } from "./model/weeklyShelf";
+import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
+
+/** Ids of the accounts the current test signed in; set by `signInA` / `signInB`. */
+let userA = "";
+let userB = "";
+
+async function signInA(backend = newConvexTest()): Promise<TestCtx> {
+  const { t, userId } = await signedInUser(backend);
+  userA = userId;
+  return t;
+}
+
+async function signInB(backend: TestBackend): Promise<TestCtx> {
+  const { t, userId } = await signedInUser(backend);
+  userB = userId;
+  return t;
+}
 
 async function seedItem(
   t: TestCtx,
@@ -30,8 +47,8 @@ async function seedItem(
 describe("weekly shelf notifications", () => {
   it("updates only the caller's device locale and accepts older clients", async () => {
     const t = newConvexTest();
-    const owner = t.withIdentity({ subject: "user-a|session-1" });
-    const attacker = t.withIdentity({ subject: "user-b|session-2" });
+    const owner = await signInA(t);
+    const attacker = await signInB(t);
     await owner.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -64,7 +81,7 @@ describe("weekly shelf notifications", () => {
   it.each([NaN, Infinity, -Infinity, -1e100, Number.MAX_SAFE_INTEGER, 1.5])(
     "rejects invalid nextDigestAt %s without changing preferences",
     async (nextDigestAt) => {
-      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      const t = await signInA();
       await expect(
         t.mutation(api.notifications.setPreferences, {
           weeklyShelfEnabled: true,
@@ -80,8 +97,8 @@ describe("weekly shelf notifications", () => {
 
   it("revokes only a device owned by the caller and allows later registration", async () => {
     const t = newConvexTest();
-    const owner = t.withIdentity({ subject: "user-a|session-1" });
-    const other = t.withIdentity({ subject: "user-b|session-2" });
+    const owner = await signInA(t);
+    const other = await signInB(t);
     await owner.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -109,13 +126,13 @@ describe("weekly shelf notifications", () => {
     });
     expect(
       await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
-    ).toMatchObject({ userId: "user-b", enabled: true });
+    ).toMatchObject({ userId: userB, enabled: true });
   });
 
   it("refuses to re-bind another account's enabled token and leaves the row untouched", async () => {
     const t = newConvexTest();
-    const owner = t.withIdentity({ subject: "user-a|session-1" });
-    const attacker = t.withIdentity({ subject: "user-b|session-2" });
+    const owner = await signInA(t);
+    const attacker = await signInB(t);
     await owner.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -128,7 +145,12 @@ describe("weekly shelf notifications", () => {
         token: "token-a",
         platform: "android",
       }),
-    ).rejects.toThrow("registered to another account");
+    ).rejects.toMatchObject({
+      data: {
+        code: "notification_token_owned_by_another_account",
+        message: expect.stringContaining("registered to another account"),
+      },
+    });
     expect(
       await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
     ).toEqual(before);
@@ -139,7 +161,7 @@ describe("weekly shelf notifications", () => {
   });
 
   it("lets the owner refresh their own enabled token", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await t.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -153,7 +175,7 @@ describe("weekly shelf notifications", () => {
     );
     expect(devices).toHaveLength(1);
     expect(devices[0]).toMatchObject({
-      userId: "user-a",
+      userId: userA,
       platform: "android",
       enabled: true,
     });
@@ -161,8 +183,8 @@ describe("weekly shelf notifications", () => {
 
   it("supports an account switch on one device after the first account signs out", async () => {
     const t = newConvexTest();
-    const first = t.withIdentity({ subject: "user-a|session-1" });
-    const second = t.withIdentity({ subject: "user-b|session-2" });
+    const first = await signInA(t);
+    const second = await signInB(t);
     await first.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -179,7 +201,7 @@ describe("weekly shelf notifications", () => {
       ctx.db.query("notificationDevices").collect(),
     );
     expect(devices).toHaveLength(1);
-    expect(devices[0]).toMatchObject({ userId: "user-b", enabled: true });
+    expect(devices[0]).toMatchObject({ userId: userB, enabled: true });
     // Switching back works the same way.
     await second.mutation(api.notifications.unregisterDevice, {
       token: "token-a",
@@ -190,11 +212,11 @@ describe("weekly shelf notifications", () => {
     });
     expect(
       await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
-    ).toMatchObject({ userId: "user-a", enabled: true });
+    ).toMatchObject({ userId: userA, enabled: true });
   });
 
   it("rejects an unknown timezone at registration without writing anything", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await expect(
       t.mutation(api.notifications.registerDevice, {
         token: "token-a",
@@ -211,7 +233,7 @@ describe("weekly shelf notifications", () => {
   });
 
   it("rejects an unknown timezone in setPreferences and keeps the stored zone", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await t.mutation(api.notifications.setPreferences, {
       weeklyShelfEnabled: true,
       timezone: "Europe/Paris",
@@ -229,11 +251,11 @@ describe("weekly shelf notifications", () => {
   });
 
   it("prepares a digest and repairs preferences when the stored zone is invalid", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     const now = Date.now();
     await t.run((ctx) =>
       ctx.db.insert("notificationPreferences", {
-        userId: "user-a",
+        userId: userA,
         weeklyShelfEnabled: true,
         nextDigestAt: now - 1,
         timezone: "Mars/Olympus_Mons",
@@ -242,7 +264,7 @@ describe("weekly shelf notifications", () => {
     );
     await expect(
       t.mutation(internal.notifications.prepareWeeklyDigest, {
-        userId: "user-a",
+        userId: userA,
         now,
       }),
     ).resolves.toBeNull();
@@ -342,7 +364,7 @@ describe("weekly shelf notifications", () => {
   });
 
   it("keeps a newly registered device disabled and out of the due queue", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await t.mutation(api.notifications.registerDevice, {
       token: "ExponentPushToken[test]",
       platform: "ios",
@@ -361,10 +383,10 @@ describe("weekly shelf notifications", () => {
   });
 
   it("re-enables legacy sentinel preferences without inheriting the sentinel", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await t.run((ctx) =>
       ctx.db.insert("notificationPreferences", {
-        userId: "user-a",
+        userId: userA,
         weeklyShelfEnabled: false,
         nextDigestAt: Number.MAX_SAFE_INTEGER,
         timezone: "America/New_York",
@@ -382,7 +404,7 @@ describe("weekly shelf notifications", () => {
   });
 
   it("preserves a real schedule when disabled and repairs it if stale on enable", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await t.mutation(api.notifications.setPreferences, {
       weeklyShelfEnabled: true,
     });
@@ -409,7 +431,7 @@ describe("weekly shelf notifications", () => {
   it("processes opted-in users behind a full batch of legacy disabled preferences", async () => {
     vi.useFakeTimers();
     try {
-      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      const t = await signInA();
       const now = Date.now();
       await t.run(async (ctx) => {
         for (let i = 0; i < 50; i++) {
@@ -437,12 +459,12 @@ describe("weekly shelf notifications", () => {
   });
 
   it("excludes opened candidates even after more than 1000 historical reads", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     const now = Date.now();
     await t.run(async (ctx) => {
       for (let i = 0; i < 1003; i++) {
         const itemId = await ctx.db.insert("items", {
-          userId: "user-a",
+          userId: userA,
           type: "note",
           status: "ready",
           title: `Opened save ${i}`,
@@ -450,7 +472,7 @@ describe("weekly shelf notifications", () => {
           searchText: "opened save",
         });
         await ctx.db.insert("itemReads", {
-          userId: "user-a",
+          userId: userA,
           itemId,
           firstOpenedAt: now,
           lastOpenedAt: now,
@@ -462,15 +484,15 @@ describe("weekly shelf notifications", () => {
       nextDigestAt: now - 1,
     });
     await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: "user-a",
+      userId: userA,
       now,
     });
     expect(await t.query(api.notifications.getDigest, {})).toBeNull();
 
     const unopenedIds = await Promise.all([
-      seedItem(t, "user-a", "note"),
-      seedItem(t, "user-a", "note"),
-      seedItem(t, "user-a", "note"),
+      seedItem(t, userA, "note"),
+      seedItem(t, userA, "note"),
+      seedItem(t, userA, "note"),
     ]);
     await t.mutation(api.notifications.setPreferences, {
       weeklyShelfEnabled: true,
@@ -478,7 +500,7 @@ describe("weekly shelf notifications", () => {
     });
 
     await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: "user-a",
+      userId: userA,
       now,
     });
 
@@ -489,7 +511,7 @@ describe("weekly shelf notifications", () => {
   }, 20_000); // seeding 1003 reads can exceed the 5s default under coverage
 
   it("starts disabled until the user opts in", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
 
     expect(await t.query(api.notifications.getPreferences, {})).toMatchObject({
       weeklyShelfEnabled: false,
@@ -498,12 +520,12 @@ describe("weekly shelf notifications", () => {
   });
 
   it("tracks opened saves and creates a three-item digest", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     const itemIds = await Promise.all([
-      seedItem(t, "user-a", "link"),
-      seedItem(t, "user-a", "image"),
-      seedItem(t, "user-a", "note"),
-      seedItem(t, "user-a", "link"),
+      seedItem(t, userA, "link"),
+      seedItem(t, userA, "image"),
+      seedItem(t, userA, "note"),
+      seedItem(t, userA, "link"),
     ]);
     await t.mutation(api.notifications.markItemOpened, {
       itemId: itemIds[3],
@@ -516,7 +538,7 @@ describe("weekly shelf notifications", () => {
     });
 
     await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: "user-a",
+      userId: userA,
       now,
     });
 
@@ -529,11 +551,11 @@ describe("weekly shelf notifications", () => {
   });
 
   it("does not create a digest while disabled", async () => {
-    const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+    const t = await signInA();
     await Promise.all([
-      seedItem(t, "user-a", "link"),
-      seedItem(t, "user-a", "image"),
-      seedItem(t, "user-a", "note"),
+      seedItem(t, userA, "link"),
+      seedItem(t, userA, "image"),
+      seedItem(t, userA, "note"),
     ]);
     const now = Date.now();
     await t.mutation(api.notifications.setPreferences, {
@@ -542,10 +564,366 @@ describe("weekly shelf notifications", () => {
     });
 
     await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: "user-a",
+      userId: userA,
       now,
     });
 
     expect(await t.query(api.notifications.getDigest, {})).toBeNull();
+  });
+});
+
+describe("weekly shelf archive saves", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const START = Date.UTC(2026, 0, 4, 12);
+
+  /** The account predates every back-dated save: creation times never run backwards. */
+  async function user() {
+    vi.setSystemTime(START - DAY);
+    return await signInA();
+  }
+
+  async function seedAt(
+    t: TestCtx,
+    at: number,
+    type: "image" | "link" | "note",
+  ) {
+    vi.setSystemTime(at);
+    return await seedItem(t, userA, type);
+  }
+
+  async function prepare(t: TestCtx, now: number) {
+    vi.setSystemTime(now);
+    await t.mutation(api.notifications.setPreferences, {
+      weeklyShelfEnabled: true,
+      nextDigestAt: now - 1,
+    });
+    await t.mutation(internal.notifications.prepareWeeklyDigest, {
+      userId: userA,
+      now,
+    });
+    return await t.query(api.notifications.getDigest, {});
+  }
+
+  it("sends a shelf of older unopened saves when nothing was saved this week", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      const old = [
+        await seedAt(t, START, "link"),
+        await seedAt(t, START + DAY, "note"),
+        await seedAt(t, START + 2 * DAY, "image"),
+      ];
+      const opened = await seedAt(t, START + 3 * DAY, "link");
+      await t.mutation(api.notifications.markItemOpened, { itemId: opened });
+
+      const digest = await prepare(t, START + 90 * DAY);
+
+      expect(digest?.items.map((item) => item._id).sort()).toEqual(
+        [...old].sort(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps one slot for an older save beside this week's", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      const old = await seedAt(t, START, "note");
+      const now = START + 60 * DAY;
+      const recent = [
+        await seedAt(t, now - 3 * DAY, "link"),
+        await seedAt(t, now - 2 * DAY, "image"),
+        await seedAt(t, now - DAY, "note"),
+      ];
+
+      const digest = await prepare(t, now);
+      const ids = digest?.items.map((item) => item._id) ?? [];
+
+      expect(ids).toHaveLength(3);
+      expect(ids).toContain(old);
+      // This week's saves lead, so the push names one of them.
+      expect(ids[2]).toBe(old);
+      expect(recent).toEqual(expect.arrayContaining(ids.slice(0, 2)));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not bring back an archive save shown on a recent shelf", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      for (let i = 0; i < 4; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+
+      const first = await prepare(t, START + 60 * DAY);
+      const second = await prepare(t, START + 67 * DAY);
+
+      expect(first?.items).toHaveLength(3);
+      // Only one unseen save is left, which is not enough for a shelf.
+      expect(second?._id).toBe(first?._id);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tells delivery when the shelf holds older saves", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      for (let i = 0; i < 3; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+      const now = START + 60 * DAY;
+      const digest = await prepare(t, now);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("notificationDevices", {
+          userId: userA,
+          token: "live-a",
+          enabled: true,
+          platform: "ios",
+          lastSeenAt: now,
+        });
+      });
+
+      const claimed = await t.mutation(internal.notificationDelivery.claim, {
+        digestId: digest!._id,
+      });
+
+      expect(claimed?.olderIncluded).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("weekly shelf selection", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const START = Date.UTC(2026, 0, 4, 12);
+  const NOW = START + 120 * DAY;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function user() {
+    vi.setSystemTime(START - DAY);
+    return await signInA();
+  }
+
+  async function seedOld(t: TestCtx, count: number) {
+    for (let i = 0; i < count; i++) {
+      vi.setSystemTime(START + i * 60_000);
+      await seedItem(t, userA, "note");
+    }
+  }
+
+  async function seedRecent(t: TestCtx, count: number) {
+    const types = ["link", "image", "note"] as const;
+    const ids: Id<"items">[] = [];
+    for (let i = 0; i < count; i++) {
+      vi.setSystemTime(NOW - (count - i) * 60_000);
+      ids.push(await seedItem(t, userA, types[i % types.length]));
+    }
+    return ids.reverse(); // newest first, as the shelf orders them
+  }
+
+  /** The older saves in the order this week's preparation checks them. */
+  async function checkOrder(t: TestCtx) {
+    const items = await t.run((ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userA))
+        .order("desc")
+        .take(1000),
+    );
+    const { archive } = shelfCandidates(items, new Set(), NOW);
+    return archiveCheckOrder(archive, userA, NOW).map((item) => item._id);
+  }
+
+  async function markOpened(t: TestCtx, itemIds: Id<"items">[]) {
+    await t.run(async (ctx) => {
+      for (const itemId of itemIds) {
+        await ctx.db.insert("itemReads", {
+          userId: userA,
+          itemId,
+          firstOpenedAt: START,
+          lastOpenedAt: START,
+        });
+      }
+    });
+  }
+
+  /**
+   * Two read rows for one save make its read check throw (`.unique()`), so a
+   * preparation that succeeds proves the save was never checked.
+   */
+  async function poison(t: TestCtx, itemIds: Id<"items">[]) {
+    await markOpened(t, itemIds);
+    await markOpened(t, itemIds);
+  }
+
+  async function prepare(t: TestCtx) {
+    vi.setSystemTime(NOW);
+    await t.mutation(api.notifications.setPreferences, {
+      weeklyShelfEnabled: true,
+      nextDigestAt: NOW - 1,
+    });
+    await t.mutation(internal.notifications.prepareWeeklyDigest, {
+      userId: userA,
+      now: NOW,
+    });
+    return await t.query(api.notifications.getDigest, {});
+  }
+
+  const shelfIds = (digest: { items: { _id: string }[] } | null) =>
+    digest?.items.map((item) => item._id);
+
+  it("keeps two of a full week beside one older save", async () => {
+    const t = await user();
+    await seedOld(t, 5);
+    const recent = await seedRecent(t, 4);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual([
+      recent[0],
+      recent[1],
+      order[0],
+    ]);
+  });
+
+  it("adds one older save to two from this week", async () => {
+    const t = await user();
+    await seedOld(t, 5);
+    const recent = await seedRecent(t, 2);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual([...recent, order[0]]);
+  });
+
+  it("adds two older saves to one from this week", async () => {
+    const t = await user();
+    await seedOld(t, 5);
+    const recent = await seedRecent(t, 1);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual([recent[0], order[0], order[1]]);
+  });
+
+  it("fills a shelf from older saves when the week is empty", async () => {
+    const t = await user();
+    await seedOld(t, 5);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual(order.slice(0, 3));
+  });
+
+  it("keeps three from this week when every older save is opened", async () => {
+    const t = await user();
+    await seedOld(t, 4);
+    await markOpened(t, await checkOrder(t));
+    const recent = await seedRecent(t, 3);
+
+    expect(shelfIds(await prepare(t))).toEqual(recent);
+  });
+
+  it("skips opened older saves in check order", async () => {
+    const t = await user();
+    await seedOld(t, 6);
+    const order = await checkOrder(t);
+    await markOpened(t, [order[0], order[2]]);
+
+    expect(shelfIds(await prepare(t))).toEqual([order[1], order[3], order[4]]);
+  });
+
+  it("creates no shelf from fewer than three saves but still moves the schedule", async () => {
+    const t = await user();
+    await seedOld(t, 1);
+    await seedRecent(t, 1);
+
+    expect(await prepare(t)).toBeNull();
+    const preferences = await t.query(api.notifications.getPreferences, {});
+    expect(preferences.nextDigestAt).toBeGreaterThan(NOW);
+  });
+
+  it("fails a preparation that checks a poisoned save", async () => {
+    const t = await user();
+    await seedOld(t, 3);
+    await poison(t, [(await checkOrder(t))[0]]);
+
+    await expect(prepare(t)).rejects.toThrow();
+  });
+
+  it("stops checking older saves once a full week needs only one", async () => {
+    const t = await user();
+    await seedOld(t, 4);
+    const order = await checkOrder(t);
+    await poison(t, order.slice(1));
+    const recent = await seedRecent(t, 3);
+
+    expect(shelfIds(await prepare(t))).toEqual([
+      recent[0],
+      recent[1],
+      order[0],
+    ]);
+  });
+
+  it("stops checking older saves once the shelf is full", async () => {
+    const t = await user();
+    await seedOld(t, 6);
+    const order = await checkOrder(t);
+    await poison(t, order.slice(3));
+
+    expect(shelfIds(await prepare(t))).toEqual(order.slice(0, 3));
+  });
+
+  it("checks at most fifty older saves", async () => {
+    const t = await user();
+    await seedOld(t, 53);
+    const order = await checkOrder(t);
+    expect(order).toHaveLength(50);
+    await markOpened(t, order);
+    const unchecked = (
+      await t.run((ctx) =>
+        ctx.db
+          .query("items")
+          .withIndex("by_user", (q) => q.eq("userId", userA))
+          .collect(),
+      )
+    )
+      .map((item) => item._id)
+      .filter((id) => !order.includes(id));
+    expect(unchecked).toHaveLength(3);
+    await poison(t, unchecked);
+
+    // The three unopened saves sit past the fiftieth check, so none is found.
+    expect(await prepare(t)).toBeNull();
+  }, 20_000);
+
+  it("tells delivery a this-week shelf holds no older saves", async () => {
+    const t = await user();
+    await seedRecent(t, 3);
+    const digest = await prepare(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("notificationDevices", {
+        userId: userA,
+        token: "live-a",
+        enabled: true,
+        platform: "ios",
+        lastSeenAt: NOW,
+      });
+    });
+
+    const claimed = await t.mutation(internal.notificationDelivery.claim, {
+      digestId: digest!._id,
+    });
+
+    expect(claimed?.olderIncluded).toBe(false);
   });
 });

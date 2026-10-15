@@ -5,17 +5,15 @@ import {
   BottomSheetView,
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
-import { parseExifDate } from "@/lib/date";
-import { resolvePickedImageLocation } from "@/lib/picked-image-location";
+import { pickAndSaveImages } from "@/lib/pick-and-save-images";
 import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
-import { saveErrorCode } from "@convex/model/saveErrors";
+import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import * as Clipboard from "expo-clipboard";
+import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -31,6 +29,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+import { typedLink } from "@/lib/url";
 
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
@@ -39,36 +38,24 @@ type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
  * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
 
-/** Read a link from the clipboard for the article prefill. `getUrlAsync` is
- * iOS-only, so Android reads the raw string and keeps it only when it parses as
- * an http(s) URL. A failed read resolves to null instead of rejecting. */
-async function readClipboardUrl(): Promise<string | null> {
-  try {
-    if (Platform.OS === "ios") {
-      return (await Clipboard.getUrlAsync()) ?? null;
-    }
-    const text = (await Clipboard.getStringAsync()).trim();
-    if (text === "") return null;
-    return new URL(text).protocol.startsWith("http") ? text : null;
-  } catch {
-    return null;
-  }
-}
-
 function ActionButton({
   icon,
   label,
   onPress,
   disabled,
+  testID,
 }: {
   icon: AppSymbolName;
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  testID?: string;
 }) {
   const { theme } = useUnistyles();
   return (
     <Pressable
+      testID={testID}
+      accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}
       style={[styles.action, disabled && { opacity: 0.4 }]}
@@ -150,38 +137,63 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const { theme } = useUnistyles();
   const router = useRouter();
   // Opened from inside a space: everything saved here is pre-pinned to it.
-  const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
+  // `mode=note` opens straight into the note composer (Home's save card).
+  const { spaceId, mode: startMode } = useLocalSearchParams<{
+    spaceId?: string;
+    mode?: string;
+  }>();
   const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
   const [mode, setMode] = useState<Mode>("menu");
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
+  const inputRef = useRef<TextInput>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro — route to the paywall before composing if not entitled.
+  // Saving is Pro: route to the paywall before composing if not entitled.
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
+
+  // A composer opened straight from a link opens only once the Pro guard
+  // passes, so nothing is typed into a composer the paywall then closes.
+  const startChecked = useRef(false);
+  useEffect(() => {
+    if (startMode !== "note" || entitlementLoading || startChecked.current) {
+      return;
+    }
+    startChecked.current = true;
+    void guard().then((entitled) => {
+      if (entitled) setMode("note");
+    });
+  }, [startMode, entitlementLoading, guard]);
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
 
-  // Prefill the article field with a link already on the clipboard.
+  // Android's Material sheet resizes to the composer over ~300ms, and a
+  // keyboard opened mid-resize can land behind it, so focus once it settles.
   useEffect(() => {
-    if (mode !== "article") return;
-    let active = true;
-    readClipboardUrl().then((url) => {
-      if (active && url) setValue((current) => current || url);
-    });
+    if (Platform.OS !== "android" || mode === "menu") return;
+    focusTimer.current = setTimeout(() => inputRef.current?.focus(), 350);
     return () => {
-      active = false;
+      if (focusTimer.current) clearTimeout(focusTimer.current);
     };
   }, [mode]);
+
+  // The sheet keeps this content mounted through its hide animation, so a
+  // pending focus must be dropped when dismissal starts, or the keyboard
+  // would come back up mid-close.
+  const dismiss = () => {
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+    close();
+  };
 
   const success = () => {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    close();
+    dismiss();
   };
 
   const openComposer = (next: Mode) => {
@@ -191,24 +203,52 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const save = async () => {
     if (!canSave) return;
+    // Checked here so typed text that is not a link never reaches the server,
+    // whose refusal would only surface as the generic failure alert.
+    const link = mode === "article" ? typedLink(trimmed) : null;
+    if (mode === "article" && link === null) {
+      Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
+      return;
+    }
     setSaving(true);
+    // The first-save funnel: the submission's attempt event, with the entry
+    // source the server's `item_saved` will carry too.
+    const saveSource = mode === "article" ? "manual_link" : "note";
+    const saveKind = mode === "article" ? "link" : "note";
+    const operationId = `${saveKind}:${Crypto.randomUUID()}`;
+    analytics.capture("save_attempt_started", {
+      save_source: saveSource,
+      save_kind: saveKind,
+      operation_id: operationId,
+    });
     try {
       if (mode === "article") {
         await createLinkItem({
-          url: trimmed,
+          url: link ?? trimmed,
           spaceId: pinnedSpaceId,
+          operationId,
           analyticsSessionId: analytics.sessionId(),
+          saveSource: "manual_link",
         });
       } else {
         await createNoteItem({
           text: trimmed,
           spaceId: pinnedSpaceId,
+          operationId,
           analyticsSessionId: analytics.sessionId(),
         });
       }
       analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
     } catch (error) {
+      // The bounded stage: the server's structured refusal code when it sent
+      // one, `other` for a network failure or a redacted error.
+      analytics.capture("save_failed", {
+        save_source: saveSource,
+        save_kind: saveKind,
+        stage: saveFailureStage(error),
+        operation_id: operationId,
+      });
       setSaving(false);
       // Pro can lapse while the composer is open. The paywall is the only
       // useful next step, so show it instead of a generic failure alert.
@@ -226,6 +266,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   // route, and the partial-failure alert.
   const runImageRequests = useSaveImageBatch({
     spaceId: pinnedSpaceId,
+    saveSource: "photo_import",
     paywallPlacement: PAYWALL_PLACEMENT,
     setBusy: setSaving,
     onAllSaved: (results) => {
@@ -235,37 +276,14 @@ function AddContent({ close, openCamera }: AddContentProps) {
       }
       success();
     },
-    onDismiss: close,
+    onDismiss: dismiss,
     onUnexpectedError: (error) => {
       analytics.captureError("image_upload_failed", error);
       Alert.alert(t("errors.saveTitle"), t("errors.batchUpload"));
     },
   });
 
-  const pickImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 0.8,
-      exif: true,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-    await runImageRequests(
-      await Promise.all(
-        result.assets.map(async (asset) => ({
-          image: {
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-            mimeType: asset.mimeType,
-            capturedAt: parseExifDate(asset.exif),
-            ...(await resolvePickedImageLocation(asset)),
-          },
-        })),
-      ),
-    );
-  };
+  const pickImages = () => pickAndSaveImages(runImageRequests);
 
   const isComposer = mode === "note" || mode === "article";
   const isArticle = mode === "article";
@@ -285,7 +303,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
         }}
       />
       {/* Each platform mounts exactly one persistent title so changes cascade
-          between "Save something" / "New note" / "Save an article". */}
+          between "Save something" / "New note" / "Save a link". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
           <AnimatedText text={title} style={styles.heading} truncate />
@@ -325,6 +343,8 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
       {isComposer ? (
         <TextInput
+          ref={inputRef}
+          testID={isArticle ? "add-article-input" : "add-note-input"}
           style={isArticle ? styles.articleInput : styles.noteInput}
           value={value}
           onChangeText={setValue}
@@ -334,7 +354,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
               : t("capture.notePlaceholder")
           }
           placeholderTextColor={theme.colors.muted}
-          autoFocus
+          autoFocus={Platform.OS !== "android"}
           multiline={!isArticle}
           autoCapitalize={isArticle ? "none" : "sentences"}
           autoCorrect={!isArticle}
@@ -343,15 +363,18 @@ function AddContent({ close, openCamera }: AddContentProps) {
           onSubmitEditing={isArticle ? save : undefined}
           editable={!saving}
         />
-      ) : (
+      ) : null}
+      {isComposer ? null : (
         <View style={styles.actions}>
           <ActionButton
+            testID="add-option-note"
             icon="square.and.pencil"
             label={t("item.note")}
             onPress={() => guard(() => openComposer("note"))}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
+            testID="add-option-article"
             icon="link"
             label={t("item.article")}
             onPress={() => guard(() => openComposer("article"))}
@@ -498,6 +521,10 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 18,
     color: theme.colors.foreground,
     minHeight: 120,
+    // The Android sheet sizes to its content above the keyboard. An uncapped
+    // note would grow the sheet until the header and its Save button leave
+    // the screen, so long notes scroll inside the field instead.
+    maxHeight: Platform.OS === "android" ? 240 : undefined,
     padding: theme.gap(1.5),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",

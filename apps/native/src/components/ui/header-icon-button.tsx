@@ -40,8 +40,6 @@ export function HeaderIconButton({
   );
 }
 
-type HeaderMenuAction = ActionMenuItem;
-
 export function HeaderActionMenu({
   icon,
   label,
@@ -51,7 +49,7 @@ export function HeaderActionMenu({
   icon: AppSymbolName;
   label: string;
   title: string;
-  actions: HeaderMenuAction[];
+  actions: ActionMenuItem[];
 }) {
   const { theme } = useUnistyles();
 

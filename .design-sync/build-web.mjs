@@ -80,6 +80,14 @@ const webGaps = {
       contents: 'export class AsyncLocalStorage { getStore() {} run(_s, cb) { return cb(); } }',
       loader: 'js',
     }));
+    // expo-image imports `expo`, whose web entry loads Metro's lazy-bundle
+    // loader and, under __DEV__, its fast-refresh, HMR and message sockets.
+    // There is no Metro server behind a design, so the sockets only log
+    // connection errors.
+    b.onLoad({ filter: /[\\/]expo[\\/]src[\\/]async-require[\\/](index|setup)\.ts$/ }, () => ({
+      contents: '',
+      loader: 'js',
+    }));
     // The unistyles plugin rewrites imports to components/native/<Name>. Its
     // exports map targets extensionless files, which Metro resolves and esbuild
     // doesn't; point at the browser build (<Name>.js, not <Name>.native.js).
@@ -131,24 +139,51 @@ const iconNames = new Set(
   [...mapBlock.matchAll(/^\s*(?:"([^"]+)"|([A-Za-z_$][\w$]*))\s*:/gm)].map((m) => m[1] ?? m[2]),
 );
 const cfg = JSON.parse(readFileSync(join(HERE, 'config.json'), 'utf8'));
-for (const [component, prop] of [
-  ['AppSymbolIcon', 'name'],
-  ['HeaderIconButton', 'icon'],
+// ThemedText's `variant` is the type ramp, hand-written for the same reason.
+const themeSrc = readFileSync(join(NATIVE, 'src/unistyles.ts'), 'utf8');
+const rampStart = themeSrc.indexOf('  type: {');
+const rampBlock = themeSrc.slice(rampStart, themeSrc.indexOf('\n  },', rampStart));
+const rampNames = new Set([...rampBlock.matchAll(/^ {4}(\w+): \{/gm)].map((m) => m[1]));
+for (const [component, prop, names, source] of [
+  ['AppSymbolIcon', 'name', iconNames, 'symbol.tsx'],
+  ['HeaderIconButton', 'icon', iconNames, 'symbol.tsx'],
+  ['SettingsRow', 'icon', iconNames, 'symbol.tsx'],
+  ['ThemedText', 'variant', rampNames, 'unistyles.ts theme.type'],
 ]) {
   const body = cfg.dtsPropsFor?.[component] ?? '';
   const segment = new RegExp(`(?:^|;)\\s*${prop}\\??:([^;]*)`).exec(body)?.[1] ?? '';
   const listed = new Set([...segment.matchAll(/'([^']+)'/g)].map((m) => m[1]));
-  const missing = [...iconNames].filter((n) => !listed.has(n));
-  const extra = [...listed].filter((n) => !iconNames.has(n));
-  if (!iconNames.size || missing.length || extra.length) {
+  const missing = [...names].filter((n) => !listed.has(n));
+  const extra = [...listed].filter((n) => !names.has(n));
+  if (!names.size || missing.length || extra.length) {
     console.error(
-      `build-web: config.json dtsPropsFor.${component} \`${prop}\` is out of sync with symbol.tsx` +
+      `build-web: config.json dtsPropsFor.${component} \`${prop}\` is out of sync with ${source}` +
         (missing.length ? `\n  missing: ${missing.join(', ')}` : '') +
-        (extra.length ? `\n  not in symbol.tsx: ${extra.join(', ')}` : '') +
-        (iconNames.size ? '' : '\n  (no names parsed from SF_TO_MATERIAL)'),
+        (extra.length ? `\n  not in ${source}: ${extra.join(', ')}` : '') +
+        (names.size ? '' : `\n  (no names parsed from ${source})`),
     );
     process.exit(1);
   }
+}
+
+// ItemCardFace's `item` is the app's FeedItem, too long for the converter, so
+// the fields a designer sets are hand-written. Fail when one leaves FeedItem.
+const faceSrc = readFileSync(join(NATIVE, 'src/components/item-card-face.tsx'), 'utf8');
+const feedItemStart = faceSrc.indexOf('export type FeedItem = {');
+const feedItemFields = new Set(
+  [...faceSrc.slice(feedItemStart, faceSrc.indexOf('\n};', feedItemStart)).matchAll(/^ {2}(\w+)\??:/gm)].map(
+    (m) => m[1],
+  ),
+);
+const faceItem = /^item: \{(.*?)\}; menuActions:/.exec(cfg.dtsPropsFor?.ItemCardFace ?? '')?.[1] ?? '';
+const faceFields = [...faceItem.replace(/\{[^}]*\}/g, '').matchAll(/(\w+)\??:/g)].map((m) => m[1]);
+const staleFields = faceFields.filter((f) => !feedItemFields.has(f));
+if (!faceFields.length || staleFields.length) {
+  console.error(
+    'build-web: config.json dtsPropsFor.ItemCardFace `item` is out of sync with FeedItem in item-card-face.tsx' +
+      (staleFields.length ? `\n  not in FeedItem: ${staleFields.join(', ')}` : '\n  (no fields parsed)'),
+  );
+  process.exit(1);
 }
 
 // -- bundle ---------------------------------------------------------------------

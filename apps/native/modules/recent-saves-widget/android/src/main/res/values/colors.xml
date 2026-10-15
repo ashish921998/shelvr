@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shelvr palette, mirrored from src/unistyles.ts (same values as the iOS widget). -->
+<resources>
+  <color name="recent_saves_widget_background">#FAF6EE</color>
+  <color name="recent_saves_widget_tile">#F3ECDD</color>
+  <color name="recent_saves_widget_foreground">#2B2418</color>
+  <color name="recent_saves_widget_muted">#6F6455</color>
+  <color name="recent_saves_widget_accent">#E6A23C</color>
+</resources>

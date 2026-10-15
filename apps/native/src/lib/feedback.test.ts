@@ -61,18 +61,12 @@ beforeEach(() => {
   kv.clear();
 });
 
-it("does not invite or claim a submission when analytics is opted out or disabled", async () => {
+it("gates only the invitation on analytics availability — submission no longer travels through PostHog", () => {
   posthogMock.optedOut = true;
   expect(feedbackAnalytics.isAvailable()).toBe(false);
-  expect(await feedbackAnalytics.submitFeedback("profile", "Feedback")).toBe(
-    "unavailable",
-  );
   posthogMock.optedOut = false;
   posthogMock.isDisabled = true;
   expect(feedbackAnalytics.isAvailable()).toBe(false);
-  expect(await feedbackAnalytics.submitFeedback("profile", "Feedback")).toBe(
-    "unavailable",
-  );
   expect(posthogMock.capture).not.toHaveBeenCalled();
 });
 
@@ -236,33 +230,6 @@ describe("review prompt coordination", () => {
     const at = lastNativeReviewPromptAt();
     expect(at).not.toBeNull();
     expect(at! >= before).toBe(true);
-  });
-});
-
-describe("feedbackAnalytics.submitFeedback", () => {
-  it("queues the typed message with base properties on an explicit send", async () => {
-    const result = await feedbackAnalytics.submitFeedback(
-      "home",
-      "Love the feed",
-    );
-    expect(result).toBe("queued");
-    expect(posthogMock.capture).toHaveBeenCalledWith("feedback_submitted", {
-      surface: "home",
-      message: "Love the feed",
-      char_count: 13,
-      environment: "development",
-      analytics_version: 1,
-    });
-    expect(posthogMock.flush).toHaveBeenCalled();
-  });
-
-  it("reports failure honestly when capture throws", async () => {
-    posthogMock.capture.mockImplementation(() => {
-      throw new Error("boom");
-    });
-    const result = await feedbackAnalytics.submitFeedback("profile", "hello");
-    expect(result).toBe("failed");
-    posthogMock.capture.mockImplementation(() => {});
   });
 });
 

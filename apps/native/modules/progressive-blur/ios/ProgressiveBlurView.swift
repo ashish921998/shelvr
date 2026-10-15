@@ -12,7 +12,24 @@ import UIKit
 // opacity is faded out by a gradient `CALayer` mask. The result is a close
 // visual approximation, not a true per-pixel variable-radius blur.
 class ProgressiveBlurView: ExpoView {
-  private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .regular))
+  // A plain `.regular` blur smears text but leaves it legible; what makes text
+  // under a system navigation bar unreadable is the tint `.systemChromeMaterial`
+  // layers over its blur. That tint is a system grey-white though, so on a
+  // paper-coloured page the band read as a different colour from the body.
+  // This lays the page's own background over the blur instead (`pageColor`),
+  // so the band mutes what scrolls under it while staying the page's colour.
+  private let blurView = UIVisualEffectView(
+    effect: UIBlurEffect(style: .regular)
+  )
+  private let tintView = UIView()
+  // How much of the page colour sits over the blur. Chrome material lands
+  // around here; lower and text under the band reads through, higher and the
+  // blur stops showing at all.
+  private let tintOpacity: CGFloat = 0.72
+
+  var pageColor: UIColor? {
+    didSet { tintView.backgroundColor = pageColor?.withAlphaComponent(tintOpacity) }
+  }
 
   // Opacity mask on the whole effect view. A UIVisualEffectView draws a faint
   // hairline at its own bottom edge no matter its blur radius; only fading the
@@ -27,6 +44,26 @@ class ProgressiveBlurView: ExpoView {
   // left un-clipped so this overhang survives.
   private let edgeMargin: CGFloat = 48
 
+  // Where the fade begins when it is kept inside the band (`fadePastHeader`
+  // zero), as a fraction of the band. The blur then reads at full strength over
+  // the status bar and has largely faded by the navigation bar below it.
+  private let insetFadeStart: CGFloat = 0.6
+
+  /// How far below the band the fade finishes, in points. Zero keeps the fade
+  /// inside the band; a positive value holds full-strength blur across the
+  /// whole band and finishes the fade this far into the content — what a header
+  /// whose own text fills the band needs, since an inset fade has already
+  /// dissolved where that text sits. Clamped to the overhang so the effect
+  /// view's hairline still lands in fully-transparent territory.
+  var fadePastHeader: CGFloat = 0 {
+    didSet {
+      // Assigning inside didSet does not re-enter it, so the clamp is safe here.
+      fadePastHeader = min(max(fadePastHeader, 0), edgeMargin)
+      guard fadePastHeader != oldValue else { return }
+      setNeedsLayout()
+    }
+  }
+
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
     // The blur is purely decorative and must never intercept touches meant for
@@ -34,6 +71,10 @@ class ProgressiveBlurView: ExpoView {
     blurView.isUserInteractionEnabled = false
     isUserInteractionEnabled = false
     blurView.layer.mask = maskLayer
+    tintView.isUserInteractionEnabled = false
+    tintView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // Inside the effect view's contentView so the same opacity mask fades it.
+    blurView.contentView.addSubview(tintView)
     addSubview(blurView)
   }
 
@@ -46,35 +87,35 @@ class ProgressiveBlurView: ExpoView {
     // to zero by the header's bottom edge and stays zero through the overhang.
     let totalSize = CGSize(width: bounds.width, height: bounds.height + edgeMargin)
     blurView.frame = CGRect(origin: .zero, size: totalSize)
+    tintView.frame = blurView.contentView.bounds
     updateOpacityMask(bandHeight: bounds.height, totalSize: totalSize)
   }
 
-  /// Feathers the whole effect view's opacity to zero across the bottom of the
-  /// band so its backdrop layer's hard edge is never visible. Opaque through the
-  /// upper part so the public blur reads at full strength; below the header edge
-  /// the terminal clear color fills the overhang.
+  /// Fades the whole effect view's opacity to zero so its backdrop layer's hard
+  /// edge is never visible. The gradient axis spans the fade alone:
+  /// CAGradientLayer holds its first color above `startPoint` (opaque, so the
+  /// blur reads at full strength there) and its last one below `endPoint`
+  /// (clear, masking out the overhang), which leaves only the fade to describe.
   private func updateOpacityMask(bandHeight: CGFloat, totalSize: CGSize) {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     defer { CATransaction.commit() }
 
     maskLayer.frame = CGRect(origin: .zero, size: totalSize)
-    maskLayer.startPoint = CGPoint(x: 0.5, y: 0)
-    // Gradient axis ends at the header's bottom edge; CAGradientLayer extends the
-    // terminal (clear) color beyond it, masking out the overhang entirely.
-    maskLayer.endPoint = CGPoint(x: 0.5, y: bandHeight / totalSize.height)
 
-    let featherStart: CGFloat = 0.6
+    let fadeStart = fadePastHeader > 0 ? bandHeight : bandHeight * insetFadeStart
+    let fadeEnd = bandHeight + fadePastHeader
+    maskLayer.startPoint = CGPoint(x: 0.5, y: fadeStart / totalSize.height)
+    maskLayer.endPoint = CGPoint(x: 0.5, y: fadeEnd / totalSize.height)
+
     let steps = 48
-    var colors: [CGColor] = [UIColor.white.cgColor]
-    var locations: [NSNumber] = [0]
+    var colors: [CGColor] = []
+    var locations: [NSNumber] = []
     for i in 0...steps {
-      let f = featherStart + (1 - featherStart) * CGFloat(i) / CGFloat(steps)
-      let u = (f - featherStart) / (1 - featherStart)   // 0 -> 1 across the feather
+      let u = CGFloat(i) / CGFloat(steps)
       let smootherstep = u * u * u * (u * (u * 6 - 15) + 10)
-      let alpha = 1 - smootherstep
-      colors.append(UIColor.white.withAlphaComponent(alpha).cgColor)
-      locations.append(NSNumber(value: Double(f)))
+      colors.append(UIColor.white.withAlphaComponent(1 - smootherstep).cgColor)
+      locations.append(NSNumber(value: Double(u)))
     }
     maskLayer.colors = colors
     maskLayer.locations = locations

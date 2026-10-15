@@ -1,14 +1,8 @@
 import { t } from "./i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 
-// Stable survey/preset identities remain compatible with persisted onboarding.
+// Stable kind and preset identities remain compatible with persisted onboarding.
 const LABELS: Record<string, TextMessageKey> = {
-  "X bookmarks": "survey.xBookmarks",
-  "Instagram saved": "survey.instagram",
-  Screenshots: "survey.screenshots",
-  "Notes app": "survey.notesApp",
-  "Browser tabs": "survey.browserTabs",
-  Everywhere: "survey.everywhere",
   Articles: "presets.articles",
   Recipes: "presets.recipes",
   Products: "presets.products",
@@ -27,6 +21,24 @@ const LABELS: Record<string, TextMessageKey> = {
   Workouts: "presets.workouts",
   Ideas: "presets.ideas",
   "Watch later": "presets.watchLater",
+  Coffee: "interests.coffee",
+  AI: "interests.ai",
+  Tech: "interests.tech",
+  Startups: "interests.startups",
+  Business: "interests.business",
+  "Interior design": "interests.interiorDesign",
+  Architecture: "interests.architecture",
+  Books: "interests.books",
+  Money: "interests.money",
+  Productivity: "interests.productivity",
+  Design: "interests.design",
+  Photography: "interests.photography",
+  Films: "interests.films",
+  Anime: "interests.anime",
+  Music: "interests.music",
+  Gaming: "interests.gaming",
+  Science: "interests.science",
+  Wellness: "interests.wellness",
 };
 
 export function onboardingLabel(id: string): string {

@@ -25,6 +25,10 @@ import type { DataModel } from "./dataModel.js";
  * Typesafe environment variables declared in `convex.config.ts`.
  */
 type Env = {
+  readonly APPLE_RETENTION_MESSAGE_ID: string | undefined;
+  readonly APPLE_REVOKE_KEY_ID: string | undefined;
+  readonly APPLE_REVOKE_PRIVATE_KEY: string | undefined;
+  readonly APPLE_REVOKE_TEAM_ID: string | undefined;
   readonly AUTH_ENABLE_ANONYMOUS: string | undefined;
   readonly GOOGLE_GENERATIVE_AI_API_KEY: string;
   readonly OBSERVABILITY_ENV: string | undefined;
@@ -32,12 +36,17 @@ type Env = {
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
   readonly RESEND_ANDROID_SEGMENT_ID: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
+  readonly RESEND_FEEDBACK_FROM_EMAIL: string | undefined;
+  readonly RESEND_FEEDBACK_INBOX_EMAIL: string | undefined;
   readonly RESEND_SEGMENT_ID: string | undefined;
   readonly RESEND_TOPIC_ID: string | undefined;
   readonly REVENUECAT_API_KEY: string | undefined;
   readonly REVENUECAT_ENTITLEMENT_ID: string | undefined;
   readonly REVENUECAT_WEBHOOK_SECRET: string | undefined;
+  readonly SAVE_REMINDERS_ENABLED: string | undefined;
   readonly SERPAPI_KEY: string | undefined;
+  readonly TREG_API_KEY: string | undefined;
+  readonly VIDEO_TRANSCRIPTS_ENABLED: string | undefined;
   readonly WAITLIST_SHARED_SECRET: string | undefined;
 };
 

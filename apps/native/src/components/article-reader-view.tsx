@@ -1,28 +1,32 @@
 import { t, useAppLocale, formattingLocale } from "@/lib/i18n";
 import { TagChip } from "@/components/tag-chip";
 import { ProductsSection } from "@/components/products-section";
+import { RecipeSection } from "@/components/recipe-section";
 import { ItemSpaces } from "@/components/item-spaces";
-import { analytics } from "@/lib/analytics";
+import { PostMediaButton } from "@/components/post-media-button";
 import { displayHost } from "@/lib/url";
 import { SimilarGrid } from "@/components/similar-grid";
+import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import type { DetailItem } from "@/components/item-detail";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import * as WebBrowser from "expo-web-browser";
 import type { Id } from "@convex/_generated/dataModel";
-import { useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type Space = { _id: Id<"spaces">; name: string };
+
+type ArticleMedia = NonNullable<DetailItem["articleMedia"]>[number];
 
 type Props = {
   item: DetailItem;
@@ -51,6 +55,68 @@ export function ArticleReaderView({
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  // A picture that fails to load falls back to the monogram too. Keyed by
+  // URL, so a recycled page with a new picture tries it.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const window = useWindowDimensions();
+
+  // Media after the last stored paragraph shows at the end.
+  const mediaByParagraph = useMemo(() => {
+    const byParagraph = new Map<number, ArticleMedia[]>();
+    for (const media of item.articleMedia ?? []) {
+      const at = Math.min(media.paragraph, paragraphs.length);
+      byParagraph.set(at, [...(byParagraph.get(at) ?? []), media]);
+    }
+    return byParagraph;
+  }, [item.articleMedia, paragraphs.length]);
+
+  // A recycled reader instance must open at the top of its article.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledItemRef = useRef(item._id);
+  useLayoutEffect(() => {
+    if (scrolledItemRef.current === item._id) return;
+    scrolledItemRef.current = item._id;
+    setTagsExpanded(false);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [item._id]);
+
+  const openSource = () => openItemSource(item);
+
+  // Full body width, but a tall video poster stops at 60% of the screen.
+  const mediaFrame = (aspectRatio: number) => {
+    const width = Math.min(
+      window.width - theme.gap(2.5) * 2,
+      window.height * 0.6 * aspectRatio,
+    );
+    return { width, height: width / aspectRatio };
+  };
+
+  const mediaAt = (paragraph: number) =>
+    mediaByParagraph.get(paragraph)?.map((media, index) => {
+      const image = (
+        <Image
+          source={{ uri: media.imageUrl }}
+          recyclingKey={`${item._id}-media-${index}`}
+          contentFit="cover"
+          style={[styles.articleMedia, mediaFrame(media.aspectRatio)]}
+        />
+      );
+      return (
+        <View key={`media-${index}`} style={styles.articleMediaRow}>
+          {media.kind !== "photo" && item.url ? (
+            <PostMediaButton
+              site={item.siteName ?? displayHost(item.url)}
+              playable
+              onPress={openSource}
+            >
+              {image}
+            </PostMediaButton>
+          ) : (
+            image
+          )}
+        </View>
+      );
+    });
 
   const compactTags = item.tags.slice(0, 2);
   const remainingTagCount = Math.max(item.tags.length - compactTags.length, 0);
@@ -63,24 +129,43 @@ export function ArticleReaderView({
     .filter(Boolean)
     .join(" · ");
 
-  const thumbnail = heroUri ? (
-    <Image
-      source={{ uri: heroUri }}
-      contentFit="cover"
-      style={styles.thumbnailImage}
-    />
-  ) : (
-    <View style={styles.thumbnailFallback}>
-      <AppSymbolIcon
-        name="link"
-        size={22}
-        tintColor={theme.colors.primaryText}
+  // A save with no picture shows its site's first letter, like a book spine.
+  // Array.from keeps an emoji or other astral first character whole.
+  const monogram = Array.from(displayHost(item.url))[0]?.toLocaleUpperCase();
+  const thumbnail =
+    heroUri && heroUri !== failedUri ? (
+      <Image
+        source={{ uri: heroUri }}
+        recyclingKey={item._id}
+        contentFit="cover"
+        style={styles.thumbnailImage}
+        onError={() => setFailedUri(heroUri)}
       />
-    </View>
-  );
+    ) : (
+      // Not collapsable: the zoom target flattens a plain view, which drew
+      // the fallback as an empty box.
+      <View collapsable={false} style={styles.thumbnailFallback}>
+        {monogram ? (
+          <Text
+            style={styles.monogram}
+            maxFontSizeMultiplier={1}
+            accessible={false}
+          >
+            {monogram}
+          </Text>
+        ) : (
+          <AppSymbolIcon
+            name="link"
+            size={22}
+            tintColor={theme.colors.primaryText}
+          />
+        )}
+      </View>
+    );
 
   return (
     <ScrollView
+      ref={scrollRef}
       testID={
         item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
       }
@@ -92,7 +177,7 @@ export function ArticleReaderView({
       <View style={styles.body}>
         {item.status === "processing" ? (
           <View style={styles.processingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <StitchRing />
             <Text style={styles.processingText}>{t("item.reading")}</Text>
           </View>
         ) : null}
@@ -109,36 +194,16 @@ export function ArticleReaderView({
           <View style={styles.summaryCopy}>
             <View style={styles.sourceLine}>
               {item.url ? (
-                <Pressable
-                  accessibilityRole="link"
-                  accessibilityLabel={t("item.openSite", {
-                    site: item.siteName ?? displayHost(item.url),
-                  })}
-                  hitSlop={6}
+                <ItemSourceLink
+                  item={item}
+                  iconTintColor={theme.colors.muted}
+                  arrowTintColor={theme.colors.faint}
                   style={({ pressed }) => [
                     styles.source,
                     pressed && styles.pressed,
                   ]}
-                  onPress={() => {
-                    void WebBrowser.openBrowserAsync(item.url!)
-                      .then(() => analytics.itemAction(item, "open_source"))
-                      .catch(() => {});
-                  }}
-                >
-                  <AppSymbolIcon
-                    name="safari"
-                    size={13}
-                    tintColor={theme.colors.muted}
-                  />
-                  <Text numberOfLines={1} style={styles.sourceText}>
-                    {item.siteName ?? displayHost(item.url)}
-                  </Text>
-                  <AppSymbolIcon
-                    name="arrow.up.right"
-                    size={10}
-                    tintColor={theme.colors.faint}
-                  />
-                </Pressable>
+                  textStyle={styles.sourceText}
+                />
               ) : null}
             </View>
 
@@ -182,21 +247,36 @@ export function ArticleReaderView({
           </View>
         ) : null}
 
-        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
 
-        <View style={styles.article}>
-          {paragraphs.map((paragraph, index) => (
-            <Text
-              selectable
-              key={index}
-              style={[styles.paragraph, index === 0 && styles.lede]}
-            >
-              {paragraph}
-            </Text>
-          ))}
-        </View>
+        {/* A recipe page replaces the article body: the classifier already
+            lifted the ingredients and steps out of the story around them. The
+            article's own images go with that story, since their positions are
+            paragraph-relative and the paragraphs are gone. */}
+        {item.recipe ? (
+          <RecipeSection key={item._id} recipe={item.recipe} />
+        ) : (
+          <View style={styles.article}>
+            {paragraphs.map((paragraph, index) => (
+              <Fragment key={index}>
+                {mediaAt(index)}
+                <Text
+                  selectable
+                  style={[styles.paragraph, index === 0 && styles.lede]}
+                >
+                  {paragraph}
+                </Text>
+              </Fragment>
+            ))}
+            {mediaAt(paragraphs.length)}
+          </View>
+        )}
 
-        {item.status === "ready" ? <ProductsSection item={item} /> : null}
+        {item.status === "ready" ? (
+          <ProductsSection item={item} inset={theme.gap(2.5)} />
+        ) : null}
 
         {similar && similar.length > 0 ? (
           <View style={styles.similarSection}>
@@ -250,6 +330,12 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
+  },
+  monogram: {
+    fontFamily: theme.fonts.display,
+    fontSize: 34,
+    lineHeight: 40,
+    color: theme.colors.primaryText,
   },
   summaryCopy: {
     flex: 1,
@@ -323,6 +409,14 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 19,
     lineHeight: 28,
+  },
+  articleMediaRow: {
+    alignItems: "center",
+  },
+  articleMedia: {
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
   },
   pressed: {
     opacity: 0.7,

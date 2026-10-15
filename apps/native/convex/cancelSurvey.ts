@@ -15,7 +15,7 @@ import {
  * person": existence of a row is the ask, and the first recorded outcome
  * wins. Local device state cannot guarantee this across installs or devices.
  *
- * The ask is consumed only when the card actually renders on screen — the
+ * The ask is consumed only when the card actually renders on screen: the
  * client calls `markShown` from the card's mount, never at detection time,
  * so closing the app on a loading screen leaves the ask unspent.
  *
@@ -45,8 +45,8 @@ export const getStatus = query({
 /**
  * Consume the ask durably. Returns whether THIS call won the race: a second
  * call (relaunch, another device racing the same moment) is a no-op and is
- * told it lost, so the client can keep PostHog in lockstep with this row —
- * one shown event per account, and a losing card comes down. The account is
+ * told it lost, so the client can keep PostHog in lockstep with this row
+ * (one shown event per account), and a losing card comes down. The account is
  * spent exactly once no matter how many installations race.
  */
 export const markShown = mutation({
@@ -65,7 +65,7 @@ export const markShown = mutation({
 
 /**
  * Record how the ask ended. First response wins: once `outcome` is set, a
- * later call (stale device, reinstall) is ignored. Lenient about ordering —
+ * later call (stale device, reinstall) is ignored. Lenient about ordering:
  * a response may arrive before `markShown` lands (e.g. an offline queue
  * flushes out of order) and creates the row itself.
  */
@@ -90,8 +90,8 @@ export const respond = mutation({
       return { accepted: true };
     }
     // First outcome wins: a late (or cross-device) response is told it lost,
-    // so the client can keep PostHog in lockstep with this row — one
-    // submission event per account, never conflicting reasons.
+    // so the client can keep PostHog in lockstep with this row (one
+    // submission event per account, never conflicting reasons).
     if (existing.outcome !== undefined) return { accepted: false };
     await ctx.db.patch(existing._id, {
       outcome: args.outcome,

@@ -7,7 +7,7 @@ import { beginProcessingRun } from "./items";
 import { requireUserId } from "./model/auth";
 import { demoError } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
-import { isTerminalFailure } from "./model/itemFields";
+import { isTerminalFailure, MAX_ITEM_TITLE_CHARS } from "./model/itemFields";
 import { insertMembership } from "./model/memberships";
 import { validateSpaceName } from "./model/spaceName";
 import { rateLimiter } from "./model/rateLimiter";
@@ -103,10 +103,15 @@ export const createDemoItem = mutation({
     url: v.string(),
     spaceName: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
+    // The heading the onboarding preview showed, kept so the save comes back
+    // under the same name. Older builds omit it.
+    title: v.optional(v.string()),
   },
   returns: v.object({
     itemId: v.id("items"),
+    userId: v.string(),
     url: v.string(),
+    urlMatchesRequest: v.boolean(),
     reused: v.boolean(),
     savedSpaceNames: v.array(v.string()),
   }),
@@ -124,9 +129,17 @@ export const createDemoItem = mutation({
       if (item === null || item.userId !== userId || !item.url) {
         throw demoError("demo_used");
       }
+      let urlMatchesRequest = false;
+      try {
+        urlMatchesRequest = normalizeExternalUrl(args.url) === item.url;
+      } catch {
+        // A repeat stays idempotent even when its new URL is invalid.
+      }
       return {
         itemId: existing.itemId,
+        userId,
         url: item.url,
+        urlMatchesRequest,
         reused: true,
         savedSpaceNames: await savedSpaceNames(ctx, existing.itemId),
       };
@@ -142,10 +155,20 @@ export const createDemoItem = mutation({
     // Same run stamp as every other save, so finalizeItem/failItem fence this
     // run and the stale sweeper measures from now rather than creation.
     const run = beginProcessingRun();
+    // The heading the onboarding preview showed for a sample the person
+    // picked, kept as theirs so the save matches what they chose. The client
+    // sends it only for that sample's own URL. A title past the limit is a
+    // hint lost, not an error: the classifier names the save instead.
+    const title = args.title?.trim() ?? "";
+    const keptTitle =
+      title !== "" && title.length <= MAX_ITEM_TITLE_CHARS
+        ? { title, titleSource: "user" as const }
+        : {};
     const itemId = await ctx.db.insert("items", {
       userId,
       type: "link",
       ...run,
+      ...keptTitle,
       url,
       tags: [],
       searchText: "",
@@ -171,10 +194,13 @@ export const createDemoItem = mutation({
       itemType: "link",
       savedAt: item?._creationTime ?? Date.now(),
       sessionId: args.analyticsSessionId?.slice(0, 128),
+      saveSource: "onboarding_demo",
     });
     return {
       itemId,
+      userId,
       url,
+      urlMatchesRequest: true,
       reused: false,
       savedSpaceNames: destination !== undefined ? [destination] : [],
     };
@@ -188,8 +214,8 @@ export const createDemoItem = mutation({
  * the `demoRetry` rate limiter (cooldown) and `retryCount` (total cap).
  *
  * Same gate as `reprocessItem`: a terminal failure (the page is gone) is
- * refused outright — it would spend a classification without changing the
- * result — and consumes neither the retry cap nor the rate-limit bucket.
+ * refused outright (it would spend a classification without changing the
+ * result) and consumes neither the retry cap nor the rate-limit bucket.
  */
 export const retryDemoItem = mutation({
   args: {},

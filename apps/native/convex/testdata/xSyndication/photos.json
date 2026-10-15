@@ -1,0 +1,505 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 481,
+  "lang": "ja",
+  "possibly_sensitive": false,
+  "created_at": "2022-05-04T13:30:00.000Z",
+  "display_text_range": [0, 20],
+  "entities": {
+    "hashtags": [
+      {
+        "indices": [13, 20],
+        "text": "スーパーカブ"
+      }
+    ],
+    "media": [
+      {
+        "display_url": "pic.x.com/zJ8IC61x1i",
+        "expanded_url": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+        "indices": [21, 44],
+        "url": "https://t.co/zJ8IC61x1i"
+      }
+    ]
+  },
+  "id_str": "1521844593804906496",
+  "text": "GWなので再放送です☺\n #スーパーカブ https://t.co/zJ8IC61x1i",
+  "user": {
+    "id_str": "115694863",
+    "name": "まるよ",
+    "screen_name": "maruyo_",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1347203444801564673/u1Pgno0U_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": ["1521844593804906496"],
+    "editable_until_msecs": "1651672800000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/zJ8IC61x1i",
+      "expanded_url": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "ext_alt_text": "江ノ電カブネキからすっかりネタに走ってますがたまにまじめに描いてはいるのです。トークショーからもうそろそろ１か月でスタンプラリーももうすぐ終わりですね。5/8までなのでまだ間に合いますYO",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [21, 44],
+      "media_url_https": "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 672,
+            "w": 1200,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1103,
+            "w": 1103,
+            "x": 19,
+            "y": 0
+          },
+          {
+            "h": 1103,
+            "w": 968,
+            "x": 86,
+            "y": 0
+          },
+          {
+            "h": 1103,
+            "w": 552,
+            "x": 294,
+            "y": 0
+          },
+          {
+            "h": 1103,
+            "w": 1200,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1103,
+        "width": 1200
+      },
+      "sizes": {
+        "large": {
+          "h": 1103,
+          "resize": "fit",
+          "w": 1200
+        },
+        "medium": {
+          "h": 1103,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 625,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/zJ8IC61x1i"
+    },
+    {
+      "display_url": "pic.x.com/zJ8IC61x1i",
+      "expanded_url": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "ext_alt_text": "これはメタルギアがネタですねｗ",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [21, 44],
+      "media_url_https": "https://pbs.twimg.com/media/FRu0eYwVEAAso2d.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 672,
+            "w": 1200,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 862,
+            "w": 862,
+            "x": 78,
+            "y": 0
+          },
+          {
+            "h": 862,
+            "w": 756,
+            "x": 131,
+            "y": 0
+          },
+          {
+            "h": 862,
+            "w": 431,
+            "x": 294,
+            "y": 0
+          },
+          {
+            "h": 862,
+            "w": 1200,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 862,
+        "width": 1200
+      },
+      "sizes": {
+        "large": {
+          "h": 862,
+          "resize": "fit",
+          "w": 1200
+        },
+        "medium": {
+          "h": 862,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 488,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/zJ8IC61x1i"
+    },
+    {
+      "display_url": "pic.x.com/zJ8IC61x1i",
+      "expanded_url": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "ext_alt_text": "トークショー脳内作画。礼子さんがおしとやかで小熊はそのまんまという感じですｗ　バイク歴は真逆なのでライディング講座をするとか面白かったです。現地にいた人は優勝。なんと外からでも見ることができるようにしてくれるという神対応だったので最後まで居残った人は全員見られたはず（と思う）",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [21, 44],
+      "media_url_https": "https://pbs.twimg.com/media/FRu0eY2UUAE54PD.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 672,
+            "w": 1200,
+            "x": 0,
+            "y": 54
+          },
+          {
+            "h": 1029,
+            "w": 1029,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1029,
+            "w": 903,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1029,
+            "w": 515,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 1029,
+            "w": 1200,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 1029,
+        "width": 1200
+      },
+      "sizes": {
+        "large": {
+          "h": 1029,
+          "resize": "fit",
+          "w": 1200
+        },
+        "medium": {
+          "h": 1029,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 583,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/zJ8IC61x1i"
+    },
+    {
+      "display_url": "pic.x.com/zJ8IC61x1i",
+      "expanded_url": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "ext_alt_text": "情報量の多い画像です。配役はすぐこれだ！と思ったわけですｗ",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [21, 44],
+      "media_url_https": "https://pbs.twimg.com/media/FRu0eY9VcAEZluY.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 672,
+            "w": 1200,
+            "x": 0,
+            "y": 305
+          },
+          {
+            "h": 977,
+            "w": 977,
+            "x": 80,
+            "y": 0
+          },
+          {
+            "h": 977,
+            "w": 857,
+            "x": 140,
+            "y": 0
+          },
+          {
+            "h": 977,
+            "w": 489,
+            "x": 324,
+            "y": 0
+          },
+          {
+            "h": 977,
+            "w": 1200,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 977,
+        "width": 1200
+      },
+      "sizes": {
+        "large": {
+          "h": 977,
+          "resize": "fit",
+          "w": 1200
+        },
+        "medium": {
+          "h": 977,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 554,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/zJ8IC61x1i"
+    }
+  ],
+  "photos": [
+    {
+      "accessibilityLabel": "江ノ電カブネキからすっかりネタに走ってますがたまにまじめに描いてはいるのです。トークショーからもうそろそろ１か月でスタンプラリーももうすぐ終わりですね。5/8までなのでまだ間に合いますYO",
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 672,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1103,
+          "w": 1103,
+          "x": 19,
+          "y": 0
+        },
+        {
+          "h": 1103,
+          "w": 968,
+          "x": 86,
+          "y": 0
+        },
+        {
+          "h": 1103,
+          "w": 552,
+          "x": 294,
+          "y": 0
+        },
+        {
+          "h": 1103,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "url": "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg",
+      "width": 1200,
+      "height": 1103
+    },
+    {
+      "accessibilityLabel": "これはメタルギアがネタですねｗ",
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 672,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 862,
+          "w": 862,
+          "x": 78,
+          "y": 0
+        },
+        {
+          "h": 862,
+          "w": 756,
+          "x": 131,
+          "y": 0
+        },
+        {
+          "h": 862,
+          "w": 431,
+          "x": 294,
+          "y": 0
+        },
+        {
+          "h": 862,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "url": "https://pbs.twimg.com/media/FRu0eYwVEAAso2d.jpg",
+      "width": 1200,
+      "height": 862
+    },
+    {
+      "accessibilityLabel": "トークショー脳内作画。礼子さんがおしとやかで小熊はそのまんまという感じですｗ　バイク歴は真逆なのでライディング講座をするとか面白かったです。現地にいた人は優勝。なんと外からでも見ることができるようにしてくれるという神対応だったので最後まで居残った人は全員見られたはず（と思う）",
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 672,
+          "w": 1200,
+          "x": 0,
+          "y": 54
+        },
+        {
+          "h": 1029,
+          "w": 1029,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1029,
+          "w": 903,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1029,
+          "w": 515,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 1029,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "url": "https://pbs.twimg.com/media/FRu0eY2UUAE54PD.jpg",
+      "width": 1200,
+      "height": 1029
+    },
+    {
+      "accessibilityLabel": "情報量の多い画像です。配役はすぐこれだ！と思ったわけですｗ",
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 672,
+          "w": 1200,
+          "x": 0,
+          "y": 305
+        },
+        {
+          "h": 977,
+          "w": 977,
+          "x": 80,
+          "y": 0
+        },
+        {
+          "h": 977,
+          "w": 857,
+          "x": 140,
+          "y": 0
+        },
+        {
+          "h": 977,
+          "w": 489,
+          "x": 324,
+          "y": 0
+        },
+        {
+          "h": 977,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/maruyo_/status/1521844593804906496/photo/1",
+      "url": "https://pbs.twimg.com/media/FRu0eY9VcAEZluY.jpg",
+      "width": 1200,
+      "height": 977
+    }
+  ],
+  "conversation_count": 2,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

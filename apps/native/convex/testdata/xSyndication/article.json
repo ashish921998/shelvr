@@ -1,0 +1,66 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 127,
+  "lang": "zxx",
+  "possibly_sensitive": false,
+  "created_at": "2026-09-07T21:24:32.000Z",
+  "display_text_range": [0, 23],
+  "entities": {
+    "urls": [
+      {
+        "display_url": "x.com/i/article/2097…",
+        "expanded_url": "https://x.com/i/article/2097060822207909888",
+        "indices": [0, 23],
+        "url": "https://t.co/PsVIPfKmAa"
+      }
+    ]
+  },
+  "id_str": "2097073557868056925",
+  "text": "https://t.co/PsVIPfKmAa",
+  "user": {
+    "id_str": "1778946034581803008",
+    "name": "Adam",
+    "screen_name": "adamtwtz",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2097072667912290304/tcUcXSB4_normal.jpg",
+    "highlighted_label": {
+      "badge": {
+        "url": "https://pbs.twimg.com/profile_images/2002456460467298304/z5ilgLvM_bigger.jpg"
+      },
+      "description": "Content Rewards",
+      "url": {
+        "url": "https://twitter.com/contentrewards",
+        "url_type": "DeepLink"
+      },
+      "user_label_display_type": "Badge",
+      "user_label_type": "BusinessLabel"
+    }
+  },
+  "edit_control": {
+    "edit_tweet_ids": ["2097073557868056925"],
+    "editable_until_msecs": "1788819872000",
+    "edits_remaining": "5",
+    "is_edit_eligible": false
+  },
+  "conversation_count": 8,
+  "news_action_type": "conversation",
+  "article": {
+    "cover_media": {
+      "id": "QXBpTWVkaWE6DAAFCgABHRpC3HfbAAAKAAIYsBX+QdaQAAAA",
+      "media_info": {
+        "__typename": "ApiImage",
+        "original_img_height": 600,
+        "original_img_url": "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg",
+        "original_img_width": 1500
+      }
+    },
+    "id": "QXJ0aWNsZUVudGl0eToyMDk3MDYwODIyMjA3OTA5ODg4",
+    "preview_text": "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.\nit's a GLP-1 tracking app, and they've been running one campaign since April.\nthe",
+    "rest_id": "2097060822207909888",
+    "title": "How this GLP-1 app generated 20m+ views"
+  },
+  "isEdited": false,
+  "isStaleEdit": false
+}

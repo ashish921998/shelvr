@@ -1,5 +1,5 @@
 // Persistent incoming-share session store. The share target can be killed at
-// any point — mid-save, after backend success but before the native payload is
+// any point: mid-save, after backend success but before the native payload is
 // cleared, or after the clear but before local state is deleted. This module
 // records enough of the session to reconcile every one of those windows on the
 // next launch, so a successful entry is never re-saved (duplicate) and a failed
@@ -7,22 +7,35 @@
 //
 // The contract the UI layer relies on, in plain terms:
 //
-//   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the
+//   1. fingerprintSharePayloads(rawPayloads): a collision-free encoding of the
 //      current raw shared payload batch (order + duplicates included). Two
-//      distinct batches must never share a fingerprint, so a deliberate later
-//      re-share of identical content is its own fresh session rather than
-//      matching a stale completed one.
-//   2. reconcileSession(userId, rawPayloads) — returns exactly one of:
+//      distinct batches must never share a fingerprint. On Android the last
+//      completed batch also leaves a tombstone (recordCompletedShare), and a
+//      later batch with the same fingerprint from the same user is treated as
+//      the OS replaying that share: entries it already saved are skipped
+//      silently. So a deliberate re-share of identical content is a fresh
+//      session only once another share has replaced the tombstone, or the
+//      saved item was deleted in the app (forgetDeletedShareItem).
+//   2. reconcileSession(userId, rawPayloads) returns exactly one of:
 //        { kind: 'new', session }     start a brand-new session for this batch
 //        { kind: 'resume', session }  same batch + user as an active session: retry pending/failed
 //        { kind: 'clear', session }   same batch + user as a COMPLETED session: clear native
 //                                     payloads. NOTE: reconcileSession does NOT delete the record
-//                                     here — a throwing clear must stay retryable on remount, so
+//                                     here: a throwing clear must stay retryable on remount, so
 //                                     the caller deletes it only after a non-throwing clear.
 //        { kind: 'empty' }            no raw payloads: drop any stale local session
+//        { kind: 'ghost' }            no session record, but the batch matches the last
+//                                     completed one (see recordCompletedShare). Android keeps
+//                                     the last share SEND intent in the task record and
+//                                     re-delivers it to onCreate after a process death, so
+//                                     reopening the app from recents replays the previous share
+//                                     as if it were fresh. A fresh sessionId would mint a fresh
+//                                     operationId and the backend ledger could not dedupe, so the
+//                                     last-saved item would be saved again. The caller skips it
+//                                     quietly: the batch is already in Shelvr.
 //      Sessions are scoped to userId: a record left by a different user (account
 //      switch) is treated as no session, never matched.
-//   3. updateEntry / markComplete / deleteSession — mutate the persisted session
+//   3. updateEntry / markComplete / deleteSession: mutate the persisted session
 //      in place. Each takes an optional sessionId scope so an in-flight run whose
 //      record was replaced mid-flight cannot mutate the newer session.
 
@@ -44,15 +57,31 @@ export type RawSharePayload = {
   mimeType?: string;
 };
 
+export const MAX_SHARE_ENTRIES = 20;
+export const MAX_SHARE_TEXT_BYTES = 256 * 1024;
+
+export function shareBatchAllowed(
+  payloads: readonly RawSharePayload[],
+): boolean {
+  if (payloads.length > MAX_SHARE_ENTRIES) return false;
+  let bytes = 0;
+  for (const payload of payloads) {
+    if (payload.value.length > MAX_SHARE_TEXT_BYTES) return false;
+    bytes += new TextEncoder().encode(payload.value).byteLength;
+    if (bytes > MAX_SHARE_TEXT_BYTES) return false;
+  }
+  return true;
+}
+
 /** The kind of item a resolved entry will save as. `unsupported` covers audio,
  * video, file, and any future content type the share target deliberately does
- * not import — it is reported, never silently coerced into a note. */
+ * not import. It is reported, never silently coerced into a note. */
 export type ShareEntryKind = "link" | "note" | "image" | "unsupported";
 
 export type ShareEntryStatus = "pending" | "saved" | "failed" | "unsupported";
 
 /** A single resolved share entry plus its stable operation id and outcome. The
- * operation id is `share:<session>:<index>` — index is the entry's position in
+ * operation id is `share:<session>:<index>`, where index is the entry's position in
  * the RAW payloads array, so it survives resolution reordering and is stable
  * across remounts/process-restart. */
 export type ShareEntry = {
@@ -74,7 +103,7 @@ export type ShareSession = {
   fingerprint: string;
   /** The authenticated user (Convex Auth user id) this session belongs to. A record
    * left by a prior account must never be matched by a new user, even if the
-   * share content is identical — otherwise switching accounts can silently drop
+   * share content is identical; otherwise switching accounts can silently drop
    * the new user's share by matching a stale completed session. loadSession and
    * reconcileSession treat a userId mismatch as "no session" (start fresh). */
   userId: string;
@@ -102,18 +131,27 @@ const ENTRY_KINDS = new Set<ShareEntryKind>([
 
 export const SESSION_KEY = "incoming-share-session";
 
+/** Tombstone of the most recently completed (or cancelled) share batch, used
+ * to detect Android task-restore ghost redeliveries. Survives completion,
+ * unlike the session record, which is single-use by design. Scoped to the
+ * authenticated user, like sessions: a prior account's tombstone must never
+ * match a new user's identical share. */
+export const LAST_COMPLETED_SHARE_KEY = "last-completed-share";
+
 // ---------------------------------------------------------------------------
 // Fingerprinting
 // ---------------------------------------------------------------------------
 
 /** A stable, unambiguous encoding of a raw payload batch. JSON of an array of
- * {value, shareType, mimeType} objects — never delimiter concatenation, which
+ * {value, shareType, mimeType} objects, never delimiter concatenation, which
  * can collide across distinct batches (e.g. `"a|b"` vs `"a","b"`). Order and
  * duplicates are preserved so two identical entries in one batch stay distinct
  * and a re-ordering reads as a different batch (a new session). */
 export function fingerprintSharePayloads(
   rawPayloads: RawSharePayload[],
 ): string {
+  if (!shareBatchAllowed(rawPayloads))
+    throw new Error("Share batch is too large");
   // Sort object keys for determinism: an undefined mimeType serialized as
   // {mimeType: undefined} vs {mimeType omitted} must not flip the fingerprint.
   const normalized = rawPayloads.map((p) => ({
@@ -138,6 +176,8 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
   const raw = store.getString(SESSION_KEY);
   if (raw === undefined) return null;
   try {
+    if (raw.length > MAX_SHARE_TEXT_BYTES * 2)
+      throw new Error("Oversized share session");
     const parsed = JSON.parse(raw) as Partial<ShareSession>;
     if (
       typeof parsed.version !== "number" ||
@@ -150,9 +190,10 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
       (parsed.phase !== "active" && parsed.phase !== "complete") ||
       !Array.isArray(parsed.entries) ||
       parsed.entries.length === 0 ||
+      parsed.entries.length > MAX_SHARE_ENTRIES ||
       !parsed.entries.every(isValidEntry)
     ) {
-      // Unknown/incompatible shape — drop it so a fresh session starts clean.
+      // Unknown/incompatible shape: drop it so a fresh session starts clean.
       store.remove(SESSION_KEY);
       return null;
     }
@@ -207,10 +248,11 @@ type ReconcileResult =
   | { kind: "empty" }
   | { kind: "new"; session: ShareSession }
   | { kind: "resume"; session: ShareSession }
-  | { kind: "clear"; session: ShareSession };
+  | { kind: "clear"; session: ShareSession }
+  | { kind: "ghost" };
 
 /** The single entry point the UI calls on every render/mount with the current
- * raw shared payloads. It decides — atomically with respect to the store —
+ * raw shared payloads. It decides, atomically with respect to the store,
  * whether this batch is brand-new, an active session to resume, a completed
  * session whose native payloads must be cleared, or empty.
  *
@@ -219,18 +261,18 @@ type ReconcileResult =
  * session and a fresh one starts, so a prior account's completed session can
  * never silently drop the new user's identical share.
  *
- * Completed-state is single-use: a fingerprint (and user) match alone is NOT a
- * durable "drop this share" signal. The caller clears native payloads and
- * deletes the record only after a non-throwing clear — reconcileSession itself
+ * Completed-state is single-use: the caller clears native payloads and
+ * deletes the record only after a non-throwing clear; reconcileSession itself
  * does NOT delete a completed record, so a throwing clear stays retryable on
- * remount. */
+ * remount. The durable "skip this share" signal is the separate Android
+ * tombstone read by ghostRedelivery, which outlives the session record. */
 export function reconcileSession(
   store: SessionStoreAdapter,
   userId: string,
   rawPayloads: RawSharePayload[],
   generateSessionId: () => string,
 ): ReconcileResult {
-  // No native payloads. Drop any stale local session — there is nothing to
+  // No native payloads. Drop any stale local session: there is nothing to
   // resume or clear.
   if (rawPayloads.length === 0) {
     deleteSession(store);
@@ -240,17 +282,32 @@ export function reconcileSession(
   const currentFp = fingerprintSharePayloads(rawPayloads);
   const existing = loadSession(store);
 
-  // A session from a different user, or no session at all: start fresh. The
-  // mismatched record is replaced by newSession below.
+  // A session from a different user, or no session at all: normally start
+  // fresh, but if this exact batch was just handled, it is (almost certainly)
+  // an Android task-restore ghost, not a user action. A stale record from a
+  // DIFFERENT batch stays a genuine 'new' (its own fingerprint mismatch path
+  // below handles it).
   if (existing === null || existing.userId !== userId) {
+    const settled = ghostRedelivery(store, currentFp, userId);
+    // Every entry already settled: nothing left to save, skip the replay.
+    if (
+      settled !== null &&
+      rawPayloads.every((_, i) => settled.some((e) => e.index === i))
+    ) {
+      return { kind: "ghost" };
+    }
+    // A match whose batch only partly saved (or failed) is not skipped: the
+    // settled entries carry over so only the rest is attempted, and a retry
+    // after a failure is never swallowed.
     return {
       kind: "new",
-      session: newSession(
+      session: startNewSession(
         store,
         userId,
         currentFp,
         rawPayloads,
         generateSessionId,
+        settled ?? [],
       ),
     };
   }
@@ -258,10 +315,10 @@ export function reconcileSession(
   if (existing.fingerprint !== currentFp) {
     // Different batch: a new share superseded the previous one. Start fresh,
     // replacing the stale record. (The previous session's native payloads are
-    // gone — a new share cannot arrive while old ones linger natively.)
+    // gone: a new share cannot arrive while old ones linger natively.)
     return {
       kind: "new",
-      session: newSession(
+      session: startNewSession(
         store,
         userId,
         currentFp,
@@ -289,30 +346,179 @@ export function reconcileSession(
 
 /** Allocates a brand-new active session for `rawPayloads` and persists it. All
  * entries start `pending`; the processor assigns their kind/status as it
- * resolves and saves them. */
-function newSession(
+ * resolves and saves them. `settled` entries (from a partly saved replay)
+ * start in their settled status, so the processor never saves them again. */
+export function startNewSession(
   store: SessionStoreAdapter,
   userId: string,
   fp: string,
   rawPayloads: RawSharePayload[],
   generateSessionId: () => string,
+  settled: SettledEntry[] = [],
 ): ShareSession {
+  if (!shareBatchAllowed(rawPayloads))
+    throw new Error("Share batch is too large");
   const sessionId = generateSessionId();
+  const byIndex = new Map(settled.map((e) => [e.index, e]));
   const session: ShareSession = {
     version: SESSION_SCHEMA_VERSION,
     fingerprint: fp,
     userId,
     sessionId,
     phase: "active",
-    entries: rawPayloads.map((_, index) => ({
-      index,
-      operationId: operationIdFor(sessionId, index),
-      kind: "link", // placeholder; the processor classifies each entry
-      status: "pending",
-    })),
+    entries: rawPayloads.map((_, index): ShareEntry => {
+      const done = byIndex.get(index);
+      return {
+        index,
+        operationId: operationIdFor(sessionId, index),
+        // "link" is a placeholder; the processor classifies each entry.
+        kind: done?.status === "unsupported" ? "unsupported" : "link",
+        status: done?.status ?? "pending",
+        ...(done?.itemId !== undefined ? { itemId: done.itemId } : {}),
+      };
+    }),
   };
   saveSession(store, session);
   return session;
+}
+
+// ---------------------------------------------------------------------------
+// Ghost-redelivery tombstone (Android task restore)
+// ---------------------------------------------------------------------------
+
+/** An entry of a completed batch that needs no further attempt: saved (with
+ * its item id, so a sibling link reuses it) or unsupported. */
+export type SettledEntry = {
+  index: number;
+  status: "saved" | "unsupported";
+  itemId?: string;
+};
+
+/** The entries of `entries` that need no further attempt. */
+export function settledEntries(entries: ShareEntry[]): SettledEntry[] {
+  const settled: SettledEntry[] = [];
+  for (const e of entries) {
+    if (e.status !== "saved" && e.status !== "unsupported") continue;
+    settled.push({
+      index: e.index,
+      status: e.status,
+      ...(e.itemId !== undefined ? { itemId: e.itemId } : {}),
+    });
+  }
+  return settled;
+}
+
+/** Records the batch that just finished its handoff (saved, continued, or
+ * cancelled; any path through the share screen's completion), with which of
+ * its entries settled, so a replay skips only what is already in Shelvr.
+ * Replaces any prior tombstone. Android only: iOS never replays a share. Takes
+ * the completing user's id so a tombstone left by one account never matches
+ * another account's identical batch (the ghost check is user-scoped). */
+export function recordCompletedShare(
+  store: SessionStoreAdapter,
+  fingerprint: string,
+  userId: string,
+  settled: SettledEntry[],
+): void {
+  store.set(
+    LAST_COMPLETED_SHARE_KEY,
+    JSON.stringify({ digest: digestFingerprint(fingerprint), userId, settled }),
+  );
+}
+
+/** A one-way digest of a fingerprint. The tombstone outlives the session, so
+ * it keeps only this digest, never the shared URLs or note text themselves.
+ * Sync because reconcileSession is sync (expo-crypto only hashes async).
+ * cyrb53, 53 bits, not cryptographic; a collision would skip a
+ * genuinely new share, so move to SHA-256 only if the reconcile path goes
+ * async. */
+function digestFingerprint(fingerprint: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < fingerprint.length; i++) {
+    const ch = fingerprint.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/** The settled entries of the user's last handled batch when this
+ * fingerprint matches it, else null. A tombstone written before settled
+ * entries were recorded reads as null: it was written for failed batches
+ * too, so it cannot prove anything saved, and a retry must not be dropped. */
+function ghostRedelivery(
+  store: SessionStoreAdapter,
+  fingerprint: string,
+  userId: string,
+): SettledEntry[] | null {
+  const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
+  if (raw === undefined) return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      digest?: unknown;
+      userId?: unknown;
+      settled?: unknown;
+    };
+    // A tombstone from a different account is not this user's ghost: their
+    // identical share is a genuine new share.
+    if (
+      parsed.userId !== userId ||
+      parsed.digest !== digestFingerprint(fingerprint)
+    ) {
+      return null;
+    }
+    if (!Array.isArray(parsed.settled) || !parsed.settled.every(isSettled)) {
+      store.remove(LAST_COMPLETED_SHARE_KEY);
+      return null;
+    }
+    return parsed.settled;
+  } catch {
+    store.remove(LAST_COMPLETED_SHARE_KEY);
+    return null;
+  }
+}
+
+/** Forgets a deleted item in the last-share tombstone. The tombstone can only
+ * tell a replay from a deliberate re-share by content, so without this, sharing
+ * a link again after deleting its save would be skipped as a replay and the
+ * save lost. Dropping just this item's settled entries makes a later identical
+ * batch save it again, while its other still-saved entries are still skipped. */
+export function forgetDeletedShareItem(
+  store: SessionStoreAdapter,
+  itemId: string,
+): void {
+  const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
+  if (raw === undefined) return;
+  let parsed: { settled?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { settled?: unknown };
+  } catch {
+    store.remove(LAST_COMPLETED_SHARE_KEY);
+    return;
+  }
+  if (!Array.isArray(parsed.settled)) return;
+  const settled = parsed.settled.filter(
+    (e) => !(isSettled(e) && e.itemId === itemId),
+  );
+  if (settled.length === parsed.settled.length) return;
+  store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ ...parsed, settled }));
+}
+
+function isSettled(value: unknown): value is SettledEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.index === "number" &&
+    Number.isInteger(e.index) &&
+    e.index >= 0 &&
+    (e.status === "saved" || e.status === "unsupported") &&
+    (e.itemId === undefined || typeof e.itemId === "string")
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +527,7 @@ function newSession(
 
 /** Updates one entry by index and persists the result. No-op (and no write) if
  * the session no longer exists OR if `sessionId` is provided and does not match
- * the current persisted session — the latter guards an in-flight save run from
+ * the current persisted session; the latter guards an in-flight save run from
  * mutating a NEWER session that replaced its record mid-flight (a new share
  * arriving while the old run is still saving). */
 export function updateEntry(
@@ -373,7 +579,7 @@ export function deleteSession(
 }
 
 /** The entries the processor should (re)attempt: those still pending or failed.
- * Saved and unsupported entries are excluded — successes are never re-saved. */
+ * Saved and unsupported entries are excluded: successes are never re-saved. */
 export function entriesToProcess(session: ShareSession): ShareEntry[] {
   return session.entries.filter(
     (e) => e.status === "pending" || e.status === "failed",

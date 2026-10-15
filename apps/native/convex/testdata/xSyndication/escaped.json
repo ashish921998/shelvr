@@ -1,0 +1,161 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 3905,
+  "lang": "ja",
+  "possibly_sensitive": false,
+  "created_at": "2024-04-09T11:39:56.000Z",
+  "display_text_range": [0, 30],
+  "entities": {
+    "hashtags": [
+      {
+        "indices": [17, 30],
+        "text": "ユニコーンオーバーロード"
+      }
+    ],
+    "media": [
+      {
+        "display_url": "pic.x.com/vKPcuZsPdY",
+        "expanded_url": "https://x.com/takobe_t/status/1777662729890730410/photo/1",
+        "indices": [31, 54],
+        "url": "https://t.co/vKPcuZsPdY"
+      }
+    ]
+  },
+  "id_str": "1777662729890730410",
+  "text": "ロザリンデ&amp;エルトリンデ\n#ユニコーンオーバーロード https://t.co/vKPcuZsPdY",
+  "user": {
+    "id_str": "4520665067",
+    "name": "タコベー",
+    "screen_name": "takobe_t",
+    "is_blue_verified": false,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1563859693780574209/6Iu8EybV_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": ["1777662729890730410"],
+    "editable_until_msecs": "1712666396000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.x.com/vKPcuZsPdY",
+      "expanded_url": "https://x.com/takobe_t/status/1777662729890730410/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [31, 54],
+      "media_url_https": "https://pbs.twimg.com/media/GKuG1IEbwAA8Vbm.jpg",
+      "original_info": {
+        "focus_rects": [
+          {
+            "h": 1147,
+            "w": 2048,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 2048,
+            "w": 2048,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 2048,
+            "w": 1796,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "h": 2048,
+            "w": 1024,
+            "x": 256,
+            "y": 0
+          },
+          {
+            "h": 2048,
+            "w": 2048,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "height": 2048,
+        "width": 2048
+      },
+      "sizes": {
+        "large": {
+          "h": 2048,
+          "resize": "fit",
+          "w": 2048
+        },
+        "medium": {
+          "h": 1200,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 680,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "photo",
+      "url": "https://t.co/vKPcuZsPdY"
+    }
+  ],
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "h": 1147,
+          "w": 2048,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 2048,
+          "w": 2048,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 2048,
+          "w": 1796,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "h": 2048,
+          "w": 1024,
+          "x": 256,
+          "y": 0
+        },
+        {
+          "h": 2048,
+          "w": 2048,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expandedUrl": "https://x.com/takobe_t/status/1777662729890730410/photo/1",
+      "url": "https://pbs.twimg.com/media/GKuG1IEbwAA8Vbm.jpg",
+      "width": 2048,
+      "height": 2048
+    }
+  ],
+  "conversation_count": 5,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

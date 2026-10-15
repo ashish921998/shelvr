@@ -4,7 +4,7 @@ import { type Infer, v } from "convex/values";
  * Item-field validators shared by `schema.ts` (the document shape) and
  * `items.ts` (the `returns:` validators). Defining them once here is the point:
  * `items.ts` carries a comment about `capturedAt`/`intents` drifting out of its
- * hand-copied validator — these two fields must not become the next instance.
+ * hand-copied validator. These two fields must not become the next instance.
  */
 
 // The closed set of intent kinds the model may emit and the client can run.
@@ -36,6 +36,24 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const postMediaValidator = v.object({
+  kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
+  imageUrl: v.string(),
+  aspectRatio: v.number(),
+});
+
+export type PostMedia = Infer<typeof postMediaValidator>;
+
+// An image or video inside an article body. `paragraph` counts the body's
+// paragraphs (split on blank lines) that come before it, so the reader can
+// place it between them.
+export const articleMediaValidator = v.object({
+  ...postMediaValidator.fields,
+  paragraph: v.number(),
+});
+
+export type ArticleMedia = Infer<typeof articleMediaValidator>;
+
 // Why processing failed. `not_found` (missing page or missing/empty photo) and `image_too_large`
 // are terminal; `error` is a pipeline fault worth retrying. Only set with
 // `status: "failed"`.
@@ -45,10 +63,25 @@ export const failureReasonValidator = v.union(
   v.literal("image_too_large"),
 );
 
+// A structured recipe lifted during processing: from a recipe page's
+// schema.org markup, from the recipe page a video caption links to, or from
+// the classifier reading a caption or screenshot. Absent for every other
+// save; the client keeps rendering the plain article when absent. `servings` is a display string ("4 servings",
+// "12 cookies") because recipes quantify the yield in too many shapes for a
+// number field to be honest.
+export const recipeValidator = v.object({
+  name: v.optional(v.string()),
+  servings: v.optional(v.string()),
+  ingredients: v.array(v.string()),
+  steps: v.array(v.string()),
+});
+
+export type Recipe = Infer<typeof recipeValidator>;
+
 // How much of the item could be enriched. "partial" = classified from the URL
 // alone because the page body was unreadable (retryable); "no_article" = the
 // page loaded but no article body could be extracted (a landing page or docs
-// URL, say — nothing a retry would change); absent = fully enriched.
+// URL, say: nothing a retry would change); absent = fully enriched.
 export const enrichmentValidator = v.union(
   v.literal("partial"),
   v.literal("no_article"),

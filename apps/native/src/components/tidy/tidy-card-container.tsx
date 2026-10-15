@@ -1,15 +1,16 @@
-import { memo, type FC, type PropsWithChildren } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { memo, type FC, type PropsWithChildren } from "react";
+import { useWindowDimensions } from "react-native";
 import Animated, {
   Extrapolation,
   interpolate,
   useAnimatedStyle,
-} from 'react-native-reanimated';
-import { StyleSheet } from 'react-native-unistyles';
+  useReducedMotion,
+} from "react-native-reanimated";
+import { StyleSheet } from "react-native-unistyles";
 
-import { useCardAnimation } from '@/lib/tidy/card-animation';
-import { useDeckAnimation } from '@/lib/tidy/deck-animation';
-import { useUndoAnimation } from '@/lib/tidy/use-undo-animation';
+import { useCardAnimation } from "@/lib/tidy/card-animation";
+import { useDeckAnimation } from "@/lib/tidy/deck-animation";
+import { useUndoAnimation } from "@/lib/tidy/use-undo-animation";
 
 type Props = {
   index: number;
@@ -19,7 +20,11 @@ type Props = {
 // channel-container: behind-cards sit at 0.95 scale with a slight downward
 // parallax and interpolate up as the top card leaves; the top card follows
 // the pan and tilts up to 4° with the hinge direction picked by grab point.
-const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({ children, index }) => {
+const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({
+  children,
+  index,
+}) => {
+  const reducedMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const { animatedIndex, currentIndex } = useDeckAnimation();
   const { panX, panY, absoluteYAnchor, panDistanceX } = useCardAnimation();
@@ -31,12 +36,17 @@ const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({ children, in
     // Cull cards beyond the visible stack (top, two behind, one just
     // dismissed) to cut overdraw.
     const isVisible =
-      index === current || index === current - 1 || index === current - 2 || index === current + 1;
+      index === current ||
+      index === current - 1 ||
+      index === current - 2 ||
+      index === current + 1;
 
     const inputRange = [index - 2, index - 1, index, index + 1, index + 2];
 
     const sign = absoluteYAnchor.get() > height / 2 ? -1 : 1;
 
+    // The behind-card drop folds into translateY so it travels with the pan
+    // instead of laying out a separate `top` pass.
     const top = interpolate(
       animatedIndex.get(),
       inputRange,
@@ -54,32 +64,40 @@ const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({ children, in
     );
 
     return {
-      top,
-      opacity: isVisible ? 1 : 0,
-      transform: [
-        { translateX: panX.get() },
-        { translateY: panY.get() },
-        { rotate: `${rotate}deg` },
-        { scale },
-      ],
+      // Opacity alone still receives touches, especially when Reduce Motion
+      // keeps dismissed cards in place instead of moving them off-screen.
+      pointerEvents: index === current ? "auto" : "none",
+      opacity: isVisible && !(reducedMotion && index > current) ? 1 : 0,
+      transform: reducedMotion
+        ? []
+        : [
+            { translateX: panX.get() },
+            { translateY: top + panY.get() },
+            { rotate: `${rotate}deg` },
+            { scale },
+          ],
     };
   });
 
-  return <Animated.View style={[styles.container, rContainerStyle]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[styles.container, rContainerStyle]}>
+      {children}
+    </Animated.View>
+  );
 };
 
 export const TidyCardContainer = memo(TidyCardContainerComponent);
 
 const styles = StyleSheet.create((theme) => ({
   container: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+    position: "absolute",
+    width: "100%",
+    height: "100%",
     borderRadius: theme.radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.imageBorder,
     backgroundColor: theme.colors.surface,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
 }));

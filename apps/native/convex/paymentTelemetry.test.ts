@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { newConvexTest } from "./test.setup";
 import { internal } from "./_generated/api";
+import { RECEIPT_RETENTION_MS } from "./paymentTelemetry";
 
 const event = {
   id: "rc-event-1",
@@ -147,7 +148,8 @@ describe("server-confirmed payments", () => {
       ctx.db.query("subscriptions").collect(),
     );
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].status).toBe("pro");
+    // The historical purchase is still recorded, but its expired period grants no access.
+    expect(subscriptions[0].status).toBe("lapsed");
     expect(
       await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),
@@ -305,13 +307,28 @@ describe("server-confirmed payments", () => {
     ]);
   });
 
-  it("ignores unknown or deleted accounts", async () => {
+  it("ignores unknown, deleted, and deleting accounts", async () => {
     const t = newConvexTest();
-    const payment = parsePaymentTelemetry({ event });
-    if (!payment) throw new Error("Invalid fixture");
-    await t.mutation(internal.paymentTelemetry.enqueue, { payment });
+    const deleting = await t.run((ctx) =>
+      ctx.db.insert("users", { deleting: true }),
+    );
+    for (const [eventId, appUserId] of [
+      ["rc-event-1", "user-1"],
+      ["rc-event-2", deleting as string],
+    ]) {
+      const payment = parsePaymentTelemetry({
+        event: { ...event, id: eventId, app_user_id: appUserId },
+      });
+      if (!payment) throw new Error("Invalid fixture");
+      await t.mutation(internal.paymentTelemetry.enqueue, { payment });
+    }
     expect(
       await t.run((ctx) => ctx.db.query("paymentAnalyticsReceipts").collect()),
+    ).toHaveLength(0);
+    expect(
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      ),
     ).toHaveLength(0);
   });
 
@@ -442,7 +459,7 @@ describe("cancellation lifecycle telemetry", () => {
   it("maps inherited-property reasons like 'constructor' to unknown instead of poisoning the event", () => {
     // `in` would pass (inherited from Object.prototype) and surface the
     // constructor function as cancel_category, which the enqueue validator
-    // would reject — dropping the whole webhook event. Own-property check
+    // would reject, dropping the whole webhook event. Own-property check
     // must fall back to unknown.
     const parsed = parsePaymentTelemetry({
       event: { ...lifecycle, cancel_reason: "constructor" },
@@ -500,5 +517,63 @@ describe("cancellation lifecycle telemetry", () => {
       event: "subscription_uncancelled",
       payment_kind: "subscription",
     });
+  });
+});
+
+describe("receipt retention", () => {
+  it("purges rows past the retention window and keeps live ones", async () => {
+    const t = newConvexTest();
+    await t.run((ctx) =>
+      ctx.db.insert("paymentAnalyticsReceipts", { eventId: "old" }),
+    );
+    vi.advanceTimersByTime(30 * 24 * 60 * 60 * 1000);
+    await t.run((ctx) =>
+      ctx.db.insert("paymentAnalyticsReceipts", { eventId: "live" }),
+    );
+    vi.advanceTimersByTime(RECEIPT_RETENTION_MS);
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    const remaining = await t.run((ctx) =>
+      ctx.db.query("paymentAnalyticsReceipts").collect(),
+    );
+    expect(remaining.map((row) => row.eventId)).toEqual(["live"]);
+  });
+
+  it("keeps live rows when run before the retention window passes", async () => {
+    const t = newConvexTest();
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const payment = parsePaymentTelemetry({
+      event: { ...event, app_user_id: userId },
+    });
+    if (!payment) throw new Error("Invalid fixture");
+    await t.mutation(internal.paymentTelemetry.enqueue, { payment });
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    expect(
+      await t.run((ctx) => ctx.db.query("paymentAnalyticsReceipts").collect()),
+    ).toHaveLength(1);
+  });
+
+  it("chains across pages until every expired row is purged", async () => {
+    const t = newConvexTest();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 250; i++) {
+        await ctx.db.insert("paymentAnalyticsReceipts", {
+          eventId: `expired-${i}`,
+        });
+      }
+    });
+    vi.advanceTimersByTime(30 * 24 * 60 * 60 * 1000);
+    await t.run((ctx) =>
+      ctx.db.insert("paymentAnalyticsReceipts", { eventId: "live" }),
+    );
+    vi.advanceTimersByTime(RECEIPT_RETENTION_MS);
+    // Two full pages chain themselves; the third call drains the remainder
+    // and stops without scheduling more.
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    const remaining = await t.run((ctx) =>
+      ctx.db.query("paymentAnalyticsReceipts").collect(),
+    );
+    expect(remaining.map((row) => row.eventId)).toEqual(["live"]);
   });
 });

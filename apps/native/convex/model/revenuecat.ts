@@ -12,7 +12,7 @@ export type RevenueCatEvent = {
 };
 
 /** Parse the subset of a RevenueCat webhook used by the entitlement sync.
- * Returns `undefined` only when the body is not a readable object — the caller
+ * Returns `undefined` only when the body is not a readable object: the caller
  * then returns HTTP 400. A readable event missing `type` or `app_user_id`
  * returns a partial object with those fields as `undefined` so the caller can
  * respond HTTP 200 (acknowledging the event so RevenueCat stops retrying)
@@ -74,6 +74,28 @@ export function mapRevenueCatStatus(
   }
 }
 
+/** Events whose current access must come from RevenueCat, not the webhook body. */
+export function requiresAuthoritativeReconciliation(
+  event: RevenueCatEvent,
+): boolean {
+  switch (event.type) {
+    case "BILLING_ISSUE":
+    case "REFUND_REVERSED":
+      return true;
+    case "CANCELLATION":
+      // A failed charge sends BILLING_ERROR with the already-past expiry; only
+      // the snapshot knows the billing grace window.
+      return (
+        event.cancelReason === "CUSTOMER_SUPPORT" ||
+        event.cancelReason === "BILLING_ERROR"
+      );
+    case "EXPIRATION":
+      return event.expirationReason === "CUSTOMER_SUPPORT";
+    default:
+      return false;
+  }
+}
+
 function readStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || value.length > 100) return undefined;
   if (
@@ -85,13 +107,15 @@ function readStringArray(value: unknown): string[] | undefined {
   return [...new Set(value)];
 }
 
-export type RevenueCatSnapshot = {
+type RevenueCatSnapshot = {
   status: "trialing" | "pro" | "lapsed" | "lifetime";
   expiresAt: number;
   productId?: string;
 };
 
-/** Read only the project's Pro entitlement; malformed responses must not revoke access. */
+/** Read only the project's Pro entitlement; malformed responses must not revoke access.
+ * Billing grace is honoured only from this authoritative snapshot, never the webhook body.
+ */
 export function parseRevenueCatSnapshot(
   body: unknown,
   entitlementIdentifier = "Shelvr Pro",

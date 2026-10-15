@@ -1,5 +1,5 @@
-import { MenuView } from "@expo/ui/community/menu";
-import type { ReactNode } from "react";
+import { MenuView, type MenuComponentRef } from "@expo/ui/community/menu";
+import { useRef, type ReactNode } from "react";
 import {
   AppState,
   Platform,
@@ -13,6 +13,8 @@ export type ActionMenuItem = {
   label: string;
   destructive?: boolean;
   disabled?: boolean;
+  /** Shows the platform checkmark, for a menu that picks one value. */
+  selected?: boolean;
   onPress: () => void;
 };
 
@@ -36,6 +38,8 @@ export function ActionMenu({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const menu = useRef<MenuComponentRef>(null);
+  const isAndroid = process.env.EXPO_OS === "android";
   return (
     // On iOS the SwiftUI menu opens from a native gesture that React Native's
     // responder system never sees. Without a responder here, the touch bubbles
@@ -49,6 +53,7 @@ export function ActionMenu({
       onResponderRelease={markMenuOpen}
     >
       <MenuView
+        ref={menu}
         title={title}
         actions={actions.map((action) => ({
           id: action.id ?? action.label,
@@ -57,6 +62,9 @@ export function ActionMenu({
             destructive: action.destructive,
             disabled: action.disabled,
           },
+          ...(action.selected === undefined
+            ? {}
+            : { state: action.selected ? ("on" as const) : ("off" as const) }),
         }))}
         onPressAction={({ nativeEvent }) => {
           menuOpen = false;
@@ -72,6 +80,19 @@ export function ActionMenu({
         <View
           accessibilityRole="button"
           accessibilityLabel={label}
+          // Android's trigger Pressable opts out of accessibility, so TalkBack's
+          // double tap would land on this View with nothing to run. Route the
+          // activate action to the menu. iOS's SwiftUI menu handles VoiceOver.
+          accessible={isAndroid ? true : undefined}
+          accessibilityActions={isAndroid ? [{ name: "activate" }] : undefined}
+          onAccessibilityAction={
+            isAndroid
+              ? ({ nativeEvent }) => {
+                  if (nativeEvent.actionName === "activate")
+                    menu.current?.show();
+                }
+              : undefined
+          }
           style={style}
         >
           {children}

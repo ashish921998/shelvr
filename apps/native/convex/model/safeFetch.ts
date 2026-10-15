@@ -6,21 +6,21 @@
  *
  *   1. scheme/credential/port/length policy from externalUrl.ts, re-run on
  *      every redirect target;
- *   2. DNS answers resolved and classified with ipaddr.js — only globally
- *      routable unicast addresses are allowed — and the validated address is
+ *   2. DNS answers resolved and classified with ipaddr.js: only globally
+ *      routable unicast addresses are allowed, and the validated address is
  *      the one handed to the actual socket via undici's connect.lookup, so
  *      validation cannot be bypassed by a second, independent resolution
  *      (DNS rebinding);
  *   3. manual redirects, at most MAX_REDIRECTS hops, each target revalidated
  *      before the next request, each redirect body cancelled;
- *   4. a single total deadline (AbortController) covering DNS and every hop —
+ *   4. a single total deadline (AbortController) covering DNS and every hop:
  *      a resolver that never completes still times out;
  *   5. bounded streaming readers that honor Content-Length when present and
  *      still stop after actual bytes exceed the limit, cancelling the body;
  *   6. a narrow result type exposing only bounded bytes, the final validated
- *      URL, status, and sanitized metadata — never the underlying Response
+ *      URL, status, and sanitized metadata, never the underlying Response
  *      whose text()/json()/arrayBuffer() would bypass the limits;
- *   7. errors/logs carry only a policy code and identifiers — never
+ *   7. errors/logs carry only a policy code and identifiers, never
  *      credentials, query strings, redirect locations, response bodies, or
  *      resolved addresses.
  *
@@ -78,7 +78,7 @@ export function isSafeFetchError(e: unknown): e is SafeFetchErrorClass {
 
 /**
  * ipaddr.js `range()` returns the broad class of an address. We allow only
- * `unicast` — globally routable addresses — and reject everything else:
+ * `unicast`, globally routable addresses, and reject everything else:
  * loopback, private (RFC1918), linkLocal, multicast, reserved, and
  * documentation/test ranges. IPv4-mapped IPv6 addresses are parsed by
  * ipaddr.js and their mapped IPv4 is classified, so ::ffff:127.0.0.1 is
@@ -105,7 +105,7 @@ export function isPublicAddress(address: string): boolean {
 /**
  * Validate the destination host of an already-parsed URL. IP-literal hosts
  * (e.g. `http://127.0.0.1/`) are classified directly here because Node's
- * net.connect does NOT call connect.lookup for IP literals — it connects
+ * net.connect does NOT call connect.lookup for IP literals: it connects
  * straight to the address, which would bypass the validating DNS lookup.
  * DNS-name hosts are left to the validating lookup at connection time.
  *
@@ -134,7 +134,7 @@ function assertHostAllowed(url: string): void {
   try {
     ipaddr.parse(hostname);
   } catch {
-    // Not an IP literal — it's a DNS name; the validating lookup handles it.
+    // Not an IP literal: it's a DNS name; the validating lookup handles it.
     return;
   }
   // It IS an IP literal: classify it. Reuse isPublicAddress so IPv4-mapped
@@ -156,13 +156,13 @@ export type DnsResolver = (
 
 /**
  * Hard ceiling on a single DNS resolution. Node's dns.lookup has no built-in
- * timeout — it relies on the OS getaddrinfo, which can hang for tens of seconds
+ * timeout: it relies on the OS getaddrinfo, which can hang for tens of seconds
  * against a non-responsive resolver. undici does not wire the request AbortSignal
  * to the lookup phase, so a hung lookup would outlive the per-request deadline
  * returned to the caller, dangling a connection attempt. This bound fails the
  * lookup fast (well under every caller's timeoutMs) so no DNS work lingers.
  */
-export const DNS_LOOKUP_TIMEOUT_MS = 8000;
+const DNS_LOOKUP_TIMEOUT_MS = 8000;
 
 /** Race a promise against a timeout, rejecting with a coded error on expiry. */
 function withTimeout<T>(
@@ -234,7 +234,7 @@ export function makeValidatingLookup(resolver: DnsResolver) {
       );
       return;
     }
-    // Reject if ANY answer is unsafe — do not pick a convenient public one from
+    // Reject if ANY answer is unsafe: do not pick a convenient public one from
     // a mixed set. This defeats DNS rebinding that returns a public + private.
     for (const a of addresses) {
       if (!isPublicAddress(a.address)) {
@@ -259,7 +259,7 @@ export function makeValidatingLookup(resolver: DnsResolver) {
 }
 
 /** Build a production undici Agent whose connections use the validating lookup. */
-export function makeSafeDispatcher(
+function makeSafeDispatcher(
   resolver: DnsResolver = defaultResolver,
 ): Dispatcher {
   // undici forwards connect options to net.connect/tls.connect, so `lookup`
@@ -278,7 +278,7 @@ export function makeSafeDispatcher(
 let sharedDispatcher: Dispatcher | undefined;
 
 /** Return the process-wide shared validating dispatcher, creating it on first use. */
-export function getSharedDispatcher(): Dispatcher {
+function getSharedDispatcher(): Dispatcher {
   if (sharedDispatcher === undefined) {
     sharedDispatcher = makeSafeDispatcher(defaultResolver);
   }
@@ -286,10 +286,10 @@ export function getSharedDispatcher(): Dispatcher {
 }
 
 // ---------------------------------------------------------------------------
-// Result type (narrow — never exposes the raw Response)
+// Result type (narrow: never exposes the raw Response)
 // ---------------------------------------------------------------------------
 
-export type SafeFetchOk = {
+type SafeFetchOk = {
   ok: true;
   /** Final, policy-validated URL after following redirects. Safe to log:
    * credentials are rejected at parse time; query strings may be present, so
@@ -299,9 +299,15 @@ export type SafeFetchOk = {
   contentType: string;
   /** Bounded body bytes. Never larger than the requested maxBytes. */
   bytes: Uint8Array;
+  /** Set only when `onOverflow: "truncate"` actually fired, so `bytes` is a
+   * prefix of what the server sent. A caller that needs the whole document to
+   * be right, parsing structured markup, say, must refuse a truncated read
+   * instead of parsing the prefix, because a cut document can still parse into
+   * a plausible-looking partial answer. */
+  truncated?: true;
 };
 
-export type SafeFetchResult =
+type SafeFetchResult =
   | SafeFetchOk
   | {
       ok: false;
@@ -314,7 +320,7 @@ export type SafeFetchResult =
 // Options
 // ---------------------------------------------------------------------------
 
-export type SafeFetchOptions = {
+type SafeFetchOptions = {
   /** Total deadline in ms, covering DNS resolution and every redirect hop. */
   timeoutMs: number;
   /** Hard cap on streamed body bytes, enforced even if Content-Length is absent
@@ -348,13 +354,16 @@ const DEFAULT_MAX_REDIRECTS = 3;
  *
  * When `onOverflow` is `"error"` (the default), exceeding the cap throws
  * `response_too_large`. When `"truncate"`, the reader stops at `maxBytes`,
- * dumps the remainder, and returns the bounded prefix as a successful result. */
+ * dumps the remainder, and returns the bounded prefix as a successful result.
+ *
+ * `truncated` reports which of those happened, so a caller that cannot use a
+ * prefix can tell a short page from a cut one. */
 async function readBounded(
   body: BodyReadable,
   maxBytes: number,
   signal: AbortSignal,
   onOverflow: "error" | "truncate" = "error",
-): Promise<Uint8Array> {
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of body as unknown as AsyncIterable<Buffer>) {
@@ -381,7 +390,10 @@ async function readBounded(
             "deadline exceeded while draining overflow",
           );
         }
-        return new Uint8Array(Buffer.concat(chunks));
+        return {
+          bytes: new Uint8Array(Buffer.concat(chunks)),
+          truncated: true,
+        };
       }
       // Over cap in error mode: cancel the body by dumping the remainder.
       await safeDump(body);
@@ -392,7 +404,7 @@ async function readBounded(
     }
     chunks.push(chunk);
   }
-  return new Uint8Array(Buffer.concat(chunks));
+  return { bytes: new Uint8Array(Buffer.concat(chunks)), truncated: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +480,7 @@ function followRedirect(
 }
 
 /** Pre-check a declared Content-Length against the cap before streaming.
- * Skipped in truncate mode — the reader stops at maxBytes and returns the
+ * Skipped in truncate mode: the reader stops at maxBytes and returns the
  * prefix instead of failing. */
 async function rejectOversizeContentLength(
   response: Dispatcher.ResponseData,
@@ -565,12 +577,12 @@ async function safeFetchThrowing(
         );
       }
       // Pre-check a declared Content-Length against the cap before streaming.
-      // Skip this pre-check in truncate mode — the reader will stop at maxBytes
+      // Skip this pre-check in truncate mode: the reader will stop at maxBytes
       // and return the prefix instead of failing.
       if (onOverflow === "error") {
         await rejectOversizeContentLength(response, maxBytes);
       }
-      const bytes = await readBounded(
+      const { bytes, truncated } = await readBounded(
         response.body,
         maxBytes,
         ac.signal,
@@ -581,6 +593,7 @@ async function safeFetchThrowing(
         status: response.statusCode,
         contentType,
         bytes,
+        ...(truncated ? { truncated: true as const } : {}),
       };
     }
   } finally {
@@ -624,7 +637,7 @@ async function dispatch(
     ]);
   } catch (e) {
     // Translate a raw transport error into a safe-fetch error. We must not
-    // leak the URL (it may carry a query secret) — only a code propagates.
+    // leak the URL (it may carry a query secret). Only a code propagates.
     if (e instanceof SafeFetchErrorClass) {
       throw e;
     }
@@ -663,12 +676,6 @@ async function safeDump(body: BodyReadable | null | undefined): Promise<void> {
 // ---------------------------------------------------------------------------
 // Convenience readers (operate on the already-bounded bytes)
 // ---------------------------------------------------------------------------
-
-/** Decode bounded bytes as text using UTF-8. The stream cap already bounded
- * the size; this just converts. Callers should still slice for their needs. */
-export function decodeUtf8(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8").decode(bytes);
-}
 
 /**
  * Charset labels the WHATWG Encoding Standard maps to windows-1252. Browsers
@@ -745,7 +752,7 @@ export function decodeWithContentType(
     try {
       return new TextDecoder(charset).decode(bytes);
     } catch {
-      // Unsupported charset label — fall back to UTF-8.
+      // Unsupported charset label: fall back to UTF-8.
     }
   }
   return new TextDecoder("utf-8").decode(bytes);
@@ -753,5 +760,5 @@ export function decodeWithContentType(
 
 /** Parse bounded bytes as JSON. Throws on invalid JSON. */
 export function parseJson(bytes: Uint8Array): unknown {
-  return JSON.parse(decodeUtf8(bytes));
+  return JSON.parse(new TextDecoder("utf-8").decode(bytes));
 }

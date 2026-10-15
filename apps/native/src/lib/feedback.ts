@@ -1,7 +1,6 @@
-import Constants from "expo-constants";
 import { createMMKV } from "react-native-mmkv";
 import { analytics } from "@/lib/analytics";
-import { isAnalyticsAvailable, posthog } from "@/lib/posthog";
+import { isAnalyticsAvailable } from "@/lib/posthog";
 
 /**
  * Lightweight in-app feedback.
@@ -9,8 +8,11 @@ import { isAnalyticsAvailable, posthog } from "@/lib/posthog";
  * Privacy rules baked in below:
  * - Automatic events (invitation shown/dismissed, form opened) never carry
  *   message text, URLs, or saved-item content.
- * - The typed message is only published by `submitFeedback`, which runs on an
- *   explicit Send tap. Replay masks all text inputs globally (posthog.ts).
+ * - The typed message is sent only through the Convex `submitFeedback`
+ *   mutation on an explicit Send tap; it never enters PostHog in any form.
+ *   Telemetry about a submission is bounded to surface, char count, and a
+ *   content-free delivery category. Replay masks all text inputs globally
+ *   (posthog.ts).
  */
 
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 1000;
@@ -64,7 +66,7 @@ type InvitationGate = {
 
 /**
  * The single decision for whether the inline home invitation may appear.
- * Caps: once per account, at most twice with a 14-day gap, never after a
+ * Caps: at most twice per account with a 14-day gap between, never after a
  * submission, and never in the same breath as the native review prompt.
  */
 export function canShowInvitation(
@@ -120,7 +122,7 @@ export function parseInvitationState(
 // --- review-prompt coordination --------------------------------------------
 // `useReviewPrompt` fires on the same 3-ready-saves threshold. It marks here
 // when it claims the moment; the invitation defers while the mark is fresh.
-// Session scope is enough — the native review flow only exists in-session.
+// Session scope is enough: the native review flow only exists in-session.
 
 let reviewPromptedAt: number | null = null;
 let reviewAttemptInFlight = false;
@@ -187,8 +189,6 @@ export function sanitizeFeedbackMessage(raw: string): string {
 
 // --- analytics boundary -----------------------------------------------------
 
-type FeedbackSubmitResult = "queued" | "unavailable" | "failed";
-
 export const feedbackAnalytics = {
   isAvailable(): boolean {
     return isAnalyticsAvailable();
@@ -207,40 +207,5 @@ export const feedbackAnalytics = {
 
   feedbackOpened(surface: FeedbackSurface): void {
     analytics.capture("feedback_opened", { surface });
-  },
-
-  /**
-   * Publishes the typed message — called ONLY on an explicit Send tap.
-   * 'queued' means captured into the local PostHog queue (best-effort flush
-   * attempted), not acknowledged by a server.
-   */
-  async submitFeedback(
-    surface: FeedbackSurface,
-    message: string,
-  ): Promise<FeedbackSubmitResult> {
-    // `!posthog` also narrows the client below; availability logic itself is
-    // the canonical check.
-    if (!posthog || !isAnalyticsAvailable()) return "unavailable";
-    const sanitized = sanitizeFeedbackMessage(message);
-    if (!sanitized) return "failed";
-    try {
-      posthog.capture("feedback_submitted", {
-        surface,
-        message: sanitized,
-        char_count: sanitized.length,
-        environment: Constants.expoConfig?.extra?.variant ?? "development",
-        analytics_version: 1,
-      });
-    } catch {
-      return "failed";
-    }
-    // Flush so feedback leaves the device promptly; a failed flush still
-    // leaves the event queued for the next batch.
-    try {
-      await posthog.flush();
-    } catch {
-      // Queued locally regardless.
-    }
-    return "queued";
   },
 };

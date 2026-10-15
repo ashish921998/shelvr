@@ -1,6 +1,6 @@
 // Tests for the pure saveImageOperations orchestration. The React/Convex
 // adapter (useSaveImages) and the expo modules it imports are not exercised
-// here — only the dependency-injected orchestration, which is where the
+// here: only the dependency-injected orchestration, which is where the
 // per-image settled-result contract lives. Runs in the Node default env.
 import {
   MAX_CONCURRENT_SAVES,
@@ -29,7 +29,7 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
 vi.mock("expo-crypto", () => {
   // A counter (not a constant) so tests can assert each image in a batch mints
-  // a DISTINCT operation id — a constant stub would hide an id-reuse bug that
+  // a DISTINCT operation id: a constant stub would hide an id-reuse bug that
   // collapses a whole batch into one backend operation.
   let n = 0;
   return { randomUUID: () => `stub-uuid-${++n}` };
@@ -73,7 +73,7 @@ describe("saveImageOperations", () => {
     expect(
       (results[2] as Extract<ImageSaveResult, { status: "saved" }>).image.uri,
     ).toBe("c");
-    // Each result carries the operation id it minted — and every image in the
+    // Each result carries the operation id it minted, and every image in the
     // batch gets its own distinct id.
     for (const r of results) {
       expect(r.operationId).toMatch(/^image:stub-uuid-\d+$/);

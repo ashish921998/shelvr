@@ -2,13 +2,12 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { AppSymbolIcon } from "@/components/symbol";
 import {
   RUBBER_BAND_LIMIT,
-  isDarkColor,
   overflowPast,
   rubberBand,
   tabIndexAt,
   tabSlotX,
-  withAlpha,
 } from "@/lib/tab-bar-motion";
+import { isDarkColor, withAlpha } from "@/lib/color";
 import { setTabSearchQuery, useTabSearchQuery } from "@/lib/tab-search-query";
 import {
   reconcileTabSelection,
@@ -41,6 +40,7 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -149,6 +149,18 @@ function pressTrigger(trigger: ReturnType<typeof useTabTrigger>) {
 
 export function AppTabs() {
   useAppLocale();
+  // `Tabs` is a plain view the Unistyles babel plugin cannot repaint
+  // natively; it only picks up a new background when this component
+  // re-renders. That re-render is not guaranteed on a theme switch:
+  // setAppearanceMode applies the OS colour scheme before rebuilding the
+  // Unistyles theme (appearance-runtime.ts), so the render the scheme change
+  // triggers still resolves styles.* to the outgoing theme, and nothing
+  // renders again after the rebuild. Subscribing here re-renders on the
+  // rebuild. Reading `theme` during render is what registers the
+  // dependency, and the inline colour hands the view the new value.
+  // Without it the backdrop the bar floats over keeps the outgoing theme's
+  // background: a cream band under a dark theme.
+  const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const restingBottom = Math.max(insets.bottom, 10);
 
@@ -162,7 +174,10 @@ export function AppTabs() {
       behavior="height"
       enabled={Platform.OS === "android"}
     >
-      <Tabs style={styles.root} options={{ backBehavior: "history" }}>
+      <Tabs
+        style={[styles.root, { backgroundColor: theme.colors.background }]}
+        options={{ backBehavior: "history" }}
+      >
         <TabSlot
           style={[
             styles.slot,
@@ -182,6 +197,7 @@ export function AppTabs() {
 }
 
 function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
+  const reducedMotion = useReducedMotion();
   const { theme } = useUnistyles();
   const { width: windowWidth } = useWindowDimensions();
   const keyboardVisible = useKeyboardVisible();
@@ -385,12 +401,14 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     const press = 1 + pressed.get() * PRESS_GROWTH;
     return {
       width: interpolate(morph.get(), [0, 1], [pillWidth, BAR_HEIGHT]),
-      transform: [
-        { translateX: stretchX * DRIFT },
-        { translateY: stretchY * DRIFT },
-        { scaleX: press * (1 + growX - growY * SQUASH) },
-        { scaleY: press * (1 + growY - growX * SQUASH) },
-      ],
+      transform: reducedMotion
+        ? []
+        : [
+            { translateX: stretchX * DRIFT },
+            { translateY: stretchY * DRIFT },
+            { scaleX: press * (1 + growX - growY * SQUASH) },
+            { scaleY: press * (1 + growY - growX * SQUASH) },
+          ],
     };
   });
 

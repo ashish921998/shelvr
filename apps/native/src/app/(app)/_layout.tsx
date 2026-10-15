@@ -1,27 +1,84 @@
+import { AiConsentCard } from "@/components/ai-consent";
+import { useAiConsent } from "@/lib/ai-consent";
+import { AppIntentsBridge } from "@/lib/app-intents";
+import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
+import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
+import { useTrialReminder } from "@/lib/trial-reminder";
+import { useWelcomeSaveTracker } from "@/lib/welcome-save";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
-import { Platform } from "react-native";
-import { useUnistyles } from "react-native-unistyles";
+import { useReducedMotion } from "react-native-reanimated";
+import { Platform, View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+/**
+ * The AI consent gate. Every save path, and every hook that saves on its own
+ * (onboarding replay, a resumed share, queued Siri captures), lives in
+ * AppStack below, so holding AppStack back is what guarantees nothing is
+ * saved before the answer.
+ *
+ * Past onboarding, AppStack is not mounted at all until the answer is known.
+ * During onboarding it has to stay mounted, since unmounting would lose the
+ * flow's place: the card covers it instead, and the one save that can run
+ * there (`useDemoSave`) waits on the same answer.
+ */
 export default function AppLayout() {
+  useAppLocale();
+  const { onboarded } = useOnboarding();
+  const consent = useAiConsent();
+  const { asking } = consent;
+
+  if (onboarded && consent.savesBlocked) {
+    return asking ? (
+      <AiConsentCard />
+    ) : (
+      <ScreenLoader label={t("loading.app")} />
+    );
+  }
+
+  return (
+    <>
+      <AppStack />
+      {asking ? (
+        <View style={styles.cover}>
+          <AiConsentCard />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  cover: { ...StyleSheet.absoluteFillObject },
+});
+
+function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
+  // Spatial slide transitions are the first thing to cut under Reduce Motion.
+  const reducedMotion = useReducedMotion();
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
   useResumePendingShare();
+  // Remind trialers two days before the yearly plan starts charging.
+  useTrialReminder();
+  // Right after Pro starts, Home hands off to one real save.
+  useWelcomeSaveTracker();
+  useExitOfferReminder();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
@@ -36,8 +93,12 @@ export default function AppLayout() {
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
+      <AppIntentsBridge />
+      <ExitOfferSheetHost />
+      <TrialReminderPrimerSheet />
       <Stack
         screenOptions={{
+          animation: reducedMotion ? "fade" : "default",
           headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: theme.colors.primary,
@@ -65,7 +126,7 @@ export default function AppLayout() {
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label={t("capture.backToLibrary")}
+                    label={t("digest.backHome")}
                     onPress={() => router.replace("/")}
                   />
                 ),
@@ -74,9 +135,15 @@ export default function AppLayout() {
           <Stack.Screen
             name="space/[id]"
             options={{
+              // iOS 26 native soft scroll edge: the feed fades out under the header.
+              scrollEdgeEffects: { top: "soft" },
               title: "",
               headerBackButtonDisplayMode: "minimal",
             }}
+          />
+          <Stack.Screen
+            name="plan/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
             name="add"
@@ -94,18 +161,13 @@ export default function AppLayout() {
                   }
                 : {
                     presentation: "formSheet",
-                    // Android form sheets do not reliably render native-stack header
-                    // controls. Add owns an in-content toolbar there; iOS keeps the
-                    // native title and toolbar.
                     headerShown: true,
                     headerTransparent: false,
                     headerStyle: { backgroundColor: theme.colors.background },
                     sheetGrabberVisible: true,
-                    // Android does not resize a fit-to-content form sheet when Add
-                    // switches from the compact action menu to the note/article
-                    // composer. Use a large detent there so the native Back/Save
-                    // header and editor remain reachable; iOS can keep its compact,
-                    // dynamically sized sheet.
+                    // Sized to its content so the compact action menu and the
+                    // taller note/article composer both fit without a fixed
+                    // detent leaving the editor unreachable.
                     sheetAllowedDetents: "fitToContents",
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
@@ -155,6 +217,18 @@ export default function AppLayout() {
             }}
           />
           <Stack.Screen
+            name="settings"
+            options={{
+              presentation: "formSheet",
+              // Android form sheets have no native header, so the screen
+              // draws its own title and close button, as Profile does.
+              headerShown: false,
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
             name="camera"
             options={{
               presentation: "fullScreenModal",
@@ -162,20 +236,23 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
-          <Stack.Screen
-            name="paywall"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
+        {/* Onboarding opens the paywall fallback before onboarding
+            completes. Keep it last: the first available screen is the initial
+            route, so it must be (tabs) or onboarding. */}
+        <Stack.Screen
+          name="paywall"
+          options={{
+            presentation: "formSheet",
+            headerShown: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: "fitToContents",
+            contentStyle: { backgroundColor: theme.colors.background },
+          }}
+        />
       </Stack>
     </HomeFeedProvider>
   );

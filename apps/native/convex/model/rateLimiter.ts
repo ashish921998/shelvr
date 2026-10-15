@@ -1,4 +1,4 @@
-import { RateLimiter, HOUR, MINUTE } from "@convex-dev/rate-limiter";
+import { DAY, HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 
 // Per-user token buckets on the mutations that each schedule real paid work
@@ -8,6 +8,16 @@ import { components } from "../_generated/api";
 // allowance, rate/period = sustained refill. Generous for real use, fatal to loops.
 // ponytail: fixed limits; make them per-plan config if tiers ever need different caps.
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
+  requestBodyIp: { kind: "token bucket", rate: 60, period: HOUR, capacity: 12 },
+  requestBodyGlobal: {
+    kind: "token bucket",
+    rate: 300,
+    period: MINUTE,
+    capacity: 100,
+  },
+  imageBegin: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
+  imageUpload: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
+  captureBody: { kind: "token bucket", rate: 240, period: HOUR, capacity: 60 },
   itemCreate: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
   findLinks: { kind: "token bucket", rate: 60, period: HOUR, capacity: 15 },
   // Bulk link import (X bookmarks). An export runs to hundreds of links, so
@@ -36,6 +46,28 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 10,
   },
+  // "Make a plan" sends up to 60 saves in one prompt and gets 5 places back.
+  // A user re-rolls a few times while deciding; a loop gets cut off.
+  makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  // A spoken transcript of a recipe video whose caption had no recipe (one
+  // paid Treg call, about $0.002, plus one model call). Per user: room for a
+  // cooking binge, fatal to a loop. Global: about $4 a day at most, whatever
+  // the number of accounts.
+  videoTranscript: {
+    kind: "token bucket",
+    rate: 20,
+    period: DAY,
+    capacity: 10,
+  },
+  videoTranscriptGlobal: {
+    kind: "token bucket",
+    rate: 2000,
+    period: DAY,
+    capacity: 200,
+  },
+  // "We went" on a plan: one small row each, no model call. Bounds a loop
+  // that would fill the table with names.
+  placeVisit: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
   // The onboarding demo's Pro-free retry of a FAILED demo classification.
   // Tighter than reprocessItem: the demo is the one uncapped-price save a
   // non-paying user gets, so retries stay strictly bounded.
@@ -43,7 +75,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Email-keyed limit still stops one address from looping. IP and global
   // buckets stop a client from rotating emails (or one IP from flooding).
   // The global bucket gates every signup site-wide, so it must sit well
-  // above a legitimate launch spike — err high.
+  // above a legitimate launch spike. Err high.
   waitlistJoin: { kind: "token bucket", rate: 5, period: HOUR, capacity: 3 },
   waitlistJoinIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   waitlistJoinGlobal: {
@@ -51,5 +83,21 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 300,
     period: MINUTE,
     capacity: 100,
+  },
+  // In-app feedback submissions (one email to the support inbox each). The
+  // row is authenticated, but unbounded submissions would still turn the
+  // feedback button into a spam relay to the operator's inbox. Generous for
+  // a person (3 covers an immediate follow-up burst, 6/day sustained);
+  // fatal to a looped or scripted client.
+  feedbackSubmit: { kind: "token bucket", rate: 6, period: DAY, capacity: 3 },
+  // The no-login web oracle: one model call per verdict, open to anyone. The
+  // IP bucket lets a visitor try a few modes; the global bucket caps what a
+  // viral spike or an IP-rotating script can spend.
+  oracleIp: { kind: "token bucket", rate: 10, period: HOUR, capacity: 4 },
+  oracleGlobal: {
+    kind: "token bucket",
+    rate: 120,
+    period: MINUTE,
+    capacity: 40,
   },
 });

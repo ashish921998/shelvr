@@ -75,10 +75,10 @@ The localization tests cover Hermes without `Intl.Locale`, ordered preferences,
 supported regional variants, number formatting, callback freshness and draft
 preservation.
 
-Notification delivery interpolates exactly one `%{formattedCount}` value. The
-generator rejects digest variants with missing, repeated or additional placeholders
-before writing any resources; richer notification templates require updating that
-delivery contract first.
+Notification delivery interpolates a `%{formattedCount}` value and, for named
+copies, a `%{title}` value. The generator rejects digest variants with missing,
+repeated or additional placeholders before writing any resources; richer
+notification templates require updating that delivery contract first.
 
 Native text renders joining scripts, combining marks, emoji and glyphs missing
 from the display font. Covered Latin text and ordinary punctuation retain the

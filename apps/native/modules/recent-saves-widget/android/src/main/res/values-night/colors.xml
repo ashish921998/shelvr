@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="recent_saves_widget_background">#191510</color>
+  <color name="recent_saves_widget_tile">#2C261C</color>
+  <color name="recent_saves_widget_foreground">#F4EDDD</color>
+  <color name="recent_saves_widget_muted">#A2977F</color>
+  <color name="recent_saves_widget_accent">#E6A23C</color>
+</resources>

@@ -6,8 +6,8 @@ import { useTabSearchQuery } from "@/lib/tab-search-query";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { Stack } from "expo-router";
-import { ProgressiveBlurHeader } from "progressive-blur";
+import { Stack, useLocalSearchParams } from "expo-router";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -27,15 +27,44 @@ export default function SearchScreen() {
   const searchBarRef = useRef<ComponentRef<typeof Stack.SearchBar>>(null);
   // iOS types into the native header search bar. Everywhere else the floating
   // tab bar owns the field and shares its text through the tab search store.
-  const [iosSearch, setIosSearch] = useState("");
+  // Siri's "search Shelvr for ..." opens this tab with `q`; `t` marks each new
+  // request so asking for the same words twice still fills the bar again.
+  const { q, t: requestedAt } = useLocalSearchParams<{
+    q?: string;
+    t?: string;
+  }>();
+  const [iosSearch, setIosSearch] = useState(q ?? "");
+  const request = q ? `${requestedAt ?? ""}|${q}` : null;
+  const [appliedRequest, setAppliedRequest] = useState(request);
+  if (request !== appliedRequest) {
+    setAppliedRequest(request);
+    if (q) setIosSearch(q);
+  }
+  useEffect(() => {
+    if (q) searchBarRef.current?.setText(q);
+  }, [q, requestedAt]);
   const tabBarSearch = useTabSearchQuery();
   const search = Platform.OS === "ios" ? iosSearch : tabBarSearch;
   const query = useDebounced(search.trim(), 250);
 
+  // 'skip', not `enabled`: a disabled React Query still subscribes through
+  // the Convex adapter (see the pager), so an empty query would hold a live
+  // server subscription that answers [] on every push.
   const { data: results } = useQuery({
-    ...convexQuery(api.items.searchItems, { query }),
-    enabled: query.length > 0,
+    ...convexQuery(
+      api.items.searchItems,
+      query.length > 0 ? { query } : "skip",
+    ),
   });
+  const emptyCopy =
+    query.length === 0
+      ? { title: t("search.emptyTitle"), message: t("search.emptyBody") }
+      : results?.length === 0
+        ? {
+            title: t("search.noResultsTitle"),
+            message: t("search.noResults", { query }),
+          }
+        : null;
 
   return (
     <View style={styles.container}>
@@ -52,16 +81,8 @@ export default function SearchScreen() {
         // The header is transparent, so results start below it.
         <View style={{ height: headerHeight }} />
       )}
-      {query.length === 0 ? (
-        <EmptyState
-          title={t("search.emptyTitle")}
-          message={t("search.emptyBody")}
-        />
-      ) : results && results.length === 0 ? (
-        <EmptyState
-          title={t("search.noResultsTitle")}
-          message={t("search.noResults", { query })}
-        />
+      {emptyCopy ? (
+        <EmptyState animateEntrance={false} {...emptyCopy} />
       ) : (
         <MasonryFeed
           items={results ?? []}
@@ -69,7 +90,7 @@ export default function SearchScreen() {
           onScrollBeginDrag={() => searchBarRef.current?.blur()}
         />
       )}
-      <ProgressiveBlurHeader />
+      <HeaderScrim />
     </View>
   );
 }

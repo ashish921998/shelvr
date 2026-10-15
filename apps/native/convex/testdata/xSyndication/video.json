@@ -1,0 +1,148 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 2387,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2017-05-01T15:54:26.000Z",
+  "display_text_range": [0, 84],
+  "entities": {
+    "hashtags": [
+      {
+        "indices": [63, 73],
+        "text": "TeamFiona"
+      },
+      {
+        "indices": [74, 83],
+        "text": "fionafix"
+      }
+    ],
+    "media": [
+      {
+        "display_url": "pic.x.com/r2TKhhkgFb",
+        "expanded_url": "https://x.com/CincinnatiZoo/status/859073537713328129/video/1",
+        "indices": [84, 107],
+        "url": "https://t.co/r2TKhhkgFb"
+      }
+    ]
+  },
+  "id_str": "859073537713328129",
+  "text": "Fiona loves playing in the hose water just like her parents! 💦 #TeamFiona #fionafix https://t.co/r2TKhhkgFb",
+  "user": {
+    "id_str": "19040451",
+    "name": "Cincinnati Zoo",
+    "screen_name": "CincinnatiZoo",
+    "is_blue_verified": false,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1493601492829413388/YL4NWN8W_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": ["859073537713328129"],
+    "editable_until_msecs": "1493655866862",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "additional_media_info": {},
+      "display_url": "pic.x.com/r2TKhhkgFb",
+      "expanded_url": "https://x.com/CincinnatiZoo/status/859073537713328129/video/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [84, 107],
+      "media_url_https": "https://pbs.twimg.com/ext_tw_video_thumb/859073467769126913/pu/img/VKHGdXPsqKASBTvm.jpg",
+      "original_info": {
+        "focus_rects": [],
+        "height": 720,
+        "width": 1280
+      },
+      "sizes": {
+        "large": {
+          "h": 720,
+          "resize": "fit",
+          "w": 1280
+        },
+        "medium": {
+          "h": 675,
+          "resize": "fit",
+          "w": 1200
+        },
+        "small": {
+          "h": 383,
+          "resize": "fit",
+          "w": 680
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "video",
+      "url": "https://t.co/r2TKhhkgFb",
+      "video_info": {
+        "aspect_ratio": [16, 9],
+        "duration_millis": 23108,
+        "variants": [
+          {
+            "content_type": "application/x-mpegURL",
+            "url": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/pl/N6FavbC0omQcvt3n.m3u8"
+          },
+          {
+            "bitrate": 256000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/vid/320x180/br9rBqI8IebQxMUb.mp4"
+          },
+          {
+            "bitrate": 832000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/vid/640x360/l4MBp61vUkWK_5FM.mp4"
+          },
+          {
+            "bitrate": 2176000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/vid/1280x720/cPGgVROXHy3yrK6u.mp4"
+          }
+        ]
+      }
+    }
+  ],
+  "photos": [],
+  "video": {
+    "aspectRatio": [16, 9],
+    "contentType": "media_entity",
+    "durationMs": 23108,
+    "mediaAvailability": {
+      "status": "available"
+    },
+    "poster": "https://pbs.twimg.com/ext_tw_video_thumb/859073467769126913/pu/img/VKHGdXPsqKASBTvm.jpg",
+    "variants": [
+      {
+        "type": "application/x-mpegURL",
+        "src": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/pl/N6FavbC0omQcvt3n.m3u8"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/vid/320x180/br9rBqI8IebQxMUb.mp4"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/vid/640x360/l4MBp61vUkWK_5FM.mp4"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/ext_tw_video/859073467769126913/pu/vid/1280x720/cPGgVROXHy3yrK6u.mp4"
+      }
+    ],
+    "videoId": {
+      "type": "tweet",
+      "id": "859073537713328129"
+    },
+    "viewCount": 0
+  },
+  "conversation_count": 23,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+}

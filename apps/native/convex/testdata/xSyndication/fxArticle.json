@@ -1,0 +1,1213 @@
+{
+  "status": {
+    "type": "status",
+    "url": "https://x.com/adamtwtz/status/2097073557868056925",
+    "id": "2097073557868056925",
+    "text": "https://x.com/i/article/2097060822207909888",
+    "raw_text": {
+      "text": "https://t.co/PsVIPfKmAa",
+      "display_text_range": [0, 23],
+      "facets": [
+        {
+          "type": "url",
+          "indices": [0, 23],
+          "original": "https://t.co/PsVIPfKmAa",
+          "replacement": "https://x.com/i/article/2097060822207909888",
+          "display": "x.com/i/article/2097…"
+        }
+      ]
+    },
+    "author": {
+      "screen_name": "adamtwtz",
+      "url": "https://x.com/adamtwtz",
+      "id": "1778946034581803008",
+      "followers": 1999,
+      "following": 137,
+      "likes": 1034,
+      "media_count": 29,
+      "statuses": 1017,
+      "name": "Adam",
+      "description": "exposing how apps blow up • @contentrewards",
+      "raw_description": {
+        "text": "exposing how apps blow up • @contentrewards",
+        "facets": []
+      },
+      "location": "book a call for a free audit →",
+      "banner_url": "https://pbs.twimg.com/profile_banners/1778946034581803008/1788816061",
+      "avatar_url": "https://pbs.twimg.com/profile_images/2097072667912290304/tcUcXSB4_200x200.jpg",
+      "joined": "Sat Apr 13 00:39:30 +0000 2024",
+      "protected": false,
+      "website": {
+        "url": "https://cal.com/team/content-rewards/discovery-call?a=adam",
+        "display_url": "cal.com/team/content-r…"
+      },
+      "verification": {
+        "verified": true,
+        "verified_at": null,
+        "type": "individual"
+      },
+      "type": "profile"
+    },
+    "replies": 8,
+    "reposts": 5,
+    "likes": 127,
+    "bookmarks": 520,
+    "quotes": 12,
+    "embed_card": "tweet",
+    "created_at": "Mon Sep 07 21:24:32 +0000 2026",
+    "created_timestamp": 1788816272,
+    "possibly_sensitive": false,
+    "views": 111728,
+    "is_note_tweet": false,
+    "community_note": null,
+    "lang": null,
+    "replying_to": null,
+    "media": {},
+    "source": "Twitter Web App",
+    "article": {
+      "created_at": "2026-09-07T21:24:32.000Z",
+      "modified_at": "2026-09-07T21:25:03.000Z",
+      "id": "2097060822207909888",
+      "title": "How this GLP-1 app generated 20m+ views",
+      "preview_text": "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.\nit's a GLP-1 tracking app, and they've been running one campaign since April.\nthe",
+      "cover_media": {
+        "id": "QXBpTWVkaWE6DAAFCgABHRpC3HfbAAAKAAIYsBX+QdaQAAAA",
+        "media_id": "2097062091165466624",
+        "media_info": {
+          "__typename": "ApiImage",
+          "color_info": {
+            "palette": [
+              {
+                "percentage": 52.67,
+                "rgb": {
+                  "blue": 11,
+                  "green": 71,
+                  "red": 178
+                }
+              },
+              {
+                "percentage": 17.19,
+                "rgb": {
+                  "blue": 23,
+                  "green": 54,
+                  "red": 117
+                }
+              },
+              {
+                "percentage": 16.62,
+                "rgb": {
+                  "blue": 29,
+                  "green": 32,
+                  "red": 48
+                }
+              },
+              {
+                "percentage": 6.97,
+                "rgb": {
+                  "blue": 110,
+                  "green": 150,
+                  "red": 222
+                }
+              },
+              {
+                "percentage": 3.54,
+                "rgb": {
+                  "blue": 135,
+                  "green": 145,
+                  "red": 184
+                }
+              }
+            ]
+          },
+          "original_img_height": 600,
+          "original_img_url": "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg",
+          "original_img_width": 1500
+        },
+        "media_key": "3_2097062091165466624"
+      },
+      "content": {
+        "blocks": [
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "28k9q",
+            "text": "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5ev86",
+            "text": "it's a GLP-1 tracking app, and they've been running one campaign since April.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4gcla",
+            "text": "the content is faceless AI slideshows posted on tiktok, and they are running with an effective CPM of $0.91",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "3e49l",
+            "text": "here's exactly how the whole campaign worked",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 0,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "2ded3",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "a25r2",
+            "text": "why GLP-1 apps can't run ads",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "b9b5u",
+            "text": "running ads is already a stupid option on its own, due to the crazy high cpms and low af conversion rates",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5jnia",
+            "text": "but GLP-1 apps are restricted from running them in the first place",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fgk99",
+            "text": "On Meta, they have a policy for weight loss ads, they must target 18 or over, you can't make claims about physical appearance and you're banned from running certain formats",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 1,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "eijh8",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "et8c4",
+            "text": "and here's another policy from Meta",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4vr8e",
+            "text": "\"For weight loss products that require prescription, please refer to Drugs and Pharmaceuticals ads policy and comply with the geo-targeting, and written permission requirements.\"",
+            "type": "blockquote"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "eugot",
+            "text": "you need written permission from Meta before you run anything",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6emal",
+            "text": "which is why organic is the best method for apps like this",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "aih54",
+            "text": "organic content doesn't have to go thru ad review and there's no team deciding what creative should stay up and what shouldn't. a creator can post a slideshow about their experience and the algo will push it like all other content",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "60s8o",
+            "text": "so for GLP-1 apps organic is the way to go",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 2,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "10csl",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6acm",
+            "text": "the campaign",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "78req",
+            "text": "the campaign was really simple",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "afs61",
+            "text": "it was TikTok only, and the content was AI slideshows",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7bpee",
+            "text": "so completely faceless, all images & slides generated by AI",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "da9re",
+            "text": "this is really important, because weight loss is personal. 99% of creators won't show their face on a slideshow for a GLP-1 app which is exactly why they used AI slideshows.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7kn78",
+            "text": "the rates were:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7siuf",
+            "text": "$1 RPM, $400 cap per video and an MVR of 1000",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 3,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "5sccs",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "avtru",
+            "text": "and they require a 40% tier 1 audience for each account, because tier 1 countries means higher conversion rates & more people that can actually pay",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 4,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "5rdih",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "1hgpn",
+            "text": "the content vault",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "evd4a",
+            "text": "a lot of app founders mess up here",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "34tc5",
+            "text": "don't be like them",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "2othh",
+            "text": "see, most founders just write a brief that says \"make videos about our app\" and they get a lot submissions that don't convert or generate views at all",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 29,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "6b598",
+            "text": "this campaign didn't do that.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4puvq",
+            "text": "for this campaign they gave creators a full tutorial on how to create slideshows w Gemini, a content vault full of viral slideshow formats & structures and they even did live calls",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 5,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "9o765",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "c9jkk",
+            "text": "for new creators this was a gamechanger",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6jicl",
+            "text": "everyone knew exactly what they had to do",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 53,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "8a711",
+            "text": "and that's why 139 creators produced 2945 submissions",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 6,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "6h8mg",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5k8f9",
+            "text": "if they ran a campaign where creators had to invent their own formats, they wouldn't have got anywhere near these results",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 40,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "9el9h",
+            "text": "the brief & content vault was so crucial",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9o22v",
+            "text": "they had 139 creators all using the same prompt bank, everyone was generating consistent and viral content.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 7,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "ao8ls",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6g67g",
+            "text": "where the views came from",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "ajtlg",
+            "text": "139 creators submitted to this campaign.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6fbk8",
+            "text": "but 10 of them generated 21M out of the 23.1M views",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "compp",
+            "text": "two creators did 11.8M and the top creator posted 324 times for 6.2M views.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "b5454",
+            "text": "only 60 out of the 139 who submitted had at least one post approved",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "h20u",
+            "text": "this is something you need to consider when you launch your campaign",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 47,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "1vusa",
+            "text": "you aren't trying to find thousands of creators",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "crqi8",
+            "text": "you're looking to find a few very dedicated ones who will post on multiple accounts daily and stay consistent for months",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "d0ejf",
+            "text": "the top 2 alone in this campaign earned $5000+ each because they were consistent",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 8,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "42hba",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6cfd4",
+            "text": "how they funded it",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5oraq",
+            "text": "they didn't deposit $30K in one go",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4fdtr",
+            "text": "for the first run they started with $4k, and they topped up five times over four months",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "q532",
+            "text": "they topped up $3000 in May, $5000 in June and $2500 a few weeks after that. Then they added another $5000 on July 1st and finally $10,000 at the end of July (their biggest topup so far)",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 9,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "dcrse",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "ciph2",
+            "text": "this was a really smart thing to do, they tested with different amounts and once they knew it was working they went much bigger",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "47e0s",
+            "text": "a lot of brands start with one huge budget, which works & can still generate results",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "d85d7",
+            "text": "but at the start you could lose money due to creators using formats that don't actually convert etc",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 10,
+                "length": 1,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [],
+            "key": "8rf8r",
+            "text": " ",
+            "type": "atomic"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "18man",
+            "text": "the numbers so far",
+            "type": "header-two"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "8mdhl",
+            "text": "as of today the campaign has done 23.1M views with a spend of $21,418",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7mv7q",
+            "text": "and the app has gone from $2k mrr all the way to $25k mrr and generated $100k in revenue within a few months",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fq00j",
+            "text": "all with an effective CPM of $0.91",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5rsl5",
+            "text": "and the campaign is still running, there's $8000+ left in the budget and a huge volume of submissions are still coming in daily",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4881v",
+            "text": "Meta would charge $8-14 and still restrict you heavily in this niche",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9v05u",
+            "text": "this is why organic always wins",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4i4qr",
+            "text": "the results speak for themselves",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "brpim",
+            "text": "if you want to generate results as good as these, book a call and we'll help you setup your first campaign:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [
+              {
+                "key": 11,
+                "length": 11,
+                "offset": 0
+              }
+            ],
+            "inlineStyleRanges": [
+              {
+                "length": 11,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "cv3hg",
+            "text": "Book a call",
+            "type": "unstyled"
+          }
+        ],
+        "entityMap": [
+          {
+            "key": "8",
+            "value": {
+              "data": {},
+              "mutability": "Immutable",
+              "type": "DIVIDER"
+            }
+          },
+          {
+            "key": "4",
+            "value": {
+              "data": {},
+              "mutability": "Immutable",
+              "type": "DIVIDER"
+            }
+          },
+          {
+            "key": "11",
+            "value": {
+              "data": {
+                "url": "https://cal.com/team/content-rewards/discovery-call?a=glp"
+              },
+              "mutability": "Mutable",
+              "type": "LINK"
+            }
+          },
+          {
+            "key": "9",
+            "value": {
+              "data": {
+                "entityKey": "aae33467-e859-4218-bbcf-47cf0ce4aa23",
+                "mediaItems": [
+                  {
+                    "localMediaId": "10",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2097062695354695680"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "5",
+            "value": {
+              "data": {
+                "entityKey": "db7abebc-65e0-4c68-a29f-0833619a2157",
+                "mediaItems": [
+                  {
+                    "localMediaId": "6",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2097062457810235395"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "10",
+            "value": {
+              "data": {},
+              "mutability": "Immutable",
+              "type": "DIVIDER"
+            }
+          },
+          {
+            "key": "6",
+            "value": {
+              "data": {
+                "entityKey": "13dcf779-1e72-4f35-863c-72616b106c49",
+                "mediaItems": [
+                  {
+                    "localMediaId": "8",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2097062520657735680"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "1",
+            "value": {
+              "data": {
+                "entityKey": "5855630c-0352-4da8-b1ad-fcd54125a42a",
+                "mediaItems": [
+                  {
+                    "localMediaId": "2",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2097062218772742144"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          },
+          {
+            "key": "0",
+            "value": {
+              "data": {},
+              "mutability": "Immutable",
+              "type": "DIVIDER"
+            }
+          },
+          {
+            "key": "2",
+            "value": {
+              "data": {},
+              "mutability": "Immutable",
+              "type": "DIVIDER"
+            }
+          },
+          {
+            "key": "7",
+            "value": {
+              "data": {},
+              "mutability": "Immutable",
+              "type": "DIVIDER"
+            }
+          },
+          {
+            "key": "3",
+            "value": {
+              "data": {
+                "entityKey": "d85d2624-026a-42f5-a309-ec2f1b1a8827",
+                "mediaItems": [
+                  {
+                    "localMediaId": "4",
+                    "mediaCategory": "DraftTweetImage",
+                    "mediaId": "2097062377317347328"
+                  }
+                ]
+              },
+              "mutability": "Immutable",
+              "type": "MEDIA"
+            }
+          }
+        ]
+      },
+      "media_entities": [
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHRpDaSRXAAAKAAIYsBX+QdaQAAAA",
+          "media_id": "2097062695354695680",
+          "media_info": {
+            "__typename": "ApiImage",
+            "color_info": {
+              "palette": [
+                {
+                  "percentage": 94.74,
+                  "rgb": {
+                    "blue": 254,
+                    "green": 254,
+                    "red": 254
+                  }
+                },
+                {
+                  "percentage": 1.91,
+                  "rgb": {
+                    "blue": 11,
+                    "green": 99,
+                    "red": 253
+                  }
+                },
+                {
+                  "percentage": 1.52,
+                  "rgb": {
+                    "blue": 192,
+                    "green": 216,
+                    "red": 166
+                  }
+                },
+                {
+                  "percentage": 1.08,
+                  "rgb": {
+                    "blue": 174,
+                    "green": 204,
+                    "red": 244
+                  }
+                },
+                {
+                  "percentage": 0.2,
+                  "rgb": {
+                    "blue": 80,
+                    "green": 142,
+                    "red": 245
+                  }
+                }
+              ]
+            },
+            "original_img_height": 486,
+            "original_img_url": "https://pbs.twimg.com/media/HRpDaSRXAAA7R_k.png",
+            "original_img_width": 680
+          },
+          "media_key": "3_2097062695354695680"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHRpDQHeW8AAKAAIYsBX+QdaQAAAA",
+          "media_id": "2097062520657735680",
+          "media_info": {
+            "__typename": "ApiImage",
+            "color_info": {
+              "palette": [
+                {
+                  "percentage": 80.05,
+                  "rgb": {
+                    "blue": 255,
+                    "green": 255,
+                    "red": 255
+                  }
+                },
+                {
+                  "percentage": 14.16,
+                  "rgb": {
+                    "blue": 7,
+                    "green": 98,
+                    "red": 255
+                  }
+                },
+                {
+                  "percentage": 3.44,
+                  "rgb": {
+                    "blue": 156,
+                    "green": 192,
+                    "red": 254
+                  }
+                },
+                {
+                  "percentage": 1.77,
+                  "rgb": {
+                    "blue": 99,
+                    "green": 156,
+                    "red": 254
+                  }
+                },
+                {
+                  "percentage": 0.64,
+                  "rgb": {
+                    "blue": 129,
+                    "green": 129,
+                    "red": 129
+                  }
+                }
+              ]
+            },
+            "original_img_height": 383,
+            "original_img_url": "https://pbs.twimg.com/media/HRpDQHeW8AANiq8.png",
+            "original_img_width": 680
+          },
+          "media_key": "3_2097062520657735680"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHRpDHxfWMAAKAAIYsBX+QdaQAAAA",
+          "media_id": "2097062377317347328",
+          "media_info": {
+            "__typename": "ApiImage",
+            "color_info": {
+              "palette": [
+                {
+                  "percentage": 93.76,
+                  "rgb": {
+                    "blue": 28,
+                    "green": 29,
+                    "red": 31
+                  }
+                },
+                {
+                  "percentage": 3.83,
+                  "rgb": {
+                    "blue": 109,
+                    "green": 110,
+                    "red": 112
+                  }
+                },
+                {
+                  "percentage": 2.81,
+                  "rgb": {
+                    "blue": 207,
+                    "green": 208,
+                    "red": 209
+                  }
+                },
+                {
+                  "percentage": 0.16,
+                  "rgb": {
+                    "blue": 51,
+                    "green": 68,
+                    "red": 78
+                  }
+                }
+              ]
+            },
+            "original_img_height": 134,
+            "original_img_url": "https://pbs.twimg.com/media/HRpDHxfWMAAMLDN.png",
+            "original_img_width": 221
+          },
+          "media_key": "3_2097062377317347328"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHRpC+i3XgAAKAAIYsBX+QdaQAAAA",
+          "media_id": "2097062218772742144",
+          "media_info": {
+            "__typename": "ApiImage",
+            "color_info": {
+              "palette": [
+                {
+                  "percentage": 99.68,
+                  "rgb": {
+                    "blue": 255,
+                    "green": 255,
+                    "red": 255
+                  }
+                },
+                {
+                  "percentage": 0.2,
+                  "rgb": {
+                    "blue": 237,
+                    "green": 206,
+                    "red": 183
+                  }
+                },
+                {
+                  "percentage": 0.12,
+                  "rgb": {
+                    "blue": 145,
+                    "green": 139,
+                    "red": 133
+                  }
+                }
+              ]
+            },
+            "original_img_height": 655,
+            "original_img_url": "https://pbs.twimg.com/media/HRpC-i3XgAAO3MN.jpg",
+            "original_img_width": 904
+          },
+          "media_key": "3_2097062218772742144"
+        },
+        {
+          "id": "QXBpTWVkaWE6DAAFCgABHRpDMdWWMAMKAAIYsBX+QdaQAAAA",
+          "media_id": "2097062457810235395",
+          "media_info": {
+            "__typename": "ApiImage",
+            "color_info": {
+              "palette": [
+                {
+                  "percentage": 98.51,
+                  "rgb": {
+                    "blue": 255,
+                    "green": 255,
+                    "red": 255
+                  }
+                },
+                {
+                  "percentage": 1.36,
+                  "rgb": {
+                    "blue": 132,
+                    "green": 132,
+                    "red": 132
+                  }
+                }
+              ]
+            },
+            "original_img_height": 867,
+            "original_img_url": "https://pbs.twimg.com/media/HRpDMdWWMAMCDP0.png",
+            "original_img_width": 701
+          },
+          "media_key": "3_2097062457810235395"
+        }
+      ]
+    },
+    "provider": "twitter",
+    "reposted_by": null
+  },
+  "thread": null,
+  "author": {
+    "screen_name": "adamtwtz",
+    "url": "https://x.com/adamtwtz",
+    "id": "1778946034581803008",
+    "followers": 1999,
+    "following": 137,
+    "likes": 1034,
+    "media_count": 29,
+    "statuses": 1017,
+    "name": "Adam",
+    "description": "exposing how apps blow up • @contentrewards",
+    "raw_description": {
+      "text": "exposing how apps blow up • @contentrewards",
+      "facets": []
+    },
+    "location": "book a call for a free audit →",
+    "banner_url": "https://pbs.twimg.com/profile_banners/1778946034581803008/1788816061",
+    "avatar_url": "https://pbs.twimg.com/profile_images/2097072667912290304/tcUcXSB4_200x200.jpg",
+    "joined": "Sat Apr 13 00:39:30 +0000 2024",
+    "protected": false,
+    "website": {
+      "url": "https://cal.com/team/content-rewards/discovery-call?a=adam",
+      "display_url": "cal.com/team/content-r…"
+    },
+    "verification": {
+      "verified": true,
+      "verified_at": null,
+      "type": "individual"
+    },
+    "type": "profile"
+  },
+  "code": 200
+}

@@ -4,33 +4,69 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
 
 ## Event contract
 
-- `onboarding_step_viewed`: emitted when entering each named step, including the first. `step_id` and `step_index` identify the step without answers or saved content.
+- `onboarding_step_viewed`: emitted the first time each named step is entered, including the opener. The setup step has a back button to the opener; returning to a step does not emit it again. `step_id` and `step_index` identify the step without answers or saved content.
 - `onboarding_step_completed`: emitted once per step per onboarding mount when advancing; `duration_ms` is wall-clock time since entry and can include background time.
+- `acquisition_source_answered`, `acquisition_source_skipped`: the "How did you hear about Shelvr?" step that sat right after the opener in `flow_version` 3 and 4 (step id `acquisition_source`). `flow_version` 7 removed the step (5 and 6 never shipped), so neither event fires from it on; filter funnels on `step_id`. The `acquisition_source` person property stays on people who answered. Both step events carry `flow_version` (absent before 3).
+- `flow_version` 7 added the interests step (`step_id` `interests`) between the opener and setup, and removed the reveal step (`step_id` `reveal`): everyone goes from the notifications step to the share step, and the paywall (placement `onboarding`) opens when the share step is left, by its "Keep saving with Pro" button or by skipping the practice. Onboarding completes whatever the paywall's outcome; a practice share is dropped when the paywall is closed without a purchase. `step_index` therefore differs from earlier flows; filter funnels on `step_id`. The step never blocks, so it can complete with nothing picked. `onboarding_completed` carries the picked topics as `interests`; each is also one of the spaces counted in `space_count` and listed in `space_names`. A picked topic's sample is offered on the first-save screen and files into that topic's space.
+- `onboarding_demo_picked`: a first-save pick, fired before any sign-in. `sample` is true for a ready-made link, false for a pasted, typed or shared one; `signed_in` says whether an account already existed. From `flow_version` 4 a signed-out sample is previewed with no server call, then the demo step asks for sign-in; `onboarding_demo_submitted` for it fires in the demo step, after sign-in. From `flow_version` 7 that save does not play the reading steps again: the sign-in screen stays up until the item is read, then the step moves on, and `onboarding_demo_result` fires as for any other save; a sample picked again after going back fires `onboarding_demo_picked` again and skips the preview.
+- `onboarding_signin_prompt`: the onboarding sign-in ask. `surface` is `demo_sheet` (a pasted or typed link, signed out) or `sample_preview` (the sign-in screen after a previewed sample); `action` is `shown` or `dismissed` (the sheet's scrim or back, or that screen's back button; `flow_version` 4 had a "Not now" there). A provider tap shows as `auth_started` with the same surface.
+- `onboarding_share_practice`: the share-sheet practice step (`step_id` `share_practice`), shown after the onboarding paywall only to people with Pro. `outcome` is `received` (the share reached Shelvr; the share screen saves it after onboarding), `other_app` (iOS only, can repeat), `skipped` or `sheet_failed`. From `flow_version` 4 the first save is a one-tap sample on every platform; before it, iOS made the first save through the share sheet.
 - `onboarding_completed`: existing completion event. Authenticated and deferred onboarding are both supported; do not require a universal signup-before-onboarding order.
-- `auth_started`, `auth_cancelled`, `auth_failed`: OAuth outcomes with provider only, no error messages or callback URLs.
+- `auth_started`, `auth_cancelled`, `auth_failed`, `auth_succeeded`: OAuth outcomes with provider, no error messages or callback URLs.
+  - All four carry `method`: `native` for the system Sign in with Apple sheet (Apple on iOS, where the device offers it) and `web` for a browser auth session, which is every other provider and Apple where the sheet is missing. Events from before this field are all web sessions.
+  - `auth_cancelled`, `auth_failed` and `auth_succeeded` carry `auto_retry: true` when a web session ended in under 800 ms, before its sheet could have shown, and the app reopened it once on its own. The event then describes the second session, so the first one's instant end shows only as this flag. A native attempt is never retried as native. One that fails (not one a person cancels) is followed by a separate `web` attempt with its own `auth_attempt_id`, so a native `auth_failed` followed within the same second by a web `auth_started` is that fallback.
+  - `auth_cancelled` carries `elapsed_ms` (since `auth_started`) and `browser_ms` (time the system sign-in sheet was open). expo-web-browser reports every auth-session error as a cancel, so a `browser_ms` well under a second is the sheet failing to present, not a person backing out. Apple's review devices produce these. On a `native` attempt the sheet reports a real cancel, and `browser_ms` is the time that sheet was open.
+  - `auth_failed` carries `stage` (`request`, `browser`, or `exchange`) and `elapsed_ms`. A code exchange that returns without signing in counts as an `exchange` failure. On a `native` attempt `browser` is the Apple sheet failing and `exchange` is the backend rejecting its identity token. `error_code` is the native module's own code (for example `ERR_REQUEST_UNKNOWN`) when the failure came from one; it is a fixed vocabulary, never a message.
+  - `auth_succeeded` carries `elapsed_ms` and fires once per sign-in that finished in the app. Use it for sign-in conversion. It exists from the release after 1.0.3.
 - `auth_completed`: emitted after identifying the authenticated user. Also fires on authenticated cold starts, so it is **not a new-account signup event**.
+- Identity: the app resets PostHog only when it settles signed out while PostHog still holds an identified user. Before this change it reset on every launch while sign-in state loaded, which gave signed-out launches a new anonymous id and split a resumed onboarding across people. Read person counts from earlier releases with that in mind. Until the auth state loads, a launch whose Convex session is gone (expired, rejected, or lost to a keychain wipe or an Android backup restore) still sends its first events, such as `Application Opened` and the first screen views, as the previous account.
+- Every event carries `ota_update_id`, `ota_channel` and `ota_embedded`, because `$app_build` does not change with OTA updates. `Application Opened` no longer carries the launch `url`.
 - `paywall_requested`: before waiting for RevenueCat identity readiness.
 - `paywall_presentation_started`: before calling the native presentation API. This is an attempt, not a confirmed impression. It includes sessions interrupted before the promise settles.
 - `paywall_shown`: emitted after a cancel, purchase, or restore confirms the sheet was presented. The imperative API has no on-show callback. **Never use this event as the abandonment denominator.**
 - `paywall_cancelled`, `paywall_purchase_completed`, `paywall_restored`, `paywall_failed`: client outcomes. A completed checkout can start a free trial and is not evidence of payment. Attempts/outcomes share `paywall_attempt_id` and `placement`. Failures use bounded reasons and no raw error text.
+- The presentation, shown, cancelled, completed, restored, and failed events
+  carry `offering_id` and `trial_eligible` when RevenueCat can read the current
+  offering before the sheet opens. `trial_eligible` is one of `eligible`,
+  `ineligible`, `no_intro`, or `unknown`; missing SDK context is omitted rather
+  than guessed.
+- `paywall_purchase_started` records a purchase tap in the mounted exit-offer
+  component. RevenueCat's imperative `presentPaywall` API does not expose the
+  equivalent callback, so the event is intentionally not emitted for the main
+  paywall. Its `package_id` is the SDK package identifier.
+- `entitlement_activated` records the later client observation that the
+  Convex entitlement became active after a purchase or restore. It carries
+  `source`, the bounded entitlement `status`, and `delay_ms`. A Profile
+  restore reports nothing while an entitlement is already visible, because restoring
+  an already-active entitlement made nothing new visible.
+- `paywall_blocked_action_resumed` records a gated action that later passed at
+  the same placement within 30 minutes of the block. `purchased_since_block`
+  distinguishes a post-purchase retry from a later independent visit. The
+  memory is one action deep (a new block replaces it), and a resume is only
+  reported where a `usePaywallGuard` backs the placement: a screen-level gate
+  (Tidy, Map) blocks through its Pro gate CTA, and no guard runs there after
+  the purchase, so those placements report requests and outcomes but never a
+  resume.
+- Purchase and restore outcomes add `product_id` when RevenueCat returns the
+  active store product. It is absent when the SDK cannot provide it.
 - `trial_started`: authenticated RevenueCat INITIAL_PURCHASE with TRIAL period.
 - `payment_succeeded`: authenticated RevenueCat INITIAL_PURCHASE, RENEWAL, or NON_RENEWING_PURCHASE with a finite positive USD `price`. Excludes trial/promotional periods, family sharing, zero-price transactions, restores, cancellations, and transfers. `payment_kind` distinguishes initial, trial_conversion, renewal, and one_time. This measures positive charges, not net revenue after refunds or fees.
-- `trial_cancelled`: authenticated RevenueCat CANCELLATION with a TRIAL period — auto-renew was turned off, or a refund hit the trial. `payment_kind` is `trial`.
-- `subscription_cancelled`: CANCELLATION for a non-trial period; `payment_kind` is `subscription`. Both cancellation events carry `cancel_reason` (the verbatim RevenueCat enum when sent) and a derived `cancel_category`: `voluntary` (UNSUBSCRIBE, PRICE_INCREASE), `refund` (CUSTOMER_SUPPORT), `billing` (BILLING_ERROR), `developer` (DEVELOPER_INITIATED), `unknown` (UNKNOWN or absent). A `refund` cancellation is not a lost user — support refunds can leave auto-renew on, so payments may continue. Read known-voluntary churn as `cancel_category=voluntary`; a bare `cancel_reason != BILLING_ERROR` filter still mixes refunds and unknowns into "voluntary".
-- `trial_expired`: EXPIRATION with a TRIAL period — the trial lapsed unconverted. Paid expirations are not emitted; `payment_kind` is `trial_lapsed`.
-- `subscription_uncancelled`: UNCANCELLATION — auto-renew re-enabled. The general name is deliberate (the event fires for paid subscriptions too); `payment_kind` (`trial`/`subscription`) carries the split. It is the correction path in cancel funnels, never a conversion.
-- `cancel_survey_shown`, `cancel_survey_dismissed`, `cancel_survey_submitted`: client events from the one-time next-visit card (`survey_source: next_visit_card`), shown when RevenueCat reports the trial cancelled but still inside its window (`willRenew=false`, period TRIAL). **A survey response is stated intent, never proof of cancellation**: the respondent may keep the subscription, and Settings-app cancellers who never return during the window never see the card. Only the webhook events above count as cancellations; never use survey responses as a funnel denominator. `reason` is a bounded id; the in-repo id→label mapping is `too_expensive` → Too expensive, `not_useful_enough` → Not useful enough, `missing_feature` → Missing a feature, `other` → Something else (`apps/native/src/lib/cancel-survey.ts`).
+- `trial_cancelled`: authenticated RevenueCat CANCELLATION with a TRIAL period. Auto-renew was turned off, or a refund hit the trial. `payment_kind` is `trial`.
+- `subscription_cancelled`: CANCELLATION for a non-trial period; `payment_kind` is `subscription`. Both cancellation events carry `cancel_reason` (the verbatim RevenueCat enum when sent) and a derived `cancel_category`: `voluntary` (UNSUBSCRIBE, PRICE_INCREASE), `refund` (CUSTOMER_SUPPORT), `billing` (BILLING_ERROR), `developer` (DEVELOPER_INITIATED), `unknown` (UNKNOWN or absent). A `refund` cancellation is not a lost user. Support refunds can leave auto-renew on, so payments may continue. Read known-voluntary churn as `cancel_category=voluntary`; a bare `cancel_reason != BILLING_ERROR` filter still mixes refunds and unknowns into "voluntary".
+- `trial_expired`: EXPIRATION with a TRIAL period, meaning the trial lapsed unconverted. Paid expirations are not emitted; `payment_kind` is `trial_lapsed`.
+- `subscription_uncancelled`: UNCANCELLATION, meaning auto-renew was re-enabled. The general name is deliberate (the event fires for paid subscriptions too); `payment_kind` (`trial`/`subscription`) carries the split. It is the correction path in cancel funnels, never a conversion.
+- `cancel_survey_shown`, `cancel_survey_dismissed`, `cancel_survey_submitted`: client events from the one-time next-visit card (`survey_source: next_visit_card`), shown when RevenueCat reports the trial cancelled but still inside its window (`willRenew=false`, period TRIAL). **A survey response is stated intent, never proof of cancellation**: the respondent may keep the subscription, and Settings-app cancellers who never return during the window never see the card. Only the webhook events above count as cancellations; never use survey responses as a funnel denominator. `reason` is a bounded id; the in-repo mapping from id to label is `too_expensive` for Too expensive, `not_useful_enough` for Not useful enough, `missing_feature` for Missing a feature, and `other` for Something else (`apps/native/src/lib/cancel-survey.ts`).
 
   Mechanics (`use-cancel-survey.ts` + `convex/cancelSurvey.ts`):
   - Detection re-runs on every foreground episode while on Home and invalidates RevenueCat's customer-info cache before reading, so the check requests current renewal state after a return from Settings. Store/server propagation can still delay a change; transient detection failures retry on the next episode.
   - The ask is durably one-per-account, enforced by a server row (`cancelSurveys` table): existence = asked, first recorded outcome wins. This holds across devices and reinstalls; the client fails closed (never asks when it cannot verify the ask is unspent).
-  - `cancel_survey_shown` fires when the card actually renders — the ask is consumed at that moment, never at detection time.
+  - `cancel_survey_shown` fires when the card renders. The ask is consumed at that moment, never at detection time.
   - A bounded response is saved locally under the signed-in account before sending. Failed responses retry on foreground or relaunch, even though the ask was already consumed. The first server-accepted outcome still wins; retries do not show another card or emit another `cancel_survey_shown` event.
   - If renewal resumes (`subscription_uncancelled`) while the card is up, the next foreground check takes it down silently.
 
 - `$screen`: Expo Router route templates, retaining `[id]` placeholders. No route parameters, saved URLs, or OAuth codes. Automatic screen/touch capture is disabled to avoid duplicate or content-bearing events.
 
-Client identity is the same Convex user ID passed to RevenueCat. PostHog identify merges the anonymous onboarding identity. Purchase events timestamp `purchased_at_ms`; the four cancellation lifecycle events timestamp `event_timestamp_ms` — both are the event's own moment, not webhook arrival time. Delivery retries preserve event UUID and time. A transactional receipt ledger deduplicates RevenueCat IDs independently of subscription ordering, so a late purchase remains measurable even if a later entitlement event arrived first. Missing/deleted users are ignored.
+Client identity is the same Convex user ID passed to RevenueCat. PostHog identify merges the anonymous onboarding identity. Purchase events timestamp `purchased_at_ms`; the four cancellation lifecycle events timestamp `event_timestamp_ms`. Both are the event's own moment, not webhook arrival time. Delivery retries preserve event UUID and time. A transactional receipt ledger deduplicates RevenueCat IDs independently of subscription ordering, so a late purchase remains measurable even if a later entitlement event arrived first. Missing/deleted users are ignored.
 
 ## Reading the dashboard
 
@@ -46,9 +82,9 @@ The trial funnel is `trial_started` → (`trial_cancelled` | `trial_expired` | `
 
 Three insights read the cancellation events (all filtered `environment=production` and PostHog test accounts, fourteen-day window):
 
-1. **Known-voluntary cancel funnel** — `trial_started` → `trial_cancelled` filtered to `cancel_category=voluntary`. Refunds, billing failures, developer actions, and `unknown` are excluded from the voluntary rate and read as their own slices. A `refund` cancellation is not churn — auto-renew may remain on and payments continue.
-2. **Survey mix over time** — `cancel_survey_submitted` grouped by `reason`, 100% stacked. The ask is once per account (server-enforced via the `cancelSurveys` row), so each person contributes at most one response. Reason-id → label mapping is kept in-repo (`apps/native/src/lib/cancel-survey.ts`) so PostHog data stays interpretable even if the card copy changes in a later build.
-3. **Canceller behavior — evidence, not reason** — for the `trial_cancelled` cohort: saves created (`article_saved`, `note_saved`, `images_saved`), days active, and spaces used before the cancellation timestamp. Usage is corroborating evidence about the cohort: it can show that cancellers on average saved nothing, but it cannot establish why any individual cancelled. Do not label these charts with survey reasons.
+1. **Known-voluntary cancel funnel.** `trial_started` → `trial_cancelled` filtered to `cancel_category=voluntary`. Refunds, billing failures, developer actions, and `unknown` are excluded from the voluntary rate and read as their own slices. A `refund` cancellation is not churn, because auto-renew may remain on and payments continue.
+2. **Survey mix over time.** `cancel_survey_submitted` grouped by `reason`, 100% stacked. The ask is once per account (server-enforced via the `cancelSurveys` row), so each person contributes at most one response. The repo keeps the mapping from reason id to label (`apps/native/src/lib/cancel-survey.ts`) so PostHog data stays interpretable even if the card copy changes in a later build.
+3. **Canceller behavior: evidence, not reason.** For the `trial_cancelled` cohort: saves created (`article_saved`, `note_saved`, `images_saved`), days active, and spaces used before the cancellation timestamp. Usage is corroborating evidence about the cohort: it can show that cancellers on average saved nothing, but it cannot establish why any individual cancelled. Do not label these charts with survey reasons.
 
 The card appears only while the cancelled trial is still inside its window (auto-renew off, trial not yet expired); users who return after the trial lapsed are covered by `trial_expired`, not by the card. Detection is client-side from RevenueCat CustomerInfo; an untrusted read (`unknown`) never shows the card.
 
@@ -56,31 +92,33 @@ The card appears only while the cancelled trial is still inside its window (auto
 
 All four live on the [Onboarding and payment conversion dashboard](https://us.posthog.com/project/546847/dashboard/2075680), mirroring its conventions (global `environment = production` property, `filterTestAccounts` test-account exclusion, 30-day range):
 
-1. **Known-voluntary cancel funnel** — `trial_started` → `trial_cancelled` with `cancel_category = voluntary`, 14-day conversion window. [insight 11832813](https://us.posthog.com/project/546847/insights/11832813)
-2. **Cancel survey mix over time** — `cancel_survey_submitted` broken down by `reason`, percentage-stacked bars; at most one response per person. [insight 11832829](https://us.posthog.com/project/546847/insights/11832829)
-3. **Canceller behavior — saves by the cohort** — HogQL: save events per day by persons who performed `trial_cancelled` vs all users (evidence, not reason). [insight 11832830](https://us.posthog.com/project/546847/insights/11832830)
-4. **Canceller behavior — saves before cancel (per person)** — HogQL: CTE join of cancellers to their pre-cancellation saves. [insight 11832831](https://us.posthog.com/project/546847/insights/11832831)
+1. **Known-voluntary cancel funnel.** `trial_started` → `trial_cancelled` with `cancel_category = voluntary`, 14-day conversion window. [insight 11832813](https://us.posthog.com/project/546847/insights/11832813)
+2. **Cancel survey mix over time.** `cancel_survey_submitted` broken down by `reason`, percentage-stacked bars; at most one response per person. [insight 11832829](https://us.posthog.com/project/546847/insights/11832829)
+3. **Canceller behavior: saves by the cohort.** HogQL: save events per day by persons who performed `trial_cancelled` vs all users (evidence, not reason). [insight 11832830](https://us.posthog.com/project/546847/insights/11832830)
+4. **Canceller behavior: saves before cancel (per person).** HogQL: CTE join of cancellers to their pre-cancellation saves. [insight 11832831](https://us.posthog.com/project/546847/insights/11832831)
 
-All four are lazy-computed: open each tile once after events start flowing to confirm rendering and the two HogQL queries. Until the backend deploy and the rebuilt binary ship, expect empty charts — check event arrival before reading empties as zero.
+All four are lazy-computed: open each tile once after events start flowing to confirm rendering and the two HogQL queries. Until the backend deploy and the rebuilt binary ship, expect empty charts. Check event arrival before reading empties as zero.
 
 ## Cancellation flow decisions
 
 Recorded 13 September 2026 from RevenueCat's cancellation-flow guidance, Apple telemetry boundaries, and the simulator walkthrough that found the Customer Center shipped with no cancel path. Do not reverse these without the data named below.
 
 - **The survey is next-visit, not at-cancel.** The ask happens in a calm later session on Home, never inside the cancel flow. An at-cancel prompt catches only in-app cancellers (no survey can follow a user into iOS Settings), collects rushed tap-through answers, and its responses land in RevenueCat instead of this funnel. The card covers both cancel paths with one vocabulary, once per account.
-- **Customer Center: cancel path ON, RevenueCat's built-in exit survey OFF.** The management path is a RevenueCat-dashboard launch requirement — without it, users cannot cancel in-app at all and must dig through iOS Settings. RC's exit survey stays off because an in-app canceller is indistinguishable from a Settings canceller (`willRenew=false` + TRIAL is identical in CustomerInfo), so running both surveys asks in-app cancellers twice with no way to suppress the second ask.
+- **Customer Center: cancel path ON, RevenueCat's built-in exit survey OFF.** The management path is a RevenueCat-dashboard launch requirement. Without it, users cannot cancel in-app at all and must dig through iOS Settings. RC's exit survey stays off because an in-app canceller is indistinguishable from a Settings canceller (`willRenew=false` + TRIAL is identical in CustomerInfo), so running both surveys asks in-app cancellers twice with no way to suppress the second ask.
 - **Apple sends no cancel reasons.** An empty `cancel_reason` is Apple's normal state, not a bug; the `unknown` category is the expected iOS mode. The only source of a stated reason on iOS is this survey (or an out-of-band channel like email).
-- **The `trial_cancelled` → `cancel_survey_shown` drop-off is the never-return rate** — cancellers who do not open the app again during the trial window. No in-app survey (ours or RC's) can reach them; only email/push win-back can, which additionally requires enabling `$process_person_profile` on the cancellation events (kept off for cost). Roadmap order: measure this drop-off first, add win-back email or Apple win-back offers (iOS 18+) only if the rate justifies it, and reason-keyed offers (`too_expensive` → targeted offer) only with response volume.
+- **The `trial_cancelled` → `cancel_survey_shown` drop-off is the never-return rate**: cancellers who do not open the app again during the trial window. No in-app survey (ours or RC's) can reach them; only email/push win-back can, which additionally requires enabling `$process_person_profile` on the cancellation events (kept off for cost). Roadmap order: measure this drop-off first, add win-back email or Apple win-back offers (iOS 18+) only if the rate justifies it, and reason-keyed offers (a targeted offer for `too_expensive`) only with response volume.
 
-For failure recordings, open **Paywall attempt to actual payment**, click the dropped-off people at the payment step, then inspect their matching recordings. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
+To study failures, open **Paywall attempt to actual payment** and click the dropped-off people at the payment step. Production builds do not record sessions, so read their event timelines; recordings exist only for preview and development builds. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
 
-For the 1.0.2 release, native replay is disabled for the production build variant
-until its visual masking check is complete. Production funnel events remain enabled.
-Development replay samples 20% of sessions, masks all text, images, and sandboxed
-system views, disables logs/network telemetry, and captures at most one snapshot
-per second. Not every failed journey will have a recording. Native dead-tap
-detection is not promised. Replay requires a rebuilt native binary; an OTA
-JavaScript update cannot add the plugin.
+Production session replay is off. Apple's guideline 2.5.14 requires explicit
+consent and a visible indicator for recording user activity, and the app has
+neither, so `REPLAY_VARIANTS` in `src/lib/posthog.ts` holds only the preview and
+development variants. Production recorded from 2026-09-28 until that gate was
+narrowed in October 2026. On preview and development builds replay records every
+session, masks all text, images, and sandboxed system views, disables
+logs/network telemetry, and captures at most one snapshot per second. Native
+dead-tap detection is not promised. Turning production replay back on needs an
+in-app consent step and a recording indicator first.
 
 Website identities remain separate from app identities. Do not interpret these charts as a stitched landing-page-to-App-Store-install funnel.
 
@@ -98,11 +136,11 @@ Payment deliveries retry five times after the initial attempt (six HTTP attempts
 
 Sandbox charges retain their amount for development diagnostics, but carry `environment=sandbox` on the production backend (or `development` on a development backend). Production reports must filter `environment=production`; an unfiltered sum of `revenue_usd` is not production revenue.
 
-## Review verification — 9 September 2026
+## Review verification, 9 September 2026
 
 - The native dependency is `@posthog/react-native-plugin` 2.5.2. [PostHog's installation guide](https://posthog.com/docs/session-replay/installation/react-native) identifies it as the renamed session-replay module. It is autolinked; it is not an Expo config plugin and must not be added to the Expo `plugins` array. The prior native build/runtime checks confirmed it loaded.
 - The installed iOS PostHog implementation explicitly checks both `RCTTextView` and Fabric `RCTParagraphComponentView` under `maskAllTextInputs`, so the claim that this setting only covers editable controls is incorrect for this build. Visual masking verification remains a release requirement; this source check does not replace it.
-- The HTTP action calls `reconcileRevenueCatTransfer` with an `ActionCtx`: its owner query, RevenueCat requests, and final mutation do not share a transaction. The final `internal.subscriptions.reconcileTransfer` mutation starts one write transaction for all snapshots; its nested `upsertSubscription` calls share that transaction. An uncaught failure within this mutation rolls back all snapshot writes, but does not roll back the earlier owner query or external requests. A failure in the HTTP action after the mutation commits would not undo those writes. See the [Convex transaction documentation](https://docs.convex.dev/understanding/best-practices#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations).
+- The HTTP action calls `reconcileRevenueCatCustomers` in `model/revenuecatReconcile.ts` with an `ActionCtx`: its owner query, RevenueCat requests, and final mutation do not share a transaction. The final `internal.subscriptions.applySnapshots` mutation starts one write transaction for all snapshots; its nested `upsertSubscription` calls share that transaction. An uncaught failure within this mutation rolls back all snapshot writes, but does not roll back the earlier owner query or external requests. A failure in the HTTP action after the mutation commits would not undo those writes. See the [Convex transaction documentation](https://docs.convex.dev/understanding/best-practices#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations).
 - The legacy waitlist regression test inserts a row without `resendAttempts` and reads it through the actual indexed retry query. The `< maximum` range includes that missing value; the returned count is normalized to zero. No backfill is needed for this query.
 
 References: [RevenueCat webhook fields](https://www.revenuecat.com/docs/integrations/webhooks/event-types-and-fields), [PostHog native replay](https://posthog.com/docs/session-replay/installation/react-native).

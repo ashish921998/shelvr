@@ -1,28 +1,77 @@
+import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import type { Id } from "@convex/_generated/dataModel";
-import { Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { useRouter } from "expo-router";
+import { Pressable, Text } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+// Where a save is filed. Tapping it opens the same space picker as the ⋯
+// menu's "Add to space". A save in no space shows nothing here; the menu
+// still offers it.
 export function ItemSpaces({
+  itemId,
   spaces,
+  centered = false,
 }: {
+  itemId: Id<"items">;
   spaces: { _id: Id<"spaces">; name: string }[];
+  centered?: boolean;
 }) {
   useAppLocale();
+  const router = useRouter();
+  const { theme } = useUnistyles();
+
+  if (spaces.length === 0) return null;
+
+  const label = t("item.inSpaces", {
+    spaces: spaces.map((space) => space.name).join(", "),
+  });
 
   return (
-    <Text style={styles.label} numberOfLines={2}>
-      {spaces.length > 0
-        ? t("item.inSpaces", {
-            spaces: spaces.map((space) => space.name).join(", "),
-          })
-        : t("item.inbox")}
-    </Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={t("spaces.membershipHelp")}
+      // The row is one line of small text; the slop brings the target up to
+      // the control minimum without spacing out the page.
+      hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+      pressRetentionOffset={theme.control.pressRetentionOffset}
+      onPress={() =>
+        router.push({ pathname: "/manage-spaces", params: { itemId } })
+      }
+      style={[styles.row, centered && styles.centered]}
+    >
+      <Text
+        style={[styles.label, centered && styles.centeredLabel]}
+        numberOfLines={2}
+      >
+        {label}
+      </Text>
+      <AppSymbolIcon
+        name="chevron.right"
+        size={10}
+        weight="semibold"
+        tintColor={theme.colors.muted}
+      />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+  },
+  centered: {
+    alignSelf: "center",
+  },
+  centeredLabel: {
+    textAlign: "center",
+  },
   label: {
+    flexShrink: 1,
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.muted,

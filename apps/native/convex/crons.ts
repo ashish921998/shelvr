@@ -3,6 +3,20 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
+crons.interval(
+  "cleanup unattached storage",
+  { hours: 24 },
+  internal.items.cleanupOrphanStorage,
+  {},
+);
+
+crons.interval(
+  "retry refund consent sync",
+  { minutes: 1 },
+  internal.legalConsent.retry,
+  {},
+);
+
 // Sweep a bounded page of stale pending image operations (their attached upload
 // was never finalized) so unreferenced storage objects don't accumulate. The
 // mutation processes at most 100 rows per run; unbounded scans are avoided.
@@ -34,6 +48,16 @@ crons.interval(
   {},
 );
 
+// Deliver feedback rows whose first attempt never ran or failed, and pick up
+// `unconfigured` rows once the support-inbox env vars appear. Bounded and
+// index-backed; capped rows stay `failed` for manual inspection.
+crons.interval(
+  "retry feedback inbox delivery",
+  { hours: 1 },
+  internal.feedback.retryFailedDeliveries,
+  {},
+);
+
 // Prepare and deliver eligible weekly shelves. The worker is bounded and
 // schedules one small transaction per due user.
 crons.interval(
@@ -43,10 +67,57 @@ crons.interval(
   {},
 );
 
+// Consider each due user for one save reminder: an unread article or a recipe
+// to cook, at the hour that user tends to save. Hourly, because each user's
+// hour is their own; a user is only due once a day.
 crons.interval(
-  "recover weekly shelf deliveries",
+  "prepare save reminders",
+  { hours: 1 },
+  internal.notifications.prepareDueSaveReminders,
+  {},
+);
+
+// Embed items whose vector is missing or from an older generation: the
+// backfill for saves made before embeddings existed, the repair path for a
+// classification whose embed call failed, and the migration path after a
+// version bump. A page that made progress chains itself, so this interval is
+// only how often a drained sweep re-checks; it costs one indexed read when
+// there is nothing to do.
+crons.interval(
+  "sweep item embeddings",
+  { minutes: 30 },
+  internal.aiEmbeddingSweep.sweepItemEmbeddings,
+  {},
+);
+
+crons.interval(
+  "recover notification deliveries",
   { minutes: 5 },
   internal.notificationDelivery.recover,
+  {},
+);
+
+// Drop payment-event dedupe rows past the retention window so the ledger does
+// not grow forever. RevenueCat retries deliveries for days, never months, so
+// a purged id cannot cause double counting.
+crons.interval(
+  "purge expired payment receipts",
+  { hours: 24 },
+  internal.paymentTelemetry.purgeExpiredReceipts,
+  {},
+);
+
+crons.interval(
+  "recover expired subscriptions",
+  { minutes: 1 },
+  internal.subscriptions.recoverExpiredSubscriptions,
+  {},
+);
+
+crons.interval(
+  "confirm legacy unsynced waitlist requests",
+  { hours: 1 },
+  internal.waitlist.requestLegacyConfirmations,
   {},
 );
 

@@ -1,18 +1,19 @@
-import { Image } from 'expo-image';
-import { memo, useState, type FC } from 'react';
-import { Text, View } from 'react-native';
+import { Image } from "expo-image";
+import { memo, useState, type FC } from "react";
+import { Text, View } from "react-native";
 import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
   withTiming,
-} from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
-import { StyleSheet } from 'react-native-unistyles';
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+import { StyleSheet } from "react-native-unistyles";
 
-import { TidyCardContainer } from './tidy-card-container';
-import { TidyHints } from './tidy-hints';
-import { useDeckAnimation } from '@/lib/tidy/deck-animation';
-import type { TidyPhoto } from '@/lib/tidy/use-photo-batch';
+import { motion } from "@/lib/motion";
+import { TidyCardContainer } from "./tidy-card-container";
+import { TidyHints } from "./tidy-hints";
+import { useDeckAnimation } from "@/lib/tidy/deck-animation";
+import type { TidyPhoto } from "@/lib/tidy/use-photo-batch";
 
 /** How many cards below the top one keep their image decoded. */
 const MOUNT_WINDOW = 3;
@@ -33,12 +34,12 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
   // Only cards near the top decode their image, keeping memory flat across a
   // batch of full-screen photos. Membership is derived from the shared
   // currentIndex on the UI thread, so advancing the deck re-renders only the
-  // one or two cards whose visibility actually flips — not the whole stack.
+  // one or two cards whose visibility actually flips, not the whole stack.
   const [mounted, setMounted] = useState(() => inWindow(index, topStart));
 
   useAnimatedReaction(
     () => {
-      // Inline the window check so it runs entirely on the UI thread — calling
+      // Inline the window check so it runs entirely on the UI thread. Calling
       // an external helper here would break worklet compilation.
       const top = currentIndex.get();
       return index >= top - MOUNT_WINDOW && index <= top + 1;
@@ -51,7 +52,7 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
   );
 
   const rHintsStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(isDragging.get() ? 1 : 0, { duration: 150 }),
+    opacity: withTiming(isDragging.get() ? 1 : 0, motion.timing.fade),
   }));
 
   return (
@@ -69,9 +70,9 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
         <View style={styles.dateChip}>
           <Text style={styles.dateText}>
             {new Date(photo.creationTime).toLocaleDateString(undefined, {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
+              month: "long",
+              day: "numeric",
+              year: "numeric",
             })}
           </Text>
         </View>
@@ -93,18 +94,18 @@ const styles = StyleSheet.create((theme) => ({
     ...StyleSheet.absoluteFillObject,
   },
   dateChip: {
-    position: 'absolute',
+    position: "absolute",
     bottom: theme.gap(2),
     left: theme.gap(2),
     paddingHorizontal: theme.gap(1.5),
     paddingVertical: theme.gap(0.75),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.overlay,
   },
   dateText: {
     fontFamily: theme.fonts.medium,
     fontSize: 13,
-    color: 'white',
+    color: "white",
   },
 }));

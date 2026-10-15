@@ -9,16 +9,22 @@
         "src/**/*.test.{ts,tsx}",
         "src/widgets/recent-saves-widget.tsx",
         "src/lib/revenuecat-api-key*.ts",
-        "convex/**/*.ts",
+        "convex/*.ts",
+        "convex/**/*.test.ts",
         "modules/*/index.{ts,tsx}",
         "babel.config.js",
         "metro.config.js",
         "generateKeys.mjs",
         "goldie/goldie.config.ts",
-        "plugins/with-widget-localization.js"
+        "plugins/with-widget-localization.js",
+        "plugins/with-android-share-new-intent.js"
       ],
       "project": ["**/*.{js,mjs,ts,tsx}"],
       "ignore": ["convex/_generated/**"]
+    },
+    "tools/e2e": {
+      "entry": ["e2e.config.ts", "tests/**/*.e2e.ts"],
+      "project": ["**/*.ts"]
     },
     "apps/web": {
       "entry": ["src/app/**/*.{ts,tsx}"],
@@ -26,8 +32,28 @@
       "ignoreDependencies": ["tailwindcss"]
     },
     ".": {
-      "entry": ["tools/generate-localizations.mjs"],
-      "project": ["tools/**/*.mjs"]
+      "entry": [
+        "tools/generate-localizations.mjs",
+        "tools/git-trailer.test.mjs",
+        "tools/main-module.test.mjs",
+        "tools/measure-header-morph.mjs",
+        "tools/release-guards.test.mjs",
+        "tools/verify-agent-docs.mjs",
+        "tools/verify-agent-docs.test.mjs",
+        "tools/verify-ci.cjs",
+        "tools/verify-convex-api.mjs",
+        "tools/verify-convex-api.test.mjs",
+        "tools/verify-convex-codegen.mjs",
+        "tools/verify-convex-codegen.test.mjs",
+        "tools/verify-ios-submit.mjs",
+        "tools/verify-native-fingerprint.mjs",
+        "tools/verify-native-fingerprint.test.mjs",
+        "tools/verify-ota-compatibility.mjs",
+        "tools/verify-ota-compatibility.test.mjs",
+        "tools/verify-ota-env.mjs"
+      ],
+      "project": ["tools/**/*.{mjs,cjs}"],
+      "ignoreDependencies": ["expo-updates"]
     }
   }
 }

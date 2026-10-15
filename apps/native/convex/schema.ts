@@ -3,14 +3,23 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { recipientValidator } from "./model/notificationFields";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  postMediaValidator,
+  recipeValidator,
 } from "./model/itemFields";
+import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   cancelSurveyOutcomeValidator,
   cancelSurveyReasonValidator,
 } from "./model/cancelSurveyFields";
+import {
+  feedbackDeliveryStatusValidator,
+  feedbackPlatformValidator,
+  feedbackSurfaceValidator,
+} from "./model/feedbackFields";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -20,6 +29,75 @@ export default defineSchema({
   // deriving the stable users-table document ID; the raw auth subject can also
   // include a session suffix.
   ...authTables,
+
+  // Convex Auth's own users table with two fields added; the indexes must stay
+  // the ones `authTables` declares. Convex Auth writes everything the Apple
+  // profile callback returns onto this row, so the refresh token has to be a
+  // legal field for that write. `keepAppleRefreshToken` moves it to
+  // `appleTokens` in the same transaction, so no stored row carries it.
+  // `deleting` is set by the mutation that starts account deletion and stays
+  // on the row until the final batch removes it; `model/auth.ts` treats such
+  // an owner as gone. Rows carry it only mid-deletion, but it must stay
+  // declared (optional) while any row does, or the deploy is rejected.
+  users: defineTable({
+    ...authTables.users.validator.fields,
+    appleRefreshToken: v.optional(v.string()),
+    deleting: v.optional(v.boolean()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
+
+  // The latest Sign in with Apple refresh token per user, kept only to revoke
+  // it when the account is deleted. Never returned to a client or logged.
+  appleTokens: defineTable({
+    userId: v.id("users"),
+    refreshToken: v.string(),
+    // The client the token was issued to when that is not the web Service ID:
+    // the app's bundle id, for a token from the native sheet.
+    clientId: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // A web-flow Apple refresh token that arrived while its owner was already
+  // deleting, so it could not be kept in `appleTokens`. Held only until the
+  // revoke job has asked Apple to revoke it, so the token never travels in a
+  // scheduled job's arguments. No owner: the account is going away.
+  detachedAppleTokens: defineTable({
+    refreshToken: v.string(),
+    createdAt: v.number(),
+  }),
+
+  // One row per user: their answer to the third-party AI processing
+  // disclosure. No row means they have not answered.
+  aiConsents: defineTable({
+    userId: v.string(),
+    status: v.union(v.literal("granted"), v.literal("declined")),
+    version: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  legalConsents: defineTable({
+    userId: v.id("users"),
+    reviewedVersion: v.string(),
+    acceptedVersion: v.optional(v.string()),
+    acceptedAt: v.optional(v.number()),
+    refundSharing: v.boolean(),
+    changedAt: v.number(),
+    // Historical deployments wrote this field. Preserve it while those rows
+    // exist; dropping it rejects the deployment instead of rolling it back.
+    revision: v.optional(v.number()),
+    deleting: v.optional(v.boolean()),
+    syncState: v.union(
+      v.literal("pending"),
+      v.literal("syncing"),
+      v.literal("synced"),
+      v.literal("failed"),
+    ),
+    nextSyncAt: v.number(),
+    attempts: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_syncState_and_nextSyncAt", ["syncState", "nextSyncAt"]),
 
   paymentAnalyticsReceipts: defineTable({ eventId: v.string() }).index(
     "by_event",
@@ -38,7 +116,8 @@ export default defineSchema({
       v.literal("failed"),
     ),
     title: v.optional(v.string()),
-    // "user" once the owner typed the title. Classification then leaves
+    // "user" once the owner typed the title, or picked an onboarding sample
+    // whose heading they saw (createDemoItem). Classification then leaves
     // `title` alone; absent means any title is the classifier's.
     titleSource: v.optional(v.literal("user")),
     description: v.optional(v.string()),
@@ -53,10 +132,18 @@ export default defineSchema({
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    // Structured recipe lifted from the page's schema.org markup, a linked
+    // recipe page, or (captions and screenshots) the classifier. Optional so
+    // pre-existing rows validate; absent = not a recipe.
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
-    // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.
+    // Creator handle for social saves (e.g. "@nasa"). Set for TikTok and X links.
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
+    // Images and videos inside `content`. Kept apart from `media`, which marks
+    // a save as a social post.
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.
@@ -105,6 +192,30 @@ export default defineSchema({
     // back to `_creationTime` (their only run is the one create scheduled).
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
+    // Semantic retrieval vector over `model/embedding.ts`'s composed text.
+    // Optional because every row written before this existed has none: such a
+    // row is simply absent from the vector index (Convex indexes only
+    // documents that carry the field) until the backfill sweeper reaches it,
+    // and callers fall back to their pre-embedding path meanwhile.
+    //
+    // Deliberately NOT part of `itemFields`. That object is spread into
+    // `enrichedItemValidator`, the return shape of `listItems`, `getItem`,
+    // `searchItems`, the weekly digest, and `getSpace`. Adding ~6 KB of
+    // floats to every feed row is exactly the cost the card/detail split
+    // exists to avoid. `enrichItem` strips it at the single chokepoint those
+    // reads share.
+    embedding: v.optional(v.array(v.float64())),
+    // Which generation of model + composed text produced `embedding`. See
+    // CURRENT_EMBEDDING_VERSION; `undefined` sorts before every number, so the
+    // sweeper's `lt(CURRENT)` range finds never-embedded and stale rows in one
+    // scan.
+    embeddingVersion: v.optional(v.number()),
+    // Consecutive item-specific embedding failures. Only incremented when the
+    // provider answered for the rest of the batch, so a provider outage never
+    // burns an item's allowance. Cleared on success; once it reaches
+    // MAX_EMBEDDING_ATTEMPTS the sweep stamps the row anyway so one
+    // permanently unembeddable item cannot block every row behind it.
+    embeddingAttempts: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.
@@ -127,8 +238,25 @@ export default defineSchema({
     // referenced by any completed item before deleting/adopting it, so a
     // malicious caller can't point attach at another user's storage object.
     .index("by_storage", ["storageId"])
+    // Embedding backfill/refresh sweeper: `ready` rows whose embeddingVersion
+    // is below the current generation, oldest generation first. Scoped to
+    // `ready` because nothing else is worth embedding: a `processing` row has
+    // no final text yet and a `failed` one has no text at all.
+    .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
       searchField: "searchText",
+      filterFields: ["userId"],
+    })
+    // Semantic search and recommendation retrieval.
+    //
+    // `userId` is the only filter field on purpose. Convex vector filters
+    // support equality and `q.or(...)` but have no AND across different
+    // fields, so exactly one field can be pushed into the index, and it has
+    // to be the one whose failure would leak another account's saves. Status
+    // is filtered after hydration instead, where a plain predicate is free.
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: EMBEDDING_DIMENSIONS,
       filterFields: ["userId"],
     }),
 
@@ -140,6 +268,15 @@ export default defineSchema({
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
+    // Auto-file = new saves the classifier matches to this space land as
+    // `saved` instead of `suggested`. The user's own opt-in, so it is the one
+    // case where an AI pass writes a saved row. Only takes effect while
+    // `dynamic` is on. Absent means false.
+    autoFile: v.optional(v.boolean()),
+    // When auto-file was last turned on. Only saves created at or after it
+    // are auto-filed, so reclassifying an older save (a retry or a note edit)
+    // still only suggests.
+    autoFileSince: v.optional(v.number()),
     // Denormalized membership summary so the spaces list never has to walk
     // `spaceItems`. Counts mirror the spaceItems status vocabulary: `saved`
     // rows (user-owned memberships) and `suggested` rows (pending AI picks);
@@ -199,7 +336,7 @@ export default defineSchema({
   //
   //   begin (pending) -> upload bytes -> attach storageId -> finalize (complete)
   //
-  // `complete` rows are the permanent idempotency record — a retry reads the
+  // `complete` rows are the permanent idempotency record: a retry reads the
   // same itemId back. `pending` rows older than 24h whose attached upload was
   // never finalized are swept by a bounded cleanup cron; their storage object
   // is deleted first. A completed row whose item was explicitly deleted is
@@ -212,17 +349,23 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("complete")),
     storageId: v.optional(v.id("_storage")),
     itemId: v.optional(v.id("items")),
+    uploadUrl: v.optional(v.string()),
+    uploadUrlIssuedAt: v.optional(v.number()),
+    uploadTokenHash: v.optional(v.string()),
+    uploadClaimedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
-    // The logical unique key — every mutation loads the row through this index.
+    // The logical unique key: every mutation loads the row through this index.
     .index("by_user_operation", ["userId", "operationId"])
+    .index("by_user_and_kind_and_status", ["userId", "kind", "status"])
+    .index("by_upload_token_hash", ["uploadTokenHash"])
     // deleteItem cleanup: releases ledger rows whose item was deleted so the
     // same durable operationId can be re-performed. Pending rows have no
     // itemId and so are never returned by this index lookup.
     .index("by_item", ["itemId"])
     // Lets isStorageUnreferenced see storage held by pending operations (an
-    // uploaded-but-unfinalized blob), not just storage referenced by items —
-    // otherwise the same blob could be adopted into two operations and later
+    // uploaded-but-unfinalized blob), not just storage referenced by items.
+    // Otherwise the same blob could be adopted into two operations and later
     // deleted out from under a live item.
     .index("by_storage", ["storageId"])
     // Stale-pending cleanup cron, bounded per run. kind leads so the sweep
@@ -253,18 +396,20 @@ export default defineSchema({
     ),
     expiresAt: v.number(),
     productId: v.optional(v.string()),
-    // RevenueCat `event_timestamp_ms` — a monotonic event timestamp from the
+    // RevenueCat `event_timestamp_ms`, a monotonic event timestamp from the
     // webhook payload. Used to order events so a newer event can move expiry in
     // either direction (e.g. a refund shortens the period). Optional for
     // backward compatibility with rows created before this field existed.
     eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_and_expiresAt", ["status", "expiresAt"]),
 
   // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
   // row is the durable, cross-install record: its existence is the ask, and
   // the first recorded outcome wins. Local (MMKV) state can never enforce
-  // once-per-account across devices or reinstalls — only this row can.
+  // once-per-account across devices or reinstalls: only this row can.
   cancelSurveys: defineTable({
     userId: v.string(),
     askedAt: v.number(),
@@ -275,6 +420,41 @@ export default defineSchema({
     reason: v.optional(cancelSurveyReasonValidator),
     respondedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
+
+  // Authenticated in-app feedback (convex/feedback.ts). Convex is the source
+  // of truth; the support-inbox email is only a projection, so a Resend
+  // outage or missing operator configuration can never lose a submission.
+  // The message never reaches PostHog. Client telemetry carries surface,
+  // char count, and a content-free delivery category only. Deleting a row
+  // does not retract an already-delivered email (see
+  // docs/architecture/feedback.md).
+  feedbackSubmissions: defineTable({
+    userId: v.string(),
+    message: v.string(),
+    surface: feedbackSurfaceValidator,
+    // Bounded app context so the operator can reply with the right build in
+    // mind. Platform is a closed union; the version strings are capped at
+    // write time.
+    platform: v.optional(feedbackPlatformValidator),
+    appVersion: v.optional(v.string()),
+    buildVariant: v.optional(v.string()),
+    status: feedbackDeliveryStatusValidator,
+    // Delivery attempts started, spent at claim time before the send so a
+    // delivery that crashes mid-flight still counts toward the cap.
+    // `unconfigured` claims are free, and a row that reaches the attempt
+    // cap stays `failed` for manual inspection instead of occupying the
+    // retry window forever.
+    attempts: v.number(),
+    // `<category>[:<http status>]`: why the last delivery failed, without
+    // any provider text (which can echo the message back).
+    deliveryError: v.optional(v.string()),
+    deliveredAt: v.optional(v.number()),
+  })
+    // Account deletion drains the user's rows through this index.
+    .index("by_user", ["userId"])
+    // Bounded, index-backed retry scan: each retryable status pages rows
+    // below the attempt cap without ever scanning the whole table.
+    .index("by_status_attempts", ["status", "attempts"]),
 
   // One Expo push token per device. A token row moves to a different account
   // only after its current owner disables it (the client revokes every stored
@@ -301,13 +481,20 @@ export default defineSchema({
     weeklyShelfEnabled: v.boolean(),
     nextDigestAt: v.number(),
     timezone: v.optional(v.string()),
+    // Save reminders are on for anyone who allowed notifications; only an
+    // explicit `false` turns them off. Absent on rows written before they existed.
+    remindersEnabled: v.optional(v.boolean()),
+    // When the next reminder is due to be considered. Absent while reminders
+    // are off or the user has no device; `registerDevice` sets it again.
+    nextReminderAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_enabled_and_next_digest_at", [
       "weeklyShelfEnabled",
       "nextDigestAt",
-    ]),
+    ])
+    .index("by_next_reminder_at", ["nextReminderAt"]),
 
   // Read state is separate from items so opening a save does not rewrite the
   // item row that is rendered throughout the feed.
@@ -320,6 +507,51 @@ export default defineSchema({
     .index("by_user_and_item", ["userId", "itemId"])
     .index("by_user", ["userId"])
     .index("by_item", ["itemId"]),
+
+  // Places the user marked "We went" from a plan. One row per place per user,
+  // keyed by the squashed name, so the next plan ranks it last. `itemId` is
+  // the save the place came from and may since have been deleted.
+  placeVisits: defineTable({
+    userId: v.string(),
+    key: v.string(),
+    name: v.string(),
+    itemId: v.id("items"),
+    visitedAt: v.number(),
+  })
+    .index("by_user_and_key", ["userId", "key"])
+    .index("by_user_and_visited", ["userId", "visitedAt"]),
+
+  // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
+  // intents save without launching the JavaScript app, so they have no Convex
+  // Auth JWT. Only the SHA-256 hex hash is stored; the raw token lives in the
+  // device keychain. See appIntents.ts.
+  captureTokens: defineTable({
+    userId: v.id("users"),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_user", ["userId"]),
+
+  // A public share link for one item. The random token, never the item id, is
+  // the capability: item ids travel through analytics, tokens do not.
+  shareLinks: defineTable({
+    token: v.string(),
+    userId: v.string(),
+    itemId: v.id("items"),
+    // Set once the owner completed a share of this link. Absent on a link
+    // whose share sheet is still open, and on every link minted before the
+    // field existed.
+    confirmedAt: v.optional(v.number()),
+    // True while the share sheet this link was minted for is still open, on
+    // a client that reports how the sheet ended. Only such a link can be
+    // withdrawn by a cancel.
+    pending: v.optional(v.boolean()),
+  })
+    .index("by_token", ["token"])
+    .index("by_item", ["itemId"])
+    .index("by_user", ["userId"]),
 
   // A persisted weekly shelf keeps the notification payload and in-app view
   // stable even if the underlying saves are later deleted or reclassified.
@@ -337,9 +569,44 @@ export default defineSchema({
     deliveryAttempts: v.optional(v.number()),
     deliveryRecipients: v.optional(v.array(recipientValidator)),
     deliveryError: v.optional(v.string()),
+    // When Expo first accepted a push for this notification, stamped at the
+    // first finish that sees a ticket in hand. Separate from `deliveredAt`
+    // (the confirmation time) because `notification_sent` telemetry timestamps
+    // the send itself. Otherwise a notification open can precede the
+    // notification's own "sent" event. Absent on rows that never sent.
+    deliverySentAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_week", ["userId", "weekStart"])
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
+
+  // One push that names one save: an unread article or a recipe to cook. A
+  // save is reminded about at most once, and these rows are also the budget's
+  // memory of what was sent and when. Delivery fields mirror weeklyDigests.
+  saveReminders: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    kind: v.union(v.literal("read"), v.literal("cook")),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.union(
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
+    // See weeklyDigests: the first accepted send, kept apart from the
+    // delivery-confirmation time so `notification_sent` timestamps the send.
+    deliverySentAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_item", ["userId", "itemId"])
     .index("by_delivery_status_and_attempt", [
       "deliveryStatus",
       "deliveryNextAttemptAt",
@@ -374,6 +641,10 @@ export default defineSchema({
     consentVersion: v.string(),
     consentText: v.string(),
     consentedAt: v.number(),
+    confirmedAt: v.optional(v.number()),
+    confirmed: v.optional(v.boolean()),
+    confirmationHash: v.optional(v.string()),
+    confirmationExpiresAt: v.optional(v.number()),
     firstSubmittedAt: v.number(),
     lastSubmittedAt: v.number(),
     resendStatus: v.union(
@@ -387,6 +658,12 @@ export default defineSchema({
     resendAttempts: v.optional(v.number()),
   })
     .index("by_email_and_product", ["email", "product"])
+    .index("by_confirmationHash", ["confirmationHash"])
+    .index("by_confirmed_and_resendStatus_and_resendAttempts", [
+      "confirmed",
+      "resendStatus",
+      "resendAttempts",
+    ])
     // Bounded Resend retry cron pages failed/pending/unconfigured rows below
     // the attempt cap without scanning the whole waitlist.
     .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),

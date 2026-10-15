@@ -3,39 +3,20 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
+type Backend = ReturnType<typeof newConvexTest>;
 
-async function as(userId: string): Promise<TestCtx> {
-  const t = newConvexTest().withIdentity({
-    subject: `${userId}|session-1`,
-  });
-  await seedPro(t, userId);
-  return t;
-}
-
-async function seedPro(t: TestCtx, userId: string): Promise<void> {
-  await t.run(async (ctx) => {
-    const existing = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
-    const fields = {
-      status: "pro" as const,
-      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      updatedAt: Date.now(),
-    };
-    if (existing !== null) {
-      await ctx.db.patch(existing._id, fields);
-    } else {
-      await ctx.db.insert("subscriptions", { userId, ...fields });
-    }
-  });
+/** A signed-in Pro user backed by a real users row. */
+async function as(
+  backend: Backend,
+): Promise<{ t: TestCtx; userId: Id<"users"> }> {
+  return await signedInUser(backend, { pro: true });
 }
 
 async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
@@ -110,8 +91,7 @@ describe("deleteCurrentUserAccount", () => {
   });
 
   it("removes items, spaces, memberships, operations, storage, and subscription", async () => {
-    const userId = "user-delete-a";
-    const t = await as(userId);
+    const { t, userId } = await as(newConvexTest());
     const seeded = await seedOwnedData(t, userId);
 
     await t.run(async (ctx) => {
@@ -140,6 +120,23 @@ describe("deleteCurrentUserAccount", () => {
         outcome: "submitted",
         reason: "too_expensive",
         respondedAt: 1700000000001,
+      });
+      // Feedback submissions hold the user's authored messages; they drain
+      // with the account as well.
+      await ctx.db.insert("feedbackSubmissions", {
+        userId,
+        message: "Loved the app, sad to go",
+        surface: "profile",
+        status: "delivered",
+        attempts: 1,
+      });
+      // "We went" places say where the user has been.
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId: seeded.noteId,
+        visitedAt: 1700000000002,
       });
     });
 
@@ -176,6 +173,18 @@ describe("deleteCurrentUserAccount", () => {
           .withIndex("by_user", (q) => q.eq("userId", userId))
           .unique(),
       ).toBeNull();
+      expect(
+        await ctx.db
+          .query("feedbackSubmissions")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(0);
+      expect(
+        await ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(0);
       expect(await ctx.db.system.get("_storage", seeded.storageId)).toBeNull();
       expect(
         await ctx.db.system.get("_storage", seeded.pendingStorageId),
@@ -189,34 +198,13 @@ describe("deleteCurrentUserAccount", () => {
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
-      const { userId, sessionId } = await backend.run(async (ctx) => {
-        const userId = await ctx.db.insert("users", {
-          email: "big@example.com",
-        });
-        const sessionId = await ctx.db.insert("authSessions", {
-          userId,
-          expirationTime: Date.now() + 60_000,
-        });
-        for (let i = 0; i < DELETE_BATCH + 1; i++) {
-          await ctx.db.insert("items", {
-            userId: userId as string,
-            type: "note",
-            status: "ready",
-            tags: [],
-            searchText: `note ${i}`,
-            note: `note ${i}`,
-          });
-        }
-        await ctx.db.insert("subscriptions", {
-          userId: userId as string,
-          status: "pro",
-          expiresAt: Date.now() + 60_000,
-          updatedAt: Date.now(),
-        });
-        return { userId, sessionId };
+      const { userId, t } = await signedInUser(backend, {
+        email: "big@example.com",
+        pro: true,
+        session: true,
       });
+      await seedNotes(backend, userId, DELETE_BATCH + 1);
 
-      const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
       await t.mutation(api.users.deleteCurrentUserAccount, {});
       await backend.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -242,25 +230,23 @@ describe("deleteCurrentUserAccount", () => {
 
   it("does not delete another user's data", async () => {
     const backend = newConvexTest();
-    const ta = backend.withIdentity({ subject: "user-a|session-1" });
-    const tb = backend.withIdentity({ subject: "user-b|session-1" });
-    await seedPro(ta, "user-a");
-    await seedPro(tb, "user-b");
+    const { t: ta, userId: userA } = await as(backend);
+    const { t: tb, userId: userB } = await as(backend);
 
-    await seedOwnedData(ta, "user-a");
-    const bSeeded = await seedOwnedData(tb, "user-b");
+    await seedOwnedData(ta, userA);
+    const bSeeded = await seedOwnedData(tb, userB);
 
     await ta.mutation(api.users.deleteCurrentUserAccount, {});
 
     await tb.run(async (ctx) => {
       const items = await ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-b"))
+        .withIndex("by_user", (q) => q.eq("userId", userB))
         .collect();
       expect(items).toHaveLength(2);
       const spaces = await ctx.db
         .query("spaces")
-        .withIndex("by_user", (q) => q.eq("userId", "user-b"))
+        .withIndex("by_user", (q) => q.eq("userId", userB))
         .collect();
       expect(spaces).toHaveLength(1);
       expect(
@@ -268,16 +254,22 @@ describe("deleteCurrentUserAccount", () => {
       ).not.toBeNull();
       const sub = await ctx.db
         .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", "user-b"))
+        .withIndex("by_user", (q) => q.eq("userId", userB))
         .unique();
       expect(sub).not.toBeNull();
     });
+
+    // B's identity still works; A's is gone with the account.
+    await expect(tb.query(api.spaces.listSpaces, {})).resolves.toHaveLength(1);
+    await expect(ta.query(api.spaces.listSpaces, {})).rejects.toThrow(
+      /Not authenticated/,
+    );
 
     await ta.run(async (ctx) => {
       expect(
         await ctx.db
           .query("items")
-          .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+          .withIndex("by_user", (q) => q.eq("userId", userA))
           .collect(),
       ).toHaveLength(0);
     });
@@ -286,16 +278,14 @@ describe("deleteCurrentUserAccount", () => {
   it("removes auth sessions, accounts, and the users document", async () => {
     const backend = newConvexTest();
 
-    const { userId, sessionId, accountId } = await backend.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {
-        email: "delete-me@example.com",
-      });
-      const sessionId = await ctx.db.insert("authSessions", {
-        userId,
-        expirationTime: Date.now() + 60_000,
-      });
+    const { userId, sessionId, t } = await signedInUser(backend, {
+      email: "delete-me@example.com",
+      pro: true,
+      session: true,
+    });
+    const accountId = await backend.run(async (ctx) => {
       await ctx.db.insert("authRefreshTokens", {
-        sessionId,
+        sessionId: sessionId!,
         expirationTime: Date.now() + 60_000,
       });
       const accountId = await ctx.db.insert("authAccounts", {
@@ -311,25 +301,18 @@ describe("deleteCurrentUserAccount", () => {
         searchText: "x",
         note: "x",
       });
-      await ctx.db.insert("subscriptions", {
-        userId: userId as string,
-        status: "pro",
-        expiresAt: Date.now() + 60_000,
-        updatedAt: Date.now(),
-      });
-      return { userId, sessionId, accountId };
+      return accountId;
     });
 
-    const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
     await t.mutation(api.users.deleteCurrentUserAccount, {});
 
     await backend.run(async (ctx) => {
       expect(await ctx.db.get(userId)).toBeNull();
-      expect(await ctx.db.get(sessionId)).toBeNull();
+      expect(await ctx.db.get(sessionId!)).toBeNull();
       expect(await ctx.db.get(accountId)).toBeNull();
       const tokens = await ctx.db
         .query("authRefreshTokens")
-        .withIndex("sessionId", (q) => q.eq("sessionId", sessionId))
+        .withIndex("sessionId", (q) => q.eq("sessionId", sessionId!))
         .collect();
       expect(tokens).toHaveLength(0);
       expect(
@@ -341,18 +324,60 @@ describe("deleteCurrentUserAccount", () => {
     });
   });
 
-  // Regression: the onboarding demo table must drain with the account — no
+  // Feedback rows hold authored messages, so a chatty account must be able
+  // to exceed one deletion batch and still drain completely (via the same
+  // scheduled continuations as every other table) before the auth identity
+  // is removed.
+  it("drains more than one batch of feedback rows via scheduled continuations", async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await signedInUser(backend, {
+        email: "chatty@example.com",
+        pro: true,
+        session: true,
+      });
+      await backend.run(async (ctx) => {
+        for (let i = 0; i < DELETE_BATCH + 1; i++) {
+          await ctx.db.insert("feedbackSubmissions", {
+            userId: userId as string,
+            message: `feedback ${i}`,
+            surface: "home",
+            status: "delivered",
+            attempts: 1,
+          });
+        }
+      });
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+
+      await backend.run(async (ctx) => {
+        expect(
+          await ctx.db
+            .query("feedbackSubmissions")
+            .withIndex("by_user", (q) => q.eq("userId", userId as string))
+            .collect(),
+        ).toHaveLength(0);
+        // The auth identity is only removed by the final batch, so its
+        // absence proves the continuations ran to completion.
+        expect(await ctx.db.get(userId)).toBeNull();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Regression: the onboarding demo table must drain with the account: no
   // orphan allowance row (or dangling item reference) may survive deletion.
   it("removes the onboarding demo allowance with the account", async () => {
     const backend = newConvexTest();
-    const { userId, sessionId } = await backend.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {
-        email: "demo-delete@example.com",
-      });
-      const sessionId = await ctx.db.insert("authSessions", {
-        userId,
-        expirationTime: Date.now() + 60_000,
-      });
+    const { userId, t } = await signedInUser(backend, {
+      email: "demo-delete@example.com",
+      pro: true,
+      session: true,
+    });
+    await backend.run(async (ctx) => {
       const itemId = await ctx.db.insert("items", {
         userId: userId as string,
         type: "link",
@@ -366,16 +391,8 @@ describe("deleteCurrentUserAccount", () => {
         itemId,
         createdAt: Date.now(),
       });
-      await ctx.db.insert("subscriptions", {
-        userId: userId as string,
-        status: "pro",
-        expiresAt: Date.now() + 60_000,
-        updatedAt: Date.now(),
-      });
-      return { userId, sessionId };
     });
 
-    const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
     await t.mutation(api.users.deleteCurrentUserAccount, {});
 
     await backend.run(async (ctx) => {
@@ -386,5 +403,178 @@ describe("deleteCurrentUserAccount", () => {
           .collect(),
       ).toHaveLength(0);
     });
+  });
+});
+
+/** A real signed-in Pro user with `itemCount` notes. More than `DELETE_BATCH`
+ * leaves the account mid-deletion after the first mutation, so the owner row
+ * is still there to carry the marker. */
+async function fencedUser(backend: Backend, itemCount: number) {
+  const { userId, t } = await signedInUser(backend, {
+    email: "fence@example.com",
+    pro: true,
+    session: true,
+  });
+  await seedNotes(backend, userId, itemCount);
+  return { userId, t };
+}
+
+async function remainingItems(backend: TestCtx, userId: Id<"users">) {
+  return await backend.run(
+    async (ctx) =>
+      (
+        await ctx.db
+          .query("items")
+          .withIndex("by_user", (q) => q.eq("userId", userId as string))
+          .collect()
+      ).length,
+  );
+}
+
+/** The same authenticated identity, driven through a query, a mutation, a
+ * demo save and the capture-token action. Every one must refuse. */
+async function expectRetainedIdentityRejected(t: TestCtx) {
+  await expect(t.query(api.spaces.listSpaces, {})).rejects.toThrow(
+    /Not authenticated/,
+  );
+  await expect(
+    t.mutation(api.items.createNoteItem, { text: "after deletion" }),
+  ).rejects.toThrow(/Not authenticated/);
+  await expect(
+    t.mutation(api.demo.createDemoItem, { url: "https://example.com/x" }),
+  ).rejects.toThrow(/Not authenticated/);
+  await expect(t.action(api.appIntents.issueCaptureToken, {})).rejects.toThrow(
+    /Not authenticated/,
+  );
+}
+
+describe("account deletion fence", () => {
+  it("marks the owner deleting in the first transaction and keeps the marker between batches", async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+
+      // Mid-deletion: rows remain, the owner row is still there, and it is
+      // marked.
+      expect(await remainingItems(backend, userId)).toBe(1);
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toMatchObject({
+        deleting: true,
+      });
+
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await remainingItems(backend, userId)).toBe(0);
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("resumes safely when deletion is requested again mid-cleanup and schedules the Apple revoke once", async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
+      await backend.run((ctx) =>
+        ctx.db.insert("appleTokens", {
+          userId,
+          refreshToken: "r.token",
+          updatedAt: Date.now(),
+        }),
+      );
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      expect(await remainingItems(backend, userId)).toBe(1);
+      // The retry during cleanup must not fail because the owner is already
+      // deleting; it resumes the drain.
+      await expect(
+        t.mutation(api.users.deleteCurrentUserAccount, {}),
+      ).resolves.toBeNull();
+      expect(await remainingItems(backend, userId)).toBe(0);
+
+      const revokes = await backend.run(async (ctx) =>
+        (await ctx.db.system.query("_scheduled_functions").collect()).filter(
+          (job) => job.name === "appleRevoke:revoke",
+        ),
+      );
+      expect(revokes).toHaveLength(1);
+
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("is a safe no-op once the account is gone", async () => {
+    const backend = newConvexTest();
+    const { userId, t } = await fencedUser(backend, 1);
+
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+    expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+
+    await expect(
+      t.mutation(api.users.deleteCurrentUserAccount, {}),
+    ).resolves.toBeNull();
+    expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+  });
+
+  it("rejects the retained identity in query, mutation and action while deleting and after removal", async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
+
+      // Live: the identity works everywhere.
+      await expect(t.query(api.spaces.listSpaces, {})).resolves.toEqual([]);
+      await expect(
+        t.action(api.appIntents.issueCaptureToken, {}),
+      ).resolves.toEqual(expect.any(String));
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toMatchObject({
+        deleting: true,
+      });
+      await expectRetainedIdentityRejected(t);
+      expect(await remainingItems(backend, userId)).toBe(1);
+
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+      await expectRetainedIdentityRejected(t);
+      expect(
+        await backend.run((ctx) => ctx.db.query("captureTokens").collect()),
+      ).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers null from getCurrentUser for a deleting owner", async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
+      await expect(t.query(api.users.getCurrentUser, {})).resolves.toEqual({
+        _id: userId,
+        email: "fence@example.com",
+      });
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      await expect(t.query(api.users.getCurrentUser, {})).resolves.toBeNull();
+
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await expect(t.query(api.users.getCurrentUser, {})).resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still rejects a signed-out deletion request", async () => {
+    const backend = newConvexTest();
+    await expect(
+      backend.mutation(api.users.deleteCurrentUserAccount, {}),
+    ).rejects.toThrow(/Not authenticated/);
   });
 });

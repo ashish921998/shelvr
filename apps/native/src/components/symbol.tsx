@@ -60,6 +60,7 @@ const SF_TO_MATERIAL = {
   // Navigation
   "chevron.left": "arrow_back",
   "chevron.right": "arrow_forward",
+  "chevron.up": "expand_less",
   "arrow.uturn.backward": "undo",
   // Tabs / system
   "house.fill": "home",
@@ -74,6 +75,7 @@ const SF_TO_MATERIAL = {
   "tray.and.arrow.up": "move_up",
   "arrow.up": "arrow_upward",
   "doc.text": "description",
+  "fork.knife": "restaurant",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 

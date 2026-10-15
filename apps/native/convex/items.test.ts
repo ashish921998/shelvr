@@ -3,11 +3,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { pageGone } from "./ai";
+import { pageGone } from "./model/pageRead";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   IMPORT_STAGGER_MS,
@@ -15,6 +15,7 @@ import {
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
   STALE_IMPORT_CUTOFF_MS,
+  tagSearchWords,
 } from "./items";
 import {
   IMAGE_EMPTY_MESSAGE,
@@ -77,9 +78,25 @@ async function seedFeed(
 }
 
 describe("listItems (installed builds)", () => {
+  it("does not expose existing page-controlled preview URLs", async () => {
+    const { t, userId } = await as();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        tags: [],
+        searchText: "",
+        status: "ready",
+        heroImageUrl: "http://127.0.0.1/private",
+      });
+    });
+    expect(
+      (await t.query(api.items.listItems, {}))[0].heroImageUrl,
+    ).toBeUndefined();
+  });
   it("still returns every item as a full row, newest first", async () => {
-    const t = await as("feed-user");
-    const ids = await seedFeed(t, "feed-user", 3);
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, 3);
 
     const items = await t.query(api.items.listItems, {});
     expect(items.map((item) => item._id)).toEqual([...ids].reverse());
@@ -90,18 +107,18 @@ describe("listItems (installed builds)", () => {
 
   it("only returns the caller's items", async () => {
     const backend = newConvexTest();
-    const ta = backend.withIdentity({ subject: "feed-a|session-1" });
-    const tb = backend.withIdentity({ subject: "feed-b|session-1" });
-    const aIds = await seedFeed(ta, "feed-a", 2);
-    await seedFeed(tb, "feed-b", 1);
+    const { t: ta, userId: aId } = await signedInUser(backend);
+    const { t: tb, userId: bId } = await signedInUser(backend);
+    const aIds = await seedFeed(ta, aId, 2);
+    await seedFeed(tb, bId, 1);
 
     const mine = await ta.query(api.items.listItems, {});
     expect(mine.map((item) => item._id)).toEqual([...aIds].reverse());
   });
 
   it("searchItems keeps the article body on the row those builds open from", async () => {
-    const t = await as("feed-user");
-    const [id] = await seedFeed(t, "feed-user", 1);
+    const { t, userId } = await as();
+    const [id] = await seedFeed(t, userId, 1);
 
     const results = await t.query(api.items.searchItems, { query: "save" });
     expect(results.map((item) => item._id)).toEqual([id]);
@@ -114,8 +131,8 @@ describe("listItems (installed builds)", () => {
 
 describe("listItemsPage", () => {
   it("pages newest-first with a working cursor and isDone on the last page", async () => {
-    const t = await as("feed-user");
-    const ids = await seedFeed(t, "feed-user", 5);
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, 5);
     const newestFirst = [...ids].reverse();
 
     const first = await t.query(api.items.listItemsPage, {
@@ -140,8 +157,8 @@ describe("listItemsPage", () => {
   });
 
   it("caps the page size a client can ask for and keeps the rest reachable", async () => {
-    const t = await as("feed-user");
-    const ids = await seedFeed(t, "feed-user", LIST_PAGE_MAX + 3);
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, LIST_PAGE_MAX + 3);
     const newestFirst = [...ids].reverse();
 
     const first = await t.query(api.items.listItemsPage, {
@@ -162,8 +179,8 @@ describe("listItemsPage", () => {
   });
 
   it("returns the card shape without article bodies or shopping results", async () => {
-    const t = await as("feed-user");
-    const [id] = await seedFeed(t, "feed-user", 1);
+    const { t, userId } = await as();
+    const [id] = await seedFeed(t, userId, 1);
 
     const { page } = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 10, cursor: null },
@@ -198,13 +215,13 @@ describe("listItemsPage", () => {
   });
 
   it("only returns the caller's items", async () => {
-    // One shared backend, so the userId scope — not database isolation — is
+    // One shared backend, so the userId scope, not database isolation, is
     // what keeps the two feeds apart.
     const backend = newConvexTest();
-    const ta = backend.withIdentity({ subject: "feed-a|session-1" });
-    const tb = backend.withIdentity({ subject: "feed-b|session-1" });
-    const aIds = await seedFeed(ta, "feed-a", 2);
-    const bIds = await seedFeed(tb, "feed-b", 3);
+    const { t: ta, userId: aId } = await signedInUser(backend);
+    const { t: tb, userId: bId } = await signedInUser(backend);
+    const aIds = await seedFeed(ta, aId, 2);
+    const bIds = await seedFeed(tb, bId, 3);
 
     const mine = await ta.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 10, cursor: null },
@@ -229,15 +246,98 @@ describe("listItemsPage", () => {
 });
 
 describe("listRecentItems", () => {
+  it("returns no saves for users without active Pro", async () => {
+    const { t, userId } = await signedInUser(newConvexTest());
+    await seedFeed(t, userId, 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+    // The legacy no-clock path gates the same way.
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for an expired Pro subscription", async () => {
+    const { t, userId } = await signedInUser(newConvexTest());
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId,
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, userId, 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("still serves a build that omits its clock while its status is active", async () => {
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, 2);
+
+    // Rollout contract: installed builds predate the `now` argument, so the
+    // stored status gates them until the update reaches them.
+    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
+  });
+
+  it("does not extend access through the expiry webhook window", async () => {
+    // A period that ended before its webhook landed still says "pro", so
+    // the status-only fallback keeps the installed build's widget fed
+    // while a build that sends its clock is already cut off.
+    const { t, userId } = await signedInUser(newConvexTest());
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId,
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, userId, 1);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for a lapsed status when the client omits its clock", async () => {
+    const { t, userId } = await signedInUser(newConvexTest());
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId,
+        status: "lapsed",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, userId, 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
   it("returns the newest ready items up to the limit, skipping unready ones", async () => {
-    const t = await as("recent-user");
-    const older = await seedFeed(t, "recent-user", 3);
-    const pending = await seedFeed(t, "recent-user", 1, {
+    const { t, userId } = await as();
+    const older = await seedFeed(t, userId, 3);
+    const pending = await seedFeed(t, userId, 1, {
       status: "processing",
     });
-    const failed = await seedFeed(t, "recent-user", 1, { status: "failed" });
+    const failed = await seedFeed(t, userId, 1, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 2 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 2,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([older[2], older[1]]);
     expect(recent.map((item) => item._id)).not.toContain(pending[0]);
     expect(recent.map((item) => item._id)).not.toContain(failed[0]);
@@ -245,13 +345,16 @@ describe("listRecentItems", () => {
   });
 
   it("finds older ready items behind a burst of newer processing ones", async () => {
-    const t = await as("recent-user");
-    const ready = await seedFeed(t, "recent-user", 3);
+    const { t, userId } = await as();
+    const ready = await seedFeed(t, userId, 3);
     // A bulk photo import: far more fresh processing rows than any fixed
     // window would cover. The widget must still show the older ready saves.
-    await seedFeed(t, "recent-user", 30, { status: "processing" });
+    await seedFeed(t, userId, 30, { status: "processing" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([
       ready[2],
       ready[1],
@@ -260,36 +363,276 @@ describe("listRecentItems", () => {
   });
 
   it("finds a ready item behind any number of newer failed ones", async () => {
-    const t = await as("recent-user");
-    const ready = await seedFeed(t, "recent-user", 1);
-    await seedFeed(t, "recent-user", 200, { status: "failed" });
+    const { t, userId } = await as();
+    const ready = await seedFeed(t, userId, 1);
+    await seedFeed(t, userId, 200, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([ready[0]]);
   });
 
   it("caps the limit and scopes to the caller", async () => {
-    const t = await as("recent-user");
-    await seedFeed(t, "recent-user", RECENT_ITEMS_MAX + 5);
+    const { t, userId } = await as();
+    await seedFeed(t, userId, RECENT_ITEMS_MAX + 5);
     await seedFeed(t, "someone-else", 2);
 
-    const capped = await t.query(api.items.listRecentItems, { limit: 1000 });
+    const capped = await t.query(api.items.listRecentItems, {
+      limit: 1000,
+      now: Date.now(),
+    });
     expect(capped).toHaveLength(RECENT_ITEMS_MAX);
     expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
 
     // A non-positive or fractional limit still yields at least one item.
-    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(
-      1,
+    expect(
+      await t.query(api.items.listRecentItems, {
+        limit: 0,
+        now: Date.now(),
+      }),
+    ).toHaveLength(1);
+  });
+});
+
+describe("nextUp", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  // Seeded saves are made "now", so the clock the client sends is moved
+  // forward: an article has to be a day old before Home suggests it.
+  const later = (days: number) => Date.now() + days * DAY;
+
+  async function markOpened(
+    t: TestCtx,
+    userId: string,
+    itemId: Id<"items">,
+    at: number,
+  ) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("itemReads", {
+        userId,
+        itemId,
+        firstOpenedAt: at,
+        lastOpenedAt: at,
+      });
+    });
+  }
+
+  it("suggests the newest article the user has not opened", async () => {
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, 3);
+    await markOpened(t, userId, ids[2], Date.now());
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.kind).toBe("read");
+    expect(next?.item._id).toBe(ids[1]);
+    // Card shape only: the article body never rides along.
+    expect(next?.item).not.toHaveProperty("content");
+  });
+
+  it("finds an unread article behind many opened ones", async () => {
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, 12);
+    for (const id of ids.slice(1)) {
+      await markOpened(t, userId, id, Date.now());
+    }
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.item._id).toBe(ids[0]);
+  });
+
+  it("waits a day before suggesting a fresh save", async () => {
+    const { t, userId } = await as();
+    await seedFeed(t, userId, 1);
+
+    await expect(
+      t.query(api.items.nextUp, { now: Date.now(), skip: [] }),
+    ).resolves.toBeNull();
+  });
+
+  it("suggests a recipe not looked at in the last week", async () => {
+    const { t, userId } = await as();
+    const recipeId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Lasagna page",
+        url: "https://example.com/lasagna",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "lasagna",
+      }),
     );
+    const now = later(10);
+    await markOpened(t, userId, recipeId, now - 2 * DAY);
+    await expect(
+      t.query(api.items.nextUp, { now, skip: [] }),
+    ).resolves.toBeNull();
+
+    await t.run(async (ctx) => {
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", userId).eq("itemId", recipeId),
+        )
+        .unique();
+      await ctx.db.patch(read!._id, { lastOpenedAt: now - 8 * DAY });
+    });
+    const next = await t.query(api.items.nextUp, { now, skip: [] });
+    expect(next?.kind).toBe("cook");
+    expect(next?.item._id).toBe(recipeId);
+  });
+
+  it("moves on to the next save when told to skip one", async () => {
+    const { t, userId } = await as();
+    const ids = await seedFeed(t, userId, 3);
+
+    const next = await t.query(api.items.nextUp, {
+      now: later(2),
+      skip: [ids[2]],
+    });
+    expect(next?.item._id).toBe(ids[1]);
+  });
+
+  it("names a recipe by its dish", async () => {
+    const { t, userId } = await as();
+    await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        url: "https://example.com/dish",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "dish",
+      }),
+    );
+    const next = await t.query(api.items.nextUp, {
+      now: later(4),
+      skip: [],
+    });
+    expect(next?.subject).toBe("Lasagna");
+  });
+
+  it("suggests every kind of save, newest first", async () => {
+    const { t, userId } = await as();
+    const base = {
+      userId,
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+    };
+    const [demo, note, photo, video, reel] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "The sample",
+        url: "https://example.com/sample",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        note: "A scarf",
+      }),
+      await ctx.db.insert("items", { ...base, type: "image", title: "Menu" }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "How to fold a shirt",
+        url: "https://www.youtube.com/watch?v=abc",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "A reel",
+        url: "https://www.instagram.com/reel/abc/",
+        content: "The caption",
+        media: [
+          { kind: "video", imageUrl: "https://x.test/a.jpg", aspectRatio: 1 },
+        ],
+      }),
+    ]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("onboardingDemos", {
+        userId,
+        itemId: demo,
+        createdAt: Date.now(),
+      });
+    });
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "watch", id: reel });
+    expect(await pick([reel])).toEqual({ kind: "watch", id: video });
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: photo });
+    await markOpened(t, userId, photo, now);
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: note });
+    await markOpened(t, userId, note, now);
+    expect(await pick([reel, video])).toBeNull();
+  });
+
+  it("calls a captioned social post a save for later, not an article", async () => {
+    const { t, userId } = await as();
+    const base = {
+      userId,
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+      type: "link" as const,
+      content: "The caption",
+    };
+    const [post, photo] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A post",
+        url: "https://x.com/someone/status/123",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A photo",
+        url: "https://www.instagram.com/p/abc/",
+      }),
+    ]);
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "open", id: photo });
+    expect(await pick([photo])).toEqual({ kind: "open", id: post });
+  });
+
+  it("suggests nothing without Pro", async () => {
+    const { t, userId } = await signedInUser(newConvexTest());
+    await seedFeed(t, userId, 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
+  });
+
+  it("never suggests another account's saves", async () => {
+    const { t } = await as();
+    await seedFeed(t, "someone-else", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
   });
 });
 
 describe("listLocatedItems", () => {
   it("returns only the caller's photos that carry coordinates", async () => {
-    const t = await as("map-user");
+    const { t, userId } = await as();
     const { located, unlocated } = await t.run(async (ctx) => {
       const located = await ctx.db.insert("items", {
-        userId: "map-user",
+        userId,
         type: "image",
         status: "ready",
         title: "Belém Tower",
@@ -299,7 +642,7 @@ describe("listLocatedItems", () => {
         searchText: "",
       });
       const unlocated = await ctx.db.insert("items", {
-        userId: "map-user",
+        userId,
         type: "image",
         status: "ready",
         tags: [],
@@ -331,9 +674,166 @@ describe("listLocatedItems", () => {
   });
 });
 
+describe("similarItems", () => {
+  async function insertItem(
+    t: TestCtx,
+    userId: string,
+    fields: { title: string; tags: string[]; status?: "ready" | "processing" },
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: fields.status ?? "ready",
+        title: fields.title,
+        url: `https://example.com/${encodeURIComponent(fields.title)}`,
+        tags: fields.tags,
+        searchText: [fields.title, ...fields.tags].join(" ").toLowerCase(),
+      }),
+    );
+  }
+
+  it("finds a related save older than the newest-items window", async () => {
+    const { t, userId } = await as();
+    const old = await insertItem(t, userId, {
+      title: "Walnut floor lamp",
+      tags: ["lighting", "furniture"],
+    });
+    // Enough unrelated saves to push the old one out of the recent read.
+    await seedFeed(t, userId, 320);
+    const fresh = await insertItem(t, userId, {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+    // Card shape only: the index copy never reaches the client.
+    expect(similar[0]).not.toHaveProperty("searchText");
+  });
+
+  it("searches on short tags like art and diy", async () => {
+    const { t, userId } = await as();
+    const old = await insertItem(t, userId, {
+      title: "Linocut prints",
+      tags: ["art", "diy"],
+    });
+    await seedFeed(t, userId, 320);
+    const fresh = await insertItem(t, userId, {
+      title: "Watercolour washes",
+      tags: ["art", "diy"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("keeps short tag words but drops filler from multi-word tags", () => {
+    expect(tagSearchWords("art")).toEqual(["art"]);
+    expect(tagSearchWords("ux")).toEqual(["ux"]);
+    expect(tagSearchWords("how to")).toEqual([]);
+    expect(tagSearchWords("to do lists")).toEqual(["do", "lists"]);
+  });
+
+  it("searches for older saves with non-Latin tags and titles", async () => {
+    const { t, userId } = await as();
+    const old = await insertItem(t, userId, {
+      title: "真鍮のフロアランプ",
+      tags: ["照明", "家具"],
+    });
+    await seedFeed(t, userId, 320);
+    const fresh = await insertItem(t, userId, {
+      title: "読書用ランプ",
+      tags: ["照明", "家具"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("scores shared non-Latin title words without a shared tag", async () => {
+    const { t, userId } = await as();
+    const old = await insertItem(t, userId, {
+      title: "北欧 照明 スタンド 真鍮",
+      tags: ["インテリア"],
+    });
+    const fresh = await insertItem(t, userId, {
+      title: "北欧 照明 スタンド 木製",
+      tags: ["読書"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("skips unready matches and never reads another user's saves", async () => {
+    const backend = newConvexTest();
+    const { t: mine, userId: mineId } = await signedInUser(backend);
+    const { t: theirs, userId: theirsId } = await signedInUser(backend);
+    await insertItem(theirs, theirsId, {
+      title: "Ceramic table lamp",
+      tags: ["lighting", "furniture"],
+    });
+    await insertItem(mine, mineId, {
+      title: "Paper pendant lamp",
+      tags: ["lighting", "furniture"],
+      status: "processing",
+    });
+    const fresh = await insertItem(mine, mineId, {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    expect(await mine.query(api.items.similarItems, { id: fresh })).toEqual([]);
+  });
+
+  describe("reserves old matches ahead of the score cut", () => {
+    // _creationTime is stamped from Date.now(), so backdating the old save
+    // needs the same faked-Date pattern as the "stale processing runs" tests.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+    });
+
+    it("keeps a strong old match out of a burst of higher-scoring newer saves", async () => {
+      const start = Date.now();
+      const oldAgeMs = 8 * 24 * 60 * 60 * 1000; // past the 7-day reserve threshold
+
+      // convex-test's virtual clock anchors to the real Date.now() at the
+      // first write on a test context, then ticks forward from there, so
+      // the backdated write has to be the very first thing this context
+      // does. `as()` seeds a Pro row first, which similarItems doesn't need,
+      // so build the identity directly instead.
+      vi.setSystemTime(start - oldAgeMs);
+      const { t, userId } = await signedInUser(newConvexTest());
+      const old = await insertItem(t, userId, {
+        title: "Walnut floor lamp",
+        tags: ["lighting", "furniture", "walnut"],
+      });
+
+      vi.setSystemTime(start);
+      // More than SIMILAR_LIMIT newer saves that fully match the fresh
+      // save's tags, so a plain top-score cut would push the old match out.
+      for (let i = 0; i < 12; i++) {
+        await insertItem(t, userId, {
+          title: `Recent lamp ${i}`,
+          tags: ["lighting", "furniture", "brass", "reading"],
+        });
+      }
+      const fresh = await insertItem(t, userId, {
+        title: "Brass reading lamp",
+        tags: ["lighting", "furniture", "brass", "reading"],
+      });
+
+      const similar = await t.query(api.items.similarItems, { id: fresh });
+      expect(similar.map((item) => item._id)).toContain(old);
+    });
+  });
+});
+
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
-    const t = await as("telemetry-user");
+    const { t, userId } = await as();
     const itemId = await t.mutation(api.items.createNoteItem, {
       text: "Private note",
       operationId: "note:telemetry-1",
@@ -356,16 +856,18 @@ describe("canonical save telemetry", () => {
     expect(telemetry[0].args).toEqual([
       {
         itemId,
-        userId: "telemetry-user",
+        userId,
         itemType: "note",
         savedAt: item?._creationTime,
         sessionId: "save-session",
+        saveSource: "note",
+        operationId: "note:telemetry-1",
       },
     ]);
   });
 
   it("tracks link and image saves while remaining compatible with old clients", async () => {
-    const t = await as("telemetry-user");
+    const { t } = await as();
     const linkId = await t.mutation(api.items.createLinkItem, {
       url: "https://example.com",
     });
@@ -403,29 +905,61 @@ describe("canonical save telemetry", () => {
         }),
       ]),
     );
-    expect(
-      telemetry.find((job) => job.args[0].itemType === "link")?.args[0],
-    ).not.toHaveProperty("photoCount");
+    const linkJob = telemetry.find((job) => job.args[0].itemType === "link")
+      ?.args[0];
+    expect(linkJob).not.toHaveProperty("photoCount");
+    // An installed build that predates save_source sends no source, and the
+    // property must then be absent rather than present and empty.
+    expect(linkJob).not.toHaveProperty("saveSource");
+  });
+
+  it("forwards a client-supplied source, and lets it override the note default", async () => {
+    const { t } = await as();
+    const linkId = await t.mutation(api.items.createLinkItem, {
+      url: "https://example.com",
+      saveSource: "manual_link",
+    });
+    const noteId = await t.mutation(api.items.createNoteItem, {
+      text: "Shared through the extension",
+      saveSource: "share_extension",
+    });
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    await t.mutation(api.items.attachImageUpload, {
+      operationId: OP_ID,
+      storageId: await storeBlob(t),
+    });
+    const imageId = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+      saveSource: "camera",
+    });
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const sourceById = new Map(
+      jobs
+        .filter((job) => job.name === "analytics:captureSave")
+        .map((job) => [job.args[0].itemId, job.args[0].saveSource]),
+    );
+    expect(sourceById.get(linkId)).toBe("manual_link");
+    expect(sourceById.get(imageId)).toBe("camera");
+    // A note shared through the extension counts as extension use. If someone
+    // turns the server-side `note` default into an override, this is what fails.
+    expect(sourceById.get(noteId)).toBe("share_extension");
   });
 });
 
-// Each test gets its own authenticated user via withIdentity. subject is the
-// value requireUserId returns, so different subjects model different users.
-// Every save and Pro mutation is gated behind an active subscription, so `as`
-// seeds an active Pro row for the user — the existing tests model the entitled
-// (paying) path. The lapsed/not-entitled path is covered by the gating tests
-// further down.
-async function as(userId: string): Promise<TestCtx> {
-  const t = newConvexTest().withIdentity({
-    subject: `${userId}|session-1`,
-  });
-  await seedPro(t, userId);
-  return t;
+// Each test gets its own authenticated user: a real users row, signed in as
+// `${userId}|session`, so different rows model different users. Every save and
+// Pro mutation is gated behind an active subscription, so `as` seeds an active
+// Pro row for the user. The existing tests model the entitled (paying) path.
+// The lapsed/not-entitled path is covered by the gating tests further down.
+async function as(): Promise<{ t: TestCtx; userId: string }> {
+  return await signedInUser(newConvexTest(), { pro: true });
 }
 
 /** Insert an active Pro subscription for `userId` so gated mutations succeed.
  * Idempotent: if a row already exists it is patched, otherwise a new one is
- * inserted — so calling `seedPro` twice (e.g. in a shared helper) doesn't
+ * inserted, so calling `seedPro` twice (e.g. in a shared helper) doesn't
  * violate the `by_user` unique index. */
 async function seedPro(t: TestCtx, userId: string): Promise<void> {
   await t.run(async (ctx) => {
@@ -456,6 +990,92 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
   });
 }
 
+describe("upload abuse controls", () => {
+  it("reuses pending upload capabilities and limits fresh begins", async () => {
+    const { t } = await as();
+    const first = await t.mutation(api.items.beginImageImport, {
+      operationId: OP_ID,
+    });
+    for (let i = 0; i < 35; i++) {
+      expect(
+        await t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+      ).toEqual(first);
+    }
+    for (let i = 0; i < 29; i++) {
+      await t.mutation(api.items.beginImageImport, {
+        operationId: `image:limit-${i}`,
+      });
+    }
+    await expect(
+      t.mutation(api.items.beginImageImport, {
+        operationId: "image:over-limit",
+      }),
+    ).rejects.toThrow();
+    expect(
+      await t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).toEqual(first);
+  });
+
+  it("caps pending imports independently of the finalized photo quota", async () => {
+    const { t, userId } = await as();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 30; i++) {
+        await ctx.db.insert("itemOperations", {
+          userId,
+          operationId: `pending:${i}`,
+          kind: "image",
+          status: "pending",
+          updatedAt: Date.now(),
+        });
+      }
+    });
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow("Too many pending image imports");
+  });
+
+  it("sweeps unattached storage while protecting young and referenced blobs", async () => {
+    const { t, userId } = await as();
+    const orphan = await storeBlob(t);
+    const owned = await storeBlob(t);
+    const pending = await storeBlob(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId,
+        type: "image",
+        tags: [],
+        searchText: "",
+        status: "ready",
+        storageId: owned,
+      });
+      await ctx.db.insert("itemOperations", {
+        userId,
+        operationId: OP_ID,
+        kind: "image",
+        status: "pending",
+        storageId: pending,
+        updatedAt: Date.now(),
+      });
+    });
+    await t.mutation(internal.items.cleanupOrphanStorage, {});
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", orphan)),
+    ).not.toBeNull();
+    await t.mutation(internal.items.cleanupOrphanStorage, {
+      cutoff: Date.now() + 1000,
+    });
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", orphan)),
+    ).toBeNull();
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", owned)),
+    ).not.toBeNull();
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", pending)),
+    ).not.toBeNull();
+  });
+});
+
 /** Asserts a refusal carries BOTH halves of the save-error contract: the code
  * the current client routes on, and the sentence an already-installed bundle
  * still matches in `localizeError`'s `ERROR_MESSAGES` table. A copy edit would
@@ -478,12 +1098,12 @@ async function expectSaveRefusal(
 
 describe("photo quota", () => {
   it("refuses a new photo at the cap, reports usage, and frees the slot on delete", async () => {
-    const t = await as("user-a");
+    const { t, userId } = await as();
     // Fill the account to one under the cap, then take the last slot for real.
     await t.run(async (ctx) => {
       for (let i = 0; i < MAX_PHOTOS_PER_ACCOUNT - 1; i++) {
         await ctx.db.insert("items", {
-          userId: "user-a",
+          userId,
           type: "image",
           status: "ready",
           tags: [],
@@ -492,7 +1112,7 @@ describe("photo quota", () => {
       }
       // Links and notes never count.
       await ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "link",
         status: "ready",
         tags: [],
@@ -535,7 +1155,7 @@ describe("photo quota", () => {
 
 describe("image import lifecycle", () => {
   it("finalizes a pending operation into one item and schedules processing", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     const begin = await t.mutation(api.items.beginImageImport, {
       operationId: OP_ID,
     });
@@ -566,7 +1186,7 @@ describe("image import lifecycle", () => {
   });
 
   it("returns the same item when begin/finalize repeat the same operation", async () => {
-    const t = await as("user-a");
+    const { t, userId } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -594,7 +1214,7 @@ describe("image import lifecycle", () => {
     const items = await t.run(async (ctx) => {
       return await ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
     });
     expect(items.filter((i) => i.type === "image")).toHaveLength(1);
@@ -602,12 +1222,10 @@ describe("image import lifecycle", () => {
 
   it("keeps the same operation id independent across users", async () => {
     // Both users must operate against ONE shared backend so the (userId,
-    // operationId) pair — not database isolation — is what distinguishes them.
+    // operationId) pair, not database isolation, is what distinguishes them.
     const backend = newConvexTest();
-    const ta = backend.withIdentity({ subject: "user-a" });
-    const tb = backend.withIdentity({ subject: "user-b" });
-    await seedPro(ta, "user-a");
-    await seedPro(tb, "user-b");
+    const { t: ta } = await signedInUser(backend, { pro: true });
+    const { t: tb } = await signedInUser(backend, { pro: true });
 
     // user-a finalizes the operation.
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID });
@@ -621,7 +1239,7 @@ describe("image import lifecycle", () => {
     });
 
     // user-b using the same operation id is a separate operation and a separate
-    // item — the (userId, operationId) pair is the unique key.
+    // item: the (userId, operationId) pair is the unique key.
     await tb.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const sb = await storeBlob(tb);
     await tb.mutation(api.items.attachImageUpload, {
@@ -645,8 +1263,8 @@ describe("image import lifecycle", () => {
 
   it("returns the completed itemId to a lapsed user without checking Pro", async () => {
     // A user who saved an image while Pro, then lapsed, must still retrieve
-    // the completed itemId — the idempotent read path is not gated on Pro.
-    const t = await as("user-a");
+    // the completed itemId: the idempotent read path is not gated on Pro.
+    const { t, userId } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -661,7 +1279,7 @@ describe("image import lifecycle", () => {
     await t.run(async (ctx) => {
       const sub = await ctx.db
         .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
       if (sub) {
         await ctx.db.patch(sub._id, {
@@ -686,10 +1304,10 @@ describe("image import lifecycle", () => {
 
   it("rejects reusing an operation id with a different kind", async () => {
     // Seed a completed image operation directly.
-    const t = await as("user-a");
+    const { t, userId } = await as();
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID,
         kind: "image",
         status: "complete",
@@ -706,7 +1324,7 @@ describe("image import lifecycle", () => {
       const op = await ctx.db
         .query("itemOperations")
         .withIndex("by_user_operation", (q) =>
-          q.eq("userId", "user-a").eq("operationId", OP_ID),
+          q.eq("userId", userId).eq("operationId", OP_ID),
         )
         .unique();
       if (op === null) throw new Error("seed op missing");
@@ -718,7 +1336,7 @@ describe("image import lifecycle", () => {
   });
 
   it("keeps one canonical storage id and discards a redundant attachment", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const first = await storeBlob(t);
     const second = await storeBlob(t);
@@ -756,7 +1374,7 @@ describe("image import lifecycle", () => {
   });
 
   it("does not mark the operation complete on invalid metadata", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -790,7 +1408,7 @@ describe("image import lifecycle", () => {
   });
 
   it("releases the operation when its item is explicitly deleted", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -818,14 +1436,14 @@ describe("image import lifecycle", () => {
   });
 
   it("deletes only eligible unreferenced stale pending uploads", async () => {
-    const t = await as("user-a");
+    const { t, userId } = await as();
 
     // A stale pending operation with an attached upload (process died between
     // upload and finalize). Its storage should be swept.
     const staleStorageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID,
         kind: "image",
         status: "pending",
@@ -835,11 +1453,11 @@ describe("image import lifecycle", () => {
       });
     });
 
-    // A fresh pending operation (well within the 24h window) — must survive.
+    // A fresh pending operation (well within the 24h window) must survive.
     const freshStorageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID_2,
         kind: "image",
         status: "pending",
@@ -873,7 +1491,7 @@ describe("image import lifecycle", () => {
 
   it("refuses to adopt or delete a storage id referenced by a completed item", async () => {
     // A completed image for user-a with its own storage object.
-    const ta = await as("user-a");
+    const { t: ta } = await as();
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const victimStorageId = await storeBlob(ta);
     await ta.mutation(api.items.attachImageUpload, {
@@ -884,7 +1502,7 @@ describe("image import lifecycle", () => {
 
     // A malicious/buggy second operation tries to attach victimStorageId (which
     // is already referenced by user-a's completed item). attach must REJECT it
-    // rather than adopt it — otherwise finalize/deleteItem could delete the
+    // rather than adopt it. Otherwise finalize/deleteItem could delete the
     // victim's storage. Defense: only unreferenced storage is adoptable.
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID_2 });
     await expect(
@@ -902,7 +1520,7 @@ describe("image import lifecycle", () => {
   });
 
   it("returns the existing item when finalizing an already-complete op even with bad resubmitted metadata", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -915,7 +1533,7 @@ describe("image import lifecycle", () => {
     });
 
     // A retry that resends an impossible aspectRatio must still return the
-    // existing item — the idempotent read path is not gated on re-validation.
+    // existing item: the idempotent read path is not gated on re-validation.
     const retriedId = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
       aspectRatio: -1,
@@ -926,9 +1544,9 @@ describe("image import lifecycle", () => {
   it("deletes the redundant re-upload when attach lands on an already-complete op", async () => {
     // The headline retry race: the original attempt finalizes while a retry's
     // re-upload is in flight. The retry's attach must return the canonical id
-    // AND delete its own redundant blob — nothing else references it, so the
+    // AND delete its own redundant blob: nothing else references it, so the
     // pending-only cleanup cron would otherwise never reclaim it.
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const canonical = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -958,7 +1576,7 @@ describe("image import lifecycle", () => {
     // Double-adopt defense: without the itemOperations check, one blob could
     // back two operations, finalize into two items sharing it, and be deleted
     // out from under the survivor when either item is deleted.
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -983,7 +1601,7 @@ describe("image import lifecycle", () => {
 
   it("rejects attaching a storage id that does not exist", async () => {
     // A swept blob's id must not become an item with a permanently dead image.
-    const t = await as("user-a");
+    const { t } = await as();
     const storageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.storage.delete(storageId);
@@ -1001,11 +1619,11 @@ describe("image import lifecycle", () => {
     // Inconsistent-but-possible state: a stale pending row holds a storageId
     // that a live item also references. The sweep must drop only the ledger
     // row and leave the blob alone.
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const storageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "image",
         status: "ready",
         storageId,
@@ -1013,7 +1631,7 @@ describe("image import lifecycle", () => {
         searchText: "",
       });
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID,
         kind: "image",
         status: "pending",
@@ -1037,19 +1655,19 @@ describe("image import lifecycle", () => {
   it("sweeps stale image rows even when stale non-image rows exist", async () => {
     // The kind-first index means link/note rows (plans 004/005) can never fill
     // the sweep page and starve image cleanup.
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const staleAt = Date.now() - STALE_IMPORT_CUTOFF_MS - 60 * 60 * 1000;
     const imageBlob = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: "link:stale-operation",
         kind: "link",
         status: "pending",
         updatedAt: staleAt,
       });
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID,
         kind: "image",
         status: "pending",
@@ -1079,11 +1697,11 @@ describe("image import lifecycle", () => {
     // Seed the inconsistent state directly (an item deleted NOT via deleteItem,
     // which would have released the row): begin must reset the row to pending,
     // delete the orphaned blob, and hand back a fresh upload URL.
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const storageId = await storeBlob(t);
     const deadItemId = await t.run(async (ctx) => {
       const id = await ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "image",
         status: "ready",
         storageId,
@@ -1095,7 +1713,7 @@ describe("image import lifecycle", () => {
     });
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID,
         kind: "image",
         status: "complete",
@@ -1123,13 +1741,13 @@ describe("image import lifecycle", () => {
 
   it("recycles an inconsistent complete op (no itemId) and clears its stale storageId", async () => {
     // Defensive branch: a complete row with no itemId. Recycling must clear
-    // the stale storageId — left in place, attach would treat it as canonical
+    // the stale storageId. Left in place, attach would treat it as canonical
     // and delete the fresh re-upload as "redundant".
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const staleBlob = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: OP_ID,
         kind: "image",
         status: "complete",
@@ -1162,7 +1780,7 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects operation ids outside the allowed length bounds", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await expect(
       t.mutation(api.items.beginImageImport, { operationId: "short" }),
     ).rejects.toThrow(/Invalid operationId/i);
@@ -1174,7 +1792,7 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects finalize when the operation was never begun or never attached", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     // Never begun.
     await expect(
       t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
@@ -1224,7 +1842,7 @@ const NOTE_OP = "note:44444444-4444-4444-8444-444444444444";
 
 describe("shared link/note operation idempotency", () => {
   it("creates one link for a repeated shared operation and returns the same id", async () => {
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/share",
       operationId: LINK_OP,
@@ -1239,14 +1857,14 @@ describe("shared link/note operation idempotency", () => {
     const items = await t.run(async (ctx) => {
       return await ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
     });
     expect(items.filter((i) => i.type === "link")).toHaveLength(1);
   });
 
   it("creates one note for a repeated shared operation and returns the same id", async () => {
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const firstId = await t.mutation(api.items.createNoteItem, {
       text: "shared note",
       operationId: NOTE_OP,
@@ -1260,14 +1878,14 @@ describe("shared link/note operation idempotency", () => {
     const items = await t.run(async (ctx) => {
       return await ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
     });
     expect(items.filter((i) => i.type === "note")).toHaveLength(1);
   });
 
   it("rejects reusing a link operation id for a note (kind mismatch)", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await t.mutation(api.items.createLinkItem, {
       url: "example.com/kind",
       operationId: LINK_OP,
@@ -1282,11 +1900,11 @@ describe("shared link/note operation idempotency", () => {
 
   it("rejects reusing an image operation id for a link", async () => {
     // Seed a completed image operation directly, then attempt a link create with
-    // the same operation id — the kind guard must reject it.
-    const t = await as("user-a");
+    // the same operation id: the kind guard must reject it.
+    const { t, userId } = await as();
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
-        userId: "user-a",
+        userId,
         operationId: LINK_OP,
         kind: "image",
         status: "complete",
@@ -1303,10 +1921,8 @@ describe("shared link/note operation idempotency", () => {
 
   it("isolates the same operation id across users", async () => {
     const backend = newConvexTest();
-    const ta = backend.withIdentity({ subject: "user-a" });
-    const tb = backend.withIdentity({ subject: "user-b" });
-    await seedPro(ta, "user-a");
-    await seedPro(tb, "user-b");
+    const { t: ta, userId: userA } = await signedInUser(backend, { pro: true });
+    const { t: tb, userId: userB } = await signedInUser(backend, { pro: true });
 
     const aId = await ta.mutation(api.items.createLinkItem, {
       url: "example.com/shared",
@@ -1322,13 +1938,13 @@ describe("shared link/note operation idempotency", () => {
     const aItems = await ta.run(async (ctx) =>
       ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userA))
         .collect(),
     );
     const bItems = await tb.run(async (ctx) =>
       ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-b"))
+        .withIndex("by_user", (q) => q.eq("userId", userB))
         .collect(),
     );
     expect(aItems.filter((i) => i.type === "link")).toHaveLength(1);
@@ -1338,7 +1954,7 @@ describe("shared link/note operation idempotency", () => {
   it("creates two intentional items for identical content under distinct operations", async () => {
     // Idempotency is per-operation, never per-content: the same URL shared twice
     // (different share sessions) is two deliberate saves, not a deduplicated one.
-    const t = await as("user-a");
+    const { t, userId } = await as();
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/dup",
       operationId: "link:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -1352,14 +1968,14 @@ describe("shared link/note operation idempotency", () => {
     const items = await t.run(async (ctx) => {
       return await ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
     });
     expect(items.filter((i) => i.type === "link")).toHaveLength(2);
   });
 
   it("still creates a fresh item when no operation id is given (Add UI path)", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/add",
     });
@@ -1380,8 +1996,8 @@ describe("shared link/note operation idempotency", () => {
     // (which schedules processItem) AND then schedule processItem again itself,
     // running the AI pipeline twice and racing two concurrent classifications.
     // Both the guarded (operationId) and ordinary paths must schedule exactly
-    // one processItem job for the created item — no more.
-    const t = await as("user-a");
+    // one processItem job for the created item, no more.
+    const { t } = await as();
 
     // Guarded path (share flow).
     const guardedId = await t.mutation(api.items.createLinkItem, {
@@ -1397,7 +2013,7 @@ describe("shared link/note operation idempotency", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     const processJobs = scheduled.filter((j) => j.name === "ai:processItem");
-    // Exactly two jobs total — one per create — and each targets its own item.
+    // Exactly two jobs total: one per create, and each targets its own item.
     expect(processJobs).toHaveLength(2);
     const targeted = processJobs.flatMap((j) =>
       // args is stored as a single-element array wrapping the mutation args.
@@ -1407,7 +2023,7 @@ describe("shared link/note operation idempotency", () => {
     expect(targeted).toContain(plainId);
 
     // A repeat create on the completed guarded operation (idempotent hit) must
-    // NOT schedule processItem again — the item already exists and was processed.
+    // NOT schedule processItem again: the item already exists and was processed.
     await t.mutation(api.items.createLinkItem, {
       url: "example.com/guarded",
       operationId: LINK_OP,
@@ -1421,7 +2037,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("releases the link operation when its item is deleted, allowing re-perform", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     const itemId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/delete-me",
       operationId: LINK_OP,
@@ -1442,7 +2058,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects invalid operation ids on the link/note paths", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await expect(
       t.mutation(api.items.createLinkItem, {
         url: "example.com",
@@ -1458,7 +2074,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects empty note text on the idempotent path without completing the op", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     await expect(
       t.mutation(api.items.createNoteItem, {
         text: "   ",
@@ -1473,7 +2089,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects an invalid url on the idempotent path without completing the op", async () => {
-    const t = await as("user-a");
+    const { t } = await as();
     // The centralized URL policy rejects empty/whitespace URLs before any
     // operation row is created. The error category is "empty"; the important
     // contract is that the op is not recorded, so a corrected retry is clean.
@@ -1495,11 +2111,11 @@ describe("shared link/note operation idempotency", () => {
 // ---------------------------------------------------------------------------
 
 describe("Pro entitlement gate", () => {
-  // A user with no subscription row at all — the brand-new-user case. Every
+  // A user with no subscription row at all (the brand-new-user case). Every
   // save and Pro mutation must throw `Pro required` so the client can route
   // to the paywall; reads (listItems, getItem, searchItems) stay open.
   it("blocks saves for a user with no subscription", async () => {
-    const t = newConvexTest().withIdentity({ subject: "no-sub" });
+    const { t } = await signedInUser(newConvexTest());
 
     // Both halves of the contract: the code the client routes to the paywall
     // on, and the unchanged sentence an already-installed bundle still sees.
@@ -1524,14 +2140,13 @@ describe("Pro entitlement gate", () => {
     // A user who began an import while Pro, then lapsed, must NOT be able to
     // retry the pending operation: begin would otherwise hand back a fresh
     // upload URL and refresh updatedAt, pinning the row alive past the cron.
-    const t = newConvexTest().withIdentity({ subject: "pend-lapse" });
-    await seedPro(t, "pend-lapse");
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
     // Begin while Pro (creates the pending row), then lapse the subscription.
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     await t.run(async (ctx) => {
       const sub = await ctx.db
         .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", "pend-lapse"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
       if (sub) {
         await ctx.db.patch(sub._id, {
@@ -1547,11 +2162,11 @@ describe("Pro entitlement gate", () => {
   });
 
   it("blocks Find links for a lapsed user", async () => {
-    const t = newConvexTest().withIdentity({ subject: "lapsed" });
+    const { t, userId } = await signedInUser(newConvexTest());
     // Seed a subscription whose trial already expired.
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
-        userId: "lapsed",
+        userId,
         status: "lapsed",
         expiresAt: Date.now() - 1000,
         updatedAt: Date.now(),
@@ -1561,7 +2176,7 @@ describe("Pro entitlement gate", () => {
     // gate isn't exercised on the insert).
     const itemId = await t.run(async (ctx) => {
       return await ctx.db.insert("items", {
-        userId: "lapsed",
+        userId,
         type: "link",
         status: "ready",
         url: "https://example.com",
@@ -1575,10 +2190,10 @@ describe("Pro entitlement gate", () => {
   });
 
   it("allows saves for an active trial", async () => {
-    const t = newConvexTest().withIdentity({ subject: "trier" });
+    const { t, userId } = await signedInUser(newConvexTest());
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
-        userId: "trier",
+        userId,
         status: "trialing",
         expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
         updatedAt: Date.now(),
@@ -1591,10 +2206,10 @@ describe("Pro entitlement gate", () => {
   });
 
   it("getEntitlement reports the stored status and the client computes entitled", async () => {
-    const t = newConvexTest().withIdentity({ subject: "pro-user" });
+    const { t, userId } = await signedInUser(newConvexTest());
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
-        userId: "pro-user",
+        userId,
         status: "pro",
         expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
         updatedAt: Date.now(),
@@ -1606,7 +2221,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("getEntitlement returns 'none' for a user with no subscription", async () => {
-    const t = newConvexTest().withIdentity({ subject: "anon" });
+    const { t } = await signedInUser(newConvexTest());
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent.status).toBe("none");
     expect(ent.expiresAt).toBeUndefined();
@@ -1790,9 +2405,9 @@ describe("Pro entitlement gate", () => {
   });
 
   it("an event with no expiry and no existing row creates nothing", async () => {
-    const t = newConvexTest().withIdentity({ subject: "rc-empty" });
+    const { t, userId } = await signedInUser(newConvexTest());
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-empty",
+      userId,
       expiresAt: 0,
       eventTimestampMs: 1000,
     });
@@ -1956,8 +2571,8 @@ describe("failed saves and retry", () => {
   }
 
   it("records why an item failed so the client can explain it", async () => {
-    const t = await as("fail-reason");
-    const itemId = await seedLink(t, "fail-reason", { status: "processing" });
+    const { t, userId } = await as();
+    const itemId = await seedLink(t, userId, { status: "processing" });
     await t.mutation(internal.items.failItem, { itemId, reason: "not_found" });
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("failed");
@@ -1965,8 +2580,8 @@ describe("failed saves and retry", () => {
   });
 
   it("retries a failed item, clearing the reason and re-queueing processing", async () => {
-    const t = await as("retry-fail");
-    const itemId = await seedLink(t, "retry-fail", {
+    const { t, userId } = await as();
+    const itemId = await seedLink(t, userId, {
       status: "failed",
       failureReason: "error",
     });
@@ -1977,8 +2592,8 @@ describe("failed saves and retry", () => {
   });
 
   it("retries a partially enriched item", async () => {
-    const t = await as("retry-partial");
-    const itemId = await seedLink(t, "retry-partial", {
+    const { t, userId } = await as();
+    const itemId = await seedLink(t, userId, {
       status: "ready",
       enrichment: "partial",
     });
@@ -1989,10 +2604,10 @@ describe("failed saves and retry", () => {
   });
 
   it("does not retry a no-article link (the URL itself is the save)", async () => {
-    // A no-article page read fine — a retry cannot change the outcome, so the
+    // A no-article page read fine: a retry cannot change the outcome, so the
     // backend must refuse the retry the way it refuses a 404.
-    const t = await as("retry-no-article");
-    const itemId = await seedLink(t, "retry-no-article", {
+    const { t, userId } = await as();
+    const itemId = await seedLink(t, userId, {
       status: "ready",
       enrichment: "no_article",
     });
@@ -2003,8 +2618,8 @@ describe("failed saves and retry", () => {
   });
 
   it("does not retry a page that is gone (a 404 will not change)", async () => {
-    const t = await as("retry-gone");
-    const itemId = await seedLink(t, "retry-gone", {
+    const { t, userId } = await as();
+    const itemId = await seedLink(t, userId, {
       status: "failed",
       failureReason: "not_found",
     });
@@ -2017,10 +2632,10 @@ describe("failed saves and retry", () => {
   it.each(["not_found", "image_too_large"] as const)(
     "does not spend retry capacity on a terminal photo (%s)",
     async (failureReason) => {
-      const t = await as("terminal-photo");
+      const { t, userId } = await as();
       const id = await t.run((ctx) =>
         ctx.db.insert("items", {
-          userId: "terminal-photo",
+          userId,
           type: "image",
           status: "failed",
           failureReason,
@@ -2050,20 +2665,20 @@ describe("failed saves and retry", () => {
   );
 
   it("does not retry a fully enriched item", async () => {
-    const t = await as("retry-ready");
-    const itemId = await seedLink(t, "retry-ready", { status: "ready" });
+    const { t, userId } = await as();
+    const itemId = await seedLink(t, userId, { status: "ready" });
     await t.mutation(api.items.reprocessItem, { id: itemId });
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("ready");
   });
 
   it("refuses to retry another user's item", async () => {
-    const owner = await as("retry-owner");
-    const itemId = await seedLink(owner, "retry-owner", {
+    const { t: owner, userId: ownerId } = await as();
+    const itemId = await seedLink(owner, ownerId, {
       status: "failed",
       failureReason: "error",
     });
-    const attacker = await as("retry-attacker");
+    const { t: attacker } = await as();
     await expect(
       attacker.mutation(api.items.reprocessItem, { id: itemId }),
     ).rejects.toThrow(/Item not found/);
@@ -2072,16 +2687,16 @@ describe("failed saves and retry", () => {
   });
 
   it("blocks retry for a lapsed user", async () => {
-    const t = newConvexTest().withIdentity({ subject: "retry-lapsed" });
+    const { t, userId } = await signedInUser(newConvexTest());
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
-        userId: "retry-lapsed",
+        userId,
         status: "lapsed",
         expiresAt: Date.now() - 1000,
         updatedAt: Date.now(),
       });
     });
-    const itemId = await seedLink(t, "retry-lapsed", {
+    const itemId = await seedLink(t, userId, {
       status: "failed",
       failureReason: "error",
     });
@@ -2096,7 +2711,7 @@ describe("rate limiting", () => {
     // itemCreate bucket capacity is 30; the 31st create in a tight loop (no
     // meaningful refill) must be rejected so a leaked/shared Pro account can't
     // loop and burn LLM spend. Notes avoid any network fetch.
-    const t = await as("rate-user");
+    const { t } = await as();
     for (let i = 0; i < 30; i++) {
       await t.mutation(api.items.createNoteItem, { text: `note ${i}` });
     }
@@ -2115,7 +2730,7 @@ describe("importLinks", () => {
     );
 
   it("creates run-fenced items whose processing continues the stagger offset", async () => {
-    const t = await as("import-user");
+    const { t, userId } = await as();
     const before = Date.now();
     const res = await t.mutation(api.items.importLinks, {
       urls: ["https://example.com/one", "example.com/two", " "],
@@ -2131,7 +2746,7 @@ describe("importLinks", () => {
     const items = await t.run((ctx) =>
       ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", "import-user"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect(),
     );
     expect(items.map((item) => item.url)).toEqual([
@@ -2158,12 +2773,12 @@ describe("importLinks", () => {
   });
 
   it("skips a link saved long before the latest 1,000 through the URL index", async () => {
-    const t = await as("import-dedup");
-    await seedFeed(t, "import-dedup", 1); // https://example.com/0, the oldest save
+    const { t, userId } = await as();
+    await seedFeed(t, userId, 1); // https://example.com/0, the oldest save
     await t.run(async (ctx) => {
       for (let i = 1; i <= 5; i++) {
         await ctx.db.insert("items", {
-          userId: "import-dedup",
+          userId,
           type: "link",
           status: "ready",
           url: `https://newer.example/${i}`,
@@ -2191,7 +2806,7 @@ describe("importLinks", () => {
   });
 
   it("rejects an oversized batch instead of truncating it", async () => {
-    const t = await as("import-cap");
+    const { t } = await as();
     const urls = Array.from(
       { length: 51 },
       (_, i) => `https://example.com/${i}`,
@@ -2202,7 +2817,7 @@ describe("importLinks", () => {
   });
 
   it("draws from its own bucket, not the single-save itemCreate burst", async () => {
-    const t = await as("import-own-bucket");
+    const { t } = await as();
     for (let i = 0; i < 30; i++) {
       await t.mutation(api.items.createNoteItem, { text: `note ${i}` });
     }
@@ -2214,7 +2829,7 @@ describe("importLinks", () => {
   });
 
   it("stops at the bulkImport limit and resumes free over saved links", async () => {
-    const t = await as("import-rate");
+    const { t, userId } = await as();
     const batch = Array.from(
       { length: 10 },
       (_, i) => `https://example.com/${i}`,
@@ -2223,7 +2838,7 @@ describe("importLinks", () => {
     // Drain the 600-token bucket down to 5 without inserting 600 rows.
     await t.run(async (ctx) => {
       const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
-        key: "import-rate",
+        key: userId,
         count: 585,
       });
       expect(ok).toBe(true);
@@ -2260,7 +2875,7 @@ describe("photo rejection before classification", () => {
   it.each([0, OVERSIZED])(
     "cleans up rejected attachments of %s bytes and creates no item",
     async (size) => {
-      const t = await as("oversized-attach");
+      const { t } = await as();
       await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
       const storageId = await t.run((ctx) =>
         ctx.storage.store(new Blob([new Uint8Array(size)])),
@@ -2301,13 +2916,13 @@ describe("photo rejection before classification", () => {
   ] as const)(
     "blocks legacy $code pending uploads at finalization",
     async ({ size, code, message }) => {
-      const t = await as(`legacy-${code}`);
+      const { t, userId } = await as();
       await t.run(async (ctx) => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array(size)]),
         );
         await ctx.db.insert("itemOperations", {
-          userId: `legacy-${code}`,
+          userId,
           operationId: OP_ID,
           kind: "image",
           status: "pending",
@@ -2327,10 +2942,10 @@ describe("photo rejection before classification", () => {
   );
 
   it("does not charge or queue product-search retries for missing photos", async () => {
-    const t = await as("missing-product-photo");
+    const { t, userId } = await as();
     const id = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "missing-product-photo",
+        userId,
         type: "image",
         status: "ready",
         tags: [],
@@ -2363,7 +2978,7 @@ describe("photo rejection before classification", () => {
   });
 
   it("does not delete an oversized photo referenced by another item", async () => {
-    const t = await as("rejected-shared-upload");
+    const { t } = await as();
     const storageId = await t.run(async (ctx) => {
       const id = await ctx.storage.store(new Blob([new Uint8Array(OVERSIZED)]));
       await ctx.db.insert("items", {
@@ -2395,7 +3010,7 @@ describe("stale processing runs", () => {
 
   /** Insert a `processing` link for `userId` whose run started `ageMs` ago.
    * `legacy` rows omit the run fields the way pre-fencing rows do, so their
-   * age has to come from `_creationTime` — which convex-test stamps from
+   * age has to come from `_creationTime`, which convex-test stamps from
    * Date.now(), hence the faked clock below. convex-test also keeps
    * `_creationTime` monotonic per instance, so legacy rows must be inserted
    * before newer rows, oldest first. */
@@ -2445,7 +3060,7 @@ describe("stale processing runs", () => {
   });
 
   it("stamps a run id and start time on every path that starts processing", async () => {
-    const t = await as("run-stamp");
+    const { t } = await as();
     const noteId = await t.mutation(api.items.createNoteItem, {
       text: "a note",
     });
@@ -2610,6 +3225,88 @@ describe("stale processing runs", () => {
     });
   });
 
+  it("schedules one processed event for each applied terminal outcome", async () => {
+    const t = newConvexTest();
+    const readyId = await processingLink(t, "processed", FRESH_AGE);
+    const readyRun = (await t.run((ctx) => ctx.db.get(readyId)))!
+      .processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId: readyId,
+      runId: readyRun,
+      title: "Ready",
+      description: "Usable",
+      tags: [],
+      status: "ready",
+      enrichment: "partial",
+    });
+
+    const failedId = await processingLink(t, "processed", FRESH_AGE);
+    const failedRun = (await t.run((ctx) => ctx.db.get(failedId)))!
+      .processingRunId;
+    await t.mutation(internal.items.failItem, {
+      itemId: failedId,
+      reason: "not_found",
+      runId: failedRun,
+    });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const processed = jobs.filter(
+      (job) => job.name === "analytics:captureItemProcessed",
+    );
+    expect(processed).toHaveLength(2);
+    expect(processed.map((job) => job.args[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: readyId,
+          outcome: "ready",
+          enrichment: "partial",
+          processingMs: expect.any(Number),
+        }),
+        expect.objectContaining({
+          itemId: failedId,
+          outcome: "failed",
+          failureReason: "not_found",
+          processingMs: expect.any(Number),
+        }),
+      ]),
+    );
+  });
+
+  it("does not report a processed event for a ready note refresh", async () => {
+    const t = newConvexTest();
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "refresh",
+        type: "note",
+        note: "Updated note",
+        status: "ready",
+        processingRunId: "refresh-run",
+        processingStartedAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
+        tags: [],
+        searchText: "updated note",
+      }),
+    );
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId: "refresh-run",
+      keepTitle: true,
+      title: "Updated note",
+      description: "The refreshed note",
+      tags: ["note"],
+      status: "ready",
+    });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(
+      jobs.filter((job) => job.name === "analytics:captureItemProcessed"),
+    ).toHaveLength(0);
+  });
+
   it("finalizeItem reports a deleted item as missing", async () => {
     const t = newConvexTest();
     const itemId = await processingLink(t, "gone", FRESH_AGE);
@@ -2625,25 +3322,78 @@ describe("stale processing runs", () => {
     ).resolves.toBe("missing");
   });
 
-  it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
-    const t = newConvexTest().withIdentity({
-      subject: "retry-stale|session-1",
+  it("finalizeItem persists a recipe extracted from a recipe page", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "recipe-persist", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour", "2 eggs"],
+      steps: ["Whisk.", "Fry."],
+    };
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe,
     });
-    // The legacy row is created first so its `_creationTime` can be back-dated
-    // past the Pro row `as` would otherwise insert at "now".
-    const legacyStale = await processingLink(t, "retry-stale", STALE_AGE, {
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ recipe });
+  });
+
+  it("keeps the recipe off the feed card", async () => {
+    // `itemCardValidator` omits `recipe`, and Convex enforces the returns
+    // validator at runtime, so a card still carrying it fails the whole feed
+    // query rather than just shipping an extra field.
+    const { t, userId } = await as();
+    const itemId = await processingLink(t, userId, FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe: {
+        name: "Pancakes",
+        servings: "4 servings",
+        ingredients: ["2 cups flour", "2 eggs"],
+        steps: ["Whisk.", "Fry."],
+      },
+    });
+
+    const feed = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(feed.page.map((item) => item._id)).toContain(itemId);
+    expect(feed.page[0]).not.toHaveProperty("recipe");
+  });
+
+  it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
+    // The account is created before the legacy row, back-dated past it, so the
+    // row's `_creationTime` can still land STALE_AGE ago: creation times never
+    // run backwards. The Pro row is inserted afterwards at "now".
+    const now = Date.now();
+    vi.setSystemTime(now - STALE_AGE - 60_000);
+    const { t, userId } = await signedInUser(newConvexTest());
+    vi.setSystemTime(now);
+    const legacyStale = await processingLink(t, userId, STALE_AGE, {
       legacy: true,
     });
     await t.run((ctx) =>
       ctx.db.insert("subscriptions", {
-        userId: "retry-stale",
+        userId,
         status: "pro",
         expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
         updatedAt: Date.now(),
       }),
     );
-    const stale = await processingLink(t, "retry-stale", STALE_AGE);
-    const fresh = await processingLink(t, "retry-stale", FRESH_AGE);
+    const stale = await processingLink(t, userId, STALE_AGE);
+    const fresh = await processingLink(t, userId, FRESH_AGE);
     const before = await t.run(async (ctx) => ({
       stale: await ctx.db.get(stale),
       fresh: await ctx.db.get(fresh),
@@ -2721,5 +3471,241 @@ describe("stale processing runs", () => {
         (item) => item.status === "ready" && item.userId === "ready-list",
       ),
     ).toBe(true);
+  });
+});
+
+describe("share links", () => {
+  async function seedItem(
+    t: TestCtx,
+    userId: string,
+    fields: Partial<{
+      type: "image" | "link" | "note";
+      status: "processing" | "ready" | "failed";
+    }> = {},
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: fields.type ?? "link",
+        status: fields.status ?? "ready",
+        title: "A great recipe",
+        description: "Weeknight pasta",
+        url: "https://example.com/recipe",
+        tags: ["food"],
+        searchText: "a great recipe",
+      }),
+    );
+  }
+
+  it("mints one token per item and serves a narrow preview for it", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+
+    const preview = await t.query(internal.items.getSharePreview, {
+      token: token!,
+    });
+    expect(preview).toEqual({
+      type: "link",
+      title: "A great recipe",
+      description: "Weeknight pasta",
+      imageUrl: undefined,
+      sourceUrl: "https://example.com/recipe",
+      noteText: undefined,
+    });
+  });
+
+  it("names the sender by first name only", async () => {
+    const base = newConvexTest();
+    const named = await base.run((ctx) =>
+      ctx.db.insert("users", {
+        name: "  Ashish Huddar ",
+        email: "a@example.com",
+      }),
+    );
+    const unnamed = await base.run((ctx) => ctx.db.insert("users", {}));
+    // Apple sign-in with the name withheld: the email stands in as the name.
+    const emailOnly = await base.run((ctx) =>
+      ctx.db.insert("users", {
+        name: "private@privaterelay.appleid.com",
+        email: "private@privaterelay.appleid.com",
+      }),
+    );
+    const previewFor = async (userId: string) => {
+      const t = base.withIdentity({ subject: `${userId}|session-1` });
+      await seedPro(t, userId);
+      const itemId = await seedItem(t, userId);
+      const token = await t.mutation(api.items.createShareLink, { itemId });
+      return await t.query(internal.items.getSharePreview, { token: token! });
+    };
+
+    expect((await previewFor(named))?.senderName).toBe("Ashish");
+    expect((await previewFor(unnamed))?.senderName).toBeUndefined();
+    expect((await previewFor(emailOnly))?.senderName).toBeUndefined();
+  });
+
+  it("does not treat an item id as a token", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    await t.mutation(api.items.createShareLink, { itemId });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: itemId }),
+    ).toBeNull();
+  });
+
+  it("returns no token for an unfinished save or an image", async () => {
+    const { t, userId } = await as();
+    const processing = await seedItem(t, userId, {
+      status: "processing",
+    });
+    const image = await seedItem(t, userId, { type: "image" });
+
+    expect(
+      await t.mutation(api.items.createShareLink, { itemId: processing }),
+    ).toBeNull();
+    expect(
+      await t.mutation(api.items.createShareLink, { itemId: image }),
+    ).toBeNull();
+  });
+
+  it("refuses another user's item", async () => {
+    const backend = newConvexTest();
+    const { t: owner, userId: ownerId } = await signedInUser(backend);
+    const { t: other } = await signedInUser(backend);
+    const itemId = await seedItem(owner, ownerId);
+
+    await expect(
+      other.mutation(api.items.createShareLink, { itemId }),
+    ).rejects.toThrow("Item not found");
+  });
+
+  it("withdraws a link minted for a share the owner then cancelled", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+
+    // Settling with no link left is a no-op, and a later share mints anew.
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+    const next = await t.mutation(api.items.createShareLink, { itemId });
+    expect(next).toMatch(/^[0-9a-f]{32}$/);
+    expect(next).not.toBe(token);
+  });
+
+  it("keeps a link an older build already handed out when a later share is cancelled", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    // An older build mints and shares without ever settling.
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("keeps a link the owner really shared when a later share is cancelled", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("keeps a link from a client that never reports, when a share is cancelled", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    // An app version from before settling shared this link for real.
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("withdraws a cancelled link however late the cancel arrives", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const now = new Date("2026-10-08T12:00:00Z").getTime();
+    // convex-test anchors its clock at a context's first write, so the link
+    // has to be minted before the clock moves on.
+    vi.setSystemTime(now - 3 * 60 * 60 * 1000);
+    const { t, userId } = await signedInUser(newConvexTest());
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+
+    // The sheet sat open, or the report waited out a spell offline.
+    vi.setSystemTime(now);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+  });
+
+  it("stops treating a link as this attempt's once it has gone out", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("does not let another user settle a link", async () => {
+    const backend = newConvexTest();
+    const { t: owner, userId: ownerId } = await signedInUser(backend);
+    const { t: other } = await signedInUser(backend);
+    const itemId = await seedItem(owner, ownerId);
+    const token = await owner.mutation(api.items.createShareLink, { itemId });
+
+    await expect(
+      other.mutation(api.items.settleShareLink, { itemId, shared: false }),
+    ).rejects.toThrow("Item not found");
+    expect(
+      await owner.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("stops serving the preview once the item is deleted", async () => {
+    const { t, userId } = await as();
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.deleteItem, { id: itemId });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+    const links = await t.run((ctx) => ctx.db.query("shareLinks").collect());
+    expect(links).toEqual([]);
   });
 });

@@ -1,9 +1,9 @@
 // Pure coordinator that drives one share session's entries through their saves.
-// It has NO React, Convex, or storage imports — every side effect (link, note,
+// It has NO React, Convex, or storage imports: every side effect (link, note,
 // image save, persistence) is injected, so the orchestration is unit-testable
 // with fakes and so a partial failure can never erase sibling successes.
 //
-// The contract (plan 004):
+// The contract:
 //   - classify(): convert resolved payloads into entries WITHOUT side effects,
 //     treating malformed input (no contentUri, blank text, bad website URL,
 //     unsupported types) as explicit failed/unsupported entries.
@@ -16,6 +16,7 @@ import { extractFirstUrl, isProbablyUrl } from "@/lib/url";
 import { userSafeMessage } from "@/lib/user-safe-message";
 import type { Id } from "@convex/_generated/dataModel";
 import type { ImageSaveResult, LocalImage } from "@/lib/use-save-image";
+import { MAX_SHARE_ENTRIES } from "./storage";
 import type {
   RawSharePayload,
   ShareEntry,
@@ -122,11 +123,73 @@ export function classifyPayload(payload: ResolvedPayload): {
   return { kind: "note" };
 }
 
+/** The first valid link in a share, as the URL its save uses. */
+function firstLink(resolved: ResolvedPayload[]): string | null {
+  for (const payload of resolved) {
+    const result = classifyPayload(payload);
+    if (result.kind === "link" && result.reason === undefined) {
+      return result.url ?? payload.value.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * classifyPayload for one payload of a whole share. Text with no URL in a
+ * share that also carries a link is that link's caption (Instagram's web share
+ * sends "See this Instagram post by @user" beside the reel URL), so it resolves
+ * to the link and shares its single save instead of becoming a stray note.
+ */
+function classifyInShare(
+  resolved: ResolvedPayload[],
+  index: number,
+): ReturnType<typeof classifyPayload> {
+  const result = classifyPayload(resolved[index]);
+  if (result.kind !== "note" || result.reason !== undefined) return result;
+  const url = firstLink(resolved);
+  return url === null ? result : { kind: "link", url };
+}
+
+/** The URL an entry's link save uses, or null when it does not save a link.
+ * An older build may have saved a link's caption as a note; that entry keeps
+ * its own item. */
+function shareLinkUrl(
+  entry: ShareEntry,
+  resolved: ResolvedPayload[],
+): string | null {
+  if (entry.status === "saved" && entry.kind !== "link") return null;
+  const payload = resolved[entry.index];
+  if (payload === undefined) return null;
+  const { kind, reason, url } = classifyInShare(resolved, entry.index);
+  if (kind !== "link" || reason !== undefined) return null;
+  return url ?? payload.value.trim();
+}
+
+/**
+ * The entries of a share grouped by the item they save: entries resolving to
+ * the same link share one save (see sharedLinkSaves), every other entry is its
+ * own group. Groups keep the share's order.
+ */
+export function shareGroups(
+  entries: readonly ShareEntry[],
+  resolved: ResolvedPayload[],
+): ShareEntry[][] {
+  const groups = new Map<string, ShareEntry[]>();
+  for (const entry of entries) {
+    const url = shareLinkUrl(entry, resolved);
+    const key = url === null ? `entry:${entry.operationId}` : `link:${url}`;
+    const group = groups.get(key);
+    if (group) group.push(entry);
+    else groups.set(key, [entry]);
+  }
+  return [...groups.values()];
+}
+
 /**
  * Builds processor payloads from RAW share payloads, for use when native
  * resolution failed or its results no longer align with the raw payloads. The
  * SDK's resolver probes shared URLs with a live request, so bot-hostile hosts
- * (TikTok, some shorteners) can fail the whole resolution — but for `url` and
+ * (TikTok, some shorteners) can fail the whole resolution. But for `url` and
  * `text` shares the raw value is everything the save needs: the backend does
  * its own fetch with its own user agent and degrades gracefully when the host
  * blocks it. Resolution-dependent kinds keep their content type but carry no
@@ -181,7 +244,7 @@ export function resolvedFromRawPayloads(
 
 /**
  * Stamps a fresh session's entries with the kind and (for malformed/unsaveable
- * payloads) terminal status derived from the resolved payloads — WITHOUT saving
+ * payloads) terminal status derived from the resolved payloads, WITHOUT saving
  * anything. Resolved payload order is assumed to match the raw payload order
  * used to build the session's operation ids; the caller guards the divergent-
  * count case (see processSession's raw/resolved count check).
@@ -202,7 +265,7 @@ export function classifyEntries(
         message: "No resolved payload for this entry",
       };
     }
-    const { kind, reason } = classifyPayload(payload);
+    const { kind, reason } = classifyInShare(resolved, entry.index);
     if (reason !== undefined) {
       // The kind still records intent; status is the terminal outcome.
       const status: ShareEntry["status"] =
@@ -231,30 +294,67 @@ export async function processSession(
   deps: ShareSaveDeps,
   onEntrySettled?: (entry: ShareEntry) => void,
 ): Promise<ShareSession> {
+  if (
+    session.entries.length > MAX_SHARE_ENTRIES ||
+    resolved.length > MAX_SHARE_ENTRIES
+  )
+    throw new Error("Share batch is too large");
   const entries = session.entries.map((e) => ({ ...e }));
+  const linkDeps = sharedLinkSaves(entries, resolved, deps);
 
-  await Promise.all(
-    entries.map(async (entry): Promise<void> => {
-      // Skip terminal entries: saved successes are never re-saved; unsupported
-      // entries have nothing to attempt.
-      if (entry.status === "saved" || entry.status === "unsupported") return;
-      // Already-processed-and-failed entries are retried; pending entries are
-      // attempted for the first time. Both go through the same path.
+  for (const entry of entries) {
+    // Skip terminal entries: saved successes are never re-saved; unsupported
+    // entries have nothing to attempt.
+    if (entry.status === "saved" || entry.status === "unsupported") continue;
+    // Already-processed-and-failed entries are retried; pending entries are
+    // attempted for the first time. Both go through the same path.
 
-      const settled = await processOne(entry, resolved, deps);
-      // Merge the settled outcome onto this entry, including the re-derived kind.
-      // On a resume where classifyEntries did not run (a sibling was already
-      // settled), a pending entry may still carry its placeholder kind:'link';
-      // persisting settled.kind corrects it rather than leaving the wrong kind.
-      entry.kind = settled.kind;
-      entry.status = settled.status;
-      entry.itemId = settled.itemId;
-      entry.message = settled.message;
-      onEntrySettled?.(entry);
-    }),
-  );
+    const settled = await processOne(entry, resolved, linkDeps);
+    // Merge the settled outcome onto this entry, including the re-derived kind.
+    // On a resume where classifyEntries did not run (a sibling was already
+    // settled), a pending entry may still carry its placeholder kind:'link';
+    // persisting settled.kind corrects it rather than leaving the wrong kind.
+    entry.kind = settled.kind;
+    entry.status = settled.status;
+    entry.itemId = settled.itemId;
+    entry.message = settled.message;
+    onEntrySettled?.(entry);
+  }
 
   return { ...session, entries };
+}
+
+/**
+ * Wraps `deps.saveLink` so every entry in one session that resolves to the same
+ * URL shares a single save. The iOS share extension turns each attachment into
+ * its own payload, and Instagram attaches the URL twice: once as a URL and once
+ * as caption text holding the same URL. Without this, each copy saved under its
+ * own operation id and the user got two items. Saved entries seed the map, so a
+ * retry of a failed copy reuses the item its sibling already created.
+ */
+function sharedLinkSaves(
+  entries: ShareEntry[],
+  resolved: ResolvedPayload[],
+  deps: ShareSaveDeps,
+): ShareSaveDeps {
+  const saves = new Map<string, Promise<Id<"items">>>();
+  for (const entry of entries) {
+    if (entry.status !== "saved" || !entry.itemId) continue;
+    const url = shareLinkUrl(entry, resolved);
+    if (url !== null) {
+      saves.set(url, Promise.resolve(entry.itemId as Id<"items">));
+    }
+  }
+  return {
+    ...deps,
+    saveLink: (args) => {
+      const existing = saves.get(args.url);
+      if (existing) return existing;
+      const save = deps.saveLink(args);
+      saves.set(args.url, save);
+      return save;
+    },
+  };
 }
 
 /** Processes a single entry and returns its settled outcome. A failure is data,
@@ -283,7 +383,7 @@ async function processOne(
 
   // Re-derive kind + malformed-ness from the resolved payload. If the payload
   // is absent (raw/resolved divergence not caught earlier) or malformed, fail
-  // WITHOUT a backend call — no empty link/note item, no wasted round-trip.
+  // WITHOUT a backend call: no empty link/note item, no wasted round-trip.
   if (payload === undefined) {
     return {
       kind: entry.kind,
@@ -291,7 +391,7 @@ async function processOne(
       message: "No resolved payload for this entry",
     };
   }
-  const { kind, reason, url } = classifyPayload(payload);
+  const { kind, reason, url } = classifyInShare(resolved, entry.index);
   if (reason !== undefined) {
     // A saveable kind with a malformed payload (blank website/text, image with
     // no contentUri) is terminal; an unsupported type is terminal too.
@@ -349,4 +449,10 @@ async function processOne(
       message: userSafeMessage(error, "Could not save this item"),
     };
   }
+}
+
+/** The first shared link in a raw share, for the onboarding demo, which saves
+ * exactly one link and leaves every other payload to the share screen. */
+export function firstSharedUrl(raw: RawSharePayload[]): string | null {
+  return firstLink(resolvedFromRawPayloads(raw));
 }

@@ -1,6 +1,10 @@
-import { GlassView as ExpoGlassView } from 'expo-glass-effect';
-import { Platform, View } from 'react-native';
-import type { ViewProps } from 'react-native';
+import {
+  GlassView as ExpoGlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from "expo-glass-effect";
+import { Platform, View } from "react-native";
+import type { ViewProps } from "react-native";
 
 /**
  * Cross-platform glass surface.
@@ -14,13 +18,22 @@ import type { ViewProps } from 'react-native';
  */
 type GlassViewProps = React.ComponentProps<typeof ExpoGlassView>;
 
+/**
+ * True where the Liquid Glass material actually renders (iOS 26+ with the
+ * runtime API present). Expo recommends both checks. Callers that need a
+ * solid fallback of their own, like Button, branch on this; GlassView below
+ * keeps its iOS/Android split for the surfaces already built on it.
+ */
+export const hasLiquidGlass =
+  isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+
 export function GlassView({
   style,
   fallbackStyle,
   children,
   ...props
-}: GlassViewProps & { fallbackStyle?: ViewProps['style'] }) {
-  if (Platform.OS === 'ios') {
+}: GlassViewProps & { fallbackStyle?: ViewProps["style"] }) {
+  if (Platform.OS === "ios") {
     return (
       <ExpoGlassView style={style} {...props}>
         {children}
@@ -34,7 +47,7 @@ export function GlassView({
     <View
       style={[
         style,
-        { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
+        { backgroundColor: "rgba(255, 255, 255, 0.12)" },
         fallbackStyle,
       ]}
     >

@@ -2,6 +2,8 @@
 
 # dependencies
 node_modules
+.github/runtime/
+.secure-review-tooling/
 .pnp
 .pnp.js
 
@@ -28,6 +30,10 @@ build
 *.pem
 dist
 
+# Play API key written by release.yml from the
+# EAS_GOOGLE_SERVICE_ACCOUNT_KEY secret; eas.json points at this path.
+apps/native/google-service-account-key.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -51,6 +57,9 @@ yarn-error.log*
 .agents/*
 !.agents/setup
 !.agents/resume
+!.agents/skills
+.agents/skills/*
+!.agents/skills/verify-shelvr
 .claude/
 .codex/
 .cursor/
@@ -98,3 +107,12 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# Design handoffs and scraped research are reference material for shelvr-notes,
+# not product code. Keep local copies out of commits.
+design_handoff_*/
+.firecrawl/
+
+# App Store listing working copy for the asc CLI. App Store Connect is the
+# source of truth; listing history belongs in shelvr-notes.
+metadata/

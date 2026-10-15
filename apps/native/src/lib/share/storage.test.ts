@@ -1,18 +1,22 @@
 // Tests for the incoming-share session store. The reconciliation rules are the
 // load-bearing correctness logic for plan 004, so every remount window is
-// exercised with an in-memory adapter — no MMKV, no React Native runtime.
+// exercised with an in-memory adapter: no MMKV, no React Native runtime.
 import { describe, expect, it } from "vitest";
 
 import {
   deleteSession,
   entriesToProcess,
   fingerprintSharePayloads,
+  forgetDeletedShareItem,
+  LAST_COMPLETED_SHARE_KEY,
   loadSession,
   markComplete,
   operationIdFor,
   reconcileSession,
+  recordCompletedShare,
   SESSION_KEY,
   SESSION_SCHEMA_VERSION,
+  startNewSession,
   updateEntry,
   type SessionStoreAdapter,
   type RawSharePayload,
@@ -37,6 +41,7 @@ function memoryStore(): SessionStoreAdapter {
 // The authenticated user the session is scoped to. Different USER values model
 // different accounts on the same device.
 const USER = "user-a";
+const OTHER_USER = "user-b";
 
 const id = () => "sess-1";
 const payload = (value: string, shareType = "text"): RawSharePayload => ({
@@ -183,12 +188,12 @@ describe("reconcileSession", () => {
     expect(result.kind).toBe("clear");
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // Second remount: clear still failing — still 'clear', record still there.
+    // Second remount: clear still failing; still 'clear', record still there.
     result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // Third remount: clear finally succeeds, caller deletes — record is gone.
+    // Third remount: clear finally succeeds, caller deletes; record is gone.
     result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     deleteSession(store);
@@ -236,6 +241,187 @@ describe("reconcileSession", () => {
     reconcileSession(store, USER, BATCH_A, id);
     const session = loadSession(store);
     expect(session?.version).toBe(SESSION_SCHEMA_VERSION);
+  });
+});
+
+describe("ghost redelivery (Android task-restore replay)", () => {
+  function completedBatchA(store: SessionStoreAdapter) {
+    reconcileSession(store, USER, BATCH_A, id);
+    updateEntry(store, 0, {
+      status: "saved",
+      itemId: "items-1",
+      kind: "link",
+    });
+    markComplete(store, "sess-1");
+    deleteSession(store, "sess-1");
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+    ]);
+  }
+
+  it("flags a record-less identical, fully settled batch as a ghost", () => {
+    // The reported duplicate: the save completed (record deleted), Android
+    // replayed the task's share intent, and a fresh session minted a fresh
+    // operationId the ledger could not dedupe. It must be skipped instead.
+    const store = memoryStore();
+    completedBatchA(store);
+    const result = reconcileSession(store, USER, BATCH_A, id);
+    expect(result).toEqual({ kind: "ghost" });
+    // No session was started for the replay.
+    expect(loadSession(store)).toBeNull();
+  });
+
+  it("keeps no shared content in the tombstone, only a digest", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    const tombstone = store.getString(LAST_COMPLETED_SHARE_KEY);
+    expect(tombstone).toBeDefined();
+    for (const p of BATCH_A) expect(tombstone).not.toContain(p.value);
+  });
+
+  it("treats a different batch as a genuine new share, not a ghost", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    expect(reconcileSession(store, USER, BATCH_B, id).kind).toBe("new");
+  });
+
+  it("treats an identical batch as new when nothing completed before it", () => {
+    // First-ever share must never prompt.
+    const store = memoryStore();
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
+  });
+
+  it("does not ghost-check an active or completed session match", () => {
+    // A matching existing session follows the resume/clear rules regardless of
+    // any tombstone: those paths reuse stable operation ids.
+    const store = memoryStore();
+    completedBatchA(store);
+    // Directly start the active session (bypasses the ghost branch).
+    startNewSession(
+      store,
+      USER,
+      fingerprintSharePayloads(BATCH_A),
+      BATCH_A,
+      id,
+    );
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, []);
+    // Active session for the same batch → resume, not ghost.
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("resume");
+  });
+
+  it("drops a corrupt tombstone instead of failing reconciliation", () => {
+    const store = memoryStore();
+    store.set(LAST_COMPLETED_SHARE_KEY, "not json{");
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
+  });
+
+  it("never matches a tombstone left by a different user", () => {
+    // Account switch: user A completed this batch, user B shares identical
+    // content. The ghost check is user-scoped: B's share is genuine.
+    const store = memoryStore();
+    completedBatchA(store);
+    expect(reconcileSession(store, OTHER_USER, BATCH_A, id).kind).toBe("new");
+  });
+
+  it("retries a replayed batch that failed, instead of skipping it", () => {
+    // A failed save still completes (Cancel / Continue) and tombstones the
+    // batch. Sharing it again must save it, not return Home empty-handed.
+    const store = memoryStore();
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, []);
+    const result = reconcileSession(store, USER, BATCH_A, () => "sess-9");
+    expect(result.kind).toBe("new");
+    expect(loadSession(store)?.entries.map((e) => e.status)).toEqual(
+      BATCH_A.map(() => "pending"),
+    );
+  });
+
+  it("carries settled entries into a partly saved batch's replay", () => {
+    // Only the entries that did not save are attempted again; the saved one
+    // keeps its item id, so it is never saved twice.
+    const store = memoryStore();
+    const batch = [...BATCH_A, ...BATCH_B];
+    recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+    ]);
+    const result = reconcileSession(store, USER, batch, () => "sess-9");
+    expect(result.kind).toBe("new");
+    const entries = loadSession(store)?.entries ?? [];
+    expect(entries[0]).toMatchObject({ status: "saved", itemId: "items-1" });
+    expect(entries.slice(1).every((e) => e.status === "pending")).toBe(true);
+  });
+
+  it("does not skip a replay when settled entries miss an index", () => {
+    // Matching counts are not enough: a duplicate index must not hide an
+    // entry that never saved.
+    const store = memoryStore();
+    const batch = [...BATCH_A, ...BATCH_B];
+    recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+      { index: 0, status: "saved", itemId: "items-1" },
+    ]);
+    expect(reconcileSession(store, USER, batch, id).kind).toBe("new");
+  });
+
+  it("saves a replay whose tombstone predates settled entries", () => {
+    // Older tombstones were written for failed batches too, so they cannot
+    // prove the batch saved: treat the match as a new share.
+    const store = memoryStore();
+    completedBatchA(store);
+    const legacy = JSON.parse(store.getString(LAST_COMPLETED_SHARE_KEY)!) as {
+      settled?: unknown;
+    };
+    delete legacy.settled;
+    store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify(legacy));
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
+  });
+
+  it("saves an identical re-share after its item was deleted", () => {
+    // Save a link, delete the item, share the same link again: content alone
+    // cannot tell this from a replay, so the delete must unmark the entry.
+    const store = memoryStore();
+    completedBatchA(store);
+    forgetDeletedShareItem(store, "items-1");
+    const result = reconcileSession(store, USER, BATCH_A, () => "sess-9");
+    expect(result.kind).toBe("new");
+    expect(loadSession(store)?.entries[0].status).toBe("pending");
+  });
+
+  it("keeps skipping the other saved entries after one item is deleted", () => {
+    const store = memoryStore();
+    const batch = [...BATCH_A, ...BATCH_B];
+    recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+      { index: 1, status: "saved", itemId: "items-2" },
+    ]);
+    forgetDeletedShareItem(store, "items-2");
+    reconcileSession(store, USER, batch, () => "sess-9");
+    const entries = loadSession(store)?.entries ?? [];
+    expect(entries[0]).toMatchObject({ status: "saved", itemId: "items-1" });
+    expect(entries[1].status).toBe("pending");
+  });
+
+  it("still skips a replay when an unrelated item is deleted", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    forgetDeletedShareItem(store, "items-other");
+    expect(reconcileSession(store, USER, BATCH_A, id)).toEqual({
+      kind: "ghost",
+    });
+  });
+
+  it("starts a session with a fresh id via startNewSession", () => {
+    const store = memoryStore();
+    const session = startNewSession(
+      store,
+      USER,
+      fingerprintSharePayloads(BATCH_A),
+      BATCH_A,
+      () => "sess-9",
+    );
+    expect(session.sessionId).toBe("sess-9");
+    expect(session.phase).toBe("active");
+    expect(session.entries[0].operationId).toBe("share:sess-9:0");
+    expect(loadSession(store)?.sessionId).toBe("sess-9");
   });
 });
 
@@ -346,7 +532,7 @@ describe("deleteSession", () => {
     const second = reconcileSession(store, USER, BATCH_B, () => "sess-2");
     if (second.kind !== "new") throw new Error("expected new");
 
-    // The old session tries to delete by its (now-stale) id — must be a no-op.
+    // The old session tries to delete by its (now-stale) id, which must be a no-op.
     deleteSession(store, firstSessionId);
     expect(loadSession(store)?.sessionId).toBe("sess-2");
   });
@@ -355,7 +541,7 @@ describe("deleteSession", () => {
 describe("user-scoped sessions (account switching)", () => {
   it("starts a fresh session when a different user reconciles an identical batch", () => {
     // user-a completes a batch; user-b (same device) sharing the SAME content
-    // must NOT match user-a's stale record — otherwise the new share is dropped.
+    // must NOT match user-a's stale record; otherwise the new share is dropped.
     const store = memoryStore();
     const a = reconcileSession(store, USER, BATCH_A, id);
     if (a.kind !== "new") throw new Error("expected new");
@@ -527,4 +713,23 @@ describe("session-scoped mutations (new-share-during-in-flight-run safety)", () 
     // The newer session stays active (not completed).
     expect(loadSession(store)?.phase).toBe("active");
   });
+});
+
+it("rejects oversized raw share batches before writing a session", async () => {
+  const { shareBatchAllowed, MAX_SHARE_ENTRIES, MAX_SHARE_TEXT_BYTES } =
+    await import("./storage");
+  expect(
+    shareBatchAllowed(
+      Array.from({ length: MAX_SHARE_ENTRIES + 1 }, () => ({
+        value: "x",
+        shareType: "text",
+      })),
+    ),
+  ).toBe(false);
+  expect(
+    shareBatchAllowed([
+      { value: "é".repeat(MAX_SHARE_TEXT_BYTES), shareType: "text" },
+    ]),
+  ).toBe(false);
+  expect(shareBatchAllowed([{ value: "valid", shareType: "text" }])).toBe(true);
 });

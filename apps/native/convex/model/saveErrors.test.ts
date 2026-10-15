@@ -6,7 +6,12 @@ import {
   IMAGE_TOO_LARGE_MESSAGE,
   PHOTO_LIMIT_MESSAGE,
 } from "./imagePolicy";
-import { SAVE_ERROR_MESSAGES, saveError, saveErrorCode } from "./saveErrors";
+import {
+  SAVE_ERROR_MESSAGES,
+  saveError,
+  saveErrorCode,
+  saveFailureStage,
+} from "./saveErrors";
 
 describe("save error classification", () => {
   it("round-trips a code through the ConvexError data the client receives", () => {
@@ -43,5 +48,36 @@ describe("save error classification", () => {
     ).toBeNull();
     expect(saveErrorCode(undefined)).toBeNull();
     expect(saveErrorCode("pro_required")).toBeNull();
+  });
+});
+
+describe("save failure stages", () => {
+  it("prefers the structured code and bounds everything else to `other`", () => {
+    expect(saveFailureStage(saveError("image_empty"))).toBe("image_empty");
+    expect(saveFailureStage(new ConvexError({ code: "not_a_save_code" }))).toBe(
+      "other",
+    );
+    expect(saveFailureStage(new Error("network unavailable"))).toBe("other");
+    expect(saveFailureStage(undefined)).toBe("other");
+  });
+
+  it("recognizes a plain Error carrying a fixed refusal sentence", () => {
+    // The legacy transport shape (a sentence straight in ConvexError data)
+    // and the pipeline stages that rethrow a returned error string: the
+    // sentence is the only signal, and matching the canonical table keeps
+    // the stage bounded. The sentences themselves are pinned to the constants
+    // by the copy test above.
+    expect(saveFailureStage(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBe(
+      "photo_limit",
+    );
+    expect(
+      saveFailureStage(new Error(SAVE_ERROR_MESSAGES.image_too_large)),
+    ).toBe("image_too_large");
+    expect(saveFailureStage(new Error(SAVE_ERROR_MESSAGES.photo_limit))).toBe(
+      "photo_limit",
+    );
+    expect(saveFailureStage(new Error(SAVE_ERROR_MESSAGES.pro_required))).toBe(
+      "pro_required",
+    );
   });
 });

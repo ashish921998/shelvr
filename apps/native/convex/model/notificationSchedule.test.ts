@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   isValidTimezone,
+  rebookedSchedule,
+  localHour,
+  nextLocalHourAt,
   nextWeeklyDigestAt,
   parseTimezoneInput,
   resolveTimezone,
@@ -30,6 +33,28 @@ describe("Sunday 09:00 schedule", () => {
   });
 });
 
+describe("daily local hour", () => {
+  it.each([
+    // Later today, then tomorrow once the hour has passed.
+    ["2026-09-25T10:00:00Z", "UTC", 18, "2026-09-25T18:00:00Z"],
+    ["2026-09-25T18:00:00Z", "UTC", 18, "2026-09-26T18:00:00Z"],
+    ["2026-09-25T13:00:00Z", "Asia/Kolkata", 18, "2026-09-26T12:30:00Z"],
+    // Across the spring-forward night the wall clock still reads 18:00.
+    ["2026-03-07T23:30:00Z", "America/New_York", 18, "2026-03-08T22:00:00Z"],
+  ])("%s in %s at %i:00 is %s", (now, zone, hour, expected) => {
+    expect(
+      new Date(nextLocalHourAt(Date.parse(now), zone, hour)).toISOString(),
+    ).toBe(new Date(expected).toISOString());
+  });
+
+  it("reads the hour on the user's clock", () => {
+    const instant = Date.parse("2026-09-25T13:45:00Z");
+    expect(localHour(instant, "UTC")).toBe(13);
+    expect(localHour(instant, "Asia/Kolkata")).toBe(19);
+    expect(localHour(instant, "Mars/Olympus_Mons")).toBe(13);
+  });
+});
+
 describe("timezone validation", () => {
   it.each(["UTC", "America/New_York", "Asia/Kolkata", "Etc/GMT+5"])(
     "accepts %s",
@@ -53,5 +78,34 @@ describe("timezone validation", () => {
     expect(parseTimezoneInput(undefined)).toBeUndefined();
     expect(parseTimezoneInput("  Europe/Paris ")).toBe("Europe/Paris");
     expect(resolveTimezone(undefined)).toBe("UTC");
+  });
+});
+
+describe("rebookedSchedule", () => {
+  const now = Date.UTC(2026, 8, 29, 12);
+
+  it("leaves an unchanged zone alone", () => {
+    expect(
+      rebookedSchedule({ timezone: "Asia/Kolkata" }, "Asia/Kolkata", now, 18),
+    ).toBeUndefined();
+  });
+
+  it("rebooks the shelf and the reminder slot in the new zone", () => {
+    expect(
+      rebookedSchedule({ timezone: "UTC" }, "Asia/Kolkata", now, 18),
+    ).toEqual({
+      timezone: "Asia/Kolkata",
+      nextDigestAt: nextWeeklyDigestAt(now, "Asia/Kolkata"),
+      nextReminderAt: nextLocalHourAt(now, "Asia/Kolkata", 18),
+    });
+  });
+
+  it("books no reminder slot when the caller passes no hour", () => {
+    expect(
+      rebookedSchedule({ timezone: "UTC" }, "Asia/Kolkata", now, null),
+    ).toEqual({
+      timezone: "Asia/Kolkata",
+      nextDigestAt: nextWeeklyDigestAt(now, "Asia/Kolkata"),
+    });
   });
 });

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { captureWebException } from "@/lib/analytics";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function Error({
   error,
@@ -17,13 +18,13 @@ export default function Error({
 
   return (
     <main className="bg-paper min-h-screen">
-      <div className="container max-w-3xl py-10 sm:py-16">
+      <div className="container max-w-2xl py-10 sm:py-16">
         <h1 className="font-display text-3xl text-ink sm:text-4xl">
           Something went wrong
         </h1>
         <p className="mt-3 text-[15px] leading-7 text-ink/90">
           The page hit an unexpected error. You can try again, or email
-          support@shelvr.app if it keeps happening.
+          {SUPPORT_EMAIL} if it keeps happening.
         </p>
         <button
           className="mt-8 inline-flex rounded-full bg-ink px-6 py-3 font-semibold text-paper transition-opacity hover:opacity-80"

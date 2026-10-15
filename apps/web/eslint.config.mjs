@@ -4,7 +4,14 @@ import checkFile from "eslint-plugin-check-file";
 
 export default defineConfig([
   ...nextVitals,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    // Local design handoffs (gitignored) carry prototype scripts.
+    "design_handoff_*/**",
+  ]),
   {
     files: ["src/**/*.{ts,tsx}"],
     plugins: { "check-file": checkFile },

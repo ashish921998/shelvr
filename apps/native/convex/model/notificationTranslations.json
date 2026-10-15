@@ -4,6 +4,26 @@
     "body": {
       "one": "%{formattedCount} gespeicherter Inhalt wartet auf dich",
       "other": "%{formattedCount} gespeicherte Inhalte warten auf dich"
+    },
+    "named": {
+      "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt aus dieser Woche",
+      "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
+    },
+    "namedSingle": "„%{title}“ – diese Woche gespeichert",
+    "namedShelf": {
+      "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt warten in deinem Regal",
+      "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte warten in deinem Regal"
+    },
+    "namedShelfSingle": "„%{title}“ wartet in deinem Regal",
+    "reminder": {
+      "read": {
+        "title": "Für später gespeichert",
+        "body": "„%{title}“ wartet auf dich, wenn du Zeit hast."
+      },
+      "cook": {
+        "title": "Aus deinen gespeicherten Rezepten",
+        "body": "Lust, heute „%{title}“ zu kochen?"
+      }
     }
   },
   "en": {
@@ -11,6 +31,26 @@
     "body": {
       "one": "%{formattedCount} save waiting for you",
       "other": "%{formattedCount} saves waiting for you"
+    },
+    "named": {
+      "one": "“%{title}” and %{formattedCount} more you saved this week",
+      "other": "“%{title}” and %{formattedCount} more you saved this week"
+    },
+    "namedSingle": "“%{title}”, saved this week",
+    "namedShelf": {
+      "one": "“%{title}” and %{formattedCount} more save waiting on your shelf",
+      "other": "“%{title}” and %{formattedCount} more saves waiting on your shelf"
+    },
+    "namedShelfSingle": "“%{title}” is waiting on your shelf",
+    "reminder": {
+      "read": {
+        "title": "Saved for later",
+        "body": "“%{title}” is ready when you are."
+      },
+      "cook": {
+        "title": "From your saved recipes",
+        "body": "Want to make “%{title}” today?"
+      }
     }
   },
   "es": {
@@ -19,6 +59,28 @@
       "one": "%{formattedCount} contenido guardado te espera",
       "many": "%{formattedCount} contenidos guardados te esperan",
       "other": "%{formattedCount} contenidos guardados te esperan"
+    },
+    "named": {
+      "one": "«%{title}» y %{formattedCount} contenido más que guardaste esta semana",
+      "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
+      "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
+    },
+    "namedSingle": "«%{title}», guardado esta semana",
+    "namedShelf": {
+      "one": "«%{title}» y %{formattedCount} contenido más te esperan en tu estantería",
+      "many": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería",
+      "other": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería"
+    },
+    "namedShelfSingle": "«%{title}» te espera en tu estantería",
+    "reminder": {
+      "read": {
+        "title": "Guardado para después",
+        "body": "«%{title}» te espera cuando quieras."
+      },
+      "cook": {
+        "title": "De tus recetas guardadas",
+        "body": "¿Te apetece preparar «%{title}» hoy?"
+      }
     }
   },
   "es-MX": {
@@ -27,6 +89,28 @@
       "one": "%{formattedCount} contenido guardado te espera",
       "many": "%{formattedCount} contenidos guardados te esperan",
       "other": "%{formattedCount} contenidos guardados te esperan"
+    },
+    "named": {
+      "one": "«%{title}» y %{formattedCount} contenido más que guardaste esta semana",
+      "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
+      "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
+    },
+    "namedSingle": "«%{title}», guardado esta semana",
+    "namedShelf": {
+      "one": "«%{title}» y %{formattedCount} contenido más te esperan en tu estantería",
+      "many": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería",
+      "other": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería"
+    },
+    "namedShelfSingle": "«%{title}» te espera en tu estantería",
+    "reminder": {
+      "read": {
+        "title": "Guardado para después",
+        "body": "«%{title}» te espera cuando quieras."
+      },
+      "cook": {
+        "title": "De tus recetas guardadas",
+        "body": "¿Se te antoja preparar «%{title}» hoy?"
+      }
     }
   },
   "fr": {
@@ -35,6 +119,28 @@
       "one": "%{formattedCount} contenu enregistré vous attend",
       "many": "%{formattedCount} contenus enregistrés vous attendent",
       "other": "%{formattedCount} contenus enregistrés vous attendent"
+    },
+    "named": {
+      "one": "« %{title} » et %{formattedCount} autre contenu enregistré cette semaine",
+      "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
+      "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
+    },
+    "namedSingle": "« %{title} », enregistré cette semaine",
+    "namedShelf": {
+      "one": "« %{title} » et %{formattedCount} autre contenu vous attendent sur votre étagère",
+      "many": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère",
+      "other": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère"
+    },
+    "namedShelfSingle": "« %{title} » vous attend sur votre étagère",
+    "reminder": {
+      "read": {
+        "title": "Enregistré pour plus tard",
+        "body": "« %{title} » vous attend quand vous voulez."
+      },
+      "cook": {
+        "title": "Parmi vos recettes enregistrées",
+        "body": "Envie de préparer « %{title} » aujourd'hui ?"
+      }
     }
   },
   "fr-CA": {
@@ -43,18 +149,76 @@
       "one": "%{formattedCount} contenu enregistré vous attend",
       "many": "%{formattedCount} contenus enregistrés vous attendent",
       "other": "%{formattedCount} contenus enregistrés vous attendent"
+    },
+    "named": {
+      "one": "« %{title} » et %{formattedCount} autre contenu enregistré cette semaine",
+      "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
+      "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
+    },
+    "namedSingle": "« %{title} », enregistré cette semaine",
+    "namedShelf": {
+      "one": "« %{title} » et %{formattedCount} autre contenu vous attendent sur votre étagère",
+      "many": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère",
+      "other": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère"
+    },
+    "namedShelfSingle": "« %{title} » vous attend sur votre étagère",
+    "reminder": {
+      "read": {
+        "title": "Enregistré pour plus tard",
+        "body": "« %{title} » vous attend quand vous voulez."
+      },
+      "cook": {
+        "title": "Parmi vos recettes enregistrées",
+        "body": "Envie de préparer « %{title} » aujourd'hui ?"
+      }
     }
   },
   "ja": {
     "title": "あなたの今週のシェルフ",
     "body": {
       "other": "%{formattedCount}件の保存項目があなたを待っています"
+    },
+    "named": {
+      "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
+    },
+    "namedSingle": "「%{title}」を今週保存しました",
+    "namedShelf": {
+      "other": "「%{title}」ほか%{formattedCount}件がシェルフで待っています"
+    },
+    "namedShelfSingle": "「%{title}」がシェルフで待っています",
+    "reminder": {
+      "read": {
+        "title": "あとで読む",
+        "body": "「%{title}」、時間のあるときにどうぞ。"
+      },
+      "cook": {
+        "title": "保存したレシピから",
+        "body": "今日は「%{title}」を作ってみませんか？"
+      }
     }
   },
   "ko": {
     "title": "내 주간 책장",
     "body": {
       "other": "저장 항목 %{formattedCount}개가 기다리고 있어요"
+    },
+    "named": {
+      "other": "'%{title}' 외 %{formattedCount}개를 이번 주에 저장했어요"
+    },
+    "namedSingle": "이번 주에 저장한 '%{title}'",
+    "namedShelf": {
+      "other": "'%{title}' 외 %{formattedCount}개가 책장에서 기다리고 있어요"
+    },
+    "namedShelfSingle": "'%{title}', 책장에서 기다리고 있어요",
+    "reminder": {
+      "read": {
+        "title": "나중에 볼 글",
+        "body": "'%{title}', 여유 있을 때 읽어 보세요."
+      },
+      "cook": {
+        "title": "저장한 레시피에서",
+        "body": "오늘 '%{title}' 만들어 볼까요?"
+      }
     }
   },
   "pt-BR": {
@@ -63,6 +227,28 @@
       "one": "%{formattedCount} conteúdo salvo esperando por você",
       "many": "%{formattedCount} conteúdos salvos esperando por você",
       "other": "%{formattedCount} conteúdos salvos esperando por você"
+    },
+    "named": {
+      "one": "“%{title}” e mais %{formattedCount} conteúdo salvo esta semana",
+      "many": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana",
+      "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
+    },
+    "namedSingle": "“%{title}”, salvo esta semana",
+    "namedShelf": {
+      "one": "“%{title}” e mais %{formattedCount} conteúdo esperando na sua estante",
+      "many": "“%{title}” e mais %{formattedCount} conteúdos esperando na sua estante",
+      "other": "“%{title}” e mais %{formattedCount} conteúdos esperando na sua estante"
+    },
+    "namedShelfSingle": "“%{title}” está esperando na sua estante",
+    "reminder": {
+      "read": {
+        "title": "Salvo para depois",
+        "body": "“%{title}” te espera quando você quiser."
+      },
+      "cook": {
+        "title": "Das suas receitas salvas",
+        "body": "Que tal fazer “%{title}” hoje?"
+      }
     }
   }
 }

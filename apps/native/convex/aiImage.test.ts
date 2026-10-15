@@ -48,9 +48,10 @@ async function photo(
   blob = new Blob([bytes], { type: "image/png" }),
 ) {
   return t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", {});
     const storageId = await ctx.storage.store(blob);
     const itemId = await ctx.db.insert("items", {
-      userId: "photo-user",
+      userId,
       type: "image",
       status: "processing",
       storageId,
@@ -59,18 +60,44 @@ async function photo(
       aspectRatio: 1.5,
     });
     const spaceId = await ctx.db.insert("spaces", {
-      userId: "photo-user",
+      userId,
       name: "Saved photos",
     });
     await ctx.db.insert("spaceItems", {
-      userId: "photo-user",
+      userId,
       itemId,
       spaceId,
       status: "saved",
     });
-    return { itemId, storageId, spaceId };
+    return { itemId, storageId, spaceId, userId };
   });
 }
+
+describe("Siri capture context", () => {
+  it("steers the image prompt with what Siri passed along", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.action(internal.ai.processItem, {
+      itemId,
+      captureContext: "Siri: save this\n\nText in the image:\nMiso ramen",
+    });
+    const text = generateObject.mock.calls[0][0].messages[0].content.find(
+      (part: { type: string }) => part.type === "text",
+    ).text as string;
+    expect(text).toContain("saved this with Siri");
+    expect(text).toContain("Miso ramen");
+  });
+
+  it("leaves an in-app save's prompt without it", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.action(internal.ai.processItem, { itemId });
+    const text = generateObject.mock.calls[0][0].messages[0].content.find(
+      (part: { type: string }) => part.type === "text",
+    ).text as string;
+    expect(text).not.toContain("Siri");
+  });
+});
 
 describe("stored photo processing", () => {
   it("passes original bytes to vision and retains the uploaded file and chosen space", async () => {
@@ -182,7 +209,7 @@ describe("stored photo processing", () => {
     "bounds %s prompt space data including JSON escapes and multibyte text",
     async (type) => {
       const t = newConvexTest();
-      const { itemId } = await photo(t);
+      const { itemId, userId } = await photo(t);
       if (type !== "image") {
         await t.run((ctx) =>
           ctx.db.patch(itemId, {
@@ -202,7 +229,7 @@ describe("stored photo processing", () => {
       await t.run(async (ctx) => {
         for (let i = 0; i < 100; i++)
           await ctx.db.insert("spaces", {
-            userId: "photo-user",
+            userId,
             dynamic: true,
             name: `Space ${i}`,
             description: "\u0000😀".repeat(10000),
@@ -236,10 +263,10 @@ describe("stored photo processing", () => {
 
   it("does not split emoji when shortening space descriptions", async () => {
     const t = newConvexTest();
-    const { itemId } = await photo(t);
+    const { itemId, userId } = await photo(t);
     await t.run((ctx) =>
       ctx.db.insert("spaces", {
-        userId: "photo-user",
+        userId,
         dynamic: true,
         name: "Emoji",
         description: "a".repeat(511) + "😀end",

@@ -1,13 +1,17 @@
 import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
-import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import {
+  isDevelopmentAnonymousUser,
+  liveOwner,
+  requireUserId,
+} from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
 import { saveError } from "./model/saveErrors";
 
-export const subscriptionStatusValidator = v.union(
+const subscriptionStatusValidator = v.union(
   v.literal("trialing"),
   v.literal("pro"),
   v.literal("lapsed"),
@@ -18,7 +22,7 @@ export const subscriptionStatusValidator = v.union(
  * The entitlement a client renders. `status` is the stored subscription state
  * (or `"none"` if the user has never started a trial); `expiresAt` is the raw
  * stored period end. The client computes `entitled` from `expiresAt` against
- * its own clock — this query deliberately does NOT read the wall clock, because
+ * its own clock: this query deliberately does NOT read the wall clock, because
  * queries are not rerun as time advances and a `Date.now()` read here would go
  * stale at the exact trial-expiry moment. The server re-checks expiry with
  * `Date.now()` inside gated mutations (see {@link requireProEntitlement}), so
@@ -49,7 +53,7 @@ export const getEntitlement = query({
 /**
  * Server-side entitlement gate for Pro mutations. Reads the wall clock
  * (`Date.now()` is allowed in mutations) so a trial that expired between the
- * client's last fetch and this call is correctly rejected — the client's
+ * client's last fetch and this call is correctly rejected: the client's
  * `entitled` is advisory; this is the source of truth. Throws
  * {@link saveError}`("pro_required")` when the user has no active trial or
  * subscription, which the client decodes to present the paywall instead of a
@@ -68,23 +72,50 @@ export async function requireProEntitlement(
 }
 
 /**
- * The same rule as {@link requireProEntitlement}, as a boolean. For mutations
- * whose core write must succeed for every user but whose paid side effect
- * (an LLM pass) is Pro-only: the caller keeps the write and skips the spend.
+ * The same rule as {@link requireProEntitlement}, as a boolean. Mutations
+ * whose core write must succeed for every user can use this to skip a
+ * Pro-only side effect. Reads the wall clock, so it is mutation-only;
+ * queries use {@link hasProEntitlementAt} with a client-supplied clock,
+ * or {@link hasProEntitlementStatus} when no clock is available.
  */
 export async function hasProEntitlement(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<boolean> {
-  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
-  const sub = await ctx.db
+  return await hasProEntitlementAt(ctx, userId, Date.now());
+}
+
+/** The caller's one subscription row, or null when they never started one. */
+async function subscriptionFor(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<Doc<"subscriptions"> | null> {
+  return await ctx.db
     .query("subscriptions")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
-  if (sub === null) {
-    return false;
-  }
-  return isEntitled(sub.status, sub.expiresAt, Date.now());
+}
+
+/** Query-safe entitlement check. The caller supplies the current client time. */
+export async function hasProEntitlementAt(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+  now: number,
+): Promise<boolean> {
+  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
+  const sub = await subscriptionFor(ctx, userId);
+  return sub !== null && isEntitled(sub.status, sub.expiresAt, now);
+}
+
+/** Server-maintained status: scheduled expiry and a recovery sweep lapse paid
+ * periods independently of RevenueCat webhook delivery and client clocks. */
+export async function hasProEntitlementStatus(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
+  const sub = await subscriptionFor(ctx, userId);
+  return sub !== null && isEntitled(sub.status, sub.expiresAt, sub.updatedAt);
 }
 
 /**
@@ -97,7 +128,7 @@ export async function hasProEntitlement(
  * downgrades an active subscriber. Newer events CAN move expiry in either
  * direction (e.g. a refund shortens the period).
  *
- * `status` is optional — when omitted (e.g. a CANCELLATION that still has
+ * `status` is optional: when omitted (e.g. a CANCELLATION that still has
  * access until period end) the existing status is preserved and only
  * `expiresAt` is refreshed. When `expiresAt` is 0 and no existing row is found,
  * the event is acknowledged but no row is created unless it is authoritative
@@ -119,7 +150,7 @@ export const upsertSubscription = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .unique();
 
-    // Stale/duplicate event? Drop it before doing anything else — cheapest exit.
+    // Stale/duplicate event? Drop it before doing anything else: cheapest exit.
     // Once a row has an ordering timestamp, an event without one is also unsafe
     // to apply because its age is unknown.
     if (
@@ -134,19 +165,17 @@ export const upsertSubscription = internalMutation({
     // Account deletion removes the users row but deliberately does NOT cancel
     // the App Store subscription, so RevenueCat keeps sending renewal/
     // expiration events for the deleted account. Acknowledge the event (so
-    // RevenueCat stops retrying) but do not insert or patch a row — otherwise
+    // RevenueCat stops retrying) but do not insert or patch a row. Otherwise
     // a renewal webhook resurrects an entitlement for a user who no longer
-    // exists. The userId here is the Convex Auth users-table document id.
-    const ownerId = ctx.db.normalizeId("users", args.userId);
-    if (ownerId === null) {
-      return null;
-    }
-    const owner = await ctx.db.get(ownerId);
-    if (owner === null) {
+    // exists. An owner mid-deletion counts as gone for the same reason: its
+    // subscription row is about to drain, and a write here would race the
+    // drain or outlive it. The userId here is the Convex Auth users-table
+    // document id.
+    if ((await liveOwner(ctx, args.userId)) === null) {
       return null;
     }
 
-    // A lifetime row is sticky unless an authoritative snapshot replaces it — a
+    // A lifetime row is sticky unless an authoritative snapshot replaces it: a
     // stray CANCELLATION or an EXPIRATION for an unrelated product (this table
     // is one row per user, not per-product) is preserved as-is. Refunds and
     // reversals reconcile the current Pro entitlement instead. The webhook
@@ -169,7 +198,7 @@ export const upsertSubscription = internalMutation({
     }
 
     // Nothing to record: an event with no expiry and no prior state (e.g. a
-    // lapsed non-lifetime event). A lifetime purchase is exempt — it reports
+    // lapsed non-lifetime event). A lifetime purchase is exempt: it reports
     // `expiresAt: 0` (non-renewing) but is a real entitlement.
     // An authoritative lapse records the ordering timestamp even before a
     // purchase arrives, so a delayed purchase cannot resurrect refunded access.
@@ -192,8 +221,14 @@ export const upsertSubscription = internalMutation({
         ? existing.expiresAt
         : args.expiresAt;
 
-    const doc = {
+    const effectiveStatus = await scheduleSubscriptionExpiry(
+      ctx,
+      args.userId,
       status,
+      expiresAt,
+    );
+    const doc = {
+      status: effectiveStatus,
       expiresAt,
       ...(args.authoritative ||
       (!stickyLifetime && args.productId !== undefined)
@@ -215,20 +250,23 @@ export const upsertSubscription = internalMutation({
   },
 });
 
-export const transferOwners = internalQuery({
+/** The live owners among RevenueCat's app user ids. Anonymous RevenueCat ids,
+ * removed accounts and accounts mid-deletion are dropped, so the reconciler
+ * neither asks RevenueCat about them nor writes access back for them. */
+export const liveOwners = internalQuery({
   args: { userIds: v.array(v.string()) },
   returns: v.array(v.id("users")),
   handler: async (ctx, { userIds }) => {
     const owners: Id<"users">[] = [];
     for (const userId of new Set(userIds)) {
-      const id = ctx.db.normalizeId("users", userId);
-      if (id !== null && (await ctx.db.get(id)) !== null) owners.push(id);
+      const owner = await liveOwner(ctx, userId);
+      if (owner !== null) owners.push(owner._id);
     }
     return owners;
   },
 });
 
-export const reconcileTransfer = internalMutation({
+export const applySnapshots = internalMutation({
   args: {
     eventTimestampMs: v.number(),
     snapshots: v.array(
@@ -253,3 +291,66 @@ export const reconcileTransfer = internalMutation({
     return null;
   },
 });
+
+export const expireSubscription = internalMutation({
+  args: { userId: v.string(), expiresAt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const sub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+    if (
+      sub &&
+      sub.expiresAt === args.expiresAt &&
+      sub.expiresAt <= Date.now() &&
+      (sub.status === "pro" || sub.status === "trialing")
+    ) {
+      await ctx.db.patch(sub._id, { status: "lapsed", updatedAt: Date.now() });
+    }
+    return null;
+  },
+});
+
+export const recoverExpiredSubscriptions = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    for (const status of ["pro", "trialing"] as const) {
+      const rows = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_status_and_expiresAt", (q) =>
+          q.eq("status", status).lte("expiresAt", Date.now()),
+        )
+        .take(100);
+      for (const row of rows)
+        await ctx.db.patch(row._id, {
+          status: "lapsed",
+          updatedAt: Date.now(),
+        });
+      if (rows.length === 100)
+        await ctx.scheduler.runAfter(
+          0,
+          internal.subscriptions.recoverExpiredSubscriptions,
+          {},
+        );
+    }
+    return null;
+  },
+});
+
+async function scheduleSubscriptionExpiry(
+  ctx: MutationCtx,
+  userId: string,
+  status: SubscriptionStatus,
+  expiresAt: number,
+): Promise<SubscriptionStatus> {
+  if (!isEntitled(status, expiresAt, Date.now())) return "lapsed";
+  if (status !== "lifetime")
+    await ctx.scheduler.runAt(
+      expiresAt,
+      internal.subscriptions.expireSubscription,
+      { userId, expiresAt },
+    );
+  return status;
+}

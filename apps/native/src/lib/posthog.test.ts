@@ -4,7 +4,9 @@
 // so the real PostHog client never loads. Runs in the Node default env.
 import { describe, expect, it, vi } from "vitest";
 
-import { SAFE_ERROR_MESSAGES } from "./posthog";
+import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
+
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
 type BeforeSend = (event: EventLike) => EventLike;
 type ExceptionListEntry = {
@@ -34,6 +36,11 @@ const posthogCtor = vi.hoisted(() => {
   return PostHogStub;
 });
 vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
+vi.mock("expo-updates", () => ({
+  updateId: "update-7",
+  channel: "production",
+  isEmbeddedLaunch: false,
+}));
 vi.mock("expo-constants", () => ({
   default: {
     expoConfig: {
@@ -85,6 +92,45 @@ describe("posthog before_send", () => {
     ]);
   });
 
+  it("keeps a generated Expo error code so the failing module is named", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "ERR_UNAVAILABLE",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "ERR_UNAVAILABLE",
+            stacktrace: "frame at app.js:1",
+          },
+        ],
+      }),
+    );
+    expect(sent.properties?.$exception_message).toBe("ERR_UNAVAILABLE");
+    const list = sent.properties?.$exception_list as ExceptionListEntry[];
+    expect(list[0].value).toBe("ERR_UNAVAILABLE");
+  });
+
+  it("redacts an all-caps message that is not a bare code token", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "FAILED saving https://private.example/note",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "FAILED saving https://private.example/note",
+          },
+        ],
+      }),
+    );
+    const serialized = JSON.stringify(sent);
+    expect(serialized).not.toContain("private.example");
+    expect(sent.properties?.$exception_message).toBe("Error");
+  });
+
   it("replaces content-carrying messages with the error class", () => {
     const beforeSend = sentBeforeSend();
     const noteUrl = "https://private.example/saved/note-42";
@@ -109,6 +155,18 @@ describe("posthog before_send", () => {
     // for symbolication.
     expect(list[0].value).toBe("TypeError");
     expect(list[0].stacktrace).toBe("frame at app.js:1");
+  });
+
+  it("drops the launch deep link from Application Opened", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend({
+      event: "Application Opened",
+      properties: {
+        url: "shelvr://auth/callback?code=secret",
+        version: "1.0.3",
+      },
+    });
+    expect(sent.properties).toEqual({ version: "1.0.3" });
   });
 
   it("leaves non-exception events untouched", () => {
@@ -179,5 +237,89 @@ describe("posthog exception autocapture gate", () => {
     expect(options.errorTracking.autocapture.uncaughtExceptions).toBe(true);
     expect(options.errorTracking.autocapture.unhandledRejections).toBe(true);
     vi.doUnmock("expo-constants");
+  });
+});
+
+describe("posthog session replay gate", () => {
+  const replayOptionsFor = async (variant: string) => {
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+            variant,
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    vi.doUnmock("expo-constants");
+    return posthogCtor.options as {
+      enableSessionReplay: boolean;
+      sessionReplayConfig: Record<string, unknown>;
+    };
+  };
+
+  it("never records a production build", async () => {
+    const options = await replayOptionsFor("production");
+    expect(options.enableSessionReplay).toBe(false);
+  });
+
+  it("records a preview build with masking intact", async () => {
+    const options = await replayOptionsFor("preview");
+    expect(options.enableSessionReplay).toBe(true);
+    expect(options.sessionReplayConfig).toMatchObject({
+      maskAllTextInputs: true,
+      maskAllImages: true,
+      maskAllSandboxedViews: true,
+      captureLog: false,
+      captureNetworkTelemetry: false,
+      sampleRate: 1,
+    });
+  });
+
+  it("stays off when the build declares no variant", async () => {
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as { enableSessionReplay: boolean };
+    expect(options.enableSessionReplay).toBe(false);
+    vi.doUnmock("expo-constants");
+  });
+});
+
+describe("superProperties", () => {
+  it("tags events with the running OTA update and the store platform", () => {
+    expect(superProperties()).toEqual({
+      environment: "development",
+      platform: "ios",
+      analytics_version: 1,
+      ota_update_id: "update-7",
+      ota_channel: "production",
+      ota_embedded: false,
+    });
+  });
+});
+
+describe("push notification capture", () => {
+  // Both options default to true in the SDK, and the native side sends
+  // `$push_notification_opened` without consulting `before_send`, so the
+  // redaction above cannot reach it. Pinned off explicitly: an SDK bump must
+  // not widen what leaves the device.
+  it("stays off so no push data bypasses the redaction hook", () => {
+    const options = posthogCtor.options as Record<string, unknown>;
+    expect(options.capturePushNotificationSubscriptions).toBe(false);
+    expect(options.capturePushNotificationOpened).toBe(false);
   });
 });

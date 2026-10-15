@@ -1,9 +1,12 @@
+import { imageSizeError } from "@convex/model/imagePolicy";
 import {
-  IMAGE_TOO_LARGE_MESSAGE,
-  imageSizeError,
-  PHOTO_LIMIT_MESSAGE,
-} from "@convex/model/imagePolicy";
-import { saveErrorCode, type SaveErrorCode } from "@convex/model/saveErrors";
+  SAVE_ERROR_CODES,
+  SAVE_ERROR_MESSAGES,
+  saveErrorCode,
+  saveFailureStage,
+  type SaveErrorCode,
+} from "@convex/model/saveErrors";
+import type { SaveSource } from "@convex/model/saveSource";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -42,12 +45,7 @@ export type ImageSaveRequest = {
   operationId?: string;
 };
 
-export type ImageSaveStage =
-  | "begin"
-  | "normalize"
-  | "upload"
-  | "attach"
-  | "finalize";
+type ImageSaveStage = "begin" | "normalize" | "upload" | "attach" | "finalize";
 
 /** A settled per-image outcome. A failure is data, not a rejected promise, so
  * one image failing can never erase its siblings' success information. A caller
@@ -97,6 +95,7 @@ export type SaveImageDeps = {
     latitude?: number;
     longitude?: number;
     spaceId?: Id<"spaces">;
+    saveSource?: SaveSource;
   }) => Promise<Id<"items">>;
 };
 
@@ -110,16 +109,21 @@ const REASON_BY_CODE: Record<SaveErrorCode, ImageSaveFailureReason> = {
 };
 
 /** Buckets a failed result for analytics. Prefers the structured code, so a
- * copy edit on the server cannot re-bucket every installed client. The message
- * comparison is the fallback for a server that still throws bare sentences and
- * for the client-side size check; delete it once no such server is live. */
+ * copy edit on the server cannot re-bucket every installed client. The
+ * message comparison is the fallback for a server that still throws bare
+ * sentences and for the client-side size check, and matches the canonical
+ * sentences from `saveErrors` so both failure events bucket alike; delete it
+ * once no such server is live. */
 export function saveFailureReason(
   message: string,
   code?: SaveErrorCode,
 ): ImageSaveFailureReason {
   if (code) return REASON_BY_CODE[code];
-  if (message === PHOTO_LIMIT_MESSAGE) return "photo_limit";
-  if (message === IMAGE_TOO_LARGE_MESSAGE) return "too_large";
+  for (const saveCode of SAVE_ERROR_CODES) {
+    if (message === SAVE_ERROR_MESSAGES[saveCode]) {
+      return REASON_BY_CODE[saveCode];
+    }
+  }
   return "other";
 }
 
@@ -160,7 +164,7 @@ export const MAX_CONCURRENT_SAVES = 3;
 export async function saveImageOperations(
   requests: ImageSaveRequest[],
   deps: SaveImageDeps,
-  options?: { spaceId?: Id<"spaces"> },
+  options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
 ): Promise<ImageSaveResult[]> {
   const results: ImageSaveResult[] = new Array(requests.length);
   let next = 0;
@@ -182,7 +186,7 @@ export async function saveImageOperations(
 async function saveImageOperation(
   request: ImageSaveRequest,
   deps: SaveImageDeps,
-  options?: { spaceId?: Id<"spaces"> },
+  options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
 ): Promise<ImageSaveResult> {
   const image = request.image;
   let stage: ImageSaveStage = "begin";
@@ -193,6 +197,13 @@ async function saveImageOperation(
     // `||` (not `??`): the empty-string placeholder from a mint failure
     // must also get a fresh id on retry.
     operationId = operationId || generateOperationId();
+    if (options?.saveSource !== undefined) {
+      analytics.capture("save_attempt_started", {
+        save_source: options.saveSource,
+        save_kind: "image",
+        operation_id: operationId,
+      });
+    }
     const began = await deps.begin(operationId);
     if (began.kind === "complete") {
       // Already finalized server-side (a previous attempt landed); skip the
@@ -225,9 +236,18 @@ async function saveImageOperation(
       latitude: image.latitude,
       longitude: image.longitude,
       spaceId: options?.spaceId,
+      saveSource: options?.saveSource,
     });
     return { status: "saved", operationId, image, itemId };
   } catch (error) {
+    if (options?.saveSource !== undefined) {
+      analytics.capture("save_failed", {
+        save_source: options.saveSource,
+        save_kind: "image",
+        stage: saveFailureStage(error),
+        ...(operationId !== undefined && { operation_id: operationId }),
+      });
+    }
     return {
       status: "failed",
       // Only undefined if minting itself threw; the placeholder keeps the
@@ -254,7 +274,7 @@ export function useSaveImages() {
   return useCallback(
     async (
       requests: ImageSaveRequest[],
-      options?: { spaceId?: Id<"spaces"> },
+      options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
     ): Promise<ImageSaveResult[]> => {
       const deps: SaveImageDeps = {
         begin: (operationId) => beginImageImport({ operationId }),

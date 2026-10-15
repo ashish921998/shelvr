@@ -1,4 +1,9 @@
 const appConfig = require("./app.json");
+const {
+  productionCloudOrigin,
+  productionSiteOrigin,
+  isExactOrigin,
+} = require("./production-origins");
 const localizationConfig = require("./localization.config.json");
 const supportedLocales = [
   ...new Set(Object.values(localizationConfig.storeLocales)),
@@ -36,7 +41,7 @@ function requireProductionValue(name, value, isValid, expected) {
 // the rejected build artifact contained a different key from the current
 // RevenueCat App Store app. Keep this as a permanent release guardrail.
 const buildPlatform = process.env.EAS_BUILD_PLATFORM;
-const productionConvexUrl = "https://amiable-setter-120.convex.cloud";
+const productionConvexUrl = productionCloudOrigin;
 const developmentTestKey = "test_VOYicTvOGPXCBFMVdHzyxRndiRi";
 if (!isProduction) {
   let convexOrigin;
@@ -81,16 +86,15 @@ if (buildPlatform === "android") {
 requireProductionValue(
   "EXPO_PUBLIC_CONVEX_URL",
   process.env.EXPO_PUBLIC_CONVEX_URL,
-  (value) => {
-    if (!value) return false;
-    try {
-      const url = new URL(value);
-      return url.origin === productionConvexUrl && url.pathname === "/";
-    } catch {
-      return false;
-    }
-  },
+  (value) => isExactOrigin(value, productionCloudOrigin),
   "the Shelvr production deployment URL",
+);
+
+requireProductionValue(
+  "EXPO_PUBLIC_CONVEX_SITE_URL",
+  process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
+  (value) => isExactOrigin(value, productionSiteOrigin),
+  "the Shelvr production HTTP origin",
 );
 
 function displayName(base) {
@@ -100,6 +104,23 @@ function displayName(base) {
 }
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+// expo-maps reads the Android Google Maps key from the config block below. A
+// production build without it ships the Pro-gated map screen unconfigured, so
+// fail the build instead — matching the RevenueCat key guardrails above.
+if (buildPlatform === "android") {
+  requireProductionValue(
+    "GOOGLE_MAPS_API_KEY",
+    googleMapsApiKey,
+    (value) => Boolean(value),
+    "a Google Maps API key so expo-maps is configured on Android",
+  );
+}
+
+// PostHog source map upload runs inside the native build (Gradle/Xcode) and
+// fails the build when it cannot authenticate. Enable it only once the CLI key
+// is present, so a build without credentials keeps working and uploads switch on
+// the moment the EAS secret is set.
+const uploadsSourceMaps = Boolean(process.env.POSTHOG_CLI_API_KEY);
 const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .split(",")
   .map((arch) => arch.trim())
@@ -110,6 +131,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: displayName(appConfig.expo.name ?? "Shelvr"),
   icon: isProduction ? appConfig.expo.icon : "./assets/icon-dev.png",
+  scheme: isProduction ? "shelvr" : `shelvr${idSuffix.replace(".", "-")}`,
   ios: {
     ...appConfig.expo.ios,
     ...config?.ios,
@@ -117,6 +139,11 @@ module.exports = ({ config }) => ({
     infoPlist: {
       ...appConfig.expo.ios?.infoPlist,
       ...config?.ios?.infoPlist,
+      // Dev and preview builds are named "Shelvr (Dev)" / "Shelvr (Preview)";
+      // this lets Siri and App Shortcut phrases still answer to "Shelvr".
+      INAlternativeAppNames: [
+        { INAlternativeAppName: appConfig.expo.name ?? "Shelvr" },
+      ],
       ...(isProduction
         ? {
             NSAppTransportSecurity: {
@@ -127,6 +154,12 @@ module.exports = ({ config }) => ({
         : {}),
     },
     bundleIdentifier: bundleId,
+    associatedDomains: isProduction
+      ? [
+          "applinks:shelvr-web.vercel.app",
+          "webcredentials:shelvr-web.vercel.app",
+        ]
+      : [],
   },
   android: {
     ...appConfig.expo.android,
@@ -147,6 +180,9 @@ module.exports = ({ config }) => ({
     supportedLocales.map((locale) => [locale, `./locales/${locale}.json`]),
   ),
   plugins: [
+    "./plugins/with-google-services",
+    "./plugins/with-android-share-new-intent",
+    "./plugins/with-android-accent",
     // Xcode mods run in reverse registration order; attach strings after Widgets creates its target.
     "./plugins/with-widget-localization",
     ["expo-localization", { supportedLocales, supportsRTL }],
@@ -179,7 +215,7 @@ module.exports = ({ config }) => ({
     [
       "expo-widgets",
       {
-        groupIdentifier: "group.app.shelvr.save",
+        groupIdentifier: `group.${bundleId}`,
         widgets: [
           {
             name: "RecentSaves",
@@ -191,6 +227,12 @@ module.exports = ({ config }) => ({
         ],
       },
     ],
+    // Uploads the Hermes source map on each native build so error tracking can
+    // symbolicate crash stacks. skipOnConflict keeps a rebuild of the same
+    // commit from failing on an already-uploaded release.
+    ...(uploadsSourceMaps
+      ? [["posthog-react-native/expo", { skipOnConflict: true }]]
+      : []),
   ],
   extra: {
     ...appConfig.expo.extra,
@@ -215,6 +257,12 @@ module.exports = ({ config }) => ({
                 ? {
                     ...ext,
                     bundleIdentifier: `${bundleId}.expo-sharing-extension`,
+                    entitlements: {
+                      ...ext.entitlements,
+                      "com.apple.security.application-groups": [
+                        `group.${bundleId}`,
+                      ],
+                    },
                   }
                 : ext,
             ),
@@ -222,6 +270,11 @@ module.exports = ({ config }) => ({
         },
       },
     },
+    // Ship the full font license with the native app's Expo manifest. JSON
+    // rather than the plain OFL.txt the website serves: the test suite loads
+    // this config without __dirname or require.resolve, so a require() of JSON
+    // is the only form that resolves in both Node and the tests.
+    fontLicenses: require("./assets/fonts/crimson-pro-license.json"),
     // Public ingestion key for Shelvr; development stays opt-in via env.
     posthogProjectToken:
       process.env.POSTHOG_PROJECT_TOKEN ??

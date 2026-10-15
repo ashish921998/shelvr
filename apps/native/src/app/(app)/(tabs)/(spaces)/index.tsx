@@ -1,3 +1,6 @@
+import { analytics } from "@/lib/analytics";
+import { clampRatio } from "@/lib/aspect-ratio";
+import { isEmptySpace } from "@/lib/empty-space";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -9,24 +12,17 @@ import { FlashList } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ProgressiveBlurHeader } from "progressive-blur";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { Alert, Platform, Pressable, Text, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Standard OpenGraph image shape (1200×630) — the default when a link's real
+// Standard OpenGraph image shape (1200×630), the default when a link's real
 // hero dimensions weren't captured. Mirrors item-card so covers match the feed.
 const OG_RATIO = 1.91;
-
-function clampRatio(ratio: number | undefined, fallback: number) {
-  const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
-  // Respect the cover's real proportions; only bound pathological panoramas /
-  // slivers so the stack keeps a sane footprint inside its square cell.
-  return Math.min(Math.max(value, 0.6), 1.9);
-}
 
 // Stable pseudo-random in [-1, 1) derived from a seed string (FNV-1a), so each
 // card's jitter is fixed per space and doesn't reshuffle on every re-render.
@@ -84,7 +80,12 @@ function CoverStack({
   useAppLocale();
   const { theme } = useUnistyles();
   const ratio = cover
-    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1)
+    ? clampRatio(
+        cover.aspectRatio,
+        cover.type === "link" ? OG_RATIO : 1,
+        0.6,
+        1.9,
+      )
     : 1;
   const position = CARD_POSITION;
 
@@ -175,6 +176,53 @@ function emptySpaceIcon(name: string) {
   return "rectangle.stack";
 }
 
+/**
+ * Spaces that hold nothing yet, as one line of name chips instead of grid
+ * cards. Each joins the grid once a save lands in it, and a tap still opens
+ * it, and a long press deletes it. Plain Pressables with router.push: no
+ * Link asChild style trap (#197).
+ */
+function EmptySpaces({
+  spaces,
+  onDelete,
+}: {
+  spaces: { _id: Id<"spaces">; name: string }[];
+  /** Long-press deletes, like the grid cards' menu. */
+  onDelete: (id: Id<"spaces">) => void;
+}) {
+  useAppLocale();
+  const router = useRouter();
+  return (
+    <View style={styles.emptySection} testID="empty-spaces">
+      <Text style={styles.emptyHeading}>{t("spaces.waitingTitle")}</Text>
+      <Text style={styles.emptyHelp}>{t("spaces.waitingBody")}</Text>
+      <View style={styles.chips}>
+        {spaces.map((space) => (
+          <Pressable
+            key={space._id}
+            accessibilityRole="button"
+            onPress={() => router.push(`/space/${space._id}`)}
+            onLongPress={() => onDelete(space._id)}
+            accessibilityActions={[
+              { name: "delete", label: t("common.delete") },
+            ]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === "delete") {
+                onDelete(space._id);
+              }
+            }}
+            style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          >
+            <Text style={styles.chipText} numberOfLines={1}>
+              {space.name}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function SpacesScreen() {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -187,10 +235,20 @@ export default function SpacesScreen() {
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () => deleteSpace({ id }),
+        onPress: () => {
+          void deleteSpace({ id }).then(
+            () => analytics.capture("space_deleted"),
+            (err) => analytics.captureError("space_delete_failed", err),
+          );
+        },
       },
     ]);
   };
+
+  // Staggered entrances replay on recycled cells and jank the masonry list,
+  // so spaces render without them. The zoom handoff stays, but not under
+  // Reduce Motion.
+  const reducedMotion = useReducedMotion();
 
   if (spaces === undefined) {
     return <ScreenLoader label={t("loading.spaces")} />;
@@ -207,28 +265,49 @@ export default function SpacesScreen() {
     );
   }
 
+  // Empty spaces stay out of the masonry grid: a pile with no cover read as
+  // a bare label under the header, so they wait in a chip row below it.
+  const filled = spaces.filter((space) => !isEmptySpace(space));
+  const empty = spaces.filter(isEmptySpace);
+  const emptySpaces =
+    empty.length > 0 ? (
+      <EmptySpaces spaces={empty} onDelete={confirmDelete} />
+    ) : null;
+
+  if (filled.length === 0) {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+        >
+          {emptySpaces}
+        </ScrollView>
+        <HeaderScrim />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlashList
-        data={spaces}
+        data={filled}
+        ListFooterComponent={emptySpaces}
         masonry
         numColumns={2}
         optimizeItemArrangement
         keyExtractor={(space) => space._id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        renderItem={({ item: space, index }) => {
+        renderItem={({ item: space }) => {
           // `previews` can be briefly absent when the offline cache rehydrates an
           // older query shape before the live refetch lands. The newest item is
           // the cover; the rest of the pile is intentionally blank.
           const cover = (space.previews ?? [])[0];
           return (
-            <Animated.View
-              style={styles.cell}
-              entering={FadeInDown.delay(index * 60).duration(350)}
-            >
+            <Animated.View style={styles.cell}>
               <Link href={`/space/${space._id}`} asChild>
-                <Link.Trigger withAppleZoom>
+                <Link.Trigger withAppleZoom={!reducedMotion}>
                   {/* The whole card is the pressable that routes to the space. */}
                   <Pressable
                     testID={
@@ -236,38 +315,43 @@ export default function SpacesScreen() {
                         ? `fixture-space-${space.fixtureKey}`
                         : undefined
                     }
-                    style={({ pressed }) => pressed && styles.pressed}
                   >
-                    <CoverStack
-                      cover={cover}
-                      seed={space._id}
-                      name={space.name}
-                      itemCount={space.itemCount}
-                      suggestionCount={space.suggestionCount}
-                    />
-                    <View style={styles.caption}>
-                      <Text style={styles.title} numberOfLines={1}>
-                        {space.name}
-                      </Text>
-                      <ActionMenu
-                        label={t("spaces.actions")}
-                        title={t("spaces.actions")}
-                        actions={[
-                          {
-                            label: t("common.delete"),
-                            destructive: true,
-                            onPress: () => confirmDelete(space._id),
-                          },
-                        ]}
-                        style={styles.menuButton}
-                      >
-                        <AppSymbolIcon
-                          name="ellipsis"
-                          size={15}
-                          tintColor={theme.colors.foreground}
+                    {/* Link.Trigger's Slot drops a Pressable style function,
+                        so press feedback lives on this inner View. */}
+                    {({ pressed }) => (
+                      <View style={pressed ? styles.pressed : undefined}>
+                        <CoverStack
+                          cover={cover}
+                          seed={space._id}
+                          name={space.name}
+                          itemCount={space.itemCount}
+                          suggestionCount={space.suggestionCount}
                         />
-                      </ActionMenu>
-                    </View>
+                        <View style={styles.caption}>
+                          <Text style={styles.title} numberOfLines={1}>
+                            {space.name}
+                          </Text>
+                          <ActionMenu
+                            label={t("spaces.actions")}
+                            title={t("spaces.actions")}
+                            actions={[
+                              {
+                                label: t("common.delete"),
+                                destructive: true,
+                                onPress: () => confirmDelete(space._id),
+                              },
+                            ]}
+                            style={styles.menuButton}
+                          >
+                            <AppSymbolIcon
+                              name="ellipsis"
+                              size={15}
+                              tintColor={theme.colors.foreground}
+                            />
+                          </ActionMenu>
+                        </View>
+                      </View>
+                    )}
                   </Pressable>
                 </Link.Trigger>
                 <Link.Preview />
@@ -284,7 +368,7 @@ export default function SpacesScreen() {
           );
         }}
       />
-      {Platform.OS === "ios" ? <ProgressiveBlurHeader /> : null}
+      <HeaderScrim />
     </View>
   );
 }
@@ -296,7 +380,7 @@ const styles = StyleSheet.create((theme) => ({
   content: {
     padding: theme.gap(1),
   },
-  // Grid cell — no panel of its own (like the home feed); the stacked covers are
+  // Grid cell, no panel of its own (like the home feed); the stacked covers are
   // the visual. The margin creates the gutters between the two columns and rows.
   cell: {
     flex: 1,
@@ -305,8 +389,9 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.85,
   },
-  // Square area the pile is centered within. Kept square so every cell is the
-  // same height and the 2-column grid stays tidy regardless of cover shape.
+  // Square area the pile is centered within. Fixed so every cell in the
+  // 2-column grid has the same height regardless of cover shape; the covers
+  // scale themselves to fit.
   stack: {
     width: "100%",
     aspectRatio: 1,
@@ -338,7 +423,7 @@ const styles = StyleSheet.create((theme) => ({
     // behind it, matching the matte instead of a grey block.
     backgroundColor: "#ffffff",
   },
-  // The blank cards behind — same white stock as the cover matte so the pile
+  // The blank cards behind, same white stock as the cover matte so the pile
   // reads as a stack of identical cards.
   cardBlank: {
     backgroundColor: "#ffffff",
@@ -386,6 +471,45 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 10,
     lineHeight: 12,
+    color: theme.colors.foreground,
+  },
+  emptySection: {
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(1),
+    paddingVertical: theme.gap(2),
+  },
+  emptyHeading: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.faint,
+  },
+  emptyHelp: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.gap(1),
+    paddingTop: theme.gap(0.5),
+  },
+  chip: {
+    minHeight: 36,
+    maxWidth: "100%",
+    justifyContent: "center",
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  chipText: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 14,
     color: theme.colors.foreground,
   },
   menuButton: {

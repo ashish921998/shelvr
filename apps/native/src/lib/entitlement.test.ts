@@ -1,0 +1,710 @@
+// @vitest-environment jsdom
+// Covers the one-sheet-at-a-time latch shared by presentPaywall and
+// presentCustomerCenter. iOS presents a single sheet, so a second presentation
+// raced against a live one leaves both RevenueCat promises unsettled and the
+// attempt is never reported. The suite drives RevenueCat identity sync to
+// ready through the real useEntitlementSync hook so every call reaches the
+// fake native sheet; only the module boundary is stubbed.
+import { act, renderHook } from "@testing-library/react";
+import { createRequire } from "node:module";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mock = vi.hoisted(() => ({
+  presentPaywall: vi.fn(),
+  observed: vi.fn(),
+  presentExitSheet: vi.fn(),
+  dismissed: vi.fn(async () => {}),
+  paywall: () => null,
+  presentCustomerCenter: vi.fn(),
+  captureError: vi.fn(),
+  capture: vi.fn(),
+  getOfferings: vi.fn(),
+  checkEligibility: vi.fn(),
+  getCustomerInfo: vi.fn(),
+  useQuery: vi.fn(),
+  isEntitled: vi.fn(() => false),
+  store: new Map<string, string>(),
+  hidePro: false,
+  apiKey: {
+    REVENUECAT_API_KEY: "appl_test" as string | undefined,
+    REVENUECAT_DISABLED_BY_BUILD: false,
+  },
+}));
+
+vi.mock("react-native", () => ({
+  AppState: { addEventListener: () => ({ remove: () => {} }) },
+  NativeModules: { RNPaywalls: {}, RNPurchases: {} },
+  Platform: { OS: "ios" },
+}));
+
+// The RevenueCat modules are loaded through a bare `require()` thunk, which
+// vi.mock does not intercept, so the fakes are seeded into Node's module
+// cache under the ids that thunk resolves.
+const req = createRequire(import.meta.url);
+function seedRequire(name: string, exports: unknown) {
+  const id = req.resolve(name);
+  req.cache[id] = { id, filename: id, loaded: true, exports } as never;
+}
+seedRequire("react-native-purchases", {
+  default: {
+    configure: async () => {},
+    logIn: async () => {},
+    overridePreferredLocale: async () => {},
+    getOfferings: mock.getOfferings,
+    checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
+    getCustomerInfo: mock.getCustomerInfo,
+    // The SDK exposes its intro-eligibility enum as a static on the default
+    // export; the paywall context read uses it directly, so the fake mirrors
+    // the real member names and values.
+    INTRO_ELIGIBILITY_STATUS: {
+      INTRO_ELIGIBILITY_STATUS_UNKNOWN: 0,
+      INTRO_ELIGIBILITY_STATUS_INELIGIBLE: 1,
+      INTRO_ELIGIBILITY_STATUS_ELIGIBLE: 2,
+      INTRO_ELIGIBILITY_STATUS_NO_INTRO_OFFER_EXISTS: 3,
+    },
+  },
+});
+seedRequire("react-native-purchases-ui", {
+  default: {
+    presentPaywall: mock.presentPaywall,
+    presentCustomerCenter: mock.presentCustomerCenter,
+    Paywall: mock.paywall,
+  },
+});
+vi.mock("./exit-offer-sheet", () => ({
+  presentExitSheet: mock.presentExitSheet,
+  whenExitSheetDismissed: () => mock.dismissed(),
+}));
+vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
+vi.mock("@/lib/e2e-hide-pro", () => ({
+  isProHiddenForE2E: () => mock.hidePro,
+}));
+vi.mock("expo-secure-store", () => ({
+  getItem: (key: string) => mock.store.get(key) ?? null,
+  setItem: (key: string, value: string) => void mock.store.set(key, value),
+  deleteItemAsync: async (key: string) => void mock.store.delete(key),
+}));
+vi.mock("expo-crypto", () => ({ randomUUID: () => "attempt-1" }));
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: mock.capture, captureError: mock.captureError },
+}));
+vi.mock("@/lib/paywall-telemetry", () => ({
+  observePaywallPresentation: async (
+    _p: unknown,
+    run: () => Promise<unknown>,
+  ) => {
+    const result = await run();
+    mock.observed(result);
+    return result;
+  },
+}));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: { _id: "user_1" } }),
+}));
+vi.mock("@/lib/revenuecat-api-key", () => mock.apiKey);
+vi.mock("@/lib/trial-cancellation", () => ({
+  readFreshTrialCancellation: () => null,
+}));
+vi.mock("./revenuecat-locale", () => ({
+  revenueCatLocale: () => "en",
+  syncRevenueCatUILocale: async () => true,
+}));
+vi.mock("@convex/_generated/api", () => ({ api: { subscriptions: {} } }));
+vi.mock("@convex/model/entitlement", () => ({
+  isEntitled: mock.isEntitled,
+}));
+vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("convex/react", () => ({
+  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+}));
+vi.mock("@tanstack/react-query", () => ({ useQuery: mock.useQuery }));
+
+const SHEET_STALE_MS = 5 * 60_000;
+
+const push = vi.fn();
+const router = { push } as never;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+// Fresh module state per test, with identity sync already ready so
+// presentPaywall reaches the native sheet instead of the identity gate.
+async function loadReady() {
+  vi.resetModules();
+  const mod = await import("./entitlement");
+  const hook = renderHook(() => mod.useEntitlementSync());
+  await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+  return { ...mod, hook };
+}
+
+beforeEach(() => {
+  mock.hidePro = false;
+  mock.presentPaywall.mockReset();
+  mock.observed.mockReset();
+  mock.presentExitSheet.mockReset();
+  mock.presentCustomerCenter.mockReset();
+  mock.captureError.mockReset();
+  mock.capture.mockReset();
+  mock.getOfferings.mockReset().mockResolvedValue({ all: {} });
+  mock.checkEligibility.mockReset();
+  mock.getCustomerInfo
+    .mockReset()
+    .mockResolvedValue({ entitlements: { active: {} } });
+  mock.useQuery.mockReset().mockReturnValue({});
+  mock.isEntitled.mockReset().mockReturnValue(false);
+  mock.store.clear();
+  mock.apiKey.REVENUECAT_API_KEY = "appl_test";
+  mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = false;
+  push.mockClear();
+});
+
+describe("useEntitlementSync on a build with RevenueCat disabled", () => {
+  it("neither reports the missing key nor marks the user synced", async () => {
+    mock.apiKey.REVENUECAT_API_KEY = undefined;
+    mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = true;
+    const { openPaywall } = await loadReady();
+    expect(mock.captureError).not.toHaveBeenCalled();
+    // Readiness was never recorded, so the paywall degrades to the fallback
+    // route instead of opening a sheet under an unsynced identity.
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+    expect(mock.presentPaywall).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/(app)/paywall");
+  });
+
+  it("still reports a missing key the build did not choose", async () => {
+    mock.apiKey.REVENUECAT_API_KEY = undefined;
+    await loadReady();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "purchase_identity_sync_failed",
+      expect.objectContaining({ message: "revenuecat_key_missing" }),
+      { reason: "revenuecat_key_missing" },
+    );
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("presentPaywall concurrency", () => {
+  it("presents once for two concurrent openPaywall calls", async () => {
+    const { openPaywall } = await loadReady();
+    const sheet = deferred<string>();
+    mock.presentPaywall.mockReturnValue(sheet.promise);
+
+    // Both calls are made before either awaits, reproducing the share screen's
+    // two openPaywall calls 80ms apart.
+    const first = openPaywall(router, "share");
+    const second = openPaywall(router, "share");
+    sheet.resolve("CANCELLED");
+    await Promise.all([first, second]);
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("gives the duplicate caller the live presentation's real outcome", async () => {
+    const { openPaywall } = await loadReady();
+    const sheet = deferred<string>();
+    mock.presentPaywall.mockReturnValue(sheet.promise);
+
+    const first = openPaywall(router, "share");
+    const second = openPaywall(router, "share");
+    sheet.resolve("PURCHASED");
+
+    expect(await Promise.all([first, second])).toEqual([true, true]);
+  });
+
+  it("routes to the fallback once when a shared presentation is unavailable", async () => {
+    const { openPaywall } = await loadReady();
+    const sheet = deferred<string>();
+    mock.presentPaywall.mockReturnValue(sheet.promise);
+
+    const first = openPaywall(router, "share");
+    const second = openPaywall(router, "share");
+    // ERROR maps to `unavailable`, the only outcome that opens the fallback.
+    sheet.resolve("ERROR");
+
+    expect(await Promise.all([first, second])).toEqual([false, false]);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  it("presents again once the previous presentation settles", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "share");
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+  });
+
+  it("presents again after a presentation that never settles goes stale", async () => {
+    const { openPaywall } = await loadReady();
+    vi.useFakeTimers();
+    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+
+    void openPaywall(router, "share");
+    vi.advanceTimersByTime(SHEET_STALE_MS);
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("paywall activation funnel", () => {
+  it("reports entitlement activation after a purchase reaches Convex", async () => {
+    const { openPaywall, hook } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+
+    mock.useQuery.mockReturnValue({
+      data: {
+        status: "pro",
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      },
+    });
+    mock.isEntitled.mockReturnValue(true);
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+
+    expect(mock.capture).toHaveBeenCalledWith(
+      "entitlement_activated",
+      expect.objectContaining({
+        status: "pro",
+        source: "purchase",
+        delay_ms: expect.any(Number),
+      }),
+    );
+  });
+});
+
+describe("restore from the paywall", () => {
+  it("treats a restore that found nothing as a close", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+    // Telemetry sees the close too, not a restore.
+    expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
+  });
+
+  it("keeps a restore whose customer info could not be read", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockRejectedValue(new Error("offline"));
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+  });
+
+  it("counts a restore that found an entitlement", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockResolvedValue({
+      entitlements: { active: { "Shelvr Pro": {} } },
+    });
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+  });
+});
+
+describe("trial eligibility for copy", () => {
+  const current = {
+    identifier: "default",
+    availablePackages: [{ product: { identifier: "annual" } }],
+  };
+
+  it.each([
+    ["eligible", 2, true],
+    ["ineligible", 1, false],
+    ["unknown", 0, false],
+  ])("an %s account reads %s", async (_label, status, expected) => {
+    mock.getOfferings.mockResolvedValue({ current, all: {} });
+    mock.checkEligibility.mockResolvedValue({ annual: { status } });
+    const { readTrialEligible } = await loadReady();
+
+    await expect(readTrialEligible()).resolves.toBe(expected);
+  });
+
+  it("reads no when the store cannot be reached", async () => {
+    mock.getOfferings.mockRejectedValue(new Error("offline"));
+    const { readTrialEligible } = await loadReady();
+
+    await expect(readTrialEligible()).resolves.toBe(false);
+  });
+});
+
+describe("customer center latch", () => {
+  it("refuses the Customer Center while a paywall is live", async () => {
+    const { openPaywall, presentCustomerCenter } = await loadReady();
+    const sheet = deferred<string>();
+    mock.presentPaywall.mockReturnValue(sheet.promise);
+    mock.presentCustomerCenter.mockResolvedValue(undefined);
+
+    const paywall = openPaywall(router, "share");
+    const presented = await presentCustomerCenter();
+    sheet.resolve("CANCELLED");
+    await paywall;
+
+    expect(presented).toBe(false);
+    expect(mock.presentCustomerCenter).not.toHaveBeenCalled();
+  });
+
+  it("does not stack a paywall on an open Customer Center", async () => {
+    const { openPaywall, presentCustomerCenter } = await loadReady();
+    const sheet = deferred<void>();
+    mock.presentCustomerCenter.mockReturnValue(sheet.promise);
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    const center = presentCustomerCenter();
+    const purchased = await openPaywall(router, "share");
+    sheet.resolve();
+    await center;
+
+    expect(purchased).toBe(false);
+    expect(mock.presentPaywall).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("exit offer after a paywall close", () => {
+  const exitOffering = {
+    identifier: "exit_offer",
+    availablePackages: [
+      { product: { identifier: "annual_exit", introPrice: { price: 19.99 } } },
+    ],
+  };
+
+  beforeEach(() => {
+    mock.getOfferings.mockResolvedValue({ all: { exit_offer: exitOffering } });
+    mock.checkEligibility.mockResolvedValue({ annual_exit: { status: 2 } });
+  });
+
+  const sheetCall = {
+    Paywall: mock.paywall,
+    offering: exitOffering,
+    customVariables: {
+      offer_ends: { type: "string", value: expect.any(String) },
+    },
+    endsAt: expect.any(Number),
+    onPurchaseStarted: expect.any(Function),
+  };
+
+  it("presents the exit offering once and reports its purchase", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    mock.presentExitSheet.mockResolvedValueOnce("PURCHASED");
+
+    await expect(openPaywall(router, "onboarding")).resolves.toBe(true);
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledWith(sheetCall);
+    const { endsAt } = mock.presentExitSheet.mock.calls[0][0];
+    expect(endsAt - Date.now()).toBeGreaterThan(23 * 60 * 60 * 1000);
+    const request = mock.presentExitSheet.mock.calls[0][0];
+    request.onPurchaseStarted("annual_exit");
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_purchase_started",
+      expect.objectContaining({
+        placement: "exit_offer",
+        package_id: "annual_exit",
+      }),
+    );
+  });
+
+  it("skips the exit offer in an e2e run that hides Pro", async () => {
+    const { openPaywall } = await loadReady();
+    mock.hidePro = true;
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+
+    await expect(openPaywall(router, "home_card")).resolves.toBe(false);
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
+  });
+
+  it("waits a month before offering it again", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+
+    await expect(openPaywall(router, "home_card")).resolves.toBe(false);
+    await openPaywall(router, "home_card");
+
+    // First close: paywall + exit offer. Second close: paywall only.
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed exit offer a plain cancel", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    mock.presentExitSheet.mockResolvedValueOnce("ERROR");
+
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the offer unclaimed when the exit sheet never appeared", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet
+      .mockResolvedValueOnce("NOT_PRESENTED")
+      .mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "share");
+    await openPaywall(router, "share");
+
+    // Close, failed exit sheet, close, exit sheet shown this time.
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
+  });
+
+  it("reopens from the Home countdown while the window is open", async () => {
+    const { openPaywall, openExitOffer, useExitOfferEndsAt } =
+      await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "home_card");
+    const { result } = renderHook(() => useExitOfferEndsAt("user_1"));
+    expect(result.current).not.toBeNull();
+
+    mock.presentExitSheet.mockResolvedValueOnce("PURCHASED");
+    await expect(openExitOffer(router)).resolves.toBe(true);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
+    expect(mock.presentExitSheet).toHaveBeenLastCalledWith({
+      ...sheetCall,
+      endsAt: result.current,
+    });
+  });
+
+  it("keeps the open offer when onboarding asks again", async () => {
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+
+    // First tap: paywall, then the exit offer on close.
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", true),
+    ).resolves.toBe("cancelled");
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+
+    // Second tap inside the window: the discounted sheet, not full price.
+    mock.presentExitSheet.mockResolvedValueOnce("PURCHASED");
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", true),
+    ).resolves.toBe("success");
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_requested",
+      expect.objectContaining({
+        placement: "exit_offer",
+        source_placement: "onboarding",
+      }),
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("opens the regular paywall when the reopened offer is declined", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentExitSheet.mockImplementation(async (request) => {
+      request.onDeclined?.();
+      return "CANCELLED";
+    });
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", true),
+    ).resolves.toBe("success");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reopen the offer when that paywall is closed too", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentExitSheet.mockImplementation(async (request) => {
+      request.onDeclined?.();
+      return "CANCELLED";
+    });
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", true),
+    ).resolves.toBe("cancelled");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("just closes when the deadline closes the reopened offer", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    // Closed, but not by the person: `onDeclined` never fires.
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", true),
+    ).resolves.toBe("cancelled");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).not.toHaveBeenCalled();
+  });
+
+  it("just closes when an offer nobody asked for is declined", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentExitSheet.mockImplementation(async (request) => {
+      request.onDeclined?.();
+      return "CANCELLED";
+    });
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", false),
+    ).resolves.toBe("cancelled");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).not.toHaveBeenCalled();
+  });
+
+  it("opens the onboarding paywall once the window has closed", async () => {
+    mock.store.set(
+      "shelvr.exitOffer.shownAt.user_1",
+      String(Date.now() - 25 * 60 * 60 * 1000),
+    );
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", true),
+    ).resolves.toBe("cancelled");
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_requested",
+      expect.objectContaining({ placement: "onboarding" }),
+    );
+  });
+
+  it("tells onboarding when its paywall could not show, without routing", async () => {
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("ERROR");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", false),
+    ).resolves.toBe("unavailable");
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("holds the sheet latch until the exit sheet has slid away", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openExitOffer, isPaywallPending } = await loadReady();
+    let slidAway = () => {};
+    mock.dismissed.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        slidAway = resolve;
+      }),
+    );
+    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
+
+    let settled = false;
+    const closing = openExitOffer(router).then(() => {
+      settled = true;
+    });
+    await vi.waitFor(() =>
+      expect(mock.presentExitSheet).toHaveBeenCalledTimes(1),
+    );
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(isPaywallPending()).toBe(true);
+
+    slidAway();
+    await closing;
+    expect(isPaywallPending()).toBe(false);
+  });
+
+  it("opens the regular paywall once the window has closed", async () => {
+    mock.store.set(
+      "shelvr.exitOffer.shownAt.user_1",
+      String(Date.now() - 25 * 60 * 60 * 1000),
+    );
+    const { openExitOffer, useExitOfferEndsAt } = await loadReady();
+    const { result } = renderHook(() => useExitOfferEndsAt("user_1"));
+    expect(result.current).toBeNull();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(openExitOffer(router)).resolves.toBe(false);
+
+    // The main paywall only: an expired offer does not return on close.
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    // No offering was read, so the trial length is unknown and nothing is dated.
+    expect(mock.presentPaywall).toHaveBeenCalledWith({
+      customVariables: undefined,
+    });
+  });
+
+  it("presents the offering it dated the trial timeline from", async () => {
+    const current = {
+      identifier: "default",
+      availablePackages: [
+        {
+          product: {
+            identifier: "annual",
+            introPrice: {
+              price: 0,
+              periodUnit: "WEEK",
+              periodNumberOfUnits: 2,
+            },
+          },
+        },
+      ],
+    };
+    mock.getOfferings.mockResolvedValue({ current, all: {} });
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledWith({
+      offering: current,
+      customVariables: expect.objectContaining({
+        trial_end_day: { type: "string", value: "14" },
+      }),
+    });
+  });
+
+  it("does not follow a purchase", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    // The paywall context read and the post-sync offering read both precede
+    // presentation, even when the result is already PURCHASED. Nothing reads
+    // offerings afterward, so the exit offer is never looked up.
+    expect(mock.getOfferings).toHaveBeenCalledTimes(2);
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+  });
+});

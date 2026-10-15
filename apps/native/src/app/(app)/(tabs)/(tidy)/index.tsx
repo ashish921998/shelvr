@@ -85,7 +85,7 @@ export default function TidyScreen() {
 
   return (
     // Keyed by batch so every batch remounts fresh shared values and deck
-    // state — indices always start at the top card.
+    // state: indices always start at the top card.
     <DeckAnimationProvider key={batchId} lastIndex={batch.length - 1}>
       <TidyDeckView
         batch={batch}
@@ -226,7 +226,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
         }}
       />
 
-      {/* Native header controls (note 3): undo on the left, delete on the
+      {/* Native header controls: undo on the left, delete on the
           right with a live count badge. */}
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="left">
@@ -275,7 +275,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
         </Stack.Toolbar>
       ) : null}
 
-      {/* Centered progress counter (note 2). */}
+      {/* Centered progress counter. */}
       <View style={styles.progressRow}>
         <Text style={styles.progressText}>
           {Math.min(reviewedCount, batch.length)} / {batch.length}
@@ -315,7 +315,11 @@ const PermissionGate: FC<{
   return (
     <View style={styles.gate}>
       <EmptyState title={t("tidy.introTitle")} message={t("tidy.introBody")} />
-      <Pressable style={styles.gateButton} onPress={handlePress}>
+      <Pressable
+        accessibilityRole="button"
+        style={styles.gateButton}
+        onPress={handlePress}
+      >
         <Text style={styles.gateButtonText}>
           {permission.canAskAgain
             ? t("permissions.allowPhotos")
@@ -328,9 +332,14 @@ const PermissionGate: FC<{
 
 const Loading: FC = () => <ScreenLoader label={t("loading.tidy")} />;
 
-/** Pro gate shown to lapsed users on the Tidy tab. */
+/** Pro gate shown to lapsed users on the Tidy tab, with its own paywall
+ * placement so the funnel separates a Tidy gate from Map's. */
 const ProGate: FC = () => (
-  <ProGateView title={t("tidy.proTitle")} message={t("tidy.proBody")} />
+  <ProGateView
+    title={t("tidy.proTitle")}
+    message={t("tidy.proBody")}
+    placement="tidy"
+  />
 );
 
 const styles = StyleSheet.create((theme, rt) => ({
@@ -356,7 +365,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   deckArea: {
     flex: 1,
     marginHorizontal: theme.gap(2),
-    // Clear the floating native tab bar with a comfortable gap (note 5).
+    // Clear the floating native tab bar with a comfortable gap.
     marginBottom: rt.insets.bottom + theme.gap(11),
   },
   gate: {
@@ -366,6 +375,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   gateButton: {
     alignSelf: "center",
+    justifyContent: "center",
+    minHeight: theme.control.minHeight,
     marginBottom: theme.gap(6),
     paddingHorizontal: theme.gap(3),
     paddingVertical: theme.gap(1.5),
@@ -376,6 +387,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   gateButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: "white",
+    color: theme.colors.onTint,
   },
 }));

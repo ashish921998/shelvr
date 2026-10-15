@@ -1,10 +1,14 @@
 // The pure derivations the share screen renders from. They live next to the
 // session store and the processor rather than inside the screen so each one has
-// exactly ONE definition — in particular the "what still needs saving" decision,
-// which the retry button and the processor must never disagree about — and so
+// exactly ONE definition (in particular the "what still needs saving" decision,
+// which the retry button and the processor must never disagree about) and so
 // they stay unit-testable without a React renderer or the native share module.
 
-import { resolvedFromRawPayloads, type ResolvedPayload } from "./process-share";
+import {
+  resolvedFromRawPayloads,
+  shareGroups,
+  type ResolvedPayload,
+} from "./process-share";
 import {
   entriesToProcess,
   type RawSharePayload,
@@ -21,29 +25,58 @@ export function hasRetryableEntries(session: ShareSession): boolean {
   return entriesToProcess(session).length > 0;
 }
 
+const isFailed = (e: ShareEntry) =>
+  e.status === "failed" || e.status === "unsupported";
+
+/** One outcome per saved item: a group of entries sharing a link is saved once
+ * any of them saved, and failed (as its first failed entry) only when none
+ * saved. */
+function groupOutcomes(
+  session: ShareSession,
+  resolved: ResolvedPayload[],
+): { saved: boolean; failed: ShareEntry | undefined }[] {
+  return shareGroups(session.entries, resolved).map((entries) => {
+    const saved = entries.some((e) => e.status === "saved");
+    return { saved, failed: saved ? undefined : entries.find(isFailed) };
+  });
+}
+
 /** Saved-of-total for the in-flight "Saved N of M" progress label. */
-export function countProgress(session: ShareSession): {
-  saved: number;
-  total: number;
-} {
-  const saved = session.entries.filter((e) => e.status === "saved").length;
-  return { saved, total: session.entries.length };
+export function countProgress(
+  session: ShareSession,
+  resolved: ResolvedPayload[],
+): { saved: number; total: number } {
+  const groups = groupOutcomes(session, resolved);
+  return {
+    saved: groups.filter((g) => g.saved).length,
+    total: groups.length,
+  };
 }
 
 /** Saved/failed/total for the terminal partial screen. `failed` counts the
- * failed AND unsupported entries — both are terminal outcomes the user is told
- * about — so it can be 0 while entries are still pending (the orchestration-
+ * failed AND unsupported outcomes (both are terminal outcomes the user is told
+ * about), so it can be 0 while entries are still pending (the orchestration-
  * error path), which is why the screen words its subtitle from the count. */
-export function countPartial(session: ShareSession): {
-  saved: number;
-  failed: number;
-  total: number;
-} {
-  const saved = session.entries.filter((e) => e.status === "saved").length;
-  const failed = session.entries.filter(
-    (e) => e.status === "failed" || e.status === "unsupported",
-  ).length;
-  return { saved, failed, total: session.entries.length };
+export function countPartial(
+  session: ShareSession,
+  resolved: ResolvedPayload[],
+): { saved: number; failed: number; total: number } {
+  const groups = groupOutcomes(session, resolved);
+  return {
+    saved: groups.filter((g) => g.saved).length,
+    failed: groups.filter((g) => g.failed !== undefined).length,
+    total: groups.length,
+  };
+}
+
+/** The failed entries the partial screen lists, one per failed item. */
+export function failedEntries(
+  session: ShareSession,
+  resolved: ResolvedPayload[],
+): ShareEntry[] {
+  return groupOutcomes(session, resolved).flatMap((g) =>
+    g.failed === undefined ? [] : [g.failed],
+  );
 }
 
 /** Returns a copy of `session` with the entry matching `settled.index` replaced
@@ -62,9 +95,9 @@ export function withEntry(
 
 /** The payload list the processor runs against. Normal path: the natively
  * resolved payloads, narrowed to the slice the processor reads. When resolution
- * failed or its results no longer align with the raw payloads — the resolver
+ * failed or its results no longer align with the raw payloads (the resolver
  * probes shared URLs with a live request, so bot-hostile hosts (TikTok) can
- * fail the whole resolution — fall back to the raw payloads: for url/text
+ * fail the whole resolution), fall back to the raw payloads: for url/text
  * shares the raw value is everything the save needs, and entries the fallback
  * cannot resolve (images) are reported as failed entries instead of killing the
  * share. */

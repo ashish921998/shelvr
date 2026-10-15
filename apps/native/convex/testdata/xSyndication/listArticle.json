@@ -1,0 +1,45 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 568,
+  "lang": "zxx",
+  "possibly_sensitive": false,
+  "created_at": "2025-12-31T17:53:38.000Z",
+  "display_text_range": [0, 23],
+  "entities": {
+    "urls": [
+      {
+        "display_url": "x.com/i/article/2006…",
+        "expanded_url": "http://x.com/i/article/2006422714513526785",
+        "indices": [0, 23],
+        "url": "https://t.co/pE2pQ1isw8"
+      }
+    ]
+  },
+  "id_str": "2006423514446749965",
+  "text": "https://t.co/pE2pQ1isw8",
+  "user": {
+    "id_str": "13826102",
+    "name": "Paul Dix",
+    "screen_name": "pauldix",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1469375526431346702/Cz_MQEVn_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": ["2006423514446749965"],
+    "editable_until_msecs": "1767207218000",
+    "edits_remaining": "5",
+    "is_edit_eligible": false
+  },
+  "conversation_count": 23,
+  "news_action_type": "conversation",
+  "article": {
+    "id": "QXJ0aWNsZUVudGl0eToyMDA2NDIyNzE0NTEzNTI2Nzg1",
+    "preview_text": "2025 will go down as the year code became cheap and programming changed forever. With agentic development tools—Claude Code, Codex CLI, Gemini CLI—engineers can produce far more code than ever before:",
+    "rest_id": "2006422714513526785",
+    "title": "2026: The Great Engineering Divergence"
+  },
+  "isEdited": false,
+  "isStaleEdit": false
+}

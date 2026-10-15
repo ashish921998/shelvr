@@ -10,34 +10,100 @@ const productionUrl = "https://amiable-setter-120.convex.cloud";
 const testKey = "test_VOYicTvOGPXCBFMVdHzyxRndiRi";
 
 function validate(env: Record<string, string>) {
-  runInNewContext(source, { require: requireConfig, module: { exports: {} }, process: { env }, URL });
+  runInNewContext(source, {
+    require: requireConfig,
+    module: { exports: {} },
+    process: { env },
+    URL,
+  });
 }
-
 describe("billing environment isolation", () => {
-  it.each(["/", "?test=true", "/?test=true", "/#test"])("rejects production origin with suffix %s", (suffix) => {
-    expect(() => validate({ APP_VARIANT: "preview", EXPO_PUBLIC_CONVEX_URL: productionUrl + suffix })).toThrow(/must not use production Convex/);
+  it.each([
+    "",
+    "https://attacker.example",
+    "http://amiable-setter-120.convex.site",
+    "https://user@amiable-setter-120.convex.site",
+    "https://amiable-setter-120.convex.site/path",
+    "https://amiable-setter-120.convex.site?x=1",
+    "https://amiable-setter-120.convex.site#fragment",
+  ])("rejects production capture origin %s", (siteUrl) => {
+    expect(() =>
+      validate({
+        EAS_BUILD: "true",
+        APP_VARIANT: "production",
+        EXPO_PUBLIC_REVENUECAT_IOS_KEY: "appl_store",
+        EXPO_PUBLIC_CONVEX_URL: productionUrl,
+        EXPO_PUBLIC_CONVEX_SITE_URL: siteUrl,
+      }),
+    ).toThrow(/production HTTP origin/);
   });
-  it.each(["development", "preview"])("rejects production Convex in %s", (variant) => {
-    expect(() => validate({ APP_VARIANT: variant, EXPO_PUBLIC_CONVEX_URL: productionUrl })).toThrow(/must not use production Convex/);
-  });
+  it.each(["/", "?test=true", "/?test=true", "/#test"])(
+    "rejects production origin with suffix %s",
+    (suffix) => {
+      expect(() =>
+        validate({
+          APP_VARIANT: "preview",
+          EXPO_PUBLIC_CONVEX_URL: productionUrl + suffix,
+        }),
+      ).toThrow(/must not use production Convex/);
+    },
+  );
+  it.each(["development", "preview"])(
+    "rejects production Convex in %s",
+    (variant) => {
+      expect(() =>
+        validate({
+          APP_VARIANT: variant,
+          EXPO_PUBLIC_CONVEX_URL: productionUrl,
+        }),
+      ).toThrow(/must not use production Convex/);
+    },
+  );
 
   it("rejects the old production-project Test Store key", () => {
-    expect(() => validate({ EXPO_PUBLIC_REVENUECAT_TEST_KEY: "test_DzhYgoqsrxPykbPmjFpAMFbGBwn" })).toThrow(/Shelvr Development/);
+    expect(() =>
+      validate({
+        EXPO_PUBLIC_REVENUECAT_TEST_KEY: "test_DzhYgoqsrxPykbPmjFpAMFbGBwn",
+      }),
+    ).toThrow(/Shelvr Development/);
   });
 
   it("requires the isolated test key in a development build", () => {
-    expect(() => validate({ EAS_BUILD: "true", APP_VARIANT: "development" })).toThrow(/Shelvr Development/);
+    expect(() =>
+      validate({ EAS_BUILD: "true", APP_VARIANT: "development" }),
+    ).toThrow(/Shelvr Development/);
   });
 
   it("accepts the development backend and isolated Test Store", () => {
-    expect(() => validate({ EAS_BUILD: "true", EXPO_PUBLIC_CONVEX_URL: "https://amicable-antelope-639.convex.cloud", EXPO_PUBLIC_REVENUECAT_TEST_KEY: testKey })).not.toThrow();
+    expect(() =>
+      validate({
+        EAS_BUILD: "true",
+        EXPO_PUBLIC_CONVEX_URL: "https://amicable-antelope-639.convex.cloud",
+        EXPO_PUBLIC_REVENUECAT_TEST_KEY: testKey,
+      }),
+    ).not.toThrow();
   });
 
   it("rejects a Test Store key in a production build", () => {
-    expect(() => validate({ EAS_BUILD: "true", APP_VARIANT: "production", EXPO_PUBLIC_REVENUECAT_IOS_KEY: testKey })).toThrow(/appl_/);
+    expect(() =>
+      validate({
+        EAS_BUILD: "true",
+        APP_VARIANT: "production",
+        EXPO_PUBLIC_REVENUECAT_IOS_KEY: testKey,
+      }),
+    ).toThrow(/appl_/);
   });
 
   it("rejects a development backend in a production build", () => {
-    expect(() => validate({ EAS_BUILD: "true", APP_VARIANT: "production", EAS_BUILD_PLATFORM: "android", EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: "goog_store", EXPO_PUBLIC_CONVEX_URL: "https://amicable-antelope-639.convex.cloud" })).toThrow(/production deployment URL/);
+    expect(() =>
+      validate({
+        EAS_BUILD: "true",
+        APP_VARIANT: "production",
+        EAS_BUILD_PLATFORM: "android",
+        EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: "goog_store",
+        EXPO_PUBLIC_CONVEX_URL: "https://amicable-antelope-639.convex.cloud",
+        GOOGLE_SERVICES_JSON: "/tmp/google-services.json",
+      }),
+    ).toThrow(/production deployment URL/);
   });
 });

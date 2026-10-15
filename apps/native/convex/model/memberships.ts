@@ -16,7 +16,7 @@ export const SUMMARY_SCAN_LIMIT = 50;
 
 /**
  * A spaceItems row's effective state. Rows written before the suggestion
- * model existed have no `status` — they were real memberships, so they read
+ * model existed have no `status`. They were real memberships, so they read
  * as "saved".
  */
 export function effectiveStatus(row: Doc<"spaceItems">): MembershipStatus {
@@ -135,7 +135,7 @@ export async function summarizeMemberships(
  * positive. Legacy rows store no `status` yet read as saved, so the saved
  * bucket merges the explicit and the absent key.
  */
-export async function previewItemIdsForStatus(
+async function previewItemIdsForStatus(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   status: CountedStatus,
@@ -230,10 +230,10 @@ async function applyTransition(
   if (isCounted(to)) {
     patch[countField(to)] = space[countField(to)] + 1;
     const list = patch[previewField(to)] ?? space[previewField(to)];
-    patch[previewField(to)] = [itemId, ...list.filter((id) => id !== itemId)].slice(
-      0,
-      PREVIEW_LIMIT,
-    );
+    patch[previewField(to)] = [
+      itemId,
+      ...list.filter((id) => id !== itemId),
+    ].slice(0, PREVIEW_LIMIT);
   }
   // A bucket that lost a previewed member may still have more rows than the
   // shortened list shows; top it up from that bucket alone. This is the only
@@ -327,7 +327,7 @@ export async function deleteMembershipsForItem(
 /**
  * Space delete: remove up to `limit` of the space's join rows. Returns true
  * when more remain, so the caller can continue in a fresh transaction. The
- * summary is not touched — the caller deletes the space row itself, and the
+ * summary is not touched: the caller deletes the space row itself, and the
  * fields die with it.
  */
 export async function deleteMembershipsForSpace(

@@ -7,6 +7,7 @@ import {
   useSaveImages,
 } from "@/lib/use-save-image";
 import type { Id } from "@convex/_generated/dataModel";
+import type { SaveSource } from "@convex/model/saveSource";
 import { useRouter } from "expo-router";
 import { Alert } from "react-native";
 
@@ -22,7 +23,7 @@ type BatchAlertButton = { text: string; onPress?: () => void };
 export type ImageBatchDeps = {
   saveImages: (
     requests: ImageSaveRequest[],
-    options?: { spaceId?: Id<"spaces"> },
+    options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
   ) => Promise<ImageSaveResult[]>;
   /** `Alert.alert`, injected so a test can drive the retry button. */
   alert: (title: string, message: string, buttons: BatchAlertButton[]) => void;
@@ -41,12 +42,14 @@ export type ImageBatchDeps = {
   /** Pins every save in the batch to a space (set when the flow was opened
    * from inside one). */
   spaceId?: Id<"spaces">;
+  /** Which entry point the host screen ran this batch from. */
+  saveSource?: SaveSource;
 };
 
 /**
  * Runs a batch of image requests, handing an all-saved batch to the host and
  * otherwise reporting a partial outcome. Only failed requests are retained for
- * a retry — successful ones are never resubmitted — and each retry replays the
+ * a retry; successful ones are never resubmitted, and each retry replays the
  * failed request's existing operation id so the backend `itemOperations` ledger
  * resumes that operation instead of starting a second one per image.
  *
@@ -66,7 +69,10 @@ export async function runImageBatch(
   }
   deps.setBusy(true);
   try {
-    const results = await deps.saveImages(requests, { spaceId: deps.spaceId });
+    const results = await deps.saveImages(requests, {
+      spaceId: deps.spaceId,
+      saveSource: deps.saveSource,
+    });
     const failed = results.filter((r) => r.status === "failed");
     const savedSoFar = [
       ...alreadySaved,
@@ -104,7 +110,7 @@ export async function runImageBatch(
           text: t("capture.retryFailed"),
           onPress: () => {
             void runImageBatch(
-              // Reuse each failed operation id on retry — never mint fresh ones.
+              // Reuse each failed operation id on retry: never mint fresh ones.
               failed.map((r) => ({
                 image: r.image,
                 operationId: r.operationId,

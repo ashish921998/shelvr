@@ -1,5 +1,7 @@
 import Constants from "expo-constants";
+import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
+import { Platform } from "react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -8,6 +10,9 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | string
   | undefined;
 
+// Production never records. Apple's guideline 2.5.14 requires explicit consent
+// and a visible indicator for recording user activity, and the app has
+// neither. Replay stays a development and preview tool.
 const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
 
 // Distributed builds report crashes; local development does not. A dev machine
@@ -30,10 +35,25 @@ const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
 // `before_send` hook below extends it to SDK-autocaptured crashes.
 export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
+// Expo and other native modules reject with a `CodedError` whose message is a
+// generated code token: `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
+// the failing module and holds no user content (no spaces, URLs, or free text),
+// so it is safe to keep. Without it a native crash reaches error tracking as the
+// bare class name ("Error"), naming nothing that failed. The pattern only admits
+// a single SCREAMING_SNAKE token, so an interpolated message (which carries
+// spaces, slashes, or lowercase) can never match.
+const SAFE_EXCEPTION_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+
+function isSafeExceptionValue(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    (SAFE_ERROR_MESSAGES.has(value) ||
+      (value.length <= 80 && SAFE_EXCEPTION_CODE.test(value)))
+  );
+}
+
 function sanitizeExceptionValue(value: unknown, fallback: unknown): unknown {
-  return typeof value === "string" && SAFE_ERROR_MESSAGES.has(value)
-    ? value
-    : fallback;
+  return isSafeExceptionValue(value) ? value : fallback;
 }
 
 function redactExceptionProperties(properties: unknown): void {
@@ -50,7 +70,7 @@ function redactExceptionProperties(properties: unknown): void {
       };
     });
   }
-  // Only rewrite the message when the SDK captured one — an unconditional
+  // Only rewrite the message when the SDK captured one: an unconditional
   // assignment would stamp an undefined `$exception_message` key onto every
   // lifecycle and custom event passing through the hook.
   if ("$exception_message" in record) {
@@ -58,6 +78,17 @@ function redactExceptionProperties(properties: unknown): void {
       record.$exception_message,
       record.$exception_type,
     );
+  }
+}
+
+// The SDK attaches the launch deep link to "Application Opened". That URL can
+// carry an OAuth callback code or saved content, so it never leaves the device.
+function dropLaunchUrl(event: {
+  event: string;
+  properties?: Record<string, unknown>;
+}): void {
+  if (event.event === "Application Opened" && event.properties) {
+    delete event.properties.url;
   }
 }
 
@@ -69,9 +100,18 @@ export const posthog =
     ? new PostHog(posthogProjectToken, {
         host: posthogHost,
         captureAppLifecycleEvents: true,
-        // Replay stays off in production until visual masking is verified on a
-        // signed build. Fail closed: only builds that declare a non-production
-        // variant record, so a missing `extra` can never turn replay on.
+        // Both default to true in posthog-react-native >= 4.73 and activate
+        // through @posthog/react-native-plugin. The native SDK builds and sends
+        // `$push_notification_opened` itself, so `before_send` below never sees
+        // it and cannot apply the redaction this file exists to enforce. Push
+        // tokens are already owned by `notificationDevices` in Convex, so
+        // mirroring them into PostHog would widen what leaves the device for no
+        // product gain. Fail closed, as replay and exception autocapture do.
+        capturePushNotificationSubscriptions: false,
+        capturePushNotificationOpened: false,
+        // Fail closed: only builds that declare a development or preview
+        // variant record, so a production build or a missing `extra` can never
+        // turn replay on.
         enableSessionReplay: REPLAY_VARIANTS.has(
           Constants.expoConfig?.extra?.variant,
         ),
@@ -81,10 +121,12 @@ export const posthog =
           maskAllSandboxedViews: true,
           captureLog: false,
           captureNetworkTelemetry: false,
-          sampleRate: 0.2,
+          // Every session: only development and preview builds record, so
+          // there is no volume to sample down.
+          sampleRate: 1,
           throttleDelayMs: 1000,
         },
-        // The object form resolves omitted keys to false — an empty
+        // The object form resolves omitted keys to false: an empty
         // `console: []` alone silently disables crash capture. Exceptions are
         // additionally gated server-side by the project's "exception
         // autocapture" remote config.
@@ -97,19 +139,61 @@ export const posthog =
         },
         // eslint-disable-next-line @typescript-eslint/naming-convention -- the SDK's option key is fixed snake_case
         before_send: (event) => {
-          if (event !== null) redactExceptionProperties(event.properties);
+          if (event !== null) {
+            redactExceptionProperties(event.properties);
+            dropLaunchUrl(event);
+          }
           return event;
         },
       })
     : undefined;
 
-posthog?.register({
-  environment: Constants.expoConfig?.extra?.variant ?? "development",
-  analytics_version: 1,
-});
+// `$app_build` stays the store build across OTA updates, so the running
+// update is recorded separately to tell which JS a user had.
+function updateProperties(): Record<string, string | boolean> {
+  try {
+    return {
+      ...(Updates.updateId ? { ota_update_id: Updates.updateId } : {}),
+      ...(Updates.channel ? { ota_channel: Updates.channel } : {}),
+      ota_embedded: Updates.isEmbeddedLaunch,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Properties registered on every event, and again after each reset. */
+export function superProperties(): Record<string, string | number | boolean> {
+  return {
+    environment: Constants.expoConfig?.extra?.variant ?? "development",
+    platform: Platform.OS,
+    analytics_version: 1,
+    ...updateProperties(),
+  };
+}
+
+posthog?.register(superProperties());
+
+/** Clears the identity and restores the super properties a reset drops. */
+function resetClient(client: PostHog): void {
+  client.reset();
+  client.register(superProperties());
+}
+
+/** Resets only when PostHog still holds an identified user, so a signed-out
+ * launch keeps its anonymous id and one person's onboarding stays on one
+ * profile. */
+export async function resetIfIdentified(client: PostHog): Promise<void> {
+  await client.ready();
+  const distinctId = client.getDistinctId();
+  const anonymousId = client.getAnonymousId();
+  if (distinctId && anonymousId && distinctId !== anonymousId) {
+    resetClient(client);
+  }
+}
 
 /** True when the client analytics boundary may capture. The single canonical
- * check — every analytics facade (feedback, cancel survey) delegates here
+ * check: every analytics facade (feedback, cancel survey) delegates here
  * instead of re-deriving availability from the client's state. */
 export function isAnalyticsAvailable(): boolean {
   return posthog !== undefined && !posthog.isDisabled && !posthog.optedOut;
