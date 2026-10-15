@@ -74,7 +74,13 @@ export function startOnSeededHome(): void {
       { timeout: 30_000 },
     );
     await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-    await screen.scrollUntilVisible(reset);
+    // Even then a swipe has moved nothing (seen on CI, once in about ten
+    // runs), so the scroll gets one more try after another settle.
+    await screen.scrollUntilVisible(reset).catch(async (error: unknown) => {
+      if (!String(error).includes("moved nothing")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
+      await screen.scrollUntilVisible(reset);
+    });
     await reset.tap();
     await screen.getByRole("button", "Reset").tap();
     await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
@@ -149,6 +155,30 @@ export async function tapTab(screen: Screen, name: string): Promise<void> {
   await (
     (await tab.isVisible()) ? tab : tabBar.getByRole("button", name)
   ).tap();
+}
+
+/**
+ * Fills a text field, recovering from the runner's "could not confirm the
+ * typed text reached the field": the text may have landed in full, in part
+ * or not at all. Seen on CI in about one run in ten. As the runner's hint
+ * says, the field is read back: if it already holds `value` the fill
+ * counts, otherwise it is filled once more (`fill` replaces the content). A
+ * field that still ends up wrong fails on that second fill or later in the
+ * flow, so this does not pass over a field that really is broken.
+ */
+export async function fillField(field: Locator, value: string): Promise<void> {
+  try {
+    await field.fill(value);
+  } catch (error) {
+    if (!String(error).includes("could not confirm the typed text")) {
+      throw error;
+    }
+    const landed = await expect(field)
+      .toHaveValue(value, { timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!landed) await field.fill(value);
+  }
 }
 
 /**
