@@ -95,7 +95,7 @@ export function startOnSeededHome(): void {
  * server list instead of the app; a cold Metro can take longer, so the app is
  * opened again whenever the launcher shows.
  */
-export async function openApp(
+async function openApp(
   app: App,
   screen: Screen,
   ready: () => Promise<boolean>,

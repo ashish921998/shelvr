@@ -2,10 +2,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import type { Device } from "@e2e-dev/mobile";
-import { type App, expect, type Screen } from "e2e";
+import { expect, type Screen } from "e2e";
 
-import { BUNDLE_ID, URL_SCHEME } from "./launch.ts";
-import { openApp } from "./seeded-home.ts";
+import { BUNDLE_ID, LAUNCH_ARGUMENTS, URL_SCHEME } from "./launch.ts";
 
 /**
  * Starts the app as a first-time user on the onboarding opener. Onboarding
@@ -15,21 +14,16 @@ import { openApp } from "./seeded-home.ts";
  * user with an unused demo save.
  */
 export async function startFreshOnboarding({
-  app,
   device,
   screen,
 }: {
-  app: App;
   device: Device;
   screen: Screen;
 }): Promise<void> {
   await device.closeApp().catch(() => undefined);
   await device.clearKeychain();
   const start = screen.getByRole("button", "Start yours");
-  await openApp(app, screen, () => start.isVisible());
-  await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
-    timeout: 30_000,
-  });
+  await relaunchWith(device, screen, LAUNCH_ARGUMENTS, () => start.isVisible());
 }
 
 /**
@@ -73,6 +67,7 @@ const APP_GROUP = `group.${BUNDLE_ID}`;
  */
 export async function shareLinkIntoApp(
   device: Device,
+  screen: Screen,
   url: string,
 ): Promise<void> {
   const { stdout } = await execFileAsync("xcrun", [
@@ -97,12 +92,24 @@ export async function shareLinkIntoApp(
     Buffer.from(payload).toString("hex"),
   ]);
   await device.openLink(`${URL_SCHEME}://expo-sharing`);
+
+  // The simulator may ask before it opens the link in the app.
+  const open = screen.getByRole("alert").getByRole("button", "Open");
+  await open.tap({ timeout: 10_000 }).catch(() => undefined);
+  await expect(open).toBeHidden({ timeout: 10_000 });
 }
+
+/**
+ * A launch still on the splash after this long has lost its bundle request
+ * (seen on CI: the request to Metro hung and the splash stayed up), so the
+ * app is launched again.
+ */
+const STALLED_LAUNCH_MS = 75_000;
 
 /**
  * Relaunches the app with `launchArguments` and waits until `ready`. Like
  * `openApp`, it opens the app again when the dev launcher shows its server
- * list instead of the bundle.
+ * list instead of the bundle, and also when a launch stalls on the splash.
  */
 export async function relaunchWith(
   device: Device,
@@ -111,14 +118,18 @@ export async function relaunchWith(
   ready: () => Promise<boolean>,
 ): Promise<void> {
   const launcher = screen.getByText("Searching for development servers...");
-  const open = () =>
-    device.openApp(BUNDLE_ID, { relaunch: true, launchArguments });
+  let openedAt = 0;
+  const open = async () => {
+    await device.openApp(BUNDLE_ID, { relaunch: true, launchArguments });
+    openedAt = Date.now();
+  };
   await open();
   await expect
     .poll(
       async () => {
         if (await ready()) return true;
-        if (await launcher.isVisible()) await open();
+        const stalled = Date.now() - openedAt > STALLED_LAUNCH_MS;
+        if (stalled || (await launcher.isVisible())) await open();
         return false;
       },
       { timeout: 180_000 },

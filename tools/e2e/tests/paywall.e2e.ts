@@ -104,5 +104,8 @@ test("leaves the exit offer by the app's own close", async ({
   await expect(close).toBeVisible({ timeout: 60_000 });
   await close.tap();
   await expect(close).toBeHidden({ timeout: 30_000 });
-  await expect(viewPlans).toBeVisible({ timeout: 30_000 });
+  // Home holds the offer open for its window in place of the Pro prompt.
+  await expect(screen.getByRole("button", "See the offer")).toBeVisible({
+    timeout: 30_000,
+  });
 });

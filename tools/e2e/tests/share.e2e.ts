@@ -14,13 +14,12 @@ import {
 // away (PR #87 saved the shared demo link without saying so, and Home taught
 // sharing seconds after it).
 test("remembers a shared first save and skips the share how-to on Home", async ({
-  app,
   device,
   screen,
 }) => {
-  await startFreshOnboarding({ app, device, screen });
+  await startFreshOnboarding({ device, screen });
   await walkToFirstSave(screen);
-  await shareLinkIntoApp(device, "https://example.com/");
+  await shareLinkIntoApp(device, screen, "https://example.com/");
   await signInAndSaveFirst(screen);
   await screen.getByRole("button", "Don't remind me").tap();
   // The dev user is Pro, so leaving the practice goes straight to Home.

@@ -15,11 +15,10 @@ import { LAUNCH_ARGUMENTS } from "./launch.ts";
 // relaunch on (src/lib/e2e-hide-pro.ts), as it is for a real new user, so
 // the end-of-onboarding paywall has someone to ask.
 test("asks for the paywall at the end of onboarding, after a relaunch on the reminder step", async ({
-  app,
   device,
   screen,
 }) => {
-  await startFreshOnboarding({ app, device, screen });
+  await startFreshOnboarding({ device, screen });
   await walkToFirstSave(screen);
   await screen.getByRole("button", /^Save it, /).tap();
   await signInAndSaveFirst(screen);
