@@ -564,7 +564,7 @@
   "onboarding.remindSavedNow": "saved just now",
   "onboarding.remindFallbackTitle": "Your first save",
   "onboarding.remindPledge": "I'll look back at my saves on Sundays.",
-  "onboarding.remindConsent": "Shelvr may also remind you about saves you haven't opened. You can turn this off in Settings.",
+  "onboarding.remindConsent": "This also turns on your Weekly shelf for Sundays, and Shelvr may remind you about saves you haven't opened. You can turn these off in Settings.",
   "demo.privacyNote": "We only use this to sign you in.",
   "demo.stepSaved": "Saved to your shelf",
   "demo.stepReading": "Reading the post",
