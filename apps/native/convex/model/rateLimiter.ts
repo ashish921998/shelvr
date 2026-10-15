@@ -65,6 +65,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: DAY,
     capacity: 200,
   },
+  // "We went" on a plan: one small row each, no model call. Bounds a loop
+  // that would fill the table with names.
+  placeVisit: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
   // The onboarding demo's Pro-free retry of a FAILED demo classification.
   // Tighter than reprocessItem: the demo is the one uncapped-price save a
   // non-paying user gets, so retries stay strictly bounded.

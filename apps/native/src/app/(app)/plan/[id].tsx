@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
-import { PlanPlaceCard } from "@/components/plan-place-card";
+import { PlanDeck } from "@/components/plan-deck";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -11,6 +11,8 @@ import {
   placeLabel,
   planShareText,
   useMakePlan,
+  usePlaceVisits,
+  usePlanDeck,
   usePlanPicker,
   type PlanPlace,
 } from "@/lib/make-plan";
@@ -90,6 +92,60 @@ function PlanLoading({ images }: { images: string[] }) {
   );
 }
 
+/** Maps and "We went" for the card on top, once the deck has dealt one. */
+function TonightActions({
+  place,
+  visited,
+  onOpenMaps,
+  onToggleVisited,
+}: {
+  place: PlanPlace;
+  visited: boolean;
+  onOpenMaps: () => void;
+  onToggleVisited: () => void;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <Animated.View entering={FadeIn} style={styles.actions}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("plan.openMapsFor", { name: place.name })}
+        onPress={onOpenMaps}
+        style={({ pressed }) => [
+          styles.action,
+          styles.actionFilled,
+          pressed && styles.pressed,
+        ]}
+      >
+        <AppSymbolIcon name="map" size={16} tintColor={theme.colors.onTint} />
+        <ThemedText variant="button" style={styles.onTint}>
+          {t("plan.openMaps")}
+        </ThemedText>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${place.name}, ${visited ? t("plan.been") : t("plan.weWent")}`}
+        accessibilityState={{ selected: visited }}
+        onPress={onToggleVisited}
+        style={({ pressed }) => [
+          styles.action,
+          visited ? styles.actionWent : styles.actionOpen,
+          pressed && styles.pressed,
+        ]}
+      >
+        <AppSymbolIcon
+          name="checkmark"
+          size={15}
+          tintColor={visited ? theme.colors.danger : theme.colors.foreground}
+        />
+        <ThemedText variant="button" style={visited ? styles.went : undefined}>
+          {visited ? t("plan.been") : t("plan.weWent")}
+        </ThemedText>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function PlanScreen() {
   const locale = useAppLocale();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -103,16 +159,33 @@ export default function PlanScreen() {
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
   const planId = state.status === "ready" ? state.planId : null;
-  const onPicked = useCallback(() => {
-    haptic("done");
-    analytics.capture("plan_picked", { place_count: places.length });
-  }, [places.length]);
-  const { highlight, picked, pickedPlace, isSpinning, pickForMe } =
-    usePlanPicker(places, planId, {
+  const deck = usePlanDeck(planId, places.length);
+  const { show } = deck;
+  const onPicked = useCallback(
+    (index: number) => {
+      show(index);
+      haptic("done");
+      analytics.capture("plan_picked", { place_count: places.length });
+    },
+    [places.length, show],
+  );
+  const { highlight, pickedPlace, isSpinning, pickForMe } = usePlanPicker(
+    places,
+    planId,
+    {
       reducedMotion,
       onStep: tick,
       onPicked,
-    });
+    },
+  );
+  const { isVisited, toggle: toggleVisited } = usePlaceVisits();
+  // While dealing, the deck shuffles through its cards; then the card on top
+  // is the one the actions below act on.
+  const front = isSpinning && highlight !== null ? highlight : deck.front;
+  const frontPlace = places[front] ?? null;
+  const hasPlaces = state.status === "ready" && places.length > 0;
+  const dealt = pickedPlace !== null && !isSpinning;
+  const frontBeen = dealt && frontPlace !== null && isVisited(frontPlace);
 
   const { imageById, titleById } = useMemo(() => {
     const images = new Map<string, string>();
@@ -192,44 +265,58 @@ export default function PlanScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <View style={styles.heading}>
-          {space ? (
-            <ThemedText variant="label" style={styles.muted}>
-              {space.name}
-            </ThemedText>
+        <View style={styles.headingRow}>
+          <View style={styles.heading}>
+            {space ? (
+              <ThemedText variant="label" style={styles.muted}>
+                {space.name}
+              </ThemedText>
+            ) : null}
+            <ThemedText variant="largeTitle">{t("plan.title")}</ThemedText>
+          </View>
+          {hasPlaces ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={again}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.shuffle,
+                pressed && styles.pressed,
+              ]}
+            >
+              <ThemedText variant="secondaryLabel" style={styles.muted}>
+                {t("plan.again")}
+              </ThemedText>
+            </Pressable>
           ) : null}
-          <ThemedText variant="largeTitle">{t("plan.title")}</ThemedText>
         </View>
 
         {state.status === "loading" ? (
           <PlanLoading images={[...imageById.values()]} />
         ) : null}
 
-        {state.status === "ready" && places.length > 0 ? (
+        {hasPlaces ? (
           <>
-            <View style={styles.list}>
-              {places.map((place, i) => (
-                <PlanPlaceCard
-                  key={`${place.itemId}-${place.name}`}
-                  place={place}
-                  rank={i + 1}
-                  sourceImageUrl={imageById.get(place.itemId)}
-                  sourceTitle={titleById.get(place.itemId)}
-                  highlighted={(picked ?? highlight) === i}
-                  onOpenMaps={() => openMaps(place, i + 1)}
-                />
-              ))}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={again}
-              hitSlop={8}
-              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
+            <PlanDeck
+              places={places}
+              front={front}
+              flipped={deck.flipped && !isSpinning}
+              imageFor={(place) => imageById.get(place.itemId)}
+              titleFor={(place) => titleById.get(place.itemId)}
+              isVisited={isVisited}
+              onFlip={deck.flip}
+              onNext={deck.next}
+              onOpenMaps={openMaps}
+            />
+            <ThemedText
+              variant="caption"
+              style={[styles.muted, styles.hint]}
+              accessibilityLiveRegion="polite"
             >
-              <ThemedText variant="secondaryLabel" style={styles.muted}>
-                {t("plan.again")}
-              </ThemedText>
-            </Pressable>
+              {frontBeen && frontPlace
+                ? t("plan.beenHint", { name: frontPlace.name })
+                : t("plan.deckHint")}
+            </ThemedText>
           </>
         ) : null}
 
@@ -277,32 +364,36 @@ export default function PlanScreen() {
           </View>
         ) : null}
       </ScrollView>
-      {state.status === "ready" && places.length > 0 ? (
+      {hasPlaces ? (
         // Pinned under the list so the pick and its result stay on screen
         // however long the shortlist is.
         <View style={styles.footer}>
-          {pickedPlace ? (
-            <Animated.View
-              entering={FadeIn}
-              style={styles.tonight}
-              accessibilityLiveRegion="polite"
-              accessibilityRole="text"
-            >
-              <AppSymbolIcon
-                name="sparkles"
-                size={16}
-                tintColor={theme.colors.onTint}
-              />
-              <ThemedText variant="headline" style={styles.tonightText}>
-                {t("plan.tonight", { name: pickedPlace.name })}
-              </ThemedText>
-            </Animated.View>
+          {dealt && frontPlace ? (
+            <TonightActions
+              place={frontPlace}
+              visited={isVisited(frontPlace)}
+              onOpenMaps={() => openMaps(frontPlace, front + 1)}
+              onToggleVisited={() => toggleVisited(frontPlace)}
+            />
           ) : null}
-          <Button
-            title={t("plan.pick")}
-            onPress={pickForMe}
-            disabled={isSpinning}
-          />
+          {dealt ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={pickForMe}
+              hitSlop={8}
+              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
+            >
+              <ThemedText variant="secondaryLabel" style={styles.muted}>
+                {t("plan.dealAgain")}
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <Button
+              title={t("plan.pick")}
+              onPress={pickForMe}
+              disabled={isSpinning}
+            />
+          )}
         </View>
       ) : null}
     </>
@@ -328,7 +419,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
   },
+  headingRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+  },
+  // Sits on the title's last line, not centred against the whole heading.
+  shuffle: {
+    paddingBottom: theme.gap(0.75),
+  },
   heading: {
+    flexShrink: 1,
     gap: theme.gap(0.5),
     marginTop: theme.gap(1),
   },
@@ -364,21 +466,41 @@ const styles = StyleSheet.create((theme, rt) => ({
     width: "100%",
     height: "100%",
   },
-  tonight: {
+  actions: {
+    flexDirection: "row",
+    gap: theme.gap(1),
+  },
+  action: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(1),
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.lg,
-    paddingVertical: theme.gap(1.5),
-    paddingHorizontal: theme.gap(2),
+    minHeight: theme.control.minHeight + theme.gap(0.5),
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
-  tonightText: {
-    flex: 1,
+  actionFilled: {
+    backgroundColor: theme.colors.primary,
+  },
+  actionOpen: {
+    borderColor: theme.colors.foreground,
+  },
+  actionWent: {
+    borderColor: theme.colors.danger,
+  },
+  onTint: {
     color: theme.colors.onTint,
   },
-  list: {
-    gap: theme.gap(1.5),
+  went: {
+    color: theme.colors.danger,
+  },
+  hint: {
+    textAlign: "center",
+    // Two lines held, so the We went hint replacing it moves nothing.
+    minHeight: 36,
+    paddingHorizontal: theme.gap(2),
   },
   again: {
     alignSelf: "center",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
-import { isGrounded, sanitizePlan, type PlanSource } from "./plan";
+import { isGrounded, placeKey, sanitizePlan, type PlanSource } from "./plan";
 
 function source(fields: Partial<PlanSource>): PlanSource {
   return { itemId: "item1" as Id<"items">, places: [], ...fields };
@@ -317,6 +317,123 @@ describe("sanitizePlan", () => {
       sources,
     );
     expect(dropped.area).toBe("Springfield");
+  });
+
+  it("strips a street address from a place's name", () => {
+    const sources = [source({ title: "The Palomar in Soho, London" })];
+    const [pick] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "The Palomar, 34 Rupert Street, London",
+          area: "Soho",
+          why: "Go",
+        },
+      ],
+      sources,
+    );
+    expect(pick.name).toBe("The Palomar");
+    // A comma that is part of the name stays.
+    const [kept] = sanitizePlan(
+      [{ saveNumber: 1, name: "The Palomar, Soho", area: "", why: "Go" }],
+      sources,
+    );
+    expect(kept.name).toBe("The Palomar, Soho");
+  });
+
+  it("cuts at the address, keeping commas and numbers in the name", () => {
+    const [withComma] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Paul, Smith & Co, 12 Main Street",
+          area: "",
+          why: "Go",
+        },
+      ],
+      [source({ title: "Paul, Smith & Co" })],
+    );
+    expect(withComma.name).toBe("Paul, Smith & Co");
+    const sources = [
+      source({ itemId: "a" as Id<"items">, title: "Copper, Bar 61" }),
+      source({ itemId: "b" as Id<"items">, title: "Copper, Bar 62" }),
+    ];
+    const both = sanitizePlan(
+      [
+        { saveNumber: 1, name: "Copper, Bar 61", area: "", why: "Go" },
+        { saveNumber: 2, name: "Copper, Bar 62", area: "", why: "Go" },
+      ],
+      sources,
+    );
+    expect(both.map((place) => place.name)).toEqual([
+      "Copper, Bar 61",
+      "Copper, Bar 62",
+    ]);
+  });
+
+  it("keeps a neighbourhood that starts with St", () => {
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: "The Ivy, St John's Wood", area: "", why: "Go" }],
+      [source({ title: "The Ivy, St John's Wood" })],
+    );
+    expect(pick.name).toBe("The Ivy, St John's Wood");
+    const [cut] = sanitizePlan(
+      [{ saveNumber: 1, name: "The Ivy, 9 Rupert St", area: "", why: "Go" }],
+      [source({ title: "The Ivy" })],
+    );
+    expect(cut.name).toBe("The Ivy");
+  });
+
+  it("keeps a landmark square and strips a street with no number", () => {
+    const [square] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Shake Shack, Times Square",
+          area: "",
+          why: "Go",
+        },
+      ],
+      [source({ title: "Shake Shack, Times Square" })],
+    );
+    expect(square.name).toBe("Shake Shack, Times Square");
+    const [street] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "The Palomar, Rupert Street",
+          area: "",
+          why: "Go",
+        },
+      ],
+      [source({ title: "The Palomar" })],
+    );
+    expect(street.name).toBe("The Palomar");
+  });
+
+  it("caps the shortlist after visited places move last", () => {
+    const sources = Array.from({ length: 6 }, (_, i) =>
+      source({ itemId: `item${i}` as Id<"items">, title: `Spot${i} dinner` }),
+    );
+    const raw = sources.map((_, i) => ({
+      saveNumber: i + 1,
+      name: `Spot${i}`,
+      area: "",
+      why: "Good",
+    }));
+    const been = new Set([0, 1, 2, 3, 4].map((i) => placeKey(`Spot${i}`)));
+    const places = sanitizePlan(raw, sources, been);
+    expect(places).toHaveLength(5);
+    expect(places[0]).toMatchObject({ name: "Spot5" });
+    expect(places[0].been).toBeUndefined();
+  });
+
+  it("keeps the address when the name before it proves nothing alone", () => {
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: "Cafe, 12 Main St", area: "", why: "Go" }],
+      [source({ title: "The cafe at 12 Main St" })],
+    );
+    expect(pick.name).toBe("Cafe, 12 Main St");
   });
 
   it("drops picks with an empty reason and trims long fields", () => {

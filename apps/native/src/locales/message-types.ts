@@ -288,8 +288,16 @@ export type MessageParams = {
   "plan.openMaps": undefined;
   "plan.openMapsFor": { name: string };
   "plan.pick": undefined;
+  "plan.dealAgain": undefined;
   "plan.again": undefined;
   "plan.tonight": { name: string };
+  "plan.weWent": undefined;
+  "plan.been": undefined;
+  "plan.beenHint": { name: string };
+  "plan.deckHint": undefined;
+  "plan.flipHint": undefined;
+  "plan.nextCard": undefined;
+  "plan.why": undefined;
   "plan.from": { title: string };
   "plan.emptyTitle": undefined;
   "plan.emptyBody": undefined;

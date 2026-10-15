@@ -3,8 +3,8 @@ import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isAiConsentRequired } from "@convex/model/aiConsent";
-import type { PlanPlace } from "@convex/model/plan";
-import { useAction } from "convex/react";
+import { placeKey, type PlanPlace } from "@convex/model/plan";
+import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type { PlanPlace };
@@ -85,6 +85,94 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
   return { state, retry };
 }
 
+/**
+ * "We went" for the places on a plan. A tap shows at once and is saved in the
+ * background; if the save fails the place goes back to how it was. A place
+ * the server already tagged `been` reads as visited until the user takes the
+ * mark back.
+ */
+export function usePlaceVisits() {
+  const setVisited = useMutation(api.placeVisits.setVisited);
+  const [marks, setMarks] = useState<ReadonlyMap<string, boolean>>(new Map());
+  // The latest tap per place: an older save failing must not undo a newer tap.
+  const latest = useRef(new Map<string, number>());
+
+  const isVisited = useCallback(
+    (place: PlanPlace) =>
+      marks.get(placeKey(place.name)) ?? place.been === true,
+    [marks],
+  );
+
+  const toggle = useCallback(
+    (place: PlanPlace) => {
+      const key = placeKey(place.name);
+      const was = marks.get(key) ?? place.been === true;
+      const tap = (latest.current.get(key) ?? 0) + 1;
+      latest.current.set(key, tap);
+      const mark = (value: boolean) =>
+        setMarks((current) => new Map(current).set(key, value));
+      mark(!was);
+      analytics.capture("plan_place_visited", { visited: !was });
+      setVisited({
+        itemId: place.itemId,
+        name: place.name,
+        visited: !was,
+      }).catch((error: unknown) => {
+        if (latest.current.get(key) === tap) mark(was);
+        analytics.captureError("plan_visit_failed", error);
+      });
+    },
+    [marks, setVisited],
+  );
+
+  return { isVisited, toggle };
+}
+
+type Deck = { planId: number | null; front: number; flipped: boolean };
+
+/**
+ * The plan as a deck of cards: which card is on top and whether it is turned
+ * over to show why it was picked. A new plan starts on its first card, face
+ * up. `next` sends the top card to the back; `show` brings a card to the top.
+ */
+export function usePlanDeck(planId: number | null, count: number) {
+  const [deck, setDeck] = useState<Deck>({
+    planId,
+    front: 0,
+    flipped: false,
+  });
+  const current =
+    deck.planId === planId ? deck : { planId, front: 0, flipped: false };
+  const front = count > 0 ? current.front % count : 0;
+
+  const next = useCallback(() => {
+    if (count === 0) return;
+    setDeck({ planId, front: (front + 1) % count, flipped: false });
+  }, [planId, front, count]);
+  const show = useCallback(
+    (index: number) => setDeck({ planId, front: index, flipped: false }),
+    [planId],
+  );
+  const flip = useCallback(
+    () => setDeck({ planId, front, flipped: !current.flipped }),
+    [planId, front, current.flipped],
+  );
+
+  return { front, flipped: current.flipped, next, show, flip };
+}
+
+/**
+ * Indexes of the cards to draw, back to front: up to `depth` cards, ending
+ * with `front`, so the top card renders last.
+ */
+export function deckOrder(count: number, front: number, depth = 4): number[] {
+  const shown = Math.min(count, depth);
+  return Array.from(
+    { length: shown },
+    (_, i) => (front + shown - 1 - i) % count,
+  );
+}
+
 type Pick = {
   planId: number;
   highlight: number | null;
@@ -103,7 +191,7 @@ export function usePlanPicker(
   options: {
     reducedMotion: boolean;
     onStep?: () => void;
-    onPicked?: () => void;
+    onPicked?: (index: number) => void;
   },
 ) {
   const [pick, setPick] = useState<Pick | null>(null);
@@ -150,7 +238,7 @@ export function usePlanPicker(
       setTimeout(() => {
         spinningPlan.current = null;
         setPick({ planId, highlight: winner, picked: winner, spinning: false });
-        onPicked?.();
+        onPicked?.(winner);
       }, at),
     );
   }, [planId, places.length, reducedMotion, onStep, onPicked]);

@@ -5,6 +5,7 @@ import {
   PLAN_SHARE_URL,
   placeLabel,
   planShareText,
+  deckOrder,
   spinSteps,
   type PlanPlace,
 } from "./make-plan";
@@ -95,5 +96,17 @@ describe("canMakePlan", () => {
     expect(canMakePlan([{ ...ready, spaceIntents: maps }, ready, ready])).toBe(
       true,
     );
+  });
+});
+
+describe("deckOrder", () => {
+  it("draws up to four cards, back to front, ending on the top card", () => {
+    expect(deckOrder(5, 0)).toEqual([3, 2, 1, 0]);
+    expect(deckOrder(5, 3)).toEqual([1, 0, 4, 3]);
+  });
+
+  it("draws every card of a short deck once", () => {
+    expect(deckOrder(2, 1)).toEqual([0, 1]);
+    expect(deckOrder(0, 0)).toEqual([]);
   });
 });

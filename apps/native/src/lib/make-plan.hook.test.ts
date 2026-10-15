@@ -2,11 +2,22 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
-import { useMakePlan, usePlanPicker, type PlanPlace } from "./make-plan";
+import {
+  useMakePlan,
+  usePlaceVisits,
+  usePlanDeck,
+  usePlanPicker,
+  type PlanPlace,
+} from "./make-plan";
 
-const mocks = vi.hoisted(() => ({ makePlan: vi.fn() }));
-vi.mock("convex/react", () => ({ useAction: () => mocks.makePlan }));
-vi.mock("@convex/_generated/api", () => ({ api: { plans: {} } }));
+const mocks = vi.hoisted(() => ({ makePlan: vi.fn(), setVisited: vi.fn() }));
+vi.mock("convex/react", () => ({
+  useAction: () => mocks.makePlan,
+  useMutation: () => mocks.setVisited,
+}));
+vi.mock("@convex/_generated/api", () => ({
+  api: { plans: {}, placeVisits: {} },
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
@@ -27,6 +38,75 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   mocks.makePlan.mockReset();
+  mocks.setVisited.mockReset();
+});
+
+describe("usePlaceVisits", () => {
+  it("shows a tap at once and saves it", async () => {
+    mocks.setVisited.mockResolvedValue(null);
+    const tigre = place("Tigre");
+    const { result } = renderHook(() => usePlaceVisits());
+    expect(result.current.isVisited(tigre)).toBe(false);
+
+    act(() => result.current.toggle(tigre));
+
+    expect(result.current.isVisited(tigre)).toBe(true);
+    // The same place spelled another way is the same visit.
+    expect(result.current.isVisited(place("TIGRE"))).toBe(true);
+    expect(mocks.setVisited).toHaveBeenCalledWith({
+      itemId: tigre.itemId,
+      name: "Tigre",
+      visited: true,
+    });
+  });
+
+  it("takes back a place the plan already tagged been", () => {
+    mocks.setVisited.mockResolvedValue(null);
+    const tigre = { ...place("Tigre"), been: true };
+    const { result } = renderHook(() => usePlaceVisits());
+    expect(result.current.isVisited(tigre)).toBe(true);
+
+    act(() => result.current.toggle(tigre));
+
+    expect(result.current.isVisited(tigre)).toBe(false);
+    expect(mocks.setVisited).toHaveBeenCalledWith(
+      expect.objectContaining({ visited: false }),
+    );
+  });
+
+  it("keeps a newer tap when an older save fails", async () => {
+    let failFirst!: (error: Error) => void;
+    mocks.setVisited
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          failFirst = reject;
+        }),
+      )
+      .mockResolvedValue(null);
+    const tigre = place("Tigre");
+    const { result } = renderHook(() => usePlaceVisits());
+
+    act(() => result.current.toggle(tigre));
+    act(() => result.current.toggle(tigre));
+    act(() => result.current.toggle(tigre));
+    expect(result.current.isVisited(tigre)).toBe(true);
+
+    await act(async () => {
+      failFirst(new Error("offline"));
+      await Promise.resolve();
+    });
+    expect(result.current.isVisited(tigre)).toBe(true);
+  });
+
+  it("goes back when the save fails", async () => {
+    mocks.setVisited.mockRejectedValue(new Error("offline"));
+    const tigre = place("Tigre");
+    const { result } = renderHook(() => usePlaceVisits());
+
+    act(() => result.current.toggle(tigre));
+
+    await waitFor(() => expect(result.current.isVisited(tigre)).toBe(false));
+  });
 });
 
 describe("useMakePlan", () => {
@@ -126,6 +206,8 @@ describe("usePlanPicker", () => {
     spinToEnd();
     expect(onPicked).toHaveBeenCalledTimes(1);
     expect(result.current.picked).not.toBeNull();
+    // The deck brings the dealt card to the top by its index.
+    expect(onPicked).toHaveBeenCalledWith(result.current.picked);
   });
 
   it("clears its timers on unmount", () => {
@@ -165,5 +247,38 @@ describe("usePlanPicker", () => {
     expect(vi.getTimerCount()).toBe(1);
     spinToEnd();
     expect(onPicked).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("usePlanDeck", () => {
+  it("sends the top card to the back and turns the new one face up", () => {
+    const { result } = renderHook(() => usePlanDeck(1, 3));
+    act(() => result.current.flip());
+    expect(result.current.flipped).toBe(true);
+
+    act(() => result.current.next());
+    expect(result.current).toMatchObject({ front: 1, flipped: false });
+    act(() => result.current.next());
+    act(() => result.current.next());
+    expect(result.current.front).toBe(0);
+  });
+
+  it("brings a dealt card to the top", () => {
+    const { result } = renderHook(() => usePlanDeck(1, 5));
+    act(() => result.current.show(3));
+    expect(result.current).toMatchObject({ front: 3, flipped: false });
+  });
+
+  it("starts a new plan on its first card", () => {
+    const { result, rerender } = renderHook(
+      ({ planId }) => usePlanDeck(planId, 5),
+      { initialProps: { planId: 1 } },
+    );
+    act(() => result.current.show(4));
+    act(() => result.current.flip());
+
+    rerender({ planId: 2 });
+
+    expect(result.current).toMatchObject({ front: 0, flipped: false });
   });
 });

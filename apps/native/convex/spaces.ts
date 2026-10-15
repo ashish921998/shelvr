@@ -12,6 +12,7 @@ import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import {
+  MAX_BEEN_PLACES,
   MAX_PLAN_ITEMS,
   PLAN_CONTENT_CHARS,
   planSourceValidator,
@@ -863,6 +864,8 @@ export const claimPlanInternal = internalMutation({
   returns: v.object({
     spaceName: v.string(),
     sources: v.array(planSourceValidator),
+    // Places the user marked "We went", newest first.
+    been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
     // Convex forwards the action caller's identity, so authorization and the
@@ -917,13 +920,23 @@ export const claimPlanInternal = internalMutation({
           .map((intent) => intent.value),
       });
     }
-    if (sources.length > 0) {
-      await rateLimiter.limit(ctx, "makePlan", {
-        key: userId,
-        throws: true,
-      });
+    if (sources.length === 0) {
+      return { spaceName: space.name, sources, been: [] };
     }
-    return { spaceName: space.name, sources };
+    await rateLimiter.limit(ctx, "makePlan", {
+      key: userId,
+      throws: true,
+    });
+    const visits = await ctx.db
+      .query("placeVisits")
+      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(MAX_BEEN_PLACES);
+    return {
+      spaceName: space.name,
+      sources,
+      been: visits.map((visit) => visit.name),
+    };
   },
 });
 
