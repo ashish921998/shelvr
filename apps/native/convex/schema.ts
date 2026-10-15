@@ -170,6 +170,11 @@ export default defineSchema({
         v.literal("unavailable"),
       ),
     ),
+    // When the current "searching" began. The watchdog findLinks schedules
+    // flips that search to "failed" only while this still matches, so a dead
+    // action cannot leave the button spinning and a newer search is untouched.
+    // Server only: stripped before any item crosses a function boundary.
+    productsSearchStartedAt: v.optional(v.number()),
     // Why processing failed, so the client can say something true instead of
     // rendering an item that looks stuck forever. Only set with
     // `status: "failed"`; absent on pre-existing failed rows.

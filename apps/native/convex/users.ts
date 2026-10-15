@@ -17,6 +17,7 @@ import {
   appleTokenId,
   storeAppleToken,
 } from "./model/appleTokens";
+import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
 
 /**
@@ -222,6 +223,11 @@ export const processAccountDeletion = internalMutation({
  * large enough that typical accounts finish in the first, synchronous pass. */
 export const DELETE_BATCH = 100;
 
+/** Bytes of items one pass reads before it hands the rest to the
+ * continuation. Well under the 16 MiB read limit, leaving room for the other
+ * tables the same pass reads. */
+const DELETE_ITEM_READ_BYTES = 4 * 1024 * 1024;
+
 async function deleteAccountBatch(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -273,17 +279,21 @@ async function deleteUserOwnedDataBatch(
   }
   if (spaces.length === DELETE_BATCH) return false;
 
-  const items = await ctx.db
-    .query("items")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
-    .take(DELETE_BATCH);
+  // Items alone also stop on bytes: a link save keeps up to 100k characters
+  // of article plus its search copy, so a full batch of them can read past
+  // Convex's 16 MiB transaction limit and fail every retry.
+  const { rows: items, bytes: itemBytes } = await takeWithinBytes(
+    ctx.db.query("items").withIndex("by_user", (q) => q.eq("userId", userKey)),
+    { maxRows: DELETE_BATCH, maxBytes: DELETE_ITEM_READ_BYTES },
+  );
   for (const item of items) {
     if (item.storageId !== undefined) {
       await safeDeleteStorage(ctx, item.storageId);
     }
     await ctx.db.delete(item._id);
   }
-  if (items.length === DELETE_BATCH) return false;
+  if (items.length === DELETE_BATCH || itemBytes >= DELETE_ITEM_READ_BYTES)
+    return false;
 
   // Pending rows may still hold an unfinalized upload: delete that storage.
   const operations = await ctx.db

@@ -7,7 +7,9 @@ import { api, internal } from "@convex/_generated/api";
 import type { DataModel, Doc, Id } from "@convex/_generated/dataModel";
 import { ConvexError } from "convex/values";
 import {
+  MAX_SPACE_DESCRIPTION_LENGTH,
   MAX_SPACE_NAME_LENGTH,
+  SPACE_DESCRIPTION_TOO_LONG_MESSAGE,
   SPACE_NAME_EMPTY_MESSAGE,
   SPACE_NAME_TOO_LONG_MESSAGE,
 } from "./model/spaceName";
@@ -116,6 +118,39 @@ describe("space creation", () => {
           .collect(),
     );
     expect(spaces).toHaveLength(1);
+  });
+
+  it("bounds the description, which the recommendation prompt carries", async () => {
+    const { t } = await entitledUser();
+    const atLimit = "x".repeat(MAX_SPACE_DESCRIPTION_LENGTH);
+
+    const tooLong = await t
+      .mutation(api.spaces.createSpace, {
+        name: "Too long",
+        description: atLimit + "x",
+      })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(tooLong).toBeInstanceOf(ConvexError);
+    expect((tooLong as ConvexError<string>).data).toBe(
+      SPACE_DESCRIPTION_TOO_LONG_MESSAGE,
+    );
+    const stored = await t.run((ctx) =>
+      ctx.db
+        .query("spaces")
+        .filter((q) => q.eq(q.field("name"), "Too long"))
+        .collect(),
+    );
+    expect(stored).toHaveLength(0);
+
+    const id = await t.mutation(api.spaces.createSpace, {
+      name: "At limit",
+      description: atLimit,
+    });
+    const space = await t.run((ctx) => ctx.db.get(id));
+    expect(space?.description).toBe(atLimit);
   });
 
   it("bounds the name on create and rename with a message the client can show", async () => {

@@ -51,8 +51,10 @@ Native app (`apps/native/src`):
 
 ## Evidence
 
-The PR evidence check only confirms the Verification section and screenshots exist. The
-reviewer checks that they are right:
+The PR evidence check only confirms that the Verification section's three subsections
+(What I ran, Evidence, Not verified) are filled in, and that UI changes carry a screenshot
+or recording unless the `no-ui-change` label is set. The reviewer checks that they are
+right:
 
 - [ ] The evidence was taken on the current head commit, or on one whose later commits
       cannot change what it shows.
