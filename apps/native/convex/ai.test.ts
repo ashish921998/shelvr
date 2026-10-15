@@ -139,6 +139,12 @@ describe("firstLinkedUrl", () => {
         "saved from https://in.pinterest.com/pin/1/ and https://pin.it/abc",
       ),
     ).toBe(undefined);
+    expect(
+      firstLinkedUrl(
+        "https://m.youtube.com/watch?v=1 https://vm.tiktok.com/a https://l.instagram.com/?u=x https://cook.example/dal",
+      ),
+    ).toBe("https://cook.example/dal");
+    expect(firstLinkedUrl("https://box.com/dal")).toBe("https://box.com/dal");
     expect(firstLinkedUrl("no links here")).toBeUndefined();
     expect(firstLinkedUrl(undefined)).toBeUndefined();
   });

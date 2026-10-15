@@ -321,6 +321,20 @@ const LINK_HUB_HOSTS = new Set([
   "youtu.be",
 ]);
 
+/** A link hub or social host, subdomains included (m.youtube.com, vm.tiktok.com). */
+function isLinkHub(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (isPinterestHost(host)) {
+    return true;
+  }
+  for (const hub of LINK_HUB_HOSTS) {
+    if (host === hub || host.endsWith(`.${hub}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** First http(s) URL in a caption worth following for a recipe, with trailing
  * punctuation trimmed and link hubs skipped. Exported pure for unit testing. */
 export function firstLinkedUrl(text: string | undefined): string | undefined {
@@ -330,8 +344,7 @@ export function firstLinkedUrl(text: string | undefined): string | undefined {
   for (const match of text.matchAll(/https?:\/\/[^\s<>"'()]+/gi)) {
     const candidate = match[0].replace(/[.,;:!?]+$/, "");
     try {
-      const host = new URL(candidate).hostname.replace(/^www\./, "");
-      if (!LINK_HUB_HOSTS.has(host) && !isPinterestHost(host)) {
+      if (!isLinkHub(new URL(candidate).hostname)) {
         return candidate;
       }
     } catch {
