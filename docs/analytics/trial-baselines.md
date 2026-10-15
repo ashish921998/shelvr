@@ -214,6 +214,9 @@ Reading rules:
   is progression, not activation. Nothing in this query is a personal save.
 - `persons_new_account` is bounded by `account_created`, which started on
   8 September 2026 and is not backfilled.
+- `persons_new_account` counts an account only when its `account_created` falls
+  inside the person's window. An account created earlier that signs in again
+  is a returning sign-in (case `p_returning`).
 
 ## Query 2a and 2b: attempts, outcomes and trial confirmation
 
@@ -240,6 +243,8 @@ Honest outcomes:
   then the closest start time wins. Each trial attributes to at most one
   attempt. A trial matched to an unresolved attempt is the interrupted-sheet
   case and is reported as `unresolved_with_confirmed_trial`.
+  `confirmed_trial_percent` counts both kinds, `purchases_with_confirmed_trial`
+  plus `unresolved_with_confirmed_trial`, over mature attempts.
 - A trial with no candidate is `unmatched` in Query 2b and stays a gap
   (a lost client event, a different device, or a purchase outside the app).
   Do not infer an attempt for it.

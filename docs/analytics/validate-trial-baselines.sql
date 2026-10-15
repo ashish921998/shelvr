@@ -86,14 +86,15 @@ onboarding_rows AS (
     UNION ALL SELECT 'p_internal_late_auth' AS person_id, 'acct-internal' AS distinct_id, 'auth_completed' AS event, now() - INTERVAL 100000 SECOND AS timestamp, '' AS step_id, 0 AS flow_version, 0 AS sample, '' AS outcome, '' AS placement, 'production' AS environment, 1 AS analytics_version
 ),
 account_rows AS (
-    SELECT 'acct-full' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-two-a' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-two-b' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-failed' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-other' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-orphan' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-replay' AS account_id, 'production' AS environment, 1 AS analytics_version
-    UNION ALL SELECT 'acct-devcreated' AS account_id, 'development' AS environment, 1 AS analytics_version
+    SELECT 'acct-full' AS account_id, now() - INTERVAL 179495 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-two-a' AS account_id, now() - INTERVAL 179505 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-two-b' AS account_id, now() - INTERVAL 100010 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-failed' AS account_id, now() - INTERVAL 179505 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-other' AS account_id, now() - INTERVAL 179505 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-returning' AS account_id, now() - INTERVAL 400000 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-orphan' AS account_id, now() - INTERVAL 300000 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-replay' AS account_id, now() - INTERVAL 179510 SECOND AS created_at, 'production' AS environment, 1 AS analytics_version
+    UNION ALL SELECT 'acct-devcreated' AS account_id, now() - INTERVAL 179505 SECOND AS created_at, 'development' AS environment, 1 AS analytics_version
 ),
 -- source:end q1
 -- final:begin q1

@@ -60,6 +60,7 @@ onboarding_rows AS (
 account_rows AS (
     SELECT
         distinct_id AS account_id,
+        timestamp AS created_at,
         coalesce(toString(properties.environment), '') AS environment,
         coalesce(toInt(properties.analytics_version), 0) AS analytics_version
     FROM events
@@ -76,7 +77,7 @@ onboarding_events AS (
       AND analytics_version = 1
 ),
 created_accounts AS (
-    SELECT account_id
+    SELECT account_id, min(created_at) AS created_at
     FROM account_rows
     WHERE environment = 'production'
       AND analytics_version = 1
@@ -119,12 +120,18 @@ windowed AS (
 ),
 person_accounts AS (
     SELECT
-        person_id,
-        distinct_id AS account_id,
-        max(distinct_id IN (SELECT account_id FROM created_accounts)) AS is_new_account
-    FROM windowed
-    WHERE event = 'auth_completed'
-    GROUP BY person_id, distinct_id
+        w.person_id AS person_id,
+        w.distinct_id AS account_id,
+        -- New means the account was created inside this person's window. An
+        -- account created earlier (or by a later replay) is a returning sign-in.
+        max(coalesce(c.created_at >= o.opened_at
+            AND c.created_at <= o.opened_at + INTERVAL 1 DAY
+            AND (length(o.opener_times) < 2 OR c.created_at < arrayElement(o.opener_times, 2)), false)) AS is_new_account
+    FROM windowed AS w
+    INNER JOIN openers AS o ON o.person_id = w.person_id
+    LEFT JOIN created_accounts AS c ON c.account_id = w.distinct_id
+    WHERE w.event = 'auth_completed'
+    GROUP BY w.person_id, w.distinct_id
 ),
 accounts_by_person AS (
     SELECT
@@ -438,7 +445,7 @@ SELECT
     round(100.0 * failed / nullIf(mature_attempts, 0), 1) AS failed_percent,
     round(100.0 * purchase_completed / nullIf(mature_attempts, 0), 1) AS purchase_completed_percent,
     round(100.0 * unresolved / nullIf(mature_attempts, 0), 1) AS unresolved_percent,
-    round(100.0 * purchases_with_confirmed_trial / nullIf(mature_attempts, 0), 1) AS confirmed_trial_percent
+    round(100.0 * (purchases_with_confirmed_trial + unresolved_with_confirmed_trial) / nullIf(mature_attempts, 0), 1) AS confirmed_trial_percent
 FROM reported
 GROUP BY placement
 ),
