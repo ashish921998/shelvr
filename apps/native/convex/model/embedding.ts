@@ -1,8 +1,11 @@
+/** The bounded candidate budget shared by recommendation selection and validation. */
+export const RECOMMEND_CANDIDATES = 100;
+
 /**
  * Shared embedding constants and text composition. Lives in `model/` for the
  * same reason as `itemFields.ts`: `schema.ts` needs the dimension count, the
  * AI action needs the text builder, and `items.ts` needs the generation
- * number — one definition, no hand-copied second source to drift.
+ * number: one definition, no hand-copied second source to drift.
  *
  * This module must stay runtime-agnostic (no `"use node"`, no provider
  * imports): `schema.ts` imports it, and the schema is evaluated everywhere.
@@ -11,7 +14,7 @@
 /**
  * Length of every stored vector. Convex enforces that a vector written to a
  * vector index matches the index's declared `dimensions` exactly, so this and
- * `schema.ts` can never disagree — they read the same constant.
+ * `schema.ts` can never disagree: they read the same constant.
  *
  * 768 rather than the model's native width: Matryoshka-trained embeddings
  * truncate with little quality loss, and at ~6 KB per item the field stays
@@ -56,7 +59,7 @@ export const EMBEDDING_SWEEP_PAGE = 25;
  *
  * Page size alone is not a bound: a `ready` link can carry 100k characters of
  * extracted article, so 25 worst-case rows would be megabytes inside a single
- * Convex transaction — and the same page would be re-read on every run, so
+ * Convex transaction, and the same page would be re-read on every run, so
  * exceeding the read limit would wedge the sweep permanently on the same rows
  * rather than failing once. The query stops accumulating at whichever of the
  * two limits it reaches first.
@@ -145,7 +148,7 @@ export function buildEmbeddingText(parts: {
  * which would fail the whole classification transaction over an optional
  * field; a NaN component silently poisons every later similarity comparison;
  * and an all-zero vector has no direction, so cosine similarity against it is
- * 0/0. Callers check before writing and drop the vector instead — an item with
+ * 0/0. Callers check before writing and drop the vector instead: an item with
  * no embedding is merely invisible to semantic retrieval until the sweeper
  * repairs it.
  */
@@ -178,7 +181,7 @@ export function isValidEmbedding(vector: readonly number[]): boolean {
  * for unit-length vectors; the sibling model `gemini-embedding-001` explicitly
  * does NOT normalize at any width other than its native 3072, so a fallback or
  * rollback would silently produce wrong rankings; and nothing downstream fails
- * loudly if a future model stops normalizing — results would just quietly get
+ * loudly if a future model stops normalizing: results would just quietly get
  * worse. Re-normalizing an already-unit vector is a numerical no-op, so the
  * defensive pass costs one cheap loop and removes the whole class of bug.
  *

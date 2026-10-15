@@ -3,7 +3,7 @@ import { formattingLocale } from "./i18n";
 /**
  * Reads the original capture time from an image picker asset's EXIF data.
  * EXIF `DateTimeOriginal` is formatted `"YYYY:MM:DD HH:MM:SS"` (colons in the
- * date portion), which `Date.parse` won't accept — swap the first two colons
+ * date portion), which `Date.parse` won't accept. Swap the first two colons
  * for dashes first. Returns epoch ms, or `undefined` if the tag is missing or
  * unparseable.
  */
@@ -23,6 +23,18 @@ export function formatShortDate(ms: number): string {
     month: "short",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+/** A short date that names the year only when it is not this year's:
+ * "Aug 14", but "Aug 14, 2025". */
+export function formatRecentDate(ms: number, now = Date.now()): string {
+  const date = new Date(ms);
+  const thisYear = date.getFullYear() === new Date(now).getFullYear();
+  return date.toLocaleDateString(formattingLocale(), {
+    month: "short",
+    day: "numeric",
+    ...(thisYear ? {} : { year: "numeric" }),
   });
 }
 

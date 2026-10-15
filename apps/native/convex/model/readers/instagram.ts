@@ -13,6 +13,7 @@ import {
   fetchErrorCategory,
   isTransientFetchFailure,
   logEvent,
+  postField,
   type PageData,
 } from "../pageReadCore";
 import { instagramMedia } from "../externalUrl";
@@ -178,7 +179,13 @@ async function fetchInstagramPost(url: string) {
       error_category: embed.errorCategory,
     });
   }
-  return { page, html, kind: (post ?? linked)?.kind, embed };
+  return {
+    page,
+    html,
+    kind: (post ?? linked)?.kind,
+    embed,
+    postUrl: post && instagramPostUrl(post),
+  };
 }
 
 /**
@@ -190,7 +197,7 @@ async function fetchInstagramPost(url: string) {
  * incomplete so the save can retry.
  */
 export async function fetchInstagram(url: string): Promise<PageData> {
-  const { page, html, kind, embed } = await fetchInstagramPost(url);
+  const { page, html, kind, embed, postUrl } = await fetchInstagramPost(url);
   const embedded: InstagramEmbedFields =
     embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
   const card = instagramCard(html);
@@ -219,6 +226,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
       (kind === "p" ? 1 : 9 / 16))
     : undefined;
   return {
+    ...postField(postUrl),
     title:
       Array.from(caption?.split("\n")[0] ?? "")
         .slice(0, 100)

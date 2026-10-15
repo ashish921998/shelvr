@@ -214,6 +214,17 @@ export function extractBodyText(html: string, url: string): string | undefined {
     )) {
       element.remove();
     }
+    // MediaWiki chrome (Wikipedia and other MediaWiki sites): the fact box
+    // would otherwise open the body as one line per row, and citation marks
+    // and edit links would interrupt the prose. Only on a MediaWiki page,
+    // since other sites use "infobox" for real content.
+    if (document.querySelector(".mw-parser-output")) {
+      for (const element of document.querySelectorAll(
+        ".infobox, .navbox, .mw-editsection, sup.reference",
+      )) {
+        element.remove();
+      }
+    }
     // A skip link is an in-page anchor, so it sits outside nav and banner and
     // reads to Readability as ordinary body text.
     for (const anchor of document.querySelectorAll('a[href^="#"]')) {
@@ -285,7 +296,13 @@ export type PageData = {
    * rather than the display text. Readers that don't set it fall back to
    * scanning the caption in `withLinkedRecipe`. */
   linkedUrl?: string;
+  /** The post's own address, once a share or short link has named it. */
+  postUrl?: string;
 };
+
+export function postField(postUrl: string | undefined): { postUrl?: string } {
+  return postUrl ? { postUrl } : {};
+}
 
 /** Hosts whose pages are link hubs or the social network itself — never the
  * recipe write-up — so a caption pointing there is not worth a fetch. */

@@ -42,9 +42,10 @@ afterEach(() => {
 async function seedReady(count: number) {
   const t = newConvexTest();
   await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", {});
     for (let i = 0; i < count; i++) {
       await ctx.db.insert("items", {
-        userId: "sweeper",
+        userId,
         type: "link" as const,
         status: "ready" as const,
         title: `Save ${i}`,
@@ -61,10 +62,69 @@ async function chainedRuns(t: Awaited<ReturnType<typeof seedReady>>) {
   const jobs = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
-  return jobs.filter((job) => job.name === "ai:sweepItemEmbeddings");
+  return jobs.filter(
+    (job) => job.name === "aiEmbeddingSweep:sweepItemEmbeddings",
+  );
 }
 
 describe("sweepItemEmbeddings", () => {
+  it("advances past more than one page belonging to a deleting owner", async () => {
+    const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
+    await t.run(async (ctx) => {
+      const owner = (await ctx.db.query("users").collect())[0];
+      await ctx.db.patch(owner._id, { deleting: true });
+      const userId = await ctx.db.insert("users", {});
+      await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        title: "Live owner's save",
+        tags: [],
+        searchText: "",
+      });
+    });
+    embedMany.mockImplementation(async ({ values }) => ({
+      embeddings: values.map(() => unitVector()),
+    }));
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).toHaveBeenCalledOnce();
+    expect(embedMany.mock.calls[0][0].values).toEqual(["Live owner's save"]);
+    const rows = await t.run((ctx) => ctx.db.query("items").collect());
+    expect(
+      rows.every((row) => row.embeddingVersion === CURRENT_EMBEDDING_VERSION),
+    ).toBe(true);
+    expect(rows.filter((row) => row.embedding !== undefined)).toHaveLength(1);
+  });
+
+  it("advances past more than one page whose owner row is missing", async () => {
+    const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
+    await t.run(async (ctx) => {
+      const owner = (await ctx.db.query("users").collect())[0];
+      await ctx.db.delete(owner._id);
+      const userId = await ctx.db.insert("users", {});
+      await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        title: "Live owner's save",
+        tags: [],
+        searchText: "",
+      });
+    });
+    embedMany.mockImplementation(async ({ values }) => ({
+      embeddings: values.map(() => unitVector()),
+    }));
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).toHaveBeenCalledOnce();
+    expect(embedMany.mock.calls[0][0].values).toEqual(["Live owner's save"]);
+    const rows = await t.run((ctx) => ctx.db.query("items").collect());
+    expect(
+      rows.every((row) => row.embeddingVersion === CURRENT_EMBEDDING_VERSION),
+    ).toBe(true);
+  });
+
   it("embeds a page, stamps it, and chains while there is more to do", async () => {
     const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
     embedMany.mockImplementation(async ({ values }) => ({
@@ -119,7 +179,7 @@ describe("sweepItemEmbeddings", () => {
   it("spends an attempt when the provider answers with nothing usable", async () => {
     // A completed call whose vectors are all malformed is not an outage. Read
     // as one, every row would defer, and because the same rows lead the sweep
-    // range every run the page would be re-read forever — wedging the sweep
+    // range every run the page would be re-read forever, wedging the sweep
     // behind items it can never embed, with every later ready item stuck
     // behind them. These spend an attempt instead, and the cap clears them.
     const t = await seedReady(3);
@@ -134,7 +194,7 @@ describe("sweepItemEmbeddings", () => {
     const rows = await t.run((ctx) => ctx.db.query("items").collect());
     for (const row of rows) {
       expect(row.embeddingAttempts).toBe(1);
-      // Still unstamped, so the sweep will retry — up to the cap.
+      // Still unstamped, so the sweep will retry (up to the cap).
       expect(row.embeddingVersion).toBeUndefined();
     }
   });
@@ -199,8 +259,9 @@ describe("sweepItemEmbeddings", () => {
   it("finishes items with no embeddable text without calling the provider", async () => {
     const t = newConvexTest();
     await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {});
       await ctx.db.insert("items", {
-        userId: "sweeper",
+        userId,
         type: "image" as const,
         status: "ready" as const,
         tags: [],

@@ -38,6 +38,12 @@ const app = defineApp({
     SERPAPI_KEY: v.optional(v.string()),
     // Optional video descriptions; absent or failed reads retain oEmbed.
     YOUTUBE_API_KEY: v.optional(v.string()),
+    // Treg token (treg.to) for spoken transcripts of recipe videos
+    // (convex/model/videoTranscript.ts). Used only while
+    // VIDEO_TRANSCRIPTS_ENABLED is "true"; set that to anything else to stop
+    // them at the next save, with no deploy.
+    TREG_API_KEY: v.optional(v.string()),
+    VIDEO_TRANSCRIPTS_ENABLED: v.optional(v.string()),
     // Shared with the marketing site's server; authenticates POST /waitlist/join.
     WAITLIST_SHARED_SECRET: v.optional(v.string()),
   },

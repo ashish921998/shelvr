@@ -7,7 +7,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { IMAGE_EMPTY_MESSAGE } from "./model/imagePolicy";
 import {
@@ -70,23 +70,26 @@ export const issueCaptureToken = action({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
     const token = newCaptureToken();
     await ctx.runMutation(internal.appIntents.storeCaptureToken, {
-      userId,
       tokenHash: await sha256Hex(token),
     });
     return token;
   },
 });
 
-/** Persists a freshly minted token hash and trims the user's oldest tokens. */
+/** Persists a freshly minted token hash and trims the caller's oldest tokens.
+ * The caller is derived here, not in the action: Convex forwards the caller's
+ * identity to functions run from an action, so authorization and the write
+ * are one transaction and a deletion that has already begun fails the same
+ * `requireUserId` check every public function uses. */
 export const storeCaptureToken = internalMutation({
-  args: { userId: v.id("users"), tokenHash: v.string() },
+  args: { tokenHash: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
     await ctx.db.insert("captureTokens", {
-      userId: args.userId,
+      userId,
       tokenHash: args.tokenHash,
       createdAt: Date.now(),
     });
@@ -94,7 +97,7 @@ export const storeCaptureToken = internalMutation({
     // MAX_CAPTURE_TOKENS_PER_USER rows, plus any a racing issue just added.
     const tokens = await ctx.db
       .query("captureTokens")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(50);
     for (const stale of tokens.slice(MAX_CAPTURE_TOKENS_PER_USER)) {
@@ -129,7 +132,10 @@ export const revokeCaptureToken = mutation({
   },
 });
 
-/** The token row for a hash, or null. Marks it used (coarsely). */
+/** The token row for a hash when its owner is still live, or null. Marks it
+ * used (coarsely). A row whose owner is missing or deleting is as good as
+ * absent: deletion drains tokens in batches, so one can outlive its owner for
+ * a moment. */
 async function claimCaptureToken(
   ctx: MutationCtx,
   tokenHash: string,
@@ -139,6 +145,7 @@ async function claimCaptureToken(
     .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
     .first();
   if (token === null) return null;
+  if ((await liveOwner(ctx, token.userId)) === null) return null;
   const now = Date.now();
   if (
     token.lastUsedAt === undefined ||

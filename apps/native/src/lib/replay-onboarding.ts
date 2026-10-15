@@ -9,6 +9,7 @@ import {
   clearPending,
   getPendingDemoUrl,
   getPendingSpaces,
+  getPendingOperationId,
   getOrCreatePendingOperationId,
   hasPending,
   subscribePendingOnboarding,
@@ -59,6 +60,14 @@ export function noteDeclinedDuringOnboarding() {
   onboardingPaywall = "declined";
 }
 
+function pendingWorkKey(): string {
+  return JSON.stringify([
+    getPendingOperationId(),
+    getPendingSpaces(),
+    getPendingDemoUrl(),
+  ]);
+}
+
 /**
  * After onboarding is finished and the user signs in, replay the deferred
  * onboarding spaces, then present the paywall. Runs once.
@@ -80,6 +89,12 @@ export function useReplayOnboarding() {
   const startedEntitledRef = useRef(false);
   const rerunRef = useRef(false);
   const awaitingEntitlementRef = useRef(false);
+  // The pending work this mount already tried and could not finish. Saving
+  // the failed remainder notifies the store, which re-runs this effect; without
+  // this the replay would retry its own failure in a tight loop. A remount, an
+  // entitlement change, or different pending work starts a fresh attempt.
+  const settledWorkRef = useRef<string | null>(null);
+  const settledEntitledRef = useRef(entitled);
   const [retryNonce, setRetryNonce] = useState(0);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
@@ -91,6 +106,10 @@ export function useReplayOnboarding() {
   );
 
   useEffect(() => {
+    if (entitled !== settledEntitledRef.current) {
+      settledEntitledRef.current = entitled;
+      settledWorkRef.current = null;
+    }
     if (!isAuthenticated || ranRef.current) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
@@ -104,6 +123,7 @@ export function useReplayOnboarding() {
       return;
     }
     if (!hasPending()) return;
+    if (pendingWorkKey() === settledWorkRef.current) return;
     if (
       !entitled &&
       (awaitingEntitlementRef.current || onboardingPaywall !== "unseen")
@@ -117,6 +137,9 @@ export function useReplayOnboarding() {
     runningRef.current = true;
     startedEntitledRef.current = entitled;
 
+    // What this run left unfinished, read straight after its own writes so
+    // work that arrives while a mutation is in flight is never mistaken for it.
+    let remainderKey: string | null = null;
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -150,6 +173,7 @@ export function useReplayOnboarding() {
         // Persist only the failed work so a later replay retries it without
         // recreating spaces that already succeeded.
         updatePendingSpaces(failedSpaces);
+        remainderKey = pendingWorkKey();
         const allSpacesOk = failedSpaces.length === 0;
 
         if (legacyDemoUrl) {
@@ -163,6 +187,7 @@ export function useReplayOnboarding() {
               analyticsSessionId: analytics.sessionId(),
             });
             clearLegacyDemoUrl();
+            remainderKey = pendingWorkKey();
           } catch {
             return;
           }
@@ -174,7 +199,18 @@ export function useReplayOnboarding() {
         ranRef.current = true;
         clearPending();
       } finally {
-        const shouldRerun = rerunRef.current;
+        // An entitlement change during the run asked for a fresh pass; marking
+        // this work settled would make that pass skip it.
+        const entitlementRerun = rerunRef.current;
+        if (remainderKey !== null && !entitlementRerun) {
+          settledWorkRef.current = remainderKey;
+        }
+        // New work that arrived mid-run found the replay busy; run it now.
+        const newWork =
+          remainderKey !== null &&
+          hasPending() &&
+          pendingWorkKey() !== remainderKey;
+        const shouldRerun = entitlementRerun || newWork;
         rerunRef.current = false;
         runningRef.current = false;
         if (shouldRerun) {

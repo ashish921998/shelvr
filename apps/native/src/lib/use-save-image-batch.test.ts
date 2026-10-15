@@ -1,6 +1,6 @@
 // Tests for the pure runImageBatch protocol. The React adapter
 // (useSaveImageBatch) and the React Native / expo-router modules it binds are
-// not exercised here — only the dependency-injected protocol, which is where
+// not exercised here: only the dependency-injected protocol, which is where
 // the operation-id-reusing retry and the paywall precedence live. Runs in the
 // Node default env.
 import { describe, expect, it, vi } from "vitest";

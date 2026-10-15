@@ -35,7 +35,6 @@ import {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
@@ -46,6 +45,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CardRow = FunctionReturnType<
   typeof api.items.listItemsPage
@@ -115,7 +115,7 @@ function useItemDetailData(item: DetailItem) {
     withSpaces === undefined &&
     !fullRowFailed;
 
-  // Lexical-similarity strip for the bottom of the page (v0 — a vector index
+  // Lexical-similarity strip for the bottom of the page (v0, a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
   // Conditional queries use the 'skip' sentinel, not `enabled` (see the
   // pager): a disabled React Query still subscribes through the Convex
@@ -147,7 +147,7 @@ function useItemDetailData(item: DetailItem) {
 // Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
 // is stable across swipes (Convex query data, staleTime Infinity). Without this,
 // every parent re-render (setActiveId on each swipe) re-rendered every mounted
-// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
+// page and its ~100+ paragraph Text nodes, the dominant swipe cost profiled.
 export const ItemDetail = memo(function ItemDetail({
   item,
   isZoomTarget,
@@ -164,7 +164,7 @@ export const ItemDetail = memo(function ItemDetail({
 
   // iOS keeps a transparent header (blur band behind it, full-bleed hero), so
   // its pages pad the header band in. Android owns an opaque toolbar (see
-  // item/[id].tsx), so its content already starts below the header — padding
+  // item/[id].tsx), so its content already starts below the header. Padding
   // by the header height there would open a blank band under the toolbar.
   const headerInset = Platform.OS === "ios" ? headerHeight : 0;
 
@@ -206,7 +206,7 @@ export const ItemDetail = memo(function ItemDetail({
   }
 
   // The item's own actions, plus any purpose-steered ones from the space this
-  // page was opened through (deduped — steering may echo a general intent).
+  // page was opened through (deduped: steering may echo a general intent).
   const intents = (() => {
     const base = item.intents ?? [];
     const scoped = item.spaceIntents ?? [];
@@ -238,7 +238,7 @@ export const ItemDetail = memo(function ItemDetail({
         details={
           bodyPending ? (
             <View style={styles.bodyPending}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <StitchRing />
             </View>
           ) : (
             <ItemSheetBody
@@ -265,7 +265,7 @@ export const ItemDetail = memo(function ItemDetail({
     (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
-  // frame allows, but never taller than the cap — and when the cap bites, pull
+  // frame allows, but never taller than the cap, and when the cap bites, pull
   // the width back in too so the image keeps its shape and the frame hugs it
   // (no cropping, no lopsided gap). The frame insets the image by its own
   // horizontal margin + padding.
@@ -362,7 +362,7 @@ export const ItemDetail = memo(function ItemDetail({
       <ScrollView {...scrollProps}>
         {heroBlock}
         <View style={styles.bodyPending}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <StitchRing />
         </View>
       </ScrollView>
     );
@@ -450,7 +450,9 @@ function ItemPageBody({
     return (
       <View style={styles.body}>
         <NoteEditor key={item._id} item={detail} />
-        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
@@ -467,7 +469,7 @@ function ItemPageBody({
       <SaveStatusNotice item={item} centered />
 
       {item.status === "ready" ? (
-        <ItemSpaces spaces={spaces} style={styles.centeredText} />
+        <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
       {item.url ? (
@@ -537,7 +539,9 @@ function ItemSheetBody({
   useAppLocale();
   return (
     <View style={styles.body}>
-      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+      {item.status === "ready" ? (
+        <ItemSpaces itemId={item._id} spaces={spaces} />
+      ) : null}
 
       {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
 
@@ -583,9 +587,10 @@ function DetailSections({
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
           the ingredients and steps out of the story around them. A social post
           keeps its caption above and gains the recipe its caption described or
-          linked to; a recipe screenshot gets the card under the photo. */}
+          linked to; a recipe screenshot gets the card under the photo. Keyed
+          by item so a recycled pager page opens a new recipe on Ingredients. */}
       {detail.recipe ? (
-        <RecipeSection recipe={detail.recipe} />
+        <RecipeSection key={item._id} recipe={detail.recipe} />
       ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
@@ -690,7 +695,7 @@ function saveState(item: DetailItem, now: number): SaveState | null {
     return "partial";
   }
   // The page loaded but had no extractable article: the URL itself is the
-  // save. Explained, but not retryable — a re-run would reach the same result.
+  // save. Explained, but not retryable: a re-run would reach the same result.
   return item.enrichment === "no_article" ? "no_article" : null;
 }
 
@@ -718,7 +723,7 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  * the URL alone. Without this a failed item renders as an untitled page with no
  * explanation and no way forward, indistinguishable from one still processing.
  *
- * A `not_found` page is gone for good, so it gets no retry — only a reason.
+ * A `not_found` page is gone for good, so it gets no retry, only a reason.
  */
 // `centered` follows the link layout, whose title, source and chips all sit on
 // the centre axis; the note layout keeps the notice flush with its editor.
@@ -757,10 +762,7 @@ function SaveStatusNotice({
   if (processing && state === null) {
     return (
       <View style={[styles.processingRow, centered && styles.centeredRow]}>
-        <ActivityIndicator
-          size="small"
-          color={onMedia ? "white" : theme.colors.primary}
-        />
+        <StitchRing color={onMedia ? "white" : undefined} />
         <Text style={[styles.processingText, onMedia && styles.onMediaText]}>
           {t("item.reading")}
         </Text>
@@ -824,7 +826,7 @@ function SaveStatusNotice({
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
           {retrying ? (
-            <ActivityIndicator size="small" color={theme.colors.primaryText} />
+            <StitchRing size={14} color={theme.colors.primaryText} />
           ) : (
             <AppSymbolIcon
               name="arrow.clockwise"

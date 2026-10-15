@@ -405,7 +405,7 @@ describe("CardAnimationProvider", () => {
       false,
     );
     expect(deck.isDragging.value).toBe(false);
-    // No commit spring and no spring home either — recovery is onFinalize's.
+    // No commit spring and no spring home either: recovery is onFinalize's.
     expect(card.panX.value).toBe(250);
     expect(deck.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();

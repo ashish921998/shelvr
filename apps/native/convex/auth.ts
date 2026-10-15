@@ -12,7 +12,10 @@ import type { DataModel, Id } from "./_generated/dataModel";
 import { env, type ActionCtx } from "./_generated/server";
 import { nativeAppleProfile, normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
-import { exchangeAuthorizationCode } from "./model/appleClient";
+import {
+  exchangeAuthorizationCode,
+  revokeRefreshToken,
+} from "./model/appleClient";
 import {
   AppleIdTokenError,
   appleTokenSubject,
@@ -26,6 +29,26 @@ import { errorName, logEvent } from "./model/log";
 const isDevDeployment = () =>
   process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
   "https://amicable-antelope-639.convex.site";
+
+// A token that was verified but never stored (deletion won the persistence
+// race) is revoked here, while it is still in memory: never in a row or a
+// scheduled job argument. Best effort, like the rest of the flow.
+async function revokeUnstoredToken(
+  signing: {
+    clientId: string;
+    privateKey: string;
+    keyId: string;
+    teamId: string;
+  },
+  refreshToken: string,
+): Promise<void> {
+  const status = await revokeRefreshToken({ ...signing, refreshToken });
+  logEvent(
+    status === 200 ? "info" : "error",
+    "apple_native_late_token_revoke",
+    status === undefined ? { code: "unreachable" } : { status },
+  );
+}
 
 // The native sheet hands the app a one-time code where the web flow hands the
 // backend a refresh token. Trading the code here is what lets account deletion
@@ -80,11 +103,17 @@ async function keepNativeAppleToken(
       });
       return;
     }
-    await ctx.runMutation(internal.users.keepNativeAppleToken, {
+    const stored = await ctx.runMutation(internal.users.keepNativeAppleToken, {
       userId,
       refreshToken,
       clientId,
     });
+    if (!stored) {
+      await revokeUnstoredToken(
+        { clientId, privateKey, keyId, teamId },
+        refreshToken,
+      );
+    }
   } catch (error) {
     logEvent("error", "apple_native_token_failed", {
       code: "unreachable",
@@ -134,7 +163,7 @@ const AppleNative = ConvexCredentials<DataModel>({
 //
 // Anonymous is an instant sign-in (no credentials) used only for local
 // development. It is gated behind AUTH_ENABLE_ANONYMOUS so a production
-// deployment never exposes a passwordless back door — set it to "true" on
+// deployment never exposes a passwordless back door. Set it to "true" on
 // the dev deployment only.
 const providers: AuthProviderConfig[] = [
   Google,

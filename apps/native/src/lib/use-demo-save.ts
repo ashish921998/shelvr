@@ -3,7 +3,7 @@ import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
 import { releaseSavedShare } from "@/lib/use-incoming-share-url";
-import { demoDestination, isDemoSample } from "@/lib/onboarding-demo";
+import { demoDestination, findSample } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -121,6 +121,7 @@ export function demoSaveReducer(
           ...next,
           authRequest: alreadyPreviewed(next) ? state.authRequest : null,
           submitting: true,
+          deadlineNonce: state.deadlineNonce + 1,
         };
       }
       return {
@@ -174,9 +175,16 @@ export function demoSaveReducer(
       if (!action.lost && state.error === action.error) return state;
       return { ...dropLost(state, action.lost), error: action.error };
     case "keepWaiting":
-      return { ...state, deadlineNonce: state.deadlineNonce + 1 };
+      return {
+        ...state,
+        deadlineNonce: state.deadlineNonce + 1,
+      };
     case "timedOut":
-      return { ...state, timedOutKey: action.key, authRequest: null };
+      return {
+        ...state,
+        timedOutKey: action.key,
+        authRequest: state.phase === "saved" ? null : state.authRequest,
+      };
   }
 }
 
@@ -265,6 +273,13 @@ export function useDemoSave({
   );
   const inFlightRef = useRef(false);
   const advancedRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const { itemId } = state;
 
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
@@ -288,6 +303,7 @@ export function useDemoSave({
 
   const status = view === "share" ? null : item?.status;
   useEffect(() => {
+    if (advancedRef.current) return;
     if (status === "ready") {
       analytics.capture("onboarding_demo_result", { outcome: "ready" });
       advance();
@@ -298,10 +314,12 @@ export function useDemoSave({
 
   // Only flips the slow flag. The user, never a timer, decides to move on.
   const deadlineKey = deadlineKeyOf(state);
+  const submissionPending = state.submitting && itemId === null;
   const watching =
-    itemId !== null &&
-    state.phase === "saved" &&
-    (view === "reading" || view === "auth");
+    submissionPending ||
+    (itemId !== null &&
+      state.phase === "saved" &&
+      (view === "reading" || view === "auth"));
   useEffect(() => {
     if (!watching) return;
     const id = setTimeout(
@@ -310,14 +328,18 @@ export function useDemoSave({
     );
     return () => clearTimeout(id);
   }, [watching, deadlineKey]);
-  const timedOut = watching && state.timedOutKey === deadlineKey;
+  const slow = watching && state.timedOutKey === deadlineKey;
+  const timedOut = slow && itemId !== null;
+  const submissionTimedOut = slow && itemId === null;
 
   const submit = useCallback(
     async (request: PendingDemo, resumed = false) => {
       const url = request.url.trim();
-      if (url === "" || inFlightRef.current) return;
+      const stale = () => advancedRef.current || !mountedRef.current;
+      if (url === "" || inFlightRef.current || stale()) return;
       const trimmed = { ...request, url };
-      const sample = isDemoSample(url);
+      const found = findSample(url);
+      const sample = found !== undefined;
       // Fires before any sign-in, so the funnel shows a pick that never got
       // past the sign-in sheet. Resuming after sign-in is not a new pick.
       if (!resumed) {
@@ -340,9 +362,12 @@ export function useDemoSave({
       try {
         const result = await createDemoItem({
           url,
+          // A sample keeps the heading its preview showed.
+          title: found?.pageHeading,
           spaceName: trimmed.destination ?? undefined,
           analyticsSessionId: analytics.sessionId(),
         });
+        if (stale()) return;
         // A relaunch resubmits the persisted save and gets it back; that is
         // not a second submission.
         if (!result.reused) analytics.capture("onboarding_demo_submitted");
@@ -370,6 +395,7 @@ export function useDemoSave({
           savedSpaceNames: result.savedSpaceNames,
         });
       } catch (err) {
+        if (stale()) return;
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
         const used = demoErrorCode(err) === "demo_used";
@@ -462,6 +488,7 @@ export function useDemoSave({
   const previewed = useCallback(() => dispatch({ type: "previewed" }), []);
 
   const continueAfterTimeout = () => {
+    if (advancedRef.current) return;
     analytics.capture("onboarding_demo_result", { outcome: "timeout" });
     advance();
   };
@@ -498,6 +525,7 @@ export function useDemoSave({
     submitting: state.submitting,
     error: state.error ?? lostError,
     timedOut,
+    submissionTimedOut,
     demoUsed: state.demoUsed,
     canSkip: view === "share" && !state.demoUsed && (state.saveFailed || lost),
     canAcceptShare,

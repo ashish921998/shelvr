@@ -56,6 +56,10 @@ const mock = vi.hoisted(() => ({
   platform: "android",
 }));
 
+vi.mock("@/components/ui/stitch-loader", () => ({
+  StitchRing: vi.fn(() => null),
+  StitchRow: vi.fn(() => null),
+}));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: vi.fn(),
@@ -167,7 +171,6 @@ vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: { colors: { primary: "" } } }),
 }));
 vi.mock("react-native", () => ({
-  ActivityIndicator: vi.fn(() => null),
   Platform: {
     get OS() {
       return mock.platform;

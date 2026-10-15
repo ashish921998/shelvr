@@ -1,4 +1,4 @@
-# Billing configuration and customer measurement — 8 September 2026
+# Billing configuration and customer measurement, 8 September 2026
 
 ## Apple connection
 
@@ -14,10 +14,10 @@ Production RevenueCat remains [Shelvr](https://app.revenuecat.com/projects/2a02f
 
 EAS previously pointed **development and preview at production Convex**. Development's Test Store key also belonged to the production RevenueCat project. The environments now use:
 
-| Environment | Convex deployment | RevenueCat |
-| --- | --- | --- |
-| Production / internal-test | `amiable-setter-120` | Existing platform-specific production keys |
-| Development / preview | `amicable-antelope-639` | Dedicated `EXPO_PUBLIC_REVENUECAT_TEST_KEY` for project `963bf108` |
+| Environment                | Convex deployment       | RevenueCat                                                         |
+| -------------------------- | ----------------------- | ------------------------------------------------------------------ |
+| Production / internal-test | `amiable-setter-120`    | Existing platform-specific production keys                         |
+| Development / preview      | `amicable-antelope-639` | Dedicated `EXPO_PUBLIC_REVENUECAT_TEST_KEY` for project `963bf108` |
 
 The ignored local `.env.local` uses the isolated test key too. Platform modules choose the key by the build variant. The old Android profile override was removed. Build validation rejects production Convex in development/preview, the old production-project Test Store key, and a development backend or Test Store key in production EAS builds.
 
@@ -50,6 +50,6 @@ The verified baseline is 13 production accounts including one confirmed owner/te
 - Final published-paywall check: the simulator displayed USD 4.99/month and USD 19.99/year. Selecting Annual opened `annual_1999` with a one-week free trial. The paywall returned `PURCHASED`, and the webhook updated the fresh account to `trialing`. This separately verifies trial semantics after the initial no-trial Test Store checks.
 - The trial account passed the server-gated Space action after purchase, then was deleted with its test data. Both disposable QA accounts were cleaned up. The simulator's original RevenueCat identity and `AUTH_ENABLE_ANONYMOUS=true` development setting were restored. The production payment receipt ledger remained empty; sandbox tests did not create production payment telemetry.
 
-The native source/environment changes are active in the local development client and in future EAS builds. No new App Store or Play Store binary was submitted by this task. Existing installed binaries retain their bundled configuration until updated. Production client analytics still requires the instrumented native release described in `docs/analytics/payment-funnel.md`.
+The native source/environment changes are active in the local development client and in future EAS builds. This task submitted no new App Store or Play Store binary. Existing installed binaries retain their bundled configuration until updated. Production client analytics still requires the instrumented native release described in `docs/analytics/payment-funnel.md`.
 
 Test Store checks verify the SDK → RevenueCat → webhook → Convex path, not Apple's payment processing. A fresh real Apple sandbox/TestFlight purchase on a suitable signed-in device remains a release verification step. No physical Android device or iPhone was connected during this check.

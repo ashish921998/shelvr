@@ -39,7 +39,7 @@ const ON_TOPIC = vec({ 0: 1 });
 const NEARBY = vec({ 0: 0.8, 1: 0.6 });
 const OFF_TOPIC = vec({ 1: 1 });
 
-const USER = "chef";
+let USER: string;
 
 type SeedItem = {
   title: string;
@@ -52,12 +52,13 @@ type SeedItem = {
 /**
  * Every seeded item carries an embedding unless a test is explicitly about the
  * no-vector path. convex-test's `vectorSearch` scores every row matching the
- * filter, including rows with no vector field, and throws on them — real
+ * filter, including rows with no vector field, and throws on them. Real
  * Convex simply leaves unembedded documents out of the index.
  */
 async function seed(items: SeedItem[]) {
   const t = newConvexTest();
   const ids = await t.run(async (ctx) => {
+    USER = await ctx.db.insert("users", {});
     const spaceId = await ctx.db.insert("spaces", {
       userId: USER,
       name: "Pasta",
@@ -240,7 +241,7 @@ describe("recommendForSpace candidate selection", () => {
       // The trigger is a harness artifact: convex-test scores every row
       // matching the filter, so a row with no vector makes its cosine throw.
       // Real Convex leaves unembedded documents out of the index entirely.
-      // What the test is actually for is the catch — the outer action only
+      // What the test is actually for is the catch: the outer action only
       // logs and returns, so an error escaping the search would turn a
       // transient hiccup into no recommendations at all.
       await ctx.db.insert("items", {
@@ -278,8 +279,8 @@ describe("recommendForSpace candidate selection", () => {
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
     const prompted = promptedTitles();
-    // Exactly the cap, in relevance order, and the 101st — the weakest match
-    // — is the one left out. A recency top-up would have put it back, and a
+    // Exactly the cap, in relevance order, and the 101st (the weakest match)
+    // is the one left out. A recency top-up would have put it back, and a
     // truncated search window would have cost one of the strong ones.
     expect(prompted).toHaveLength(100);
     expect(prompted[0]).toBe("Save 0");
@@ -291,7 +292,7 @@ describe("recommendForSpace candidate selection", () => {
     // Hydration's byte budget is the reachable stand-in for a half-drained
     // sweep: either way the index hands back fewer candidates than the shelf
     // holds, and the prompt must not shrink to match. Two bodies of just over
-    // half the budget cross it, so the third hit never survives hydration —
+    // half the budget cross it, so the third hit never survives hydration,
     // sized from the constant so retuning it moves this fixture too.
     const half = "x".repeat(Math.ceil(MAX_HYDRATE_READ_BYTES / 2) + 1);
     const { t, spaceId } = await seed([

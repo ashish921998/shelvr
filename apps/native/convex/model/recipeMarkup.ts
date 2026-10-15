@@ -2,7 +2,7 @@
  * Deterministic recipe extraction from a page's structured data.
  *
  * Recipe sites publish schema.org `Recipe` markup for Google's recipe rich
- * results — as JSON-LD in nearly every case, occasionally as microdata. That
+ * results, as JSON-LD in nearly every case, occasionally as microdata. That
  * markup already carries the exact ingredient lines and instruction steps, so
  * reading it is free, complete (no prompt window to overflow), and never
  * hallucinated. This module is the single place the markup shapes are known;
@@ -80,7 +80,7 @@ function collectRecipeNodes(root: unknown): JsonObject[] {
 
 /** Parse one `<script type="application/ld+json">` body. Sites wrap the JSON
  * in HTML comments or CDATA markers now and then; anything still malformed is
- * skipped — the page simply has no usable markup. */
+ * skipped: the page simply has no usable markup. */
 function parseJsonLd(text: string): unknown {
   const stripped = text
     .replace(/^\s*<!--/, "")
@@ -169,14 +169,45 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
   // recursion below already handles both shapes.
   if (value.itemListElement !== undefined) {
     const steps = instructionSteps(value.itemListElement, clean);
-    const sectionName = stringValue(value.name, clean);
-    if (sectionName !== undefined && steps.length > 0) {
+    const sectionName = trimTrailingColons(stringValue(value.name, clean));
+    if (sectionName && steps.length > 0) {
       return [`${sectionName}: ${steps[0]}`, ...steps.slice(1)];
     }
     return steps;
   }
   const text = stringValue(value.text, clean) ?? stringValue(value.name, clean);
   return text === undefined ? [] : splitInstructionText(text, clean);
+}
+
+/** WP Recipe Maker writes an ingredient's notes as a trailing bracket around
+ * text that already starts with a comma or its own brackets ("1 onion (,
+ * chopped)", "beef ((ground) (Note 1))"). Drop the redundant outer bracket. */
+function tidyIngredient(text: string): string {
+  if (!text.endsWith(")")) return text;
+  // Walk back to the bracket the final ")" closes: linear, unlike a regex
+  // that would rescan the tail at every " (," on a hostile page.
+  let depth = 0;
+  let open = text.length - 1;
+  for (; open >= 0; open -= 1) {
+    if (text[open] === ")") depth += 1;
+    else if (text[open] === "(" && --depth === 0) break;
+  }
+  if (open < 1 || text[open - 1] !== " ") return text;
+  const notes = text.slice(open + 1, -1);
+  if (/^,\s*\S/.test(notes)) return text.slice(0, open - 1) + notes;
+  if (/^\(\s*[^\s)]/.test(notes)) {
+    return text.slice(0, open) + notes;
+  }
+  return text;
+}
+
+/** Strip trailing colons by hand: `/:+$/` backtracks quadratically on a
+ * long run of colons that is not at the end. */
+function trimTrailingColons(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  let end = text.length;
+  while (end > 0 && text[end - 1] === ":") end -= 1;
+  return text.slice(0, end);
 }
 
 function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
@@ -186,14 +217,14 @@ function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
     ingredients: stringList(
       node.recipeIngredient ?? node.ingredients ?? [],
       clean,
-    ),
+    ).map(tidyIngredient),
     steps: instructionSteps(node.recipeInstructions, clean),
   };
 }
 
 /**
  * One page, one recipe. Several distinct Recipe nodes mean a roundup ("12
- * weeknight dinners") — there is no single recipe to show, so none is
+ * weeknight dinners"). There is no single recipe to show, so none is
  * returned. Plugins that emit the same recipe twice (e.g. once standalone and
  * once inside the SEO graph) collapse to one by name.
  */
@@ -281,7 +312,7 @@ function extractMicrodata(document: Document): RecipeDraft | undefined {
  * Read the page's structured recipe, if it declares exactly one. JSON-LD is
  * checked first (the overwhelmingly common form), then microdata. Returns the
  * raw draft; callers sanitize. A page that is not a recipe, a roundup of
- * several, or one whose markup will not parse yields undefined — never an
+ * several, or one whose markup will not parse yields undefined, never an
  * error, since the page itself still saves fine.
  */
 export function extractRecipeMarkup(html: string): RecipeDraft | undefined {
@@ -312,7 +343,7 @@ const MAX_RECIPE_SERVINGS_CHARS = 60;
  * cannot read around; a recipe over budget is refused instead, which leaves the
  * article in place. Repeated lines are kept for the same reason: a recipe in
  * components lists the same quantity under each one, and a dough really does
- * rest twice. A rejected recipe is simply omitted — never fails the whole
+ * rest twice. A rejected recipe is simply omitted and never fails the whole
  * finalize. */
 export function sanitizeRecipe(
   raw: RecipeDraft | null | undefined,

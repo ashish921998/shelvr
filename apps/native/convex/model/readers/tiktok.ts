@@ -5,8 +5,23 @@ import {
   parseJson,
   PageFetchError,
   SHELVR_USER_AGENT,
+  postField,
   type PageData,
 } from "../pageReadCore";
+
+/** A short link (vm.tiktok.com, tiktok.com/t/) resolved to the video it
+ * names, from the oEmbed author and video id. */
+function tikTokPostUrl(
+  handle: string | undefined,
+  videoId: string | undefined,
+): string | undefined {
+  return handle &&
+    videoId &&
+    /^[A-Za-z0-9._]+$/.test(handle) &&
+    /^\d+$/.test(videoId)
+    ? `https://www.tiktok.com/@${handle}/video/${videoId}`
+    : undefined;
+}
 
 /**
  * TikTok refuses bot page loads, but its public oEmbed endpoint answers with
@@ -35,6 +50,7 @@ export async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const handle = str("author_unique_id");
   const caption = str("title");
   return {
+    ...postField(tikTokPostUrl(handle, str("embed_product_id"))),
     title: caption,
     siteName: "TikTok",
     author: handle ? `@${handle}` : str("author_name"),

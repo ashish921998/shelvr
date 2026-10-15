@@ -120,7 +120,7 @@ const RecentSavesWidget = (
 
   // A grid cell: thumbnail if the save has one, otherwise a warm tile with
   // the type icon and title. Every cell is sized to exactly half the widget
-  // minus padding (12pt) and gap (7pt): (side - 12*2 - 7) / 2 — an image's
+  // minus padding (12pt) and gap (7pt): (side - 12*2 - 7) / 2: an image's
   // intrinsic size would otherwise skew the HStack split.
   const gridCell = containerRelativeFrame({
     axes: "both",

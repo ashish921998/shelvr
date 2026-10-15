@@ -614,7 +614,8 @@ describe("readPage for Instagram posts", () => {
       const result = await readPage(url);
       expect(result).toMatchObject({ status: "ok", askForRecipe: eligible });
       if (result.status === "ok") {
-        expect(result.page.caption).toBe(true);
+        // An empty caption leaves no content to mark as a caption.
+        expect(result.page.caption).toBe(caption === "" ? undefined : true);
         expect(result.page.recipe).toBeUndefined();
       }
     },
