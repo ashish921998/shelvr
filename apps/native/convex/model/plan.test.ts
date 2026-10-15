@@ -182,6 +182,20 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("does not ground a Korean name on a different last syllable", () => {
+    expect(isGrounded("마포", source({ content: "마폭 맛집 다녀옴" }))).toBe(
+      false,
+    );
+    expect(isGrounded("마포", source({ content: "마포에서 저녁" }))).toBe(true);
+  });
+
+  it("does not read a spaced author as one handle", () => {
+    expect(isGrounded("Art Bar", source({ author: "Smart Barista" }))).toBe(
+      false,
+    );
+    expect(isGrounded("Tigre", source({ author: "tigrenyc" }))).toBe(true);
+  });
+
   it("matches a Korean name with a particle written onto it", () => {
     expect(
       isGrounded(
