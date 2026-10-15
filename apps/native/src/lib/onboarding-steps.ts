@@ -30,6 +30,8 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   promise: "promise",
 };
 
+// The promise step has no way back: a practice share that reached Shelvr
+// stays held, and a share step that finds one moves straight on again.
 // The demo step is missing on purpose: what back means there depends on
 // which of its screens is up, so the step tells the screen itself.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
@@ -37,7 +39,6 @@ const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
   setup: "interests",
   notifications: "demo",
   share: "notifications",
-  promise: "share",
 };
 
 export function previousOnboardingStep(
