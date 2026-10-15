@@ -10,6 +10,7 @@ import {
   fakeAiLocks,
   fakeLinkAnalysis,
   fakeNoteAnalysis,
+  fakeRecommendation,
   FIXTURE_ORIGIN,
   fixturePage,
   noteFromPrompt,
@@ -240,6 +241,59 @@ describe("FAKE_MODEL on a link", () => {
         schema: noteSchema.extend({ recipe: z.string().nullable() }),
         prompt: linkPrompt("Membrillo sets slowly."),
       }),
+    ).rejects.toThrow(FakeAiUnansweredError);
+  });
+});
+
+// The shape of the recommendation prompt in aiRecommendForSpace.ts.
+function recommendPrompt(spaceName: string): string {
+  return [
+    "You are helping organize a save-it-for-later app. The user just created a space (a themed collection).",
+    `Space name: "${spaceName}"\nSpace description: Bowls`,
+    "Below is a numbered list of the user's saved items.",
+    [
+      "1. Weeknight Miso Ramen — A fast ramen recipe — tags: recipes, dinner",
+      "2. Belém Tower — A saved place in Lisbon",
+      "3. Ramen bars in Tokyo — tags: travel",
+    ].join("\n"),
+  ].join("\n\n");
+}
+
+describe("fakeRecommendation", () => {
+  it("picks the saves that share a word with the space name", () => {
+    expect(fakeRecommendation(recommendPrompt("Ramen 1760"))).toEqual({
+      itemNumbers: [1, 3],
+    });
+  });
+
+  it("picks nothing when no save shares one", () => {
+    expect(fakeRecommendation(recommendPrompt("Pilot 1760"))).toEqual({
+      itemNumbers: [],
+    });
+  });
+
+  it("leaves a prompt that is not a recommendation unanswered", () => {
+    expect(fakeRecommendation(notePrompt('Space name: "Ramen"'))).toBe(
+      undefined,
+    );
+  });
+});
+
+describe("FAKE_MODEL on a recommendation", () => {
+  const schema = z.object({ itemNumbers: z.array(z.number().int()) });
+
+  it("answers through generateObject", async () => {
+    const { object } = await generateObject({
+      model: FAKE_MODEL,
+      schema,
+      prompt: recommendPrompt("Lisbon"),
+    });
+    expect(object.itemNumbers).toEqual([2]);
+  });
+
+  it("fails a recommendation schema on another prompt", async () => {
+    await expect(
+      generateObject({ model: FAKE_MODEL, schema, prompt: notePrompt("x") }),
     ).rejects.toThrow(FakeAiUnansweredError);
   });
 });

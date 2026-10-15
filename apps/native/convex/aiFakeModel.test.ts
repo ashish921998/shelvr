@@ -10,8 +10,8 @@ import { FIXTURE_ORIGIN } from "./model/fakeAi";
 import { newConvexTest, signedInUser } from "./test.setup";
 
 // The e2e backend's settings, in place before ai.ts and its model load. Unlike
-// fakeAi.test.ts, nothing here hands the fake a prompt: processItem builds its
-// own and sends it through the real generateObject, so a change to a prompt or
+// fakeAi.test.ts, nothing here hands the fake a prompt: the actions build their
+// own and send them through the real generateObject, so a change to a prompt or
 // a schema that the fake no longer recognizes fails here, not on the
 // simulator.
 vi.hoisted(() => {
@@ -123,5 +123,49 @@ describe("the e2e fake model behind processItem", () => {
       description: "How to cook membrillo slowly until it sets.",
     });
     expect(item?.tags).toContain("membrillo");
+  });
+});
+
+describe("the e2e fake model behind recommendForSpace", () => {
+  it("suggests the saves that share a word with the new space's name", async () => {
+    // On the e2e backend the placeholder key fails the embedding call, so
+    // the candidates are the newest saves.
+    embedMany.mockRejectedValue(new Error("no embedding provider"));
+    const { t, userId } = await signedInUser(newConvexTest());
+    const spaceId = await t.run(async (ctx) => {
+      for (const title of ["Weeknight Miso Ramen", "Belém Tower"]) {
+        await ctx.db.insert("items", {
+          userId,
+          type: "link",
+          status: "ready",
+          title,
+          tags: [],
+          searchText: title.toLowerCase(),
+        });
+      }
+      return await ctx.db.insert("spaces", {
+        userId,
+        name: "Ramen 1760",
+        dynamic: true,
+      });
+    });
+    await t.action(internal.aiRecommendForSpace.recommendForSpace, {
+      spaceId,
+    });
+    const suggested = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("spaceItems")
+        .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+        .collect();
+      return await Promise.all(
+        rows.map(async (row) => ({
+          status: row.status,
+          title: (await ctx.db.get(row.itemId))?.title,
+        })),
+      );
+    });
+    expect(suggested).toEqual([
+      { status: "suggested", title: "Weeknight Miso Ramen" },
+    ]);
   });
 });

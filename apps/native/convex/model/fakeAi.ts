@@ -7,8 +7,9 @@ import type { wrapLanguageModel } from "ai";
  * placeholder model key, so every real model call fails and a save that needs
  * one can never finish. This model answers instead, from the saved content
  * itself, so a flow like save-note can run on every pull request with no
- * secret. It knows two calls (a note's and a fixture page's classification)
- * and fails loudly on anything else, so a flow that strays onto an unanswered
+ * secret. It knows three calls (a note's and a fixture page's
+ * classification, and a new space's recommendations) and fails loudly on
+ * anything else, so a flow that strays onto an unanswered
  * call fails instead of passing on an invented answer. It recognizes them by
  * the wording of the prompts in ai.ts; aiFakeModel.test.ts runs those real
  * prompts through it, so a rewording that would strand the fake fails there.
@@ -88,6 +89,12 @@ const NOTE_MARKER = "\n\nNote:\n";
 const LINK_TASK = "Analyze this saved web page";
 const CONTENT_MARKER = "\n\nPage content:\n";
 const INTENTS_MARKER = "\n\nAlso propose up to ";
+/** The key of recommendSchema in aiRecommendForSpace.ts, and the markers of
+ * its prompt: the task line, the space's name, and the numbered saves. */
+const RECOMMEND_KEYS = "itemNumbers";
+const RECOMMEND_TASK = "The user just created a space";
+const SPACE_NAME = /^Space name: "(.*)"$/m;
+const NUMBERED_SAVE = /^(\d+)\. (.*)$/gm;
 const TITLE_WORDS = 6;
 const MAX_TAGS = 6;
 
@@ -102,12 +109,14 @@ type Analysis = {
 /** A web page as the fake reads it back out of the link prompt. */
 type PromptPage = { title?: string; description?: string; content?: string };
 
+/** Words of four letters or more, lowercased, as the fake compares them. */
+function wordsOf(text: string): Set<string> {
+  return new Set(text.toLowerCase().match(/\p{L}{4,}/gu) ?? []);
+}
+
 /** Unique lowercase words of four letters or more, as tags. */
 function tagsFrom(text: string): string[] {
-  return [...new Set(text.toLowerCase().match(/\p{L}{4,}/gu) ?? [])].slice(
-    0,
-    MAX_TAGS,
-  );
+  return [...wordsOf(text)].slice(0, MAX_TAGS);
 }
 
 /**
@@ -182,6 +191,27 @@ export function pageFromPrompt(prompt: string): PromptPage | undefined {
   };
 }
 
+/**
+ * What the fake recommends for a new space: every numbered save whose line
+ * shares a word of four letters or more with the space's name, so a flow
+ * that names a space after a seeded save sees exactly that save suggested.
+ * Undefined when the prompt is not a recommendation prompt. Exported pure for
+ * unit testing.
+ */
+export function fakeRecommendation(
+  prompt: string,
+): { itemNumbers: number[] } | undefined {
+  const name = prompt.includes(RECOMMEND_TASK)
+    ? SPACE_NAME.exec(prompt)?.[1]
+    : undefined;
+  if (name === undefined) return undefined;
+  const nameWords = wordsOf(name);
+  const itemNumbers = [...prompt.matchAll(NUMBERED_SAVE)]
+    .filter(([, , line]) => [...wordsOf(line)].some((w) => nameWords.has(w)))
+    .map(([, number]) => Number(number));
+  return { itemNumbers };
+}
+
 function promptText(options: CallOptions): string {
   return options.prompt
     .filter((message) => message.role === "user")
@@ -215,9 +245,17 @@ export class FakeAiUnansweredError extends Error {
 
 /** The answer to one call, or a thrown FakeAiUnansweredError. Exported for
  * unit testing. */
-export function fakeAnswer(options: CallOptions): Analysis {
-  if (schemaKeys(options) !== ANALYSIS_KEYS) throw new FakeAiUnansweredError();
+export function fakeAnswer(
+  options: CallOptions,
+): Analysis | { itemNumbers: number[] } {
+  const keys = schemaKeys(options);
   const prompt = promptText(options);
+  if (keys === RECOMMEND_KEYS) {
+    const picks = fakeRecommendation(prompt);
+    if (picks === undefined) throw new FakeAiUnansweredError();
+    return picks;
+  }
+  if (keys !== ANALYSIS_KEYS) throw new FakeAiUnansweredError();
   const note = noteFromPrompt(prompt);
   if (note !== undefined) return fakeNoteAnalysis(note);
   const page = pageFromPrompt(prompt);
