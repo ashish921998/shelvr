@@ -96,51 +96,11 @@ export function startOnSeededHome(): void {
     });
     await screen.getByRole("button", "OK").tap();
 
-    await closeSheetsAfterReset(app, screen, profile);
-  });
-}
-
-/**
- * Closes Settings and the Profile sheet under it, back to Home. The reset
- * changes only server data, which the app picks up live, so this replaces
- * the relaunch that used to follow it: about a minute per test on CI. If a
- * sheet will not close, the app is relaunched as before.
- */
-async function closeSheetsAfterReset(
-  app: App,
-  screen: Screen,
-  profile: Locator,
-): Promise<void> {
-  try {
-    await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-    await dragSheetDown(screen, screen.getByTestId("reset-flow-fixtures"));
-    await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-    await dragSheetDown(screen, screen.getByRole("button", "Settings"));
-    await expect(profile).toBeVisible({ timeout: 10_000 });
-  } catch {
     await openApp(app, screen, () => profile.isVisible());
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
-  }
-}
-
-/**
- * Drags the top sheet down by its grabber, far past the point where iOS
- * dismisses it, and waits for `content`, a control on that sheet, to go.
- * Only the top sheet's grabber is expected in the tree; `last` picks it if
- * the one below is listed too.
- */
-async function dragSheetDown(screen: Screen, content: Locator): Promise<void> {
-  const box = await screen
-    .getByRole("button", "Sheet Grabber")
-    .last()
-    .boundingBox();
-  if (box === null) throw new Error("no sheet grabber to drag");
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await screen.swipe({ from: { x, y }, to: { x, y: y + 600 } });
-  await expect(content).toBeHidden({ timeout: 10_000 });
+  });
 }
 
 /**

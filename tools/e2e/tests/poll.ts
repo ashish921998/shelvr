@@ -30,7 +30,11 @@ function isToolFailure(error: unknown): boolean {
  * `expect.poll` treats every thrown read as "not yet", so a test tool that
  * stopped answering used to keep a poll going until its timeout and then
  * fail as an assertion. Here the tool's own failure ends the poll at once,
- * after TOOL_FAILURE_STREAK of them in a row, and is reported as what it is.
+ * after TOOL_FAILURE_STREAK of them in a row, and the error names it.
+ *
+ * It is thrown as a plain error, which the runner counts as a test failure:
+ * on CI it retries a test only for those, and a retry starts from a fresh
+ * launch that often gets past a stalled tool.
  */
 export async function pollUntil(
   check: () => Promise<boolean>,
@@ -55,5 +59,9 @@ export async function pollUntil(
       { timeout },
     )
     .toBe(true);
-  if (toolFailure !== undefined) throw toolFailure;
+  if (toolFailure !== undefined) {
+    const reason =
+      toolFailure instanceof Error ? toolFailure.message : String(toolFailure);
+    throw new Error(`The test tool stopped answering: ${reason}`);
+  }
 }
