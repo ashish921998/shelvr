@@ -2,6 +2,7 @@ import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
 import {
+  tapTab,
   chooseAddOption,
   SHEET_TRANSITION_MS,
   startOnSeededHome,
@@ -11,8 +12,9 @@ startOnSeededHome();
 
 const NOTE = "Ask the landlord about the quokka mural";
 
-// A note's own words are searchable, so the check needs no model: the word
-// below is in no seeded save, and only the new note can answer for it.
+// The word below is in no seeded save, so only the new note can answer for
+// it. The test makes no model call itself, but the backend does: a note's
+// words reach the search index only once the model has processed it.
 test("saves a note and finds it by its own words", async ({ screen }) => {
   await chooseAddOption(screen, screen.getByTestId("add-option-note"));
   await screen.getByTestId("add-note-input").fill(NOTE);
@@ -26,7 +28,7 @@ test("saves a note and finds it by its own words", async ({ screen }) => {
   });
   await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
 
-  await screen.getByRole("tab", "Search").tap();
+  await tapTab(screen, "Search");
   await screen.getByRole("textbox", "Search your saves").fill("quokka");
 
   // The model titles the note, so the result's label is not known ahead of

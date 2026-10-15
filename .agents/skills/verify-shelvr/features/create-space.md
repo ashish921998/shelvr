@@ -36,7 +36,7 @@ space-input|ios|fuzzer|From the seeded Home, create spaces named empty, with onl
 
 ## Gotchas
 
-- One unexplained flake: "New space" is tapped and its name field never
-  appears. Seen once in nine runs before #351 and once after; it is not behind
-  the entitlement guard, so none of #351's fixes covers it. Rerun once before
-  calling it a regression, and report it if it repeats.
+- "New space" has been tapped with its name field never appearing, once in
+  nine runs before #351 and once after, cause unknown. The test now taps it
+  through `tapUntilVisible`, so a lost tap shows as a second `New space` tap
+  in the report instead of a failure.

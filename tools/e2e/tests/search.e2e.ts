@@ -1,12 +1,12 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { startOnSeededHome, tapTab } from "./seeded-home.ts";
 
 startOnSeededHome();
 
 test("finds a save by a word in its title", async ({ screen }) => {
-  await screen.getByRole("tab", "Search").tap();
+  await tapTab(screen, "Search");
   await screen.getByRole("textbox", "Search your saves").fill("ramen");
 
   // The query is debounced and runs on the backend, so the toBeVisible wait

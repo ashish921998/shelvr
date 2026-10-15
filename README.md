@@ -179,9 +179,10 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 [e2e](https://github.com/tester-army/e2e) framework: save a link, save a note,
 save a photo, create a space, search, a search with no match, and the paywall,
 plus a smoke test (`tests/smoke.e2e.ts`) that only opens the seeded Home.
-Search, save-a-note, create-a-space and the paywall use plain locators and need
-no model. The paywall flow relaunches the app with `-E2EHidePro YES`, which makes
-a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check` or CI yet. Every flow launches with `-E2EHideLogBox YES`, which keeps the
+Search, save-a-note, create-a-space and the paywall use plain locators and make
+no model call from the test; save-a-note still needs the backend's model, which
+makes the note searchable. The paywall flow relaunches the app with `-E2EHidePro YES`, which makes
+a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check`. The `e2e ios` workflow runs search, search-no-results, create-space and the paywall on pull requests that touch the app, against a local Convex backend and with no model, as a check that is not required yet. Every flow launches with `-E2EHideLogBox YES`, which keeps the
 development error banner from covering the controls the flows tap.
 
 It needs a booted iOS simulator with the development build

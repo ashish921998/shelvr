@@ -1,12 +1,12 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { startOnSeededHome, tapTab } from "./seeded-home.ts";
 
 startOnSeededHome();
 
 test("says so when no save matches the search", async ({ screen }) => {
-  await screen.getByRole("tab", "Search").tap();
+  await tapTab(screen, "Search");
   await screen.getByRole("textbox", "Search your saves").fill("zzyzxq");
 
   await expect(screen.getByText("Nothing yet")).toBeVisible({
