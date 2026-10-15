@@ -2977,6 +2977,62 @@ describe("photo rejection before classification", () => {
     });
   });
 
+  it("lets a product search whose action died be pressed again", async () => {
+    const { t, userId } = await as();
+    const id = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        note: "chair",
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.mutation(api.items.findLinks, { id });
+    // The search action is killed (a deploy, a timeout) before it writes.
+    await t.run(async (ctx) => {
+      for (const job of await ctx.db.system
+        .query("_scheduled_functions")
+        .collect()) {
+        if (job.name.includes("findProductLinks")) {
+          await ctx.scheduler.cancel(job._id);
+        }
+      }
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "failed",
+    });
+
+    await t.mutation(api.items.findLinks, { id });
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "searching",
+    });
+  });
+
+  it("leaves a newer product search alone when an older one expires", async () => {
+    const { t, userId } = await as();
+    const id = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        tags: [],
+        searchText: "",
+        productsStatus: "searching",
+        productsSearchStartedAt: 2,
+      }),
+    );
+    await t.mutation(internal.items.expireProductSearch, {
+      itemId: id,
+      startedAt: 1,
+    });
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "searching",
+    });
+  });
+
   it("does not delete an oversized photo referenced by another item", async () => {
     const { t } = await as();
     const storageId = await t.run(async (ctx) => {
