@@ -7,7 +7,7 @@ the product model, architecture, environment variables, commands, and
 conventions. Keep this file short and use it as the routing layer rather than
 duplicating that reference.
 
-Before editing native app code, consult the Expo SDK 57 documentation linked in
+Before editing native app code, consult the Expo SDK 58 documentation linked in
 `CLAUDE.md`. Before editing `apps/native/convex/**`, read
 `apps/native/convex/_generated/ai/guidelines.md` and use the Convex-specific
 workflow described there.

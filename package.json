@@ -50,7 +50,7 @@
       "compression": "^1.8.2",
       "source-map-js": "^1.2.2",
       "sharp": "^0.35.5",
-      "expo-app-intents>@expo/ui": "~57.0.10"
+      "expo-app-intents>@expo/ui": "58.0.9"
     },
     "auditConfig": {
       "ignoreGhsas": [
