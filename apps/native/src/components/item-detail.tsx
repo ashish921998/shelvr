@@ -16,6 +16,7 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { withoutSourceLink } from "@/lib/source-link";
 import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
 import { convexQuery } from "@convex-dev/react-query";
@@ -211,10 +212,16 @@ export const ItemDetail = memo(function ItemDetail({
     const base = item.intents ?? [];
     const scoped = item.spaceIntents ?? [];
     const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
-    return [
-      ...base,
-      ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
-    ];
+    // An action that only reopens the save's own page repeats the source line.
+    return withoutSourceLink(
+      [
+        ...base,
+        ...scoped.filter(
+          (i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`),
+        ),
+      ],
+      item.url,
+    );
   })();
 
   // `detail`, not `item`: a row from a search or a space carries the recipe
