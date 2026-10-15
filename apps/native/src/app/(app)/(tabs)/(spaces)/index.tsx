@@ -252,6 +252,17 @@ function SpaceCard({
     // `role`, not `accessibilityRole`, which Link's role="link" would shadow.
     role: "button" as const,
     accessibilityLabel: space.name,
+    // The cell stands in for the card, so it also carries the count the
+    // empty cover shows, as a value: the name stays the label tests and
+    // Voice Control match on.
+    accessibilityValue: {
+      text:
+        space.itemCount > 0
+          ? t("spaces.saveCount", { count: space.itemCount })
+          : space.suggestionCount > 0
+            ? t("spaces.suggestionCount", { count: space.suggestionCount })
+            : undefined,
+    },
     accessibilityActions: [{ name: "delete", label: t("common.delete") }],
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
       if (event.nativeEvent.actionName === "delete") {
