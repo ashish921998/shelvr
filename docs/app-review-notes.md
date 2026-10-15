@@ -6,7 +6,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
-- Reviewer path: onboarding opener → topics → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → share practice → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
+- Reviewer path: onboarding opener → topics → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → share practice → promise → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
 - App Review can use its own Apple account through Sign in with Apple; no developer-issued credentials, one-time code, invitation, or special account state is required.
 - A dedicated Google test account is optional fallback access. If one is supplied, enter the credentials in App Store Connect only, never in this repo or the app binary.
 - Anonymous / "Continue without account" is **dev-only** and disabled in production builds.
@@ -18,11 +18,12 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 3. **Setup:** "What do you save?" picks save kinds and the spaces to start with.
 4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. A sample first shows a preview of the result with no account, then asks for Sign in with Apple or Google on its own screen; that screen stays up for a few seconds while Shelvr reads, titles, and files the link. **Skip for now** passes the first save, and onboarding then ends at the sign-in screen. If the save fails, for example while offline, the step offers a retry or a way to continue without saving.
 5. **Reminder:** "When should it come back?" offers one reminder for the save just made. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
-6. **Share practice:** "Now save one from the Share menu." has the user share one sample link to Shelvr through the system share sheet, or skip with **I'll try it later**. A successful share shows "You nailed it."
-7. **Paywall:** "Keep saving with Pro" on that screen (or skipping the practice) opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
-8. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
-9. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
-10. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
+6. **Share practice:** "Save this post the way you will in any app." has the user share one sample post to Shelvr through the system share sheet, or skip with **I'll try it later**. A successful share shows "You nailed it." and a **Continue** button.
+7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. Nothing is stored or sent. **I'm in** is the only action.
+8. **Paywall:** **I'm in** opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
+9. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
+10. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
+11. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
 
 ## Core save loop
 
@@ -116,7 +117,7 @@ Account access:
 
 Subscription testing:
 
-1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice, tap "Keep saving with Pro" (or "I'll try it later") to open the RevenueCat paywall in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
+1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile > Settings.
