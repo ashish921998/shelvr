@@ -81,6 +81,7 @@ describe("fakeNoteAnalysis", () => {
       tags: ["landlord", "about", "quokka", "mural", "soon"],
       spaceNames: [],
       intents: [],
+      cities: [],
     });
   });
 
@@ -135,6 +136,7 @@ const noteSchema = z.object({
   tags: z.array(z.string()),
   spaceNames: z.array(z.string()),
   intents: z.array(z.object({ kind: z.string() })),
+  cities: z.array(z.string()),
 });
 
 describe("FAKE_MODEL", () => {
@@ -204,6 +206,7 @@ describe("fakeLinkAnalysis", () => {
       tags: ["quince", "paste", "beginners", "membrillo", "sets", "slowly"],
       spaceNames: [],
       intents: [],
+      cities: [],
     });
   });
 

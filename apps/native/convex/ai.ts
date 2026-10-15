@@ -19,7 +19,7 @@ import {
   type ShortFormSource,
 } from "./model/pageRead";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { INTENT_KINDS, type Recipe } from "./model/itemFields";
+import { INTENT_KINDS, normalizeCities, type Recipe } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { sanitizeRecipe, type RecipeDraft } from "./model/recipeMarkup";
 import { buildEmbeddingText } from "./model/embedding";
@@ -251,6 +251,11 @@ const itemAnalysisSchema = z.object({
     .describe(
       "0-5 pressable actions that would be genuinely useful for this item. Empty if none clearly apply; do not pad.",
     ),
+  cities: z
+    .array(z.string())
+    .describe(
+      "The cities of the specific places this item names or shows (restaurants, bars, cafés, shops, hotels, sights), at most 3, city name only in English, e.g. 'Mumbai' or 'New York'. Empty if it names no place or the city is not stated or clearly shown; never guess.",
+    ),
 });
 
 const recipeSchema = z
@@ -388,7 +393,14 @@ function unclassified(
   title: string | undefined,
   description = "",
 ): Classification["result"] {
-  return { title, description, tags: [], spaceNames: [], intents: [] };
+  return {
+    title,
+    description,
+    tags: [],
+    spaceNames: [],
+    intents: [],
+    cities: [],
+  };
 }
 
 /** What each kind of save can say for itself with no model involved. */
@@ -434,12 +446,14 @@ function classifiedFields(
       tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
       description: result.description,
       intents: sanitizeIntents(result.intents),
+      cities: normalizeCities(result.cities),
     };
   }
   return {
     tags: item.tags,
     description: result.description || (item.description ?? ""),
     intents: item.intents ?? [],
+    cities: item.cities,
   };
 }
 
@@ -1115,7 +1129,7 @@ export const processItem = internalAction({
       // Map returned space names back to ids (case-insensitive, trimmed).
       const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
-      const { tags, description, intents } = classifiedFields(
+      const { tags, description, intents, cities } = classifiedFields(
         aiAllowed,
         result,
         item,
@@ -1156,6 +1170,7 @@ export const processItem = internalAction({
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
         intents,
+        cities,
         recipe: finalRecipe(page, result),
         enrichment: linkEnrichment(linkRead),
         status: "ready",

@@ -77,7 +77,7 @@ function isLoopback(url: string | undefined): boolean {
 /** The keys of itemAnalysisSchema in ai.ts, sorted: the plain note and
  * web page classification. The recipe and video variants add keys, so the
  * fake does not answer them. */
-const ANALYSIS_KEYS = "description,intents,spaceNames,tags,title";
+const ANALYSIS_KEYS = "cities,description,intents,spaceNames,tags,title";
 // Markers from the note and link prompts in ai.ts: their task lines, the
 // sections that carry the note or the page, and the intents block that
 // always closes both.
@@ -95,6 +95,7 @@ type Analysis = {
   tags: string[];
   spaceNames: string[];
   intents: never[];
+  cities: never[];
 };
 
 /** A web page as the fake reads it back out of the link prompt. */
@@ -127,6 +128,7 @@ export function fakeNoteAnalysis(note: string): Analysis {
     tags: tagsFrom(note),
     spaceNames: [],
     intents: [],
+    cities: [],
   };
 }
 
@@ -145,6 +147,7 @@ export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
     tags: tagsFrom(`${page.title}\n${page.content ?? ""}`),
     spaceNames: [],
     intents: [],
+    cities: [],
   };
 }
 
