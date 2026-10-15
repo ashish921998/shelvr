@@ -58,6 +58,8 @@ vi.mock("react-native", () => {
       <span>{children}</span>
     )),
     Alert: { alert: vi.fn() },
+    AppState: { addEventListener: vi.fn() },
+    Platform: { OS: "ios" },
     Share: { share: vi.fn(), sharedAction: "sharedAction" },
     StyleSheet: { flatten: (style: unknown) => style },
   };
