@@ -40,6 +40,7 @@ export function ActionMenu({
 }) {
   const menu = useRef<MenuComponentRef>(null);
   const owner = useRef({});
+  const pressedAt = useRef({ pageX: 0, pageY: 0 });
   // A card can unmount with its menu open (deleted elsewhere, or the list
   // changed), so the tap that would have closed it never comes.
   useEffect(() => {
@@ -59,8 +60,16 @@ export function ActionMenu({
     <View
       onStartShouldSetResponder={claimTouch}
       onResponderTerminationRequest={keepTouch}
-      onResponderRelease={() => {
-        openMenu = Platform.OS === "ios" ? owner.current : null;
+      onResponderGrant={({ nativeEvent }) => {
+        pressedAt.current = nativeEvent;
+      }}
+      onResponderRelease={({ nativeEvent }) => {
+        // A finger that slid off before lifting opened no menu, and marking
+        // one open would drop the next unrelated tap.
+        const tapped =
+          Math.abs(nativeEvent.pageX - pressedAt.current.pageX) <= TAP_SLOP &&
+          Math.abs(nativeEvent.pageY - pressedAt.current.pageY) <= TAP_SLOP;
+        openMenu = Platform.OS === "ios" && tapped ? owner.current : null;
       }}
     >
       <MenuView
@@ -113,6 +122,8 @@ export function ActionMenu({
   );
 }
 
+// How far a finger may drift and still count as a tap, in points.
+const TAP_SLOP = 10;
 const claimTouch = () => true;
 const keepTouch = () => false;
 

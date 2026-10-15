@@ -5,6 +5,11 @@ import { View } from "react-native";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ActionMenu, dropMenuDismissTouch } from "./action-menu";
 
+type TouchAt = { nativeEvent: { pageX: number; pageY: number } };
+const touchAt = (event: { clientX: number; clientY: number }): TouchAt => ({
+  nativeEvent: { pageX: event.clientX, pageY: event.clientY },
+});
+
 // Models React Native's responder bubbling: a touch goes to the deepest view
 // whose `onStartShouldSetResponder` returns true, and ancestors never see it.
 // That view also receives the release.
@@ -15,23 +20,27 @@ vi.mock("react-native", () => ({
     ({
       children,
       onStartShouldSetResponder,
+      onResponderGrant,
       onResponderRelease,
       accessibilityLabel,
     }: {
       children: ReactNode;
       onStartShouldSetResponder?: () => boolean;
-      onResponderRelease?: () => void;
+      onResponderGrant?: (event: TouchAt) => void;
+      onResponderRelease?: (event: TouchAt) => void;
       accessibilityLabel?: string;
     }) => (
       <div
         aria-label={accessibilityLabel}
-        onPointerDown={(event) => {
-          if (onStartShouldSetResponder?.()) event.stopPropagation();
-        }}
-        onPointerUp={(event) => {
+        onMouseDown={(event) => {
           if (!onStartShouldSetResponder?.()) return;
           event.stopPropagation();
-          onResponderRelease?.();
+          onResponderGrant?.(touchAt(event));
+        }}
+        onMouseUp={(event) => {
+          if (!onStartShouldSetResponder?.()) return;
+          event.stopPropagation();
+          onResponderRelease?.(touchAt(event));
         }}
       >
         {children}
@@ -71,11 +80,11 @@ beforeEach(() => {
 function renderCard(cardPress: () => void, onShare = () => {}) {
   return render(
     <div
-      onPointerDownCapture={(event) => {
+      onMouseDownCapture={(event) => {
         if (dropMenuDismissTouch()) event.stopPropagation();
       }}
     >
-      <div data-testid="card" onPointerDown={cardPress}>
+      <div data-testid="card" onMouseDown={cardPress}>
         <ActionMenu
           label="Item actions"
           title="Item actions"
@@ -89,8 +98,8 @@ function renderCard(cardPress: () => void, onShare = () => {}) {
 }
 
 function tap(element: HTMLElement) {
-  fireEvent.pointerDown(element);
-  fireEvent.pointerUp(element);
+  fireEvent.mouseDown(element);
+  fireEvent.mouseUp(element);
 }
 
 it("keeps a tap on the trigger away from a pressable ancestor", () => {
@@ -148,6 +157,20 @@ it("lets the next tap through when an open menu unmounts", () => {
   tap(screen.getByLabelText("Item actions"));
   unmount();
   renderCard(cardPress);
+  tap(screen.getByTestId("card"));
+
+  expect(cardPress).toHaveBeenCalledTimes(1);
+});
+
+// Pressing the trigger and sliding off before lifting opens no menu, so there
+// is no dismissing tap to drop.
+it("lets the next tap through when the finger slides off the trigger", () => {
+  const cardPress = vi.fn();
+  renderCard(cardPress);
+
+  const trigger = screen.getByLabelText("Item actions");
+  fireEvent.mouseDown(trigger, { clientX: 300, clientY: 500 });
+  fireEvent.mouseUp(trigger, { clientX: 220, clientY: 500 });
   tap(screen.getByTestId("card"));
 
   expect(cardPress).toHaveBeenCalledTimes(1);
