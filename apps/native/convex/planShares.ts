@@ -248,6 +248,18 @@ export const getPublicPlanShare = internalQuery({
  * pick. Rate limited per visitor IP and site-wide; a link keeps at most
  * MAX_PLAN_VOTERS voters, and one IP can add only a few of them.
  */
+/**
+ * The network a new voter's slot is counted against. One IPv6 device holds a
+ * whole /64 and can rotate through it, so IPv6 is keyed by its /64 prefix;
+ * IPv4 keeps the full address.
+ */
+function voterNetwork(ip: string | undefined): string {
+  const address = normalizeIp(ip);
+  if (address === undefined) return UNKNOWN_IP_LIMITER_KEY;
+  if (!address.includes(":")) return address;
+  return `${address.split(":").slice(0, 4).join(":")}::/64`;
+}
+
 export const recordPlanVote = internalMutation({
   args: {
     token: v.string(),
@@ -296,7 +308,7 @@ export const recordPlanVote = internalMutation({
       .take(MAX_PLAN_VOTERS);
     if (voters.length >= MAX_PLAN_VOTERS) return "full";
     await rateLimiter.limit(ctx, "planVoterSlot", {
-      key: `${share._id}:${normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY}`,
+      key: `${share._id}:${voterNetwork(args.ip)}`,
       throws: true,
     });
     await ctx.db.insert("planVotes", {

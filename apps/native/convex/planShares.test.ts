@@ -186,15 +186,35 @@ describe("votes", () => {
       spaceId,
       places,
     });
-    for (const voter of ["a", "b", "c"]) {
-      expect(await vote(backend, token, voter, ["p0"])).toBe("recorded");
+    for (let i = 0; i < 8; i++) {
+      expect(await vote(backend, token, `v${i}`, ["p0"])).toBe("recorded");
     }
-    await expect(vote(backend, token, "d", ["p0"])).rejects.toThrow();
+    await expect(vote(backend, token, "late", ["p0"])).rejects.toThrow();
     // Voters already on the link can still change their answer.
-    expect(await vote(backend, token, "a", ["p1"])).toBe("recorded");
-    expect(await vote(backend, token, "d", ["p0"], [], "198.51.100.9")).toBe(
+    expect(await vote(backend, token, "v0", ["p1"])).toBe("recorded");
+    expect(await vote(backend, token, "late", ["p0"], [], "198.51.100.9")).toBe(
       "recorded",
     );
+  });
+
+  it("counts every address in one IPv6 /64 as one network", async () => {
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    for (let i = 0; i < 8; i++) {
+      const ip = `2001:db8:1:2::${(i + 1).toString(16)}`;
+      expect(await vote(backend, token, `v${i}`, ["p0"], [], ip)).toBe(
+        "recorded",
+      );
+    }
+    await expect(
+      vote(backend, token, "late", ["p0"], [], "2001:db8:1:2:ffff::9"),
+    ).rejects.toThrow();
+    expect(
+      await vote(backend, token, "late", ["p0"], [], "2001:db8:1:3::1"),
+    ).toBe("recorded");
   });
 
   it("gives no slot to an empty ballot from someone new", async () => {
