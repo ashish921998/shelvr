@@ -50,9 +50,11 @@ export function MasonryFeed({
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       onScrollBeginDrag={onScrollBeginDrag}
+      // Each cell pads 4, so 12 here puts the outer cards 16 from the screen
+      // edge, the same margin as the headers and every other page.
       contentContainerStyle={{
         flexGrow: items.length === 0 ? 1 : undefined,
-        paddingHorizontal: 0,
+        paddingHorizontal: GRID_INSET,
         paddingTop: 8,
         paddingBottom: 8,
       }}
@@ -60,6 +62,9 @@ export function MasonryFeed({
       onEndReachedThreshold={1}
       ListEmptyComponent={listEmptyComponent}
       ListHeaderComponent={listHeaderComponent}
+      // Headers already inset themselves 16, so they step back out of the
+      // grid's padding instead of doubling it.
+      ListHeaderComponentStyle={styles.edgeToEdge}
       ListFooterComponent={
         loadingMore ? (
           <View style={styles.footer}>
@@ -71,7 +76,12 @@ export function MasonryFeed({
   );
 }
 
+const GRID_INSET = 12;
+
 const styles = StyleSheet.create((theme) => ({
+  edgeToEdge: {
+    marginHorizontal: -GRID_INSET,
+  },
   footer: {
     paddingVertical: theme.gap(2),
     alignItems: "center",

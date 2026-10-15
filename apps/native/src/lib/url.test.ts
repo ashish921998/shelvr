@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { displayHost, extractFirstUrl, isProbablyUrl, typedLink } from "./url";
+import {
+  displayHost,
+  extractFirstUrl,
+  isProbablyUrl,
+  siteMonogram,
+  typedLink,
+} from "./url";
 
 describe("isProbablyUrl", () => {
   it("recognizes a URL with and without an https scheme", () => {
@@ -58,6 +64,21 @@ describe("displayHost", () => {
 
   it("returns an empty string for undefined input", () => {
     expect(displayHost(undefined)).toBe("");
+  });
+});
+
+describe("siteMonogram", () => {
+  it("takes the first letter of the host, upper-cased, past www", () => {
+    expect(siteMonogram("https://www.ikea.com/us/en/p/poaeng")).toBe("I");
+  });
+
+  it("keeps an astral first character whole", () => {
+    // An unparseable URL falls back to the raw text, emoji and all.
+    expect(siteMonogram("😀 saved thing")).toBe("😀");
+  });
+
+  it("is undefined without a URL", () => {
+    expect(siteMonogram(undefined)).toBeUndefined();
   });
 });
 

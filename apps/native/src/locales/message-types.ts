@@ -353,7 +353,6 @@ export type MessageParams = {
   "item.pageFailed": undefined;
   "item.stalled": undefined;
   "item.partial": undefined;
-  "item.noArticle": undefined;
   "recipe.ingredients": undefined;
   "recipe.steps": undefined;
   "recipe.stepNumber": { number: string };
@@ -409,6 +408,8 @@ export type MessageParams = {
   "item.link": undefined;
   "item.photo": undefined;
   "item.openSite": { site: string };
+  "item.viewOnSite": { site: string };
+  "item.watchOnSite": { site: string };
   "item.hideTags": { tags: string };
   "item.showTags": { tags: string };
   "item.inSpaces": { spaces: string };

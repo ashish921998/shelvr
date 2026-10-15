@@ -13,12 +13,15 @@ import { IntentChip } from "@/components/intent-chip";
 import { SimilarGrid } from "@/components/similar-grid";
 import { TagChip } from "@/components/tag-chip";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
+import { Button } from "@/components/ui/button";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
 import { withoutSourceLink } from "@/lib/source-link";
 import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
+import { displayHost, siteMonogram } from "@/lib/url";
+import { isYouTubeUrl } from "@convex/model/externalUrl";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +32,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
 import {
   memo,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -306,11 +310,12 @@ export const ItemDetail = memo(function ItemDetail({
     openItemSource(item);
   };
 
+  const opensAs = heroOpensAs(item, social);
   const hero =
-    heroImage && social && item.url ? (
+    heroImage && opensAs && item.url ? (
       <PostMediaButton
-        site={social.site}
-        playable={social.playable}
+        site={opensAs.site}
+        playable={opensAs.playable}
         onPress={openPost}
       >
         {heroImage}
@@ -341,18 +346,27 @@ export const ItemDetail = memo(function ItemDetail({
         ))
       : null;
 
+  const zoomable = (target: ReactNode) =>
+    isZoomTarget ? (
+      <Link.AppleZoomTarget>{target}</Link.AppleZoomTarget>
+    ) : (
+      target
+    );
+  // The body may still turn a link into the reader, so the letter panel
+  // waits for it.
+  const monogram =
+    heroUri || bodyPending ? undefined : sitePanelMonogram(item, social);
+
   const heroBlock = heroUri ? (
     <>
       <View style={heroKind === "framed" ? styles.heroContainer : undefined}>
-        {isZoomTarget ? (
-          <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
-        ) : (
-          hero
-        )}
+        {zoomable(hero)}
       </View>
       {moreMedia}
     </>
-  ) : null;
+  ) : monogram === undefined ? null : (
+    zoomable(<SitePanel monogram={monogram} url={item.url} />)
+  );
 
   const scrollProps = {
     ref: scrollRef,
@@ -395,11 +409,61 @@ export const ItemDetail = memo(function ItemDetail({
         paragraphs={paragraphs}
         social={social}
         intents={intents}
-        heroUri={heroUri}
+        hasHero={heroBlock !== null}
       />
     </ScrollView>
   );
 });
+
+const YOUTUBE: SocialPost = { site: "YouTube", playable: true };
+
+/** A link that is neither a post nor an article: a product, a video, any page
+ * Shelvr read no body from. Its page leads with one button to the site. */
+function plainLink(item: DetailItem, social: SocialPost | undefined): boolean {
+  return item.type === "link" && social === undefined;
+}
+
+/** What the hero opens when tapped: a post on its site, or a YouTube video,
+ * which plays there and so gets the same play button a video post does. */
+function heroOpensAs(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): SocialPost | undefined {
+  if (social) return social;
+  return plainLink(item, social) && isYouTubeUrl(item.url)
+    ? YOUTUBE
+    : undefined;
+}
+
+/** The letter a plain link with no picture shows in its place. */
+function sitePanelMonogram(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): string | undefined {
+  return plainLink(item, social) ? siteMonogram(item.url) : undefined;
+}
+
+/** A plain link with no picture (a shop page, most often): its site's letter
+ * on the no-photo card's warm surface, instead of a page that opens on bare
+ * text. Non-collapsable so the card's zoom has a view to land on. */
+function SitePanel({ monogram, url }: { monogram: string; url?: string }) {
+  return (
+    <View collapsable={false} style={styles.sitePanel}>
+      <View style={styles.siteDisc}>
+        <Text
+          style={styles.siteLetter}
+          maxFontSizeMultiplier={1}
+          accessible={false}
+        >
+          {monogram}
+        </Text>
+      </View>
+      <Text style={styles.siteHost} numberOfLines={1}>
+        {displayHost(url)}
+      </Text>
+    </View>
+  );
+}
 
 type PageHeroKind = "poster" | "sticker" | "framed";
 
@@ -484,10 +548,10 @@ function ItemPageBody({
   paragraphs,
   social,
   intents,
-  heroUri,
+  hasHero,
 }: DetailBodyProps & {
   intents: ItemIntent[];
-  heroUri: string | null | undefined;
+  hasHero: boolean;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -508,7 +572,7 @@ function ItemPageBody({
       style={[
         styles.body,
         // The ScrollView already clears the header; only a hero needs a gap.
-        heroUri ? { paddingTop: theme.gap(5) } : null,
+        hasHero ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
       <SaveStatusNotice item={item} centered />
@@ -517,7 +581,9 @@ function ItemPageBody({
         <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
-      {item.url ? (
+      {item.url && plainLink(item, social) ? (
+        <SiteButton item={item} />
+      ) : item.url ? (
         <View style={styles.titleContainer}>
           <ItemSourceLink
             item={item}
@@ -545,7 +611,7 @@ function ItemPageBody({
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
-      {item.url && !detail.content ? (
+      {item.url && !detail.content && !plainLink(item, social) ? (
         <Pressable
           style={styles.urlRow}
           accessibilityRole="link"
@@ -569,6 +635,24 @@ function ItemPageBody({
         social={social}
       />
     </View>
+  );
+}
+
+/** A plain link's main step: watch a YouTube video there, view anything else
+ * on its site. The raw address stays in the "…" menu's Copy link. */
+function SiteButton({ item }: { item: DetailItem }) {
+  const site = item.siteName ?? displayHost(item.url);
+  return (
+    <Button
+      title={
+        isYouTubeUrl(item.url)
+          ? t("item.watchOnSite", { site })
+          : t("item.viewOnSite", { site })
+      }
+      onPress={() => {
+        openItemSource(item);
+      }}
+    />
   );
 }
 
@@ -723,13 +807,7 @@ function TagsRow({ tags }: { tags: string[] }) {
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState =
-  | "image_too_large"
-  | "gone"
-  | "failed"
-  | "stalled"
-  | "partial"
-  | "no_article";
+type SaveState = "image_too_large" | "gone" | "failed" | "stalled" | "partial";
 
 function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status === "failed") {
@@ -746,12 +824,9 @@ function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status !== "ready") {
     return null;
   }
-  if (item.enrichment === "partial") {
-    return "partial";
-  }
-  // The page loaded but had no extractable article: the URL itself is the
-  // save. Explained, but not retryable: a re-run would reach the same result.
-  return item.enrichment === "no_article" ? "no_article" : null;
+  // "no_article" (the page read fine, with no article body) is no fault: a
+  // product or a video has none. Its page leads with the site button instead.
+  return item.enrichment === "partial" ? "partial" : null;
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
@@ -760,7 +835,6 @@ const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
   failed: "item.pageFailed",
   stalled: "item.stalled",
   partial: "item.partial",
-  no_article: "item.noArticle",
 };
 
 function noticeFor(state: SaveState, type: DetailItem["type"]): string {
@@ -832,19 +906,9 @@ function SaveStatusNotice({
   return (
     <View style={[styles.noticeRow, centered && styles.centeredRow]}>
       <AppSymbolIcon
-        name={
-          state === "no_article"
-            ? "info.circle"
-            : "exclamationmark.triangle.fill"
-        }
+        name="exclamationmark.triangle.fill"
         size={14}
-        tintColor={
-          state === "gone"
-            ? theme.colors.faint
-            : state === "no_article"
-              ? theme.colors.muted
-              : theme.colors.danger
-        }
+        tintColor={state === "gone" ? theme.colors.faint : theme.colors.danger}
       />
       <Text
         style={[
@@ -855,8 +919,7 @@ function SaveStatusNotice({
       >
         {noticeFor(state, item.type)}
       </Text>
-      {isTerminalFailure(item.failureReason) ||
-      state === "no_article" ? null : (
+      {isTerminalFailure(item.failureReason) ? null : (
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
@@ -905,10 +968,10 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     // Full-bleed so the card image (a die-cut sticker) zooms edge-to-edge.
   },
-  // Non-sticker heroes get the same white matted frame as the home cards, so
+  // Non-sticker heroes get the same matted frame as the home cards, so
   // the padded look carries through the Apple zoom into this screen.
   heroContainer: {
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     // Hug the image so a capped portrait sits as a centered card rather than
     // leaving a gap in a full-width frame.
     alignSelf: "center",
@@ -920,6 +983,45 @@ const styles = StyleSheet.create((theme) => ({
   },
   moreMedia: {
     marginTop: theme.gap(2),
+  },
+  // The no-photo card face, grown to a hero: the same warm surface, with the
+  // site's letter where the picture would be.
+  sitePanel: {
+    height: 170,
+    marginHorizontal: theme.gap(2),
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  siteDisc: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.background,
+  },
+  siteLetter: {
+    fontFamily: theme.fonts.display,
+    fontSize: 30,
+    lineHeight: 36,
+    color: theme.colors.primaryText,
+  },
+  siteHost: {
+    position: "absolute",
+    bottom: theme.gap(1.5),
+    left: theme.gap(2),
+    right: theme.gap(2),
+    textAlign: "center",
+    fontFamily: theme.fonts.bold,
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.muted,
   },
   moreMediaList: {
     gap: theme.gap(2),

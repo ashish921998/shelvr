@@ -5,6 +5,7 @@ import { Alert, Pressable, View } from "react-native";
 import { MenuView } from "@expo/ui/community/menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemCard, type FeedItem } from "./item-card";
+import { textFaceCopy } from "./item-card-face";
 
 // Every query below goes through the accessibility tree, so the mocks resolve
 // role and name the way the platform does rather than echoing whichever prop
@@ -487,5 +488,75 @@ describe("inside a space", () => {
   it("leaves a suggestion to Add and Dismiss", () => {
     const menu = menuIn({ title: "Miso soup recipe", suggested: true });
     expect(menu).not.toContain("Remove from this space");
+  });
+});
+
+describe("a save with no picture", () => {
+  it("prints a link's summary on its face, under the site's letter, and its title once below", () => {
+    render(
+      <ItemCard
+        item={{
+          ...base,
+          title: "Poäng armchair",
+          description: "A bent birch armchair.",
+          url: "https://www.ikea.com/us/en/p/poang-armchair-50240603/",
+        }}
+      />,
+    );
+    expect(screen.getByText("I")).toBeTruthy();
+    expect(screen.getByText("A bent birch armchair.")).toBeTruthy();
+    expect(screen.getAllByText("Poäng armchair")).toHaveLength(1);
+  });
+
+  it("puts the title on the face when there is nothing else to print", () => {
+    render(
+      <ItemCard
+        item={{ ...base, title: "Poäng armchair", url: "https://ikea.com" }}
+      />,
+    );
+    expect(screen.getAllByText("Poäng armchair")).toHaveLength(1);
+  });
+
+  it("prints a note's own words with its title in the caption", () => {
+    render(
+      <ItemCard
+        item={{
+          ...base,
+          type: "note",
+          title: "Gift ideas",
+          note: "Pottery class for Mum",
+        }}
+      />,
+    );
+    expect(screen.getByText("Pottery class for Mum")).toBeTruthy();
+    expect(screen.getAllByText("Gift ideas")).toHaveLength(1);
+  });
+});
+
+describe("textFaceCopy", () => {
+  it("names a save by whatever it has, without repeating it in the caption", () => {
+    expect(textFaceCopy({ ...base, title: "Ramen" })).toEqual({
+      body: "Ramen",
+    });
+    expect(textFaceCopy({ ...base, description: "Quick miso ramen." })).toEqual(
+      { body: "Quick miso ramen." },
+    );
+    expect(
+      textFaceCopy({ ...base, status: "failed" }, "Couldn't save"),
+    ).toEqual({ body: "Couldn't save" });
+    expect(textFaceCopy({ ...base, url: "https://www.ikea.com/p/1" })).toEqual({
+      body: "ikea.com",
+    });
+  });
+
+  it("reads a note's words, not a link summary it never has", () => {
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        description: "ignored",
+      }),
+    ).toEqual({ body: "Gift ideas" });
   });
 });

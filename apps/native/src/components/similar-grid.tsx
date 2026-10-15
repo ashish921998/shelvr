@@ -126,7 +126,7 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.85,
   },
   similarImageFrame: {
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     padding: theme.gap(0.5),

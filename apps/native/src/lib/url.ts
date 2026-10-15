@@ -68,3 +68,10 @@ export function displayHost(url: string | undefined) {
     return url;
   }
 }
+
+/** A site's first letter, like a book spine: what a save with no picture shows
+ * in place of one. Array.from keeps an emoji or other astral first character
+ * whole. Undefined when there is no host to take it from. */
+export function siteMonogram(url: string | undefined): string | undefined {
+  return Array.from(displayHost(url))[0]?.toLocaleUpperCase();
+}
