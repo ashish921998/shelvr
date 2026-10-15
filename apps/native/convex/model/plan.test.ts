@@ -237,6 +237,33 @@ describe("sanitizePlan", () => {
     expect(cut.name).toBe("The Ivy");
   });
 
+  it("keeps a landmark square and strips a street with no number", () => {
+    const [square] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Shake Shack, Times Square",
+          area: "",
+          why: "Go",
+        },
+      ],
+      [source({ title: "Shake Shack, Times Square" })],
+    );
+    expect(square.name).toBe("Shake Shack, Times Square");
+    const [street] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "The Palomar, Rupert Street",
+          area: "",
+          why: "Go",
+        },
+      ],
+      [source({ title: "The Palomar" })],
+    );
+    expect(street.name).toBe("The Palomar");
+  });
+
   it("caps the shortlist after visited places move last", () => {
     const sources = Array.from({ length: 6 }, (_, i) =>
       source({ itemId: `item${i}` as Id<"items">, title: `Spot${i} dinner` }),

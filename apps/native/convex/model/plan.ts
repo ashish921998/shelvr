@@ -220,8 +220,9 @@ function groundedArea(area: string, evidence: Evidence): string {
     .join(", ");
 }
 
-// Words that mark a comma-separated part of a name as a street address.
-const STREET_WORDS = new Set([
+// A street's type, which ends its name ("Rupert Street", "Old Kent Rd").
+// Squares and ways are left out: they name landmarks ("Times Square").
+const STREET_SUFFIXES = new Set([
   "street",
   "st",
   "road",
@@ -234,26 +235,23 @@ const STREET_WORDS = new Set([
   "blvd",
   "drive",
   "dr",
-  "way",
-  "square",
-  "sq",
-  "calle",
-  "rue",
-  "strasse",
-  "via",
 ]);
+// A street's type that comes first ("Rue Saint-Denis", "Via Roma").
+const STREET_PREFIXES = new Set(["calle", "rue", "via", "strasse"]);
 
-// Abbreviations that also start place names ("St John's Wood", "Dr Pong"):
-// they mark an address only after the street's name ("Rupert St").
-const LEADING_NAME_WORDS = new Set(["st", "dr"]);
-
+/**
+ * True when a comma-separated part of a name reads as a street address: a
+ * house number leads it ("34 Rupert Street"), or a street's type ends or
+ * starts it. A number inside a name ("Bar 61") or "St" that starts one
+ * ("St John's Wood") is not an address.
+ */
 function isAddressPart(part: string): boolean {
-  // A house number leads ("34 Rupert Street"); a number inside a name
-  // ("Bar 61") does not make it an address.
   if (/^\s*\p{N}/u.test(part)) return true;
-  return wordsOf(part).some(
-    (word, i) =>
-      STREET_WORDS.has(word) && !(i === 0 && LEADING_NAME_WORDS.has(word)),
+  const words = wordsOf(part);
+  if (words.length < 2) return false;
+  return (
+    STREET_SUFFIXES.has(words[words.length - 1]) ||
+    STREET_PREFIXES.has(words[0])
   );
 }
 
