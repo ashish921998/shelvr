@@ -1,19 +1,34 @@
 import { wrapLanguageModel } from "ai";
 import { google } from "@ai-sdk/google";
+import { env } from "../_generated/server";
+import { FAKE_MODEL, fakeAiLocks } from "./fakeAi";
 import { logEvent } from "./log";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
 // reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
 export const MODEL_NAME = "gemini-3.1-flash-lite";
+
+// The e2e job's local backend swaps in the deterministic fake. Every lock in
+// fakeAiLocks must hold; a switch set anywhere else is refused and logged.
+const fakeAi = fakeAiLocks({
+  E2E_FAKE_AI: env.E2E_FAKE_AI,
+  AUTH_ENABLE_ANONYMOUS: env.AUTH_ENABLE_ANONYMOUS,
+  GOOGLE_GENERATIVE_AI_API_KEY: env.GOOGLE_GENERATIVE_AI_API_KEY,
+  CONVEX_CLOUD_URL: process.env.CONVEX_CLOUD_URL,
+});
+if (!fakeAi.enabled && fakeAi.refusedBy !== "switch_off") {
+  logEvent("error", "fake_ai_refused", { refused_by: fakeAi.refusedBy });
+}
+
 // Token usage lands in the Convex log stream of whichever action made the call,
 // so classification and product-search spend can be told apart per invocation.
 export const MODEL = wrapLanguageModel({
-  model: google(MODEL_NAME),
+  model: fakeAi.enabled ? FAKE_MODEL : google(MODEL_NAME),
   middleware: {
     wrapGenerate: async ({ doGenerate }) => {
       const result = await doGenerate();
       logEvent("info", "model_usage", {
-        model: MODEL_NAME,
+        model: fakeAi.enabled ? FAKE_MODEL.modelId : MODEL_NAME,
         input_tokens: result.usage.inputTokens.total,
         cache_read_tokens: result.usage.inputTokens.cacheRead,
         output_tokens: result.usage.outputTokens.total,
