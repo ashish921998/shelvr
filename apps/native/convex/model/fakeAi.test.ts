@@ -246,10 +246,10 @@ describe("FAKE_MODEL on a link", () => {
 });
 
 // The shape of the recommendation prompt in aiRecommendForSpace.ts.
-function recommendPrompt(spaceName: string): string {
+function recommendPrompt(spaceName: string, description = "Bowls"): string {
   return [
     "You are helping organize a save-it-for-later app. The user just created a space (a themed collection).",
-    `Space name: "${spaceName}"\nSpace description: Bowls`,
+    `Space name: "${spaceName}"\nSpace description: ${description}`,
     "Below is a numbered list of the user's saved items.",
     [
       "1. Weeknight Miso Ramen — A fast ramen recipe — tags: recipes, dinner",
@@ -264,6 +264,12 @@ describe("fakeRecommendation", () => {
     expect(fakeRecommendation(recommendPrompt("Ramen 1760"))).toEqual({
       itemNumbers: [1, 3],
     });
+  });
+
+  it("reads numbered lines only from the saves, not the description", () => {
+    expect(
+      fakeRecommendation(recommendPrompt("Ramen 1760", "2. Ramen to try")),
+    ).toEqual({ itemNumbers: [1, 3] });
   });
 
   it("picks nothing when no save shares one", () => {

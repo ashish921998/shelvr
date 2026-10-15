@@ -206,7 +206,10 @@ export function fakeRecommendation(
     : undefined;
   if (name === undefined) return undefined;
   const nameWords = wordsOf(name);
-  const itemNumbers = [...prompt.matchAll(NUMBERED_SAVE)]
+  // The saves are the prompt's last section, so a numbered line in the
+  // space's description is never read as one.
+  const saves = prompt.slice(prompt.lastIndexOf("\n\n") + 2);
+  const itemNumbers = [...saves.matchAll(NUMBERED_SAVE)]
     .filter(([, , line]) => [...wordsOf(line)].some((w) => nameWords.has(w)))
     .map(([, number]) => Number(number));
   return { itemNumbers };

@@ -11,6 +11,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { FlashList } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -223,9 +224,105 @@ function EmptySpaces({
   );
 }
 
+type SpaceSummary = FunctionReturnType<typeof api.spaces.listSpaces>[number];
+
+/** One pile in the spaces grid; a tap opens the space. */
+function SpaceCard({
+  space,
+  reducedMotion,
+  onDelete,
+}: {
+  space: SpaceSummary;
+  reducedMotion: boolean;
+  onDelete: (id: Id<"spaces">) => void;
+}) {
+  const { theme } = useUnistyles();
+  const router = useRouter();
+  const href = `/space/${space._id}` as const;
+  // `previews` can be briefly absent when the offline cache rehydrates an
+  // older query shape before the live refetch lands. The newest item is
+  // the cover; the rest of the pile is intentionally blank.
+  const cover = (space.previews ?? [])[0];
+  // As in item-card: on iOS expo-router hosts the trigger inside zero-size
+  // native views, and iOS drops every accessibility element under them, so
+  // the card is read from the cell instead. Android keeps it on the
+  // Pressable.
+  const cardA11y = {
+    accessible: true,
+    // `role`, not `accessibilityRole`, which Link's role="link" would shadow.
+    role: "button" as const,
+    accessibilityLabel: space.name,
+    accessibilityActions: [{ name: "delete", label: t("common.delete") }],
+    onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+      if (event.nativeEvent.actionName === "delete") {
+        onDelete(space._id);
+      }
+    },
+    onAccessibilityTap: () => router.push(href),
+    testID: space.fixtureKey ? `fixture-space-${space.fixtureKey}` : undefined,
+  };
+  const a11yOnCell = process.env.EXPO_OS === "ios";
+
+  return (
+    <Animated.View style={styles.cell} {...(a11yOnCell ? cardA11y : {})}>
+      <Link href={href} asChild>
+        <Link.Trigger withAppleZoom={!reducedMotion}>
+          {/* The whole card is the pressable that routes to the space. */}
+          <Pressable {...(a11yOnCell ? {} : cardA11y)}>
+            {/* Link.Trigger's Slot drops a Pressable style function,
+                so press feedback lives on this inner View. */}
+            {({ pressed }) => (
+              <View style={pressed ? styles.pressed : undefined}>
+                <CoverStack
+                  cover={cover}
+                  seed={space._id}
+                  name={space.name}
+                  itemCount={space.itemCount}
+                  suggestionCount={space.suggestionCount}
+                />
+                <View style={styles.caption}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {space.name}
+                  </Text>
+                  <ActionMenu
+                    label={t("spaces.actions")}
+                    title={t("spaces.actions")}
+                    actions={[
+                      {
+                        label: t("common.delete"),
+                        destructive: true,
+                        onPress: () => onDelete(space._id),
+                      },
+                    ]}
+                    style={styles.menuButton}
+                  >
+                    <AppSymbolIcon
+                      name="ellipsis"
+                      size={15}
+                      tintColor={theme.colors.foreground}
+                    />
+                  </ActionMenu>
+                </View>
+              </View>
+            )}
+          </Pressable>
+        </Link.Trigger>
+        <Link.Preview />
+        <Link.Menu>
+          <Link.MenuAction
+            title={t("common.delete")}
+            icon="trash"
+            destructive
+            onPress={() => onDelete(space._id)}
+          />
+        </Link.Menu>
+      </Link>
+    </Animated.View>
+  );
+}
+
 export default function SpacesScreen() {
   useAppLocale();
-  const { theme } = useUnistyles();
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
   const deleteSpace = useMutation(api.spaces.deleteSpace);
 
@@ -299,74 +396,13 @@ export default function SpacesScreen() {
         keyExtractor={(space) => space._id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        renderItem={({ item: space }) => {
-          // `previews` can be briefly absent when the offline cache rehydrates an
-          // older query shape before the live refetch lands. The newest item is
-          // the cover; the rest of the pile is intentionally blank.
-          const cover = (space.previews ?? [])[0];
-          return (
-            <Animated.View style={styles.cell}>
-              <Link href={`/space/${space._id}`} asChild>
-                <Link.Trigger withAppleZoom={!reducedMotion}>
-                  {/* The whole card is the pressable that routes to the space. */}
-                  <Pressable
-                    testID={
-                      space.fixtureKey
-                        ? `fixture-space-${space.fixtureKey}`
-                        : undefined
-                    }
-                  >
-                    {/* Link.Trigger's Slot drops a Pressable style function,
-                        so press feedback lives on this inner View. */}
-                    {({ pressed }) => (
-                      <View style={pressed ? styles.pressed : undefined}>
-                        <CoverStack
-                          cover={cover}
-                          seed={space._id}
-                          name={space.name}
-                          itemCount={space.itemCount}
-                          suggestionCount={space.suggestionCount}
-                        />
-                        <View style={styles.caption}>
-                          <Text style={styles.title} numberOfLines={1}>
-                            {space.name}
-                          </Text>
-                          <ActionMenu
-                            label={t("spaces.actions")}
-                            title={t("spaces.actions")}
-                            actions={[
-                              {
-                                label: t("common.delete"),
-                                destructive: true,
-                                onPress: () => confirmDelete(space._id),
-                              },
-                            ]}
-                            style={styles.menuButton}
-                          >
-                            <AppSymbolIcon
-                              name="ellipsis"
-                              size={15}
-                              tintColor={theme.colors.foreground}
-                            />
-                          </ActionMenu>
-                        </View>
-                      </View>
-                    )}
-                  </Pressable>
-                </Link.Trigger>
-                <Link.Preview />
-                <Link.Menu>
-                  <Link.MenuAction
-                    title={t("common.delete")}
-                    icon="trash"
-                    destructive
-                    onPress={() => confirmDelete(space._id)}
-                  />
-                </Link.Menu>
-              </Link>
-            </Animated.View>
-          );
-        }}
+        renderItem={({ item: space }) => (
+          <SpaceCard
+            space={space}
+            reducedMotion={reducedMotion}
+            onDelete={confirmDelete}
+          />
+        )}
       />
       <HeaderScrim />
     </View>

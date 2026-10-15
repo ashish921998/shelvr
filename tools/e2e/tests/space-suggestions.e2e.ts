@@ -36,8 +36,9 @@ test(
     await fillField(field, name);
     await screen.getByLabel("Create space").tap();
 
-    // The recommendation pass runs after the space exists, and the space's
-    // header counts what it suggested.
+    // The recommendation pass runs after the space exists. Once its pick
+    // lands, the space moves from the empty chip row into the grid, whose
+    // card is the button by that name; the space's header counts the pick.
     await screen.getByRole("button", name).tap({ timeout: 30_000 });
     await expect(screen.getByText("1 suggestion")).toBeVisible({
       timeout: 60_000,
