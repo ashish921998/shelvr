@@ -494,31 +494,6 @@
   "cancelSurvey.other": "その他",
   "cancelSurvey.skipLabel": "解約アンケートをスキップ",
   "cancelSurvey.skip": "スキップ",
-  "import.title": "リンクをインポート",
-  "import.description": "下にURLのリストを貼り付けてください — 1行に1つ、またはJSON配列で入力できます。各リンクは通常の保存と同様にShelvrに保存され、自動で整理されます。",
-  "import.placeholder": "ここにURLを貼り付け…",
-  "import.urlReady": {
-    "other": "%{formattedCount}件のURLをインポート準備完了"
-  },
-  "import.progress": {
-    "other": "%{formattedCount}件のリンクをインポート中…"
-  },
-  "import.action": "インポート",
-  "import.resultCount": {
-    "other": "%{formattedCount}件のリンクをインポートしました"
-  },
-  "import.skipped": {
-    "other": "%{formattedCount}件は保存済みのためスキップしました"
-  },
-  "import.invalid": {
-    "other": "%{formattedCount}件は有効なリンクではありませんでした"
-  },
-  "import.notProcessed": {
-    "other": "%{formattedCount}件のリンクはまだインポートされていません"
-  },
-  "import.rateLimited": "現在インポートの上限に達しています。しばらくしてから同じリストでもう一度お試しください。保存済みのリンクはスキップされます。",
-  "import.failed": "インポートが途中で停止しました。しばらくしてから同じリストでもう一度お試しください。保存済みのリンクはスキップされます。",
-  "import.more": "追加インポート",
   "onboarding.openerTitle": "1週間後のあなたのシェルフ。",
   "onboarding.openerBody": "リンク、写真、メモ。保存した瞬間にShelvrが読み取ってタイトルを付け、合うスペースがあれば提案します。",
   "onboarding.startYours": "はじめる",
