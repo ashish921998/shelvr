@@ -20,7 +20,9 @@ concurrency:
 
 jobs:
   claude-review:
-    if: ${{ !github.event.pull_request.draft }}
+    # Bot PRs (Dependabot) get no CLAUDE_CODE_OAUTH_TOKEN and the action
+    # refuses non-human actors, so the job would only fail. Skip it for them.
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
