@@ -95,7 +95,12 @@ export function requiresAuthoritativeReconciliation(
         event.cancelReason === "BILLING_ERROR"
       );
     case "EXPIRATION":
-      return event.expirationReason === "CUSTOMER_SUPPORT";
+      // A revoked dashboard grant may have been stored as a sticky lifetime
+      // row, which only an authoritative snapshot can lapse.
+      return (
+        event.expirationReason === "CUSTOMER_SUPPORT" ||
+        event.periodType === "PROMOTIONAL"
+      );
     default:
       return false;
   }

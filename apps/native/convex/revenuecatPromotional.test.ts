@@ -107,6 +107,29 @@ describe("promotional grant webhook", () => {
     await expect(f.save()).resolves.toBeDefined();
   });
 
+  it("takes Pro back when a lifetime grant is revoked", async () => {
+    const f = await fixture();
+    stubRevenueCatFetch(lifetimeGrant);
+    expect((await f.grant()).status).toBe(200);
+    await expect(f.save()).resolves.toBeDefined();
+
+    // Revoking the grant in the dashboard expires it. RevenueCat no longer
+    // lists the entitlement.
+    stubRevenueCatFetch(revenuecatSnapshot());
+    expect(
+      (
+        await f.grant({
+          id: "promo-revoke",
+          type: "EXPIRATION",
+          expiration_reason: "UNKNOWN",
+          expiration_at_ms: Date.now() - 1,
+          event_timestamp_ms: 3,
+        })
+      ).status,
+    ).toBe(200);
+    await expect(f.save()).rejects.toThrow(/Pro required/);
+  });
+
   it("asks RevenueCat to retry when the lookup fails", async () => {
     const f = await fixture();
     vi.stubGlobal(
