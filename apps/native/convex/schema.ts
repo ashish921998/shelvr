@@ -148,6 +148,11 @@ export default defineSchema({
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.
     intents: v.optional(v.array(intentValidator)),
+    // Cities of the places the save names ("Mumbai"), as the classifier read
+    // them and `normalizeCities` cleaned them. Lets a plan use only the places
+    // in one city. Optional so older rows validate; absent = never classified
+    // for cities, empty = classified and names no city.
+    cities: v.optional(v.array(v.string())),
     // Real product results from the user-triggered "Find links" pass
     // (SerpAPI Google Shopping). `productsStatus` tracks the in-flight action
     // so the button can show progress; absent = never searched.

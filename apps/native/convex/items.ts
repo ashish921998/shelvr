@@ -189,6 +189,7 @@ const itemFields = {
   articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
+  cities: v.optional(v.array(v.string())),
   products: v.optional(v.array(productValidator)),
   productsStatus: v.optional(productsStatusValidator),
   failureReason: v.optional(failureReasonValidator),
@@ -2639,6 +2640,9 @@ export const finalizeItem = internalMutation({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
+    // Cities the classifier read, already normalized. Optional so runs queued
+    // before this argument existed still validate; absent leaves the row's.
+    cities: v.optional(v.array(v.string())),
     // The retrieval vector for the text this run classified, already
     // normalized and width-checked by the action. Optional because embedding
     // is best-effort: a run whose embed call failed still finalizes the item,
@@ -2666,6 +2670,7 @@ export const finalizeItem = internalMutation({
     const description = withdrawn ? (item.description ?? "") : args.description;
     const tags = withdrawn ? item.tags : args.tags;
     const intents = withdrawn ? item.intents : args.intents;
+    const cities = withdrawn ? item.cities : args.cities;
     const recipe = withdrawn ? item.recipe : args.recipe;
     // Race: the user pressed retry while this run was still awaiting the
     // model. The retry owns the item now; writing here would overwrite its
@@ -2709,6 +2714,9 @@ export const finalizeItem = internalMutation({
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents,
+      // Patching undefined would remove the field, so a run with no cities to
+      // offer keeps what an earlier run wrote.
+      ...(cities !== undefined ? { cities } : {}),
       status: args.status,
       // Always written so a successful retry clears a previous "partial" flag
       // and a previous failureReason (patching undefined removes the field).

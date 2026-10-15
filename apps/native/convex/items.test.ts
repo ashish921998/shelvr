@@ -2544,6 +2544,39 @@ describe("poster storage compensation", () => {
       expect(await ctx.db.system.get("_storage", shared)).not.toBeNull();
     });
   });
+
+  it("stores the cities a run read and keeps them when a later run has none", async () => {
+    const t = newConvexTest();
+    const itemId = await t.run(async (ctx) => {
+      return await ctx.db.insert("items", {
+        userId: "city-owner",
+        type: "link",
+        status: "processing",
+        tags: [],
+        searchText: "",
+      });
+    });
+    const finalize = async (cities?: string[]) =>
+      await t.mutation(internal.items.finalizeItem, {
+        itemId,
+        title: "Date spots",
+        description: "Bars in Bandra",
+        tags: [],
+        ...(cities !== undefined ? { cities } : {}),
+        status: "ready",
+      });
+
+    await finalize(["Mumbai"]);
+    await finalize();
+    expect(
+      await t.run(async (ctx) => (await ctx.db.get(itemId))?.cities),
+    ).toEqual(["Mumbai"]);
+
+    await finalize([]);
+    expect(
+      await t.run(async (ctx) => (await ctx.db.get(itemId))?.cities),
+    ).toEqual([]);
+  });
 });
 
 describe("failed saves and retry", () => {
