@@ -152,6 +152,8 @@ describe("extractRecipeMarkup", () => {
         "1 - 2 tsp sugar ((if needed - Note 3))",
         "1 1/2 cups (tightly packed) mozzarella cheese (, shred yourself (Note 4))",
         "1/4 cup tomato paste",
+        "2 cups flour (, sifted) (Note 2)",
+        "1 egg ((large)) (Note 3)",
       ],
     };
     expect(extractRecipeMarkup(page(jsonLd(wprm)))?.ingredients).toStrictEqual([
@@ -160,6 +162,8 @@ describe("extractRecipeMarkup", () => {
       "1 - 2 tsp sugar (if needed - Note 3)",
       "1 1/2 cups (tightly packed) mozzarella cheese, shred yourself (Note 4)",
       "1/4 cup tomato paste",
+      "2 cups flour (, sifted) (Note 2)",
+      "1 egg ((large)) (Note 3)",
     ]);
   });
 

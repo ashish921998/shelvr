@@ -186,9 +186,21 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
  * text that already starts with a comma or its own brackets ("1 onion (,
  * chopped)", "beef ((ground) (Note 1))"). Drop the redundant outer bracket. */
 function tidyIngredient(text: string): string {
-  return text.replace(/ \((,.*|\(.*\))\)$/, (_, notes: string) =>
-    notes.startsWith(",") ? notes : ` ${notes}`,
-  );
+  return text.replace(/ \((,.*|\(.*\))\)$/, (whole: string, notes: string) => {
+    if (!balanced(notes)) return whole;
+    return notes.startsWith(",") ? notes : ` ${notes}`;
+  });
+}
+
+/** True when every bracket in `text` closes one opened before it, so the
+ * outer bracket being dropped really wraps all of it. */
+function balanced(text: string): boolean {
+  let depth = 0;
+  for (const char of text) {
+    if (char === "(") depth += 1;
+    if (char === ")" && --depth < 0) return false;
+  }
+  return depth === 0;
 }
 
 function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
