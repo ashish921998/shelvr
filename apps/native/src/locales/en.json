@@ -506,37 +506,6 @@
   "cancelSurvey.other": "Something else",
   "cancelSurvey.skipLabel": "Skip cancellation survey",
   "cancelSurvey.skip": "Skip",
-  "import.title": "Import links",
-  "import.description": "Paste a list of URLs below — one per line or as a JSON array. Each link will be saved and auto-organized by Shelvr, just like a regular save.",
-  "import.placeholder": "Paste URLs here…",
-  "import.urlReady": {
-    "one": "%{formattedCount} URL ready to import",
-    "other": "%{formattedCount} URLs ready to import"
-  },
-  "import.progress": {
-    "one": "Importing %{formattedCount} link…",
-    "other": "Importing %{formattedCount} links…"
-  },
-  "import.action": "Import",
-  "import.resultCount": {
-    "one": "%{formattedCount} link imported",
-    "other": "%{formattedCount} links imported"
-  },
-  "import.skipped": {
-    "one": "%{formattedCount} was already saved and skipped",
-    "other": "%{formattedCount} were already saved and skipped"
-  },
-  "import.invalid": {
-    "one": "%{formattedCount} wasn’t a valid link",
-    "other": "%{formattedCount} weren’t valid links"
-  },
-  "import.notProcessed": {
-    "one": "%{formattedCount} link wasn’t imported yet",
-    "other": "%{formattedCount} links weren’t imported yet"
-  },
-  "import.rateLimited": "You’ve reached the import limit for now. Try again later with the same list to continue; links already saved are skipped.",
-  "import.failed": "The import stopped before it finished. Try again later with the same list to continue; links already saved are skipped.",
-  "import.more": "Import more",
   "onboarding.openerTitle": "Your shelf in a week.",
   "onboarding.openerBody": "Links, photos and notes, read and titled the moment you save them. Shelvr suggests a space when one fits.",
   "onboarding.startYours": "Start yours",
