@@ -118,6 +118,7 @@ export default function PlanVote({
           method: "POST",
           headers: { "content-type": "application/json" },
           body,
+          keepalive: true,
         });
         if (response.ok) {
           // Remembered only once saved, so a reload never shows a vote the

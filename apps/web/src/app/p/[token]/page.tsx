@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import PlanVote from "@/components/PlanVote";
 import Logo from "@/components/common/Logo";
+import AndroidWaitlist from "@/components/home/AndroidWaitlist";
 import { loadPlanShare, planTitle } from "@/lib/planShare";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
@@ -33,6 +35,8 @@ export async function generateMetadata({
 export default async function PlanVotePage({ params }: PageProps) {
   const { token } = await params;
   const { outcome, share } = await loadPlanShare(token);
+  // Shelvr is not on Google Play yet, so Android visitors get the waitlist.
+  const android = /android/i.test((await headers()).get("user-agent") ?? "");
 
   return (
     <main className="min-h-screen bg-paper">
@@ -68,15 +72,24 @@ export default async function PlanVotePage({ params }: PageProps) {
           </div>
         )}
 
-        <div className="mt-8 flex items-center gap-3 rounded-2xl border border-line bg-card p-4">
-          <div className="min-w-0 flex-1">
+        {android ? (
+          <div className="mt-8 flex flex-col items-center gap-1 rounded-2xl border border-line bg-card p-4 text-center">
             <p className="text-[15px] font-semibold text-ink">
               Save places like these
             </p>
-            <p className="text-sm text-muted">Shelvr for iPhone</p>
+            <AndroidWaitlist source="plan" tone="light" />
           </div>
-          <AppStoreButton source="plan" compact />
-        </div>
+        ) : (
+          <div className="mt-8 flex items-center gap-3 rounded-2xl border border-line bg-card p-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-ink">
+                Save places like these
+              </p>
+              <p className="text-sm text-muted">Shelvr for iPhone</p>
+            </div>
+            <AppStoreButton source="plan" compact />
+          </div>
+        )}
 
         <p className="mt-6 text-xs text-muted">
           <a
