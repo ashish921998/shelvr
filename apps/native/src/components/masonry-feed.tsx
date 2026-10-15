@@ -1,5 +1,4 @@
 import { FlashList } from "@shopify/flash-list";
-import { Link } from "expo-router";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
@@ -40,15 +39,13 @@ export function MasonryFeed({
       numColumns={numColumns}
       optimizeItemArrangement
       keyExtractor={(item) => item._id}
-      renderItem={({ item, index }) =>
-        firstItemZoomTarget && index === 0 ? (
-          <Link.AppleZoomTarget>
-            <ItemCard item={item} source={source} />
-          </Link.AppleZoomTarget>
-        ) : (
-          <ItemCard item={item} source={source} />
-        )
-      }
+      renderItem={({ item, index }) => (
+        <ItemCard
+          item={item}
+          source={source}
+          zoomTarget={firstItemZoomTarget === true && index === 0}
+        />
+      )}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"

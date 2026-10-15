@@ -10,7 +10,8 @@ name: e2e ios
 # model is the deterministic fake in convex/model/fakeAi.ts, which classifies
 # a note from its own words, so save-note runs here, and serves the fixture
 # pages in the same file, so save-link-fixture saves a link with no network
-# read. Two flows are left out because the fake cannot stand in for them:
+# read. It also suggests the saves that share a word with a new space's name,
+# so space-suggestions sees a seeded save suggested. Two flows are left out because the fake cannot stand in for them:
 # save-link and save-image judge the screen with a real model.
 
 on:
@@ -39,9 +40,13 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run on its old commit. On main
+# every commit keeps its own run, in a group of its own: merges landing close
+# together used to cancel each other (four on 2026-10-15), so main never built
+# the record of clean runs this check needs before it can be required.
 concurrency:
-  group: e2e-ios-${{ github.ref }}
-  cancel-in-progress: true
+  group: e2e-ios-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   E2E_TELEMETRY_DISABLED: "1"
@@ -246,7 +251,8 @@ jobs:
 
       - name: Run the flows
         working-directory: tools/e2e
-        # Tells save-link-fixture the backend serves the fixture pages.
+        # Tells the flows that need the fake (save-link-fixture,
+        # space-suggestions) that the backend runs it.
         env:
           E2E_FAKE_AI: local-v1
         run: >-
@@ -257,6 +263,7 @@ jobs:
           tests/paywall.e2e.ts
           tests/save-note.e2e.ts
           tests/save-link-fixture.e2e.ts
+          tests/space-suggestions.e2e.ts
           tests/onboarding.e2e.ts
           --reporter list,junit
 

@@ -107,6 +107,22 @@ it("omits the servings line when the recipe has none", () => {
   expect(renderedText(container)).toEqual(["Salt"]);
 });
 
+it("omits a placeholder yield the model wrote for a post that never stated one", () => {
+  for (const servings of [
+    "not specified",
+    "Not specified.",
+    "N/A",
+    "unknown",
+  ]) {
+    const { container } = render(
+      <RecipeSection
+        recipe={{ servings, ingredients: ["Salt"], steps: ["Add salt."] }}
+      />,
+    );
+    expect(renderedText(container)).toEqual(["Salt"]);
+  }
+});
+
 it("phrases a bare numeric yield through the localized serves message but keeps phrases verbatim", () => {
   const numeric = render(
     <RecipeSection

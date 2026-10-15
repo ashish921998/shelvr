@@ -73,6 +73,7 @@ const routerPush = vi.hoisted(() => vi.fn());
 const motionPreference = vi.hoisted(() => ({ reduced: true }));
 const linkProps = vi.hoisted(() => vi.fn());
 const triggerProps = vi.hoisted(() => vi.fn());
+const zoomTargets = vi.hoisted(() => vi.fn());
 vi.mock("expo-router", () => {
   const Link = (props: { children?: ReactNode }) => {
     linkProps(props);
@@ -87,6 +88,16 @@ vi.mock("expo-router", () => {
   };
   Link.Preview = function LinkPreview() {
     return null;
+  };
+  // A zero-size native view on iOS, which hides everything under it from the
+  // screen reader; aria-hidden does the same to these queries.
+  Link.AppleZoomTarget = function LinkAppleZoomTarget({
+    children,
+  }: {
+    children?: ReactNode;
+  }) {
+    zoomTargets(children);
+    return <div aria-hidden>{children}</div>;
   };
   Link.Menu = function LinkMenu({ children }: { children?: ReactNode }) {
     return <ul data-testid="link-menu">{children}</ul>;
@@ -382,6 +393,25 @@ describe("on iOS", () => {
       pathname: "/item/[id]",
       params: { id: "item-1" },
     });
+  });
+
+  it("stays readable as the zoom landing target", () => {
+    process.env.EXPO_OS = "ios";
+    zoomTargets.mockClear();
+    render(
+      <ItemCard item={{ ...base, title: "Miso soup recipe" }} zoomTarget />,
+    );
+    // The target measures its direct native child, so that child has to be
+    // a real view with the card's frame, not the Link's zero-size host.
+    const [target] = zoomTargets.mock.lastCall ?? [];
+    expect(isValidElement(target) && target.type).toBe(View);
+    expect(
+      isValidElement<{ collapsable?: boolean }>(target) &&
+        target.props.collapsable,
+    ).toBe(false);
+    expect(
+      screen.getAllByRole("button", { name: "Miso soup recipe" }),
+    ).toHaveLength(1);
   });
 
   it("offers the card's menu actions to the screen reader", () => {

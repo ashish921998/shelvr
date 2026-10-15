@@ -41,8 +41,10 @@ nothing is started by hand. Before a run:
   The `e2e ios` CI job runs `save-note` with no key: its local backend sets
   `E2E_FAKE_AI=local-v1`, and the fake in `convex/model/fakeAi.ts` classifies
   the note instead. It also runs `save-link-fixture`, which saves a fixture
-  page the fake serves (`https://fixtures.e2e.invalid/...`) and skips itself
-  unless the runner has `E2E_FAKE_AI=local-v1`. The fake refuses every
+  page the fake serves (`https://fixtures.e2e.invalid/...`), and
+  `space-suggestions`, whose new space gets the seeded save that shares a word
+  with its name. Both skip themselves unless the runner has
+  `E2E_FAKE_AI=local-v1`. The fake refuses every
   deployment but a local one.
 - **Data.** Every test's `beforeEach` (`startOnSeededHome` in
   `tests/seeded-home.ts`) signs in as the anonymous dev user and taps Settings >

@@ -11,9 +11,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const ENTITLEMENT_WAIT_MS = 5000;
 
 /**
- * The paywall at the end of onboarding, after the share practice. `ask` waits
+ * The paywall at the end of onboarding, after the promise step. `ask` waits
  * for the entitlement to load, then lets a Pro or signed-out account through
- * and shows everyone else the paywall once. A relaunch lands back on the share step and
+ * and shows everyone else the paywall once. A relaunch lands back on the promise step and
  * asks again. A paywall that could not show (RevenueCat not ready, offline)
  * was never declined: `onUnavailable` finishes without saying so, and the
  * app asks again once Home is up.
