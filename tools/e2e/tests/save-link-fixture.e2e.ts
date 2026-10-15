@@ -3,7 +3,7 @@ import { expect } from "e2e";
 
 import {
   chooseAddOption,
-  fillChecked,
+  fillField,
   SHEET_TRANSITION_MS,
   startOnSeededHome,
   tapTab,
@@ -26,7 +26,7 @@ test(
   },
   async ({ screen }) => {
     await chooseAddOption(screen, screen.getByTestId("add-option-article"));
-    await fillChecked(screen.getByTestId("add-article-input"), FIXTURE_URL);
+    await fillField(screen.getByTestId("add-article-input"), FIXTURE_URL);
     await screen.getByRole("button", "Save").tap();
     // As in save-note: wait out the sheet's close before tapping a tab under it.
     await expect(screen.getByTestId("add-article-input")).toBeHidden({
@@ -38,7 +38,7 @@ test(
     // search answers once the page was read and classified, and the fake
     // keeps the page's own title.
     await tapTab(screen, "Search");
-    await fillChecked(
+    await fillField(
       screen.getByRole("textbox", "Search your saves"),
       "membrillo",
     );

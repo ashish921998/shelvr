@@ -78,6 +78,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
+- **Measuring a reviewer:** `tools/review-eval` holds past PRs that shipped a
+  bug, plus clean ones, to score catch rate and false alarms.
 
 ## Naming conventions
 

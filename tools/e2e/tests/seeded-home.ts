@@ -74,7 +74,13 @@ export function startOnSeededHome(): void {
       { timeout: 30_000 },
     );
     await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-    await screen.scrollUntilVisible(reset);
+    // Even then a swipe has moved nothing (seen on CI, once in about ten
+    // runs), so the scroll gets one more try after another settle.
+    await screen.scrollUntilVisible(reset).catch(async (error: unknown) => {
+      if (!String(error).includes("moved nothing")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
+      await screen.scrollUntilVisible(reset);
+    });
     await reset.tap();
     await screen.getByRole("button", "Reset").tap();
     await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
@@ -152,6 +158,30 @@ export async function tapTab(screen: Screen, name: string): Promise<void> {
 }
 
 /**
+ * Fills a text field, recovering from the runner's "could not confirm the
+ * typed text reached the field": the text may have landed in full, in part
+ * or not at all. Seen on CI in about one run in ten. As the runner's hint
+ * says, the field is read back: if it already holds `value` the fill
+ * counts, otherwise it is filled once more (`fill` replaces the content). A
+ * field that still ends up wrong fails on that second fill or later in the
+ * flow, so this does not pass over a field that really is broken.
+ */
+export async function fillField(field: Locator, value: string): Promise<void> {
+  try {
+    await field.fill(value);
+  } catch (error) {
+    if (!String(error).includes("could not confirm the typed text")) {
+      throw error;
+    }
+    const landed = await expect(field)
+      .toHaveValue(value, { timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!landed) await field.fill(value);
+  }
+}
+
+/**
  * Taps `control` until `result` is on screen, for a control whose tap can be
  * lost: an accepted tap shows `result` well inside `waitMs`, so it is tapped
  * again only after that. Each tap is its own step in the run's report, so a
@@ -195,26 +225,4 @@ export async function chooseAddOption(
   });
   await expect(option).toBeEnabled({ timeout: 30_000 });
   await option.tap();
-}
-
-/** How long a field gets to show the text when the runner lost track of it. */
-const FILL_CHECK_MS = 5000;
-
-/**
- * Fills `field` with `text`. The runner checks that typed text reached the
- * field and fails when it cannot tell, which has happened on CI with the
- * text in the field (a search field typed into right after the keyboard
- * went away). Then the field itself decides: holding exactly `text` passes,
- * anything else fails with the runner's own error.
- */
-export async function fillChecked(field: Locator, text: string): Promise<void> {
-  try {
-    await field.fill(text);
-  } catch (error) {
-    await expect(field)
-      .toHaveValue(text, { timeout: FILL_CHECK_MS })
-      .catch(() => {
-        throw error;
-      });
-  }
 }
