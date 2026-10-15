@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import {
   internalMutation,
   internalQuery,
@@ -287,6 +288,8 @@ export const recordPlanVote = internalMutation({
       });
       return "recorded";
     }
+    // An empty ballot from someone new holds no vote, so it takes no slot.
+    if (picks.length === 0 && passes.length === 0) return "recorded";
     const voters = await ctx.db
       .query("planVotes")
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
@@ -345,3 +348,30 @@ export async function deletePlanSharesForUser(
   }
   return shares.length !== DELETE_BATCH;
 }
+
+/**
+ * Daily cleanup: deletes vote links a week past their expiry, with their
+ * votes, one batch per transaction. A full batch schedules the next.
+ */
+export const purgeExpiredPlanShares = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const cutoff = Date.now() - PLAN_SHARE_TTL_MS;
+    const shares = await ctx.db
+      .query("planShares")
+      .withIndex("by_expires", (q) => q.lt("expiresAt", cutoff))
+      .take(DELETE_BATCH);
+    for (const share of shares) {
+      await deleteShare(ctx, share);
+    }
+    if (shares.length === DELETE_BATCH) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.planShares.purgeExpiredPlanShares,
+        {},
+      );
+    }
+    return null;
+  },
+});

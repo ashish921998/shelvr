@@ -553,7 +553,8 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_space", ["spaceId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_expires", ["expiresAt"]),
 
   // One visitor's votes on a plan share, keyed by a random id the vote page
   // keeps in the visitor's browser, so changing a vote replaces it.

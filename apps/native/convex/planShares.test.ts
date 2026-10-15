@@ -180,6 +180,18 @@ describe("votes", () => {
     );
   });
 
+  it("gives no slot to an empty ballot from someone new", async () => {
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    expect(await vote(backend, token, "empty", [])).toBe("recorded");
+    expect(
+      await t.query(api.planShares.latestPlanShare, { spaceId }),
+    ).toMatchObject({ voters: 0 });
+  });
+
   it("closes the link after a week", async () => {
     vi.useFakeTimers();
     const { backend, t, spaceId, places } = await setup();
@@ -251,6 +263,30 @@ describe("deletion", () => {
   });
 });
 
+describe("purgeExpiredPlanShares", () => {
+  it("deletes links a week past expiry, with their votes, and keeps the rest", async () => {
+    vi.useFakeTimers();
+    const { backend, t, spaceId, places } = await setup();
+    const old = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    await vote(backend, old, "a", ["p0"]);
+    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 1);
+    const fresh = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+
+    await backend.mutation(internal.planShares.purgeExpiredPlanShares, {});
+    const left = await backend.run(async (ctx) => ({
+      tokens: (await ctx.db.query("planShares").collect()).map((s) => s.token),
+      votes: (await ctx.db.query("planVotes").collect()).length,
+    }));
+    expect(left).toEqual({ tokens: [fresh], votes: 0 });
+  });
+});
+
 describe("HTTP routes", () => {
   function postVote(
     backend: ReturnType<typeof newConvexTest>,
@@ -291,6 +327,9 @@ describe("HTTP routes", () => {
 
     expect((await postVote(backend, body, "wrong")).status).toBe(401);
     expect((await postVote(backend, { ...body, picks: "p0" })).status).toBe(
+      400,
+    );
+    expect((await postVote(backend, { ...body, voterId: "   " })).status).toBe(
       400,
     );
     expect((await postVote(backend, { ...body, token: "nope" })).status).toBe(

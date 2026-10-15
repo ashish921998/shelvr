@@ -8,6 +8,18 @@ type Choice = "pick" | "pass";
 type Status = "idle" | "saving" | "saved" | "error";
 
 const VOTER_KEY = "shelvr.planVoter";
+const VOTE_SETTLE_MS = 600;
+
+function rememberChoices(token: string, choices: Record<string, Choice>) {
+  try {
+    window.localStorage.setItem(
+      `shelvr.planVote.${token}`,
+      JSON.stringify(choices),
+    );
+  } catch {
+    // A private window keeps the vote for this visit only.
+  }
+}
 
 function storedChoices(token: string): Record<string, Choice> {
   try {
@@ -56,6 +68,11 @@ export default function PlanVote({
     setChoices(storedChoices(token));
   }, [token]);
 
+  // Taps settle for a moment before they go out, so toggling five places is
+  // one request, not ten.
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
   const send = (next: Record<string, Choice>) => {
     voter.current ??= voterId();
     const body = JSON.stringify({
@@ -64,7 +81,6 @@ export default function PlanVote({
       picks: Object.keys(next).filter((key) => next[key] === "pick"),
       passes: Object.keys(next).filter((key) => next[key] === "pass"),
     });
-    setStatus("saving");
     queue.current = queue.current.then(async () => {
       try {
         const response = await fetch("/api/plan-vote", {
@@ -73,6 +89,9 @@ export default function PlanVote({
           body,
         });
         if (response.ok) {
+          // Remembered only once saved, so a reload never shows a vote the
+          // server didn't take.
+          rememberChoices(token, next);
           setStatus("saved");
           setMessage(undefined);
           return;
@@ -94,15 +113,9 @@ export default function PlanVote({
     if (next[key] === choice) delete next[key];
     else next[key] = choice;
     setChoices(next);
-    try {
-      window.localStorage.setItem(
-        `shelvr.planVote.${token}`,
-        JSON.stringify(next),
-      );
-    } catch {
-      // A private window keeps the vote for this visit only.
-    }
-    send(next);
+    setStatus("saving");
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => send(next), VOTE_SETTLE_MS);
   };
 
   const who = senderName ?? "They";

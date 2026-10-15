@@ -197,8 +197,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
-  recovery, hourly feedback inbox delivery retry, embedding sweep, and daily payment-receipt
-  retention purge.
+  recovery, hourly feedback inbox delivery retry, embedding sweep, daily payment-receipt
+  retention purge, and the daily expired plan vote link purge.
 - **`auth.ts`**: `convexAuth()` setup with Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
   `image: null` Apple's provider emits, which the users schema rejects.
@@ -251,7 +251,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
-  web page at `apps/web/src/app/p`. Links and votes go with their space or account.
+  web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
+  daily cron deletes them a week after they close.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
