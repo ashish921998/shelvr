@@ -94,7 +94,7 @@ vi.mock("expo-router", () => {
   }: {
     children?: ReactNode;
   }) {
-    zoomTargets();
+    zoomTargets(children);
     return <div aria-hidden>{children}</div>;
   };
   Link.Menu = function LinkMenu({ children }: { children?: ReactNode }) {
@@ -399,7 +399,14 @@ describe("on iOS", () => {
     render(
       <ItemCard item={{ ...base, title: "Miso soup recipe" }} zoomTarget />,
     );
-    expect(zoomTargets).toHaveBeenCalled();
+    // The target measures its direct native child, so that child has to be
+    // a real view with the card's frame, not the Link's zero-size host.
+    const [target] = zoomTargets.mock.lastCall ?? [];
+    expect(isValidElement(target) && target.type).toBe(View);
+    expect(
+      isValidElement<{ collapsable?: boolean }>(target) &&
+        target.props.collapsable,
+    ).toBe(false);
     expect(
       screen.getAllByRole("button", { name: "Miso soup recipe" }),
     ).toHaveLength(1);
