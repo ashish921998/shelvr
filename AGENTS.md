@@ -76,6 +76,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
+- **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
+  every reviewer (CI Claude, Codex, any agent) works from.
 
 ## Naming conventions
 
