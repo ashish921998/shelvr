@@ -78,6 +78,23 @@ describe("PlanVote", () => {
     ).toEqual({ p0: "pick", p1: "pass" });
   });
 
+  it("sends a vote still settling when the page closes", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
+    render();
+    tap("Yes to Bastian");
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ keepalive: true });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      picks: ["p0"],
+    });
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("does not remember a vote the server refused", async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ message: "This shortlist has closed." }), {

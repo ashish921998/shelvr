@@ -10,6 +10,20 @@ type Status = "idle" | "saving" | "saved" | "error";
 const VOTER_KEY = "shelvr.planVoter";
 const VOTE_SETTLE_MS = 600;
 
+function ballot(
+  token: string,
+  voterId: string,
+  choices: Record<string, Choice>,
+): string {
+  const keys = Object.keys(choices);
+  return JSON.stringify({
+    token,
+    voterId,
+    picks: keys.filter((key) => choices[key] === "pick"),
+    passes: keys.filter((key) => choices[key] === "pass"),
+  });
+}
+
 function rememberChoices(token: string, choices: Record<string, Choice>) {
   try {
     window.localStorage.setItem(
@@ -71,16 +85,33 @@ export default function PlanVote({
   // Taps settle for a moment before they go out, so toggling five places is
   // one request, not ten.
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  // The ballot still waiting on that pause. Leaving the page sends it at once,
+  // with keepalive so the request outlives the tab.
+  const pending = useRef<Record<string, Choice> | undefined>(undefined);
+  useEffect(() => {
+    const leave = () => {
+      clearTimeout(timer.current);
+      const next = pending.current;
+      pending.current = undefined;
+      if (!next) return;
+      voter.current ??= voterId();
+      void fetch("/api/plan-vote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: ballot(token, voter.current, next),
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, [token]);
 
   const send = (next: Record<string, Choice>) => {
     voter.current ??= voterId();
-    const body = JSON.stringify({
-      token,
-      voterId: voter.current,
-      picks: Object.keys(next).filter((key) => next[key] === "pick"),
-      passes: Object.keys(next).filter((key) => next[key] === "pass"),
-    });
+    const body = ballot(token, voter.current, next);
     queue.current = queue.current.then(async () => {
       try {
         const response = await fetch("/api/plan-vote", {
@@ -115,7 +146,11 @@ export default function PlanVote({
     setChoices(next);
     setStatus("saving");
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => send(next), VOTE_SETTLE_MS);
+    pending.current = next;
+    timer.current = setTimeout(() => {
+      pending.current = undefined;
+      send(next);
+    }, VOTE_SETTLE_MS);
   };
 
   const who = senderName ?? "They";
