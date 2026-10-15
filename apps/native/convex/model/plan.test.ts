@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
-import { isGrounded, sanitizePlan, type PlanSource } from "./plan";
+import { isGrounded, placeKey, sanitizePlan, type PlanSource } from "./plan";
 
 function source(fields: Partial<PlanSource>): PlanSource {
   return { itemId: "item1" as Id<"items">, places: [], ...fields };
@@ -192,6 +192,46 @@ describe("sanitizePlan", () => {
       sources,
     );
     expect(kept.name).toBe("The Palomar, Soho");
+  });
+
+  it("cuts at the address, keeping commas and numbers in the name", () => {
+    const [withComma] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "Paul, Smith & Co, 12 Main Street",
+          area: "",
+          why: "Go",
+        },
+      ],
+      [source({ title: "Paul, Smith & Co" })],
+    );
+    expect(withComma.name).toBe("Paul, Smith & Co");
+    const sources = [
+      source({ itemId: "a" as Id<"items">, title: "Copper, Bar 61" }),
+      source({ itemId: "b" as Id<"items">, title: "Copper, Bar 62" }),
+    ];
+    const both = sanitizePlan(
+      [
+        { saveNumber: 1, name: "Copper, Bar 61", area: "", why: "Go" },
+        { saveNumber: 2, name: "Copper, Bar 62", area: "", why: "Go" },
+      ],
+      sources,
+    );
+    expect(both.map((place) => place.name)).toEqual([
+      "Copper, Bar 61",
+      "Copper, Bar 62",
+    ]);
+  });
+
+  it("still knows a visit saved under the full name", () => {
+    const full = "The Palomar, 34 Rupert Street, London";
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: full, area: "", why: "Go" }],
+      [source({ title: full })],
+      new Set([placeKey(full)]),
+    );
+    expect(pick).toMatchObject({ name: "The Palomar", been: true });
   });
 
   it("keeps the address when the name before it proves nothing alone", () => {

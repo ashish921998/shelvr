@@ -244,19 +244,24 @@ const STREET_WORDS = new Set([
 ]);
 
 function isAddressPart(part: string): boolean {
-  return /\p{N}/u.test(part) || wordsOf(part).some((w) => STREET_WORDS.has(w));
+  // A house number leads ("34 Rupert Street"); a number inside a name
+  // ("Bar 61") does not make it an address.
+  return (
+    /^\s*\p{N}/u.test(part) || wordsOf(part).some((w) => STREET_WORDS.has(w))
+  );
 }
 
 /**
  * Drop a street address the model wrote into a place's name: "The Palomar,
- * 34 Rupert Street, London" becomes "The Palomar". Only when a later
- * comma-separated part looks like an address, and only when what is left
- * still names the place.
+ * 34 Rupert Street, London" becomes "The Palomar". The cut is at the first
+ * comma-separated part that looks like an address, so a comma in the name
+ * itself stays, and only when what is left still names the place.
  */
 function withoutAddress(name: string, evidence: Evidence): string {
-  const [head, ...rest] = name.split(",");
-  const short = head.trim();
-  if (rest.length === 0 || !rest.some(isAddressPart)) return name;
+  const parts = name.split(",");
+  const at = parts.findIndex((part, i) => i > 0 && isAddressPart(part));
+  if (at === -1) return name;
+  const short = parts.slice(0, at).join(",").trim();
   return short !== "" && namesPlace(short, evidence) ? short : name;
 }
 
@@ -278,7 +283,8 @@ export function sanitizePlan(
     if (!Number.isInteger(n) || n < 1 || n > sources.length) continue;
     const source = sources[n - 1];
     const evidence = evidenceOf(source);
-    const name = withoutAddress(clip(pick.name, MAX_NAME_CHARS), evidence);
+    const full = clip(pick.name, MAX_NAME_CHARS);
+    const name = withoutAddress(full, evidence);
     const key = squash(name);
     if (key === "" || seen.has(key)) continue;
     if (!namesPlace(name, evidence)) continue;
@@ -291,7 +297,8 @@ export function sanitizePlan(
       ...(area !== "" ? { area } : {}),
       why,
       itemId: source.itemId,
-      ...(been.has(key) ? { been: true } : {}),
+      // A visit saved before addresses were stripped carries the full name.
+      ...(been.has(key) || been.has(squash(full)) ? { been: true } : {}),
     });
   }
   // Stable: each group keeps the model's order.
