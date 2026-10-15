@@ -244,10 +244,9 @@ jobs:
         working-directory: tools/e2e
         run: >-
           pnpm exec e2e run
-          tests/search.e2e.ts
-          tests/search-no-results.e2e.ts
-          tests/create-space.e2e.ts
           tests/paywall.e2e.ts
+          tests/onboarding.e2e.ts
+          tests/share.e2e.ts
           --reporter list,junit
 
       # tapUntilVisible taps again when a tap was lost. The run still passes

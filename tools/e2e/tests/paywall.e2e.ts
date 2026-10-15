@@ -70,3 +70,39 @@ test("shows the paywall instead of Add to someone without Pro", async ({
     await expect(screen.getByTestId(`fixture-item-${seeded}`)).toBeVisible();
   }
 });
+
+// The exit offer after a paywall close, asked for with a second launch
+// argument, since hiding Pro skips it otherwise. Its sheet hosts
+// RevenueCat's paywall full-screen, and when the design fails to render
+// RevenueCat's fallback has no close, so the app keeps a close of its own on
+// top (PR #194 shipped without one, and the offer could not be left).
+test("leaves the exit offer by the app's own close", async ({
+  device,
+  screen,
+}) => {
+  await device.openApp(BUNDLE_ID, {
+    relaunch: true,
+    launchArguments: [
+      ...LAUNCH_ARGUMENTS,
+      "-E2EHidePro",
+      "YES",
+      "-E2EExitOffer",
+      "YES",
+    ],
+  });
+  const viewPlans = screen.getByRole("button", "View Pro plans");
+  await expect(viewPlans).toBeVisible({ timeout: 180_000 });
+  await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+    timeout: 30_000,
+  });
+
+  await viewPlans.tap();
+  await expectPaywall(screen);
+  await screen.getByRole("button").first().tap();
+
+  const close = screen.getByTestId("exit-offer-close");
+  await expect(close).toBeVisible({ timeout: 60_000 });
+  await close.tap();
+  await expect(close).toBeHidden({ timeout: 30_000 });
+  await expect(viewPlans).toBeVisible({ timeout: 30_000 });
+});

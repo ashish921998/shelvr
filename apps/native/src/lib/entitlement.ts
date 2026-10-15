@@ -51,7 +51,7 @@ import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
-import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 
 /**
  * Shelvr Pro entitlement.
@@ -452,9 +452,10 @@ async function presentExitOffer(
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   if (!userId || !rc) return null;
-  // The paywall e2e flow closes the paywall and expects Home, on a simulator
-  // whose offer may or may not be due.
-  if (isProHiddenForE2E()) return null;
+  // The paywall e2e flows close the paywall and expect Home, on a simulator
+  // whose offer may or may not be due, unless the run asked for the offer.
+  const forced = isExitOfferForcedForE2E();
+  if (isProHiddenForE2E() && !forced) return null;
   const key = exitOfferShownKey(userId);
   const now = Date.now();
   let lastShownAt: number | null;
@@ -463,7 +464,8 @@ async function presentExitOffer(
   } catch {
     return null;
   }
-  if (!exitOfferDue(sourcePlacement, lastShownAt, now)) return null;
+  if (!exitOfferDue(sourcePlacement, forced ? null : lastShownAt, now))
+    return null;
   const offering = await findExitOffering(exitOfferDeps(rc));
   if (!offering) return null;
   try {
