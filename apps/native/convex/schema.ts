@@ -116,7 +116,8 @@ export default defineSchema({
       v.literal("failed"),
     ),
     title: v.optional(v.string()),
-    // "user" once the owner typed the title. Classification then leaves
+    // "user" once the owner typed the title, or picked an onboarding sample
+    // whose heading they saw (createDemoItem). Classification then leaves
     // `title` alone; absent means any title is the classifier's.
     titleSource: v.optional(v.literal("user")),
     description: v.optional(v.string()),
