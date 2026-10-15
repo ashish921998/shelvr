@@ -69,7 +69,7 @@ beforeEach(() => {
 
 // The app root drops a touch in the capture phase, before any child sees it.
 function renderCard(cardPress: () => void, onShare = () => {}) {
-  render(
+  return render(
     <div
       onPointerDownCapture={(event) => {
         if (dropMenuDismissTouch()) event.stopPropagation();
@@ -138,5 +138,17 @@ it("lets the next tap through after an item is picked", () => {
   tap(screen.getByTestId("card"));
 
   expect(onShare).toHaveBeenCalledTimes(1);
+  expect(cardPress).toHaveBeenCalledTimes(1);
+});
+
+it("lets the next tap through when an open menu unmounts", () => {
+  const cardPress = vi.fn();
+  const { unmount } = renderCard(vi.fn());
+
+  tap(screen.getByLabelText("Item actions"));
+  unmount();
+  renderCard(cardPress);
+  tap(screen.getByTestId("card"));
+
   expect(cardPress).toHaveBeenCalledTimes(1);
 });

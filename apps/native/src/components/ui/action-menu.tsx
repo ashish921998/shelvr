@@ -1,5 +1,5 @@
 import { MenuView, type MenuComponentRef } from "@expo/ui/community/menu";
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   AppState,
   Platform,
@@ -39,6 +39,15 @@ export function ActionMenu({
   style?: StyleProp<ViewStyle>;
 }) {
   const menu = useRef<MenuComponentRef>(null);
+  const owner = useRef({});
+  // A card can unmount with its menu open (deleted elsewhere, or the list
+  // changed), so the tap that would have closed it never comes.
+  useEffect(() => {
+    const self = owner.current;
+    return () => {
+      if (openMenu === self) openMenu = null;
+    };
+  }, []);
   const isAndroid = process.env.EXPO_OS === "android";
   return (
     // On iOS the SwiftUI menu opens from a native gesture that React Native's
@@ -50,7 +59,9 @@ export function ActionMenu({
     <View
       onStartShouldSetResponder={claimTouch}
       onResponderTerminationRequest={keepTouch}
-      onResponderRelease={markMenuOpen}
+      onResponderRelease={() => {
+        openMenu = Platform.OS === "ios" ? owner.current : null;
+      }}
     >
       <MenuView
         ref={menu}
@@ -67,7 +78,7 @@ export function ActionMenu({
             : { state: action.selected ? ("on" as const) : ("off" as const) }),
         }))}
         onPressAction={({ nativeEvent }) => {
-          menuOpen = false;
+          openMenu = null;
           actions
             .find(
               (action) =>
@@ -109,16 +120,14 @@ const keepTouch = () => false;
 // tap to React Native. The app root drops it with `dropMenuDismissTouch`, so
 // the tap does not also press whatever sits under it. Picking an item never
 // reaches React Native, and leaving the app closes the menu, so both clear it.
-let menuOpen = false;
-const markMenuOpen = () => {
-  menuOpen = Platform.OS === "ios";
-};
+// `openMenu` is the menu that is open, so an unmounting menu clears only itself.
+let openMenu: object | null = null;
 AppState.addEventListener("change", () => {
-  menuOpen = false;
+  openMenu = null;
 });
 
 export function dropMenuDismissTouch() {
-  const dismissing = menuOpen;
-  menuOpen = false;
+  const dismissing = openMenu !== null;
+  openMenu = null;
   return dismissing;
 }
