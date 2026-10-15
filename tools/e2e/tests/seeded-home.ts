@@ -115,17 +115,53 @@ async function openApp(
   const launcher = screen.getByText("Searching for development servers...");
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
   await app.open();
+  await pollUntil(async () => {
+    if (await ready()) return true;
+    if (await launcher.isVisible()) await app.open();
+    else if (await keepAi.isVisible()) await keepAi.tap();
+    return false;
+  }, BUNDLE_TIMEOUT);
+}
+
+/**
+ * True for a failure of the engine itself (a daemon request that timed out,
+ * a cancelled run), as opposed to a locator that matched nothing or a tap
+ * that was not accepted, which the polls below retry. The runner gives
+ * these the codes `ENGINE_FAILURE` and `CANCELLED`.
+ */
+function isEngineFailure(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "ENGINE_FAILURE" || code === "CANCELLED";
+}
+
+/**
+ * `expect.poll(attempt).toBe(true)` that fails fast on an engine failure.
+ * The poll catches whatever its callback throws, keeps the message as its
+ * `last` and retries until the deadline, so a dead engine would retry for
+ * the whole timeout and then be reported as an assertion failure. The
+ * callback's engine failures are therefore carried out of the poll and
+ * rethrown unchanged; every other throw is still retried.
+ */
+async function pollUntil(
+  attempt: () => Promise<boolean>,
+  timeout: number,
+): Promise<void> {
+  let engineFailure: unknown;
   await expect
     .poll(
       async () => {
-        if (await ready()) return true;
-        if (await launcher.isVisible()) await app.open();
-        else if (await keepAi.isVisible()) await keepAi.tap();
-        return false;
+        try {
+          return await attempt();
+        } catch (error) {
+          if (!isEngineFailure(error)) throw error;
+          engineFailure = error;
+          return true;
+        }
       },
-      { timeout: BUNDLE_TIMEOUT },
+      { timeout },
     )
     .toBe(true);
+  if (engineFailure !== undefined) throw engineFailure;
 }
 
 /** The AI consent card's yes (`aiConsent.allow` in en.json). */
@@ -139,11 +175,10 @@ const AI_CONSENT_ALLOW = "Keep it on";
  */
 async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
-  await expect
-    .poll(async () => (await home.isVisible()) || (await keepAi.isVisible()), {
-      timeout: 60_000,
-    })
-    .toBe(true);
+  await pollUntil(
+    async () => (await home.isVisible()) || (await keepAi.isVisible()),
+    60_000,
+  );
   if (await keepAi.isVisible()) {
     await keepAi.tap();
     await expect(home).toBeVisible({ timeout: 30_000 });
@@ -198,19 +233,16 @@ export async function tapUntilVisible(
   result: Locator,
   { waitMs, timeout }: { waitMs: number; timeout: number },
 ): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        if (await result.isVisible()) return true;
-        await control.tap({ timeout: Math.min(waitMs, timeout) });
-        await expect(result)
-          .toBeVisible({ timeout: waitMs })
-          .catch(() => undefined);
-        return result.isVisible();
-      },
-      { timeout },
-    )
-    .toBe(true);
+  await pollUntil(async () => {
+    if (await result.isVisible()) return true;
+    await control.tap({ timeout: Math.min(waitMs, timeout) });
+    await expect(result)
+      .toBeVisible({ timeout: waitMs })
+      .catch((error: unknown) => {
+        if (isEngineFailure(error)) throw error;
+      });
+    return result.isVisible();
+  }, timeout);
 }
 
 /**
