@@ -182,10 +182,6 @@ export default function ProfileScreen() {
           />
         </ActionMenu>
         <SettingsRow
-          label={t("import.title")}
-          onPress={() => router.push("/import")}
-        />
-        <SettingsRow
           label={t("feedback.open")}
           icon="arrow.up.right"
           onPress={() => setFeedbackOpen(true)}

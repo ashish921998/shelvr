@@ -1945,6 +1945,10 @@ async function hasSavedLink(
  * The batch draws one `bulkImport` token per link it would create, all or
  * nothing. When the bucket cannot cover the batch, nothing is created and
  * `rateLimited` tells the client to stop paging.
+ *
+ * The app no longer offers the import screen (removed 2026-10-15). This stays
+ * for installed builds that still have it; remove it once no build in the
+ * wild calls it.
  */
 export const importLinks = mutation({
   args: {

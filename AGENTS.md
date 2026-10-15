@@ -43,8 +43,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`; pasted
-  link lists in `src/lib/import-links.ts`.
+  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.
