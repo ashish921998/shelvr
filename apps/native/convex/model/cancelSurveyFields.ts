@@ -22,7 +22,7 @@ export const cancelSurveyOutcomeValidator = v.union(
 // Why the trial was cancelled, from the next-visit survey card. Absent for
 // a dismissal without a stated reason. The order is the card's display order,
 // and each id is an analytics contract (PostHog dashboards group on it), so
-// adding a reason is additive — never rename or reorder an existing one.
+// adding a reason is additive: never rename or reorder an existing one.
 export const CANCEL_SURVEY_REASONS = [
   "too_expensive",
   "not_useful_enough",

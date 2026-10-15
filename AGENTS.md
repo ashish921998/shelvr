@@ -59,9 +59,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, per-host readers) on
   top of `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
-- **Large files:** `convex/items.ts` (about 2,800 lines), `convex/ai.ts` and
-  `convex/model/pageRead.ts` (about 1,650 each). Search for the export name
-  first and read that range, not the whole file.
+- **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
+  and `convex/model/pageRead.ts` (about 1,650). Embedding and recommendation actions
+  live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
+  Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
   subscription for the anonymous dev user.
 - **Tests:** co-located `*.test.ts(x)`; shared setup in `src/test.setup.ts` and
@@ -72,7 +73,13 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
   setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
   paywall.
+- **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
+  drives the `tools/e2e` suite and maps the core features it covers to their tests.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
+- **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
+  every reviewer (CI Claude, Codex, any agent) works from.
+- **Measuring a reviewer:** `tools/review-eval` holds past PRs that shipped a
+  bug, plus clean ones, to score catch rate and false alarms.
 
 ## Naming conventions
 
@@ -132,7 +139,7 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   which the PostHog project setting must also enable server-side.
 - Convex backend: `logEvent(level, event, fields)` from `convex/model/log.ts`
   emits one JSON line per event into the Convex log stream. Fields are scalars
-  only (categories, codes, ids, counts) — never messages, URLs, or user content.
+  only (categories, codes, ids, counts), never messages, URLs, or user content.
 - Web: server code uses `serverLog` from `apps/web/src/lib/serverLog.ts`; client
   render failures report via `captureWebException` from `app/error.tsx` and
   `app/global-error.tsx`.
@@ -165,12 +172,12 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   fingerprint (a native dependency added or removed, a native config change,
   or `version` in `app.json`) makes new updates invisible to binaries built
   from the old fingerprint: cut a fresh store build before resuming OTA
-  publishes. The version is the easy one to miss — a bump must land on
+  publishes. The version is the easy one to miss: a bump must land on
   `main` before any OTA aimed at the build carrying it. The build number is
   not an input.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
-  that needs them. Breaking changes go out as expand/contract — an installed
+  that needs them. Breaking changes go out as expand/contract, so an installed
   client must never reach a missing function or a stricter validator.
 
 ## Non-negotiable boundaries
@@ -180,8 +187,9 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 - Use indexes or search indexes for growing Convex tables. Keep every Convex
   function's `args` and `returns` validators accurate.
 - Gate saves and Pro features with `requireProEntitlement`.
-- AI passes may change only `suggested` memberships. User-owned `saved` and
-  `dismissed` decisions stay intact.
+- AI passes may change only `suggested` memberships, except that the classifier
+  inserts new matches as `saved` into a space the user set to auto-file.
+  User-owned `saved` and `dismissed` decisions stay intact.
 - Keep secrets and user content out of source, logs, tests, and reports.
 - Do not reintroduce the retired notes-app domain or edit generated Convex files
   unless the Convex workflow explicitly requires regeneration.

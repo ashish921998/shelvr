@@ -3,7 +3,7 @@ import { env } from "../_generated/server";
 type LogLevel = "info" | "warn" | "error";
 
 /** Only scalars: a field is a category, code, id, count, or flag. Never a
- * message, URL, or user content — those stay out of the log stream. */
+ * message, URL, or user content. Those stay out of the log stream. */
 type LogFieldValue = string | number | boolean | null | undefined;
 type LogFields = Record<string, LogFieldValue>;
 

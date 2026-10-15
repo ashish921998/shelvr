@@ -36,7 +36,7 @@ const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
 export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
 // Expo and other native modules reject with a `CodedError` whose message is a
-// generated code token — `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
+// generated code token: `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
 // the failing module and holds no user content (no spaces, URLs, or free text),
 // so it is safe to keep. Without it a native crash reaches error tracking as the
 // bare class name ("Error"), naming nothing that failed. The pattern only admits
@@ -70,7 +70,7 @@ function redactExceptionProperties(properties: unknown): void {
       };
     });
   }
-  // Only rewrite the message when the SDK captured one — an unconditional
+  // Only rewrite the message when the SDK captured one: an unconditional
   // assignment would stamp an undefined `$exception_message` key onto every
   // lifecycle and custom event passing through the hook.
   if ("$exception_message" in record) {
@@ -126,7 +126,7 @@ export const posthog =
           sampleRate: 1,
           throttleDelayMs: 1000,
         },
-        // The object form resolves omitted keys to false — an empty
+        // The object form resolves omitted keys to false: an empty
         // `console: []` alone silently disables crash capture. Exceptions are
         // additionally gated server-side by the project's "exception
         // autocapture" remote config.
@@ -193,7 +193,7 @@ export async function resetIfIdentified(client: PostHog): Promise<void> {
 }
 
 /** True when the client analytics boundary may capture. The single canonical
- * check — every analytics facade (feedback, cancel survey) delegates here
+ * check: every analytics facade (feedback, cancel survey) delegates here
  * instead of re-deriving availability from the client's state. */
 export function isAnalyticsAvailable(): boolean {
   return posthog !== undefined && !posthog.isDisabled && !posthog.optedOut;

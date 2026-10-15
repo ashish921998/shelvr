@@ -54,14 +54,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { shareStore } from "@/lib/share/share-store";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -71,6 +64,7 @@ import {
   REDUCED_FADE_IN,
   REDUCED_FADE_OUT,
 } from "@/lib/motion";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -285,7 +279,7 @@ export default function ShareScreen() {
 
   // --- Phase render ---------------------------------------------------------
 
-  // Entitlement is still loading — don't fall through to the idle/complete
+  // Entitlement is still loading: don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts
   // until it resolves.
   if (entitlementLoading && phase.kind === "idle") {
@@ -301,7 +295,7 @@ export default function ShareScreen() {
 
   // Pro gate: an unentitled user sharing into Shelvr reached the paywall and
   // (on cancel) landed here. Do NOT fall through to the terminal "Saved to
-  // Shelvr" spinner — the save never happened. Offer Unlock Pro or Cancel.
+  // Shelvr" spinner: the save never happened. Offer Unlock Pro or Cancel.
   if (phase.kind === "locked") {
     return (
       <PhaseSurface key="locked" phaseKey="locked">
@@ -589,14 +583,14 @@ function bestEffort(code: string, run: () => void): void {
 }
 
 // ---------------------------------------------------------------------------
-// Presentational pieces (existing theme typography/buttons — no design system)
+// Presentational pieces (existing theme typography/buttons, no design system)
 // ---------------------------------------------------------------------------
 
 type Theme = ReturnType<typeof useUnistyles>["theme"];
 
 /** Phase chrome with enter/exit transitions. The Reanimated drivers fire on
  * mount/unmount, so a phase change only animates if React remounts the
- * surface — callers must pass `key={phaseKey}` at each call site. */
+ * surface: callers must pass `key={phaseKey}` at each call site. */
 function PhaseSurface({
   phaseKey,
   children,
@@ -631,7 +625,7 @@ function Centered({
 }) {
   return (
     <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
-      {spinner ? <ActivityIndicator color={theme.colors.primary} /> : null}
+      {spinner ? <StitchRing size={22} /> : null}
       <Text style={styles.label(theme)}>{label}</Text>
     </PhaseSurface>
   );

@@ -18,6 +18,7 @@ const mock = vi.hoisted(() => {
     authUrl: "",
     authRequest: null,
     submitting: false,
+    submissionTimedOut: false,
     timedOut: false,
     demoUsed: false,
     canSkip: false,
@@ -25,6 +26,10 @@ const mock = vi.hoisted(() => {
   };
   return {
     demo,
+    reducedMotion: false,
+    pendingProvider: null as "google" | null,
+    signInWith: vi.fn(),
+    modalProps: vi.fn(),
     actions: {
       setError: vi.fn(),
       submitUrl: vi.fn(),
@@ -43,8 +48,12 @@ const mock = vi.hoisted(() => {
     nothing: () => null,
     view: ({ children }: Children) => <div>{children}</div>,
     text: ({ children }: Children) => <span>{children}</span>,
-    modal: ({ visible, children }: Children & { visible: boolean }) =>
-      visible ? <div>{children}</div> : null,
+    modal: (
+      props: Children & { visible: boolean; onRequestClose?: () => void },
+    ) => {
+      mock.modalProps(props);
+      return props.visible ? <div>{props.children}</div> : null;
+    },
     pressable: ({
       children,
       onPress,
@@ -91,18 +100,23 @@ const mock = vi.hoisted(() => {
       </button>
     ),
     reading: () => <div>reading</div>,
-    sampleSignIn: () => <div>sample-sign-in</div>,
   };
 });
 
+vi.mock("@/components/ui/stitch-loader", () => ({
+  StitchRing: vi.fn(() => null),
+  StitchRow: vi.fn(() => null),
+}));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   View: mock.view,
   Text: mock.text,
-  ActivityIndicator: mock.nothing,
   Modal: mock.modal,
   Pressable: mock.pressable,
   TextInput: mock.textInput,
+}));
+vi.mock("react-native-reanimated", () => ({
+  useReducedMotion: () => mock.reducedMotion,
 }));
 vi.mock("react-native-unistyles", () => {
   const anyStyle = new Proxy({}, { get: () => ({}) });
@@ -119,6 +133,7 @@ vi.mock("expo-clipboard", () => ({
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.nothing }));
 vi.mock("@/components/onboarding/parts", () => ({
+  CtaButton: mock.ghostButton,
   GhostButton: mock.ghostButton,
 }));
 vi.mock("@/components/onboarding/demo-reading-view", () => ({
@@ -138,8 +153,8 @@ vi.mock("@/lib/anonymous-auth", () => ({
 }));
 vi.mock("@/lib/oauth-sign-in", () => ({
   useOAuthSignIn: () => ({
-    signInWith: vi.fn(),
-    pendingProvider: null,
+    signInWith: mock.signInWith,
+    pendingProvider: mock.pendingProvider,
     lastError: null,
     interrupted: false,
   }),
@@ -154,8 +169,8 @@ vi.mock("@/lib/use-incoming-share-url", () => ({
     mock.intake.canAccept = options.canAccept;
   },
 }));
-vi.mock("@/components/onboarding/sample-sign-in", () => ({
-  SampleSignIn: mock.sampleSignIn,
+vi.mock("@/components/onboarding/save-summary", () => ({
+  SaveSummary: mock.nothing,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
@@ -182,8 +197,90 @@ beforeEach(() => {
   mock.demo.error = null;
   mock.demo.demoUsed = false;
   mock.demo.authUrl = "";
+  mock.demo.submitting = false;
+  mock.demo.submissionTimedOut = false;
+  mock.demo.isAuthenticated = false;
+  mock.reducedMotion = false;
+  mock.pendingProvider = null;
   vi.clearAllMocks();
   mock.actions.canAcceptShare.mockReturnValue(true);
+});
+
+describe("submission recovery", () => {
+  it.each(["share", "reading", "auth"])(
+    "offers truthful enabled recovery from %s without saved claims",
+    (view) => {
+      mock.demo.view = view;
+      mock.demo.submitting = true;
+      mock.demo.submissionTimedOut = true;
+      mock.demo.isAuthenticated = true;
+      mock.demo.authUrl = DEMO_SAMPLES[0].url;
+      render(step());
+      expect(screen.getByText("demo.submissionUnconfirmed")).toBeTruthy();
+      expect(screen.queryByText(/reveal\.previewTitle/)).toBeNull();
+      expect(screen.queryByText("reveal.filedIn")).toBeNull();
+      expect(screen.queryByText("reading")).toBeNull();
+      expect(linkField()).toBeNull();
+      const wait = screen.getByRole("button", { name: "demo.keepWaiting" });
+      const proceed = screen.getByRole("button", { name: "common.continue" });
+      expect((wait as HTMLButtonElement).disabled).toBe(false);
+      expect((proceed as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(wait);
+      expect(mock.actions.keepWaiting).toHaveBeenCalledOnce();
+      fireEvent.click(proceed);
+      expect(mock.actions.continueAfterTimeout).toHaveBeenCalledOnce();
+      expect(mock.actions.skip).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe.each([false, true])("demo auth reduced motion %s", (reduced) => {
+  it("uses the native transition and keeps idle cancellation and the draft", () => {
+    mock.reducedMotion = reduced;
+    const { rerender } = render(step());
+    expect(mock.modalProps.mock.lastCall?.[0].visible).toBe(false);
+    fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
+    mock.demo.view = "auth";
+    mock.demo.authUrl = "https://a.test/p";
+    rerender(step());
+    expect(mock.modalProps.mock.lastCall?.[0]).toMatchObject({
+      visible: true,
+      transparent: true,
+      animationType: reduced ? "fade" : "slide",
+    });
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    expect(screen.getByText("demo.signInHelp")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "common.back" }));
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(2);
+    mock.demo.view = "pick";
+    rerender(step());
+    expect(screen.queryByText("demo.signInTitle")).toBeNull();
+    expect(linkField()?.value).toBe("https://a.test/p");
+    fireEvent.click(screen.getByRole("button", { name: "demo.save" }));
+    expect(mock.actions.submitTyped).toHaveBeenCalledWith("https://a.test/p");
+  });
+
+  it("blocks scrim and native close while the provider is pending, then allows cancellation", () => {
+    mock.reducedMotion = reduced;
+    mock.demo.view = "auth";
+    mock.demo.authUrl = "https://a.test/p";
+    const { rerender } = render(step());
+    fireEvent.click(screen.getByRole("button", { name: "account.google" }));
+    expect(mock.signInWith).toHaveBeenCalledWith("google");
+    mock.pendingProvider = "google";
+    rerender(step());
+    expect(mock.modalProps.mock.lastCall?.[0].onRequestClose).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "common.back" }));
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).not.toHaveBeenCalled();
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    mock.pendingProvider = null;
+    rerender(step());
+    mock.modalProps.mock.lastCall?.[0].onRequestClose?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("first-save picker", () => {
@@ -256,12 +353,12 @@ describe("first-save picker", () => {
     mock.demo.view = "auth";
     mock.demo.authUrl = DEMO_SAMPLES[0].url;
     const { rerender } = render(step());
-    expect(screen.getByText("sample-sign-in")).toBeTruthy();
+    expect(screen.getByText("reveal.previewSubtitle")).toBeTruthy();
     expect(linkField()).toBeNull();
 
     mock.demo.authUrl = "https://a.test/p";
     rerender(step());
-    expect(screen.queryByText("sample-sign-in")).toBeNull();
+    expect(screen.queryByText("reveal.previewSubtitle")).toBeNull();
     expect(screen.getByText("demo.signInTitle")).toBeTruthy();
   });
   it("gives the screen a way back from the picker and from a sample's sign-in ask, and none while reading", () => {

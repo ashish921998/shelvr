@@ -55,7 +55,7 @@ export function exitOfferEndsAt(
 }
 
 /** The honest reminder goes out this long before the offer closes. */
-const EXIT_OFFER_REMINDER_LEAD_MS = HOUR_MS;
+const EXIT_OFFER_REMINDER_LEAD_MS = 3 * HOUR_MS;
 
 /** When to remind that the offer is closing, or null when it is too late. */
 export function exitOfferReminderAt(
@@ -89,11 +89,19 @@ export function exitOfferReminderPlan(
 }
 
 /**
- * Whether an opted-in reminder has yet to fire. Cancelling stays possible
+ * Builds before the 3-hour lead scheduled the reminder an hour before the
+ * close, and a sync leaves a reminder that is already due alone, so one of
+ * those can still be waiting in the OS. Cancel stays on screen until it would
+ * have fired: an opt-out must never be missing while a promo is queued.
+ */
+const LATEST_REMINDER_LEAD_MS = HOUR_MS;
+
+/**
+ * Whether an opted-in reminder may still fire. Cancelling stays possible
  * until then, even once it is too late to schedule a new one.
  */
 export function exitOfferReminderPending(endsAt: number, now: number): boolean {
-  return now < endsAt - EXIT_OFFER_REMINDER_LEAD_MS;
+  return now < endsAt - LATEST_REMINDER_LEAD_MS;
 }
 
 /** Whole hours and minutes left, rounded down so it never overstates. */

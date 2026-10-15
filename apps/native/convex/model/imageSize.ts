@@ -30,7 +30,7 @@ function hasBytes(
   return signature.every((byte, i) => buf[offset + i] === byte);
 }
 
-// PNG — IHDR width/height are big-endian uint32 at offset 16/20.
+// PNG: IHDR width/height are big-endian uint32 at offset 16/20.
 function pngSize(buf: Uint8Array): ImageSize | undefined {
   if (buf.length < 24 || !hasBytes(buf, 0, [0x89, 0x50, 0x4e, 0x47])) {
     return undefined;
@@ -38,7 +38,7 @@ function pngSize(buf: Uint8Array): ImageSize | undefined {
   return { width: readUint32BE(buf, 16), height: readUint32BE(buf, 20) };
 }
 
-// GIF — little-endian uint16 at offset 6/8.
+// GIF: little-endian uint16 at offset 6/8.
 function gifSize(buf: Uint8Array): ImageSize | undefined {
   if (buf.length < 10 || !hasBytes(buf, 0, [0x47, 0x49, 0x46])) {
     return undefined;
@@ -46,7 +46,7 @@ function gifSize(buf: Uint8Array): ImageSize | undefined {
   return { width: readUint16LE(buf, 6), height: readUint16LE(buf, 8) };
 }
 
-// WebP — RIFF container tagged "WEBP", three sub-formats.
+// WebP: RIFF container tagged "WEBP", three sub-formats.
 function webpSize(buf: Uint8Array): ImageSize | undefined {
   if (
     buf.length < 30 ||
@@ -81,7 +81,7 @@ function webpSize(buf: Uint8Array): ImageSize | undefined {
   return undefined;
 }
 
-// JPEG — walk segments to the start-of-frame marker.
+// JPEG: walk segments to the start-of-frame marker.
 function jpegSize(buf: Uint8Array): ImageSize | undefined {
   if (buf.length < 2 || !hasBytes(buf, 0, [0xff, 0xd8])) {
     return undefined;
@@ -115,7 +115,7 @@ function jpegSize(buf: Uint8Array): ImageSize | undefined {
 
 /**
  * Read the pixel dimensions straight from an image file's header bytes.
- * Covers PNG, GIF, WebP (VP8/VP8L/VP8X) and JPEG — no dependencies. Returns
+ * Covers PNG, GIF, WebP (VP8/VP8L/VP8X) and JPEG, with no dependencies. Returns
  * undefined for formats we don't recognize or truncated buffers.
  */
 export function readImageSize(buf: Uint8Array): ImageSize | undefined {

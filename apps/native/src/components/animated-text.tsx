@@ -57,7 +57,7 @@ const FONTS: Record<string, number> = {
 const morph = motion.textMorph;
 const CANVAS_HEIGHT = 56;
 // Fixed layout width. Kept just under the native header's title slot (~242pt
-// between the bar buttons) so it is never clamped — iOS then centers the whole
+// between the bar buttons) so it is never clamped. iOS then centers the whole
 // canvas on screen and the text, centered within it, lands dead-center.
 const DEFAULT_WIDTH = 240;
 const DEFAULT_FONT_SIZE = 24;

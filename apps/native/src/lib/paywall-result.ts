@@ -2,9 +2,9 @@
  * Maps RevenueCat paywall presentation outcomes into the three user-visible
  * results Shelvr needs:
  *
- * - `success` — purchase or restore completed; callers refresh entitlement
- * - `cancelled` — the user dismissed without buying; return to the previous screen
- * - `unavailable` — SDK missing, identity sync timed out, not presented, or error;
+ * - `success`: purchase or restore completed; callers refresh entitlement
+ * - `cancelled`: the user dismissed without buying; return to the previous screen
+ * - `unavailable`: SDK missing, identity sync timed out, not presented, or error;
  *   callers may show a retryable fallback
  *
  * The previous boolean contract collapsed cancellation into the same path as a
@@ -47,7 +47,7 @@ export function restoreFoundAccess(
 }
 
 /**
- * Whether the paywall fallback route should open. Only real failures do —
+ * Whether the paywall fallback route should open. Only real failures do:
  * cancellation must return the user to the previous screen without routing.
  */
 export function shouldOpenPaywallFallback(outcome: PaywallOutcome): boolean {

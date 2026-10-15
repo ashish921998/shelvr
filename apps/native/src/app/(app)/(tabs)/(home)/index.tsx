@@ -208,7 +208,7 @@ export default function HomeScreen() {
     <ProSlot userId={user?._id} lapsed={entitlement.status === "lapsed"} />
   ) : null;
 
-  // One element, two slots (empty feed and feed header) — the survey claims
+  // One element, two slots (empty feed and feed header): the survey claims
   // the Home moment when both prompts are eligible.
   const cancelSurveyCard = cancelSurvey.visible ? (
     <CancelSurveyCard
@@ -264,6 +264,7 @@ export default function HomeScreen() {
 
   const recallCard = recall.visible ? (
     <SaveRecallCard
+      savedTitle={recall.saved?.title}
       matches={recall.matches}
       onOpen={recall.opened}
       onDismiss={recall.dismiss}

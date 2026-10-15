@@ -16,7 +16,7 @@ export const SUMMARY_SCAN_LIMIT = 50;
 
 /**
  * A spaceItems row's effective state. Rows written before the suggestion
- * model existed have no `status` — they were real memberships, so they read
+ * model existed have no `status`. They were real memberships, so they read
  * as "saved".
  */
 export function effectiveStatus(row: Doc<"spaceItems">): MembershipStatus {
@@ -327,7 +327,7 @@ export async function deleteMembershipsForItem(
 /**
  * Space delete: remove up to `limit` of the space's join rows. Returns true
  * when more remain, so the caller can continue in a fresh transaction. The
- * summary is not touched — the caller deletes the space row itself, and the
+ * summary is not touched: the caller deletes the space row itself, and the
  * fields die with it.
  */
 export async function deleteMembershipsForSpace(

@@ -46,9 +46,10 @@ async function note(
   t: ReturnType<typeof newConvexTest>,
   runId: string,
 ): Promise<Id<"items">> {
+  const userId = await t.run((ctx) => ctx.db.insert("users", {}));
   return t.run((ctx) =>
     ctx.db.insert("items", {
-      userId: "note-user",
+      userId,
       type: "note",
       note: "eggs, milk, bread",
       status: "processing",

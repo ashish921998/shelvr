@@ -47,12 +47,12 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
   // Only cards near the top decode their image, keeping memory flat across a
   // batch of full-screen photos. Membership is derived from the shared
   // currentIndex on the UI thread, so advancing the deck re-renders only the
-  // one or two cards whose visibility actually flips — not the whole stack.
+  // one or two cards whose visibility actually flips, not the whole stack.
   const [mounted, setMounted] = useState(() => inWindow(index, topStart));
 
   useAnimatedReaction(
     () => {
-      // Inline the window check so it runs entirely on the UI thread — calling
+      // Inline the window check so it runs entirely on the UI thread. Calling
       // an external helper here would break worklet compilation.
       const top = currentIndex.get();
       return index >= top - MOUNT_WINDOW && index <= top + 1;

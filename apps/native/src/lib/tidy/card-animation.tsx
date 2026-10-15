@@ -79,7 +79,7 @@ export const CardAnimationProvider: FC<Props> = ({
   const handleDecision = useCallback(
     (action: TidyAction) => {
       // Commit immediately. The fling runs on the UI thread via shared values,
-      // so a JS-side state update here can't jank it — and deferring would make
+      // so a JS-side state update here can't jank it, and deferring would make
       // rapid successive swipes feel laggy.
       onDecision(index, action);
     },
@@ -87,7 +87,7 @@ export const CardAnimationProvider: FC<Props> = ({
   );
 
   // Memoized so decision-driven re-renders (mount window, counters) hand
-  // GestureDetector the SAME instance — a fresh instance re-attaches the
+  // GestureDetector the SAME instance: a fresh instance re-attaches the
   // native handler and cancels any pan that is already in flight.
   const gesture = useMemo(
     () =>
@@ -126,7 +126,7 @@ export const CardAnimationProvider: FC<Props> = ({
           // RNGH also calls onEnd for a FAILED or CANCELLED pan, with
           // success=false. Deciding from one would delete or keep a photo the
           // person never released, and onFinalize cannot recall a scheduled
-          // decision — so leave a cancelled pan to its recovery below.
+          // decision, so leave a cancelled pan to its recovery below.
           if (!success) return;
 
           // The lift can carry travel that arrived after the last onChange, so

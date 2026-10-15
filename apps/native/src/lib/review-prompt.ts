@@ -123,7 +123,7 @@ export function useReviewPrompt(
           await StoreReview.requestReview();
         }
       } catch {
-        // Best-effort — Apple rate-limits internally and returns no signal.
+        // Best-effort: Apple rate-limits internally and returns no signal.
       } finally {
         // A cancelled attempt's cleanup already released the hold, and a
         // newer attempt may own it now. A suppressed one (no review action,

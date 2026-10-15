@@ -9,8 +9,8 @@ import {
   TIMELINE,
 } from "./timeline";
 
-// The animation's beats live in two files — `TIMELINE` here and `SCHEDULE` in
-// the composition — because the saves' times are generated where the saves
+// The animation's beats live in two files: `TIMELINE` here and `SCHEDULE` in
+// the composition, because the saves' times are generated where the saves
 // are. These assertions are what keeps the two honest when either is retimed.
 
 /** When the last save finishes its glide onto the shelf. */

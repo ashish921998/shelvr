@@ -43,7 +43,7 @@ export const DISCARDED_SHARE_KEY = "shelvr.discarded.share";
  * whose native clear threw, leaving the payload in the store. Without this
  * marker the resume path would route the leftover straight back to the share
  * screen, and with the session record already deleted it would re-save the
- * discarded batch under brand-new operation ids — duplicating entries that
+ * discarded batch under brand-new operation ids, duplicating entries that
  * the clearFailed window may already have saved.
  *
  * The record is fingerprint-scoped: a new, different batch never matches it

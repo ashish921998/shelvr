@@ -8,8 +8,11 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
-import { requireUserId } from "./model/auth";
-import { CURRENT_EMBEDDING_VERSION } from "./model/embedding";
+import { liveOwner, requireUserId } from "./model/auth";
+import {
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_SWEEP_PAGE,
+} from "./model/embedding";
 
 async function consentRow(ctx: QueryCtx, userId: string) {
   return await ctx.db
@@ -31,21 +34,70 @@ export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
 ): Promise<boolean> {
+  if ((await liveOwner(ctx, userId)) === null) return false;
   return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
-/** The action-side check. With `itemId` it also answers no once that save is
+/** The action-side check answers no once that save is
  * gone: a deleted save, or a deleted account, whose content a run still
  * holds in memory, must not be sent after the fact. Deleting the account
  * removes the consent row too, which on its own would read as "not asked". */
 export const isAllowed = internalQuery({
-  args: { userId: v.string(), itemId: v.optional(v.id("items")) },
+  args: { userId: v.string(), itemId: v.id("items") },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    if (args.itemId !== undefined && (await ctx.db.get(args.itemId)) === null) {
-      return false;
-    }
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== args.userId) return false;
     return await aiAllowed(ctx, args.userId);
+  },
+});
+
+/** One snapshot for the whole page, immediately before provider inputs are built.
+ * Deleting or missing owners read as declined: their rows are stamped without
+ * sending any text, so they cannot wedge the sweep. Only a save that is itself
+ * gone is skipped, and it has already left the range. */
+export const revalidateEmbeddingBatch = internalQuery({
+  args: {
+    entries: v.array(v.object({ itemId: v.id("items"), userId: v.string() })),
+  },
+  returns: v.array(
+    v.object({
+      itemId: v.id("items"),
+      disposition: v.union(
+        v.literal("allowed"),
+        v.literal("declined"),
+        v.literal("gone"),
+      ),
+    }),
+  ),
+  handler: async (ctx, { entries }) => {
+    if (entries.length > EMBEDDING_SWEEP_PAGE)
+      throw new Error("Too many embedding entries");
+    type Disposition = "allowed" | "declined" | "gone";
+    const owners = new Map<string, Disposition>();
+    const results: {
+      itemId: (typeof entries)[number]["itemId"];
+      disposition: Disposition;
+    }[] = [];
+    for (const { itemId, userId } of entries) {
+      const item = await ctx.db.get(itemId);
+      if (item === null || item.userId !== userId) {
+        results.push({ itemId, disposition: "gone" });
+        continue;
+      }
+      let disposition = owners.get(userId);
+      if (disposition === undefined) {
+        const ownerId = ctx.db.normalizeId("users", userId);
+        const owner = ownerId === null ? null : await ctx.db.get(ownerId);
+        disposition =
+          owner !== null && (await aiAllowed(ctx, userId))
+            ? "allowed"
+            : "declined";
+        owners.set(userId, disposition);
+      }
+      results.push({ itemId, disposition });
+    }
+    return results;
   },
 });
 

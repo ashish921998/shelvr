@@ -18,7 +18,7 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // Convex's hash/queryFn MUST be global defaults (not per-call) so that
-      // restored persisted query hashes match — otherwise persistence silently
+      // restored persisted query hashes match; otherwise persistence silently
       // no-ops. See plan gotcha #1.
       queryKeyHashFn: convexQueryClient.hashFn(),
       queryFn: convexQueryClient.queryFn(),

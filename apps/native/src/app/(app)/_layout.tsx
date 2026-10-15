@@ -142,6 +142,10 @@ function AppStack() {
             }}
           />
           <Stack.Screen
+            name="plan/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
             name="add"
             options={
               Platform.OS === "android"

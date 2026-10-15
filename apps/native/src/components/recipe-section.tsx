@@ -1,7 +1,10 @@
 import type { Recipe } from "@convex/model/itemFields";
+import { SegmentedControl } from "@expo/ui/community/segmented-control";
+import { isDarkThemeName } from "@/lib/appearance";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useState } from "react";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** Recipe markup often states the yield as a bare number ("4"); a phrase
  * ("Makes 16 cookies", "2 1/2 cups") is shown as written. */
@@ -12,43 +15,58 @@ function servingsLabel(servings: string): string {
     : servings;
 }
 
+const INGREDIENTS = 0;
+const DIRECTIONS = 1;
+
 // The structured recipe lifted out of a recipe page, a video caption, or a
 // screenshot. Rendered instead of the article paragraphs: the user wants the
-// recipe itself, not the blog story around it. Lists are selectable so
-// quantities can be copied.
+// recipe itself, not the blog story around it. Ingredients and directions sit
+// behind the platform's own segmented control, so the method is one tap away
+// instead of below every ingredient. Lists are selectable so quantities can be
+// copied.
 export function RecipeSection({ recipe }: { recipe: Recipe }) {
   useAppLocale();
+  const { theme, rt } = useUnistyles();
+  const [tab, setTab] = useState(INGREDIENTS);
   return (
     <View style={styles.section}>
       {recipe.servings ? (
         <Text style={styles.servings}>{servingsLabel(recipe.servings)}</Text>
       ) : null}
 
-      <Text style={styles.sectionTitle}>{t("recipe.ingredients")}</Text>
-      <View style={styles.list}>
-        {recipe.ingredients.map((ingredient, index) => (
-          <View key={index} style={styles.ingredientRow}>
-            <View style={styles.bullet} />
-            <Text selectable style={styles.ingredient}>
-              {ingredient}
-            </Text>
-          </View>
-        ))}
-      </View>
+      <SegmentedControl
+        values={[t("recipe.ingredients"), t("recipe.steps")]}
+        selectedIndex={tab}
+        onChange={(event) => setTab(event.nativeEvent.selectedSegmentIndex)}
+        appearance={isDarkThemeName(rt.themeName) ? "dark" : "light"}
+        tintColor={theme.colors.primarySoft}
+      />
 
-      <Text style={styles.sectionTitle}>{t("recipe.steps")}</Text>
-      <View style={styles.list}>
-        {recipe.steps.map((step, index) => (
-          <View key={index} style={styles.stepRow}>
-            <Text style={styles.stepNumber} numberOfLines={1}>
-              {String(index + 1)}
-            </Text>
-            <Text selectable style={styles.step}>
-              {step}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {tab === DIRECTIONS ? (
+        <View style={styles.list}>
+          {recipe.steps.map((step, index) => (
+            <View key={index} style={styles.step}>
+              <Text style={styles.stepLabel}>
+                {t("recipe.stepNumber", { number: String(index + 1) })}
+              </Text>
+              <Text selectable style={styles.body}>
+                {step}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.list}>
+          {recipe.ingredients.map((ingredient, index) => (
+            <View key={index} style={styles.ingredientRow}>
+              <View style={styles.bullet} />
+              <Text selectable style={styles.body}>
+                {ingredient}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -56,24 +74,13 @@ export function RecipeSection({ recipe }: { recipe: Recipe }) {
 const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.gap(2),
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    padding: theme.gap(2),
   },
   servings: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
+    ...theme.type.label,
     color: theme.colors.muted,
   },
-  sectionTitle: {
-    fontFamily: theme.fonts.display,
-    fontSize: 17,
-    color: theme.colors.foreground,
-  },
   list: {
-    gap: theme.gap(1.25),
+    gap: theme.gap(1.5),
   },
   ingredientRow: {
     flexDirection: "row",
@@ -88,34 +95,18 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: 9,
     flexShrink: 0,
   },
-  ingredient: {
-    flexShrink: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    lineHeight: 23,
-    color: theme.colors.foreground,
-  },
-  stepRow: {
-    flexDirection: "row",
-    gap: theme.gap(1),
-    alignItems: "flex-start",
-  },
-  stepNumber: {
-    minWidth: 20,
-    flexShrink: 0,
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    lineHeight: 23,
-    textAlign: "center",
-    color: theme.colors.primaryText,
-    backgroundColor: theme.colors.primarySoft,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
   step: {
+    gap: theme.gap(0.5),
+  },
+  stepLabel: {
+    ...theme.type.captionStrong,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: theme.colors.primaryText,
+  },
+  body: {
     flexShrink: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
+    ...theme.type.subhead,
     lineHeight: 23,
     color: theme.colors.foreground,
   },

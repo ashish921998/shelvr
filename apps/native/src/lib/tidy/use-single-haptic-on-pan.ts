@@ -41,7 +41,7 @@ export function useSingleHapticOnPan({ thresholdX, thresholdY }: Params) {
     }
   }, [isTriggered]);
 
-  // Stable identity so the gesture that captures it can be memoized — a
+  // Stable identity so the gesture that captures it can be memoized: a
   // recreated gesture instance re-attaches mid-pan and drops touches.
   const singleHapticOnChange = useCallback(
     (x: number, y: number) => {

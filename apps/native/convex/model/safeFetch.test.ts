@@ -125,7 +125,7 @@ describe("makeValidatingLookup (connection-bound DNS)", () => {
     const { err, address } = await runLookup(lookup, "anything.test");
     expect(err).not.toBeNull();
     expect(err?.code).toBe("ECONNREFUSED");
-    // No address is returned to the socket — it cannot connect.
+    // No address is returned to the socket: it cannot connect.
     expect(address).toBe("");
   });
 
@@ -617,7 +617,7 @@ describe("safeFetch HTTP policy", () => {
 // literals, so http://127.0.0.1/ would bypass the validating DNS lookup and
 // connect straight to loopback. assertHostAllowed classifies IP-literal hosts
 // before the request. These tests use a RECORDING dispatcher and assert
-// request() is NEVER called — proving the block happens before dispatch, not
+// request() is NEVER called, proving the block happens before dispatch, not
 // as a side effect of the dispatcher refusing the connection.
 // ---------------------------------------------------------------------------
 
@@ -886,7 +886,7 @@ describe("decodeWithContentType", () => {
 
   it("falls back to UTF-8 for an unsupported charset", () => {
     const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]);
-    // Non-existent charset — should fall back to UTF-8 without throwing.
+    // Non-existent charset: should fall back to UTF-8 without throwing.
     expect(() =>
       decodeWithContentType(bytes, "text/html; charset=fake-charset"),
     ).not.toThrow();

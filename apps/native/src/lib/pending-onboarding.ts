@@ -244,6 +244,11 @@ export function getPendingSpaces(): string[] {
   return readPendingRecord()?.spaces ?? [];
 }
 
+/** Read-only: unlike getOrCreatePendingOperationId, never writes a record. */
+export function getPendingOperationId(): string | null {
+  return readPendingRecord()?.operationId ?? null;
+}
+
 export function getOrCreatePendingOperationId(): string {
   return ensureOperationId();
 }

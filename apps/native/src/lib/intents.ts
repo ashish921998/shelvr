@@ -16,8 +16,8 @@ export type { IntentKind };
 /**
  * Execute an intent. Each kind maps to a guaranteed-installed Expo primitive.
  * `open_url` uses Linking (not WebBrowser) so an https URL can hand off to the
- * matching native app via universal links — e.g. an x.com URL opens the X app
- * if installed — falling back to the in-app browser only if nothing handles it.
+ * matching native app via universal links, e.g. an x.com URL opens the X app
+ * if installed, falling back to the in-app browser only if nothing handles it.
  */
 export async function runIntent(
   kind: IntentKind,

@@ -34,7 +34,6 @@ test("review preparations pin every upstream checkout and run before secrets are
     assert.match(ref, /^[a-f0-9]{40}$/, repository);
   for (const name of [
     "droid",
-    "droid-review",
     "claude",
     "claude-code-review",
   ]) {

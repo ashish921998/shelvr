@@ -1,5 +1,5 @@
 // Persistent incoming-share session store. The share target can be killed at
-// any point — mid-save, after backend success but before the native payload is
+// any point: mid-save, after backend success but before the native payload is
 // cleared, or after the clear but before local state is deleted. This module
 // records enough of the session to reconcile every one of those windows on the
 // next launch, so a successful entry is never re-saved (duplicate) and a failed
@@ -7,7 +7,7 @@
 //
 // The contract the UI layer relies on, in plain terms:
 //
-//   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the
+//   1. fingerprintSharePayloads(rawPayloads): a collision-free encoding of the
 //      current raw shared payload batch (order + duplicates included). Two
 //      distinct batches must never share a fingerprint. On Android the last
 //      completed batch also leaves a tombstone (recordCompletedShare), and a
@@ -16,12 +16,12 @@
 //      silently. So a deliberate re-share of identical content is a fresh
 //      session only once another share has replaced the tombstone, or the
 //      saved item was deleted in the app (forgetDeletedShareItem).
-//   2. reconcileSession(userId, rawPayloads) — returns exactly one of:
+//   2. reconcileSession(userId, rawPayloads) returns exactly one of:
 //        { kind: 'new', session }     start a brand-new session for this batch
 //        { kind: 'resume', session }  same batch + user as an active session: retry pending/failed
 //        { kind: 'clear', session }   same batch + user as a COMPLETED session: clear native
 //                                     payloads. NOTE: reconcileSession does NOT delete the record
-//                                     here — a throwing clear must stay retryable on remount, so
+//                                     here: a throwing clear must stay retryable on remount, so
 //                                     the caller deletes it only after a non-throwing clear.
 //        { kind: 'empty' }            no raw payloads: drop any stale local session
 //        { kind: 'ghost' }            no session record, but the batch matches the last
@@ -30,12 +30,12 @@
 //                                     re-delivers it to onCreate after a process death, so
 //                                     reopening the app from recents replays the previous share
 //                                     as if it were fresh. A fresh sessionId would mint a fresh
-//                                     operationId and the backend ledger could not dedupe — the
+//                                     operationId and the backend ledger could not dedupe, so the
 //                                     last-saved item would be saved again. The caller skips it
 //                                     quietly: the batch is already in Shelvr.
 //      Sessions are scoped to userId: a record left by a different user (account
 //      switch) is treated as no session, never matched.
-//   3. updateEntry / markComplete / deleteSession — mutate the persisted session
+//   3. updateEntry / markComplete / deleteSession: mutate the persisted session
 //      in place. Each takes an optional sessionId scope so an in-flight run whose
 //      record was replaced mid-flight cannot mutate the newer session.
 
@@ -75,13 +75,13 @@ export function shareBatchAllowed(
 
 /** The kind of item a resolved entry will save as. `unsupported` covers audio,
  * video, file, and any future content type the share target deliberately does
- * not import — it is reported, never silently coerced into a note. */
+ * not import. It is reported, never silently coerced into a note. */
 export type ShareEntryKind = "link" | "note" | "image" | "unsupported";
 
 export type ShareEntryStatus = "pending" | "saved" | "failed" | "unsupported";
 
 /** A single resolved share entry plus its stable operation id and outcome. The
- * operation id is `share:<session>:<index>` — index is the entry's position in
+ * operation id is `share:<session>:<index>`, where index is the entry's position in
  * the RAW payloads array, so it survives resolution reordering and is stable
  * across remounts/process-restart. */
 export type ShareEntry = {
@@ -103,7 +103,7 @@ export type ShareSession = {
   fingerprint: string;
   /** The authenticated user (Convex Auth user id) this session belongs to. A record
    * left by a prior account must never be matched by a new user, even if the
-   * share content is identical — otherwise switching accounts can silently drop
+   * share content is identical; otherwise switching accounts can silently drop
    * the new user's share by matching a stale completed session. loadSession and
    * reconcileSession treat a userId mismatch as "no session" (start fresh). */
   userId: string;
@@ -132,7 +132,7 @@ const ENTRY_KINDS = new Set<ShareEntryKind>([
 export const SESSION_KEY = "incoming-share-session";
 
 /** Tombstone of the most recently completed (or cancelled) share batch, used
- * to detect Android task-restore ghost redeliveries. Survives completion —
+ * to detect Android task-restore ghost redeliveries. Survives completion,
  * unlike the session record, which is single-use by design. Scoped to the
  * authenticated user, like sessions: a prior account's tombstone must never
  * match a new user's identical share. */
@@ -143,7 +143,7 @@ export const LAST_COMPLETED_SHARE_KEY = "last-completed-share";
 // ---------------------------------------------------------------------------
 
 /** A stable, unambiguous encoding of a raw payload batch. JSON of an array of
- * {value, shareType, mimeType} objects — never delimiter concatenation, which
+ * {value, shareType, mimeType} objects, never delimiter concatenation, which
  * can collide across distinct batches (e.g. `"a|b"` vs `"a","b"`). Order and
  * duplicates are preserved so two identical entries in one batch stay distinct
  * and a re-ordering reads as a different batch (a new session). */
@@ -193,7 +193,7 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
       parsed.entries.length > MAX_SHARE_ENTRIES ||
       !parsed.entries.every(isValidEntry)
     ) {
-      // Unknown/incompatible shape — drop it so a fresh session starts clean.
+      // Unknown/incompatible shape: drop it so a fresh session starts clean.
       store.remove(SESSION_KEY);
       return null;
     }
@@ -252,7 +252,7 @@ type ReconcileResult =
   | { kind: "ghost" };
 
 /** The single entry point the UI calls on every render/mount with the current
- * raw shared payloads. It decides — atomically with respect to the store —
+ * raw shared payloads. It decides, atomically with respect to the store,
  * whether this batch is brand-new, an active session to resume, a completed
  * session whose native payloads must be cleared, or empty.
  *
@@ -262,7 +262,7 @@ type ReconcileResult =
  * never silently drop the new user's identical share.
  *
  * Completed-state is single-use: the caller clears native payloads and
- * deletes the record only after a non-throwing clear — reconcileSession itself
+ * deletes the record only after a non-throwing clear; reconcileSession itself
  * does NOT delete a completed record, so a throwing clear stays retryable on
  * remount. The durable "skip this share" signal is the separate Android
  * tombstone read by ghostRedelivery, which outlives the session record. */
@@ -272,7 +272,7 @@ export function reconcileSession(
   rawPayloads: RawSharePayload[],
   generateSessionId: () => string,
 ): ReconcileResult {
-  // No native payloads. Drop any stale local session — there is nothing to
+  // No native payloads. Drop any stale local session: there is nothing to
   // resume or clear.
   if (rawPayloads.length === 0) {
     deleteSession(store);
@@ -283,7 +283,7 @@ export function reconcileSession(
   const existing = loadSession(store);
 
   // A session from a different user, or no session at all: normally start
-  // fresh — but if this exact batch was just handled, it is (almost certainly)
+  // fresh, but if this exact batch was just handled, it is (almost certainly)
   // an Android task-restore ghost, not a user action. A stale record from a
   // DIFFERENT batch stays a genuine 'new' (its own fingerprint mismatch path
   // below handles it).
@@ -315,7 +315,7 @@ export function reconcileSession(
   if (existing.fingerprint !== currentFp) {
     // Different batch: a new share superseded the previous one. Start fresh,
     // replacing the stale record. (The previous session's native payloads are
-    // gone — a new share cannot arrive while old ones linger natively.)
+    // gone: a new share cannot arrive while old ones linger natively.)
     return {
       kind: "new",
       session: startNewSession(
@@ -409,7 +409,7 @@ export function settledEntries(entries: ShareEntry[]): SettledEntry[] {
 }
 
 /** Records the batch that just finished its handoff (saved, continued, or
- * cancelled — any path through the share screen's completion), with which of
+ * cancelled; any path through the share screen's completion), with which of
  * its entries settled, so a replay skips only what is already in Shelvr.
  * Replaces any prior tombstone. Android only: iOS never replays a share. Takes
  * the completing user's id so a tombstone left by one account never matches
@@ -527,7 +527,7 @@ function isSettled(value: unknown): value is SettledEntry {
 
 /** Updates one entry by index and persists the result. No-op (and no write) if
  * the session no longer exists OR if `sessionId` is provided and does not match
- * the current persisted session — the latter guards an in-flight save run from
+ * the current persisted session; the latter guards an in-flight save run from
  * mutating a NEWER session that replaced its record mid-flight (a new share
  * arriving while the old run is still saving). */
 export function updateEntry(
@@ -579,7 +579,7 @@ export function deleteSession(
 }
 
 /** The entries the processor should (re)attempt: those still pending or failed.
- * Saved and unsupported entries are excluded — successes are never re-saved. */
+ * Saved and unsupported entries are excluded: successes are never re-saved. */
 export function entriesToProcess(session: ShareSession): ShareEntry[] {
   return session.entries.filter(
     (e) => e.status === "pending" || e.status === "failed",
