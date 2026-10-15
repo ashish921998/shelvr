@@ -207,7 +207,9 @@ export function ArticleReaderView({
               ) : null}
             </View>
 
-            {item.description ? (
+            {/* A recipe page goes straight to its tabs: the summary only
+                restates the dish the title already names. */}
+            {item.description && !item.recipe ? (
               <Text numberOfLines={2} style={styles.description}>
                 {item.description}
               </Text>
