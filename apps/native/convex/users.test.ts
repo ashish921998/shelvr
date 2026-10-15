@@ -192,6 +192,54 @@ describe("deleteCurrentUserAccount", () => {
     });
   });
 
+  it("ends a pass on bytes read, so a batch of long articles stays under the read limit", async () => {
+    // Convex refuses a transaction that reads more than 16 MiB. A link save
+    // keeps up to 100k characters of article plus its search copy, so a
+    // full row-count batch of them can cross that and fail every retry.
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await signedInUser(backend, { pro: true });
+      const article = "x".repeat(100_000);
+      const count = 60;
+      await backend.run(async (ctx) => {
+        for (let i = 0; i < count; i++) {
+          await ctx.db.insert("items", {
+            userId,
+            type: "link",
+            status: "ready",
+            url: `https://example.com/${i}`,
+            tags: [],
+            content: article,
+            searchText: article,
+          });
+        }
+      });
+      const remaining = () =>
+        backend.run(
+          async (ctx) =>
+            (
+              await ctx.db
+                .query("items")
+                .withIndex("by_user", (q) => q.eq("userId", userId as string))
+                .collect()
+            ).length,
+        );
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      // 60 rows of ~200 KB each is ~12 MB: under the row cap, over the
+      // byte budget, so the first pass leaves some for the continuation.
+      expect(await remaining()).toBeGreaterThan(0);
+      expect(await remaining()).toBeLessThan(count);
+
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await remaining()).toBe(0);
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("drains accounts larger than one batch via scheduled continuations", async () => {
     // The continuation mutation validates `userId: v.id("users")`, so this
     // test needs a real users row (a synthetic string subject won't do).
