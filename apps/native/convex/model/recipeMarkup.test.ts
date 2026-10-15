@@ -154,6 +154,8 @@ describe("extractRecipeMarkup", () => {
         "1/4 cup tomato paste",
         "2 cups flour (, sifted) (Note 2)",
         "1 egg ((large)) (Note 3)",
+        "1 onion (,)",
+        "salt (())",
       ],
     };
     expect(extractRecipeMarkup(page(jsonLd(wprm)))?.ingredients).toStrictEqual([
@@ -164,7 +166,19 @@ describe("extractRecipeMarkup", () => {
       "1/4 cup tomato paste",
       "2 cups flour (, sifted) (Note 2)",
       "1 egg ((large)) (Note 3)",
+      "1 onion (,)",
+      "salt (())",
     ]);
+  });
+
+  it("tidies a long hostile ingredient in linear time", () => {
+    const hostile = {
+      ...BASIC_RECIPE,
+      recipeIngredient: [`1 onion${" ((".repeat(100_000)}`],
+    };
+    const started = performance.now();
+    extractRecipeMarkup(page(jsonLd(hostile)));
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   it("reads a section whose itemListElement is one step rather than a list", () => {

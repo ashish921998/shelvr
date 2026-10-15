@@ -169,12 +169,9 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
   // recursion below already handles both shapes.
   if (value.itemListElement !== undefined) {
     const steps = instructionSteps(value.itemListElement, clean);
-    const sectionName = stringValue(value.name, clean);
-    if (sectionName !== undefined && steps.length > 0) {
-      return [
-        `${sectionName.replace(/:$/, "")}: ${steps[0]}`,
-        ...steps.slice(1),
-      ];
+    const sectionName = stringValue(value.name, clean)?.replace(/:+$/, "");
+    if (sectionName && steps.length > 0) {
+      return [`${sectionName}: ${steps[0]}`, ...steps.slice(1)];
     }
     return steps;
   }
@@ -186,21 +183,22 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
  * text that already starts with a comma or its own brackets ("1 onion (,
  * chopped)", "beef ((ground) (Note 1))"). Drop the redundant outer bracket. */
 function tidyIngredient(text: string): string {
-  return text.replace(/ \((,.*|\(.*\))\)$/, (whole: string, notes: string) => {
-    if (!balanced(notes)) return whole;
-    return notes.startsWith(",") ? notes : ` ${notes}`;
-  });
-}
-
-/** True when every bracket in `text` closes one opened before it, so the
- * outer bracket being dropped really wraps all of it. */
-function balanced(text: string): boolean {
+  if (!text.endsWith(")")) return text;
+  // Walk back to the bracket the final ")" closes: linear, unlike a regex
+  // that would rescan the tail at every " (," on a hostile page.
   let depth = 0;
-  for (const char of text) {
-    if (char === "(") depth += 1;
-    if (char === ")" && --depth < 0) return false;
+  let open = text.length - 1;
+  for (; open >= 0; open -= 1) {
+    if (text[open] === ")") depth += 1;
+    else if (text[open] === "(" && --depth === 0) break;
   }
-  return depth === 0;
+  if (open < 1 || text[open - 1] !== " ") return text;
+  const notes = text.slice(open + 1, -1);
+  if (/^,\s*\S/.test(notes)) return text.slice(0, open - 1) + notes;
+  if (notes.startsWith("(") && notes !== "()") {
+    return text.slice(0, open) + notes;
+  }
+  return text;
 }
 
 function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
