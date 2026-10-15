@@ -19,6 +19,7 @@ import {
 } from "./model/appleTokens";
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
+import { deletePlanSharesForUser } from "./planShares";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -326,8 +327,7 @@ async function deleteUserOwnedDataBatch(
   }
   if (reads.length === DELETE_BATCH) return false;
 
-  if (!(await deleteShareLinksBatch(ctx, userKey))) return false;
-  if (!(await deletePlaceVisitsBatch(ctx, userKey))) return false;
+  if (!(await deleteSharingAndPlansBatch(ctx, userKey))) return false;
 
   const devices = await ctx.db
     .query("notificationDevices")
@@ -446,6 +446,18 @@ async function deleteCaptureTokensBatch(
     await ctx.db.delete(token._id);
   }
   return tokens.length !== DELETE_BATCH;
+}
+
+/** Share links, "We went" places and plan vote links. True once all are gone. */
+async function deleteSharingAndPlansBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  return (
+    (await deleteShareLinksBatch(ctx, userKey)) &&
+    (await deletePlaceVisitsBatch(ctx, userKey)) &&
+    (await deletePlanSharesForUser(ctx, userKey))
+  );
 }
 
 /** Deletes up to one batch of the user's branded share links. Returns true

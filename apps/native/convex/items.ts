@@ -2472,7 +2472,7 @@ const MAX_SENDER_NAME_CHARS = 40;
  * the account has no usable name, e.g. Apple sign-in with the name withheld,
  * which leaves the email in its place.
  */
-async function senderFirstName(
+export async function senderFirstName(
   ctx: QueryCtx,
   userId: string,
 ): Promise<string | undefined> {

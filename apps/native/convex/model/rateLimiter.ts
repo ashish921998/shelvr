@@ -68,6 +68,17 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "We went" on a plan: one small row each, no model call. Bounds a loop
   // that would fill the table with names.
   placeVisit: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
+  // "Ask someone" on a plan: one share row each, no model call.
+  planShare: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  // Votes on the public plan page, per visitor IP and site-wide. A vote is a
+  // small row write; the global bucket caps a flood across many IPs.
+  planVoteIp: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
+  planVoteGlobal: {
+    kind: "token bucket",
+    rate: 600,
+    period: MINUTE,
+    capacity: 200,
+  },
   // The onboarding demo's Pro-free retry of a FAILED demo classification.
   // Tighter than reprocessItem: the demo is the one uncapped-price save a
   // non-paying user gets, so retries stay strictly bounded.

@@ -531,6 +531,40 @@ export default defineSchema({
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
 
+  // A plan's shortlist sent to someone to vote on ("Ask Priya"). The random
+  // token is the capability behind the public vote page; the places are a
+  // snapshot of the plan the owner shared, so the page never runs the model.
+  // Expires a week after it is made. See planShares.ts.
+  planShares: defineTable({
+    token: v.string(),
+    userId: v.string(),
+    spaceId: v.id("spaces"),
+    city: v.optional(v.string()),
+    places: v.array(
+      v.object({
+        key: v.string(),
+        name: v.string(),
+        area: v.optional(v.string()),
+        why: v.string(),
+        itemId: v.id("items"),
+      }),
+    ),
+    expiresAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_space", ["spaceId"])
+    .index("by_user", ["userId"]),
+
+  // One visitor's votes on a plan share, keyed by a random id the vote page
+  // keeps in the visitor's browser, so changing a vote replaces it.
+  planVotes: defineTable({
+    shareId: v.id("planShares"),
+    voterId: v.string(),
+    picks: v.array(v.string()),
+    passes: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index("by_share_and_voter", ["shareId", "voterId"]),
+
   // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
   // intents save without launching the JavaScript app, so they have no Convex
   // Auth JWT. Only the SHA-256 hex hash is stored; the raw token lives in the

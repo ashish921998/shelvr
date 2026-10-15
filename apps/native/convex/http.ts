@@ -464,6 +464,105 @@ http.route({
   }),
 });
 
+/**
+ * Public read of a plan vote link (`shelvr-web.vercel.app/p/:token`). Same
+ * trust model as `/share/links/`: the random token is the capability and the
+ * response is the narrow shape `getPublicPlanShare` returns.
+ */
+http.route({
+  pathPrefix: "/plan/shares/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const share = await ctx.runQuery(internal.planShares.getPublicPlanShare, {
+      token,
+    });
+    if (!share) return json({ message: "Not found." }, 404);
+    return json(share, 200);
+  }),
+});
+
+type PlanVoteBody = {
+  token: string;
+  voterId: string;
+  picks: string[];
+  passes: string[];
+};
+
+function isKeyList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= 10 &&
+    value.every((key) => typeof key === "string" && key.length <= 8)
+  );
+}
+
+function parsePlanVote(body: unknown): PlanVoteBody | null {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return null;
+  }
+  const { token, voterId, picks, passes } = body as Record<string, unknown>;
+  if (typeof token !== "string" || token.length === 0 || token.length > 64) {
+    return null;
+  }
+  if (
+    typeof voterId !== "string" ||
+    voterId.length === 0 ||
+    voterId.length > 64
+  ) {
+    return null;
+  }
+  if (!isKeyList(picks) || !isKeyList(passes)) return null;
+  return { token, voterId, picks, passes };
+}
+
+/**
+ * Votes from the plan vote page. Same caller and trust model as
+ * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
+ * and forwards the visitor IP for the per-IP limiter.
+ */
+http.route({
+  path: "/plan/votes",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Vote secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let vote: PlanVoteBody | null;
+    try {
+      vote = parsePlanVote(JSON.parse(await readBoundedText(req, 2048)));
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    if (!vote) return json({ message: "Invalid request." }, 400);
+
+    try {
+      const outcome = await ctx.runMutation(
+        internal.planShares.recordPlanVote,
+        {
+          ...vote,
+          ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+        },
+      );
+      if (outcome === "missing") return json({ outcome }, 404);
+      if (outcome === "full") return json({ outcome }, 409);
+      return json({ outcome }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "plan_vote_failed", { error_name: errorName(error) });
+      return json({ message: "Could not save your vote." }, 500);
+    }
+  }),
+});
+
 // ---------------------------------------------------------------------------
 // iOS App Intents (Siri, Shortcuts)
 // ---------------------------------------------------------------------------

@@ -82,6 +82,7 @@ import type * as oracle from "../oracle.js";
 import type * as oracleLimits from "../oracleLimits.js";
 import type * as paymentTelemetry from "../paymentTelemetry.js";
 import type * as placeVisits from "../placeVisits.js";
+import type * as planShares from "../planShares.js";
 import type * as plans from "../plans.js";
 import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
@@ -169,6 +170,7 @@ declare const fullApi: ApiFromModules<{
   oracleLimits: typeof oracleLimits;
   paymentTelemetry: typeof paymentTelemetry;
   placeVisits: typeof placeVisits;
+  planShares: typeof planShares;
   plans: typeof plans;
   spaces: typeof spaces;
   subscriptions: typeof subscriptions;

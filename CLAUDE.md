@@ -80,6 +80,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemReads`: per-user read state, kept out of the item row
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
+  - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
+    so someone without the app can vote on its places at `/p/<token>`
+  - `planVotes`: one visitor's ✓/✕ picks on a `planShares` link, keyed by a browser id,
+    at most 20 voters per link
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
@@ -244,6 +248,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   claims Pro, AI consent and the `makePlan` rate limit first; the pure prompt and sanitizing
   half (which drops a place no save names) is `model/plan.ts`. Places marked "We went"
   (`placeVisits.ts`, `setVisited`) go into the prompt and come back last, tagged `been`.
+- **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
+  link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
+  `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
+  web page at `apps/web/src/app/p`. Links and votes go with their space or account.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
