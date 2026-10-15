@@ -12,9 +12,9 @@ import { LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall } from "./paywall-sheet.ts";
 
 // A first-time user who saved one link, relaunched on the reminder step,
-// took the promise and declined the paywall at the end. Pro is hidden for this user from the
-// relaunch on (src/lib/e2e-hide-pro.ts), as it is for a real new user, so
-// the end-of-onboarding paywall has someone to ask.
+// took the promise and declined the paywall at the end. Pro is hidden for
+// this user from the relaunch on (src/lib/e2e-hide-pro.ts), as it is for a
+// real new user, so the end-of-onboarding paywall has someone to ask.
 test("asks for the paywall at the end of onboarding, after a relaunch on the reminder step", async ({
   device,
   screen,
