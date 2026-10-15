@@ -612,14 +612,15 @@ function DetailSections({
   const recipe = detail.recipe ? (
     <RecipeSection key={item._id} recipe={detail.recipe} />
   ) : null;
-  // A post's recipe is what it was saved for, so it comes before the caption
-  // that described or linked to it.
+  // A post's recipe is what it was saved for, so it comes first and stands in
+  // for the caption it was lifted from: a recipe caption is the same
+  // ingredients and steps again, plus hashtags the tags already carry.
   const recipeFirst = social !== undefined && recipe !== null;
   return (
     <>
       {recipeFirst ? recipe : null}
 
-      {social && paragraphs.length > 0 ? (
+      {social && !recipeFirst && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>

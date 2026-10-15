@@ -257,7 +257,9 @@ const recipeSchema = z
     servings: z
       .string()
       .optional()
-      .describe("Yield exactly as stated, e.g. '4 servings' or '12 cookies'"),
+      .describe(
+        "Yield exactly as stated, e.g. '4 servings' or '12 cookies'. Omit when the source does not state one",
+      ),
     ingredients: z
       .array(z.string())
       .describe("Every ingredient line, quantities included, in source order"),
