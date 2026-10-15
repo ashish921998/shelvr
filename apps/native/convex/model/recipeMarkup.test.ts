@@ -127,6 +127,42 @@ describe("extractRecipeMarkup", () => {
     ]);
   });
 
+  it("does not double the colon when a section name already ends in one", () => {
+    const sectioned = {
+      ...BASIC_RECIPE,
+      recipeInstructions: [
+        {
+          "@type": "HowToSection",
+          name: "Ragu:",
+          itemListElement: [{ "@type": "HowToStep", text: "Heat the oil." }],
+        },
+      ],
+    };
+    expect(extractRecipeMarkup(page(jsonLd(sectioned)))?.steps).toStrictEqual([
+      "Ragu: Heat the oil.",
+    ]);
+  });
+
+  it("tidies the note brackets WP Recipe Maker wraps around ingredients", () => {
+    const wprm = {
+      ...BASIC_RECIPE,
+      recipeIngredient: [
+        "1  onion (, finely chopped (white, yellow or brown))",
+        "1 kg / 2 lb  beef mince ((ground beef) (Note 1))",
+        "1 - 2 tsp sugar ((if needed - Note 3))",
+        "1 1/2 cups (tightly packed) mozzarella cheese (, shred yourself (Note 4))",
+        "1/4 cup tomato paste",
+      ],
+    };
+    expect(extractRecipeMarkup(page(jsonLd(wprm)))?.ingredients).toStrictEqual([
+      "1 onion, finely chopped (white, yellow or brown)",
+      "1 kg / 2 lb beef mince (ground beef) (Note 1)",
+      "1 - 2 tsp sugar (if needed - Note 3)",
+      "1 1/2 cups (tightly packed) mozzarella cheese, shred yourself (Note 4)",
+      "1/4 cup tomato paste",
+    ]);
+  });
+
   it("reads a section whose itemListElement is one step rather than a list", () => {
     // schema.org allows a single value where a list is expected. Without the
     // unwrapping the section falls through to its own name, so the step text

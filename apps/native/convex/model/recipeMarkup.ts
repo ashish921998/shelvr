@@ -171,12 +171,24 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
     const steps = instructionSteps(value.itemListElement, clean);
     const sectionName = stringValue(value.name, clean);
     if (sectionName !== undefined && steps.length > 0) {
-      return [`${sectionName}: ${steps[0]}`, ...steps.slice(1)];
+      return [
+        `${sectionName.replace(/:$/, "")}: ${steps[0]}`,
+        ...steps.slice(1),
+      ];
     }
     return steps;
   }
   const text = stringValue(value.text, clean) ?? stringValue(value.name, clean);
   return text === undefined ? [] : splitInstructionText(text, clean);
+}
+
+/** WP Recipe Maker writes an ingredient's notes as a trailing bracket around
+ * text that already starts with a comma or its own brackets ("1 onion (,
+ * chopped)", "beef ((ground) (Note 1))"). Drop the redundant outer bracket. */
+function tidyIngredient(text: string): string {
+  return text.replace(/ \((,.*|\(.*\))\)$/, (_, notes: string) =>
+    notes.startsWith(",") ? notes : ` ${notes}`,
+  );
 }
 
 function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
@@ -186,7 +198,7 @@ function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
     ingredients: stringList(
       node.recipeIngredient ?? node.ingredients ?? [],
       clean,
-    ),
+    ).map(tidyIngredient),
     steps: instructionSteps(node.recipeInstructions, clean),
   };
 }
