@@ -539,7 +539,9 @@ function ItemPageBody({
 
       <IntentsRow item={item} intents={intents} />
 
-      {item.description ? (
+      {/* A post saved for its recipe goes straight to the tabs: the summary
+          only restates the dish the title and poster already name. */}
+      {item.description && !(social && detail.recipe) ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
