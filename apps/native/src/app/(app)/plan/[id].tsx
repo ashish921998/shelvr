@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { PlanPlaceCard } from "@/components/plan-place-card";
+import { PlanReveal } from "@/components/plan-reveal";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -102,20 +103,23 @@ export default function PlanScreen() {
   const [highlight, setHighlight] = useState<number | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [revealOpen, setRevealOpen] = useState(false);
   const spinning = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
-  const { imageById, titleById } = useMemo(() => {
+  const { imageById, titleById, authorById } = useMemo(() => {
     const images = new Map<string, string>();
     const titles = new Map<string, string>();
+    const authors = new Map<string, string>();
     for (const item of space?.items ?? []) {
       const uri = item.imageUrl ?? item.heroImageUrl;
       if (uri) images.set(item._id, uri);
       if (item.title) titles.set(item._id, item.title);
+      if (item.author) authors.set(item._id, item.author);
     }
-    return { imageById: images, titleById: titles };
+    return { imageById: images, titleById: titles, authorById: authors };
   }, [space]);
 
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
@@ -145,6 +149,7 @@ export default function PlanScreen() {
         spinning.current = false;
         setIsSpinning(false);
         setPicked(winner);
+        setRevealOpen(true);
         haptic("done");
         analytics.capture("plan_picked", { place_count: places.length });
       }, at),
@@ -221,6 +226,22 @@ export default function PlanScreen() {
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
       ) : null}
+      <PlanReveal
+        place={revealOpen ? pickedPlace : null}
+        imageUrl={pickedPlace ? imageById.get(pickedPlace.itemId) : undefined}
+        sourceLabel={
+          pickedPlace ? authorById.get(pickedPlace.itemId) : undefined
+        }
+        spaceName={space?.name ?? ""}
+        considered={state.status === "ready" ? state.considered : 0}
+        onOpenMaps={() => pickedPlace && openMaps(pickedPlace, (picked ?? 0) + 1)}
+        onShare={share}
+        onPickAgain={() => {
+          setRevealOpen(false);
+          pickForMe();
+        }}
+        onClose={() => setRevealOpen(false)}
+      />
       <ScrollView
         style={styles.screen}
         contentInsetAdjustmentBehavior="automatic"
