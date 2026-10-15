@@ -37,6 +37,7 @@ const sourceValidator = v.union(
   v.literal("hero"),
   v.literal("preview"),
   v.literal("footer"),
+  v.literal("plan"),
   v.literal("unknown"),
 );
 type WaitlistSource = Infer<typeof sourceValidator>;
@@ -75,6 +76,7 @@ export function isWaitlistSource(value: unknown): value is WaitlistSource {
     value === "hero" ||
     value === "preview" ||
     value === "footer" ||
+    value === "plan" ||
     value === "unknown"
   );
 }

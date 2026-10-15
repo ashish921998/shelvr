@@ -681,6 +681,7 @@ export default defineSchema({
       v.literal("hero"),
       v.literal("preview"),
       v.literal("footer"),
+      v.literal("plan"),
       v.literal("unknown"),
     ),
     consentVersion: v.string(),

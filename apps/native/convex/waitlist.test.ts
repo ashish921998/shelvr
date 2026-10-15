@@ -28,7 +28,7 @@ afterEach(() => {
 type JoinBody = {
   email: string;
   product?: "shelvr" | "shelvr-android";
-  source?: "hero" | "preview" | "footer" | "unknown";
+  source?: "hero" | "preview" | "footer" | "plan" | "unknown";
 };
 
 /**
@@ -140,6 +140,25 @@ describe("POST /waitlist/join", () => {
         )
         .unique();
       expect(signup?.source).toBe("unknown");
+    });
+  });
+
+  it("stores an Android signup from a plan vote page as plan", async () => {
+    const t = setup();
+    const body = {
+      email: "voter@example.com",
+      product: "shelvr-android",
+      source: "plan",
+    } as const;
+    expect((await join(t, body)).status).toBe(200);
+    await t.run(async (ctx) => {
+      const signup = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q.eq("email", "voter@example.com").eq("product", "shelvr-android"),
+        )
+        .unique();
+      expect(signup?.source).toBe("plan");
     });
   });
 

@@ -180,6 +180,23 @@ describe("votes", () => {
     );
   });
 
+  it("lets one address add only a few new voters to a link", async () => {
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    for (const voter of ["a", "b", "c"]) {
+      expect(await vote(backend, token, voter, ["p0"])).toBe("recorded");
+    }
+    await expect(vote(backend, token, "d", ["p0"])).rejects.toThrow();
+    // Voters already on the link can still change their answer.
+    expect(await vote(backend, token, "a", ["p1"])).toBe("recorded");
+    expect(await vote(backend, token, "d", ["p0"], [], "198.51.100.9")).toBe(
+      "recorded",
+    );
+  });
+
   it("gives no slot to an empty ballot from someone new", async () => {
     const { backend, t, spaceId, places } = await setup();
     const token = await t.mutation(api.planShares.createPlanShare, {

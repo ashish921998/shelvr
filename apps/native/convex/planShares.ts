@@ -246,7 +246,7 @@ export const getPublicPlanShare = internalQuery({
  * Stores one visitor's votes on a link, replacing what they sent before.
  * Keys not on the link are dropped, and a key in both lists counts as a
  * pick. Rate limited per visitor IP and site-wide; a link keeps at most
- * MAX_PLAN_VOTERS voters.
+ * MAX_PLAN_VOTERS voters, and one IP can add only a few of them.
  */
 export const recordPlanVote = internalMutation({
   args: {
@@ -295,6 +295,10 @@ export const recordPlanVote = internalMutation({
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
       .take(MAX_PLAN_VOTERS);
     if (voters.length >= MAX_PLAN_VOTERS) return "full";
+    await rateLimiter.limit(ctx, "planVoterSlot", {
+      key: `${share._id}:${normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY}`,
+      throws: true,
+    });
     await ctx.db.insert("planVotes", {
       shareId: share._id,
       voterId,

@@ -16,7 +16,7 @@ import {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type WaitlistSource = "hero" | "footer" | "unknown";
+type WaitlistSource = "hero" | "footer" | "plan" | "unknown";
 
 type JoinWaitlistResult = {
   saved: boolean;
@@ -25,7 +25,9 @@ type JoinWaitlistResult = {
 };
 
 function normalizeSource(value: unknown): WaitlistSource {
-  return value === "hero" || value === "footer" ? value : "unknown";
+  return value === "hero" || value === "footer" || value === "plan"
+    ? value
+    : "unknown";
 }
 
 export async function POST(request: Request) {

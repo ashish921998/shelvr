@@ -74,6 +74,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // small row write; the global bucket caps a flood across many IPs.
   // Sized for a household or a carrier NAT sharing one address.
   planVoteIp: { kind: "token bucket", rate: 120, period: HOUR, capacity: 60 },
+  // New voters one address may add to one link, so a single caller can't
+  // fill a link's voter slots with made-up voter ids.
+  planVoterSlot: { kind: "token bucket", rate: 3, period: DAY, capacity: 3 },
   planVoteGlobal: {
     kind: "token bucket",
     rate: 600,
