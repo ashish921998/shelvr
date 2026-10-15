@@ -16,6 +16,9 @@ const fakeAi = fakeAiLocks({
   GOOGLE_GENERATIVE_AI_API_KEY: env.GOOGLE_GENERATIVE_AI_API_KEY,
   CONVEX_CLOUD_URL: process.env.CONVEX_CLOUD_URL,
 });
+/** True only on the e2e job's local backend, where fixture pages stand in
+ * for real reads too. */
+export const FAKE_AI_ENABLED = fakeAi.enabled;
 if (!fakeAi.enabled && fakeAi.refusedBy !== "switch_off") {
   logEvent("error", "fake_ai_refused", { refused_by: fakeAi.refusedBy });
 }

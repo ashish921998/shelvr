@@ -8,8 +8,12 @@ import {
   FAKE_MODEL,
   FakeAiUnansweredError,
   fakeAiLocks,
+  fakeLinkAnalysis,
   fakeNoteAnalysis,
+  FIXTURE_ORIGIN,
+  fixturePage,
   noteFromPrompt,
+  pageFromPrompt,
 } from "./fakeAi";
 
 const LOCAL = {
@@ -154,6 +158,88 @@ describe("FAKE_MODEL", () => {
     ).rejects.toThrow(FakeAiUnansweredError);
     await expect(
       generateText({ model: FAKE_MODEL, prompt: notePrompt("quokka") }),
+    ).rejects.toThrow(FakeAiUnansweredError);
+  });
+});
+
+// The shape of linkAnalysisPrompt in ai.ts for a plain web page.
+function linkPrompt(content: string): string {
+  return [
+    "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title.",
+    "Existing spaces: none",
+    `URL: ${FIXTURE_ORIGIN}/quince-paste`,
+    "Page title: Quince paste for beginners",
+    "Site: Shelvr fixtures",
+    "Meta description: How to cook membrillo.",
+    `Page content:\n${content}`,
+    "Also propose up to 5 useful actions ('intents') the user could take on this item.",
+  ].join("\n\n");
+}
+
+describe("pageFromPrompt", () => {
+  it("reads the title, description and text, blank lines included", () => {
+    expect(pageFromPrompt(linkPrompt("Cook it.\n\nServe it."))).toEqual({
+      title: "Quince paste for beginners",
+      description: "How to cook membrillo.",
+      content: "Cook it.\n\nServe it.",
+    });
+  });
+
+  it("ignores a prompt that is not a web page's", () => {
+    expect(pageFromPrompt(notePrompt("Page title: x"))).toBeUndefined();
+  });
+});
+
+describe("fakeLinkAnalysis", () => {
+  it("keeps the page's own title and description", () => {
+    expect(
+      fakeLinkAnalysis({
+        title: "Quince paste for beginners",
+        description: "How to cook membrillo.",
+        content: "Membrillo sets slowly.",
+      }),
+    ).toEqual({
+      title: "Quince paste for beginners",
+      description: "How to cook membrillo.",
+      tags: ["quince", "paste", "beginners", "membrillo", "sets", "slowly"],
+      spaceNames: [],
+      intents: [],
+    });
+  });
+
+  it("leaves a page with no title unanswered", () => {
+    expect(fakeLinkAnalysis({ content: "text" })).toBeUndefined();
+  });
+});
+
+describe("fixturePage", () => {
+  it("serves a fixture page only at the fixture origin", () => {
+    expect(fixturePage(`${FIXTURE_ORIGIN}/quince-paste`)?.title).toBe(
+      "Quince paste for beginners",
+    );
+    expect(fixturePage(`${FIXTURE_ORIGIN}/missing`)).toBeUndefined();
+    expect(fixturePage("https://example.com/quince-paste")).toBeUndefined();
+    expect(fixturePage("not a url")).toBeUndefined();
+  });
+});
+
+describe("FAKE_MODEL on a link", () => {
+  it("answers a web page classification through generateObject", async () => {
+    const { object } = await generateObject({
+      model: FAKE_MODEL,
+      schema: noteSchema,
+      prompt: linkPrompt("Membrillo sets slowly."),
+    });
+    expect(object.title).toBe("Quince paste for beginners");
+  });
+
+  it("fails a recipe-shaped call", async () => {
+    await expect(
+      generateObject({
+        model: FAKE_MODEL,
+        schema: noteSchema.extend({ recipe: z.string().nullable() }),
+        prompt: linkPrompt("Membrillo sets slowly."),
+      }),
     ).rejects.toThrow(FakeAiUnansweredError);
   });
 });
