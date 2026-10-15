@@ -33,8 +33,10 @@ clearly in one earlier PR.
 
 1. Export the parent of `commit` with no history: `git archive <commit>^ | tar -x -C <dir>`.
    A worktree or clone still carries `.git`, so a reviewer could read the fix in later refs.
-2. Run the reviewer with an empty `HOME` and no memory, project files or today's
-   `REVIEW.md`, so nothing written after the PR reaches it.
+2. Run the reviewer with an empty `HOME` and no memory or project files, so nothing
+   written after the PR reaches it except the guidance under test. If the setup uses a
+   `REVIEW.md` or prompt, copy that version into the export and record its commit; a
+   baseline run uses none.
 3. Hand the reviewer the PR's diff (`git diff <commit>^ <commit>`) as the change to review,
    with the same prompt it gets on a real PR. Do not give it the PR thread, later commits,
    or `bugs`.
