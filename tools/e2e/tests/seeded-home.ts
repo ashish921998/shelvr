@@ -52,7 +52,13 @@ export function startOnSeededHome(): void {
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
-    if (await openerSignIn.isVisible()) await openerSignIn.tap();
+    // The opener's first tap can be lost the same way (onboarding and share
+    // leave a signed-out app on the opener for the next flow).
+    if (await openerSignIn.isVisible())
+      await tapUntilVisible(openerSignIn, devLogin, {
+        waitMs: 10_000,
+        timeout: 60_000,
+      });
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
     await answerAiConsent(screen, profile);
 
