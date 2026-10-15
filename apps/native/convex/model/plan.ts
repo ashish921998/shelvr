@@ -286,8 +286,7 @@ export function sanitizePlan(
     if (!Number.isInteger(n) || n < 1 || n > sources.length) continue;
     const source = sources[n - 1];
     const evidence = evidenceOf(source);
-    const full = clip(pick.name, MAX_NAME_CHARS);
-    const name = withoutAddress(full, evidence);
+    const name = withoutAddress(clip(pick.name, MAX_NAME_CHARS), evidence);
     const key = squash(name);
     if (key === "" || seen.has(key)) continue;
     if (!namesPlace(name, evidence)) continue;
@@ -300,8 +299,7 @@ export function sanitizePlan(
       ...(area !== "" ? { area } : {}),
       why,
       itemId: source.itemId,
-      // A visit saved before addresses were stripped carries the full name.
-      ...(been.has(key) || been.has(squash(full)) ? { been: true } : {}),
+      ...(been.has(key) ? { been: true } : {}),
     });
   }
   // Stable: each group keeps the model's order. Cap after ranking, so a new

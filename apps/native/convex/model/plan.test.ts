@@ -281,16 +281,6 @@ describe("sanitizePlan", () => {
     expect(places[0].been).toBeUndefined();
   });
 
-  it("still knows a visit saved under the full name", () => {
-    const full = "The Palomar, 34 Rupert Street, London";
-    const [pick] = sanitizePlan(
-      [{ saveNumber: 1, name: full, area: "", why: "Go" }],
-      [source({ title: full })],
-      new Set([placeKey(full)]),
-    );
-    expect(pick).toMatchObject({ name: "The Palomar", been: true });
-  });
-
   it("keeps the address when the name before it proves nothing alone", () => {
     const [pick] = sanitizePlan(
       [{ saveNumber: 1, name: "Cafe, 12 Main St", area: "", why: "Go" }],
