@@ -35,14 +35,18 @@ test(
     await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
     await fillField(field, name);
     await screen.getByLabel("Create space").tap();
+    await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
 
     // The recommendation pass runs after the space exists. Once its pick
     // lands, the space moves from the empty chip row into the grid, whose
     // card is the button by that name; the space's header counts the pick.
-    await screen.getByRole("button", name).tap({ timeout: 30_000 });
-    await expect(screen.getByText("1 suggestion")).toBeVisible({
-      timeout: 60_000,
-    });
+    // A tap while the sheet closes or the card moves opens nothing (seen on
+    // CI, twice), so it is tapped again until the space is open.
+    await tapUntilVisible(
+      screen.getByRole("button", name),
+      screen.getByText("1 suggestion"),
+      { waitMs: 10_000, timeout: 90_000 },
+    );
     await expect(
       screen.getByRole("button", /^Weeknight Miso Ramen/),
     ).toHaveCount(1, { timeout: 30_000 });
