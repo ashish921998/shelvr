@@ -1,6 +1,8 @@
 import { beforeEach } from "@e2e-dev/mobile";
 import { type App, expect, type Locator, type Screen } from "e2e";
 
+import { pollUntil } from "./poll.ts";
+
 const BUNDLE_TIMEOUT = 180_000;
 
 /**
@@ -115,17 +117,15 @@ async function openApp(
   const launcher = screen.getByText("Searching for development servers...");
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
   await app.open();
-  await expect
-    .poll(
-      async () => {
-        if (await ready()) return true;
-        if (await launcher.isVisible()) await app.open();
-        else if (await keepAi.isVisible()) await keepAi.tap();
-        return false;
-      },
-      { timeout: BUNDLE_TIMEOUT },
-    )
-    .toBe(true);
+  await pollUntil(
+    async () => {
+      if (await ready()) return true;
+      if (await launcher.isVisible()) await app.open();
+      else if (await keepAi.isVisible()) await keepAi.tap();
+      return false;
+    },
+    { timeout: BUNDLE_TIMEOUT },
+  );
 }
 
 /** The AI consent card's yes (`aiConsent.allow` in en.json). */
@@ -139,11 +139,10 @@ const AI_CONSENT_ALLOW = "Keep it on";
  */
 async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
-  await expect
-    .poll(async () => (await home.isVisible()) || (await keepAi.isVisible()), {
-      timeout: 60_000,
-    })
-    .toBe(true);
+  await pollUntil(
+    async () => (await home.isVisible()) || (await keepAi.isVisible()),
+    { timeout: 60_000 },
+  );
   if (await keepAi.isVisible()) {
     await keepAi.tap();
     await expect(home).toBeVisible({ timeout: 30_000 });
@@ -198,19 +197,17 @@ export async function tapUntilVisible(
   result: Locator,
   { waitMs, timeout }: { waitMs: number; timeout: number },
 ): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        if (await result.isVisible()) return true;
-        await control.tap({ timeout: Math.min(waitMs, timeout) });
-        await expect(result)
-          .toBeVisible({ timeout: waitMs })
-          .catch(() => undefined);
-        return result.isVisible();
-      },
-      { timeout },
-    )
-    .toBe(true);
+  await pollUntil(
+    async () => {
+      if (await result.isVisible()) return true;
+      await control.tap({ timeout: Math.min(waitMs, timeout) });
+      await expect(result)
+        .toBeVisible({ timeout: waitMs })
+        .catch(() => undefined);
+      return result.isVisible();
+    },
+    { timeout },
+  );
 }
 
 /**
