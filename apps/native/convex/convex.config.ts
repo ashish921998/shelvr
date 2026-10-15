@@ -14,6 +14,10 @@ const app = defineApp({
     APPLE_REVOKE_KEY_ID: v.optional(v.string()),
     APPLE_REVOKE_TEAM_ID: v.optional(v.string()),
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
+    // Swaps Gemini for the deterministic fake in model/fakeAi.ts. Honoured only
+    // on a local e2e backend (see fakeAiLocks there); a cloud deployment
+    // refuses it and logs that it did.
+    E2E_FAKE_AI: v.optional(v.string()),
     GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     POSTHOG_HOST: v.optional(v.string()),
