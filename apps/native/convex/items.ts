@@ -253,15 +253,23 @@ const enrichedItemWithSpacesValidator = v.object({
 // query, so consumers that need them go through `getItem`. Derived from
 // `enrichedItemValidator` so a new field lands in both shapes by default and
 // has to be dropped here on purpose.
-export const itemCardValidator = enrichedItemValidator.omit(
-  "userId",
-  "content",
-  "articleMedia",
-  "recipe",
-  "searchText",
-  "products",
-  "productsStatus",
-);
+export const itemCardValidator = enrichedItemValidator
+  .omit(
+    "userId",
+    "content",
+    "articleMedia",
+    "recipe",
+    "searchText",
+    "products",
+    "productsStatus",
+  )
+  .extend({
+    // The recipe stays behind `getItem`, but its presence decides how a
+    // detail page opens (a reel with a recipe leads with the recipe, not the
+    // full-screen video), so the card says whether there is one. Set only
+    // when true.
+    hasRecipe: v.optional(v.literal(true)),
+  });
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
@@ -312,13 +320,13 @@ async function toItemCard(
     userId: _userId,
     content: _content,
     articleMedia: _articleMedia,
-    recipe: _recipe,
+    recipe,
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
     ...card
   } = await enrichItem(ctx, item);
-  return card;
+  return recipe ? { ...card, hasRecipe: true } : card;
 }
 
 /** How much of a note's own text the search index carries. Notes are short;

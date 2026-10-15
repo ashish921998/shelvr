@@ -214,6 +214,36 @@ describe("listItemsPage", () => {
     expect(full?.products).toHaveLength(1);
   });
 
+  it("flags a card whose save has a recipe, without shipping the recipe", async () => {
+    const { t, userId } = await as();
+    const [plainId] = await seedFeed(t, userId, 1);
+    const recipeId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Mushroom rice reel",
+        url: "https://www.instagram.com/reel/abc/",
+        recipe: {
+          name: "Mushroom rice",
+          ingredients: ["rice"],
+          steps: ["cook"],
+        },
+        tags: [],
+        searchText: "mushroom rice",
+      }),
+    );
+
+    const { page } = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    const recipeRow = page.find((row) => row._id === recipeId);
+    const plainRow = page.find((row) => row._id === plainId);
+    expect(recipeRow?.hasRecipe).toBe(true);
+    expect(recipeRow).not.toHaveProperty("recipe");
+    expect(plainRow).not.toHaveProperty("hasRecipe");
+  });
+
   it("only returns the caller's items", async () => {
     // One shared backend, so the userId scope, not database isolation, is
     // what keeps the two feeds apart.

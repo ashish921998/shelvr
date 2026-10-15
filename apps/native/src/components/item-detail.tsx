@@ -217,7 +217,9 @@ export const ItemDetail = memo(function ItemDetail({
     ];
   })();
 
-  if (heroUri && isMediaSave(item)) {
+  // `detail`, not `item`: a row from a search or a space carries the recipe
+  // itself, and getItem fills it in for one that only has the card's flag.
+  if (heroUri && isMediaSave(detail)) {
     return (
       <MediaViewerPage
         item={item}
@@ -276,16 +278,20 @@ export const ItemDetail = memo(function ItemDetail({
   };
   const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
+  // A post on this layout is one with a recipe (see isMediaSave). Its poster
+  // is a short, cropped band that opens the post, so the recipe it was saved
+  // for starts on the first screen.
+  const heroKind = pageHeroKind(item, social);
+  const poster = heroKind === "poster";
+
   const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
       recyclingKey={item._id}
-      contentFit="contain"
-      style={
-        item.isSticker
-          ? [styles.hero, { aspectRatio: heroAspect, maxHeight: maxHeroHeight }]
-          : [styles.heroImage, { width: heroWidth, height: heroHeight }]
-      }
+      {...pageHeroLook(heroKind, heroAspect, maxHeroHeight, {
+        width: heroWidth,
+        height: heroHeight,
+      })}
     />
   ) : null;
 
@@ -306,8 +312,10 @@ export const ItemDetail = memo(function ItemDetail({
       heroImage
     );
 
+  // A recipe post's other photos stay on the post: here they would push the
+  // recipe back below the fold.
   const moreMedia =
-    social && item.url
+    social && item.url && !poster
       ? (item.media ?? []).slice(1).map((media, index) => (
           <View key={index} style={[styles.heroContainer, styles.moreMedia]}>
             <PostMediaButton
@@ -328,7 +336,7 @@ export const ItemDetail = memo(function ItemDetail({
 
   const heroBlock = heroUri ? (
     <>
-      <View style={item.isSticker ? undefined : styles.heroContainer}>
+      <View style={heroKind === "framed" ? styles.heroContainer : undefined}>
         {isZoomTarget ? (
           <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
         ) : (
@@ -385,6 +393,36 @@ export const ItemDetail = memo(function ItemDetail({
     </ScrollView>
   );
 });
+
+type PageHeroKind = "poster" | "sticker" | "framed";
+
+function pageHeroKind(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): PageHeroKind {
+  if (item.isSticker) return "sticker";
+  return social ? "poster" : "framed";
+}
+
+/** The page hero's fit and box: a recipe post's short cropped poster, a
+ * full-bleed sticker, or a photo sized to its matted frame. */
+function pageHeroLook(
+  kind: PageHeroKind,
+  aspect: number,
+  maxHeight: number,
+  framed: { width: number; height: number },
+) {
+  if (kind === "poster") {
+    return { contentFit: "cover" as const, style: styles.poster };
+  }
+  return {
+    contentFit: "contain" as const,
+    style:
+      kind === "sticker"
+        ? [styles.hero, { aspectRatio: aspect, maxHeight }]
+        : [styles.heroImage, framed],
+  };
+}
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
@@ -570,8 +608,17 @@ function DetailSections({
   social,
 }: Omit<DetailBodyProps, "spaces">) {
   const { theme } = useUnistyles();
+  // Keyed by item so a recycled pager page opens a new recipe on Ingredients.
+  const recipe = detail.recipe ? (
+    <RecipeSection key={item._id} recipe={detail.recipe} />
+  ) : null;
+  // A post's recipe is what it was saved for, so it comes before the caption
+  // that described or linked to it.
+  const recipeFirst = social !== undefined && recipe !== null;
   return (
     <>
+      {recipeFirst ? recipe : null}
+
       {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
@@ -585,12 +632,10 @@ function DetailSections({
       ) : null}
 
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
-          the ingredients and steps out of the story around them. A social post
-          keeps its caption above and gains the recipe its caption described or
-          linked to; a recipe screenshot gets the card under the photo. Keyed
-          by item so a recycled pager page opens a new recipe on Ingredients. */}
-      {detail.recipe ? (
-        <RecipeSection key={item._id} recipe={detail.recipe} />
+          the ingredients and steps out of the story around them. A recipe
+          screenshot gets the card under the photo. */}
+      {recipeFirst ? null : recipe ? (
+        recipe
       ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
@@ -870,6 +915,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(2),
     // The sheet body is already inset; the frames bring their own margin.
     marginHorizontal: -theme.gap(2),
+  },
+  poster: {
+    width: "100%",
+    height: 250,
+    backgroundColor: theme.colors.surfaceMuted,
   },
   heroImage: {
     borderRadius: theme.radius.md,
