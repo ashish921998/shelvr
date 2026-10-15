@@ -81,9 +81,9 @@ const lightTheme = {
     primaryText: "#935d09",
     border: "#ece3d1",
     imageBorder: "rgba(0, 0, 0, 0.07)",
-    // The mat around a saved picture (feed cards, the detail hero, the reader
-    // thumbnail, similar saves). Paper white here; the dark themes use their
-    // card surface so the mat reads as a mount instead of a glare.
+    // The mat around a saved picture (feed cards, space covers, the detail
+    // hero, the reader thumbnail, similar saves). Paper white here; the dark
+    // themes use their card surface so the mat reads as a mount, not a glare.
     frame: "#ffffff",
     // Darkened from #c05a3a so destructive text clears 4.5:1 on paper
     // (4.84:1) and the background (4.57:1); on surfaceMuted (4.18:1) and

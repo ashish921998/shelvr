@@ -1,7 +1,7 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
-import { clampRatio } from "@/lib/aspect-ratio";
+import { clampRatio, letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { displayHost, siteMonogram } from "@/lib/url";
 import { shortFormSource } from "@convex/model/externalUrl";
@@ -94,11 +94,66 @@ export function textFaceCopy(
   item: FeedItem,
   failedLabel?: string,
 ): { body: string; captionTitle?: string } {
-  const words = item.type === "note" ? item.note : item.description;
-  if (item.title && words) return { body: words, captionTitle: item.title };
-  return {
-    body: item.title ?? words ?? failedLabel ?? displayHost(item.url),
-  };
+  // An empty title or summary names nothing, so it counts as missing.
+  const title = item.title || undefined;
+  const words =
+    (item.type === "note"
+      ? afterOwnHeading(item.note, title)
+      : item.description) || undefined;
+  if (title && words) return { body: words, captionTitle: title };
+  // A note that is only its heading still shows the words its owner wrote.
+  const name = item.type === "note" ? item.note || title : (title ?? words);
+  return { body: name ?? failedLabel ?? displayHost(item.url) };
+}
+
+// Where convex/ai.ts cuts a note's first line when it titles the note itself.
+const NOTE_TITLE_CUT = 80;
+
+// Words that change nothing about what a heading names.
+const FILLER_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "for",
+  "my",
+  "of",
+  "the",
+  "to",
+]);
+
+function headingWords(text: string): Set<string> {
+  const words = text.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  return new Set(
+    words.filter((word) => word.length > 1 && !FILLER_WORDS.has(word)),
+  );
+}
+
+/**
+ * A note's text after its first line when that line is the note's own heading
+ * for `title`: the same words in any order, so "Gift ideas for Mum" heads a
+ * note titled "Mum's Gift Ideas", or a line the title starts (a note saved
+ * without AI is titled with its first line, cut at 80 characters). The
+ * caption already prints the title, and the face would otherwise open with it
+ * again. Undefined when the note is only its heading; the note itself
+ * otherwise.
+ */
+function afterOwnHeading(
+  note: string | undefined,
+  title: string | undefined,
+): string | undefined {
+  if (!note || !title) return note;
+  const [first = "", ...rest] = note.trim().split("\n");
+  const heading = headingWords(first);
+  const named = headingWords(title);
+  const line = first.trim();
+  const cut = title.trim();
+  const same =
+    line === cut ||
+    (cut.length >= NOTE_TITLE_CUT && line.startsWith(cut)) ||
+    (heading.size > 0 &&
+      heading.size === named.size &&
+      [...heading].every((word) => named.has(word)));
+  return same ? rest.join("\n").trim() || undefined : note;
 }
 
 // The mark on a text face when there is no site letter to show.
@@ -138,12 +193,16 @@ function CardMedia({
           style={[
             item.isSticker ? styles.sticker : styles.image,
             {
-              aspectRatio: clampRatio(
-                item.aspectRatio,
-                isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
-                0.5,
-                2,
-              ),
+              // A letterboxed video thumbnail shows at its video's shape, so
+              // the cover fit crops the black bars away.
+              aspectRatio:
+                letterboxedVideoRatio(item.url, imageUri) ??
+                clampRatio(
+                  item.aspectRatio,
+                  isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
+                  0.5,
+                  2,
+                ),
             },
           ]}
         />
@@ -214,6 +273,7 @@ function CardCaption({
   menuActions: ActionMenuItem[];
   theme: UnistylesTheme;
 }) {
+  const hostRow = item.type === "link" && Boolean(item.url);
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>
@@ -222,7 +282,7 @@ function CardCaption({
             {captionTitle}
           </Text>
         ) : null}
-        {item.type === "link" && item.url ? (
+        {hostRow ? (
           <View style={styles.captionHostRow}>
             <Text style={styles.captionHost} numberOfLines={1}>
               {shortFormSource(item.url)?.site ?? displayHost(item.url)}
@@ -239,7 +299,10 @@ function CardCaption({
         label={t("item.actions")}
         title={t("item.actions")}
         actions={menuActions}
-        style={styles.menuButton}
+        style={[
+          styles.menuButton,
+          captionTitle !== undefined && !hostRow && styles.menuOnTitle,
+        ]}
       >
         <AppSymbolIcon
           name="ellipsis"
@@ -407,9 +470,12 @@ const styles = StyleSheet.create((theme) => ({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
+  // The mark heads the face and the words settle at its foot, so a short
+  // summary leaves its space in the middle rather than under the text.
   textFace: {
     padding: theme.gap(1.5),
     minHeight: 112,
+    justifyContent: "space-between",
     gap: theme.gap(1.25),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
@@ -474,6 +540,11 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
+  },
+  // With no site line under the title, the "…" lines up with the title
+  // instead of hanging a line below it.
+  menuOnTitle: {
+    marginTop: -14,
   },
   suggestedBadge: {
     position: "absolute",

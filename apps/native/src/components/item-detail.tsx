@@ -20,8 +20,8 @@ import { runIntent } from "@/lib/intents";
 import { withoutSourceLink } from "@/lib/source-link";
 import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
-import { displayHost, siteMonogram } from "@/lib/url";
-import { isYouTubeUrl } from "@convex/model/externalUrl";
+import { displayHost, isYouTubeVideoUrl, siteMonogram } from "@/lib/url";
+import { letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -272,10 +272,8 @@ export const ItemDetail = memo(function ItemDetail({
   // the title, description, and actions below it.
   const maxHeroHeight = height * 0.55;
 
-  // Source shape; OG images default to 1200×630 (≈1.91).
-  const heroAspect =
-    item.aspectRatio ??
-    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
+  const letterboxed = letterboxedVideoRatio(item.url, heroUri) !== undefined;
+  const heroAspect = pageHeroAspect(item, social, heroUri);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap, and when the cap bites, pull
@@ -299,10 +297,13 @@ export const ItemDetail = memo(function ItemDetail({
     <Image
       source={{ uri: heroUri }}
       recyclingKey={item._id}
-      {...pageHeroLook(heroKind, heroAspect, maxHeroHeight, {
-        width: heroWidth,
-        height: heroHeight,
-      })}
+      {...pageHeroLook(
+        heroKind,
+        heroAspect,
+        maxHeroHeight,
+        { width: heroWidth, height: heroHeight },
+        letterboxed,
+      )}
     />
   ) : null;
 
@@ -352,10 +353,9 @@ export const ItemDetail = memo(function ItemDetail({
     ) : (
       target
     );
-  // The body may still turn a link into the reader, so the letter panel
-  // waits for it.
-  const monogram =
-    heroUri || bodyPending ? undefined : sitePanelMonogram(item, social);
+  const monogram = heroUri
+    ? undefined
+    : sitePanelMonogram(item, social, bodyPending);
 
   const heroBlock = heroUri ? (
     <>
@@ -430,16 +430,20 @@ function heroOpensAs(
   social: SocialPost | undefined,
 ): SocialPost | undefined {
   if (social) return social;
-  return plainLink(item, social) && isYouTubeUrl(item.url)
+  return plainLink(item, social) && isYouTubeVideoUrl(item.url)
     ? YOUTUBE
     : undefined;
 }
 
-/** The letter a plain link with no picture shows in its place. */
+/** The letter a plain link with no picture shows in its place. While the body
+ * loads the page may still become the reader, so the panel waits, unless the
+ * save already says it has no article; then it is up for the card's zoom. */
 function sitePanelMonogram(
   item: DetailItem,
   social: SocialPost | undefined,
+  bodyPending: boolean,
 ): string | undefined {
+  if (bodyPending && item.enrichment === undefined) return undefined;
   return plainLink(item, social) ? siteMonogram(item.url) : undefined;
 }
 
@@ -475,19 +479,36 @@ function pageHeroKind(
   return social ? "poster" : "framed";
 }
 
+/** The hero's shape: a letterboxed video thumbnail's video, else the
+ * picture's own, else the usual shape of what was saved (OpenGraph images
+ * default to 1200×630, about 1.91). */
+function pageHeroAspect(
+  item: DetailItem,
+  social: SocialPost | undefined,
+  heroUri: string | null | undefined,
+): number {
+  return (
+    letterboxedVideoRatio(item.url, heroUri) ??
+    item.aspectRatio ??
+    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4)
+  );
+}
+
 /** The page hero's fit and box: a recipe post's short cropped poster, a
- * full-bleed sticker, or a photo sized to its matted frame. */
+ * full-bleed sticker, or a photo sized to its matted frame. A letterboxed
+ * video thumbnail fills its frame, which crops the black bars away. */
 function pageHeroLook(
   kind: PageHeroKind,
   aspect: number,
   maxHeight: number,
   framed: { width: number; height: number },
+  letterboxed: boolean,
 ) {
   if (kind === "poster") {
     return { contentFit: "cover" as const, style: styles.poster };
   }
   return {
-    contentFit: "contain" as const,
+    contentFit: letterboxed ? ("cover" as const) : ("contain" as const),
     style:
       kind === "sticker"
         ? [styles.hero, { aspectRatio: aspect, maxHeight }]
@@ -582,28 +603,36 @@ function ItemPageBody({
       ) : null}
 
       {item.url && plainLink(item, social) ? (
-        <SiteButton item={item} />
-      ) : item.url ? (
-        <View style={styles.titleContainer}>
-          <ItemSourceLink
-            item={item}
-            icon={social?.playable ? "play.rectangle" : "safari"}
-            iconSize={15}
-            arrowSize={11}
-            iconTintColor={theme.colors.muted}
-            arrowTintColor={theme.colors.faint}
-            label={
-              social && item.author
-                ? `${item.author} · ${social.site}`
-                : undefined
-            }
-            style={styles.sourceRow}
-            textStyle={styles.sourceText}
-          />
+        // The site button leads, with the other actions close under it.
+        <View style={styles.siteActions}>
+          <SiteButton item={item} />
+          <IntentsRow item={item} intents={intents} />
         </View>
-      ) : null}
+      ) : (
+        <>
+          {item.url ? (
+            <View style={styles.titleContainer}>
+              <ItemSourceLink
+                item={item}
+                icon={social?.playable ? "play.rectangle" : "safari"}
+                iconSize={15}
+                arrowSize={11}
+                iconTintColor={theme.colors.muted}
+                arrowTintColor={theme.colors.faint}
+                label={
+                  social && item.author
+                    ? `${item.author} · ${social.site}`
+                    : undefined
+                }
+                style={styles.sourceRow}
+                textStyle={styles.sourceText}
+              />
+            </View>
+          ) : null}
 
-      <IntentsRow item={item} intents={intents} />
+          <IntentsRow item={item} intents={intents} />
+        </>
+      )}
 
       {/* A post saved for its recipe goes straight to the tabs: the summary
           only restates the dish the title and poster already name. */}
@@ -645,7 +674,7 @@ function SiteButton({ item }: { item: DetailItem }) {
   return (
     <Button
       title={
-        isYouTubeUrl(item.url)
+        isYouTubeVideoUrl(item.url)
           ? t("item.watchOnSite", { site })
           : t("item.viewOnSite", { site })
       }
@@ -1017,8 +1046,7 @@ const styles = StyleSheet.create((theme) => ({
     left: theme.gap(2),
     right: theme.gap(2),
     textAlign: "center",
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
+    ...theme.type.badge,
     letterSpacing: 0.8,
     textTransform: "uppercase",
     color: theme.colors.muted,
@@ -1077,6 +1105,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   centeredText: {
     textAlign: "center",
+  },
+  siteActions: {
+    gap: theme.gap(1.5),
   },
   titleContainer: {
     gap: theme.gap(1),

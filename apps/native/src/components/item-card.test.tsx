@@ -549,6 +549,73 @@ describe("textFaceCopy", () => {
     });
   });
 
+  it("leaves a note's own heading to the caption instead of printing it twice", () => {
+    const note = { ...base, type: "note" as const, title: "Mum's Gift Ideas" };
+    expect(
+      textFaceCopy({
+        ...note,
+        note: "Gift ideas for Mum\nLinen apron and a good bread knife.",
+      }),
+    ).toEqual({
+      body: "Linen apron and a good bread knife.",
+      captionTitle: "Mum's Gift Ideas",
+    });
+    // Only the heading: the owner's words, with the caption left empty.
+    expect(textFaceCopy({ ...note, note: "Gift ideas for Mum" })).toEqual({
+      body: "Gift ideas for Mum",
+    });
+    // A first line that says more than the title is the note itself.
+    expect(
+      textFaceCopy({
+        ...note,
+        note: "Gift ideas for Mum and Dad\nLinen apron.",
+      }),
+    ).toEqual({
+      body: "Gift ideas for Mum and Dad\nLinen apron.",
+      captionTitle: "Mum's Gift Ideas",
+    });
+  });
+
+  it("doesn't repeat a first-line title a note saved without AI carries", () => {
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Buy oat milk",
+        note: "Buy oat milk",
+      }),
+    ).toEqual({ body: "Buy oat milk" });
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Pottery class for Mum",
+        note: "Pottery class for Mum\nSaturday 10am",
+      }),
+    ).toEqual({ body: "Saturday 10am", captionTitle: "Pottery class for Mum" });
+    // A title that only starts the first line is a summary, not a cut.
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        note: "Gift ideas for Mum and Dad\nLinen apron.",
+      }),
+    ).toEqual({
+      body: "Gift ideas for Mum and Dad\nLinen apron.",
+      captionTitle: "Gift ideas",
+    });
+    const longLine = "A very long first line ".repeat(5).trim();
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: longLine.slice(0, 80),
+        note: `${longLine}\nSecond line`,
+      }),
+    ).toEqual({ body: "Second line", captionTitle: longLine.slice(0, 80) });
+  });
+
   it("reads a note's words, not a link summary it never has", () => {
     expect(
       textFaceCopy({

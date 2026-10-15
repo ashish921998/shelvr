@@ -1,3 +1,5 @@
+import { isYouTubeUrl } from "@convex/model/externalUrl";
+
 const URL_PATTERN = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([/?#]\S*)?$/i;
 
 export function isProbablyUrl(text: string) {
@@ -69,9 +71,48 @@ export function displayHost(url: string | undefined) {
   }
 }
 
+// Labels a country's domain files its sites under (bbc.co.uk, abc.net.au).
+const REGISTRY_LABELS = new Set([
+  "ac",
+  "co",
+  "com",
+  "edu",
+  "gov",
+  "net",
+  "org",
+]);
+
+/** The label that names the site: ikea in www.ikea.com, wikipedia in
+ * en.wikipedia.org, bbc in bbc.co.uk. */
+function siteLabel(host: string): string {
+  const labels = host.split(".");
+  if (labels.length < 2) return host;
+  const second = labels[labels.length - 2];
+  return labels.length > 2 && REGISTRY_LABELS.has(second)
+    ? labels[labels.length - 3]
+    : second;
+}
+
 /** A site's first letter, like a book spine: what a save with no picture shows
  * in place of one. Array.from keeps an emoji or other astral first character
- * whole. Undefined when there is no host to take it from. */
+ * whole. Undefined when there is no host to take it from, or when the host is
+ * punycode, whose first letter would be a meaningless X. */
 export function siteMonogram(url: string | undefined): string | undefined {
-  return Array.from(displayHost(url))[0]?.toLocaleUpperCase();
+  const label = siteLabel(displayHost(url));
+  if (label.startsWith("xn--")) return undefined;
+  return Array.from(label)[0]?.toLocaleUpperCase();
+}
+
+/** A YouTube link that plays a video: a watch, Shorts, live or embed page, or
+ * a youtu.be link. A channel, playlist or search page is not one. */
+export function isYouTubeVideoUrl(url: string | undefined): boolean {
+  if (!isYouTubeUrl(url)) return false;
+  try {
+    const { hostname, pathname, searchParams } = new URL(url ?? "");
+    if (hostname.toLowerCase() === "youtu.be") return pathname.length > 1;
+    if (pathname === "/watch") return searchParams.has("v");
+    return /^\/(shorts|live|embed|v)\/[^/]+/.test(pathname);
+  } catch {
+    return false;
+  }
 }

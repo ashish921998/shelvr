@@ -1,6 +1,6 @@
 import { FlashList } from "@shopify/flash-list";
 import { View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
@@ -31,6 +31,7 @@ export function MasonryFeed({
   ListHeaderComponent: listHeaderComponent,
   onScrollBeginDrag,
 }: Props) {
+  const { theme } = useUnistyles();
   return (
     <FlashList
       data={items}
@@ -54,7 +55,7 @@ export function MasonryFeed({
       // edge, the same margin as the headers and every other page.
       contentContainerStyle={{
         flexGrow: items.length === 0 ? 1 : undefined,
-        paddingHorizontal: GRID_INSET,
+        paddingHorizontal: theme.gap(1.5),
         paddingTop: 8,
         paddingBottom: 8,
       }}
@@ -76,11 +77,9 @@ export function MasonryFeed({
   );
 }
 
-const GRID_INSET = 12;
-
 const styles = StyleSheet.create((theme) => ({
   edgeToEdge: {
-    marginHorizontal: -GRID_INSET,
+    marginHorizontal: -theme.gap(1.5),
   },
   footer: {
     paddingVertical: theme.gap(2),

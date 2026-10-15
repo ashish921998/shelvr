@@ -6,6 +6,7 @@ import { ItemDetail, type DetailItem } from "./item-detail";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { PostMediaButton } from "@/components/post-media-button";
 import { Link } from "expo-router";
+import { Image } from "expo-image";
 
 vi.mock("@/lib/i18n", () => ({
   t: (key: string, values?: Record<string, unknown>) =>
@@ -60,9 +61,11 @@ vi.mock("@convex/_generated/api", () => ({
 vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (query: string, args: unknown) => ({ queryKey: [query, args] }),
 }));
-// getItem has failed, so the page paints the row it was handed at once.
+// By default getItem has failed, so the page paints the row it was handed at
+// once; `loading` holds it in flight instead.
+const fullRow = vi.hoisted(() => ({ loading: false }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined, isError: true }),
+  useQuery: () => ({ data: undefined, isError: !fullRow.loading }),
 }));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 vi.mock("@/lib/entitlement", () => ({
@@ -130,7 +133,7 @@ const video = {
   url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   siteName: "YouTube",
   imageUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-  aspectRatio: 16 / 9,
+  aspectRatio: 4 / 3,
 } as DetailItem;
 
 function renderPage(item: DetailItem, isZoomTarget = false) {
@@ -146,6 +149,7 @@ function renderPage(item: DetailItem, isZoomTarget = false) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  fullRow.loading = false;
 });
 
 describe("a plain link's page", () => {
@@ -168,6 +172,19 @@ describe("a plain link's page", () => {
     expect(Link.AppleZoomTarget).toHaveBeenCalled();
   });
 
+  it("has the panel up for the card's zoom while the body still loads", () => {
+    fullRow.loading = true;
+    renderPage(product, true);
+    expect(screen.getByText("I")).toBeTruthy();
+    expect(Link.AppleZoomTarget).toHaveBeenCalled();
+  });
+
+  it("waits for the body before showing a link that may be an article", () => {
+    fullRow.loading = true;
+    renderPage({ ...product, enrichment: undefined }, true);
+    expect(screen.queryByText("I")).toBeNull();
+  });
+
   it("names a site with no name by its host", () => {
     renderPage({ ...product, siteName: undefined });
     expect(
@@ -186,6 +203,25 @@ describe("a plain link's page", () => {
     ).toBeTruthy();
     // The photo is the hero, so there is no letter panel.
     expect(screen.queryByText("Y")).toBeNull();
+  });
+
+  it("crops the black bars off YouTube's 4:3 thumbnail", () => {
+    renderPage(video);
+    const hero = vi.mocked(Image).mock.calls[0][0] as {
+      contentFit: string;
+      style: { width: number; height: number }[];
+    };
+    expect(hero.contentFit).toBe("cover");
+    const { width, height } = hero.style[1];
+    expect(width / height).toBeCloseTo(16 / 9);
+  });
+
+  it("only plays a YouTube link that is a video", () => {
+    renderPage({ ...video, url: "https://www.youtube.com/@RickAstleyYT" });
+    expect(PostMediaButton).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "item.viewOnSite:YouTube" }),
+    ).toBeTruthy();
   });
 
   it("keeps the retry for a page that read only partly", () => {
