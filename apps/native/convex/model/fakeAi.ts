@@ -191,13 +191,6 @@ export function pageFromPrompt(prompt: string): PromptPage | undefined {
   };
 }
 
-/**
- * What the fake recommends for a new space: every numbered save whose line
- * shares a word of four letters or more with the space's name, so a flow
- * that names a space after a seeded save sees exactly that save suggested.
- * Undefined when the prompt is not a recommendation prompt. Exported pure for
- * unit testing.
- */
 /** The saves listed after the prompt's saves instruction. A save starts at
  * the line numbered one past the last, so a blank or numbered line inside a
  * description stays part of its save. */
@@ -215,6 +208,13 @@ function savesFromPrompt(prompt: string): string[] {
   return saves;
 }
 
+/**
+ * What the fake recommends for a new space: every numbered save whose line
+ * shares a word of four letters or more with the space's name, so a flow
+ * that names a space after a seeded save sees exactly that save suggested.
+ * Undefined when the prompt is not a recommendation prompt. Exported pure for
+ * unit testing.
+ */
 export function fakeRecommendation(
   prompt: string,
 ): { itemNumbers: number[] } | undefined {
