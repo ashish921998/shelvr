@@ -43,9 +43,9 @@ test("remembers a shared first save and skips the share how-to on Home", async (
 
   // That card stands in for the how-to while it is up, so it is put away
   // first: only the first-share flag keeps the how-to from taking its place.
-  const progressCard = screen.getByTestId("save-progress-card");
-  await progressCard.getByRole("button", "Not now").tap();
-  await expect(progressCard).toBeHidden({ timeout: 10_000 });
+  // The card's controls sit beside it in the accessibility tree, not in it.
+  await screen.getByRole("button", "Not now").tap();
+  await expect(progress).toBeHidden({ timeout: 10_000 });
   await expect(screen.getByRole("button", "Profile")).toBeVisible();
   await expect(screen.getByText("Save from anywhere.")).toBeHidden();
 });
