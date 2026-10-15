@@ -243,11 +243,17 @@ const STREET_WORDS = new Set([
   "via",
 ]);
 
+// Abbreviations that also start place names ("St John's Wood", "Dr Pong"):
+// they mark an address only after the street's name ("Rupert St").
+const LEADING_NAME_WORDS = new Set(["st", "dr"]);
+
 function isAddressPart(part: string): boolean {
   // A house number leads ("34 Rupert Street"); a number inside a name
   // ("Bar 61") does not make it an address.
-  return (
-    /^\s*\p{N}/u.test(part) || wordsOf(part).some((w) => STREET_WORDS.has(w))
+  if (/^\s*\p{N}/u.test(part)) return true;
+  return wordsOf(part).some(
+    (word, i) =>
+      STREET_WORDS.has(word) && !(i === 0 && LEADING_NAME_WORDS.has(word)),
   );
 }
 
@@ -278,7 +284,6 @@ export function sanitizePlan(
   const places: PlanPlace[] = [];
   const seen = new Set<string>();
   for (const pick of raw) {
-    if (places.length >= MAX_PLAN_PLACES) break;
     const n = pick.saveNumber;
     if (!Number.isInteger(n) || n < 1 || n > sources.length) continue;
     const source = sources[n - 1];
@@ -301,11 +306,12 @@ export function sanitizePlan(
       ...(been.has(key) || been.has(squash(full)) ? { been: true } : {}),
     });
   }
-  // Stable: each group keeps the model's order.
+  // Stable: each group keeps the model's order. Cap after ranking, so a new
+  // place is never cut for a visited one.
   return [
     ...places.filter((place) => !place.been),
     ...places.filter((place) => place.been),
-  ];
+  ].slice(0, MAX_PLAN_PLACES);
 }
 
 // The model writes each reason in the app's language. Keys are the app's

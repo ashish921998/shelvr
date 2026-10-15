@@ -224,6 +224,36 @@ describe("sanitizePlan", () => {
     ]);
   });
 
+  it("keeps a neighbourhood that starts with St", () => {
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: "The Ivy, St John's Wood", area: "", why: "Go" }],
+      [source({ title: "The Ivy, St John's Wood" })],
+    );
+    expect(pick.name).toBe("The Ivy, St John's Wood");
+    const [cut] = sanitizePlan(
+      [{ saveNumber: 1, name: "The Ivy, 9 Rupert St", area: "", why: "Go" }],
+      [source({ title: "The Ivy" })],
+    );
+    expect(cut.name).toBe("The Ivy");
+  });
+
+  it("caps the shortlist after visited places move last", () => {
+    const sources = Array.from({ length: 6 }, (_, i) =>
+      source({ itemId: `item${i}` as Id<"items">, title: `Spot${i} dinner` }),
+    );
+    const raw = sources.map((_, i) => ({
+      saveNumber: i + 1,
+      name: `Spot${i}`,
+      area: "",
+      why: "Good",
+    }));
+    const been = new Set([0, 1, 2, 3, 4].map((i) => placeKey(`Spot${i}`)));
+    const places = sanitizePlan(raw, sources, been);
+    expect(places).toHaveLength(5);
+    expect(places[0]).toMatchObject({ name: "Spot5" });
+    expect(places[0].been).toBeUndefined();
+  });
+
   it("still knows a visit saved under the full name", () => {
     const full = "The Palomar, 34 Rupert Street, London";
     const [pick] = sanitizePlan(
