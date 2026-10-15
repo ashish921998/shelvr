@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest, signedInUser } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -3693,6 +3693,29 @@ describe("share links", () => {
     expect(
       await owner.query(internal.items.getSharePreview, { token: token! }),
     ).not.toBeNull();
+  });
+
+  it("stops serving the preview the moment account deletion starts", async () => {
+    const { t, userId } = await as();
+    // Enough older saves that the cleanup spans several batches, so the
+    // shared item and its link are still stored after the first transaction.
+    await seedNotes(t, userId as Id<"users">, 150);
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+
+    const link = await t.run((ctx) =>
+      ctx.db
+        .query("shareLinks")
+        .withIndex("by_token", (q) => q.eq("token", token!))
+        .unique(),
+    );
+    expect(link).not.toBeNull();
+    expect(await t.run((ctx) => ctx.db.get(itemId))).not.toBeNull();
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
   });
 
   it("stops serving the preview once the item is deleted", async () => {
