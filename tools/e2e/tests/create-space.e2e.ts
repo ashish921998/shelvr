@@ -6,6 +6,7 @@ import {
   startOnSeededHome,
   tapTab,
   tapUntilVisible,
+  fillField,
 } from "./seeded-home.ts";
 
 startOnSeededHome();
@@ -24,7 +25,7 @@ test("creates a space", async ({ screen }) => {
   // The form is a sheet, and text typed while it is still rising can miss the
   // field: the runner then cannot confirm the field holds it (seen on CI).
   await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-  await field.fill(name);
+  await fillField(field, name);
   // The app gives this control a label but no button role.
   await screen.getByLabel("Create space").tap();
 
