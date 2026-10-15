@@ -7,9 +7,11 @@ import type { wrapLanguageModel } from "ai";
  * placeholder model key, so every real model call fails and a save that needs
  * one can never finish. This model answers instead, from the saved content
  * itself, so a flow like save-note can run on every pull request with no
- * secret. It knows one call (a note's classification) and fails loudly on
- * anything else, so a flow that strays onto an unanswered call fails instead
- * of passing on an invented answer.
+ * secret. It knows two calls (a note's and a fixture page's classification)
+ * and fails loudly on anything else, so a flow that strays onto an unanswered
+ * call fails instead of passing on an invented answer. It recognizes them by
+ * the wording of the prompts in ai.ts; aiFakeModel.test.ts runs those real
+ * prompts through it, so a rewording that would strand the fake fails there.
  */
 
 type AnyLanguageModel = Parameters<typeof wrapLanguageModel>[0]["model"];
