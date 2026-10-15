@@ -31,11 +31,13 @@ import {
 import { readStoredImage, StoredImageError } from "./model/storedImage";
 
 import {
+  FAKE_AI_ENABLED,
   MODEL,
   MODEL_NAME,
   modelCallOptions,
   isModelTimeout,
 } from "./model/aiProvider";
+import { fixturePage } from "./model/fakeAi";
 import { embedTexts } from "./aiEmbeddingSweep";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -513,7 +515,7 @@ async function analyzeLinkItem(
   if (!item.url) {
     throw new Error("Link item has no url");
   }
-  const read = await readPage(item.url);
+  const read = fixtureRead(item.url) ?? (await readPage(item.url));
   if (read.status === "gone") {
     // Nothing to read and nothing to retry: a 404/410 is terminal.
     logEvent("error", "process_item_gone", {
@@ -564,6 +566,15 @@ async function analyzeLinkItem(
     page,
     linkRead: read,
   };
+}
+
+/** The e2e fixture page at `url` as a finished read, while the fake model is
+ * on (the e2e job's local backend only); undefined everywhere else. */
+function fixtureRead(
+  url: string,
+): Awaited<ReturnType<typeof readPage>> | undefined {
+  const page = FAKE_AI_ENABLED ? fixturePage(url) : undefined;
+  return page && { status: "ok", page, askForRecipe: false };
 }
 
 type LinkCall = {

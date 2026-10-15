@@ -8,9 +8,10 @@ name: e2e ios
 # No secrets: the backend is a throwaway local deployment (CONVEX_AGENT_MODE
 # anonymous), so a fork's pull request runs it the same way. The backend's
 # model is the deterministic fake in convex/model/fakeAi.ts, which classifies
-# a note from its own words, so save-note runs here. Two flows are left out
-# because the fake cannot stand in for them: save-link and save-image judge
-# the screen with a real model.
+# a note from its own words, so save-note runs here, and serves the fixture
+# pages in the same file, so save-link-fixture saves a link with no network
+# read. Two flows are left out because the fake cannot stand in for them:
+# save-link and save-image judge the screen with a real model.
 
 on:
   pull_request:
@@ -245,6 +246,9 @@ jobs:
 
       - name: Run the flows
         working-directory: tools/e2e
+        # Tells save-link-fixture the backend serves the fixture pages.
+        env:
+          E2E_FAKE_AI: local-v1
         run: >-
           pnpm exec e2e run
           tests/search.e2e.ts
@@ -252,6 +256,7 @@ jobs:
           tests/create-space.e2e.ts
           tests/paywall.e2e.ts
           tests/save-note.e2e.ts
+          tests/save-link-fixture.e2e.ts
           --reporter list,junit
 
       # tapUntilVisible taps again when a tap was lost. The run still passes

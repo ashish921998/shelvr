@@ -372,7 +372,8 @@ needed at runtime by the features that use them:
 - `GOOGLE_GENERATIVE_AI_API_KEY`: Google AI Studio API key for classification (used directly by
   `@ai-sdk/google`, no gateway). The only required entry
 - `E2E_FAKE_AI`: set to `local-v1` only by the `e2e ios` workflow's local backend. It swaps
-  Gemini for the deterministic fake in `model/fakeAi.ts`, and only when the backend is on
+  Gemini for the deterministic fake in `model/fakeAi.ts` (which also serves its fixture pages
+  at `https://fixtures.e2e.invalid/` to link saves), and only when the backend is on
   127.0.0.1, `AUTH_ENABLE_ANONYMOUS` is `"true"` and the model key is the `ci-no-model`
   placeholder. Anywhere else it is refused and logged as `fake_ai_refused`
 - `POSTHOG_PROJECT_TOKEN`: server-side PostHog ingestion key. All backend capture is skipped
