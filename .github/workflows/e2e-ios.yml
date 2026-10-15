@@ -1,15 +1,16 @@
 name: e2e ios
 
-# Runs the model-free flows in tools/e2e on an iOS simulator against a local
-# Convex backend built from the same commit. Not a required check yet: it
+# Runs the flows in tools/e2e that need no real model on an iOS simulator
+# against a local Convex backend built from the same commit. Not a required check yet: it
 # reports, and a failure does not block a merge. Once it has a clean record it
 # moves into ci.yml, so deploys wait on it too.
 #
 # No secrets: the backend is a throwaway local deployment (CONVEX_AGENT_MODE
-# anonymous), so a fork's pull request runs it the same way. Three flows are
-# left out because they need the model: save-link and save-image judge the
-# screen with it, and save-note searches for words that only reach the index
-# once the model has processed the note.
+# anonymous), so a fork's pull request runs it the same way. The backend's
+# model is the deterministic fake in convex/model/fakeAi.ts, which classifies
+# a note from its own words, so save-note runs here. Two flows are left out
+# because the fake cannot stand in for them: save-link and save-image judge
+# the screen with a real model.
 
 on:
   pull_request:
@@ -166,8 +167,9 @@ jobs:
       # A throwaway deployment on this machine. The first `convex dev --once`
       # creates it and writes its URLs to .env.local, then stops at the push,
       # which needs the required model key; the env is set after that. The key
-      # is a placeholder, so any model call fails, and none of these flows
-      # needs one.
+      # is a placeholder, which together with E2E_FAKE_AI, dev sign-in and the
+      # loopback URL is what lets the fake model answer. A call it has no
+      # answer for fails.
       #
       # The runner is several times slower than Convex's servers, and its
       # queries have run past the 1 s production limit (`legalConsent:get`,
@@ -192,6 +194,7 @@ jobs:
           test -f .env.local
           npx convex env set GOOGLE_GENERATIVE_AI_API_KEY ci-no-model
           npx convex env set AUTH_ENABLE_ANONYMOUS true
+          npx convex env set E2E_FAKE_AI local-v1
           npx convex env set JWT_PRIVATE_KEY -- "$(node -p 'JSON.parse(process.argv[1]).privateKey' "$keys")"
           npx convex env set JWKS -- "$(node -p 'JSON.parse(process.argv[1]).jwks' "$keys")"
           nohup npx convex dev --typecheck disable --codegen disable --tail-logs always \
@@ -240,7 +243,7 @@ jobs:
           echo "::error::Metro on 8091 did not stop; the run could not start its own"
           exit 1
 
-      - name: Run the model-free flows
+      - name: Run the flows
         working-directory: tools/e2e
         run: >-
           pnpm exec e2e run
@@ -248,6 +251,7 @@ jobs:
           tests/search-no-results.e2e.ts
           tests/create-space.e2e.ts
           tests/paywall.e2e.ts
+          tests/save-note.e2e.ts
           --reporter list,junit
 
       # tapUntilVisible taps again when a tap was lost. The run still passes
