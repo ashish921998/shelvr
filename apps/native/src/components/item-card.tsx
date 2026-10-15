@@ -97,9 +97,12 @@ function cardMenuActions({
 function ItemCardView({
   item,
   source,
+  zoomTarget,
 }: {
   item: FeedItem;
   source?: ItemSource;
+  /** Where a withAppleZoom link that pushed this screen zooms in to. */
+  zoomTarget?: boolean;
 }) {
   useAppLocale();
   const reducedMotion = useReducedMotion();
@@ -263,81 +266,96 @@ function ItemCardView({
   };
   const a11yOnCell = process.env.EXPO_OS === "ios";
 
+  const link = (
+    <Link href={href} asChild>
+      <Link.Trigger withAppleZoom={!reducedMotion}>
+        <Pressable {...(a11yOnCell ? {} : cardA11y)}>
+          {/* Link.Trigger's Slot drops a Pressable style function (it merges
+              style by object spread), so the card's look lives on the face's
+              View, driven by the Pressable's render-prop children. */}
+          {({ pressed }) => (
+            <ItemCardFace
+              item={item}
+              menuActions={menuActions}
+              suggested={isSuggested}
+              onAcceptSuggestion={accept}
+              pressed={pressed}
+            />
+          )}
+        </Pressable>
+      </Link.Trigger>
+      <Link.Preview />
+      {/* The iOS long-press context menu. Expo Router walks the Link's
+          direct children by element type, so these must be literal
+          Link.Menu / Link.MenuAction elements here — a component returning
+          them is silently discarded and the menu renders empty. */}
+      <Link.Menu>
+        {isSuggested && (
+          <Link.MenuAction
+            title={t("spaces.addItem")}
+            icon="plus"
+            onPress={accept}
+          />
+        )}
+        {isSuggested && (
+          <Link.MenuAction
+            title={t("spaces.dismissSuggestion")}
+            icon="xmark"
+            destructive
+            onPress={dismiss}
+          />
+        )}
+        {!isSuggested && item.url ? (
+          <Link.MenuAction
+            title={t("common.share")}
+            icon="square.and.arrow.up"
+            onPress={share}
+          />
+        ) : null}
+        {!isSuggested && item.status === "ready" ? (
+          <Link.MenuAction
+            title={t("spaces.changeMembership")}
+            icon="tray.and.arrow.up"
+            onPress={changeSpaces}
+          />
+        ) : null}
+        {!isSuggested && spaceId !== undefined ? (
+          <Link.MenuAction
+            title={t("spaces.removeFromSpace")}
+            icon="minus.circle"
+            onPress={removeFromSpace}
+          />
+        ) : null}
+        {!isSuggested && (
+          <Link.MenuAction
+            title={
+              spaceId === undefined
+                ? t("common.delete")
+                : t("item.deleteEverywhere")
+            }
+            icon="trash"
+            destructive
+            onPress={confirmDelete}
+          />
+        )}
+      </Link.Menu>
+    </Link>
+  );
+
+  // The zoom target sits inside the cell for the same reason as the card's
+  // accessibility: it is a zero-size native view, so a cell inside it would
+  // be hidden from VoiceOver and XCTest along with the card. It measures its
+  // direct native child, and the Link's own host has no size either, so a
+  // View that is never flattened gives it the card's frame.
   return (
     <View style={styles.cell} {...(a11yOnCell ? cardA11y : {})}>
-      <Link href={href} asChild>
-        <Link.Trigger withAppleZoom={!reducedMotion}>
-          <Pressable {...(a11yOnCell ? {} : cardA11y)}>
-            {/* Link.Trigger's Slot drops a Pressable style function (it merges
-                style by object spread), so the card's look lives on the face's
-                View, driven by the Pressable's render-prop children. */}
-            {({ pressed }) => (
-              <ItemCardFace
-                item={item}
-                menuActions={menuActions}
-                suggested={isSuggested}
-                onAcceptSuggestion={accept}
-                pressed={pressed}
-              />
-            )}
-          </Pressable>
-        </Link.Trigger>
-        <Link.Preview />
-        {/* The iOS long-press context menu. Expo Router walks the Link's
-            direct children by element type, so these must be literal
-            Link.Menu / Link.MenuAction elements here — a component returning
-            them is silently discarded and the menu renders empty. */}
-        <Link.Menu>
-          {isSuggested && (
-            <Link.MenuAction
-              title={t("spaces.addItem")}
-              icon="plus"
-              onPress={accept}
-            />
-          )}
-          {isSuggested && (
-            <Link.MenuAction
-              title={t("spaces.dismissSuggestion")}
-              icon="xmark"
-              destructive
-              onPress={dismiss}
-            />
-          )}
-          {!isSuggested && item.url ? (
-            <Link.MenuAction
-              title={t("common.share")}
-              icon="square.and.arrow.up"
-              onPress={share}
-            />
-          ) : null}
-          {!isSuggested && item.status === "ready" ? (
-            <Link.MenuAction
-              title={t("spaces.changeMembership")}
-              icon="tray.and.arrow.up"
-              onPress={changeSpaces}
-            />
-          ) : null}
-          {!isSuggested && spaceId !== undefined ? (
-            <Link.MenuAction
-              title={t("spaces.removeFromSpace")}
-              icon="minus.circle"
-              onPress={removeFromSpace}
-            />
-          ) : null}
-          {!isSuggested && (
-            <Link.MenuAction
-              title={
-                spaceId === undefined
-                  ? t("common.delete")
-                  : t("item.deleteEverywhere")
-              }
-              icon="trash"
-              destructive
-              onPress={confirmDelete}
-            />
-          )}
-        </Link.Menu>
-      </Link>
+      {zoomTarget ? (
+        <Link.AppleZoomTarget>
+          <View collapsable={false}>{link}</View>
+        </Link.AppleZoomTarget>
+      ) : (
+        link
+      )}
     </View>
   );
 }
@@ -370,6 +388,7 @@ export const ItemCard = memo(
   ItemCardView,
   (prev, next) =>
     prev.item === next.item &&
+    prev.zoomTarget === next.zoomTarget &&
     sourceKey(prev.source) === sourceKey(next.source),
 );
 

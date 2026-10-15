@@ -10,7 +10,8 @@ name: e2e ios
 # model is the deterministic fake in convex/model/fakeAi.ts, which classifies
 # a note from its own words, so save-note runs here, and serves the fixture
 # pages in the same file, so save-link-fixture saves a link with no network
-# read. Two flows are left out because the fake cannot stand in for them:
+# read. It also suggests the saves that share a word with a new space's name,
+# so space-suggestions sees a seeded save suggested. Two flows are left out because the fake cannot stand in for them:
 # save-link and save-image judge the screen with a real model.
 
 on:
@@ -246,7 +247,8 @@ jobs:
 
       - name: Run the flows
         working-directory: tools/e2e
-        # Tells save-link-fixture the backend serves the fixture pages.
+        # Tells the flows that need the fake (save-link-fixture,
+        # space-suggestions) that the backend runs it.
         env:
           E2E_FAKE_AI: local-v1
         run: >-
@@ -257,6 +259,7 @@ jobs:
           tests/paywall.e2e.ts
           tests/save-note.e2e.ts
           tests/save-link-fixture.e2e.ts
+          tests/space-suggestions.e2e.ts
           tests/onboarding.e2e.ts
           --reporter list,junit
 
