@@ -196,3 +196,25 @@ export async function chooseAddOption(
   await expect(option).toBeEnabled({ timeout: 30_000 });
   await option.tap();
 }
+
+/** How long a field gets to show the text when the runner lost track of it. */
+const FILL_CHECK_MS = 5000;
+
+/**
+ * Fills `field` with `text`. The runner checks that typed text reached the
+ * field and fails when it cannot tell, which has happened on CI with the
+ * text in the field (a search field typed into right after the keyboard
+ * went away). Then the field itself decides: holding exactly `text` passes,
+ * anything else fails with the runner's own error.
+ */
+export async function fillChecked(field: Locator, text: string): Promise<void> {
+  try {
+    await field.fill(text);
+  } catch (error) {
+    await expect(field)
+      .toHaveValue(text, { timeout: FILL_CHECK_MS })
+      .catch(() => {
+        throw error;
+      });
+  }
+}
