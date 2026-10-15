@@ -19,7 +19,7 @@ import {
   type PlanSource,
 } from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
-import { validateSpaceName } from "./model/spaceName";
+import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -303,6 +303,7 @@ export const createSpace = mutation({
       return existing[0]._id;
     }
     validateSpaceName(name);
+    const description = validateSpaceDescription(args.description);
 
     await requireProEntitlement(ctx, userId);
     // The recommendation pass is a paid model call; bound it before writing so
@@ -315,7 +316,7 @@ export const createSpace = mutation({
     const spaceId = await ctx.db.insert("spaces", {
       userId,
       name,
-      description: args.description,
+      description,
       dynamic: args.dynamic ?? false,
       // Auto-file only means anything on a dynamic space.
       ...(args.dynamic === true && args.autoFile === true

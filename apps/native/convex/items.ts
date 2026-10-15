@@ -12,12 +12,13 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import {
   hasProEntitlementAt,
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
+import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
 import {
@@ -280,11 +281,19 @@ export type ItemCard = Infer<typeof itemCardValidator>;
  */
 function stripEmbedding(
   item: Doc<"items">,
-): Omit<Doc<"items">, "embedding" | "embeddingVersion" | "embeddingAttempts"> {
+): Omit<
+  Doc<"items">,
+  | "embedding"
+  | "embeddingVersion"
+  | "embeddingAttempts"
+  | "productsSearchStartedAt"
+> {
   const {
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
+    // The product-search watchdog's fence, of no use to a client.
+    productsSearchStartedAt: _searchStartedAt,
     ...rest
   } = item;
   return rest;
@@ -2181,10 +2190,22 @@ export const findLinks = mutation({
       throw aiConsentRequiredError();
     }
     await rateLimiter.limit(ctx, "findLinks", { key: userId, throws: true });
-    await ctx.db.patch(item._id, { productsStatus: "searching" });
+    const startedAt = Date.now();
+    await ctx.db.patch(item._id, {
+      productsStatus: "searching",
+      productsSearchStartedAt: startedAt,
+    });
     await ctx.scheduler.runAfter(0, internal.ai.findProductLinks, {
       itemId: item._id,
     });
+    // An action killed mid-search (a deploy, the action time limit) never
+    // writes a result, and "searching" refuses every later press. Past the
+    // action limit the search is dead, so it fails and can be retried.
+    await ctx.scheduler.runAfter(
+      PROCESSING_STALE_MS,
+      internal.items.expireProductSearch,
+      { itemId: item._id, startedAt },
+    );
     return null;
   },
 });
@@ -2422,6 +2443,9 @@ export const getSharePreview = internalQuery({
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
     if (link === null) return null;
+    // Deletion drains share links after the saves themselves, which can take
+    // several batches. The account stops sharing the moment deletion starts.
+    if ((await liveOwner(ctx, link.userId)) === null) return null;
     const item = await ctx.db.get(link.itemId);
     if (!item || item.userId !== link.userId || !isShareable(item)) return null;
 
@@ -3029,6 +3053,24 @@ export const setEmbeddingsInternal = internalMutation({
       }
     }
     return { written, stamped, deferred };
+  },
+});
+
+export const expireProductSearch = internalMutation({
+  args: { itemId: v.id("items"), startedAt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      item.productsStatus !== "searching" ||
+      item.productsSearchStartedAt !== args.startedAt
+    ) {
+      return null;
+    }
+    logEvent("warn", "find_product_links_expired", { item_id: args.itemId });
+    await ctx.db.patch(args.itemId, { productsStatus: "failed" });
+    return null;
   },
 });
 
