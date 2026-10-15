@@ -3,7 +3,7 @@ import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
 import { releaseSavedShare } from "@/lib/use-incoming-share-url";
-import { demoDestination, isDemoSample } from "@/lib/onboarding-demo";
+import { demoDestination, findSample } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -338,7 +338,8 @@ export function useDemoSave({
       const stale = () => advancedRef.current || !mountedRef.current;
       if (url === "" || inFlightRef.current || stale()) return;
       const trimmed = { ...request, url };
-      const sample = isDemoSample(url);
+      const found = findSample(url);
+      const sample = found !== undefined;
       // Fires before any sign-in, so the funnel shows a pick that never got
       // past the sign-in sheet. Resuming after sign-in is not a new pick.
       if (!resumed) {
@@ -361,6 +362,8 @@ export function useDemoSave({
       try {
         const result = await createDemoItem({
           url,
+          // A sample keeps the heading its preview showed.
+          title: found?.pageHeading,
           spaceName: trimmed.destination ?? undefined,
           analyticsSessionId: analytics.sessionId(),
         });

@@ -73,7 +73,10 @@ vi.mock("@/lib/onboarding-demo", () => ({
     url === "https://sample.test/ready-made"
       ? "recipes"
       : null,
-  isDemoSample: (url: string) => url === "https://sample.test/ready-made",
+  findSample: (url: string) =>
+    url === "https://sample.test/ready-made"
+      ? { pageHeading: "Ready-made heading" }
+      : undefined,
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
@@ -311,8 +314,10 @@ describe("useDemoSave", () => {
     rerender();
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.create).toHaveBeenCalledTimes(1);
+    // A typed link is no sample, so the classifier names it.
     expect(mock.create).toHaveBeenCalledWith({
       url: "https://sample.test/recipe",
+      title: undefined,
       spaceName: "name:recipes",
       analyticsSessionId: "session",
     });
@@ -698,6 +703,10 @@ describe("useDemoSave", () => {
       result.current.submitUrl("https://sample.test/ready-made"),
     );
     expect(mock.create).toHaveBeenCalledTimes(2);
+    // The save keeps the heading its preview showed.
+    expect(mock.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "Ready-made heading" }),
+    );
     expect(result.current.view).toBe("reading");
     expect(onSaved).toHaveBeenCalledWith({
       itemId: ITEM_ID,
