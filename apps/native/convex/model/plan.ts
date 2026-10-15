@@ -158,8 +158,14 @@ function evidenceOf(source: PlanSource): Evidence {
     .join(" ");
   // A pin marks a place the way a handle does ("📍dishoomlondon").
   const tagged = raw.match(/(?:[@#]|\u{1F4CD}\s*)[\p{L}\p{N}\p{M}_.]+/gu) ?? [];
-  // The author is a handle even when written without the "@".
-  const handles = [...tagged, source.author ?? ""].map(squash).filter(Boolean);
+  // The author is a handle even when written without the "@", but only as a
+  // single token: a spaced name ("Smart Barista") squashed whole would let
+  // "Art Bar" match across its words.
+  const author = source.author?.trim() ?? "";
+  // Kept in NFC so Korean is compared by syllable, not by letter.
+  const handles = [...tagged, /\s/.test(author) ? "" : author]
+    .map((handle) => squash(handle).normalize("NFC"))
+    .filter(Boolean);
   // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
   // "McSorleys" names "McSorley's". A capital inside a word also starts one,
   // so "GymkhanaLondon" and "#LondonBAO" name "Gymkhana" and "BAO", and so
@@ -189,22 +195,32 @@ const UNSPACED_SCRIPT =
 // Korean spaces its words but writes particles onto them ("쵸리상경에서").
 const HANGUL = /\p{Script=Hangul}/u;
 
+/** A Korean word of the save that starts with the piece, compared syllable
+ * by syllable: squashed text is decomposed into letters, where "마포" would
+ * be a prefix of "마폭". */
+function hangulPrefix(piece: string, evidence: Evidence): boolean {
+  const syllables = piece.normalize("NFC");
+  return [...evidence.words].some((word) =>
+    word.normalize("NFC").startsWith(syllables),
+  );
+}
+
 /** A whole word of the save; part of one of its handles, at the start
  * ("@tigrenyc"), at the end ("#londonbao") or, for a word of 4 letters or
  * more, anywhere ("@eatatlilia");
  * in Korean, the start of a word, before a particle ("쵸리상경에서"); or, in a
  * script written without spaces, anywhere in its text. */
 function saveSays(piece: string, evidence: Evidence): boolean {
+  const composed = piece.normalize("NFC");
   return (
     evidence.words.has(piece) ||
     evidence.handles.some(
       (handle) =>
-        handle.startsWith(piece) ||
-        handle.endsWith(piece) ||
-        (piece.length >= 4 && handle.includes(piece)),
+        handle.startsWith(composed) ||
+        handle.endsWith(composed) ||
+        (composed.length >= 4 && handle.includes(composed)),
     ) ||
-    (HANGUL.test(piece) &&
-      [...evidence.words].some((word) => word.startsWith(piece))) ||
+    (HANGUL.test(piece) && hangulPrefix(piece, evidence)) ||
     (UNSPACED_SCRIPT.test(piece) && evidence.text.includes(piece))
   );
 }
