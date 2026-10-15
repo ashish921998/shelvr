@@ -12,7 +12,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import {
   hasProEntitlementAt,
   hasProEntitlementStatus,
@@ -2422,6 +2422,9 @@ export const getSharePreview = internalQuery({
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
     if (link === null) return null;
+    // Deletion drains share links after the saves themselves, which can take
+    // several batches. The account stops sharing the moment deletion starts.
+    if ((await liveOwner(ctx, link.userId)) === null) return null;
     const item = await ctx.db.get(link.itemId);
     if (!item || item.userId !== link.userId || !isShareable(item)) return null;
 
