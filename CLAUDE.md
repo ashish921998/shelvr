@@ -291,7 +291,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `(auth)` / `(app)` route groups
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
-- Other `(app)` routes: `add`, `camera`, `share`, `import`, `onboarding`, `paywall`, `profile`,
+- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
   `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`,
   `digest/[id]`
 - `(auth)` holds a single `sign-in` route
