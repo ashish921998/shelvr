@@ -1,10 +1,7 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
 import type { Device } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
-import { BUNDLE_ID, LAUNCH_ARGUMENTS, URL_SCHEME } from "./launch.ts";
+import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 
 /**
  * Starts the app as a first-time user on the onboarding opener. Onboarding
@@ -47,56 +44,6 @@ export async function walkToFirstSave(screen: Screen): Promise<void> {
   await expect(screen.getByText(/^Save your first/)).toBeVisible({
     timeout: 30_000,
   });
-}
-
-const execFileAsync = promisify(execFile);
-
-/** The simulator the run drives: CI names it, a local run uses the booted one. */
-const DEVICE = process.env.E2E_DEVICE ?? "booted";
-
-/** The app group the share extension hands shares to the app through. */
-const APP_GROUP = `group.${BUNDLE_ID}`;
-
-/**
- * Puts a shared link where Shelvr's share extension leaves one, then opens
- * the link the extension opens. The share sheet itself is system UI whose
- * app row the accessibility tree does not list, so the extension's two
- * effects are reproduced instead: the payload in the app group's defaults
- * (expo-sharing's `expo-sharing` key, a JSON array of payloads) and the
- * `<scheme>://expo-sharing` launch.
- */
-export async function shareLinkIntoApp(
-  device: Device,
-  screen: Screen,
-  url: string,
-): Promise<void> {
-  const { stdout } = await execFileAsync("xcrun", [
-    "simctl",
-    "get_app_container",
-    DEVICE,
-    BUNDLE_ID,
-    APP_GROUP,
-  ]);
-  const payload = JSON.stringify([
-    { type: "url", value: url, mimeType: "text/plain" },
-  ]);
-  await execFileAsync("xcrun", [
-    "simctl",
-    "spawn",
-    DEVICE,
-    "defaults",
-    "write",
-    `${stdout.trim()}/Library/Preferences/${APP_GROUP}`,
-    "expo-sharing",
-    "-data",
-    Buffer.from(payload).toString("hex"),
-  ]);
-  await device.openLink(`${URL_SCHEME}://expo-sharing`);
-
-  // The simulator may ask before it opens the link in the app.
-  const open = screen.getByRole("alert").getByRole("button", "Open");
-  await open.tap({ timeout: 10_000 }).catch(() => undefined);
-  await expect(open).toBeHidden({ timeout: 10_000 });
 }
 
 /**

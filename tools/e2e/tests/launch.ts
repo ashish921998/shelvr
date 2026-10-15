@@ -5,9 +5,6 @@ export const METRO_URL = `http://localhost:${METRO_PORT}`;
 
 export const BUNDLE_ID = "app.shelvr.save.dev";
 
-/** The development variant's URL scheme (`scheme` in app.config.js). */
-export const URL_SCHEME = "shelvr-dev";
-
 // The bundle Metro serves for the dev manifest. Opening it directly skips the
 // manifest, which resolves the native fingerprint on every request: 5 to 15
 // seconds on a GitHub runner, past the 10 seconds the dev launcher waits,
