@@ -187,6 +187,8 @@ describe("isGrounded", () => {
       false,
     );
     expect(isGrounded("마포", source({ content: "마포에서 저녁" }))).toBe(true);
+    expect(isGrounded("마포", source({ content: "#마폭맛집" }))).toBe(false);
+    expect(isGrounded("마포", source({ content: "#마포맛집" }))).toBe(true);
   });
 
   it("does not read a spaced author as one handle", () => {

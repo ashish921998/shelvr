@@ -156,8 +156,9 @@ function evidenceOf(source: PlanSource): Evidence {
   // single token: a spaced name ("Smart Barista") squashed whole would let
   // "Art Bar" match across its words.
   const author = source.author?.trim() ?? "";
+  // Kept in NFC so Korean is compared by syllable, not by letter.
   const handles = [...tagged, /\s/.test(author) ? "" : author]
-    .map(squash)
+    .map((handle) => squash(handle).normalize("NFC"))
     .filter(Boolean);
   // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
   // "McSorleys" names "McSorley's". A capital inside a word also starts one,
@@ -204,13 +205,14 @@ function hangulPrefix(piece: string, evidence: Evidence): boolean {
  * in Korean, the start of a word, before a particle ("쵸리상경에서"); or, in a
  * script written without spaces, anywhere in its text. */
 function saveSays(piece: string, evidence: Evidence): boolean {
+  const composed = piece.normalize("NFC");
   return (
     evidence.words.has(piece) ||
     evidence.handles.some(
       (handle) =>
-        handle.startsWith(piece) ||
-        handle.endsWith(piece) ||
-        (piece.length >= 4 && handle.includes(piece)),
+        handle.startsWith(composed) ||
+        handle.endsWith(composed) ||
+        (composed.length >= 4 && handle.includes(composed)),
     ) ||
     (HANGUL.test(piece) && hangulPrefix(piece, evidence)) ||
     (UNSPACED_SCRIPT.test(piece) && evidence.text.includes(piece))
