@@ -27,7 +27,7 @@ test("preserves all 92 literal rows transcribed from the original tables", () =>
     "8f821ab350cc283848c3580b206719ecf5bd67de2b42d415b695c420e1749976",
     "a7c11432c134e4c6faa25e623992109c85933b2bd5f3e5754b1865f385759821",
     "6e22916175249818d4bc80a95a26d15ea9f00bbf54a40601a0d6b9faac702117",
-    "29ff575786c99a9504435aa640b2eec56543d23c4fb743c214c8a886d7a17c89",
+    "c2e6f82a339f35778a51e82c7f62802003373f023a47bac2e0c4135f424f414f",
   ];
   const counts = [16, 19, 9, 24, 24];
   readStatements().forEach((statement, index) => {

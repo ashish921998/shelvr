@@ -403,7 +403,7 @@ attempt_report AS (
 trial_report AS (
     SELECT
         t.event_id AS trial_event_id,
-        t.account_id,
+        t.account_id AS account_id,
         t.trial_started_at AS trial_at,
         t.product AS product_id,
         t.deliveries AS deliveries,
@@ -710,8 +710,8 @@ lifecycle_rows AS (
     FROM events
     WHERE timestamp >= (SELECT start FROM cohort)
       AND timestamp <= now()
-      AND event IN ('trial_started', 'trial_cancelled', 'subscription_uncancelled',
-                    'trial_expired', 'payment_succeeded')
+      AND event IN ('trial_started', 'trial_cancelled', 'subscription_cancelled',
+                    'subscription_uncancelled', 'trial_expired', 'payment_succeeded')
 ),
 -- source:end q4
 -- transform:begin q4
