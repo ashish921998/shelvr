@@ -169,14 +169,45 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
   // recursion below already handles both shapes.
   if (value.itemListElement !== undefined) {
     const steps = instructionSteps(value.itemListElement, clean);
-    const sectionName = stringValue(value.name, clean);
-    if (sectionName !== undefined && steps.length > 0) {
+    const sectionName = trimTrailingColons(stringValue(value.name, clean));
+    if (sectionName && steps.length > 0) {
       return [`${sectionName}: ${steps[0]}`, ...steps.slice(1)];
     }
     return steps;
   }
   const text = stringValue(value.text, clean) ?? stringValue(value.name, clean);
   return text === undefined ? [] : splitInstructionText(text, clean);
+}
+
+/** WP Recipe Maker writes an ingredient's notes as a trailing bracket around
+ * text that already starts with a comma or its own brackets ("1 onion (,
+ * chopped)", "beef ((ground) (Note 1))"). Drop the redundant outer bracket. */
+function tidyIngredient(text: string): string {
+  if (!text.endsWith(")")) return text;
+  // Walk back to the bracket the final ")" closes: linear, unlike a regex
+  // that would rescan the tail at every " (," on a hostile page.
+  let depth = 0;
+  let open = text.length - 1;
+  for (; open >= 0; open -= 1) {
+    if (text[open] === ")") depth += 1;
+    else if (text[open] === "(" && --depth === 0) break;
+  }
+  if (open < 1 || text[open - 1] !== " ") return text;
+  const notes = text.slice(open + 1, -1);
+  if (/^,\s*\S/.test(notes)) return text.slice(0, open - 1) + notes;
+  if (/^\(\s*[^\s)]/.test(notes)) {
+    return text.slice(0, open) + notes;
+  }
+  return text;
+}
+
+/** Strip trailing colons by hand: `/:+$/` backtracks quadratically on a
+ * long run of colons that is not at the end. */
+function trimTrailingColons(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  let end = text.length;
+  while (end > 0 && text[end - 1] === ":") end -= 1;
+  return text.slice(0, end);
 }
 
 function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
@@ -186,7 +217,7 @@ function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
     ingredients: stringList(
       node.recipeIngredient ?? node.ingredients ?? [],
       clean,
-    ),
+    ).map(tidyIngredient),
     steps: instructionSteps(node.recipeInstructions, clean),
   };
 }
