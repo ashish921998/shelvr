@@ -172,6 +172,36 @@ describe("sanitizePlan", () => {
     expect(dropped.area).toBe("Springfield");
   });
 
+  it("strips a street address from a place's name", () => {
+    const sources = [source({ title: "The Palomar in Soho, London" })];
+    const [pick] = sanitizePlan(
+      [
+        {
+          saveNumber: 1,
+          name: "The Palomar, 34 Rupert Street, London",
+          area: "Soho",
+          why: "Go",
+        },
+      ],
+      sources,
+    );
+    expect(pick.name).toBe("The Palomar");
+    // A comma that is part of the name stays.
+    const [kept] = sanitizePlan(
+      [{ saveNumber: 1, name: "The Palomar, Soho", area: "", why: "Go" }],
+      sources,
+    );
+    expect(kept.name).toBe("The Palomar, Soho");
+  });
+
+  it("keeps the address when the name before it proves nothing alone", () => {
+    const [pick] = sanitizePlan(
+      [{ saveNumber: 1, name: "Cafe, 12 Main St", area: "", why: "Go" }],
+      [source({ title: "The cafe at 12 Main St" })],
+    );
+    expect(pick.name).toBe("Cafe, 12 Main St");
+  });
+
   it("drops picks with an empty reason and trims long fields", () => {
     const sources = [source({ title: "Balthazar" })];
     expect(

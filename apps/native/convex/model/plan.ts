@@ -220,6 +220,46 @@ function groundedArea(area: string, evidence: Evidence): string {
     .join(", ");
 }
 
+// Words that mark a comma-separated part of a name as a street address.
+const STREET_WORDS = new Set([
+  "street",
+  "st",
+  "road",
+  "rd",
+  "avenue",
+  "ave",
+  "lane",
+  "ln",
+  "boulevard",
+  "blvd",
+  "drive",
+  "dr",
+  "way",
+  "square",
+  "sq",
+  "calle",
+  "rue",
+  "strasse",
+  "via",
+]);
+
+function isAddressPart(part: string): boolean {
+  return /\p{N}/u.test(part) || wordsOf(part).some((w) => STREET_WORDS.has(w));
+}
+
+/**
+ * Drop a street address the model wrote into a place's name: "The Palomar,
+ * 34 Rupert Street, London" becomes "The Palomar". Only when a later
+ * comma-separated part looks like an address, and only when what is left
+ * still names the place.
+ */
+function withoutAddress(name: string, evidence: Evidence): string {
+  const [head, ...rest] = name.split(",");
+  const short = head.trim();
+  if (rest.length === 0 || !rest.some(isAddressPart)) return name;
+  return short !== "" && namesPlace(short, evidence) ? short : name;
+}
+
 /**
  * Keep the model's picks that point at a real save, name a place that save
  * carries, and are not repeats. Order is the model's (best first), except
@@ -237,10 +277,10 @@ export function sanitizePlan(
     const n = pick.saveNumber;
     if (!Number.isInteger(n) || n < 1 || n > sources.length) continue;
     const source = sources[n - 1];
-    const name = clip(pick.name, MAX_NAME_CHARS);
+    const evidence = evidenceOf(source);
+    const name = withoutAddress(clip(pick.name, MAX_NAME_CHARS), evidence);
     const key = squash(name);
     if (key === "" || seen.has(key)) continue;
-    const evidence = evidenceOf(source);
     if (!namesPlace(name, evidence)) continue;
     const why = clip(pick.why, MAX_WHY_CHARS);
     if (why === "") continue;

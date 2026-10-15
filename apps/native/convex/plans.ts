@@ -34,7 +34,7 @@ const planSchema = z.object({
         name: z
           .string()
           .describe(
-            "Just the place's name as the save writes it, e.g. 'Balthazar'. No added words like 'cocktail bar' or 'restaurant' unless they are part of the name.",
+            "Just the place's name as the save writes it, e.g. 'Balthazar'. No added words like 'cocktail bar' or 'restaurant' unless they are part of the name, and no street address.",
           ),
         area: z
           .string()
