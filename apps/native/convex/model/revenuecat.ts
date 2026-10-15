@@ -82,6 +82,11 @@ export function requiresAuthoritativeReconciliation(
     case "BILLING_ISSUE":
     case "REFUND_REVERSED":
       return true;
+    case "NON_RENEWING_PURCHASE":
+      // A dashboard grant. A lifetime one carries no expiry, which the
+      // webhook path would read as "nothing to record"; the snapshot reports
+      // its real end, or none for lifetime.
+      return event.periodType === "PROMOTIONAL";
     case "CANCELLATION":
       // A failed charge sends BILLING_ERROR with the already-past expiry; only
       // the snapshot knows the billing grace window.
