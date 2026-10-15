@@ -716,6 +716,31 @@ describe("linkEnrichment", () => {
     );
   });
 
+  it("leaves a wiki infobox, citations and edit links out of the body", () => {
+    const paragraph =
+      "Prague is the capital and largest city of the Czech Republic, and the historical capital of Bohemia. ";
+    const content = extractBodyText(
+      `<html><head><title>Prague</title></head><body><main><h1>Prague</h1><div class="mw-parser-output"><table class="infobox"><tbody><tr><th>Country</th><td>Czech Republic</td></tr><tr><th>Founded</th><td>8th century</td></tr></tbody></table><p>${paragraph.repeat(3)}<sup class="reference"><a href="#cite_note-1">[1]</a></sup></p><h2>History<span class="mw-editsection">[<a href="/edit">edit</a>]</span></h2><p>${paragraph.repeat(2)}</p><div class="navbox"><a href="/a">Brno</a> <a href="/b">Ostrava</a></div></div></main></body></html>`,
+      "https://en.wikipedia.org/wiki/Prague",
+    );
+    expect(content).toContain("Prague is the capital");
+    expect(content).toContain("History");
+    expect(content).not.toContain("Founded");
+    expect(content).not.toContain("[1]");
+    expect(content).not.toContain("[edit]");
+    expect(content).not.toContain("Ostrava");
+  });
+
+  it("keeps an infobox's prose on a page that is not MediaWiki", () => {
+    const paragraph =
+      "The dough rests overnight in the fridge, which is what gives the crust its blistered, chewy edge. ";
+    const content = extractBodyText(
+      `<html><head><title>Pizza</title></head><body><article><h1>Pizza</h1><p>${paragraph.repeat(2)}</p><div class="infobox"><p>Rest the dough for at least twelve hours before you shape it into rounds.</p></div></article></body></html>`,
+      "https://example.com/recipes/pizza",
+    );
+    expect(content).toContain("Rest the dough for at least twelve hours");
+  });
+
   it("drops an extraction too thin to be a body", () => {
     const content = extractBodyText(
       "<html><head><title>Members only</title></head><body><article><p>Sign in to continue.</p></article></body></html>",
