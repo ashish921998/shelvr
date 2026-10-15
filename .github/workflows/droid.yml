@@ -13,8 +13,36 @@ on:
     types: [opened, edited]
 
 jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      allowed: ${{ steps.origin.outputs.allowed }}
+    steps:
+      - name: Check the pull request origin before supplying agent secrets
+        id: origin
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            let allowed = context.eventName === 'issues' ||
+              (context.eventName === 'issue_comment' && Boolean(context.payload.issue) &&
+                !context.payload.issue.pull_request);
+            const pullNumber = context.payload.pull_request?.number ??
+              (context.payload.issue?.pull_request ? context.payload.issue.number : undefined);
+            if (pullNumber !== undefined) {
+              const { data } = await github.rest.pulls.get({
+                ...context.repo,
+                pull_number: pullNumber,
+              });
+              allowed = data.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            }
+            core.setOutput('allowed', String(allowed));
+
   droid:
+    needs: authorize
     if: |
+      needs.authorize.outputs.allowed == 'true' &&
       (github.actor == github.repository_owner ||
        ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) ||
        (github.event_name == 'pull_request_review' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)) ||
