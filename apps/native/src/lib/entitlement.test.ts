@@ -452,6 +452,19 @@ describe("exit offer after a paywall close", () => {
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
   });
 
+  it("takes the exit offering as it is in an e2e run that asks for it", async () => {
+    const { openPaywall } = await loadReady();
+    mock.hidePro = true;
+    mock.forceExitOffer = true;
+    mock.checkEligibility.mockResolvedValue({ annual_exit: { status: 0 } });
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
+
+    await openPaywall(router, "home_card");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+  });
+
   it("waits a month before offering it again", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("CANCELLED");

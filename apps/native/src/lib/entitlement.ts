@@ -21,6 +21,7 @@ import {
 import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import {
+  EXIT_OFFERING_ID,
   EXIT_OFFER_WINDOW_MS,
   exitOfferDue,
   exitOfferEndsAt,
@@ -430,6 +431,22 @@ function readShownAt(userId: string): number | null {
   }
 }
 
+/**
+ * The exit offering for an e2e run that asked for the offer, taken as it is.
+ * With RevenueCat's Test Store the offering loads but the intro price checks
+ * in `findExitOffering` have not passed on CI, and what the run checks is
+ * the sheet, not who qualifies for it.
+ */
+async function findForcedExitOffering(
+  rc: NonNullable<ReturnType<typeof getPurchases>>,
+) {
+  try {
+    return (await rc.getOfferings()).all[EXIT_OFFERING_ID] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
   return {
     getOfferings: () => rc.getOfferings(),
@@ -466,7 +483,9 @@ async function presentExitOffer(
   }
   if (!exitOfferDue(sourcePlacement, forced ? null : lastShownAt, now))
     return null;
-  const offering = await findExitOffering(exitOfferDeps(rc));
+  const offering = forced
+    ? await findForcedExitOffering(rc)
+    : await findExitOffering(exitOfferDeps(rc));
   if (!offering) return null;
   try {
     // Claim before presenting, so a crash mid-sheet can't repeat it.
