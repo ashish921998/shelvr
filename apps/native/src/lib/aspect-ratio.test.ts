@@ -20,45 +20,29 @@ describe("clampRatio", () => {
 
 describe("letterboxedVideoRatio", () => {
   const video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+  // oEmbed's hqdefault is 480×360.
+  const stock = 480 / 360;
 
-  it("crops YouTube's 4:3 stock thumbnails to the video's 16:9", () => {
-    for (const name of ["hqdefault.jpg", "sddefault.jpg", "default.jpg"]) {
-      expect(
-        letterboxedVideoRatio(
-          video,
-          `https://i.ytimg.com/vi/dQw4w9WgXcQ/${name}`,
-        ),
-      ).toBe(16 / 9);
-    }
+  it("crops a YouTube video's 4:3 stock thumbnail to the video's 16:9", () => {
+    expect(letterboxedVideoRatio(video, stock)).toBe(16 / 9);
+    expect(letterboxedVideoRatio("https://youtu.be/dQw4w9WgXcQ", stock)).toBe(
+      16 / 9,
+    );
     expect(
-      letterboxedVideoRatio(
-        "https://youtu.be/dQw4w9WgXcQ",
-        "https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/hqdefault.webp",
-      ),
+      letterboxedVideoRatio("https://www.youtube.com/live/abc123", stock),
     ).toBe(16 / 9);
   });
 
-  it("leaves widescreen thumbnails, Shorts and other sites alone", () => {
-    const hq = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg";
-    expect(
-      letterboxedVideoRatio(
-        video,
-        "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-      ),
-    ).toBeUndefined();
-    expect(
-      letterboxedVideoRatio(
-        video,
-        "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-      ),
-    ).toBeUndefined();
-    expect(
-      letterboxedVideoRatio("https://www.youtube.com/shorts/abc123", hq),
-    ).toBeUndefined();
-    expect(letterboxedVideoRatio("https://vimeo.com/1", hq)).toBeUndefined();
-    expect(
-      letterboxedVideoRatio(video, "https://example.com/hqdefault.jpg"),
-    ).toBeUndefined();
+  it("leaves widescreen thumbnails, Shorts, channels and other sites alone", () => {
+    expect(letterboxedVideoRatio(video, 16 / 9)).toBeUndefined();
     expect(letterboxedVideoRatio(video, undefined)).toBeUndefined();
+    expect(
+      letterboxedVideoRatio("https://www.youtube.com/shorts/abc123", stock),
+    ).toBeUndefined();
+    expect(
+      letterboxedVideoRatio("https://www.youtube.com/@RickAstleyYT", stock),
+    ).toBeUndefined();
+    expect(letterboxedVideoRatio("https://vimeo.com/1", stock)).toBeUndefined();
+    expect(letterboxedVideoRatio(undefined, stock)).toBeUndefined();
   });
 });

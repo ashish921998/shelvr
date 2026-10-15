@@ -131,10 +131,11 @@ function headingWords(text: string): Set<string> {
 /**
  * A note's text after its first line when that line is the note's own heading
  * for `title`: the same words in any order, so "Gift ideas for Mum" heads a
- * note titled "Mum's Gift Ideas", or a line the title starts (a note saved
- * without AI is titled with its first line, cut at 80 characters). The
- * caption already prints the title, and the face would otherwise open with it
- * again. Undefined when the note is only its heading; the note itself
+ * note titled "Mum's Gift Ideas". The caption already prints the title, and
+ * the face would otherwise open with it again. Undefined when the note is only
+ * its heading, or when the title is a note saved without AI's first line cut
+ * at 80 characters, which the one-line caption would cut shorter still; the
+ * face then keeps the whole note and the caption gives way. The note itself
  * otherwise.
  */
 function afterOwnHeading(
@@ -143,13 +144,18 @@ function afterOwnHeading(
 ): string | undefined {
   if (!note || !title) return note;
   const [first = "", ...rest] = note.trim().split("\n");
-  const heading = headingWords(first);
-  const named = headingWords(title);
   const line = first.trim();
   const cut = title.trim();
+  if (
+    line.length > NOTE_TITLE_CUT &&
+    line.slice(0, NOTE_TITLE_CUT).trim() === cut
+  ) {
+    return undefined;
+  }
+  const heading = headingWords(line);
+  const named = headingWords(title);
   const same =
     line === cut ||
-    (cut.length >= NOTE_TITLE_CUT && line.startsWith(cut)) ||
     (heading.size > 0 &&
       heading.size === named.size &&
       [...heading].every((word) => named.has(word)));
@@ -196,7 +202,7 @@ function CardMedia({
               // A letterboxed video thumbnail shows at its video's shape, so
               // the cover fit crops the black bars away.
               aspectRatio:
-                letterboxedVideoRatio(item.url, imageUri) ??
+                letterboxedVideoRatio(item.url, item.aspectRatio) ??
                 clampRatio(
                   item.aspectRatio,
                   isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
@@ -295,21 +301,22 @@ function CardCaption({
           </View>
         ) : null}
       </View>
-      <ActionMenu
-        label={t("item.actions")}
-        title={t("item.actions")}
-        actions={menuActions}
-        style={[
-          styles.menuButton,
-          captionTitle !== undefined && !hostRow && styles.menuOnTitle,
-        ]}
-      >
-        <AppSymbolIcon
-          name="ellipsis"
-          size={15}
-          tintColor={theme.colors.foreground}
-        />
-      </ActionMenu>
+      {/* ActionMenu styles the button inside its native menu, where an
+          offset doesn't move it, so the offset goes on a wrapper. */}
+      <View style={!hostRow && styles.menuOnTitle}>
+        <ActionMenu
+          label={t("item.actions")}
+          title={t("item.actions")}
+          actions={menuActions}
+          style={styles.menuButton}
+        >
+          <AppSymbolIcon
+            name="ellipsis"
+            size={15}
+            tintColor={theme.colors.foreground}
+          />
+        </ActionMenu>
+      </View>
     </View>
   );
 }
@@ -541,10 +548,11 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     borderRadius: 22,
   },
-  // With no site line under the title, the "…" lines up with the title
-  // instead of hanging a line below it.
+  // With no site line, the "…" centres on the title's line (7.5 down) instead
+  // of hanging a line below it (20 down). A save whose title hasn't landed yet
+  // sits the same way, so its card keeps its height when the title arrives.
   menuOnTitle: {
-    marginTop: -14,
+    marginTop: -12,
   },
   suggestedBadge: {
     position: "absolute",

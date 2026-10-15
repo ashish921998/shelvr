@@ -272,8 +272,8 @@ export const ItemDetail = memo(function ItemDetail({
   // the title, description, and actions below it.
   const maxHeroHeight = height * 0.55;
 
-  const letterboxed = letterboxedVideoRatio(item.url, heroUri) !== undefined;
-  const heroAspect = pageHeroAspect(item, social, heroUri);
+  const letterboxed = letterboxedVideoRatio(item.url, item.aspectRatio);
+  const heroAspect = pageHeroAspect(item, social, letterboxed);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap, and when the cap bites, pull
@@ -302,7 +302,7 @@ export const ItemDetail = memo(function ItemDetail({
         heroAspect,
         maxHeroHeight,
         { width: heroWidth, height: heroHeight },
-        letterboxed,
+        letterboxed !== undefined,
       )}
     />
   ) : null;
@@ -353,9 +353,7 @@ export const ItemDetail = memo(function ItemDetail({
     ) : (
       target
     );
-  const monogram = heroUri
-    ? undefined
-    : sitePanelMonogram(item, social, bodyPending);
+  const sitePanel = !heroUri && showsSitePanel(item, social, bodyPending);
 
   const heroBlock = heroUri ? (
     <>
@@ -364,9 +362,9 @@ export const ItemDetail = memo(function ItemDetail({
       </View>
       {moreMedia}
     </>
-  ) : monogram === undefined ? null : (
-    zoomable(<SitePanel monogram={monogram} url={item.url} />)
-  );
+  ) : sitePanel ? (
+    zoomable(<SitePanel url={item.url} />)
+  ) : null;
 
   const scrollProps = {
     ref: scrollRef,
@@ -435,32 +433,44 @@ function heroOpensAs(
     : undefined;
 }
 
-/** The letter a plain link with no picture shows in its place. While the body
- * loads the page may still become the reader, so the panel waits, unless the
- * save already says it has no article; then it is up for the card's zoom. */
-function sitePanelMonogram(
+/** Whether a plain link with no picture shows its site's panel in its place.
+ * While the body loads the page may still become the reader, so the panel
+ * waits, unless the save already says it has no article; then it is up for
+ * the card's zoom. */
+function showsSitePanel(
   item: DetailItem,
   social: SocialPost | undefined,
   bodyPending: boolean,
-): string | undefined {
-  if (bodyPending && item.enrichment === undefined) return undefined;
-  return plainLink(item, social) ? siteMonogram(item.url) : undefined;
+): boolean {
+  if (bodyPending && item.enrichment === undefined) return false;
+  return plainLink(item, social);
 }
 
-/** A plain link with no picture (a shop page, most often): its site's letter
- * on the no-photo card's warm surface, instead of a page that opens on bare
- * text. Non-collapsable so the card's zoom has a view to land on. */
-function SitePanel({ monogram, url }: { monogram: string; url?: string }) {
+/** A plain link with no picture (a shop page, most often): its site's letter,
+ * or the link mark when the host has none, on the no-photo card's warm
+ * surface, instead of a page that opens on bare text. Non-collapsable so the
+ * card's zoom has a view to land on. */
+function SitePanel({ url }: { url?: string }) {
+  const { theme } = useUnistyles();
+  const monogram = siteMonogram(url);
   return (
     <View collapsable={false} style={styles.sitePanel}>
       <View style={styles.siteDisc}>
-        <Text
-          style={styles.siteLetter}
-          maxFontSizeMultiplier={1}
-          accessible={false}
-        >
-          {monogram}
-        </Text>
+        {monogram === undefined ? (
+          <AppSymbolIcon
+            name="link"
+            size={24}
+            tintColor={theme.colors.primaryText}
+          />
+        ) : (
+          <Text
+            style={styles.siteLetter}
+            maxFontSizeMultiplier={1}
+            accessible={false}
+          >
+            {monogram}
+          </Text>
+        )}
       </View>
       <Text style={styles.siteHost} numberOfLines={1}>
         {displayHost(url)}
@@ -485,10 +495,10 @@ function pageHeroKind(
 function pageHeroAspect(
   item: DetailItem,
   social: SocialPost | undefined,
-  heroUri: string | null | undefined,
+  letterboxed: number | undefined,
 ): number {
   return (
-    letterboxedVideoRatio(item.url, heroUri) ??
+    letterboxed ??
     item.aspectRatio ??
     (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4)
   );

@@ -77,6 +77,8 @@ describe("siteMonogram", () => {
     expect(siteMonogram("https://en.wikipedia.org/wiki/Prague")).toBe("W");
     expect(siteMonogram("https://shop.lego.com/en-us")).toBe("L");
     expect(siteMonogram("https://www.bbc.co.uk/food")).toBe("B");
+    expect(siteMonogram("https://www.bbc.co.uk./food")).toBe("B");
+    expect(siteMonogram("https://ikea.de./")).toBe("I");
     expect(siteMonogram("https://youtu.be/dQw4w9WgXcQ")).toBe("Y");
   });
 
@@ -100,6 +102,7 @@ describe("isYouTubeVideoUrl", () => {
     "https://youtu.be/dQw4w9WgXcQ",
     "https://m.youtube.com/shorts/abc123",
     "https://www.youtube.com/live/abc123",
+    "https://youtube.com/clip/UgkxAbCdEf",
   ])("plays %s", (url) => {
     expect(isYouTubeVideoUrl(url)).toBe(true);
   });

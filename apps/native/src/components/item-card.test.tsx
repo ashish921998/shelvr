@@ -4,6 +4,7 @@ import { cloneElement, isValidElement, type ReactNode } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { MenuView } from "@expo/ui/community/menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Image } from "expo-image";
 import { ItemCard, type FeedItem } from "./item-card";
 import { textFaceCopy } from "./item-card-face";
 
@@ -533,6 +534,28 @@ describe("a save with no picture", () => {
   });
 });
 
+it("crops the black bars off a YouTube video's 4:3 thumbnail", () => {
+  vi.mocked(Image).mockClear();
+  render(
+    <ItemCard
+      item={{
+        ...base,
+        title: "Never Gonna Give You Up",
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        // The client only gets Shelvr's stored copy, never YouTube's address.
+        imageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
+        aspectRatio: 4 / 3,
+      }}
+    />,
+  );
+  const picture = vi.mocked(Image).mock.calls[0][0] as {
+    contentFit: string;
+    style: unknown[];
+  };
+  expect(picture.contentFit).toBe("cover");
+  expect(picture.style[1]).toEqual({ aspectRatio: 16 / 9 });
+});
+
 describe("textFaceCopy", () => {
   it("names a save by whatever it has, without repeating it in the caption", () => {
     expect(textFaceCopy({ ...base, title: "Ramen" })).toEqual({
@@ -605,15 +628,32 @@ describe("textFaceCopy", () => {
       body: "Gift ideas for Mum and Dad\nLinen apron.",
       captionTitle: "Gift ideas",
     });
-    const longLine = "A very long first line ".repeat(5).trim();
+  });
+
+  it("keeps a long first line whole when the title is its 80-character cut", () => {
+    const line =
+      "Mum said the best route is the coastal path from Cascais to Guincho, stop at the café by the lighthouse for lunch";
+    const note = `${line}\nBring sunscreen`;
     expect(
       textFaceCopy({
         ...base,
         type: "note",
-        title: longLine.slice(0, 80),
-        note: `${longLine}\nSecond line`,
+        title: line.slice(0, 80),
+        note,
       }),
-    ).toEqual({ body: "Second line", captionTitle: longLine.slice(0, 80) });
+    ).toEqual({ body: note });
+    // A cut that ends on a space is stored with it.
+    const spaced =
+      "Things to pack for the Lisbon trip next month: passport, adapters, sunscreen, a hat and a book";
+    expect(spaced[79]).toBe(" ");
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: spaced.slice(0, 80),
+        note: `${spaced}\nBook the airport taxi`,
+      }),
+    ).toEqual({ body: `${spaced}\nBook the airport taxi` });
   });
 
   it("reads a note's words, not a link summary it never has", () => {

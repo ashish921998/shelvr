@@ -40,7 +40,7 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
  * cover fit crops the black bars away. */
 function similarRatio(item: DetailItem): number {
   return (
-    letterboxedVideoRatio(item.url, item.imageUrl ?? item.heroImageUrl) ??
+    letterboxedVideoRatio(item.url, item.aspectRatio) ??
     clampRatio(item.aspectRatio, item.type === "link" ? 1.91 : 1, 0.5, 2)
   );
 }

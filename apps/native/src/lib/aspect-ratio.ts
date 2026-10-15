@@ -1,4 +1,4 @@
-import { isYouTubeUrl } from "@convex/model/externalUrl";
+import { isYouTubeVideoUrl } from "./url";
 
 /**
  * Bounds a cover's aspect ratio for layout. Falls back to `fallback` when the
@@ -18,29 +18,33 @@ export function clampRatio(
 }
 
 // YouTube's stock thumbnails (default, hqdefault, sddefault) are 4:3 frames
-// with the 16:9 video letterboxed between black bars. mqdefault and maxres are
-// already 16:9.
-const LETTERBOXED_THUMBNAIL =
-  /^\/vi(?:_webp)?\/[^/]+\/(?:hq|sd)?default(?:_live)?\.(?:jpg|webp)$/;
+// with the 16:9 video letterboxed between black bars, and oEmbed hands out
+// hqdefault. mqdefault and maxres are already 16:9.
+const STOCK_THUMBNAIL_RATIO = 4 / 3;
 
 /**
- * 16:9 when `imageUri` is a letterboxed YouTube thumbnail of the video at
- * `pageUrl`, so a cover fit at that shape crops the black bars away; otherwise
- * undefined. A Short is left alone: its thumbnail pillarboxes a vertical video,
- * which a widescreen crop would only make worse.
+ * 16:9 when the save at `pageUrl` is a YouTube video whose picture is 4:3,
+ * so a cover fit at that shape crops the black bars away; otherwise undefined.
+ * The client only ever gets Shelvr's stored copy of the picture, so the shape
+ * the save recorded is the tell, not the picture's address. A Short is left
+ * alone: its thumbnail pillarboxes a vertical video, which a widescreen crop
+ * would only make worse.
  */
 export function letterboxedVideoRatio(
   pageUrl: string | undefined,
-  imageUri: string | null | undefined,
+  aspectRatio: number | undefined,
 ): number | undefined {
-  if (!pageUrl || !imageUri || !isYouTubeUrl(pageUrl)) return undefined;
+  if (
+    aspectRatio === undefined ||
+    Math.abs(aspectRatio - STOCK_THUMBNAIL_RATIO) > 0.01 ||
+    !isYouTubeVideoUrl(pageUrl)
+  ) {
+    return undefined;
+  }
   try {
-    const image = new URL(imageUri);
-    if (new URL(pageUrl).pathname.startsWith("/shorts/")) return undefined;
-    return /(^|\.)ytimg\.com$/.test(image.hostname) &&
-      LETTERBOXED_THUMBNAIL.test(image.pathname)
-      ? 16 / 9
-      : undefined;
+    return new URL(pageUrl ?? "").pathname.startsWith("/shorts/")
+      ? undefined
+      : 16 / 9;
   } catch {
     return undefined;
   }

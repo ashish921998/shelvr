@@ -7,6 +7,7 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { PostMediaButton } from "@/components/post-media-button";
 import { Link } from "expo-router";
 import { Image } from "expo-image";
+import { AppSymbolIcon } from "@/components/symbol";
 
 vi.mock("@/lib/i18n", () => ({
   t: (key: string, values?: Record<string, unknown>) =>
@@ -132,7 +133,9 @@ const video = {
   title: "Never Gonna Give You Up",
   url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   siteName: "YouTube",
-  imageUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+  // The client only gets Shelvr's stored copy of YouTube's 4:3 thumbnail.
+  imageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
+  heroImageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
   aspectRatio: 4 / 3,
 } as DetailItem;
 
@@ -169,6 +172,17 @@ describe("a plain link's page", () => {
     expect(screen.getByText("I")).toBeTruthy();
     expect(screen.getByText("ikea.com")).toBeTruthy();
     // The card's zoom lands on the panel, as it would on a photo.
+    expect(Link.AppleZoomTarget).toHaveBeenCalled();
+  });
+
+  it("shows the link mark for a host with no letter to take", () => {
+    renderPage({ ...product, url: "https://bücher.de/" }, true);
+    expect(screen.getByText("xn--bcher-kva.de")).toBeTruthy();
+    expect(
+      vi
+        .mocked(AppSymbolIcon)
+        .mock.calls.some(([props]) => props.name === "link"),
+    ).toBe(true);
     expect(Link.AppleZoomTarget).toHaveBeenCalled();
   });
 
@@ -214,6 +228,17 @@ describe("a plain link's page", () => {
     expect(hero.contentFit).toBe("cover");
     const { width, height } = hero.style[1];
     expect(width / height).toBeCloseTo(16 / 9);
+  });
+
+  it("leaves a YouTube Short's thumbnail at its own shape", () => {
+    renderPage({ ...video, url: "https://www.youtube.com/shorts/abc123" });
+    const hero = vi.mocked(Image).mock.calls[0][0] as {
+      contentFit: string;
+      style: { width: number; height: number }[];
+    };
+    expect(hero.contentFit).toBe("contain");
+    const { width, height } = hero.style[1];
+    expect(width / height).toBeCloseTo(4 / 3);
   });
 
   it("only plays a YouTube link that is a video", () => {

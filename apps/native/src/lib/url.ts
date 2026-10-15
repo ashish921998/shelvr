@@ -85,7 +85,8 @@ const REGISTRY_LABELS = new Set([
 /** The label that names the site: ikea in www.ikea.com, wikipedia in
  * en.wikipedia.org, bbc in bbc.co.uk. */
 function siteLabel(host: string): string {
-  const labels = host.split(".");
+  // A fully qualified host (ikea.com.) ends in an empty root label.
+  const labels = host.replace(/\.$/, "").split(".");
   if (labels.length < 2) return host;
   const second = labels[labels.length - 2];
   return labels.length > 2 && REGISTRY_LABELS.has(second)
@@ -103,15 +104,15 @@ export function siteMonogram(url: string | undefined): string | undefined {
   return Array.from(label)[0]?.toLocaleUpperCase();
 }
 
-/** A YouTube link that plays a video: a watch, Shorts, live or embed page, or
- * a youtu.be link. A channel, playlist or search page is not one. */
+/** A YouTube link that plays a video: a watch, Shorts, live, clip or embed
+ * page, or a youtu.be link. A channel, playlist or search page is not one. */
 export function isYouTubeVideoUrl(url: string | undefined): boolean {
   if (!isYouTubeUrl(url)) return false;
   try {
     const { hostname, pathname, searchParams } = new URL(url ?? "");
     if (hostname.toLowerCase() === "youtu.be") return pathname.length > 1;
     if (pathname === "/watch") return searchParams.has("v");
-    return /^\/(shorts|live|embed|v)\/[^/]+/.test(pathname);
+    return /^\/(shorts|live|clip|embed|v)\/[^/]+/.test(pathname);
   } catch {
     return false;
   }
