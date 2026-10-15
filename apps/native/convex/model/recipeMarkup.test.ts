@@ -156,6 +156,7 @@ describe("extractRecipeMarkup", () => {
         "1 egg ((large)) (Note 3)",
         "1 onion (,)",
         "salt (())",
+        "pepper (( ))",
       ],
     };
     expect(extractRecipeMarkup(page(jsonLd(wprm)))?.ingredients).toStrictEqual([
@@ -168,7 +169,24 @@ describe("extractRecipeMarkup", () => {
       "1 egg ((large)) (Note 3)",
       "1 onion (,)",
       "salt (())",
+      "pepper (( ))",
     ]);
+  });
+
+  it("reads a hostile run of colons in a section name in linear time", () => {
+    const hostile = {
+      ...BASIC_RECIPE,
+      recipeInstructions: [
+        {
+          "@type": "HowToSection",
+          name: `${":".repeat(100_000)}x`,
+          itemListElement: [{ "@type": "HowToStep", text: "Stir." }],
+        },
+      ],
+    };
+    const started = performance.now();
+    extractRecipeMarkup(page(jsonLd(hostile)));
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   it("tidies a long hostile ingredient in linear time", () => {

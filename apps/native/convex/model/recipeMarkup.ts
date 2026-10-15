@@ -169,7 +169,7 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
   // recursion below already handles both shapes.
   if (value.itemListElement !== undefined) {
     const steps = instructionSteps(value.itemListElement, clean);
-    const sectionName = stringValue(value.name, clean)?.replace(/:+$/, "");
+    const sectionName = trimTrailingColons(stringValue(value.name, clean));
     if (sectionName && steps.length > 0) {
       return [`${sectionName}: ${steps[0]}`, ...steps.slice(1)];
     }
@@ -195,10 +195,19 @@ function tidyIngredient(text: string): string {
   if (open < 1 || text[open - 1] !== " ") return text;
   const notes = text.slice(open + 1, -1);
   if (/^,\s*\S/.test(notes)) return text.slice(0, open - 1) + notes;
-  if (notes.startsWith("(") && notes !== "()") {
+  if (/^\(\s*[^\s)]/.test(notes)) {
     return text.slice(0, open) + notes;
   }
   return text;
+}
+
+/** Strip trailing colons by hand: `/:+$/` backtracks quadratically on a
+ * long run of colons that is not at the end. */
+function trimTrailingColons(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  let end = text.length;
+  while (end > 0 && text[end - 1] === ":") end -= 1;
+  return text.slice(0, end);
 }
 
 function draftFromJsonLd(node: JsonObject, clean: TextCleaner): RecipeDraft {
