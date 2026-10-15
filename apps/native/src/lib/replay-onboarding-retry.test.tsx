@@ -193,6 +193,58 @@ describe("useReplayOnboarding retries", () => {
     });
   });
 
+  it("keeps work that arrives as a successful pass finishes", async () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Trips"],
+        demoUrl: "https://example.com/a",
+      }),
+    );
+    createSpace.mockResolvedValue("space");
+    let saveLink: (value: unknown) => void = () => {};
+    createLinkItem.mockImplementationOnce(
+      () => new Promise((resolve) => (saveLink = resolve)),
+    );
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    await act(async () => {
+      setPendingSpaces(["Books"]);
+      saveLink("item");
+    });
+    await settle();
+
+    expect(createSpace).toHaveBeenLastCalledWith({
+      name: "Books",
+      dynamic: true,
+    });
+    expect(hasPending()).toBe(false);
+  });
+
+  it("keeps work that arrives while spaces are being created", async () => {
+    let failTrips: (error: Error) => void = () => {};
+    createSpace.mockImplementationOnce(
+      () => new Promise((_, reject) => (failTrips = reject)),
+    );
+    setPendingSpaces(["Trips"]);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    createSpace.mockResolvedValue("space");
+    await act(async () => {
+      setPendingSpaces(["Books"]);
+      failTrips(new Error("server error"));
+    });
+    await settle();
+
+    const names = createSpace.mock.calls.map(([args]) => args.name);
+    expect(names).toContain("Books");
+    expect(names.filter((name) => name === "Trips")).toHaveLength(2);
+    expect(hasPending()).toBe(false);
+  });
+
   it("runs new pending work without a remount", async () => {
     createSpace.mockImplementation(failingServer());
     setPendingSpaces(["Trips"]);

@@ -69,6 +69,20 @@ function pendingWorkKey(): string {
 }
 
 /**
+ * Saves the spaces a pass could not create. When onboarding handed over new
+ * work while the pass was creating them, that work is kept beside the failures
+ * rather than overwritten, and the caller is told so it schedules a pass for it.
+ */
+function keepFailedSpaces(failed: string[], startKey: string): boolean {
+  if (pendingWorkKey() === startKey) {
+    updatePendingSpaces(failed);
+    return false;
+  }
+  updatePendingSpaces([...new Set([...getPendingSpaces(), ...failed])]);
+  return true;
+}
+
+/**
  * After onboarding is finished and the user signs in, replay the deferred
  * onboarding spaces, then present the paywall. Runs once.
  *
@@ -140,6 +154,9 @@ export function useReplayOnboarding() {
     // What this run left unfinished, read straight after its own writes so
     // work that arrives while a mutation is in flight is never mistaken for it.
     let remainderKey: string | null = null;
+    // Set when onboarding handed over new work while this pass was awaiting.
+    let workArrived = false;
+    const startKey = pendingWorkKey();
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -172,7 +189,7 @@ export function useReplayOnboarding() {
           .filter((name): name is string => name !== null);
         // Persist only the failed work so a later replay retries it without
         // recreating spaces that already succeeded.
-        updatePendingSpaces(failedSpaces);
+        workArrived = keepFailedSpaces(failedSpaces, startKey);
         remainderKey = pendingWorkKey();
         const allSpacesOk = failedSpaces.length === 0;
 
@@ -186,6 +203,7 @@ export function useReplayOnboarding() {
               operationId: getOrCreatePendingOperationId(),
               analyticsSessionId: analytics.sessionId(),
             });
+            workArrived ||= pendingWorkKey() !== remainderKey;
             clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
           } catch {
@@ -193,8 +211,9 @@ export function useReplayOnboarding() {
           }
         }
 
-        // Only mark as done when all required mutations succeed.
-        if (!allSpacesOk) return;
+        // Only mark as done when all required mutations succeed, and never
+        // clear work this pass did not see.
+        if (!allSpacesOk || workArrived) return;
 
         ranRef.current = true;
         clearPending();
@@ -202,14 +221,15 @@ export function useReplayOnboarding() {
         // An entitlement change during the run asked for a fresh pass; marking
         // this work settled would make that pass skip it.
         const entitlementRerun = rerunRef.current;
-        if (remainderKey !== null && !entitlementRerun) {
+        if (remainderKey !== null && !entitlementRerun && !workArrived) {
           settledWorkRef.current = remainderKey;
         }
         // New work that arrived mid-run found the replay busy; run it now.
         const newWork =
-          remainderKey !== null &&
-          hasPending() &&
-          pendingWorkKey() !== remainderKey;
+          workArrived ||
+          (remainderKey !== null &&
+            hasPending() &&
+            pendingWorkKey() !== remainderKey);
         const shouldRerun = entitlementRerun || newWork;
         rerunRef.current = false;
         runningRef.current = false;
