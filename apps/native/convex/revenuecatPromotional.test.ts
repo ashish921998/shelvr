@@ -130,6 +130,28 @@ describe("promotional grant webhook", () => {
     await expect(f.save()).rejects.toThrow(/Pro required/);
   });
 
+  it("takes Pro back when a lifetime grant is cancelled", async () => {
+    const f = await fixture();
+    stubRevenueCatFetch(lifetimeGrant);
+    expect((await f.grant()).status).toBe(200);
+    await expect(f.save()).resolves.toBeDefined();
+
+    // A revoke can also arrive as a promotional cancellation, whatever its
+    // reason. RevenueCat no longer lists the entitlement.
+    stubRevenueCatFetch(revenuecatSnapshot());
+    expect(
+      (
+        await f.grant({
+          id: "promo-cancel",
+          type: "CANCELLATION",
+          cancel_reason: "UNSUBSCRIBE",
+          event_timestamp_ms: 3,
+        })
+      ).status,
+    ).toBe(200);
+    await expect(f.save()).rejects.toThrow(/Pro required/);
+  });
+
   it("asks RevenueCat to retry when the lookup fails", async () => {
     const f = await fixture();
     vi.stubGlobal(
