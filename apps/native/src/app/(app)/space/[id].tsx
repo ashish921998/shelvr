@@ -31,9 +31,12 @@ export default function SpaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { data: space } = useQuery(
+  // A link whose id the server refuses (malformed, or not a space id) never
+  // resolves to `null`; it is as gone as one that does.
+  const { data: loaded, isError: refused } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
+  const space = refused ? null : loaded;
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
   const { guard: planGuard } = usePaywallGuard("make_plan");

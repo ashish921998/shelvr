@@ -9,8 +9,13 @@ import type { DetailItem } from "@/components/item-detail";
 
 const mock = vi.hoisted(() => ({
   reducedMotion: false,
-  params: { id: "b", from: "space", spaceId: "space-1" },
+  params: { id: "b", from: "space", spaceId: "space-1" } as {
+    id: string;
+    from?: string;
+    spaceId?: string;
+  },
   items: [] as DetailItem[],
+  singleRefused: false,
   scroll: vi.fn(),
   detailsScroll: vi.fn(),
   dismiss: vi.fn(),
@@ -140,6 +145,7 @@ vi.mock("@tanstack/react-query", () => ({
         : ref === "single"
           ? mock.items.find((item) => item._id === mock.params.id)
           : undefined,
+    isError: ref === "single" && mock.singleRefused,
   }),
 }));
 vi.mock("convex/react", () => ({
@@ -225,6 +231,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.items = ["a", "b", "c"].map(item);
   mock.params = { id: "b", from: "space", spaceId: "space-1" };
+  mock.singleRefused = false;
   mock.dismiss.mockResolvedValue(true);
   mock.delete.mockResolvedValue(undefined);
   mock.router.canGoBack.mockReturnValue(true);
@@ -393,4 +400,22 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
       }
     },
   );
+});
+
+describe("a link to an id the server refuses", () => {
+  it("shows the save as gone instead of loading forever", async () => {
+    mock.items = [];
+    mock.params = { id: "x" };
+    mock.singleRefused = true;
+    const { EmptyState } = await import("@/components/empty-state");
+    const { ScreenLoader } = await import("@/components/ui/screen-loader");
+
+    render(<ItemScreen />);
+
+    expect(ScreenLoader).not.toHaveBeenCalled();
+    expect(EmptyState).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "item.goneTitle" }),
+      undefined,
+    );
+  });
 });

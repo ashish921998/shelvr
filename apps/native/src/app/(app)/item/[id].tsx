@@ -499,8 +499,10 @@ function ItemScreenContent() {
   );
 
   // A single-item fallback for deep links (no source) or a stale list that no
-  // longer contains this id.
-  const { data: single } = useQuery(
+  // longer contains this id. A link whose id the server refuses (malformed,
+  // or not an item id) never resolves to `null`; it is as gone as one that
+  // does.
+  const { data: single, isError: singleRefused } = useQuery(
     convexQuery(api.items.getItem, { id: id as Id<"items"> }),
   );
 
@@ -531,10 +533,10 @@ function ItemScreenContent() {
         ? list
         : single
           ? [single]
-          : single === null
+          : single === null || singleRefused
             ? []
             : undefined,
-    [startIndex, list, single],
+    [startIndex, list, single, singleRefused],
   );
 
   const onEndReached = pagerEndReached(items, homeFeed);
