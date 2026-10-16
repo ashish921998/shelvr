@@ -119,6 +119,13 @@ export function recordBlockedAction(
   blockedAction = { placement, at: Date.now(), purchased };
 }
 
+/** A purchase that landed on the sheet after its caller had already recorded
+ * the block: flips that block's flag and keeps its time. Does nothing once
+ * the block was resumed or replaced by a newer one. */
+export function markBlockedActionPurchased(placement: string): void {
+  if (blockedAction?.placement === placement) blockedAction.purchased = true;
+}
+
 /** Reports a gated action that later went through after a paywall block at
  * the same placement, then clears the memory: one resumed event per block. */
 export function resumeBlockedAction(placement: string): void {

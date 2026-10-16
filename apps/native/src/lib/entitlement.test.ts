@@ -10,6 +10,7 @@ import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
+  syncLocale: vi.fn(async () => true),
   presentPaywall: vi.fn(),
   observed: vi.fn(),
   presentExitSheet: vi.fn(),
@@ -109,7 +110,7 @@ vi.mock("@/lib/trial-cancellation", () => ({
 }));
 vi.mock("./revenuecat-locale", () => ({
   revenueCatLocale: () => "en",
-  syncRevenueCatUILocale: async () => true,
+  syncRevenueCatUILocale: () => mock.syncLocale(),
 }));
 vi.mock("@convex/_generated/api", () => ({ api: { subscriptions: {} } }));
 vi.mock("@convex/model/entitlement", () => ({
@@ -148,6 +149,7 @@ beforeEach(() => {
   mock.hidePro = false;
   mock.forceExitOffer = false;
   mock.presentPaywall.mockReset();
+  mock.syncLocale.mockReset().mockResolvedValue(true);
   mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
@@ -255,7 +257,10 @@ describe("presentPaywall concurrency", () => {
     mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
 
     void openPaywall(router, "share");
-    vi.advanceTimersByTime(SHEET_STALE_MS);
+    // The first attempt reaches the sheet before it goes stale.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
     await openPaywall(router, "share");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
@@ -292,6 +297,21 @@ describe("presentPaywall concurrency", () => {
       "paywall_blocked_action_resumed",
       expect.objectContaining({ purchased_since_block: true }),
     );
+  });
+
+  it("puts no sheet up once its attempt has been presumed gone", async () => {
+    const { openPaywall } = await loadReady();
+    vi.useFakeTimers();
+    const locale = deferred<boolean>();
+    mock.syncLocale.mockReturnValueOnce(locale.promise);
+
+    const outcome = openPaywall(router, "share");
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+    await expect(outcome).resolves.toBe(false);
+
+    locale.resolve(true);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(mock.presentPaywall).not.toHaveBeenCalled();
   });
 
   it("tells onboarding its paywall is gone once the presentation goes stale", async () => {

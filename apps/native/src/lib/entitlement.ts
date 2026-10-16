@@ -13,6 +13,7 @@ import {
   readPaywallContext,
   readPaywallOffering,
   recordAccess,
+  markBlockedActionPurchased,
   recordBlockedAction,
   restoreCameBackEmpty,
   resumeBlockedAction,
@@ -360,6 +361,7 @@ async function presentPaywallImpl(
 ): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
+  const epoch = presentationEpoch;
   analytics.capture("paywall_requested", properties);
   // Started before the identity gate and awaited after it, so the cached
   // RevenueCat reads never add their own wait in front of the sheet.
@@ -393,6 +395,10 @@ async function presentPaywallImpl(
     // dates nothing: the paywall falls back to its undated labels instead of
     // claiming a length the offer may not have.
     const { offering, trial } = await readPaywallOffering();
+    if (epoch !== presentationEpoch) {
+      failed("presumed_gone");
+      return "unavailable";
+    }
     const customVariables = trial && trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
@@ -405,7 +411,7 @@ async function presentPaywallImpl(
     }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     const outcome = mapPaywallResult(result);
-    if (outcome !== "cancelled") return outcome;
+    if (outcome !== "cancelled" || epoch !== presentationEpoch) return outcome;
     return (await presentExitOffer(rcui, placement)) ?? outcome;
   } catch {
     return "unavailable";
@@ -595,6 +601,7 @@ async function presentOpenExitOfferImpl(
   fallbackPlacement: string,
   paywallOnDecline = false,
 ): Promise<PaywallOutcome> {
+  const epoch = presentationEpoch;
   if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
@@ -609,6 +616,7 @@ async function presentOpenExitOfferImpl(
   // The lookup can outlast the window; never sell the offer after it closes.
   if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
     return presentPaywallImpl(fallbackPlacement);
+  if (epoch !== presentationEpoch) return "unavailable";
   // Only the person's own close counts. A sheet closed by its deadline or by
   // a torn-down host must not put another paywall in front of them.
   let declined = false;
@@ -663,6 +671,11 @@ export function useExitOfferEndsAt(userId: string | undefined): number | null {
 // A RevenueCat promise that never settles must not hold the latch for the
 // life of the process; past this age the sheet is presumed gone.
 const SHEET_STALE_MS = 5 * 60_000;
+
+// Bumped when a presentation is presumed gone, so the attempt it belonged to
+// puts no sheet up after its caller has moved on: not the paywall a slow
+// locale sync was waiting to show, and not the exit offer after a late close.
+let presentationEpoch = 0;
 
 type OpenSheet = {
   startedAt: number;
@@ -781,10 +794,11 @@ async function presentPaywall(
     present(),
     () => {
       stale = true;
+      presentationEpoch += 1;
     },
     // The owner already reported no purchase; the resumed-action event must
     // still know one landed.
-    () => recordBlockedAction(placement, true),
+    () => markBlockedActionPurchased(placement),
   ).finally(() => {
     // A stale sheet may already have been replaced; only release our own.
     releaseSheet(sheet);
