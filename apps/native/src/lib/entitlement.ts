@@ -494,9 +494,13 @@ async function presentExitOffer(
     ? await findForcedExitOffering(rc)
     : await findExitOffering(exitOfferDeps(rc));
   if (!offering) return null;
+  // The lookup above is unbounded: if the attempt was presumed gone while it
+  // ran, a newer attempt may already hold the claim, so this one stays out.
+  if (epoch !== presentationEpoch) return null;
+  const claim = String(now);
   try {
     // Claim before presenting, so a crash mid-sheet can't repeat it.
-    SecureStore.setItem(key, String(now));
+    SecureStore.setItem(key, claim);
   } catch {
     return null;
   }
@@ -505,6 +509,8 @@ async function presentExitOffer(
   // Awaited before the sheet latch clears, so a later claim can't race it.
   const release = async () => {
     try {
+      // Hand back only our own claim, never one a newer attempt made since.
+      if (SecureStore.getItem(key) !== claim) return;
       if (lastShownAt === null) await SecureStore.deleteItemAsync(key);
       else SecureStore.setItem(key, String(lastShownAt));
     } catch {
@@ -514,9 +520,8 @@ async function presentExitOffer(
   };
   // UIKit refuses to present while the first paywall is still dismissing.
   await waitForSheetTransition();
-  // The lookup above is unbounded: if the attempt was presumed gone while
-  // it ran, its caller has moved on, so no sheet goes up and the claim is
-  // handed back.
+  // The attempt can also be presumed gone during the transition wait; then
+  // its caller has moved on, so no sheet goes up and the claim is handed back.
   if (epoch !== presentationEpoch) {
     await release();
     return null;

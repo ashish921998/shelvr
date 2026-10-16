@@ -509,6 +509,35 @@ describe("exit offer after a paywall close", () => {
     expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
   });
 
+  it("leaves a newer attempt's exit offer claim alone when a stale lookup returns", async () => {
+    const { openPaywall } = await loadReady();
+    vi.useFakeTimers();
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    // The first attempt's offering lookup outlives the attempt.
+    const eligibility = deferred<Record<string, { status: number }>>();
+    mock.checkEligibility.mockReturnValueOnce(eligibility.promise);
+
+    const first = openPaywall(router, "onboarding");
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+    await expect(first).resolves.toBe(false);
+
+    // A retry closes its paywall and is shown the exit offer.
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
+    const second = openPaywall(router, "onboarding");
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(second).resolves.toBe(false);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    const claim = mock.store.get("shelvr.exitOffer.shownAt.user_1");
+    expect(claim).toBeDefined();
+
+    // The stale lookup returns late; the retry's claim must survive it.
+    eligibility.resolve({ annual_exit: { status: 2 } });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.store.get("shelvr.exitOffer.shownAt.user_1")).toBe(claim);
+  });
+
   it("skips the exit offer in an e2e run that hides Pro", async () => {
     const { openPaywall } = await loadReady();
     mock.hidePro = true;
