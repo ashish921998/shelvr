@@ -140,6 +140,22 @@ describe("archive order", () => {
     expect(otherUser).not.toEqual(thisWeek);
   });
 
+  it("keys the week to the zone's clock, not UTC's", () => {
+    // Sunday 18 Jan 2026 09:00 in Sydney is Saturday 17 Jan 22:00 UTC.
+    const sydneySunday = Date.UTC(2026, 0, 17, 22);
+    expect(weekStart(sydneySunday)).toBe(Date.UTC(2026, 0, 11));
+    expect(weekStart(sydneySunday, "Australia/Sydney")).toBe(
+      Date.UTC(2026, 0, 18),
+    );
+    // West of UTC the local Sunday and the UTC Sunday agree.
+    expect(weekStart(Date.UTC(2026, 0, 11, 17), "America/Los_Angeles")).toBe(
+      Date.UTC(2026, 0, 11),
+    );
+    // Before a zone is stored the key is the UTC week it always was.
+    expect(weekStart(sydneySunday, undefined)).toBe(weekStart(sydneySunday));
+    expect(weekStart(sydneySunday, "Not/AZone")).toBe(weekStart(sydneySunday));
+  });
+
   it("pins the shuffle for fixed seeds", () => {
     const saves = ["a", "b", "c", "d", "e", "f", "g", "h"];
     const week = weekStart(NOW);

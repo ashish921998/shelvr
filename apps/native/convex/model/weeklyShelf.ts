@@ -1,5 +1,6 @@
 import type { Doc } from "../_generated/dataModel";
 import { DIGEST_WINDOW_MS } from "./notificationFields";
+import { localWallClock } from "./notificationSchedule";
 
 // Which saves go on a weekly shelf. Pure policy: the caller in
 // notifications.ts reads the rows, checks read state, and persists the shelf.
@@ -21,9 +22,15 @@ type ShelfItem = Pick<Doc<"items">, "_creationTime" | "status" | "type"> & {
   _id: string;
 };
 
-/** Sunday 00:00 UTC of the week `now` falls in: the shelf's idempotency key. */
-export function weekStart(now: number): number {
-  const date = new Date(now);
+/**
+ * The shelf's idempotency key: Sunday 00:00 of the week `now` falls in on the
+ * zone's clock, as a UTC timestamp. The shelf is booked at Sunday 09:00 local,
+ * and east of UTC+9 that instant is still Saturday in UTC, so keying on the
+ * UTC week would file it under the week before and drop it as a repeat. With
+ * no zone the week is UTC's, which is what every stored key was until now.
+ */
+export function weekStart(now: number, timezone?: string): number {
+  const date = new Date(localWallClock(now, timezone));
   date.setUTCHours(0, 0, 0, 0);
   date.setUTCDate(date.getUTCDate() - date.getUTCDay());
   return date.getTime();

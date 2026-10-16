@@ -117,11 +117,17 @@ export function nextWeeklyDigestAt(now: number, timezone = "UTC"): number {
   throw new Error("Could not calculate weekly notification time");
 }
 
+/**
+ * The zone's wall-clock reading at `instant`, as a UTC timestamp, so UTC date
+ * arithmetic on it works in local days. An invalid or missing zone reads UTC.
+ */
+export function localWallClock(instant: number, timezone?: string): number {
+  return localTimestamp(wallClockFormatter(timezone), instant);
+}
+
 /** The hour (0-23) the zone's clock shows at `instant`. */
 export function localHour(instant: number, timezone?: string): number {
-  return new Date(
-    localTimestamp(wallClockFormatter(timezone), instant),
-  ).getUTCHours();
+  return new Date(localWallClock(instant, timezone)).getUTCHours();
 }
 
 /** The next instant after `now` at which the zone's clock reads `hour`:00. */

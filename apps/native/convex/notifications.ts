@@ -555,7 +555,7 @@ export const prepareWeeklyDigest = internalMutation({
       return null;
     }
 
-    const currentWeekStart = weekStart(args.now);
+    const currentWeekStart = weekStart(args.now, preferences.timezone);
     const existing = await ctx.db
       .query("weeklyDigests")
       .withIndex("by_user_and_week", (q) =>
