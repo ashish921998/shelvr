@@ -732,19 +732,67 @@ function decodeWindows1252(bytes: Uint8Array): string {
   return out;
 }
 
+/** How far into the body the HTML charset scan looks. Browsers prescan the
+ * first 1024 bytes; 2048 leaves room for a long comment or script before the
+ * `<meta>`. */
+const META_CHARSET_PRESCAN_BYTES = 2048;
+
+/** The charset label in a Content-Type header or a `<meta ... content="...">`
+ * value, lower-cased, or undefined when none is declared. */
+function charsetFromContentType(contentType: string): string | undefined {
+  const match = contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i);
+  return match?.[1]?.toLowerCase();
+}
+
+/** The encoding a byte order mark announces, or undefined without one. */
+function charsetFromBom(bytes: Uint8Array): string | undefined {
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return "utf-8";
+  }
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return "utf-16be";
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return "utf-16le";
+  }
+  return undefined;
+}
+
+/** The charset an HTML document declares in its head, found by scanning the
+ * first bytes for `<meta charset=...>` or
+ * `<meta http-equiv="Content-Type" content="...; charset=...">`. The prefix
+ * is read byte-for-byte as windows-1252 so the scan only sees ASCII, the way
+ * a browser's prescan does. A declared UTF-16 is read as UTF-8, as the
+ * Encoding Standard says: the declaration was found as ASCII, so the bytes
+ * cannot be UTF-16. */
+function charsetFromHtmlMeta(bytes: Uint8Array): string | undefined {
+  const head = decodeWindows1252(bytes.subarray(0, META_CHARSET_PRESCAN_BYTES));
+  const match = head.match(/<meta\s[^>]*?charset\s*=\s*["']?\s*([\w.:-]+)/i);
+  const charset = match?.[1]?.toLowerCase();
+  if (charset === undefined) {
+    return undefined;
+  }
+  return charset.startsWith("utf-16") ? "utf-8" : charset;
+}
+
 /** Decode bounded bytes as text, honoring the charset declared in the
- * Content-Type header. Extracts `charset=...` from the header (case-insensitive),
- * uses it if Node's TextDecoder supports it, and falls back to UTF-8 when the
- * charset is absent or unsupported. This avoids mojibake on pages served as
- * ISO-8859-1, Windows-1252, Shift_JIS, etc. Labels the Encoding Standard maps
- * to windows-1252 are decoded locally so the result does not depend on the
- * runtime's legacy-charset tables. */
+ * Content-Type header. Extracts `charset=...` from the header (case-insensitive)
+ * and uses it if Node's TextDecoder supports it. When the header names none,
+ * a byte order mark and then an HTML `<meta>` charset declaration are
+ * consulted in that order, so a page served as bare `text/html` that declares
+ * Shift_JIS, windows-1251 or GBK itself is decoded as such. Falls back to
+ * UTF-8 when nothing declares a charset or the label is unsupported. This
+ * avoids mojibake on pages served as ISO-8859-1, Windows-1252, Shift_JIS,
+ * etc. Labels the Encoding Standard maps to windows-1252 are decoded locally
+ * so the result does not depend on the runtime's legacy-charset tables. */
 export function decodeWithContentType(
   bytes: Uint8Array,
   contentType: string,
 ): string {
-  const match = contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i);
-  const charset = match?.[1]?.toLowerCase();
+  const charset =
+    charsetFromContentType(contentType) ??
+    charsetFromBom(bytes) ??
+    charsetFromHtmlMeta(bytes);
   if (charset && charset !== "utf-8" && charset !== "utf8") {
     if (WINDOWS_1252_LABELS.has(charset)) {
       return decodeWindows1252(bytes);

@@ -895,6 +895,86 @@ describe("decodeWithContentType", () => {
     ).toContain("h");
   });
 
+  it("reads a <meta charset> when the header names none", () => {
+    // "東京" in Shift_JIS.
+    const title = [0x93, 0x8c, 0x8b, 0x9e];
+    const html = new Uint8Array([
+      ...new TextEncoder().encode(
+        '<html><head><meta charset="Shift_JIS"><title>',
+      ),
+      ...title,
+      ...new TextEncoder().encode("</title></head></html>"),
+    ]);
+    expect(decodeWithContentType(html, "text/html")).toContain(
+      "<title>東京</title>",
+    );
+  });
+
+  it("reads an http-equiv Content-Type charset when the header names none", () => {
+    // "Привет" in windows-1251.
+    const title = [0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2];
+    const html = new Uint8Array([
+      ...new TextEncoder().encode(
+        '<meta http-equiv="Content-Type" content="text/html; charset=windows-1251"><title>',
+      ),
+      ...title,
+      ...new TextEncoder().encode("</title>"),
+    ]);
+    expect(decodeWithContentType(html, "text/html")).toContain(
+      "<title>Привет</title>",
+    );
+  });
+
+  it("decodes a <meta charset> ISO-8859-1 page with the Windows-1252 table", () => {
+    const html = new Uint8Array([
+      ...new TextEncoder().encode('<meta charset="iso-8859-1">'),
+      0x73,
+      0x92,
+    ]);
+    expect(decodeWithContentType(html, "text/html")).toBe(
+      '<meta charset="iso-8859-1">s\u2019',
+    );
+  });
+
+  it("lets the header charset win over a <meta charset>", () => {
+    // 0xe9 is é in windows-1252 but an invalid lead byte in Shift_JIS.
+    const html = new Uint8Array([
+      ...new TextEncoder().encode('<meta charset="shift_jis">'),
+      0xe9,
+    ]);
+    expect(decodeWithContentType(html, "text/html; charset=windows-1252")).toBe(
+      '<meta charset="shift_jis">\u00e9',
+    );
+  });
+
+  it("honors a byte order mark when the header names none", () => {
+    const utf8Bom = new Uint8Array([
+      0xef,
+      0xbb,
+      0xbf,
+      ...new TextEncoder().encode("héllo"),
+    ]);
+    expect(decodeWithContentType(utf8Bom, "text/html")).toBe("héllo");
+    // "hé" as UTF-16LE with its BOM.
+    const utf16le = new Uint8Array([0xff, 0xfe, 0x68, 0x00, 0xe9, 0x00]);
+    expect(decodeWithContentType(utf16le, "text/html")).toBe("hé");
+  });
+
+  it("reads a <meta charset> declaring UTF-16 as UTF-8", () => {
+    // The declaration was found as ASCII, so the bytes cannot be UTF-16.
+    const html = new TextEncoder().encode('<meta charset="utf-16">héllo');
+    expect(decodeWithContentType(html, "text/html")).toBe(
+      '<meta charset="utf-16">héllo',
+    );
+  });
+
+  it("falls back to UTF-8 for an unsupported <meta charset>", () => {
+    const html = new TextEncoder().encode('<meta charset="fake-charset">héllo');
+    expect(decodeWithContentType(html, "text/html")).toBe(
+      '<meta charset="fake-charset">héllo',
+    );
+  });
+
   it("extracts charset from quoted values", () => {
     const bytes = new Uint8Array([0xe9]);
     expect(
