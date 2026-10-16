@@ -1128,6 +1128,9 @@ export const processItem = internalAction({
         allowedAtStart && !aiAllowed
           ? withoutModel(item, page)
           : outcome.result;
+      // A blank or padded title from the model says nothing; the save keeps
+      // the name it can give itself (the page's title, the note's first line).
+      const title = result.title?.trim() || withoutModel(item, page).title;
       // Map returned space names back to ids (case-insensitive, trimmed).
       const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
@@ -1144,7 +1147,7 @@ export const processItem = internalAction({
         ? await embedForRun({
             item,
             refresh: args.refresh === true,
-            title: result.title,
+            title,
             description,
             tags,
             siteName: pageSiteName,
@@ -1155,7 +1158,7 @@ export const processItem = internalAction({
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
-        title: result.title,
+        title,
         keepTitle: args.refresh === true,
         description,
         tags,
