@@ -332,6 +332,19 @@ export function useDemoSave({
   const timedOut = slow && itemId !== null;
   const submissionTimedOut = slow && itemId === null;
 
+  // The record of a pick only matters across a relaunch; the save itself goes
+  // on without it. `submit` is fire-and-forget and this write runs before its
+  // try block, so a keychain error here must not become an unhandled
+  // rejection. (The record of the finished save, written inside the try, is
+  // still a failure of the save.)
+  const persistPending = useCallback((value: PendingDemo) => {
+    try {
+      setPendingDemo(value);
+    } catch (err) {
+      analytics.captureError("pending_demo_write_failed", err);
+    }
+  }, []);
+
   const submit = useCallback(
     async (request: PendingDemo, resumed = false) => {
       const url = request.url.trim();
@@ -348,7 +361,7 @@ export function useDemoSave({
           signed_in: isAuthenticated,
         });
       }
-      setPendingDemo(trimmed);
+      persistPending(trimmed);
       dispatch({
         type: "submit",
         request: trimmed,
@@ -408,7 +421,7 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [createDemoItem, isAuthenticated, canSave, lost, onSaved],
+    [createDemoItem, isAuthenticated, canSave, lost, onSaved, persistPending],
   );
 
   const submitUrl = useCallback(

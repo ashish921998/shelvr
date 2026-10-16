@@ -341,6 +341,22 @@ describe("useDemoSave", () => {
     expect(captured("onboarding_demo_submitted")).toHaveLength(0);
   });
 
+  it("saves on when the keychain refuses the record of the pick", async () => {
+    mock.setPendingDemo.mockImplementationOnce(() => {
+      throw new Error("keychain");
+    });
+    mock.create.mockResolvedValue(saved());
+    const { result, onSaved } = renderDemo();
+
+    await act(async () => {
+      result.current.submitUrl("https://example.com/post");
+    });
+
+    expect(mock.create).toHaveBeenCalledOnce();
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(result.current.error).toBeNull();
+  });
+
   it("lets the user on without a save after a failed submit", async () => {
     mock.create.mockRejectedValue(new Error("offline"));
     const { result, onAdvance } = renderDemo();

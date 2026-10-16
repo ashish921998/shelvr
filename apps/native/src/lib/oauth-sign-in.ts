@@ -265,8 +265,6 @@ export function useOAuthSignIn(surface: OAuthSurface) {
 
   const signInWith = useCallback(
     async (provider: OAuthProvider): Promise<OAuthSignInOutcome> => {
-      // Every screen that offers sign-in shows the AI disclosure beside it.
-      markAiDisclosedAtSignIn();
       setPendingProvider(provider);
       setLastError(null);
       setInterrupted(false);
@@ -333,6 +331,8 @@ export function useOAuthSignIn(surface: OAuthSurface) {
         }
       };
       try {
+        // Every screen that offers sign-in shows the AI disclosure beside it.
+        markAiDisclosedAtSignIn();
         const method = await authMethod(provider);
         const outcome = await attemptWith(method);
         if (method !== "native" || outcome !== "failed") return outcome;
@@ -343,6 +343,19 @@ export function useOAuthSignIn(surface: OAuthSurface) {
         // is "cancelled" above and is not asked again.
         setLastError(null);
         return await attemptWith("web");
+      } catch (err) {
+        // Work outside an attempt failed (the disclosure note, picking the
+        // method). The buttons discard this promise, so it must never
+        // reject: the person is told here instead.
+        analytics.captureError("auth_failed", err, {
+          provider,
+          stage: "request",
+          surface,
+        });
+        setLastError(
+          err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        );
+        return "failed";
       } finally {
         setPendingProvider(null);
       }

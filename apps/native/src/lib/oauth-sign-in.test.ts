@@ -546,4 +546,28 @@ describe("useOAuthSignIn", () => {
       expect(captured("auth_started")).toMatchObject({ method: "web" });
     });
   });
+
+  it("reports a failure before the attempt as a failed sign-in, never as a rejection", async () => {
+    // The disclosure note is the first storage write and sits outside every
+    // attempt; the buttons discard the promise, so a throw there was silent.
+    disclosed.mockImplementation(() => {
+      throw new Error("storage");
+    });
+    const hook = renderHook(() => useOAuthSignIn("demo_sheet"));
+
+    let outcome: Promise<string> | undefined;
+    await act(async () => {
+      outcome = hook.result.current.signInWith("google");
+      await outcome.catch(() => undefined);
+    });
+
+    await expect(outcome).resolves.toBe("failed");
+    expect(hook.result.current.pendingProvider).toBeNull();
+    expect(hook.result.current.lastError).toBe("Error: storage");
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "auth_failed",
+      expect.any(Error),
+      expect.objectContaining({ stage: "request" }),
+    );
+  });
 });
