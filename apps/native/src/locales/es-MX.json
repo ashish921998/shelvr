@@ -305,6 +305,33 @@
   "plan.failedTitle": "No se pudo hacer el plan",
   "plan.shareIntro": "Nuestra selección de %{space}:",
   "plan.shareFooter": "Hecho con Shelvr %{url}",
+  "plan.cityTitle": "¿A dónde vas?",
+  "plan.cityBody": "El plan solo usa lugares de esa ciudad.",
+  "plan.anywhere": "Cualquier lugar",
+  "plan.placeCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
+  },
+  "plan.inCity": {
+    "one": "%{city} · %{formattedCount} lugar",
+    "many": "%{city} · %{formattedCount} lugares",
+    "other": "%{city} · %{formattedCount} lugares"
+  },
+  "plan.ask": "Preguntar a alguien",
+  "plan.askText": "¿A dónde vamos? Toca ✓ en los lugares a los que irías: %{url}",
+  "plan.askFailedTitle": "No se pudo crear el enlace de votación",
+  "plan.voterCount": {
+    "one": "%{formattedCount} persona votó en tu enlace.",
+    "many": "%{formattedCount} personas votaron en tu enlace.",
+    "other": "%{formattedCount} personas votaron en tu enlace."
+  },
+  "plan.daysLeft": {
+    "one": "Queda %{formattedCount} día.",
+    "many": "Quedan %{formattedCount} días.",
+    "other": "Quedan %{formattedCount} días."
+  },
+  "plan.tally": "%{picks} irían, %{passes} pasan",
   "navigation.profile": "Perfil",
   "capture.add": "Agregar contenido",
   "loading.home": "Preparando tu estantería",

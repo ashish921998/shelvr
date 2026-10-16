@@ -305,6 +305,29 @@
   "plan.failedTitle": "Couldn't make a plan",
   "plan.shareIntro": "Our shortlist from %{space}:",
   "plan.shareFooter": "Made with Shelvr %{url}",
+  "plan.cityTitle": "Where are you going?",
+  "plan.cityBody": "The plan only uses places in that city.",
+  "plan.anywhere": "Anywhere",
+  "plan.placeCount": {
+    "one": "%{formattedCount} place",
+    "other": "%{formattedCount} places"
+  },
+  "plan.inCity": {
+    "one": "%{city} · %{formattedCount} place",
+    "other": "%{city} · %{formattedCount} places"
+  },
+  "plan.ask": "Ask someone",
+  "plan.askText": "Where should we go? Tap ✓ on the ones you'd go to: %{url}",
+  "plan.askFailedTitle": "Couldn't make a vote link",
+  "plan.voterCount": {
+    "one": "%{formattedCount} person voted on your link.",
+    "other": "%{formattedCount} people voted on your link."
+  },
+  "plan.daysLeft": {
+    "one": "%{formattedCount} day left.",
+    "other": "%{formattedCount} days left."
+  },
+  "plan.tally": "%{picks} would go, %{passes} would pass",
   "navigation.profile": "Profile",
   "capture.add": "Add save",
   "loading.home": "Warming your shelf",

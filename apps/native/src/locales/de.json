@@ -305,6 +305,29 @@
   "plan.failedTitle": "Plan konnte nicht erstellt werden",
   "plan.shareIntro": "Unsere Auswahl aus %{space}:",
   "plan.shareFooter": "Erstellt mit Shelvr %{url}",
+  "plan.cityTitle": "Wohin geht es?",
+  "plan.cityBody": "Der Plan nutzt nur Orte in dieser Stadt.",
+  "plan.anywhere": "Überall",
+  "plan.placeCount": {
+    "one": "%{formattedCount} Ort",
+    "other": "%{formattedCount} Orte"
+  },
+  "plan.inCity": {
+    "one": "%{city} · %{formattedCount} Ort",
+    "other": "%{city} · %{formattedCount} Orte"
+  },
+  "plan.ask": "Jemanden fragen",
+  "plan.askText": "Wohin sollen wir gehen? Tippe ✓ bei den Orten, zu denen du mitkommen würdest: %{url}",
+  "plan.askFailedTitle": "Abstimmungslink konnte nicht erstellt werden",
+  "plan.voterCount": {
+    "one": "%{formattedCount} Person hat über deinen Link abgestimmt.",
+    "other": "%{formattedCount} Personen haben über deinen Link abgestimmt."
+  },
+  "plan.daysLeft": {
+    "one": "Noch %{formattedCount} Tag.",
+    "other": "Noch %{formattedCount} Tage."
+  },
+  "plan.tally": "%{picks} dafür, %{passes} dagegen",
   "navigation.profile": "Profil",
   "capture.add": "Inhalt hinzufügen",
   "loading.home": "Dein Regal wird vorbereitet",
