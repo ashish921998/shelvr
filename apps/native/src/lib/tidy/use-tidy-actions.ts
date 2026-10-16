@@ -16,6 +16,10 @@ type HistoryEntry = {
   /** For saves: resolves to the created item id (null if the upload failed),
    * so undo can delete the item even while the upload is still in flight. */
   itemId?: Promise<Id<"items"> | null>;
+  /** For saves: the summary counted this save when it was decided. Undo and
+   * a failed upload each take that count back, whichever comes first, and
+   * the other must not take it back again. */
+  uncounted?: boolean;
 };
 
 export type TidyCounts = {
@@ -123,7 +127,15 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         case "save":
           markReviewed([photo.id]);
           setCounts((c) => ({ ...c, saved: c.saved + 1 }));
-          entry.itemId = startSave(photo);
+          entry.itemId = startSave(photo).then((itemId) => {
+            // A failed save is not a saved photo: take it out of the summary
+            // unless undo already did.
+            if (itemId === null && !entry.uncounted) {
+              entry.uncounted = true;
+              setCounts((c) => ({ ...c, saved: c.saved - 1 }));
+            }
+            return itemId;
+          });
           break;
       }
 
@@ -154,7 +166,10 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         if (isReviewed(entry.photo.id)) {
           unmarkReviewed(entry.photo.id);
         }
-        setCounts((c) => ({ ...c, saved: c.saved - 1 }));
+        if (!entry.uncounted) {
+          entry.uncounted = true;
+          setCounts((c) => ({ ...c, saved: c.saved - 1 }));
+        }
         entry.itemId?.then((itemId) => {
           if (itemId) deleteItem({ id: itemId });
         });
