@@ -412,7 +412,7 @@ async function presentPaywallImpl(
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     const outcome = mapPaywallResult(result);
     if (outcome !== "cancelled" || epoch !== presentationEpoch) return outcome;
-    return (await presentExitOffer(rcui, placement)) ?? outcome;
+    return (await presentExitOffer(rcui, placement, epoch)) ?? outcome;
   } catch {
     return "unavailable";
   }
@@ -471,6 +471,7 @@ function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
 async function presentExitOffer(
   rcui: NonNullable<ReturnType<typeof getRCUI>>,
   sourcePlacement: string,
+  epoch: number,
 ): Promise<PaywallOutcome | null> {
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
@@ -500,8 +501,6 @@ async function presentExitOffer(
     return null;
   }
   notifyExitOffer();
-  // UIKit refuses to present while the first paywall is still dismissing.
-  await waitForSheetTransition();
   // A sheet that never appeared must not open the window.
   // Awaited before the sheet latch clears, so a later claim can't race it.
   const release = async () => {
@@ -513,6 +512,15 @@ async function presentExitOffer(
     }
     notifyExitOffer();
   };
+  // UIKit refuses to present while the first paywall is still dismissing.
+  await waitForSheetTransition();
+  // The lookup above is unbounded: if the attempt was presumed gone while
+  // it ran, its caller has moved on, so no sheet goes up and the claim is
+  // handed back.
+  if (epoch !== presentationEpoch) {
+    await release();
+    return null;
+  }
   const outcome = await showExitOffering(
     rcui,
     offering,
@@ -602,20 +610,25 @@ async function presentOpenExitOfferImpl(
   paywallOnDecline = false,
 ): Promise<PaywallOutcome> {
   const epoch = presentationEpoch;
-  if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
+  // Every branch below follows an await, so each checks that the attempt
+  // has not been presumed gone meanwhile before it puts another sheet up.
+  const fallback = (): Promise<PaywallOutcome> =>
+    epoch === presentationEpoch
+      ? presentPaywallImpl(fallbackPlacement)
+      : Promise.resolve("unavailable");
+  if (!(await awaitRcSyncReady())) return fallback();
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   const rcui = getRCUI();
   const endsAt = userId
     ? exitOfferEndsAt(readShownAt(userId), Date.now())
     : null;
-  if (!rc || !rcui || endsAt === null)
-    return presentPaywallImpl(fallbackPlacement);
+  if (!rc || !rcui || endsAt === null) return fallback();
   if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
   const offering = await findExitOffering(exitOfferDeps(rc));
   // The lookup can outlast the window; never sell the offer after it closes.
   if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
-    return presentPaywallImpl(fallbackPlacement);
+    return fallback();
   if (epoch !== presentationEpoch) return "unavailable";
   // Only the person's own close counts. A sheet closed by its deadline or by
   // a torn-down host must not put another paywall in front of them.
@@ -632,7 +645,7 @@ async function presentOpenExitOfferImpl(
   // The offer carries one plan, so declining it must still leave the trial
   // and the other plans one step away. Closing that paywall is inside the
   // cooldown and does not open the offer again.
-  return presentPaywallImpl(fallbackPlacement);
+  return fallback();
 }
 
 function subscribeExitOffer(onChange: () => void): () => void {

@@ -491,6 +491,24 @@ describe("exit offer after a paywall close", () => {
     );
   });
 
+  it("puts no exit offer up once the attempt has been presumed gone", async () => {
+    const { openPaywall } = await loadReady();
+    vi.useFakeTimers();
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    // The offering lookup is unbounded and outlives the attempt.
+    const eligibility = deferred<Record<string, { status: number }>>();
+    mock.checkEligibility.mockReturnValueOnce(eligibility.promise);
+
+    const outcome = openPaywall(router, "onboarding");
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+    await expect(outcome).resolves.toBe(false);
+
+    eligibility.resolve({ annual_exit: { status: 2 } });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
+  });
+
   it("skips the exit offer in an e2e run that hides Pro", async () => {
     const { openPaywall } = await loadReady();
     mock.hidePro = true;
