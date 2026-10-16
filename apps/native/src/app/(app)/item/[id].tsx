@@ -499,10 +499,13 @@ function ItemScreenContent() {
   );
 
   // A single-item fallback for deep links (no source) or a stale list that no
-  // longer contains this id.
-  const { data: single } = useQuery(
-    convexQuery(api.items.getItem, { id: id as Id<"items"> }),
-  );
+  // longer contains this id. Same short gcTime as the detail body's own
+  // getItem: the cache keeps the longest gcTime any observer asked for, so a
+  // session-long one here would hold the row's subscription open regardless.
+  const { data: single } = useQuery({
+    ...convexQuery(api.items.getItem, { id: id as Id<"items"> }),
+    gcTime: 30_000,
+  });
 
   // Mirror the space screen's feed order exactly (suggestions first, then
   // saved) so swiping pages through what the user saw in the grid.

@@ -20,7 +20,12 @@ export default function ManageSpacesScreen() {
   const id = itemId as Id<"items">;
 
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
-  const { data: item } = useQuery(convexQuery(api.items.getItem, { id }));
+  // Short gcTime as on the detail page, which observes the same row: the
+  // longest gcTime wins, so this one must not be the session-long default.
+  const { data: item } = useQuery({
+    ...convexQuery(api.items.getItem, { id }),
+    gcTime: 30_000,
+  });
 
   const addItemToSpace = useMutation(api.spaces.addItemToSpace);
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
