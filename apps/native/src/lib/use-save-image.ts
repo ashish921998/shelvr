@@ -2,6 +2,7 @@ import { imageSizeError } from "@convex/model/imagePolicy";
 import {
   SAVE_ERROR_CODES,
   SAVE_ERROR_MESSAGES,
+  saveError,
   saveErrorCode,
   saveFailureStage,
   type SaveErrorCode,
@@ -261,6 +262,35 @@ async function saveImageOperation(
   }
 }
 
+/** The error a refused `/image-upload` response stands for. The receiver
+ * answers a refusal with `{error: <code>}`: a `SaveErrorCode` (402
+ * `pro_required`, 413 / 422 size refusals) becomes the same structured
+ * `saveError` the mutations throw, so the batch alert, the paywall route and
+ * the queued Siri save branch on it as they already do. Anything else (429
+ * busy, 5xx, an empty or non-JSON body) stays the plain, retryable Error. */
+async function uploadRefusal(result: {
+  status: number;
+  json: () => Promise<unknown>;
+}): Promise<Error> {
+  let body: unknown;
+  try {
+    body = await result.json();
+  } catch {
+    body = undefined;
+  }
+  const code =
+    typeof body === "object" && body !== null
+      ? (body as Record<string, unknown>).error
+      : undefined;
+  if (
+    typeof code === "string" &&
+    (SAVE_ERROR_CODES as readonly string[]).includes(code)
+  ) {
+    return saveError(code as SaveErrorCode);
+  }
+  return new Error(`Upload failed (${result.status})`);
+}
+
 /**
  * React/Convex adapter that binds saveImageOperations to the image import
  * mutations. Returns one result per input image, in input order; a single
@@ -290,9 +320,7 @@ export function useSaveImages() {
               : {},
             body: file,
           });
-          if (!result.ok) {
-            throw new Error(`Upload failed (${result.status})`);
-          }
+          if (!result.ok) throw await uploadRefusal(result);
           const { storageId } = (await result.json()) as {
             storageId: Id<"_storage">;
           };
