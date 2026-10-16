@@ -765,6 +765,17 @@ function charsetFromBom(bytes: Uint8Array): string | undefined {
  * a browser's prescan does. A declared UTF-16 is read as UTF-8, as the
  * Encoding Standard says: the declaration was found as ASCII, so the bytes
  * cannot be UTF-16. */
+/** Only an HTML body (or one with no media type at all) is prescanned for a
+ * `<meta>` charset; JSON and XML bodies that happen to quote one are not. */
+function mayCarryHtmlMeta(contentType: string): boolean {
+  const mediaType = contentType.split(";")[0].trim().toLowerCase();
+  return (
+    mediaType === "" ||
+    mediaType === "text/html" ||
+    mediaType === "application/xhtml+xml"
+  );
+}
+
 function charsetFromHtmlMeta(bytes: Uint8Array): string | undefined {
   const head = decodeWindows1252(bytes.subarray(0, META_CHARSET_PRESCAN_BYTES));
   const match = head.match(/<meta\s[^>]*?charset\s*=\s*["']?\s*([\w.:-]+)/i);
@@ -792,7 +803,7 @@ export function decodeWithContentType(
   const charset =
     charsetFromContentType(contentType) ??
     charsetFromBom(bytes) ??
-    charsetFromHtmlMeta(bytes);
+    (mayCarryHtmlMeta(contentType) ? charsetFromHtmlMeta(bytes) : undefined);
   if (charset && charset !== "utf-8" && charset !== "utf8") {
     if (WINDOWS_1252_LABELS.has(charset)) {
       return decodeWindows1252(bytes);
