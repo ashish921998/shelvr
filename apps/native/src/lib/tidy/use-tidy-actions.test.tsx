@@ -91,6 +91,39 @@ describe("undo after a committed delete", () => {
     expect(result.current.counts.kept).toBe(1);
   });
 
+  it("keeps a delete decided while the dialog was open undoable", async () => {
+    let finishDelete: () => void = () => undefined;
+    mocks.deleteAssets.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finishDelete = () => resolve(undefined);
+        }),
+    );
+    const { result } = setup();
+    act(() => result.current.onDecision(23, "delete"));
+    let commit: Promise<void> = Promise.resolve();
+    act(() => {
+      commit = result.current.commitDeletes();
+    });
+    // The system dialog is open; the user swipes one more card away.
+    act(() => result.current.onDecision(22, "delete"));
+    expect(result.current.pendingDeleteCount).toBe(1);
+    await act(async () => {
+      finishDelete();
+      await commit;
+    });
+    expect(result.current.pendingDeleteCount).toBe(1);
+    expect(result.current.canUndo).toBe(true);
+
+    let undone: number | null = null;
+    act(() => {
+      undone = result.current.undo();
+    });
+    expect(undone).toBe(22);
+    expect(result.current.pendingDeleteCount).toBe(0);
+    expect(result.current.canUndo).toBe(false);
+  });
+
   it("keeps the whole history when the delete dialog is cancelled", async () => {
     mocks.deleteAssets.mockRejectedValueOnce(new Error("cancelled"));
     const { result } = setup();

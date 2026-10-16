@@ -190,9 +190,13 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       // before a committed delete can no longer be walked back to: its card
       // sits above photos that are gone. Keep only the decisions made after
       // the last committed delete, which still sit right under the top card.
+      // The cutoff comes from the queue just committed, not from every delete
+      // in history: a delete decided during the dialog is still pending and
+      // must stay undoable.
+      const committed = new Set(queue.map((photo) => photo.id));
       const lastDeleted = Math.min(
         ...historyRef.current
-          .filter((h) => h.action === "delete")
+          .filter((h) => h.action === "delete" && committed.has(h.photo.id))
           .map((h) => h.index),
       );
       historyRef.current = historyRef.current.filter(
