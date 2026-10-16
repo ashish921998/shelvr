@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { rateLimiter } from "./model/rateLimiter";
-import { UNKNOWN_IP_LIMITER_KEY, normalizeIp } from "./waitlist";
+import { ipKey } from "./model/clientIp";
 
 export const claimRequestBody = internalMutation({
   args: {
@@ -16,7 +16,7 @@ export const claimRequestBody = internalMutation({
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "requestBodyGlobal", { throws: true });
     await rateLimiter.limit(ctx, "requestBodyIp", {
-      key: `${args.route}:${normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY}`,
+      key: `${args.route}:${ipKey(args.ip)}`,
       throws: true,
     });
     return null;
@@ -29,7 +29,7 @@ export const claim = internalMutation({
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "oracleGlobal", { throws: true });
     await rateLimiter.limit(ctx, "oracleIp", {
-      key: normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY,
+      key: ipKey(args.ip),
       throws: true,
     });
     return null;

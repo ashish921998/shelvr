@@ -20,6 +20,7 @@ import {
 } from "./model/captureRequest";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
+import { parsePlanVote, type PlanVoteBody } from "./model/planVote";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
@@ -481,39 +482,6 @@ http.route({
     return json(share, 200);
   }),
 });
-
-type PlanVoteBody = {
-  token: string;
-  voterId: string;
-  picks: string[];
-  passes: string[];
-};
-
-function isKeyList(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) &&
-    value.length <= 10 &&
-    value.every((key) => typeof key === "string" && key.length <= 8)
-  );
-}
-
-function parsePlanVote(body: unknown): PlanVoteBody | null {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return null;
-  }
-  const { token, picks, passes } = body as Record<string, unknown>;
-  const rawVoterId = (body as Record<string, unknown>).voterId;
-  const voterId =
-    typeof rawVoterId === "string" ? rawVoterId.trim() : undefined;
-  if (typeof token !== "string" || token.length === 0 || token.length > 64) {
-    return null;
-  }
-  if (voterId === undefined || voterId === "" || voterId.length > 64) {
-    return null;
-  }
-  if (!isKeyList(picks) || !isKeyList(passes)) return null;
-  return { token, voterId, picks, passes };
-}
 
 /**
  * Votes from the plan vote page. Same caller and trust model as

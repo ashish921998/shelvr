@@ -34,7 +34,7 @@ describe("POST /api/plan-vote", () => {
 
   it("forwards a vote with the secret and the visitor IP", async () => {
     mocks.fetch.mockResolvedValue(new Response("{}", { status: 200 }));
-    const result = await POST(request({ ...vote, extra: "dropped" }));
+    const result = await POST(request(vote));
 
     expect(result.status).toBe(200);
     const [url, init] = mocks.fetch.mock.calls[0];
@@ -43,17 +43,19 @@ describe("POST /api/plan-vote", () => {
       "x-waitlist-secret": "secret",
       "x-shelvr-client-ip": "203.0.113.7",
     });
-    expect(JSON.parse(init.body)).toEqual(vote);
+    // Passed on as it came: Convex reads the ballot's shape, once.
+    expect(init.body).toBe(JSON.stringify(vote));
   });
 
-  it("refuses malformed votes before forwarding", async () => {
-    expect((await POST(request("{"))).status).toBe(400);
-    expect((await POST(request({ ...vote, picks: "p0" }))).status).toBe(400);
-    expect((await POST(request({ ...vote, token: "" }))).status).toBe(400);
+  it("bounds the body here and leaves its shape to Convex", async () => {
     expect(
       (await POST(request({ ...vote, voterId: "x".repeat(4096) }))).status,
     ).toBe(413);
     expect(mocks.fetch).not.toHaveBeenCalled();
+
+    mocks.fetch.mockResolvedValueOnce(new Response("{}", { status: 400 }));
+    expect((await POST(request("{"))).status).toBe(400);
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("says why a vote was refused", async () => {

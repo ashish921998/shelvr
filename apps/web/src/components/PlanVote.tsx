@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PlanSharePlace } from "@/lib/planShare";
 
 type Choice = "pick" | "pass";
+type Choices = Record<string, Choice>;
 type Status = "idle" | "saving" | "saved" | "error";
 
 const VOTER_KEY = "shelvr.planVoter";
@@ -13,7 +14,8 @@ const VOTE_SETTLE_MS = 600;
 function ballot(
   token: string,
   voterId: string,
-  choices: Record<string, Choice>,
+  choices: Choices,
+  revision: number,
 ): string {
   const keys = Object.keys(choices);
   return JSON.stringify({
@@ -21,30 +23,65 @@ function ballot(
     voterId,
     picks: keys.filter((key) => choices[key] === "pick"),
     passes: keys.filter((key) => choices[key] === "pass"),
+    revision,
   });
 }
 
-function rememberChoices(token: string, choices: Record<string, Choice>) {
+function store(key: string, value: unknown) {
   try {
-    window.localStorage.setItem(
-      `shelvr.planVote.${token}`,
-      JSON.stringify(choices),
-    );
+    window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // A private window keeps the vote for this visit only.
   }
 }
 
-function storedChoices(token: string): Record<string, Choice> {
+function forget(key: string) {
   try {
-    const raw = window.localStorage.getItem(`shelvr.planVote.${token}`);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, Choice>)
-      : {};
+    window.localStorage.removeItem(key);
   } catch {
-    return {};
+    // Nothing was kept, so there is nothing to drop.
   }
+}
+
+function load(key: string): unknown {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isChoices(value: unknown): value is Choices {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The last ballot the server took. */
+const savedKey = (token: string) => `shelvr.planVote.${token}`;
+/**
+ * A ballot sent as the page closed, kept until the server is seen taking it.
+ * The exit request outlives the tab but its answer never arrives, so the
+ * next visit sends it again. That replaces nothing newer: the server keeps
+ * the later revision.
+ */
+const pendingKey = (token: string) => `shelvr.planVotePending.${token}`;
+
+type Pending = { choices: Choices; revision: number };
+
+function storedPending(token: string): Pending | undefined {
+  const value = load(pendingKey(token)) as Partial<Pending> | undefined;
+  return value && isChoices(value.choices) && typeof value.revision === "number"
+    ? { choices: value.choices, revision: value.revision }
+    : undefined;
+}
+
+/**
+ * The number for the next ballot: the clock, or one above the last ballot
+ * when two land in the same millisecond, so each one sent is above the last.
+ */
+function nextRevision(last: { current: number }): number {
+  last.current = Math.max(Date.now(), last.current + 1);
+  return last.current;
 }
 
 /** One id per browser, so a changed mind replaces the earlier vote. */
@@ -69,49 +106,26 @@ export default function PlanVote({
   places: PlanSharePlace[];
   senderName?: string;
 }) {
-  const [choices, setChoices] = useState<Record<string, Choice>>({});
+  const [choices, setChoices] = useState<Choices>({});
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>();
   const voter = useRef<string | undefined>(undefined);
   // Votes go out one at a time, so a slow request never lands after a newer one.
   const queue = useRef<Promise<void>>(Promise.resolve());
-
-  useEffect(() => {
-    // localStorage only exists in the browser, after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setChoices(storedChoices(token));
-  }, [token]);
+  // Each ballot carries a number above the last, so the server can tell a
+  // late one from a new one however the requests arrive.
+  const lastRevision = useRef(0);
 
   // Taps settle for a moment before they go out, so toggling five places is
   // one request, not ten.
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The ballot still waiting on that pause. Leaving the page sends it at once,
   // with keepalive so the request outlives the tab.
-  const pending = useRef<Record<string, Choice> | undefined>(undefined);
-  useEffect(() => {
-    const leave = () => {
-      clearTimeout(timer.current);
-      const next = pending.current;
-      pending.current = undefined;
-      if (!next) return;
-      voter.current ??= voterId();
-      void fetch("/api/plan-vote", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: ballot(token, voter.current, next),
-        keepalive: true,
-      }).catch(() => undefined);
-    };
-    window.addEventListener("pagehide", leave);
-    return () => {
-      window.removeEventListener("pagehide", leave);
-      leave();
-    };
-  }, [token]);
+  const pending = useRef<Pending | undefined>(undefined);
 
-  const send = (next: Record<string, Choice>) => {
+  const send = (next: Choices, revision: number) => {
     voter.current ??= voterId();
-    const body = ballot(token, voter.current, next);
+    const body = ballot(token, voter.current, next, revision);
     queue.current = queue.current.then(async () => {
       try {
         const response = await fetch("/api/plan-vote", {
@@ -123,7 +137,8 @@ export default function PlanVote({
         if (response.ok) {
           // Remembered only once saved, so a reload never shows a vote the
           // server didn't take.
-          rememberChoices(token, next);
+          store(savedKey(token), next);
+          forget(pendingKey(token));
           setStatus("saved");
           setMessage(undefined);
           return;
@@ -139,6 +154,47 @@ export default function PlanVote({
       }
     });
   };
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+
+  useEffect(() => {
+    // localStorage only exists in the browser, after hydration. A ballot that
+    // left with the last visit is shown and sent again, since its answer was
+    // never seen.
+    const left = storedPending(token);
+    const saved = load(savedKey(token));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChoices(left?.choices ?? (isChoices(saved) ? saved : {}));
+    if (left) {
+      lastRevision.current = Math.max(lastRevision.current, left.revision);
+      setStatus("saving");
+      sendRef.current(left.choices, left.revision);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const leave = () => {
+      clearTimeout(timer.current);
+      const next = pending.current;
+      pending.current = undefined;
+      if (!next) return;
+      voter.current ??= voterId();
+      store(pendingKey(token), next);
+      void fetch("/api/plan-vote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: ballot(token, voter.current, next.choices, next.revision),
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, [token]);
 
   const choose = (key: string, choice: Choice) => {
     const next = { ...choices };
@@ -147,10 +203,11 @@ export default function PlanVote({
     setChoices(next);
     setStatus("saving");
     clearTimeout(timer.current);
-    pending.current = next;
+    const revision = nextRevision(lastRevision);
+    pending.current = { choices: next, revision };
     timer.current = setTimeout(() => {
       pending.current = undefined;
-      send(next);
+      send(next, revision);
     }, VOTE_SETTLE_MS);
   };
 

@@ -8,8 +8,8 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import ipaddr from "ipaddr.js";
 import { newCaptureToken, sha256Hex } from "./model/captureTokens";
+import { ipKey, normalizeIp } from "./model/clientIp";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -50,7 +50,6 @@ const resendStatusValidator = v.union(
 );
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_IP_LENGTH = 64;
 const RESEND_RETRY_SCAN = 100;
 /** Provider-side requests identify this surface so Resend metrics can split
  * waitlist syncs from feedback sends. */
@@ -81,36 +80,6 @@ export function isWaitlistSource(value: unknown): value is WaitlistSource {
   );
 }
 
-// The web route derives the IP from proxy headers it does not fully control,
-// so anything that does not parse as an IP address is treated as absent rather
-// than persisted as an attacker-chosen limiter key. The result is the canonical
-// form, so `2001:db8::1` and `2001:0db8:0000::0001` share one bucket and an
-// IPv4-mapped IPv6 address counts against the plain IPv4 key.
-export function normalizeIp(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const ip = value.trim().slice(0, MAX_IP_LENGTH);
-  // A zone id (`fe80::1%eth0`) is link-local scope and can never describe a
-  // client of a public server. ipaddr.js keeps it in the normalized form, so
-  // without this check each zone spelling would mint a fresh limiter bucket.
-  if (ip.includes("%")) return undefined;
-  if (!ipaddr.isValid(ip)) return undefined;
-  const parsed = ipaddr.parse(ip);
-  if (parsed.kind() === "ipv6") {
-    const v6 = parsed as ipaddr.IPv6;
-    if (v6.isIPv4MappedAddress()) {
-      return v6.toIPv4Address().toNormalizedString();
-    }
-  }
-  return parsed.toNormalizedString();
-}
-
-/**
- * Limiter key for a request without a usable client IP. Every such request
- * shares one bucket, so a caller cannot escape the per-IP limiter by leaving
- * the header off or filling it with garbage.
- */
-export const UNKNOWN_IP_LIMITER_KEY = "unknown";
-
 export const upsertSignup = internalMutation({
   args: {
     email: v.string(),
@@ -129,7 +98,7 @@ export const upsertSignup = internalMutation({
     await rateLimiter.limit(ctx, "waitlistJoinIp", {
       // Normalized here as well as at the HTTP edge, so a caller that hands
       // in a raw header value cannot mint a bucket per malformed string.
-      key: normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY,
+      key: ipKey(args.ip),
       throws: true,
     });
     await rateLimiter.limit(ctx, "waitlistJoin", {

@@ -162,6 +162,37 @@ describe("votes", () => {
     });
   });
 
+  it("keeps the newer ballot when an older revision lands late", async () => {
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    const ballot = (picks: string[], revision: number) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId: "a",
+        picks,
+        passes: [],
+        revision,
+        ip: "203.0.113.7",
+      });
+    const tally = async () =>
+      (await t.query(api.planShares.latestPlanShare, { spaceId }))?.places.map(
+        (place) => place.picks,
+      );
+
+    expect(await ballot(["p0"], 2)).toBe("recorded");
+    // A request that left the browser earlier but arrived later changes nothing.
+    expect(await ballot(["p1"], 1)).toBe("recorded");
+    expect(await tally()).toEqual([1, 0]);
+    // A newer one, or one from a page with no revisions, still replaces it.
+    expect(await ballot(["p1"], 3)).toBe("recorded");
+    expect(await tally()).toEqual([0, 1]);
+    expect(await vote(backend, token, "a", ["p0"])).toBe("recorded");
+    expect(await tally()).toEqual([1, 0]);
+  });
+
   it("caps voters per link", async () => {
     const { backend, t, spaceId, places } = await setup();
     const token = await t.mutation(api.planShares.createPlanShare, {

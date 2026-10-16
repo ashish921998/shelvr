@@ -563,6 +563,8 @@ export default defineSchema({
     voterId: v.string(),
     picks: v.array(v.string()),
     passes: v.array(v.string()),
+    // The visitor's own ballot order; absent from a page that predates it.
+    revision: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_share_and_voter", ["shareId", "voterId"]),
 

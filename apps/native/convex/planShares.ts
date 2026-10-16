@@ -9,8 +9,7 @@ import {
   query,
   type QueryCtx,
 } from "./_generated/server";
-import { senderFirstName } from "./items";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, requireUserId, senderFirstName } from "./model/auth";
 import {
   MAX_AREA_CHARS,
   MAX_PLACE_NAME_CHARS,
@@ -19,7 +18,7 @@ import {
 } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
-import { normalizeIp, UNKNOWN_IP_LIMITER_KEY } from "./waitlist";
+import { ipKey, ipNetwork } from "./model/clientIp";
 
 // "Ask someone" on a plan: the owner sends the shortlist as a link, and the
 // person who opens it votes on each place without an account or the app. The
@@ -31,7 +30,6 @@ export const PLAN_SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Most people whose votes one link keeps. Past this a new voter is refused. */
 export const MAX_PLAN_VOTERS = 20;
 const MAX_CITY_CHARS = 60;
-const MAX_VOTER_ID_CHARS = 64;
 /** Shares a space or account deletion removes per transaction. */
 const DELETE_BATCH = 50;
 
@@ -245,40 +243,28 @@ export const getPublicPlanShare = internalQuery({
 /**
  * Stores one visitor's votes on a link, replacing what they sent before.
  * Keys not on the link are dropped, and a key in both lists counts as a
- * pick. Rate limited per visitor IP and site-wide; a link keeps at most
- * MAX_PLAN_VOTERS voters, and one IP can add only a few of them.
+ * pick. A ballot with a revision older than the stored one is a late
+ * arrival and leaves the newer vote alone. Rate limited per visitor IP and
+ * site-wide; a link keeps at most MAX_PLAN_VOTERS voters, and one network
+ * can add only a few of them.
  */
-/**
- * The network a new voter's slot is counted against. One IPv6 device holds a
- * whole /64 and can rotate through it, so IPv6 is keyed by its /64 prefix;
- * IPv4 keeps the full address.
- */
-function voterNetwork(ip: string | undefined): string {
-  const address = normalizeIp(ip);
-  if (address === undefined) return UNKNOWN_IP_LIMITER_KEY;
-  if (!address.includes(":")) return address;
-  return `${address.split(":").slice(0, 4).join(":")}::/64`;
-}
-
 export const recordPlanVote = internalMutation({
   args: {
     token: v.string(),
     voterId: v.string(),
     picks: v.array(v.string()),
     passes: v.array(v.string()),
+    revision: v.optional(v.number()),
     ip: v.optional(v.string()),
   },
   returns: voteOutcomeValidator,
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "planVoteGlobal", { throws: true });
     await rateLimiter.limit(ctx, "planVoteIp", {
-      key: normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY,
+      key: ipKey(args.ip),
       throws: true,
     });
-    const voterId = args.voterId.trim();
-    if (voterId === "" || voterId.length > MAX_VOTER_ID_CHARS) {
-      throw new Error("Invalid voter");
-    }
+    const voterId = args.voterId;
     const share = await liveShare(ctx, args.token);
     if (share === null) return "missing";
     const keys = new Set(share.places.map((place) => place.key));
@@ -293,9 +279,17 @@ export const recordPlanVote = internalMutation({
       )
       .unique();
     if (existing !== null) {
+      if (
+        existing.revision !== undefined &&
+        args.revision !== undefined &&
+        args.revision < existing.revision
+      ) {
+        return "recorded";
+      }
       await ctx.db.patch(existing._id, {
         picks,
         passes,
+        revision: args.revision,
         updatedAt: Date.now(),
       });
       return "recorded";
@@ -308,7 +302,7 @@ export const recordPlanVote = internalMutation({
       .take(MAX_PLAN_VOTERS);
     if (voters.length >= MAX_PLAN_VOTERS) return "full";
     await rateLimiter.limit(ctx, "planVoterSlot", {
-      key: `${share._id}:${voterNetwork(args.ip)}`,
+      key: `${share._id}:${ipNetwork(args.ip)}`,
       throws: true,
     });
     await ctx.db.insert("planVotes", {
@@ -316,6 +310,7 @@ export const recordPlanVote = internalMutation({
       voterId,
       picks,
       passes,
+      revision: args.revision,
       updatedAt: Date.now(),
     });
     return "recorded";

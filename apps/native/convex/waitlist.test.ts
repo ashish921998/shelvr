@@ -10,9 +10,8 @@ import {
   CONSENT_TEXT,
   CONSENT_VERSION,
   RESEND_MAX_ATTEMPTS,
-  UNKNOWN_IP_LIMITER_KEY,
-  normalizeIp,
 } from "./waitlist";
+import { UNKNOWN_IP_LIMITER_KEY, normalizeIp } from "./model/clientIp";
 import { classifyResendError, formatResendError } from "./model/resend";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
 import { newConvexTest } from "./test.setup";
