@@ -733,17 +733,27 @@ type Presentation = { outcome: PaywallOutcome; owned: boolean; stale: boolean };
  * RevenueCat's result handler never fires) would otherwise hold its caller for
  * the life of the process. At the age `liveSheet` presumes the sheet gone, the
  * caller hears `unavailable` too, so onboarding can finish and a Pro gate can
- * be tapped again.
+ * be tapped again. The app cannot tell that sheet from one a person has kept
+ * open this long, so the presentation stays subscribed: a purchase made on it
+ * after the bound still reaches `onLateSuccess` (the entitlement itself is
+ * recorded by the presentation either way).
  */
 function presumeGoneWhenStale(
   present: Promise<PaywallOutcome>,
   onStale: () => void,
+  onLateSuccess: () => void,
 ): Promise<PaywallOutcome> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const stale = new Promise<PaywallOutcome>((resolve) => {
     timer = setTimeout(() => {
       onStale();
       resolve("unavailable");
+      present.then(
+        (outcome) => {
+          if (outcome === "success") onLateSuccess();
+        },
+        () => undefined,
+      );
     }, SHEET_STALE_MS);
   });
   return Promise.race([present, stale]).finally(() => clearTimeout(timer));
@@ -767,9 +777,15 @@ async function presentPaywall(
   }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
   let stale = false;
-  sheet.paywall = presumeGoneWhenStale(present(), () => {
-    stale = true;
-  }).finally(() => {
+  sheet.paywall = presumeGoneWhenStale(
+    present(),
+    () => {
+      stale = true;
+    },
+    // The owner already reported no purchase; the resumed-action event must
+    // still know one landed.
+    () => recordBlockedAction(placement, true),
+  ).finally(() => {
     // A stale sheet may already have been replaced; only release our own.
     releaseSheet(sheet);
   });

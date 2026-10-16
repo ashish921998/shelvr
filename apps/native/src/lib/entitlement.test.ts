@@ -273,6 +273,27 @@ describe("presentPaywall concurrency", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("still counts a purchase made on a sheet the person kept open past the bound", async () => {
+    const { openPaywall } = await loadReady();
+    const { resumeBlockedAction } = await import("./paywall-funnel");
+    vi.useFakeTimers();
+    const sheet = deferred<string>();
+    mock.presentPaywall.mockReturnValueOnce(sheet.promise);
+
+    const outcome = openPaywall(router, "share");
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+    await expect(outcome).resolves.toBe(false);
+
+    sheet.resolve("PURCHASED");
+    await vi.advanceTimersByTimeAsync(0);
+    resumeBlockedAction("share");
+
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({ purchased_since_block: true }),
+    );
+  });
+
   it("tells onboarding its paywall is gone once the presentation goes stale", async () => {
     const { openPaywallKeepingExitOffer } = await loadReady();
     vi.useFakeTimers();
