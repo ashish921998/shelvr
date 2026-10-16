@@ -29,6 +29,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import {
+  isUrlPolicyError,
   isYouTubeUrl,
   linkSource,
   normalizeExternalUrl,
@@ -873,9 +874,28 @@ export const similarItems = query({
 // Public mutations
 // ---------------------------------------------------------------------------
 
+/** `normalizeExternalUrl` for a public save: a policy refusal becomes the
+ * coded `invalid_url` save error, so the client can tell a link that will
+ * never save from a transient failure and stop retrying it. */
+function policyCheckedUrl(raw: string): string {
+  try {
+    return normalizeExternalUrl(raw);
+  } catch (error) {
+    if (isUrlPolicyError(error)) throw saveError("invalid_url");
+    throw error;
+  }
+}
+
 /**
  * Adding from inside a space files the new item there immediately: a real
  * `saved` membership (the user's own act), never subject to AI review.
+ *
+ * A space deleted since it was picked (another device, or a queued Siri
+ * capture replayed on a later launch) does not fail the save: the item lands
+ * in the feed without the membership, as the App Intents route already does
+ * through `ownedSpaceId`. Failing here threw a plain Error, which production
+ * redacts to "Server Error", so the client read a permanent refusal as an
+ * outage and retried it forever.
  */
 async function saveIntoSpace(
   ctx: MutationCtx,
@@ -885,7 +905,8 @@ async function saveIntoSpace(
 ): Promise<void> {
   const space = await ctx.db.get(spaceId);
   if (space === null || space.userId !== userId) {
-    throw new Error("Space not found");
+    logEvent("warn", "save_space_missing", { item_id: itemId });
+    return;
   }
   await insertMembership(ctx, {
     userId,
@@ -1122,7 +1143,7 @@ export async function beginImageImportForUser(
         q.eq("userId", userId).eq("kind", "image").eq("status", "pending"),
       )
       .take(30);
-    if (pending.length >= 30) throw new Error("Too many pending image imports");
+    if (pending.length >= 30) throw saveError("too_many_pending");
     if (photoCount + pending.length >= MAX_PHOTOS_PER_ACCOUNT)
       throw saveError("photo_limit");
   }
@@ -1862,7 +1883,7 @@ export const createLinkItem = mutation({
     // the item is ever inserted or scheduled. Network-destination safety (private
     // IP ranges, DNS answers) is enforced later, bound to the actual connection,
     // by the safe fetcher in convex/model/safeFetch.ts.
-    const url = normalizeExternalUrl(args.url);
+    const url = policyCheckedUrl(args.url);
     return await createItemWithOperation(
       ctx,
       userId,
