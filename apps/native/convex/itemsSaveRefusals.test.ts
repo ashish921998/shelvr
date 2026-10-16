@@ -46,25 +46,6 @@ describe("permanent save refusals carry a code", () => {
     expect(saveErrorCode(error)).toBe("invalid_url");
   });
 
-  it("beginImageImport refuses a 31st pending import as too_many_pending", async () => {
-    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
-    await t.run(async (ctx) => {
-      for (let i = 0; i < 30; i++) {
-        await ctx.db.insert("itemOperations", {
-          userId,
-          operationId: `pending:${i}`,
-          kind: "image",
-          status: "pending",
-          updatedAt: Date.now(),
-        });
-      }
-    });
-    const error = await rejection(
-      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
-    );
-    expect(saveErrorCode(error)).toBe("too_many_pending");
-  });
-
   it("createNoteItem saves without a space deleted since it was picked", async () => {
     const backend = newConvexTest();
     const { t, userId } = await signedInUser(backend, { pro: true });

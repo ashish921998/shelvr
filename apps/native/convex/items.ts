@@ -1143,7 +1143,10 @@ export async function beginImageImportForUser(
         q.eq("userId", userId).eq("kind", "image").eq("status", "pending"),
       )
       .take(30);
-    if (pending.length >= 30) throw saveError("too_many_pending");
+    // Transient, not a save refusal: the slot frees itself as imports finish
+    // or the stale sweep abandons them, so a queued Siri capture must keep
+    // retrying. A plain Error stays retryable on every client path.
+    if (pending.length >= 30) throw new Error("Too many pending image imports");
     if (photoCount + pending.length >= MAX_PHOTOS_PER_ACCOUNT)
       throw saveError("photo_limit");
   }

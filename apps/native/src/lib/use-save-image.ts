@@ -107,7 +107,6 @@ const REASON_BY_CODE: Record<SaveErrorCode, ImageSaveFailureReason> = {
   image_empty: "other",
   pro_required: "other",
   invalid_url: "other",
-  too_many_pending: "other",
 };
 
 /** Buckets a failed result for analytics. Prefers the structured code, so a

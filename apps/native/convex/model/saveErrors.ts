@@ -27,9 +27,6 @@ export const SAVE_ERROR_CODES = [
   // A link the URL policy refuses (scheme, credentials, port, length). It can
   // never succeed on retry, so a queued capture must be dropped, not kept.
   "invalid_url",
-  // 30 image imports already pending for this account; finishing or
-  // abandoning them frees the slot.
-  "too_many_pending",
 ] as const;
 
 export type SaveErrorCode = (typeof SAVE_ERROR_CODES)[number];
@@ -46,7 +43,6 @@ export const SAVE_ERROR_MESSAGES: Record<SaveErrorCode, string> = {
   image_too_large: IMAGE_TOO_LARGE_MESSAGE,
   image_empty: IMAGE_EMPTY_MESSAGE,
   invalid_url: "That link can't be saved.",
-  too_many_pending: "Too many pending image imports",
 };
 
 export function saveError(code: SaveErrorCode): ConvexError<SaveErrorData> {
