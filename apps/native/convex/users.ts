@@ -57,6 +57,8 @@ export const getCurrentUser = query({
  *
  * Identity is always derived from Convex Auth, never from a client-supplied
  * user id. Cleanup covers:
+ *  - notificationDevices and notificationPreferences (first, with the
+ *    capture tokens, so no push is prepared or claimed while data drains)
  *  - items (and their image storage blobs)
  *  - space memberships
  *  - spaces
@@ -258,6 +260,12 @@ async function deleteUserOwnedDataBatch(
   if (!(await deleteCaptureTokensBatch(ctx, userId as Id<"users">)))
     return false;
 
+  // Push targets next, for the same reason: the weekly shelf and save
+  // reminder passes and the delivery claims read only preferences and
+  // devices, so removing both in the first transaction stops every later
+  // prepare or claim for this account before its saves have drained.
+  if (!(await deleteNotificationTargetsBatch(ctx, userKey))) return false;
+
   // Raw deletes on purpose: every spaceItems write normally goes through
   // model/memberships.ts to keep the space summary exact, but these spaces
   // are deleted in the same pass, so patching their counters would be waste.
@@ -328,24 +336,6 @@ async function deleteUserOwnedDataBatch(
 
   if (!(await deleteShareLinksBatch(ctx, userKey))) return false;
   if (!(await deletePlaceVisitsBatch(ctx, userKey))) return false;
-
-  const devices = await ctx.db
-    .query("notificationDevices")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
-    .take(DELETE_BATCH);
-  for (const device of devices) {
-    await ctx.db.delete(device._id);
-  }
-  if (devices.length === DELETE_BATCH) return false;
-
-  const preferences = await ctx.db
-    .query("notificationPreferences")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
-    .take(DELETE_BATCH);
-  for (const preference of preferences) {
-    await ctx.db.delete(preference._id);
-  }
-  if (preferences.length === DELETE_BATCH) return false;
 
   if (!(await deleteSentNotificationsBatch(ctx, userKey))) return false;
 
@@ -430,6 +420,33 @@ async function deleteFeedbackBatch(
     await ctx.db.delete(submission._id);
   }
   return feedback.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's push devices and the preferences
+ * row. Returns true when both are gone. Runs right after the capture tokens
+ * so no weekly shelf or save reminder is prepared or claimed for an account
+ * whose deletion is still draining. */
+async function deleteNotificationTargetsBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const devices = await ctx.db
+    .query("notificationDevices")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const device of devices) {
+    await ctx.db.delete(device._id);
+  }
+  if (devices.length === DELETE_BATCH) return false;
+
+  const preferences = await ctx.db
+    .query("notificationPreferences")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const preference of preferences) {
+    await ctx.db.delete(preference._id);
+  }
+  return preferences.length !== DELETE_BATCH;
 }
 
 /** Deletes up to one batch of the user's Siri capture tokens. Returns true
