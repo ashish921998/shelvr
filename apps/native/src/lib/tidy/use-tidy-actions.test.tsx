@@ -49,15 +49,27 @@ beforeEach(() => {
 });
 
 describe("undo after a committed delete", () => {
+  it("reports nothing to commit as done", async () => {
+    const { result } = setup();
+    let committed = false;
+    await act(async () => {
+      committed = await result.current.commitDeletes();
+    });
+    expect(committed).toBe(true);
+    expect(mocks.deleteAssets).not.toHaveBeenCalled();
+  });
+
   // The deck re-inserts `currentIndex + 1` on every undo, so the hook may
   // only hand back the card right above the top one, or nothing.
   it("offers nothing to undo when the kept card sits above a committed delete", async () => {
     const { result } = setup();
     act(() => result.current.onDecision(23, "keep"));
     act(() => result.current.onDecision(22, "delete"));
+    let committed = false;
     await act(async () => {
-      await result.current.commitDeletes();
+      committed = await result.current.commitDeletes();
     });
+    expect(committed).toBe(true);
     expect(mocks.deleteAssets).toHaveBeenCalledTimes(1);
     expect(result.current.topIndex).toBe(21);
     expect(result.current.canUndo).toBe(false);
@@ -101,7 +113,7 @@ describe("undo after a committed delete", () => {
     );
     const { result } = setup();
     act(() => result.current.onDecision(23, "delete"));
-    let commit: Promise<void> = Promise.resolve();
+    let commit: Promise<boolean> = Promise.resolve(true);
     act(() => {
       commit = result.current.commitDeletes();
     });
@@ -135,7 +147,7 @@ describe("undo after a committed delete", () => {
     const { result } = setup();
     act(() => result.current.onDecision(23, "keep"));
     act(() => result.current.onDecision(22, "delete"));
-    let commit: Promise<void> = Promise.resolve();
+    let commit: Promise<boolean> = Promise.resolve(true);
     act(() => {
       commit = result.current.commitDeletes();
     });
@@ -155,9 +167,13 @@ describe("undo after a committed delete", () => {
     const { result } = setup();
     act(() => result.current.onDecision(23, "keep"));
     act(() => result.current.onDecision(22, "delete"));
+    let committed = true;
     await act(async () => {
-      await result.current.commitDeletes();
+      committed = await result.current.commitDeletes();
     });
+    // The caller reads this to stay on the batch instead of moving on and
+    // dropping the still-pending queue with the deck.
+    expect(committed).toBe(false);
     expect(result.current.pendingDeleteCount).toBe(1);
     expect(result.current.canUndo).toBe(true);
 

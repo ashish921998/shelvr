@@ -154,7 +154,11 @@ const TidyDeckView: FC<DeckViewProps> = ({
   const handleContinue = async () => {
     setContinuing(true);
     try {
-      await commitDeletes();
+      // A cancelled delete dialog keeps the queue and the undo history, and
+      // both live with this deck: moving on would drop them unseen. Stay on
+      // the summary, where the pending count still shows, until the deletes
+      // go through or the queue is undone.
+      if (!(await commitDeletes())) return;
       await loadNextBatch();
     } finally {
       setContinuing(false);

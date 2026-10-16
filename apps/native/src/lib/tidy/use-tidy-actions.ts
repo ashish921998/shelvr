@@ -169,10 +169,13 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
   /** Commits the queued deletions in ONE system dialog. If the user cancels,
    * the photos stay unreviewed and resurface in a later batch. Undo history is
    * trimmed only after the delete succeeds, so canceling preserves the ability
-   * to undo prior keep/save decisions. */
-  const commitDeletes = useCallback(async () => {
+   * to undo prior keep/save decisions. Resolves false when the queue is still
+   * pending (the dialog was cancelled or the delete failed), so a caller
+   * about to leave the batch can stay on it instead of dropping the queue
+   * and the undo history with the deck. */
+  const commitDeletes = useCallback(async (): Promise<boolean> => {
     const queue = pendingDeletesRef.current;
-    if (queue.length === 0) return;
+    if (queue.length === 0) return true;
 
     // Detach the queue immediately so a concurrent onDecision can't push into
     // a batch we're about to delete.
@@ -204,6 +207,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         (h) => h.index < lastDeleted,
       );
       setCanUndo(historyRef.current.length > 0);
+      return true;
     } catch (error) {
       // User canceled the system dialog (or deletion failed): restore the
       // queue so the photos stay unreviewed and resurface in a future batch.
@@ -211,6 +215,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       console.warn("Tidy delete commit skipped", error);
       pendingDeletesRef.current = queue;
       setPendingDeleteCount(queue.length);
+      return false;
     }
   }, [noteDeleted]);
 
