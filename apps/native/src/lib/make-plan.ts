@@ -31,9 +31,13 @@ const LOADING: PlanState = { status: "loading" };
  * `retry`. A late answer from an earlier run never overwrites a newer one, and
  * an answer for another space or locale reads as loading, never as ready.
  */
-export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
+export function useMakePlan(
+  spaceId: Id<"spaces">,
+  locale: string,
+  city?: string,
+) {
   const makePlan = useAction(api.plans.makePlan);
-  const key = `${spaceId}:${locale}`;
+  const key = `${spaceId}:${locale}:${city ?? ""}`;
   const [result, setResult] = useState<{
     key: string;
     state: PlanState;
@@ -45,10 +49,11 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
-        const plan = await makePlan({ spaceId, locale });
+        const plan = await makePlan({ spaceId, locale, city });
         analytics.capture("plan_made", {
           considered: plan.considered,
           place_count: plan.places.length,
+          in_city: city !== undefined,
         });
         return { status: "ready", ...plan, planId };
       } catch (error) {
@@ -60,7 +65,7 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
         return { status: aiOff ? "ai_off" : "error" };
       }
     },
-    [makePlan, spaceId, locale],
+    [makePlan, spaceId, locale, city],
   );
 
   useEffect(() => {
@@ -318,4 +323,77 @@ export function spinSteps(
     // Ease out: 60 ms per step at the start, about 300 ms at the end.
     holdMs: Math.round(60 + 240 * (step / Math.max(total - 1, 1)) ** 2),
   }));
+}
+
+/** The vote page for a plan link (`apps/web/src/app/p/[token]`). */
+export function planVoteUrl(token: string): string {
+  return `https://shelvr-web.vercel.app/p/${token}`;
+}
+
+/** The message "Ask someone" sends with the vote link. */
+export function planAskText(spaceName: string, url: string): string {
+  return t("plan.askText", { space: spaceName, url });
+}
+
+type CityCandidate = {
+  status: string;
+  /** Absent = never classified for cities. */
+  cities?: string[];
+};
+
+export type CityOption = { name: string; count: number };
+
+/**
+ * What "Where are you going?" offers: each city the space's ready saves were
+ * filed in, with how many name it, most first. `pending` counts the saves
+ * never classified for cities, so the caller can ask the backend to read
+ * them. The sheet is worth showing only with two or more cities.
+ */
+export function cityOptions(items: CityCandidate[]): {
+  cities: CityOption[];
+  pending: number;
+} {
+  const counts = new Map<string, CityOption>();
+  let pending = 0;
+  for (const item of items) {
+    if (item.status !== "ready") continue;
+    if (item.cities === undefined) {
+      pending += 1;
+      continue;
+    }
+    for (const city of item.cities) {
+      const key = city.toLowerCase();
+      const option = counts.get(key) ?? { name: city, count: 0 };
+      option.count += 1;
+      counts.set(key, option);
+    }
+  }
+  const cities = [...counts.values()].sort(
+    (a, b) => b.count - a.count || a.name.localeCompare(b.name),
+  );
+  return { cities, pending };
+}
+
+/** The tallies an open vote link holds, by place. */
+export type PlanVotes = {
+  voters: number;
+  expiresAt: number;
+  places: { name: string; picks: number; passes: number }[];
+};
+
+/** A place's tally on the link, or null when nobody voted on it. */
+export function votesFor(
+  votes: PlanVotes | null | undefined,
+  place: PlanPlace,
+): { picks: number; passes: number } | null {
+  if (!votes) return null;
+  const key = placeKey(place.name);
+  const tally = votes.places.find((entry) => placeKey(entry.name) === key);
+  if (!tally || tally.picks + tally.passes === 0) return null;
+  return { picks: tally.picks, passes: tally.passes };
+}
+
+/** Whole days the link stays open, at least 1 while it is open. */
+export function daysLeft(expiresAt: number, now = Date.now()): number {
+  return Math.max(1, Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000)));
 }

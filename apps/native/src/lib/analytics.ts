@@ -243,12 +243,17 @@ type AnalyticsEventProperties = {
   space_suggestions_accepted: { suggestion_count: number };
   // "Make a plan" on a space. `considered` is the saves read, `place_count`
   // the shortlist size (0 = nothing named a place).
-  plan_made: { considered: number; place_count: number };
+  plan_made: { considered: number; place_count: number; in_city: boolean };
   plan_failed: { reason: "ai_consent" | "error" };
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
   plan_shared: { place_count: number; picked: boolean };
+  /** "Ask someone": a vote link was made and handed to the share sheet. */
+  plan_asked: { place_count: number; in_city: boolean };
+  plan_ask_failed: { reason: "link" | "share" };
+  /** "Where are you going?" was answered; `city` false means Anywhere. */
+  plan_city_chosen: { city: boolean; city_count: number };
   onboarding_completed: {
     // Always empty since the pileup question was removed. Kept so existing
     // PostHog insights keep a stable property shape.

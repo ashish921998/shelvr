@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   canMakePlan,
+  cityOptions,
+  daysLeft,
   PLAN_SHARE_URL,
   placeLabel,
   planShareText,
+  planVoteUrl,
   deckOrder,
   spinSteps,
+  votesFor,
   type PlanPlace,
 } from "./make-plan";
 
@@ -108,5 +112,54 @@ describe("deckOrder", () => {
   it("draws every card of a short deck once", () => {
     expect(deckOrder(2, 1)).toEqual([0, 1]);
     expect(deckOrder(0, 0)).toEqual([]);
+  });
+});
+
+describe("cityOptions", () => {
+  it("counts each city once per ready save, most first, and the unread ones", () => {
+    expect(
+      cityOptions([
+        { status: "ready", cities: ["Goa"] },
+        { status: "ready", cities: ["Mumbai", "goa"] },
+        { status: "ready", cities: ["Mumbai"] },
+        { status: "ready", cities: [] },
+        { status: "ready" },
+        { status: "processing", cities: ["Oslo"] },
+      ]),
+    ).toEqual({
+      cities: [
+        { name: "Goa", count: 2 },
+        { name: "Mumbai", count: 2 },
+      ],
+      pending: 1,
+    });
+  });
+});
+
+describe("votesFor", () => {
+  const votes = {
+    voters: 2,
+    expiresAt: 0,
+    places: [
+      { name: "Tigre", picks: 2, passes: 0 },
+      { name: "Sweet Linda", picks: 0, passes: 0 },
+    ],
+  };
+
+  it("finds a place's tally however it is spelled, and only when someone voted", () => {
+    expect(votesFor(votes, place("TIGRE "))).toEqual({ picks: 2, passes: 0 });
+    expect(votesFor(votes, place("Sweet Linda"))).toBeNull();
+    expect(votesFor(votes, place("Nowhere"))).toBeNull();
+    expect(votesFor(null, place("Tigre"))).toBeNull();
+  });
+});
+
+describe("planVoteUrl and daysLeft", () => {
+  it("builds the vote page and counts whole days, never below one", () => {
+    expect(planVoteUrl("k8Q2")).toBe("https://shelvr-web.vercel.app/p/k8Q2");
+    const day = 24 * 60 * 60 * 1000;
+    expect(daysLeft(6.2 * day, 0)).toBe(7);
+    expect(daysLeft(1000, 0)).toBe(1);
+    expect(daysLeft(-day, 0)).toBe(1);
   });
 });
