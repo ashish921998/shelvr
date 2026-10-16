@@ -2,9 +2,20 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
+const title = "Privacy Policy — Shelvr";
+const description = "How Shelvr collects, uses, and protects your data.";
+
 export const metadata: Metadata = {
-  title: "Privacy Policy — Shelvr",
-  description: "How Shelvr collects, uses, and protects your data.",
+  title,
+  description,
+  alternates: { canonical: "/privacy" },
+  openGraph: {
+    title,
+    description,
+    url: "/privacy",
+    siteName: "Shelvr",
+    type: "website",
+  },
 };
 
 export default function PrivacyPage() {

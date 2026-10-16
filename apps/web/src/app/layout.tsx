@@ -9,12 +9,10 @@ export const metadata: Metadata = {
   description:
     "Links, photos and notes, saved in a tap and filed into the right Space. No folders.",
   itunes: { appId: APP_STORE_ID },
-  alternates: { canonical: "/" },
   openGraph: {
     title: "Shelvr — save the mess, find it on a shelf",
     description:
       "Links, photos and notes, saved in a tap and filed into the right Space. No folders.",
-    url: "/",
     siteName: "Shelvr",
     type: "website",
   },

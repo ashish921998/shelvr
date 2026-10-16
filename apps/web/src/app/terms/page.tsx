@@ -2,9 +2,20 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
+const title = "Terms of Service — Shelvr";
+const description = "The terms that govern your use of Shelvr.";
+
 export const metadata: Metadata = {
-  title: "Terms of Service — Shelvr",
-  description: "The terms that govern your use of Shelvr.",
+  title,
+  description,
+  alternates: { canonical: "/terms" },
+  openGraph: {
+    title,
+    description,
+    url: "/terms",
+    siteName: "Shelvr",
+    type: "website",
+  },
 };
 
 export default function TermsPage() {

@@ -4,9 +4,21 @@ import Header from "@/components/Header";
 import Footer from "@/components/home/Footer";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
+const title = "Support — Shelvr";
+const description =
+  "Get help with Shelvr, subscriptions, privacy, or your account.";
+
 export const metadata: Metadata = {
-  title: "Support — Shelvr",
-  description: "Get help with Shelvr, subscriptions, privacy, or your account.",
+  title,
+  description,
+  alternates: { canonical: "/support" },
+  openGraph: {
+    title,
+    description,
+    url: "/support",
+    siteName: "Shelvr",
+    type: "website",
+  },
 };
 
 export default function SupportPage() {
