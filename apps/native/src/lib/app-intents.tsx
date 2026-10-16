@@ -50,6 +50,9 @@ const setup = requireOptionalNativeModule<SetupModule>("AppIntentsSetup");
 const store = createMMKV({ id: "app-intents" });
 // Which account the keychain token belongs to, so an account switch mints anew.
 const CAPTURE_OWNER_KEY = "captureOwner";
+// Set whenever an account is signed in, token or not, so a reset after a
+// restart still knows the queue may hold that account's captures.
+const QUEUE_OWNER_KEY = "captureQueueOwned";
 const CAPTURE_INVOCATIONS = new Set(["saveNote", "saveLink", "saveImages"]);
 
 const siteUrl =
@@ -251,7 +254,8 @@ async function resetAppIntents(signedOut: boolean): Promise<boolean> {
   // minted, when Siri falls back to the queue) or under a stored token owner.
   // Ones queued while nobody was signed in (Siri promised to finish them "the
   // next time you open Shelvr") wait for whoever signs in on this device.
-  const hadOwner = store.contains(CAPTURE_OWNER_KEY);
+  const hadOwner =
+    store.contains(CAPTURE_OWNER_KEY) || store.contains(QUEUE_OWNER_KEY);
   const [cleared] = await Promise.all([
     signedOut || hadOwner
       ? AppIntents.clearPendingInvocationsAsync().then(
@@ -267,7 +271,10 @@ async function resetAppIntents(signedOut: boolean): Promise<boolean> {
   ]);
   // Only once the queue is gone: a failed clear keeps the owner marker, so the
   // next reset still treats the queue as that account's.
-  if (cleared) store.remove(CAPTURE_OWNER_KEY);
+  if (cleared) {
+    store.remove(CAPTURE_OWNER_KEY);
+    store.remove(QUEUE_OWNER_KEY);
+  }
   return cleared;
 }
 
@@ -301,6 +308,7 @@ export function useAppIntentsSignOutReset(): void {
     if (isAuthenticated) {
       reset.current = false;
       sawAuthenticated.current = true;
+      store.set(QUEUE_OWNER_KEY, "1");
       return;
     }
     if (reset.current) return;

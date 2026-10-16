@@ -209,6 +209,20 @@ describe("a capture Siri queued while nobody was signed in", () => {
     expect(mock.clearPending).toHaveBeenCalledOnce();
   });
 
+  it("is dropped after a restart when that account never got a capture token", async () => {
+    // Signed in, but the token mint failed, so Siri queued to the app.
+    mock.authenticated = true;
+    const before = renderHook(() => useAppIntentsSignOutReset());
+    await settle();
+    before.unmount();
+
+    // The app is killed and relaunches with the session expired.
+    mock.authenticated = false;
+    renderHook(() => useAppIntentsSignOutReset());
+    await settle();
+    expect(mock.clearPending).toHaveBeenCalledOnce();
+  });
+
   it("is not handed to the next account while the last one's queue is still clearing", async () => {
     let finishClear: () => void = () => undefined;
     mock.clearPending.mockImplementationOnce(
