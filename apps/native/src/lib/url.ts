@@ -104,16 +104,29 @@ export function siteMonogram(url: string | undefined): string | undefined {
   return Array.from(label)[0]?.toLocaleUpperCase();
 }
 
-/** A YouTube link that plays a video: a watch, Shorts, live, clip or embed
- * page, or a youtu.be link. A channel, playlist or search page is not one. */
-export function isYouTubeVideoUrl(url: string | undefined): boolean {
-  if (!isYouTubeUrl(url)) return false;
+/** What a YouTube link plays: a "short" for a Shorts page, a "video" for a
+ * watch, live, clip or embed page or a youtu.be link, and undefined for a
+ * channel, playlist or search page, or any other site. */
+export function youTubeVideo(
+  url: string | undefined,
+): "video" | "short" | undefined {
+  if (!isYouTubeUrl(url)) return undefined;
   try {
     const { hostname, pathname, searchParams } = new URL(url ?? "");
-    if (hostname.toLowerCase() === "youtu.be") return pathname.length > 1;
-    if (pathname === "/watch") return searchParams.has("v");
-    return /^\/(shorts|live|clip|embed|v)\/[^/]+/.test(pathname);
+    if (hostname.toLowerCase() === "youtu.be") {
+      return pathname.length > 1 ? "video" : undefined;
+    }
+    if (pathname === "/watch") {
+      return searchParams.has("v") ? "video" : undefined;
+    }
+    if (/^\/shorts\/[^/]+/.test(pathname)) return "short";
+    return /^\/(live|clip|embed|v)\/[^/]+/.test(pathname) ? "video" : undefined;
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+/** A YouTube link that plays something, a Short included. */
+export function isYouTubeVideoUrl(url: string | undefined): boolean {
+  return youTubeVideo(url) !== undefined;
 }

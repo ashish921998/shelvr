@@ -1,4 +1,4 @@
-import { isYouTubeVideoUrl } from "./url";
+import { youTubeVideo } from "./url";
 
 /**
  * Bounds a cover's aspect ratio for layout. Falls back to `fallback` when the
@@ -38,16 +38,9 @@ export function letterboxedVideoRatio(
 ): number | undefined {
   if (
     aspectRatio === undefined ||
-    Math.abs(aspectRatio - STOCK_THUMBNAIL_RATIO) > 0.01 ||
-    !isYouTubeVideoUrl(pageUrl)
+    Math.abs(aspectRatio - STOCK_THUMBNAIL_RATIO) > 0.01
   ) {
     return undefined;
   }
-  try {
-    return new URL(pageUrl ?? "").pathname.startsWith("/shorts/")
-      ? undefined
-      : 16 / 9;
-  } catch {
-    return undefined;
-  }
+  return youTubeVideo(pageUrl) === "video" ? 16 / 9 : undefined;
 }

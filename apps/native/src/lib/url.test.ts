@@ -7,6 +7,7 @@ import {
   isYouTubeVideoUrl,
   siteMonogram,
   typedLink,
+  youTubeVideo,
 } from "./url";
 
 describe("isProbablyUrl", () => {
@@ -138,4 +139,17 @@ describe("typedLink", () => {
       expect(typedLink(text)).toBeNull();
     },
   );
+});
+
+describe("youTubeVideo", () => {
+  it.each([
+    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "video"],
+    ["https://youtu.be/dQw4w9WgXcQ", "video"],
+    ["https://www.youtube.com/embed/dQw4w9WgXcQ", "video"],
+    ["https://m.youtube.com/shorts/abc123", "short"],
+    ["https://www.youtube.com/@RickAstleyYT", undefined],
+    ["https://vimeo.com/1", undefined],
+  ] as const)("reads %s as %s", (url, kind) => {
+    expect(youTubeVideo(url)).toBe(kind);
+  });
 });
