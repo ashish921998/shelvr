@@ -977,6 +977,15 @@ describe("decodeWithContentType", () => {
     );
   });
 
+  it("reads past a > inside another meta's quoted content", () => {
+    const html = new TextEncoder().encode(
+      '<meta name="description" content="Use charset=windows-1252 > UTF-8"><meta charset="utf-8"><title>héllo</title>',
+    );
+    expect(decodeWithContentType(html, "text/html")).toContain(
+      "<title>héllo</title>",
+    );
+  });
+
   it("ignores a <meta charset> inside an HTML comment", () => {
     const html = new TextEncoder().encode(
       '<!-- <meta charset="shift_jis"> --><meta charset="utf-8"><title>héllo</title>',

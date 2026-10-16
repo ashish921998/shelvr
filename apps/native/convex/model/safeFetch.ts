@@ -797,7 +797,10 @@ function charsetFromHtmlMeta(bytes: Uint8Array): string | undefined {
   const head = decodeWindows1252(
     bytes.subarray(0, META_CHARSET_PRESCAN_BYTES),
   ).replace(/<!--[\s\S]*?(?:-->|$)/g, " ");
-  for (const [, tag] of head.matchAll(/<meta\s([^>]*)/gi)) {
+  // Quote-aware, so a ">" inside an attribute value does not end the tag.
+  for (const [, tag] of head.matchAll(
+    /<meta\s((?:"[^"]*"|'[^']*'|[^'">])*)/gi,
+  )) {
     const attributes = metaAttributes(tag);
     const charset =
       attributes.get("charset") ??
