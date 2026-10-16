@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { saveError } from "@convex/model/saveErrors";
 import {
   getPendingSpaces,
   hasPending,
@@ -191,6 +192,28 @@ describe("useReplayOnboarding retries", () => {
       name: "Books",
       dynamic: true,
     });
+  });
+
+  it("drops an older build's queued link the server refuses for good", async () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Trips"],
+        demoUrl: "http://localhost/a",
+      }),
+    );
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockRejectedValue(saveError("invalid_url"));
+    const first = renderHook(() => useReplayOnboarding());
+    await settle();
+    first.unmount();
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(createLinkItem).toHaveBeenCalledTimes(1);
+    expect(hasPending()).toBe(false);
   });
 
   it("runs new pending work without a remount", async () => {

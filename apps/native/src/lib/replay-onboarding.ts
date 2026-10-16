@@ -1,4 +1,5 @@
 import { api } from "@convex/_generated/api";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useConvexAuth, useMutation } from "convex/react";
@@ -188,8 +189,12 @@ export function useReplayOnboarding() {
             });
             clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
-          } catch {
-            return;
+          } catch (error) {
+            // A link the server refuses for good would be refused again on
+            // every replay, holding the rest of the onboarding work open.
+            if (saveErrorCode(error) !== "invalid_url") return;
+            clearLegacyDemoUrl();
+            remainderKey = pendingWorkKey();
           }
         }
 
