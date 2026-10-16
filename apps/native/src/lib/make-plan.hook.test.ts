@@ -18,6 +18,7 @@ vi.mock("convex/react", () => ({
 vi.mock("@convex/_generated/api", () => ({
   api: { plans: {}, placeVisits: {} },
 }));
+vi.mock("react-native", () => ({ Alert: { alert: vi.fn() }, Share: {} }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
