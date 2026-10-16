@@ -209,16 +209,20 @@ function clearCatalogs() {
  * credentials, queued invocations, and the item and space catalogs (which also
  * empties Spotlight).
  */
-async function resetAppIntents(): Promise<void> {
+async function resetAppIntents(signedOut: boolean): Promise<void> {
   if (!AppIntents.isAvailable()) return;
-  // Invocations queued under an account go with it. Ones queued while nobody
-  // was signed in (Siri promised to finish them "the next time you open
-  // Shelvr") wait for whoever signs in on this device.
+  // Invocations queued under an account go with it: ones queued while this
+  // process saw the account signed in (even before its capture token was
+  // minted, when Siri falls back to the queue) or under a stored token owner.
+  // Ones queued while nobody was signed in (Siri promised to finish them "the
+  // next time you open Shelvr") wait for whoever signs in on this device.
   const hadOwner = store.contains(CAPTURE_OWNER_KEY);
   store.remove(CAPTURE_OWNER_KEY);
   await Promise.all([
     setup?.clearCaptureCredentials(),
-    hadOwner ? AppIntents.clearPendingInvocationsAsync() : undefined,
+    signedOut || hadOwner
+      ? AppIntents.clearPendingInvocationsAsync()
+      : undefined,
     clearCatalogs(),
   ]);
 }
@@ -247,15 +251,17 @@ export async function revokeSiriCapture(
 export function useAppIntentsSignOutReset(): void {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const reset = useRef(false);
+  const sawAuthenticated = useRef(false);
   useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated) {
       reset.current = false;
+      sawAuthenticated.current = true;
       return;
     }
     if (reset.current) return;
     reset.current = true;
-    void resetAppIntents().catch((error) =>
+    void resetAppIntents(sawAuthenticated.current).catch((error) =>
       analytics.captureError("app_intents_reset_failed", error),
     );
   }, [isAuthenticated, isLoading]);
@@ -514,8 +520,15 @@ function useInvocationHandler() {
     runRef.current = run;
   });
   AppIntents.useAppIntents((pending) => runRef.current(pending));
+  // The module delivers the queue once per mount. A capture queued while
+  // nobody was signed in is skipped above, so read the queue again when the
+  // account arrives after mount; an account already signed in at mount is
+  // covered by that first delivery.
+  const previousAuth = useRef(isAuthenticated);
   useEffect(() => {
-    if (!isAuthenticated) return;
+    const wasAuthenticated = previousAuth.current;
+    previousAuth.current = isAuthenticated;
+    if (!isAuthenticated || wasAuthenticated) return;
     void AppIntents.getPendingInvocationsAsync()
       .then((pending) => runRef.current(pending))
       .catch((error) =>

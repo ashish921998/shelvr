@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, render, renderHook } from "@testing-library/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppIntentsBridge, useAppIntentsSignOutReset } from "./app-intents";
 
@@ -21,11 +21,17 @@ const mock = vi.hoisted(() => ({
 
 vi.mock("expo-app-intents", () => ({
   isAvailable: () => true,
+  // Shaped like the real hook: the queue is delivered once per mount, and
+  // later deliveries reach the latest handler through a ref.
   useAppIntents: (handler: (pending: unknown[]) => Promise<void>) => {
+    const handlerRef = useRef(handler);
     useEffect(() => {
-      mock.handler = handler;
-      void handler(mock.pending);
+      handlerRef.current = handler;
     }, [handler]);
+    useEffect(() => {
+      mock.handler = (pending) => handlerRef.current(pending);
+      void handlerRef.current(mock.pending);
+    }, []);
   },
   getPendingInvocationsAsync: async () => mock.pending,
   removePendingInvocationAsync: mock.remove,
@@ -144,5 +150,24 @@ describe("a capture Siri queued while nobody was signed in", () => {
     await settle();
     expect(mock.clearPending).toHaveBeenCalledOnce();
     expect(mock.store.has("captureOwner")).toBe(false);
+  });
+
+  it("is dropped on sign-out even when that account never got a capture token", async () => {
+    mock.authenticated = true;
+    const view = renderHook(() => useAppIntentsSignOutReset());
+    await settle();
+    expect(mock.clearPending).not.toHaveBeenCalled();
+
+    mock.authenticated = false;
+    view.rerender();
+    await settle();
+    expect(mock.clearPending).toHaveBeenCalledOnce();
+  });
+
+  it("is delivered once when the account was already signed in at launch", async () => {
+    mock.authenticated = true;
+    render(<AppIntentsBridge />);
+    await settle();
+    expect(mock.createNote).toHaveBeenCalledOnce();
   });
 });
