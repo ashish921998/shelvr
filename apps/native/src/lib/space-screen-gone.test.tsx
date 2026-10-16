@@ -6,7 +6,7 @@ import SpaceScreen from "@/app/(app)/space/[id]";
 
 const mock = vi.hoisted(() => ({
   space: undefined as unknown,
-  refused: false,
+  error: null as unknown,
   emptyState: vi.fn(() => null),
   screenLoader: vi.fn(() => null),
 }));
@@ -29,13 +29,22 @@ vi.mock("react-native-reanimated", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { gap: (n: number) => n * 8, colors: {} } }),
+  useUnistyles: () => ({
+    theme: { gap: (n: number) => n * 8, colors: {}, fonts: {} },
+  }),
 }));
-vi.mock("expo-router", () => ({
-  Stack: { Screen: vi.fn(() => null) },
-  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
-  useLocalSearchParams: () => ({ id: "x" }),
-}));
+vi.mock("expo-router", () => {
+  const Toolbar = Object.assign(Container, {
+    Button: Container,
+    Menu: Container,
+    MenuAction: Container,
+  });
+  return {
+    Stack: { Screen: vi.fn(() => null), Title: Container, Toolbar },
+    useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
+    useLocalSearchParams: () => ({ id: "x" }),
+  };
+});
 vi.mock("expo-haptics", () => ({ notificationAsync: vi.fn() }));
 vi.mock("@convex/_generated/api", () => ({
   api: { spaces: { getSpace: "space" } },
@@ -44,7 +53,7 @@ vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (ref: string) => ref,
 }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: mock.space, isError: mock.refused }),
+  useQuery: () => ({ data: mock.space, error: mock.error }),
 }));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
@@ -75,12 +84,12 @@ vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 beforeEach(() => {
   vi.clearAllMocks();
   mock.space = undefined;
-  mock.refused = false;
+  mock.error = null;
 });
 
 describe("a link to a space id the server refuses", () => {
   it("shows the space as gone instead of loading forever", () => {
-    mock.refused = true;
+    mock.error = new Error("ArgumentValidationError");
 
     render(<SpaceScreen />);
 
@@ -89,6 +98,25 @@ describe("a link to a space id the server refuses", () => {
       expect.objectContaining({ message: "spaces.gone" }),
       undefined,
     );
+  });
+
+  it("keeps a loaded space up through a later query error", () => {
+    mock.space = { _id: "s1", name: "Trips", suggestions: [], items: [] };
+    mock.error = new Error("Server Error");
+
+    render(<SpaceScreen />);
+
+    expect(mock.emptyState).not.toHaveBeenCalled();
+    expect(mock.screenLoader).not.toHaveBeenCalled();
+  });
+
+  it("keeps loading through an auth error the query will recover from", () => {
+    mock.error = new Error("Not authenticated");
+
+    render(<SpaceScreen />);
+
+    expect(mock.screenLoader).toHaveBeenCalled();
+    expect(mock.emptyState).not.toHaveBeenCalled();
   });
 
   it("still loads while the query has no answer", () => {

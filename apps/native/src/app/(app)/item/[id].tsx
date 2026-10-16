@@ -60,6 +60,7 @@ import { useHomeFeed } from "@/lib/home-feed";
 import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
+import { isRefusedQuery } from "@/lib/refused-query";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
 
 // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
@@ -501,8 +502,9 @@ function ItemScreenContent() {
   // A single-item fallback for deep links (no source) or a stale list that no
   // longer contains this id. A link whose id the server refuses (malformed,
   // or not an item id) never resolves to `null`; it is as gone as one that
-  // does.
-  const { data: single, isError: singleRefused } = useQuery(
+  // does. An auth error keeps loading while the query is re-subscribed
+  // (`convex-query-healing`).
+  const { data: single, error: singleError } = useQuery(
     convexQuery(api.items.getItem, { id: id as Id<"items"> }),
   );
 
@@ -533,10 +535,10 @@ function ItemScreenContent() {
         ? list
         : single
           ? [single]
-          : single === null || singleRefused
+          : single === null || isRefusedQuery(singleError)
             ? []
             : undefined,
-    [startIndex, list, single, singleRefused],
+    [startIndex, list, single, singleError],
   );
 
   const onEndReached = pagerEndReached(items, homeFeed);

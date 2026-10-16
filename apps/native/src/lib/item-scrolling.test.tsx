@@ -15,7 +15,7 @@ const mock = vi.hoisted(() => ({
     spaceId?: string;
   },
   items: [] as DetailItem[],
-  singleRefused: false,
+  singleError: null as unknown,
   scroll: vi.fn(),
   detailsScroll: vi.fn(),
   dismiss: vi.fn(),
@@ -145,7 +145,7 @@ vi.mock("@tanstack/react-query", () => ({
         : ref === "single"
           ? mock.items.find((item) => item._id === mock.params.id)
           : undefined,
-    isError: ref === "single" && mock.singleRefused,
+    error: ref === "single" ? mock.singleError : null,
   }),
 }));
 vi.mock("convex/react", () => ({
@@ -231,7 +231,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.items = ["a", "b", "c"].map(item);
   mock.params = { id: "b", from: "space", spaceId: "space-1" };
-  mock.singleRefused = false;
+  mock.singleError = null;
   mock.dismiss.mockResolvedValue(true);
   mock.delete.mockResolvedValue(undefined);
   mock.router.canGoBack.mockReturnValue(true);
@@ -406,7 +406,7 @@ describe("a link to an id the server refuses", () => {
   it("shows the save as gone instead of loading forever", async () => {
     mock.items = [];
     mock.params = { id: "x" };
-    mock.singleRefused = true;
+    mock.singleError = new Error("ArgumentValidationError");
     const { EmptyState } = await import("@/components/empty-state");
     const { ScreenLoader } = await import("@/components/ui/screen-loader");
 
@@ -417,5 +417,18 @@ describe("a link to an id the server refuses", () => {
       expect.objectContaining({ title: "item.goneTitle" }),
       undefined,
     );
+  });
+
+  it("keeps loading through an auth error the query will recover from", async () => {
+    mock.items = [];
+    mock.params = { id: "x" };
+    mock.singleError = new Error("Not authenticated");
+    const { EmptyState } = await import("@/components/empty-state");
+    const { ScreenLoader } = await import("@/components/ui/screen-loader");
+
+    render(<ItemScreen />);
+
+    expect(ScreenLoader).toHaveBeenCalled();
+    expect(EmptyState).not.toHaveBeenCalled();
   });
 });

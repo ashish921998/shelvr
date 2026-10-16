@@ -23,6 +23,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { canMakePlan } from "@/lib/make-plan";
+import { isRefusedQuery } from "@/lib/refused-query";
 
 /** Saved items a space needs before "Make a plan" shows. */
 
@@ -32,11 +33,13 @@ export default function SpaceScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   // A link whose id the server refuses (malformed, or not a space id) never
-  // resolves to `null`; it is as gone as one that does.
-  const { data: loaded, isError: refused } = useQuery(
+  // resolves to `null`; it is as gone as one that does. A space already
+  // loaded stays up through a later error, and an auth error keeps loading
+  // while the query is re-subscribed (`convex-query-healing`).
+  const { data: loaded, error } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
-  const space = refused ? null : loaded;
+  const space = loaded ?? (isRefusedQuery(error) ? null : undefined);
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
   const { guard: planGuard } = usePaywallGuard("make_plan");
