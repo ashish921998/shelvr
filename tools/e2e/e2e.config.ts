@@ -38,6 +38,10 @@ export default {
   ],
   workers: 1,
   timeout: 300_000,
+  // The hosted macOS runner's simulator can take longer than the 30s default
+  // to relaunch the app or clear its keychain while it is loaded; give device
+  // actions room so a slow simctl is not reported as a failed flow.
+  actionTimeout: 90_000,
   agents: {
     default: {
       model: google(process.env.E2E_MODEL ?? "gemini-3.8-flash"),
