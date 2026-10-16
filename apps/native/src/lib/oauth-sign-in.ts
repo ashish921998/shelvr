@@ -332,7 +332,13 @@ export function useOAuthSignIn(surface: OAuthSurface) {
       };
       try {
         // Every screen that offers sign-in shows the AI disclosure beside it.
-        markAiDisclosedAtSignIn();
+        // The note only skips the separate consent card later; a failed
+        // write must not keep anyone from signing in.
+        try {
+          markAiDisclosedAtSignIn();
+        } catch (err) {
+          analytics.captureError("ai_disclosure_note_failed", err);
+        }
         const method = await authMethod(provider);
         const outcome = await attemptWith(method);
         if (method !== "native" || outcome !== "failed") return outcome;
@@ -344,9 +350,8 @@ export function useOAuthSignIn(surface: OAuthSurface) {
         setLastError(null);
         return await attemptWith("web");
       } catch (err) {
-        // Work outside an attempt failed (the disclosure note, picking the
-        // method). The buttons discard this promise, so it must never
-        // reject: the person is told here instead.
+        // Work outside an attempt failed. The buttons discard this promise,
+        // so it must never reject: the person is told here instead.
         analytics.captureError("auth_failed", err, {
           provider,
           stage: "request",

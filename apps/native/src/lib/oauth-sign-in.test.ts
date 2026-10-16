@@ -547,27 +547,29 @@ describe("useOAuthSignIn", () => {
     });
   });
 
-  it("reports a failure before the attempt as a failed sign-in, never as a rejection", async () => {
-    // The disclosure note is the first storage write and sits outside every
-    // attempt; the buttons discard the promise, so a throw there was silent.
+  it("signs in even when the disclosure note cannot be written", async () => {
+    // The note is the first storage write and sat outside every catch; the
+    // buttons discard the promise, so a throw there was an unhandled
+    // rejection with an idle-looking sheet.
     disclosed.mockImplementation(() => {
       throw new Error("storage");
     });
-    const hook = renderHook(() => useOAuthSignIn("demo_sheet"));
-
-    let outcome: Promise<string> | undefined;
-    await act(async () => {
-      outcome = hook.result.current.signInWith("google");
-      await outcome.catch(() => undefined);
+    mock.signIn
+      .mockResolvedValueOnce({ signingIn: false, redirect })
+      .mockResolvedValueOnce({ signingIn: true });
+    endSession({
+      type: "success",
+      url: "shelvr://auth/callback?code=abc",
     });
 
-    await expect(outcome).resolves.toBe("failed");
+    const { hook, outcome } = await run("google");
+
+    expect(outcome).toBe("completed");
     expect(hook.result.current.pendingProvider).toBeNull();
-    expect(hook.result.current.lastError).toBe("Error: storage");
+    expect(hook.result.current.lastError).toBeNull();
     expect(mock.captureError).toHaveBeenCalledWith(
-      "auth_failed",
+      "ai_disclosure_note_failed",
       expect.any(Error),
-      expect.objectContaining({ stage: "request" }),
     );
   });
 });
