@@ -124,6 +124,32 @@ describe("undo after a committed delete", () => {
     expect(result.current.canUndo).toBe(false);
   });
 
+  it("trims from the cutoff read before the dialog even if that entry was undone meanwhile", async () => {
+    let finishDelete: () => void = () => undefined;
+    mocks.deleteAssets.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finishDelete = () => resolve(undefined);
+        }),
+    );
+    const { result } = setup();
+    act(() => result.current.onDecision(23, "keep"));
+    act(() => result.current.onDecision(22, "delete"));
+    let commit: Promise<void> = Promise.resolve();
+    act(() => {
+      commit = result.current.commitDeletes();
+    });
+    // The dialog is open and the queued delete gets undone underneath it.
+    act(() => result.current.undo());
+    await act(async () => {
+      finishDelete();
+      await commit;
+    });
+    // Card 22 is gone either way, so the keep above it is not undoable.
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.undo()).toBeNull();
+  });
+
   it("keeps the whole history when the delete dialog is cancelled", async () => {
     mocks.deleteAssets.mockRejectedValueOnce(new Error("cancelled"));
     const { result } = setup();
