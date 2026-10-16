@@ -217,7 +217,6 @@ async function resetAppIntents(signedOut: boolean): Promise<void> {
   // Ones queued while nobody was signed in (Siri promised to finish them "the
   // next time you open Shelvr") wait for whoever signs in on this device.
   const hadOwner = store.contains(CAPTURE_OWNER_KEY);
-  store.remove(CAPTURE_OWNER_KEY);
   await Promise.all([
     setup?.clearCaptureCredentials(),
     signedOut || hadOwner
@@ -225,6 +224,9 @@ async function resetAppIntents(signedOut: boolean): Promise<void> {
       : undefined,
     clearCatalogs(),
   ]);
+  // Only once the queue is gone: a failed clear keeps the owner marker, so the
+  // next reset still treats the queue as that account's.
+  store.remove(CAPTURE_OWNER_KEY);
 }
 
 /**
@@ -376,10 +378,9 @@ const CAPTURE_INVOCATIONS = new Set(["saveNote", "saveLink", "saveImages"]);
  * reach the server when Siri ran. A capture waits for a signed-in account
  * (onboarding mounts this before sign-in), and the queue is read again as
  * soon as one is there. */
-function useInvocationHandler() {
+function useInvocationHandler(canSave: boolean) {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
-  const { isAuthenticated } = useConvexAuth();
   const createNoteItem = useMutation(api.items.createNoteItem);
   const createLinkItem = useMutation(api.items.createLinkItem);
   const saveImages = useSaveImages();
@@ -477,10 +478,13 @@ function useInvocationHandler() {
           })),
           { spaceId: spaceParam(invocation), saveSource: "siri" },
         );
-        // A refused image (no Pro, photo limit) would be refused again, so
-        // only a transient failure keeps the invocation for the next launch.
+        // A refused image (photo limit) would be refused again, so only a
+        // transient failure, or a Pro lapse the user may fix, keeps the
+        // invocation for the next launch.
         const retry = results.find(
-          (result) => result.status === "failed" && result.code === undefined,
+          (result) =>
+            result.status === "failed" &&
+            (result.code === undefined || result.code === "pro_required"),
         );
         if (retry) throw new Error("app_intents_image_save_failed");
         for (const file of files) file.delete();
@@ -492,16 +496,19 @@ function useInvocationHandler() {
   async function run(pending: AppIntents.AppIntentInvocation[]) {
     for (const invocation of pending) {
       if (inFlight.current.has(invocation.id)) continue;
-      // Left pending for the account that signs in.
-      if (!isAuthenticated && CAPTURE_INVOCATIONS.has(invocation.name))
-        continue;
+      // Left pending for the account that signs in, and until it has Pro:
+      // a fresh account reaches the paywall after sign-in, and a save made
+      // before that would be refused and the capture lost.
+      if (!canSave && CAPTURE_INVOCATIONS.has(invocation.name)) continue;
       inFlight.current.add(invocation.id);
       try {
         await handle(invocation);
         await AppIntents.removePendingInvocationAsync(invocation.id);
       } catch (error) {
-        if (saveErrorCode(error) !== null) {
-          // Refused (no Pro, photo limit): retrying would only fail again.
+        const code = saveErrorCode(error);
+        if (code !== null && code !== "pro_required") {
+          // Refused (photo limit, bad link): retrying would only fail again.
+          // A Pro lapse is not final: the capture waits for the entitlement.
           await AppIntents.removePendingInvocationAsync(invocation.id);
         } else {
           // Left pending, so the next launch or invocation retries it.
@@ -520,21 +527,21 @@ function useInvocationHandler() {
     runRef.current = run;
   });
   AppIntents.useAppIntents((pending) => runRef.current(pending));
-  // The module delivers the queue once per mount. A capture queued while
-  // nobody was signed in is skipped above, so read the queue again when the
-  // account arrives after mount; an account already signed in at mount is
-  // covered by that first delivery.
-  const previousAuth = useRef(isAuthenticated);
+  // The module delivers the queue once per mount. A capture queued before the
+  // account could save is skipped above, so read the queue again when a Pro
+  // account arrives after mount; one already there at mount is covered by
+  // that first delivery.
+  const previousCanSave = useRef(canSave);
   useEffect(() => {
-    const wasAuthenticated = previousAuth.current;
-    previousAuth.current = isAuthenticated;
-    if (!isAuthenticated || wasAuthenticated) return;
+    const couldSave = previousCanSave.current;
+    previousCanSave.current = canSave;
+    if (!canSave || couldSave) return;
     void AppIntents.getPendingInvocationsAsync()
       .then((pending) => runRef.current(pending))
       .catch((error) =>
         analytics.captureError("app_intents_invocation_failed", error),
       );
-  }, [isAuthenticated]);
+  }, [canSave]);
 }
 
 /**
@@ -551,7 +558,7 @@ function SignedInAppIntents() {
   const { isAuthenticated } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const { entitled, loading } = useEntitlement();
-  useInvocationHandler();
+  useInvocationHandler(isAuthenticated && entitled);
   useCaptureCredentials(isAuthenticated ? user?._id : undefined);
   useCatalogSync(isAuthenticated && entitled, loading);
   return null;

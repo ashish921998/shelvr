@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { act, render, renderHook } from "@testing-library/react";
 import { useEffect, useRef } from "react";
+import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppIntentsBridge, useAppIntentsSignOutReset } from "./app-intents";
 
 const mock = vi.hoisted(() => ({
   authenticated: false,
+  entitled: false,
   pending: [] as {
     id: string;
     name: string;
@@ -86,7 +88,7 @@ vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: undefined }),
 }));
 vi.mock("@/lib/entitlement", () => ({
-  useEntitlement: () => ({ entitled: false, loading: true }),
+  useEntitlement: () => ({ entitled: mock.entitled, loading: !mock.entitled }),
 }));
 vi.mock("@/lib/home-feed", () => ({
   useHomeFeed: () => ({
@@ -110,6 +112,7 @@ const note = {
 beforeEach(() => {
   vi.clearAllMocks();
   mock.authenticated = false;
+  mock.entitled = false;
   mock.pending = [note];
   mock.handler = null;
   mock.store.clear();
@@ -129,6 +132,7 @@ describe("a capture Siri queued while nobody was signed in", () => {
     expect(mock.remove).not.toHaveBeenCalled();
 
     mock.authenticated = true;
+    mock.entitled = true;
     view.rerender(<AppIntentsBridge />);
     await settle();
 
@@ -136,6 +140,41 @@ describe("a capture Siri queued while nobody was signed in", () => {
       expect.objectContaining({ text: "book the dentist", saveSource: "siri" }),
     );
     expect(mock.remove).toHaveBeenCalledWith("inv-1");
+  });
+
+  it("waits for Pro after sign-in instead of being refused and dropped", async () => {
+    mock.authenticated = true;
+    const view = render(<AppIntentsBridge />);
+    await settle();
+    expect(mock.createNote).not.toHaveBeenCalled();
+    expect(mock.remove).not.toHaveBeenCalled();
+
+    mock.entitled = true;
+    view.rerender(<AppIntentsBridge />);
+    await settle();
+    expect(mock.createNote).toHaveBeenCalledOnce();
+    expect(mock.remove).toHaveBeenCalledWith("inv-1");
+  });
+
+  it("stays queued when the save is refused for a Pro lapse", async () => {
+    mock.authenticated = true;
+    mock.entitled = true;
+    mock.createNote.mockRejectedValueOnce(
+      new ConvexError({ code: "pro_required" }),
+    );
+    render(<AppIntentsBridge />);
+    await settle();
+    expect(mock.createNote).toHaveBeenCalledOnce();
+    expect(mock.remove).not.toHaveBeenCalled();
+  });
+
+  it("keeps the owner marker when the queue clear fails", async () => {
+    mock.store.set("captureOwner", "user_1");
+    mock.clearPending.mockRejectedValueOnce(new Error("io"));
+    renderHook(() => useAppIntentsSignOutReset());
+    await settle();
+    expect(mock.clearPending).toHaveBeenCalledOnce();
+    expect(mock.store.has("captureOwner")).toBe(true);
   });
 
   it("survives the signed-out reset when no account owned the device", async () => {
@@ -166,6 +205,7 @@ describe("a capture Siri queued while nobody was signed in", () => {
 
   it("is delivered once when the account was already signed in at launch", async () => {
     mock.authenticated = true;
+    mock.entitled = true;
     render(<AppIntentsBridge />);
     await settle();
     expect(mock.createNote).toHaveBeenCalledOnce();
