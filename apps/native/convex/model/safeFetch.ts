@@ -758,13 +758,6 @@ function charsetFromBom(bytes: Uint8Array): string | undefined {
   return undefined;
 }
 
-/** The charset an HTML document declares in its head, found by scanning the
- * first bytes for `<meta charset=...>` or
- * `<meta http-equiv="Content-Type" content="...; charset=...">`. The prefix
- * is read byte-for-byte as windows-1252 so the scan only sees ASCII, the way
- * a browser's prescan does. A declared UTF-16 is read as UTF-8, as the
- * Encoding Standard says: the declaration was found as ASCII, so the bytes
- * cannot be UTF-16. */
 /** Only an HTML body (or one with no media type at all) is prescanned for a
  * `<meta>` charset; JSON and XML bodies that happen to quote one are not. */
 function mayCarryHtmlMeta(contentType: string): boolean {
@@ -776,14 +769,48 @@ function mayCarryHtmlMeta(contentType: string): boolean {
   );
 }
 
-function charsetFromHtmlMeta(bytes: Uint8Array): string | undefined {
-  const head = decodeWindows1252(bytes.subarray(0, META_CHARSET_PRESCAN_BYTES));
-  const match = head.match(/<meta\s[^>]*?charset\s*=\s*["']?\s*([\w.:-]+)/i);
-  const charset = match?.[1]?.toLowerCase();
-  if (charset === undefined) {
-    return undefined;
+/** The attributes of one `<meta ...>` tag, names lower-cased, values
+ * unquoted. A later duplicate does not replace the first, as in HTML. */
+function metaAttributes(tag: string): Map<string, string> {
+  const attributes = new Map<string, string>();
+  const pattern =
+    /([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+  for (const match of tag.matchAll(pattern)) {
+    const name = match[1].toLowerCase();
+    if (!attributes.has(name)) {
+      attributes.set(name, match[2] ?? match[3] ?? match[4] ?? "");
+    }
   }
-  return charset.startsWith("utf-16") ? "utf-8" : charset;
+  return attributes;
+}
+
+/** The charset an HTML document declares in its head, found by scanning the
+ * first bytes for `<meta charset=...>` or
+ * `<meta http-equiv="Content-Type" content="...; charset=...">`, the way a
+ * browser's prescan does: comments are skipped, only a `charset` attribute
+ * or the `content` of an `http-equiv="Content-Type"` meta counts, so a
+ * description that mentions `charset=` is not a declaration. The prefix is
+ * read byte-for-byte as windows-1252 so the scan only sees ASCII. A declared
+ * UTF-16 is read as UTF-8, as the Encoding Standard says: the declaration
+ * was found as ASCII, so the bytes cannot be UTF-16. */
+function charsetFromHtmlMeta(bytes: Uint8Array): string | undefined {
+  const head = decodeWindows1252(
+    bytes.subarray(0, META_CHARSET_PRESCAN_BYTES),
+  ).replace(/<!--[\s\S]*?(?:-->|$)/g, " ");
+  for (const [, tag] of head.matchAll(/<meta\s([^>]*)/gi)) {
+    const attributes = metaAttributes(tag);
+    const charset =
+      attributes.get("charset") ??
+      (attributes.get("http-equiv")?.toLowerCase() === "content-type"
+        ? charsetFromContentType(attributes.get("content") ?? "")
+        : undefined);
+    const label = charset?.trim().toLowerCase();
+    if (label === undefined || label === "") {
+      continue;
+    }
+    return label.startsWith("utf-16") ? "utf-8" : label;
+  }
+  return undefined;
 }
 
 /** Decode bounded bytes as text, honoring the charset declared in the

@@ -968,6 +968,35 @@ describe("decodeWithContentType", () => {
     );
   });
 
+  it("ignores charset= inside another meta's content", () => {
+    const html = new TextEncoder().encode(
+      '<meta name="description" content="Fix mojibake: set charset=shift_jis"><title>héllo</title>',
+    );
+    expect(decodeWithContentType(html, "text/html")).toContain(
+      "<title>héllo</title>",
+    );
+  });
+
+  it("ignores a <meta charset> inside an HTML comment", () => {
+    const html = new TextEncoder().encode(
+      '<!-- <meta charset="shift_jis"> --><meta charset="utf-8"><title>héllo</title>',
+    );
+    expect(decodeWithContentType(html, "text/html")).toContain(
+      "<title>héllo</title>",
+    );
+  });
+
+  it("reads an unquoted http-equiv charset after an unrelated meta", () => {
+    // 0xe9 is é in windows-1252.
+    const html = new Uint8Array([
+      ...new TextEncoder().encode(
+        '<meta name=viewport content=width=device-width><meta http-equiv=content-type content="text/html; charset=windows-1252">',
+      ),
+      0xe9,
+    ]);
+    expect(decodeWithContentType(html, "text/html")).toMatch(/\u00e9$/);
+  });
+
   it("falls back to UTF-8 for an unsupported <meta charset>", () => {
     const html = new TextEncoder().encode('<meta charset="fake-charset">héllo');
     expect(decodeWithContentType(html, "text/html")).toBe(
