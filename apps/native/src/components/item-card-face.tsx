@@ -301,22 +301,18 @@ function CardCaption({
           </View>
         ) : null}
       </View>
-      {/* ActionMenu styles the button inside its native menu, where an
-          offset doesn't move it, so the offset goes on a wrapper. */}
-      <View style={!hostRow && styles.menuOnTitle}>
-        <ActionMenu
-          label={t("item.actions")}
-          title={t("item.actions")}
-          actions={menuActions}
-          style={styles.menuButton}
-        >
-          <AppSymbolIcon
-            name="ellipsis"
-            size={15}
-            tintColor={theme.colors.foreground}
-          />
-        </ActionMenu>
-      </View>
+      <ActionMenu
+        label={t("item.actions")}
+        title={t("item.actions")}
+        actions={menuActions}
+        style={[styles.menuButton, !hostRow && styles.menuOnTitle]}
+      >
+        <AppSymbolIcon
+          name="ellipsis"
+          size={15}
+          tintColor={theme.colors.foreground}
+        />
+      </ActionMenu>
     </View>
   );
 }
@@ -548,11 +544,13 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     borderRadius: 22,
   },
-  // With no site line, the "…" centres on the title's line (7.5 down) instead
-  // of hanging a line below it (20 down). A save whose title hasn't landed yet
-  // sits the same way, so its card keeps its height when the title arrives.
+  // With no site line, the "…" centres on the title's line (13.5 from the
+  // caption's top) instead of hanging a line below it. The icon moves, not the
+  // button: a margin on it would not move the native menu's host, and would
+  // push the 44pt hit area up into the picture. A save whose title hasn't
+  // landed yet sits the same way, so its card keeps its height when it does.
   menuOnTitle: {
-    marginTop: -12,
+    paddingBottom: 25,
   },
   suggestedBadge: {
     position: "absolute",
