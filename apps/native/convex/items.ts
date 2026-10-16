@@ -3216,7 +3216,9 @@ export const failStaleProcessingItems = internalMutation({
  * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
  * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
  * or removed here, so the pipeline cannot clobber a user decision by
- * construction. Existing suggestions not in the new set are withdrawn.
+ * construction. Existing suggestions in dynamic spaces not in the new set are
+ * withdrawn; a suggestion in a quiet space was never shown to the classifier
+ * and stays.
  */
 /** True when the space auto-files this save: on, and the save is newer. */
 function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
@@ -3257,6 +3259,12 @@ export const setSpacesForItem = internalMutation({
     for (const join of existing) {
       touched.add(join.spaceId);
       if (effectiveStatus(join) === "suggested" && !wanted.has(join.spaceId)) {
+        // The classifier only ever sees dynamic spaces, so a suggestion in a
+        // quiet space (left by the one recommendation pass at its creation)
+        // was never evaluated and must survive a retry or refresh. Withdrawing
+        // it would lose it for good: nothing suggests into a quiet space again.
+        const space = await ctx.db.get(join.spaceId);
+        if (space !== null && space.dynamic !== true) continue;
         await deleteMembership(ctx, join);
       }
     }
