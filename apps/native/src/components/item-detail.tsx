@@ -89,9 +89,13 @@ type Props = {
 // neither the article body nor the space memberships), similar items, the hero
 // URI, and parsed article paragraphs.
 function useItemDetailData(item: DetailItem) {
-  const { data: withSpaces, isError: fullRowFailed } = useQuery(
-    convexQuery(api.items.getItem, { id: item._id }),
-  );
+  // The full row is only needed while its page is open. The short gcTime
+  // ends each visited page's subscription soon after it unmounts; with the
+  // session-long default every save ever opened kept a live one.
+  const { data: withSpaces, isError: fullRowFailed } = useQuery({
+    ...convexQuery(api.items.getItem, { id: item._id }),
+    gcTime: 30_000,
+  });
   const spaces = withSpaces?.spaces ?? [];
 
   // The full document wins once it arrives; until then the row is all we have.
