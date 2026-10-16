@@ -14,7 +14,8 @@ import {
   type PlanPlace,
 } from "./make-plan";
 
-vi.mock("convex/react", () => ({ useAction: vi.fn() }));
+vi.mock("convex/react", () => ({ useAction: vi.fn(), useMutation: vi.fn() }));
+vi.mock("react-native", () => ({ Alert: { alert: vi.fn() }, Share: {} }));
 vi.mock("@convex/_generated/api", () => ({ api: {} }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },

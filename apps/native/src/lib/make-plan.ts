@@ -6,6 +6,7 @@ import { isAiConsentRequired } from "@convex/model/aiConsent";
 import { placeKey, type PlanPlace } from "@convex/model/plan";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Share } from "react-native";
 
 export type { PlanPlace };
 
@@ -330,9 +331,52 @@ export function planVoteUrl(token: string): string {
   return `https://shelvr-web.vercel.app/p/${token}`;
 }
 
-/** The message "Ask someone" sends with the vote link. */
-export function planAskText(spaceName: string, url: string): string {
-  return t("plan.askText", { space: spaceName, url });
+/**
+ * "Ask someone": a fresh vote link for the places on screen, then the share
+ * sheet with it. A link nobody is sent still counts as this space's latest.
+ * One ask at a time; a failed link says so, a cancelled sheet says nothing.
+ */
+export function usePlanAsk(
+  spaceId: Id<"spaces">,
+  city: string | undefined,
+  places: PlanPlace[],
+) {
+  const createPlanShare = useMutation(api.planShares.createPlanShare);
+  const [asking, setAsking] = useState(false);
+
+  const ask = useCallback(async () => {
+    if (places.length === 0 || asking) return;
+    setAsking(true);
+    try {
+      const token = await createPlanShare({
+        spaceId,
+        city,
+        places: places.map((place) => ({
+          name: place.name,
+          area: place.area,
+          why: place.why,
+          itemId: place.itemId,
+        })),
+      });
+      const result = await Share.share({
+        message: t("plan.askText", { url: planVoteUrl(token) }),
+      });
+      if (result.action === Share.sharedAction) {
+        analytics.capture("plan_asked", {
+          place_count: places.length,
+          in_city: city !== undefined,
+        });
+      }
+    } catch (error) {
+      analytics.capture("plan_ask_failed", { reason: "link" });
+      analytics.captureError("plan_ask_failed", error);
+      Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
+    } finally {
+      setAsking(false);
+    }
+  }, [asking, city, createPlanShare, places, spaceId]);
+
+  return { ask, asking };
 }
 
 type CityCandidate = {

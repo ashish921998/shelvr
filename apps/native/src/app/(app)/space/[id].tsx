@@ -11,20 +11,20 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useMutation } from "convex/react";
+import { isAiConsentRequired } from "@convex/model/aiConsent";
+import { useAction, useMutation } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { PlanCitySheet } from "@/components/plan-city-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderScrim } from "@/components/ui/header-scrim";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { usePaywallGuard } from "@/lib/entitlement";
-import { canMakePlan } from "@/lib/make-plan";
-
-/** Saved items a space needs before "Make a plan" shows. */
+import { canMakePlan, cityOptions } from "@/lib/make-plan";
 
 export default function SpaceScreen() {
   useAppLocale();
@@ -36,7 +36,11 @@ export default function SpaceScreen() {
   );
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
+  const classifyCities = useAction(api.plans.classifyCities);
   const { guard: planGuard } = usePaywallGuard("make_plan");
+  const [citySheet, setCitySheet] = useState(false);
+  // One background read of the saves with no city yet, per visit.
+  const citiesRead = useRef(false);
 
   // Suggestions lead the feed (they're the ones asking for a decision),
   // wearing the sparkle badge; saved items follow. Item detail rebuilds this
@@ -95,10 +99,38 @@ export default function SpaceScreen() {
   const suggestionCount = space.suggestions.length;
   const canPlan = canMakePlan(space.items);
 
+  const openPlan = (city: string | undefined) => {
+    setCitySheet(false);
+    router.push({
+      pathname: "/plan/[id]",
+      params: city === undefined ? { id: space._id } : { id: space._id, city },
+    });
+  };
+
+  const { cities, pending: citiesPending } = cityOptions(space.items);
+
   const makePlan = () => {
-    void planGuard(() =>
-      router.push({ pathname: "/plan/[id]", params: { id: space._id } }),
-    );
+    void planGuard(() => {
+      if (citiesPending > 0 && !citiesRead.current) {
+        citiesRead.current = true;
+        classifyCities({ spaceId: space._id }).catch((error: unknown) => {
+          if (!isAiConsentRequired(error)) {
+            analytics.captureError("classify_cities_failed", error);
+          }
+        });
+      }
+      // One city, or none known: nothing to choose, straight to the plan.
+      if (cities.length >= 2) setCitySheet(true);
+      else openPlan(undefined);
+    });
+  };
+
+  const pickCity = (city: string | undefined) => {
+    analytics.capture("plan_city_chosen", {
+      city: city !== undefined,
+      city_count: cities.length,
+    });
+    openPlan(city);
   };
 
   const planPill = canPlan ? (
@@ -258,6 +290,15 @@ export default function SpaceScreen() {
         />
         <HeaderScrim />
       </View>
+      <PlanCitySheet
+        // A fresh pick each time the cities change, so the top one is chosen.
+        key={cities.map((city) => city.name).join("|")}
+        visible={citySheet}
+        cities={cities}
+        total={space.items.filter((item) => item.status === "ready").length}
+        onClose={() => setCitySheet(false)}
+        onPick={pickCity}
+      />
     </>
   );
 }
