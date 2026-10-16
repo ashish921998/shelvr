@@ -98,8 +98,9 @@ export function archiveCheckOrder<Item>(
   archive: readonly Item[],
   userId: string,
   now: number,
+  timezone?: string,
 ): Item[] {
-  return weeklyShuffle(archive, `${userId}:${weekStart(now)}`).slice(
+  return weeklyShuffle(archive, `${userId}:${weekStart(now, timezone)}`).slice(
     0,
     ARCHIVE_CHECKS,
   );

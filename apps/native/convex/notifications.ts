@@ -540,6 +540,7 @@ export const prepareWeeklyDigest = internalMutation({
       candidates.archive,
       args.userId,
       args.now,
+      preferences.timezone,
     )) {
       if (archive.length >= wanted) break;
       if (!(await wasOpened(ctx, args.userId, item._id))) archive.push(item);
