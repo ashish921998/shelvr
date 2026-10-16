@@ -211,10 +211,14 @@ function clearCatalogs() {
  */
 async function resetAppIntents(): Promise<void> {
   if (!AppIntents.isAvailable()) return;
+  // Invocations queued under an account go with it. Ones queued while nobody
+  // was signed in (Siri promised to finish them "the next time you open
+  // Shelvr") wait for whoever signs in on this device.
+  const hadOwner = store.contains(CAPTURE_OWNER_KEY);
   store.remove(CAPTURE_OWNER_KEY);
   await Promise.all([
     setup?.clearCaptureCredentials(),
-    AppIntents.clearPendingInvocationsAsync(),
+    hadOwner ? AppIntents.clearPendingInvocationsAsync() : undefined,
     clearCatalogs(),
   ]);
 }
@@ -360,11 +364,16 @@ function spaceParam(
   return param(invocation, "spaceId") as Id<"spaces"> | undefined;
 }
 
+const CAPTURE_INVOCATIONS = new Set(["saveNote", "saveLink", "saveImages"]);
+
 /** Runs the invocations Siri queued: navigation, and captures that could not
- * reach the server when Siri ran. */
+ * reach the server when Siri ran. A capture waits for a signed-in account
+ * (onboarding mounts this before sign-in), and the queue is read again as
+ * soon as one is there. */
 function useInvocationHandler() {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
+  const { isAuthenticated } = useConvexAuth();
   const createNoteItem = useMutation(api.items.createNoteItem);
   const createLinkItem = useMutation(api.items.createLinkItem);
   const saveImages = useSaveImages();
@@ -474,9 +483,12 @@ function useInvocationHandler() {
     }
   }
 
-  AppIntents.useAppIntents(async (pending) => {
+  async function run(pending: AppIntents.AppIntentInvocation[]) {
     for (const invocation of pending) {
       if (inFlight.current.has(invocation.id)) continue;
+      // Left pending for the account that signs in.
+      if (!isAuthenticated && CAPTURE_INVOCATIONS.has(invocation.name))
+        continue;
       inFlight.current.add(invocation.id);
       try {
         await handle(invocation);
@@ -495,7 +507,21 @@ function useInvocationHandler() {
         inFlight.current.delete(invocation.id);
       }
     }
+  }
+
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
   });
+  AppIntents.useAppIntents((pending) => runRef.current(pending));
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void AppIntents.getPendingInvocationsAsync()
+      .then((pending) => runRef.current(pending))
+      .catch((error) =>
+        analytics.captureError("app_intents_invocation_failed", error),
+      );
+  }, [isAuthenticated]);
 }
 
 /**
