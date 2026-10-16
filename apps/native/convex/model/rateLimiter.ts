@@ -49,6 +49,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "Make a plan" sends up to 60 saves in one prompt and gets 5 places back.
   // A user re-rolls a few times while deciding; a loop gets cut off.
   makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  // The city backfill: one small model call per save made before cities
+  // were classified, charged per save, at most ten per pass. Bounds a user
+  // opening many old spaces in a row.
+  cityBackfill: { kind: "token bucket", rate: 60, period: HOUR, capacity: 30 },
   // A spoken transcript of a recipe video whose caption had no recipe (one
   // paid Treg call, about $0.002, plus one model call). Per user: room for a
   // cooking binge, fatal to a loop. Global: about $4 a day at most, whatever

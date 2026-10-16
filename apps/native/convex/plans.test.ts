@@ -24,6 +24,8 @@ type Save = {
   itemStatus?: "ready" | "processing";
   maps?: string;
   spaceMaps?: string;
+  /** Classified cities; absent = never classified for cities. */
+  cities?: string[];
 };
 
 async function setup(
@@ -66,6 +68,7 @@ async function setup(
         url: "https://www.tiktok.com/@someone/video/1",
         tags: [],
         searchText: save.title,
+        cities: save.cities,
         intents: save.maps
           ? [{ kind: "open_maps", label: "Open in Maps", value: save.maps }]
           : undefined,
@@ -207,6 +210,40 @@ describe("makePlan", () => {
     expect(prompt).not.toContain("Still reading");
   });
 
+  it("reads only the saves filed in the chosen city", async () => {
+    const { t, spaceId } = await setup([
+      { title: "Bastian reel", cities: ["Mumbai"] },
+      { title: "Thalassa reel", cities: ["Goa"] },
+      { title: "Two-city reel", cities: ["Goa", "mumbai"] },
+      { title: "No city reel", cities: [] },
+      { title: "Never classified reel" },
+    ]);
+    generateObject.mockResolvedValue({ object: { places: [] } });
+
+    const plan = await t.action(api.plans.makePlan, {
+      spaceId,
+      city: "Mumbai",
+    });
+
+    expect(plan).toEqual({ places: [], considered: 2 });
+    const prompt = promptOf();
+    expect(prompt).toContain("Bastian reel");
+    expect(prompt).toContain("Two-city reel");
+    expect(prompt).not.toContain("Thalassa reel");
+    expect(prompt).not.toContain("No city reel");
+    expect(prompt).not.toContain("Never classified reel");
+    expect(prompt).toContain("They are going out in Mumbai.");
+  });
+
+  it("spends no token on a city with no saves", async () => {
+    const { t, spaceId } = await setup([{ title: "Reel", cities: ["Goa"] }]);
+
+    const plan = await t.action(api.plans.makePlan, { spaceId, city: "Oslo" });
+
+    expect(plan).toEqual({ places: [], considered: 0 });
+    expect(generateObject).not.toHaveBeenCalled();
+  });
+
   it("reads a place steered for this space", async () => {
     const { t, spaceId } = await setup([
       { title: "Date idea", spaceMaps: "Tigre, Brooklyn" },
@@ -301,5 +338,108 @@ describe("makePlan", () => {
     }
     await expect(t.action(api.plans.makePlan, { spaceId })).rejects.toThrow();
     expect(generateObject).toHaveBeenCalledTimes(8);
+  });
+});
+
+describe("classifyCities", () => {
+  async function citiesOf(base: ReturnType<typeof newConvexTest>) {
+    return base.run(async (ctx) =>
+      (await ctx.db.query("items").collect()).map(
+        (item) => item.cities ?? null,
+      ),
+    );
+  }
+
+  it("fills in cities for saves that were never classified for them", async () => {
+    const { base, t, spaceId } = await setup([
+      { title: "Bastian reel", content: "Bastian in Bandra, Mumbai" },
+      { title: "Already read", cities: ["Goa"] },
+      { title: "Classified, no city", cities: [] },
+      { title: "Still reading", itemStatus: "processing" },
+      { title: "Suggested reel", status: "suggested" },
+    ]);
+    generateObject.mockResolvedValue({
+      object: { cities: ["Mumbai", " mumbai ", "unknown"] },
+    });
+
+    const written = await t.action(api.plans.classifyCities, { spaceId });
+
+    expect(written).toBe(1);
+    expect(generateObject).toHaveBeenCalledTimes(1);
+    expect(promptOf()).toContain("Bastian in Bandra, Mumbai");
+    expect(promptOf()).not.toContain("Already read");
+    expect(await citiesOf(base)).toEqual([["Mumbai"], ["Goa"], [], null, null]);
+  });
+
+  it("keeps going when one save's call fails", async () => {
+    const { base, t, spaceId } = await setup([
+      { title: "First" },
+      { title: "Second" },
+    ]);
+    generateObject
+      .mockRejectedValueOnce(new Error("timeout"))
+      .mockResolvedValueOnce({ object: { cities: ["Goa"] } });
+
+    expect(await t.action(api.plans.classifyCities, { spaceId })).toBe(1);
+    // Newest filed first: Second is read first and fails.
+    expect(await citiesOf(base)).toEqual([["Goa"], null]);
+  });
+
+  it("sends nothing after the user declined AI processing", async () => {
+    const { t, spaceId } = await setup([{ title: "Reel" }], {
+      consent: "declined",
+    });
+
+    await expect(
+      t.action(api.plans.classifyCities, { spaceId }),
+    ).rejects.toThrow();
+    expect(generateObject).not.toHaveBeenCalled();
+  });
+
+  it("requires Pro", async () => {
+    const { t, spaceId } = await setup([{ title: "Reel" }], { pro: false });
+
+    await expect(
+      t.action(api.plans.classifyCities, { spaceId }),
+    ).rejects.toThrow();
+    expect(generateObject).not.toHaveBeenCalled();
+  });
+
+  it("reads at most ten saves a pass and is rate limited per save", async () => {
+    const { t, spaceId } = await setup(
+      Array.from({ length: 12 }, (_, i) => ({ title: `Reel ${i}` })),
+    );
+    generateObject.mockResolvedValue({ object: { cities: [] } });
+
+    expect(await t.action(api.plans.classifyCities, { spaceId })).toBe(10);
+    expect(await t.action(api.plans.classifyCities, { spaceId })).toBe(2);
+    expect(generateObject).toHaveBeenCalledTimes(12);
+  });
+
+  it("stops at the user's hourly budget without spending a call", async () => {
+    const { t, spaceId } = await setup(
+      Array.from({ length: 40 }, (_, i) => ({ title: `Reel ${i}` })),
+    );
+    generateObject.mockResolvedValue({ object: { cities: [] } });
+
+    for (let i = 0; i < 3; i++) {
+      expect(await t.action(api.plans.classifyCities, { spaceId })).toBe(10);
+    }
+    // 30 tokens spent: the fourth pass claims nothing.
+    expect(await t.action(api.plans.classifyCities, { spaceId })).toBe(0);
+    expect(generateObject).toHaveBeenCalledTimes(30);
+  });
+
+  it("does not overwrite cities classified while the call was out", async () => {
+    const { base, t, spaceId, itemIds } = await setup([{ title: "Reel" }]);
+    generateObject.mockImplementation(async () => {
+      await base.run(async (ctx) => {
+        await ctx.db.patch(itemIds[0], { cities: ["Goa"] });
+      });
+      return { object: { cities: ["Mumbai"] } };
+    });
+
+    expect(await t.action(api.plans.classifyCities, { spaceId })).toBe(0);
+    expect(await citiesOf(base)).toEqual([["Goa"]]);
   });
 });
