@@ -419,7 +419,7 @@ export function cityOptions(items: CityCandidate[]): {
 }
 
 /** The tallies an open vote link holds, by place. */
-export type PlanVotes = {
+type PlanVotes = {
   voters: number;
   expiresAt: number;
   places: { name: string; picks: number; passes: number }[];
