@@ -26,6 +26,16 @@ export function formatShortDate(ms: number): string {
   });
 }
 
+/** The full date with the month spelled out, e.g. "July 5, 2026", for the
+ * Tidy card's chip. */
+export function formatLongDate(ms: number): string {
+  return new Date(ms).toLocaleDateString(formattingLocale(), {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 /** A short date that names the year only when it is not this year's:
  * "Aug 14", but "Aug 14, 2025". */
 export function formatRecentDate(ms: number, now = Date.now()): string {

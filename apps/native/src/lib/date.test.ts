@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatRecentDate, trialTimelineVariables } from "./date";
+import {
+  formatLongDate,
+  formatRecentDate,
+  trialTimelineVariables,
+} from "./date";
 
 // A zone with daylight saving, so the tests cover a trial that crosses it.
 process.env.TZ = "America/New_York";
 
-vi.mock("./i18n", () => ({ formattingLocale: () => "en-US" }));
+const locale = vi.hoisted(() => ({ tag: "en-US" }));
+vi.mock("./i18n", () => ({ formattingLocale: () => locale.tag }));
 
 const at = (year: number, month: number, day: number) =>
   new Date(year, month - 1, day, 23, 30).getTime();
@@ -83,5 +88,17 @@ describe("formatRecentDate", () => {
     expect(formatRecentDate(at(2025, 8, 14), at(2026, 10, 13))).toBe(
       "Aug 14, 2025",
     );
+  });
+});
+
+describe("formatLongDate", () => {
+  it("spells the month out in the app's formatting locale", () => {
+    expect(formatLongDate(at(2026, 7, 5))).toBe("July 5, 2026");
+    locale.tag = "de-DE";
+    try {
+      expect(formatLongDate(at(2026, 7, 5))).toBe("5. Juli 2026");
+    } finally {
+      locale.tag = "en-US";
+    }
   });
 });

@@ -9,6 +9,7 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { StyleSheet } from "react-native-unistyles";
 
+import { formatLongDate } from "@/lib/date";
 import { motion } from "@/lib/motion";
 import { TidyCardContainer } from "./tidy-card-container";
 import { TidyHints } from "./tidy-hints";
@@ -69,11 +70,7 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
       {mounted && photo.creationTime != null && (
         <View style={styles.dateChip}>
           <Text style={styles.dateText}>
-            {new Date(photo.creationTime).toLocaleDateString(undefined, {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {formatLongDate(photo.creationTime)}
           </Text>
         </View>
       )}
