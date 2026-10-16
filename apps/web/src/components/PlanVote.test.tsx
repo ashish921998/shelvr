@@ -75,7 +75,7 @@ describe("PlanVote", () => {
     );
     expect(
       JSON.parse(window.localStorage.getItem("shelvr.planVote.tok")!),
-    ).toEqual({ p0: "pick", p1: "pass" });
+    ).toMatchObject({ choices: { p0: "pick", p1: "pass" } });
   });
 
   it("numbers each ballot above the last", async () => {
@@ -117,6 +117,7 @@ describe("PlanVote", () => {
 
   it("shows and resends a ballot that left with the last visit", async () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
+    // A saved ballot from a page before revisions: bare choices.
     window.localStorage.setItem(
       "shelvr.planVote.tok",
       JSON.stringify({ p1: "pass" }),
@@ -139,7 +140,7 @@ describe("PlanVote", () => {
     });
     expect(
       JSON.parse(window.localStorage.getItem("shelvr.planVote.tok")!),
-    ).toEqual({ p0: "pick", p1: "pass" });
+    ).toEqual({ choices: { p0: "pick", p1: "pass" }, revision: 7 });
     expect(
       window.localStorage.getItem("shelvr.planVotePending.tok"),
     ).toBeNull();
@@ -150,6 +151,71 @@ describe("PlanVote", () => {
     expect(
       JSON.parse(fetchMock.mock.calls[1][1].body).revision,
     ).toBeGreaterThan(7);
+  });
+
+  it("keeps a sent ballot pending until its answer arrives", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    fetchMock.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        answer = resolve;
+      }),
+    );
+    render();
+    tap("Yes to Bastian");
+    await settle();
+
+    // In flight: a tab closed now would still find it on the next visit.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(
+      JSON.parse(window.localStorage.getItem("shelvr.planVotePending.tok")!),
+    ).toEqual({ choices: { p0: "pick" }, revision: sent.revision });
+
+    await act(async () => {
+      answer(new Response("{}", { status: 200 }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(
+      window.localStorage.getItem("shelvr.planVotePending.tok"),
+    ).toBeNull();
+  });
+
+  it("numbers the next ballot above the last saved one, even with the clock behind it", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
+    const ahead = Date.now() + 60 * 60 * 1000;
+    window.localStorage.setItem(
+      "shelvr.planVote.tok",
+      JSON.stringify({ choices: { p1: "pass" }, revision: ahead }),
+    );
+    render();
+    expect(fetchMock).not.toHaveBeenCalled();
+    tap("Yes to Bastian");
+    await settle();
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).revision).toBe(
+      ahead + 1,
+    );
+  });
+
+  it("never lets an older answer replace a newer pending or saved ballot", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    const mine = JSON.parse(fetchMock.mock.calls[0][1].body).revision as number;
+    // Another tab saved and then sent something newer meanwhile.
+    const newer = { choices: { p1: "pick" }, revision: mine + 1_000_000 };
+    window.localStorage.setItem("shelvr.planVote.tok", JSON.stringify(newer));
+    window.localStorage.setItem(
+      "shelvr.planVotePending.tok",
+      JSON.stringify(newer),
+    );
+    tap("Yes to Masque");
+    await settle();
+
+    expect(
+      JSON.parse(window.localStorage.getItem("shelvr.planVote.tok")!),
+    ).toMatchObject({ revision: mine + 1_000_000 });
   });
 
   it("does not remember a vote the server refused", async () => {

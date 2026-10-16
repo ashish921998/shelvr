@@ -56,23 +56,38 @@ function isChoices(value: unknown): value is Choices {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** The last ballot the server took. */
+/** The last ballot the server took, with its revision. */
 const savedKey = (token: string) => `shelvr.planVote.${token}`;
 /**
- * A ballot sent as the page closed, kept until the server is seen taking it.
- * The exit request outlives the tab but its answer never arrives, so the
- * next visit sends it again. That replaces nothing newer: the server keeps
- * the later revision.
+ * The newest ballot sent, kept from the moment it goes out until the server
+ * is seen taking it. A tab closed before the answer arrives (the request
+ * itself outlives it) leaves it here, so the next visit shows it and sends
+ * it again. That replaces nothing newer: the server keeps the later
+ * revision.
  */
 const pendingKey = (token: string) => `shelvr.planVotePending.${token}`;
 
-type Pending = { choices: Choices; revision: number };
+type Ballot = { choices: Choices; revision: number };
 
-function storedPending(token: string): Pending | undefined {
-  const value = load(pendingKey(token)) as Partial<Pending> | undefined;
-  return value && isChoices(value.choices) && typeof value.revision === "number"
-    ? { choices: value.choices, revision: value.revision }
-    : undefined;
+function storedBallot(key: string): Ballot | undefined {
+  const value = load(key);
+  if (!isChoices(value)) return undefined;
+  const { choices, revision } = value as Partial<Ballot>;
+  if (isChoices(choices) && typeof revision === "number") {
+    return { choices, revision };
+  }
+  // A page from before revisions kept the bare choices.
+  return { choices: value, revision: 0 };
+}
+
+/**
+ * Keeps `ballot` under `key` unless a newer one is already there, so a
+ * slower answer from one tab never replaces what another tab sent later.
+ */
+function storeIfNewer(key: string, ballot: Ballot) {
+  const current = storedBallot(key);
+  if (current && current.revision > ballot.revision) return;
+  store(key, ballot);
 }
 
 /**
@@ -121,11 +136,12 @@ export default function PlanVote({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The ballot still waiting on that pause. Leaving the page sends it at once,
   // with keepalive so the request outlives the tab.
-  const pending = useRef<Pending | undefined>(undefined);
+  const pending = useRef<Ballot | undefined>(undefined);
 
   const send = (next: Choices, revision: number) => {
     voter.current ??= voterId();
     const body = ballot(token, voter.current, next, revision);
+    storeIfNewer(pendingKey(token), { choices: next, revision });
     queue.current = queue.current.then(async () => {
       try {
         const response = await fetch("/api/plan-vote", {
@@ -137,8 +153,10 @@ export default function PlanVote({
         if (response.ok) {
           // Remembered only once saved, so a reload never shows a vote the
           // server didn't take.
-          store(savedKey(token), next);
-          forget(pendingKey(token));
+          storeIfNewer(savedKey(token), { choices: next, revision });
+          if ((storedBallot(pendingKey(token))?.revision ?? 0) <= revision) {
+            forget(pendingKey(token));
+          }
           setStatus("saved");
           setMessage(undefined);
           return;
@@ -163,14 +181,22 @@ export default function PlanVote({
     // localStorage only exists in the browser, after hydration. A ballot that
     // left with the last visit is shown and sent again, since its answer was
     // never seen.
-    const left = storedPending(token);
-    const saved = load(savedKey(token));
+    // The next ballot is numbered above both, so a clock that went back since
+    // never sends one the server would treat as late.
+    const saved = storedBallot(savedKey(token));
+    const left = storedBallot(pendingKey(token));
+    const resend =
+      left && left.revision > (saved?.revision ?? -1) ? left : undefined;
+    lastRevision.current = Math.max(
+      lastRevision.current,
+      saved?.revision ?? 0,
+      left?.revision ?? 0,
+    );
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setChoices(left?.choices ?? (isChoices(saved) ? saved : {}));
-    if (left) {
-      lastRevision.current = Math.max(lastRevision.current, left.revision);
+    setChoices(resend?.choices ?? saved?.choices ?? {});
+    if (resend) {
       setStatus("saving");
-      sendRef.current(left.choices, left.revision);
+      sendRef.current(resend.choices, resend.revision);
     }
   }, [token]);
 
@@ -181,7 +207,7 @@ export default function PlanVote({
       pending.current = undefined;
       if (!next) return;
       voter.current ??= voterId();
-      store(pendingKey(token), next);
+      storeIfNewer(pendingKey(token), next);
       void fetch("/api/plan-vote", {
         method: "POST",
         headers: { "content-type": "application/json" },
