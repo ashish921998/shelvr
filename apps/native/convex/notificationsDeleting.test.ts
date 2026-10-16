@@ -123,6 +123,59 @@ describe("notifications for an account mid-deletion", () => {
     expect(preferences).toHaveLength(0);
   });
 
+  it("silences the account in the first transaction past a batch of stale device rows", async () => {
+    // A device that has rotated its token many times leaves a disabled row
+    // behind each time. More of them than one batch deletes must not keep
+    // the live device or the preferences row alive for a later claim.
+    const backend = newConvexTest();
+    vi.setSystemTime(NOW - 4 * DAY);
+    const { t, userId } = await signedInUser(backend);
+    vi.setSystemTime(NOW);
+    await backend.run(async (ctx) => {
+      await ctx.db.insert("notificationPreferences", {
+        userId,
+        weeklyShelfEnabled: true,
+        nextDigestAt: NOW - 1,
+        nextReminderAt: NOW - 1,
+        timezone: "UTC",
+        updatedAt: NOW,
+      });
+      for (let i = 0; i < DELETE_BATCH + 5; i += 1) {
+        await ctx.db.insert("notificationDevices", {
+          userId,
+          token: `ExponentPushToken[stale-${i}]`,
+          platform: "ios",
+          enabled: false,
+          lastSeenAt: NOW - DAY,
+        });
+      }
+      await ctx.db.insert("notificationDevices", {
+        userId,
+        token: "ExponentPushToken[live]",
+        platform: "ios",
+        enabled: true,
+        lastSeenAt: NOW,
+      });
+    });
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+    const [live, preferences] = await backend.run((ctx) =>
+      Promise.all([
+        ctx.db
+          .query("notificationDevices")
+          .withIndex("by_user_and_enabled", (q) =>
+            q.eq("userId", userId).eq("enabled", true),
+          )
+          .collect(),
+        ctx.db
+          .query("notificationPreferences")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ]),
+    );
+    expect(live).toHaveLength(0);
+    expect(preferences).toHaveLength(0);
+  });
+
   it("prepareWeeklyDigest writes no digest for an owner marked deleting", async () => {
     const { backend, userId } = await deletingUser();
     // The hourly cron tick lands between two deletion batches.

@@ -422,23 +422,17 @@ async function deleteFeedbackBatch(
   return feedback.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch of the user's push devices and the preferences
- * row. Returns true when both are gone. Runs right after the capture tokens
- * so no weekly shelf or save reminder is prepared or claimed for an account
- * whose deletion is still draining. */
+/** Deletes the user's push targets. Returns true when every row is gone.
+ * Order matters: the one preferences row goes first, which ends the weekly
+ * shelf and save reminder prepare passes at once; the enabled devices go
+ * next, which empties the recipient list a delivery claim reads; the
+ * disabled rows a device leaves behind when its token rotates drain last,
+ * in batches, since nothing reads them. So one transaction silences the
+ * account unless it has more than a batch of live devices at once. */
 async function deleteNotificationTargetsBatch(
   ctx: MutationCtx,
   userKey: string,
 ): Promise<boolean> {
-  const devices = await ctx.db
-    .query("notificationDevices")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
-    .take(DELETE_BATCH);
-  for (const device of devices) {
-    await ctx.db.delete(device._id);
-  }
-  if (devices.length === DELETE_BATCH) return false;
-
   const preferences = await ctx.db
     .query("notificationPreferences")
     .withIndex("by_user", (q) => q.eq("userId", userKey))
@@ -446,7 +440,21 @@ async function deleteNotificationTargetsBatch(
   for (const preference of preferences) {
     await ctx.db.delete(preference._id);
   }
-  return preferences.length !== DELETE_BATCH;
+  if (preferences.length === DELETE_BATCH) return false;
+
+  for (const enabled of [true, false]) {
+    const devices = await ctx.db
+      .query("notificationDevices")
+      .withIndex("by_user_and_enabled", (q) =>
+        q.eq("userId", userKey).eq("enabled", enabled),
+      )
+      .take(DELETE_BATCH);
+    for (const device of devices) {
+      await ctx.db.delete(device._id);
+    }
+    if (devices.length === DELETE_BATCH) return false;
+  }
+  return true;
 }
 
 /** Deletes up to one batch of the user's Siri capture tokens. Returns true
