@@ -85,9 +85,7 @@ describe("a classifier answer with no usable title", () => {
 
       const item = await t.run((ctx) => ctx.db.get(itemId));
       expect(item?.status).toBe("ready");
-      // Either no title (the card then shows the note) or a visible one; a
-      // blank string is neither.
-      expect(item?.title === undefined || item.title.trim() !== "").toBe(true);
+      expect(item?.title).toBe("eggs, milk, bread");
     },
   );
 
