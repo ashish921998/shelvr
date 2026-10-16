@@ -865,19 +865,33 @@ export function finalRecipe(
   return page?.recipe ?? sanitizeRecipe(result.recipe);
 }
 
-/** Map the model's returned space names back to ids (case-insensitive,
- * trimmed). Unknown names are dropped: the classifier only ever suggests
- * spaces it was shown. */
-function spaceNameIds(
+/** Map the model's returned space names back to ids. An exact trimmed match
+ * wins, so two spaces whose names differ only by case ("travel", "Travel")
+ * each receive the answer that named them; otherwise the match is
+ * case-insensitive, and an ambiguous one goes to the first space listed.
+ * Unknown names are dropped: the classifier only ever suggests spaces it was
+ * shown. Exported pure for unit testing. */
+export function spaceNameIds(
   spaceNames: string[],
   spaces: { _id: Id<"spaces">; name: string }[],
 ): Id<"spaces">[] {
-  const idByName = new Map(
-    spaces.map((s) => [s.name.trim().toLowerCase(), s._id]),
-  );
+  const idByExactName = new Map<string, Id<"spaces">>();
+  const idByFoldedName = new Map<string, Id<"spaces">>();
+  for (const space of spaces) {
+    const exact = space.name.trim();
+    if (!idByExactName.has(exact)) {
+      idByExactName.set(exact, space._id);
+    }
+    const folded = exact.toLowerCase();
+    if (!idByFoldedName.has(folded)) {
+      idByFoldedName.set(folded, space._id);
+    }
+  }
   const ids: Id<"spaces">[] = [];
   for (const name of spaceNames) {
-    const id = idByName.get(name.trim().toLowerCase());
+    const trimmed = name.trim();
+    const id =
+      idByExactName.get(trimmed) ?? idByFoldedName.get(trimmed.toLowerCase());
     if (id !== undefined) {
       ids.push(id);
     }
