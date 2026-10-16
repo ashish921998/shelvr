@@ -28,7 +28,9 @@ const STOCK_THUMBNAIL_RATIO = 4 / 3;
  * The client only ever gets Shelvr's stored copy of the picture, so the shape
  * the save recorded is the tell, not the picture's address. A Short is left
  * alone: its thumbnail pillarboxes a vertical video, which a widescreen crop
- * would only make worse.
+ * would only make worse. The save's address is the only tell of that, so a
+ * Short saved by its watch or youtu.be address is cropped like a video; the
+ * server records no orientation yet.
  */
 export function letterboxedVideoRatio(
   pageUrl: string | undefined,
