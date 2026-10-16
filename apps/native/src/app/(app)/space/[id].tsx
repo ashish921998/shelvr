@@ -39,7 +39,10 @@ export default function SpaceScreen() {
   const { data: loaded, error } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
-  const space = loaded ?? (isRefusedQuery(error) ? null : undefined);
+  // `loaded` is `null` for a space the server says is gone; only an
+  // unanswered query falls through to the error check.
+  const space =
+    loaded !== undefined ? loaded : isRefusedQuery(error) ? null : undefined;
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
   const { guard: planGuard } = usePaywallGuard("make_plan");

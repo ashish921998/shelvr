@@ -119,6 +119,18 @@ describe("a link to a space id the server refuses", () => {
     expect(mock.emptyState).not.toHaveBeenCalled();
   });
 
+  it("shows a space the server answers null for as gone", () => {
+    mock.space = null;
+
+    render(<SpaceScreen />);
+
+    expect(mock.screenLoader).not.toHaveBeenCalled();
+    expect(mock.emptyState).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "spaces.gone" }),
+      undefined,
+    );
+  });
+
   it("still loads while the query has no answer", () => {
     render(<SpaceScreen />);
 
