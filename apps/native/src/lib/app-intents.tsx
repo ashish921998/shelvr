@@ -50,6 +50,7 @@ const setup = requireOptionalNativeModule<SetupModule>("AppIntentsSetup");
 const store = createMMKV({ id: "app-intents" });
 // Which account the keychain token belongs to, so an account switch mints anew.
 const CAPTURE_OWNER_KEY = "captureOwner";
+const CAPTURE_INVOCATIONS = new Set(["saveNote", "saveLink", "saveImages"]);
 
 const siteUrl =
   process.env.EXPO_PUBLIC_CONVEX_SITE_URL ??
@@ -209,24 +210,65 @@ function clearCatalogs() {
  * credentials, queued invocations, and the item and space catalogs (which also
  * empties Spotlight).
  */
-async function resetAppIntents(signedOut: boolean): Promise<void> {
-  if (!AppIntents.isAvailable()) return;
+/** The last signed-out reset, settled once the queue is in a known state:
+ * `true` when its captures may be delivered, `false` when a clear failed and
+ * they still belong to the account that signed out. A sign-in that lands
+ * while the clear is in flight waits for it instead of saving the previous
+ * account's captures. */
+let queueReset: Promise<boolean> = Promise.resolve(true);
+let queueResetting = false;
+
+function startQueueReset(signedOut: boolean): void {
+  queueResetting = true;
+  queueReset = resetAppIntents(signedOut)
+    .catch((error) => {
+      analytics.captureError("app_intents_reset_failed", error);
+      return false;
+    })
+    .finally(() => {
+      queueResetting = false;
+    });
+}
+
+/** Waits out a reset in flight, then returns what may be delivered: the
+ * queue read again once it is cleared (a list read before the clear could
+ * still hold the previous account's captures), or only the non-capture
+ * invocations when the clear failed. */
+async function deliverable(
+  pending: AppIntents.AppIntentInvocation[],
+): Promise<AppIntents.AppIntentInvocation[]> {
+  const resetting = queueResetting;
+  const safe = await queueReset;
+  if (!safe) return pending.filter((i) => !CAPTURE_INVOCATIONS.has(i.name));
+  return resetting ? AppIntents.getPendingInvocationsAsync() : pending;
+}
+
+/** Resolves `true` when the queue may be delivered afterwards. */
+async function resetAppIntents(signedOut: boolean): Promise<boolean> {
+  if (!AppIntents.isAvailable()) return true;
   // Invocations queued under an account go with it: ones queued while this
   // process saw the account signed in (even before its capture token was
   // minted, when Siri falls back to the queue) or under a stored token owner.
   // Ones queued while nobody was signed in (Siri promised to finish them "the
   // next time you open Shelvr") wait for whoever signs in on this device.
   const hadOwner = store.contains(CAPTURE_OWNER_KEY);
-  await Promise.all([
-    setup?.clearCaptureCredentials(),
+  const [cleared] = await Promise.all([
     signedOut || hadOwner
-      ? AppIntents.clearPendingInvocationsAsync()
-      : undefined,
+      ? AppIntents.clearPendingInvocationsAsync().then(
+          () => true,
+          (error: unknown) => {
+            analytics.captureError("app_intents_reset_failed", error);
+            return false;
+          },
+        )
+      : true,
+    setup?.clearCaptureCredentials(),
     clearCatalogs(),
   ]);
   // Only once the queue is gone: a failed clear keeps the owner marker, so the
   // next reset still treats the queue as that account's.
-  store.remove(CAPTURE_OWNER_KEY);
+  if (cleared) store.remove(CAPTURE_OWNER_KEY);
+  return cleared;
 }
 
 /**
@@ -263,9 +305,7 @@ export function useAppIntentsSignOutReset(): void {
     }
     if (reset.current) return;
     reset.current = true;
-    void resetAppIntents(sawAuthenticated.current).catch((error) =>
-      analytics.captureError("app_intents_reset_failed", error),
-    );
+    startQueueReset(sawAuthenticated.current);
   }, [isAuthenticated, isLoading]);
 }
 
@@ -371,8 +411,6 @@ function spaceParam(
 ): Id<"spaces"> | undefined {
   return param(invocation, "spaceId") as Id<"spaces"> | undefined;
 }
-
-const CAPTURE_INVOCATIONS = new Set(["saveNote", "saveLink", "saveImages"]);
 
 /** Runs the invocations Siri queued: navigation, and captures that could not
  * reach the server when Siri ran. A capture waits for a signed-in account
@@ -493,7 +531,8 @@ function useInvocationHandler(canSave: boolean) {
     }
   }
 
-  async function run(pending: AppIntents.AppIntentInvocation[]) {
+  async function run(queued: AppIntents.AppIntentInvocation[]) {
+    const pending = await deliverable(queued);
     for (const invocation of pending) {
       if (inFlight.current.has(invocation.id)) continue;
       // Left pending for the account that signs in, and until it has Pro:
@@ -536,7 +575,8 @@ function useInvocationHandler(canSave: boolean) {
     const couldSave = previousCanSave.current;
     previousCanSave.current = canSave;
     if (!canSave || couldSave) return;
-    void AppIntents.getPendingInvocationsAsync()
+    void queueReset
+      .then(() => AppIntents.getPendingInvocationsAsync())
       .then((pending) => runRef.current(pending))
       .catch((error) =>
         analytics.captureError("app_intents_invocation_failed", error),

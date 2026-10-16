@@ -109,20 +109,26 @@ const note = {
   createdAt: 1,
 };
 
-beforeEach(() => {
+async function settle() {
+  await act(async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  });
+}
+
+beforeEach(async () => {
   vi.clearAllMocks();
   mock.authenticated = false;
   mock.entitled = false;
   mock.pending = [note];
   mock.handler = null;
   mock.store.clear();
+  // The module remembers the last reset's outcome; a signed-out reset with no
+  // owner clears nothing and leaves the queue deliverable for the next test.
+  const fresh = renderHook(() => useAppIntentsSignOutReset());
+  await settle();
+  fresh.unmount();
+  vi.clearAllMocks();
 });
-
-async function settle() {
-  await act(async () => {
-    for (let i = 0; i < 5; i += 1) await Promise.resolve();
-  });
-}
 
 describe("a capture Siri queued while nobody was signed in", () => {
   it("waits for sign-in, then saves it", async () => {
@@ -201,6 +207,56 @@ describe("a capture Siri queued while nobody was signed in", () => {
     view.rerender();
     await settle();
     expect(mock.clearPending).toHaveBeenCalledOnce();
+  });
+
+  it("is not handed to the next account while the last one's queue is still clearing", async () => {
+    let finishClear: () => void = () => undefined;
+    mock.clearPending.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finishClear = () => resolve(undefined);
+        }),
+    );
+    mock.authenticated = true;
+    const reset = renderHook(() => useAppIntentsSignOutReset());
+    await settle();
+    mock.authenticated = false;
+    reset.rerender();
+    await settle();
+    expect(mock.clearPending).toHaveBeenCalledOnce();
+
+    // The next account signs in before the clear has landed, with the
+    // previous account's capture still in the queue the bridge is handed.
+    mock.authenticated = true;
+    mock.entitled = true;
+    render(<AppIntentsBridge />);
+    await settle();
+    expect(mock.createNote).not.toHaveBeenCalled();
+
+    mock.pending = [];
+    await act(async () => {
+      finishClear();
+    });
+    await settle();
+    expect(mock.createNote).not.toHaveBeenCalled();
+    expect(mock.remove).not.toHaveBeenCalled();
+  });
+
+  it("is withheld from the next account when the queue clear failed", async () => {
+    mock.clearPending.mockRejectedValueOnce(new Error("io"));
+    mock.authenticated = true;
+    const reset = renderHook(() => useAppIntentsSignOutReset());
+    await settle();
+    mock.authenticated = false;
+    reset.rerender();
+    await settle();
+
+    mock.authenticated = true;
+    mock.entitled = true;
+    render(<AppIntentsBridge />);
+    await settle();
+    expect(mock.createNote).not.toHaveBeenCalled();
+    expect(mock.remove).not.toHaveBeenCalled();
   });
 
   it("is delivered once when the account was already signed in at launch", async () => {
