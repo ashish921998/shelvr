@@ -99,6 +99,29 @@ describe("useOnboardingPaywall", () => {
     expect(onDecline).not.toHaveBeenCalled();
   });
 
+  it("runs one handler even when that handler throws", async () => {
+    state.open.mockResolvedValue("success");
+    state.entitlement = { entitled: false, loading: false };
+    const onPro = vi.fn(() => {
+      throw new Error("finish failed");
+    });
+    const onDecline = vi.fn();
+    const onUnavailable = vi.fn();
+    const hook = renderHook(() =>
+      useOnboardingPaywall({ onPro, onDecline, onUnavailable }),
+    );
+    await act(async () => {
+      hook.result.current.ask();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(onDecline).not.toHaveBeenCalled();
+  });
+
   it("waits for the entitlement, then shows the paywall once", async () => {
     state.open.mockResolvedValue("cancelled");
     const { onDecline, hook } = await ask({ entitled: false, loading: true });

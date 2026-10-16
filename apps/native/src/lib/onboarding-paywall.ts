@@ -58,18 +58,30 @@ export function useOnboardingPaywall({
       noteDeclinedDuringOnboarding();
       handlers.current.onDecline();
     };
+    // One handler per ask. A handler that throws is reported, not followed
+    // by a second one: onboarding would finish twice.
+    let settled = false;
+    const settle = (handler: () => void) => {
+      if (settled) return;
+      settled = true;
+      handler();
+    };
     // Skipping the practice reaches this without asking for a paywall, so a
     // declined exit offer just closes.
     openPaywallKeepingExitOffer(router, "onboarding", false)
       .then((outcome) => {
-        if (outcome === "unavailable") return handlers.current.onUnavailable();
-        if (outcome === "cancelled") return decline();
-        notePurchasedDuringOnboarding();
-        handlers.current.onPro();
+        if (outcome === "unavailable") {
+          return settle(() => handlers.current.onUnavailable());
+        }
+        if (outcome === "cancelled") return settle(decline);
+        settle(() => {
+          notePurchasedDuringOnboarding();
+          handlers.current.onPro();
+        });
       })
       .catch((error: unknown) => {
         analytics.captureError("onboarding_paywall_failed", error);
-        handlers.current.onUnavailable();
+        settle(() => handlers.current.onUnavailable());
       });
   }, [asked, loading, waitedOut, entitled, isAuthenticated, router]);
 

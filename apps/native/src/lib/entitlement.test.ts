@@ -260,6 +260,30 @@ describe("presentPaywall concurrency", () => {
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
   });
+
+  it("settles a Pro gate once its own presentation goes stale, without routing", async () => {
+    const { openPaywall } = await loadReady();
+    vi.useFakeTimers();
+    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
+
+    const outcome = openPaywall(router, "share");
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+
+    await expect(outcome).resolves.toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("tells onboarding its paywall is gone once the presentation goes stale", async () => {
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    vi.useFakeTimers();
+    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
+
+    const outcome = openPaywallKeepingExitOffer(router, "onboarding", false);
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+
+    await expect(outcome).resolves.toBe("unavailable");
+    expect(push).not.toHaveBeenCalled();
+  });
 });
 
 describe("paywall activation funnel", () => {

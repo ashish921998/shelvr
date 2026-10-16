@@ -722,8 +722,32 @@ export function isPaywallPending(): boolean {
   return liveSheet() !== null;
 }
 
-/** `owned` is false when this call joined a presentation someone else opened. */
-type Presentation = { outcome: PaywallOutcome; owned: boolean };
+/**
+ * `owned` is false when this call joined a presentation someone else opened;
+ * `stale` when the sheet was presumed gone rather than closed.
+ */
+type Presentation = { outcome: PaywallOutcome; owned: boolean; stale: boolean };
+
+/**
+ * A native promise that never settles (UIKit refused to present, so
+ * RevenueCat's result handler never fires) would otherwise hold its caller for
+ * the life of the process. At the age `liveSheet` presumes the sheet gone, the
+ * caller hears `unavailable` too, so onboarding can finish and a Pro gate can
+ * be tapped again.
+ */
+function presumeGoneWhenStale(
+  present: Promise<PaywallOutcome>,
+  onStale: () => void,
+): Promise<PaywallOutcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stale = new Promise<PaywallOutcome>((resolve) => {
+    timer = setTimeout(() => {
+      onStale();
+      resolve("unavailable");
+    }, SHEET_STALE_MS);
+  });
+  return Promise.race([present, stale]).finally(() => clearTimeout(timer));
+}
 
 async function presentPaywall(
   placement = "pro_gate",
@@ -739,15 +763,18 @@ async function presentPaywall(
   const live = liveSheet();
   if (live) {
     const outcome = live.paywall ? await live.paywall : "cancelled";
-    return { outcome, owned: false };
+    return { outcome, owned: false, stale: false };
   }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
-  sheet.paywall = present().finally(() => {
+  let stale = false;
+  sheet.paywall = presumeGoneWhenStale(present(), () => {
+    stale = true;
+  }).finally(() => {
     // A stale sheet may already have been replaced; only release our own.
     releaseSheet(sheet);
   });
   openSheet = sheet;
-  return { outcome: await sheet.paywall, owned: true };
+  return { outcome: await sheet.paywall, owned: true, stale };
 }
 
 /**
@@ -760,10 +787,12 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
-  const { outcome, owned } = await presentPaywall(placement);
+  const { outcome, owned, stale } = await presentPaywall(placement);
   // Only the caller that opened the sheet may route. Joined callers share the
-  // same `unavailable`, and a second push stacks a second paywall screen.
-  if (owned && shouldOpenPaywallFallback(outcome)) {
+  // same `unavailable`, and a second push stacks a second paywall screen. A
+  // sheet presumed gone does not route either: a paywall screen minutes after
+  // the tap is not what was asked for.
+  if (owned && !stale && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
   // The gated action did not run. Whatever the sheet resolved to, the caller
@@ -777,10 +806,10 @@ export async function openPaywall(
 export async function openExitOffer(
   router: ReturnType<typeof useRouter>,
 ): Promise<boolean> {
-  const { outcome, owned } = await presentPaywall("home_countdown", () =>
+  const { outcome, owned, stale } = await presentPaywall("home_countdown", () =>
     presentOpenExitOfferImpl("home_countdown", "home_card"),
   );
-  if (owned && shouldOpenPaywallFallback(outcome)) {
+  if (owned && !stale && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
   return outcome === "success";
@@ -800,13 +829,14 @@ export async function openPaywallKeepingExitOffer(
   placement: string,
   paywallOnDecline: boolean,
 ): Promise<PaywallOutcome> {
-  const { outcome, owned } = await presentPaywall(placement, () =>
+  const { outcome, owned, stale } = await presentPaywall(placement, () =>
     presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
   );
   // Onboarding finishes whatever the outcome, which swaps the screens under
   // a pushed fallback. The app's own Pro gates offer the paywall again.
   if (
     owned &&
+    !stale &&
     shouldOpenPaywallFallback(outcome) &&
     placement !== "onboarding"
   ) {
