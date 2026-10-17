@@ -2,17 +2,12 @@
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
-import { env, internalAction, type ActionCtx } from "./_generated/server";
+import { env, internalAction } from "./_generated/server";
 import { revokeRefreshToken } from "./model/appleClient";
 import { errorName, logEvent } from "./model/log";
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5 * 60_000;
-
-async function forget(ctx: ActionCtx, tokenId: Id<"appleTokens">) {
-  await ctx.runMutation(internal.users.forgetAppleToken, { tokenId });
-}
 
 type RevokeResult =
   | { kind: "unconfigured" }
@@ -121,7 +116,9 @@ export const revoke = internalAction({
         },
       );
     } else {
-      await forget(ctx, args.tokenId);
+      await ctx.runMutation(internal.users.forgetAppleToken, {
+        tokenId: args.tokenId,
+      });
     }
     return null;
   },
