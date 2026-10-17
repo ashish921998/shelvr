@@ -168,7 +168,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
 
   /** Commits the queued deletions in ONE system dialog. If the user cancels,
    * the photos stay unreviewed and resurface in a later batch. Undo history is
-   * cleared only after the delete succeeds, so canceling preserves the ability
+   * trimmed only after the delete succeeds, so canceling preserves the ability
    * to undo prior keep/save decisions. */
   const commitDeletes = useCallback(async () => {
     const queue = pendingDeletesRef.current;
@@ -179,16 +179,29 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
     pendingDeletesRef.current = [];
     setPendingDeleteCount(0);
 
+    // Only after a successful commit are deletes (and their history) final.
+    // The deck re-inserts cards one position at a time, so a decision made
+    // before a committed delete can no longer be walked back to: its card
+    // sits above photos that are gone. Keep only the decisions made after
+    // the last committed delete, which still sit right under the top card.
+    // The cutoff comes from the queue just committed, not from every delete
+    // in history: a delete decided during the dialog is still pending and
+    // must stay undoable. It is read now, before the dialog, so an undo
+    // that pops a queued entry meanwhile cannot move it.
+    const committed = new Set(queue.map((photo) => photo.id));
+    const lastDeleted = Math.min(
+      ...historyRef.current
+        .filter((h) => h.action === "delete" && committed.has(h.photo.id))
+        .map((h) => h.index),
+    );
+
     try {
       await Asset.delete(queue.map((photo) => new Asset(photo.id)));
       markReviewed(queue.map((photo) => photo.id));
       noteDeleted(queue.length);
       setCounts((c) => ({ ...c, deleted: c.deleted + queue.length }));
-
-      // Only after a successful commit are deletes (and their history) final.
-      // Remove delete entries from history, keeping keep/save entries undoable.
       historyRef.current = historyRef.current.filter(
-        (h) => h.action !== "delete",
+        (h) => h.index < lastDeleted,
       );
       setCanUndo(historyRef.current.length > 0);
     } catch (error) {
