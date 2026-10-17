@@ -565,7 +565,7 @@ function ItemScreenContent() {
   // the param (debounced so a run of swipes writes once, after it settles).
   const onViewable = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken<DetailItem>[] }) => {
-      const first = viewableItems[0]?.item as DetailItem | undefined;
+      const first = viewableItems[0]?.item;
       if (!first) return;
       // Offscreen layout passes and scroll corrections re-emit viewability
       // for the page already shown, and while a pushed screen or a dismiss
