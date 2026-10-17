@@ -1,3 +1,5 @@
+import { isYouTubeUrl } from "@convex/model/externalUrl";
+
 const URL_PATTERN = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([/?#]\S*)?$/i;
 
 export function isProbablyUrl(text: string) {
@@ -67,4 +69,64 @@ export function displayHost(url: string | undefined) {
   } catch {
     return url;
   }
+}
+
+// Labels a country's domain files its sites under (bbc.co.uk, abc.net.au).
+const REGISTRY_LABELS = new Set([
+  "ac",
+  "co",
+  "com",
+  "edu",
+  "gov",
+  "net",
+  "org",
+]);
+
+/** The label that names the site: ikea in www.ikea.com, wikipedia in
+ * en.wikipedia.org, bbc in bbc.co.uk. */
+function siteLabel(host: string): string {
+  // A fully qualified host (ikea.com.) ends in an empty root label.
+  const labels = host.replace(/\.$/, "").split(".");
+  if (labels.length < 2) return host;
+  const second = labels[labels.length - 2];
+  return labels.length > 2 && REGISTRY_LABELS.has(second)
+    ? labels[labels.length - 3]
+    : second;
+}
+
+/** A site's first letter, like a book spine: what a save with no picture shows
+ * in place of one. Array.from keeps an emoji or other astral first character
+ * whole. Undefined when there is no host to take it from, or when the host is
+ * punycode, whose first letter would be a meaningless X. */
+export function siteMonogram(url: string | undefined): string | undefined {
+  const label = siteLabel(displayHost(url));
+  if (label.startsWith("xn--")) return undefined;
+  return Array.from(label)[0]?.toLocaleUpperCase();
+}
+
+/** What a YouTube link plays: a "short" for a Shorts page, a "video" for a
+ * watch, live, clip or embed page or a youtu.be link, and undefined for a
+ * channel, playlist or search page, or any other site. */
+export function youTubeVideo(
+  url: string | undefined,
+): "video" | "short" | undefined {
+  if (!isYouTubeUrl(url)) return undefined;
+  try {
+    const { hostname, pathname, searchParams } = new URL(url ?? "");
+    if (hostname.toLowerCase() === "youtu.be") {
+      return pathname.length > 1 ? "video" : undefined;
+    }
+    if (pathname === "/watch") {
+      return searchParams.has("v") ? "video" : undefined;
+    }
+    if (/^\/shorts\/[^/]+/.test(pathname)) return "short";
+    return /^\/(live|clip|embed|v)\/[^/]+/.test(pathname) ? "video" : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A YouTube link that plays something, a Short included. */
+export function isYouTubeVideoUrl(url: string | undefined): boolean {
+  return youTubeVideo(url) !== undefined;
 }
