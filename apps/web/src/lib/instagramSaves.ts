@@ -388,11 +388,35 @@ async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
   return entries;
 }
 
+// A saved_posts.json is a few MB even for heavy savers; anything far larger
+// is not that file and would only freeze a phone.
+const MAX_SAVES_FILE_BYTES = 50 * 1024 * 1024;
+
 async function inflate(data: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([data as BlobPart])
+  const reader = new Blob([data as BlobPart])
     .stream()
-    .pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+    .pipeThrough(new DecompressionStream("deflate-raw"))
+    .getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    // Stop a small but highly compressed entry before it fills memory.
+    if (total > MAX_SAVES_FILE_BYTES) {
+      await reader.cancel();
+      throw new Error("entry_too_large");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+  return bytes;
 }
 
 async function entryText(source: ZipSource, entry: ZipEntry): Promise<string> {
@@ -400,10 +424,13 @@ async function entryText(source: ZipSource, entry: ZipEntry): Promise<string> {
   const view = new DataView(header.buffer, header.byteOffset, 30);
   const dataStart =
     entry.offset + 30 + view.getUint16(26, true) + view.getUint16(28, true);
-  const raw = await source.read(dataStart, dataStart + entry.compressedSize);
   if (entry.method !== 0 && entry.method !== 8) {
     throw new Error("unsupported_compression");
   }
+  if (entry.compressedSize > MAX_SAVES_FILE_BYTES) {
+    throw new Error("entry_too_large");
+  }
+  const raw = await source.read(dataStart, dataStart + entry.compressedSize);
   const bytes = entry.method === 8 ? await inflate(raw) : raw;
   return new TextDecoder().decode(bytes);
 }
@@ -445,10 +472,6 @@ export type ReadResult =
         | "old_browser";
     };
 
-// A loose saved_posts.json is a few MB even for heavy savers; anything far
-// larger is not that file and would only freeze a phone.
-const MAX_LOOSE_FILE_BYTES = 50 * 1024 * 1024;
-
 function postsFirst(name: string): number {
   return /saved_posts\./i.test(name) ? 0 : 1;
 }
@@ -469,7 +492,7 @@ export async function readSaves(files: File[]): Promise<ReadResult> {
         }
         format = "zip";
         found.push(...(await savedFilesInZip(fileSource(file))));
-      } else if (file.size > MAX_LOOSE_FILE_BYTES) {
+      } else if (file.size > MAX_SAVES_FILE_BYTES) {
         return { ok: false, reason: "too_large" };
       } else {
         if (/\.html?$/i.test(file.name)) format = "html";

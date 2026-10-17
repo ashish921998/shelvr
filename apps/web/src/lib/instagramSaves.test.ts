@@ -304,6 +304,18 @@ describe("savedFilesInZip", () => {
     expect(files[1].text).toBe(savedCollections);
   });
 
+  it("refuses a saved file that inflates past the size cap", async () => {
+    const bomb = zip([
+      {
+        name: "saved/saved_posts.json",
+        text: " ".repeat(51 * 1024 * 1024),
+      },
+    ]);
+    await expect(savedFilesInZip(source(bomb))).rejects.toThrow(
+      "entry_too_large",
+    );
+  });
+
   it("finds nothing in a zip without saves or in a non-zip", async () => {
     expect(
       await savedFilesInZip(source(zip([{ name: "a.txt", text: "hi" }]))),
