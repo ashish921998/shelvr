@@ -68,3 +68,24 @@ export async function isDevelopmentAnonymousUser(
     .unique();
   return account !== null;
 }
+
+const MAX_SENDER_NAME_CHARS = 40;
+
+/**
+ * The first word of the sharer's account name: enough for "Ashish wanted you
+ * to see this" and nothing more (no surname, email or photo). Undefined when
+ * the account has no usable name, e.g. Apple sign-in with the name withheld,
+ * which leaves the email in its place.
+ */
+export async function senderFirstName(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<string | undefined> {
+  const id = ctx.db.normalizeId("users", userId);
+  const user = id === null ? null : await ctx.db.get(id);
+  const first = user?.name?.trim().split(/\s+/)[0];
+  if (!first || first.length > MAX_SENDER_NAME_CHARS || first.includes("@")) {
+    return undefined;
+  }
+  return first;
+}

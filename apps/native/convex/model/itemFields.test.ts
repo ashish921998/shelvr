@@ -9,6 +9,10 @@ describe("normalizeCities", () => {
     ]);
   });
 
+  it("trims the space left behind by trailing punctuation", () => {
+    expect(normalizeCities(["Goa .", "Paris !"])).toEqual(["Goa", "Paris"]);
+  });
+
   it("keeps one entry per city, ignoring case, in first-seen order", () => {
     expect(normalizeCities(["Mumbai", "mumbai", "Goa", "MUMBAI"])).toEqual([
       "Mumbai",

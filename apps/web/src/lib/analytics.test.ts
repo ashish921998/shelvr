@@ -90,3 +90,17 @@ it("redacts capability URLs even when event properties try to override them", ()
   );
   window.history.replaceState({}, "", "/");
 });
+
+it("redacts plan vote links too", () => {
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "test-token");
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://example.com");
+  window.history.replaceState({}, "", "/p/private-plan");
+  const spy = vi.fn().mockResolvedValue(new Response());
+  vi.stubGlobal("fetch", spy);
+  captureWebException(new Error("render failed"), {});
+  const body = JSON.parse(spy.mock.calls[0][1].body);
+  expect(body.properties.$current_url).toBe(
+    `${window.location.origin}/p/[token]`,
+  );
+  window.history.replaceState({}, "", "/");
+});

@@ -20,6 +20,7 @@ import {
 } from "./model/captureRequest";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
+import { parsePlanVote, type PlanVoteBody } from "./model/planVote";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
@@ -461,6 +462,71 @@ http.route({
     });
     if (!preview) return json({ message: "Not found." }, 404);
     return json(preview, 200);
+  }),
+});
+
+/**
+ * Public read of a plan vote link (`shelvr-web.vercel.app/p/:token`). Same
+ * trust model as `/share/links/`: the random token is the capability and the
+ * response is the narrow shape `getPublicPlanShare` returns.
+ */
+http.route({
+  pathPrefix: "/plan/shares/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const share = await ctx.runQuery(internal.planShares.getPublicPlanShare, {
+      token,
+    });
+    if (!share) return json({ message: "Not found." }, 404);
+    return json(share, 200);
+  }),
+});
+
+/**
+ * Votes from the plan vote page. Same caller and trust model as
+ * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
+ * and forwards the visitor IP for the per-IP limiter.
+ */
+http.route({
+  path: "/plan/votes",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Vote secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let vote: PlanVoteBody | null;
+    try {
+      vote = parsePlanVote(JSON.parse(await readBoundedText(req, 2048)));
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    if (!vote) return json({ message: "Invalid request." }, 400);
+
+    try {
+      const outcome = await ctx.runMutation(
+        internal.planShares.recordPlanVote,
+        {
+          ...vote,
+          ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+        },
+      );
+      if (outcome === "missing") return json({ outcome }, 404);
+      if (outcome === "full") return json({ outcome }, 409);
+      return json({ outcome }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "plan_vote_failed", { error_name: errorName(error) });
+      return json({ message: "Could not save your vote." }, 500);
+    }
   }),
 });
 
