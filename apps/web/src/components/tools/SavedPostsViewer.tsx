@@ -45,7 +45,7 @@ const monthFormat = new Intl.DateTimeFormat("en", {
   year: "numeric",
 });
 
-type Loaded = { saves: SavedPost[]; sample: boolean };
+type Loaded = { saves: SavedPost[]; sample: boolean; fromHtml?: boolean };
 
 export default function SavedPostsViewer() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -63,7 +63,11 @@ export default function SavedPostsViewer() {
       captureWebAnalyticsEvent("ig_tool_failed", { reason: result.reason });
       return;
     }
-    setLoaded({ saves: result.saves, sample: false });
+    setLoaded({
+      saves: result.saves,
+      sample: false,
+      fromHtml: result.fromHtml,
+    });
     captureWebAnalyticsEvent("ig_tool_opened", {
       format: result.format,
       count: result.saves.length,
@@ -188,7 +192,7 @@ function downloadCsv(saves: SavedPost[]) {
 }
 
 function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
-  const { saves, sample } = loaded;
+  const { saves, sample, fromHtml } = loaded;
   const summary = useMemo(() => summarize(saves), [saves]);
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(PAGE);
@@ -234,7 +238,7 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
         {facts.length > 0 && (
           <p className="mt-2 text-[15px] text-muted">{facts.join(" · ")}</p>
         )}
-        {summary.accounts === 0 && !summary.oldestAt && (
+        {fromHtml && summary.accounts === 0 && (
           <p className="mt-3 rounded-xl bg-ember-soft px-4 py-3 text-sm text-ink-soft">
             This is the HTML version of the download, which leaves out who
             posted each save and when. Request it again with the format set to

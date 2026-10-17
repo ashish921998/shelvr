@@ -428,7 +428,13 @@ export function isZip(head: Uint8Array): boolean {
 }
 
 export type ReadResult =
-  | { ok: true; saves: SavedPost[]; format: "zip" | "json" | "html" }
+  | {
+      ok: true;
+      saves: SavedPost[];
+      format: "zip" | "json" | "html";
+      /** Read from the HTML download, which carries no names or dates. */
+      fromHtml: boolean;
+    }
   | {
       ok: false;
       reason:
@@ -479,7 +485,12 @@ export async function readSaves(files: File[]): Promise<ReadResult> {
         .map((file) => parseSavesFile(file.name, file.text)),
     );
     return saves.length > 0
-      ? { ok: true, saves, format }
+      ? {
+          ok: true,
+          saves,
+          format,
+          fromHtml: found.some((file) => /\.html?$/i.test(file.name)),
+        }
       : { ok: false, reason: "no_saves" };
   } catch {
     return { ok: false, reason: "unreadable" };

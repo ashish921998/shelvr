@@ -321,6 +321,15 @@ describe("readSaves", () => {
     const fromZip = await readSaves([zipFile]);
     expect(fromZip.ok && fromZip.saves.length).toBe(4);
     expect(fromZip.ok && fromZip.format).toBe("zip");
+    expect(fromZip.ok && fromZip.fromHtml).toBe(false);
+
+    const html = await readSaves([
+      new File(
+        ['<a href="https://www.instagram.com/p/EEE/">x</a>'],
+        "saved_posts.html",
+      ),
+    ]);
+    expect(html.ok && html.fromHtml).toBe(true);
 
     // Collections listed first: the saved_posts date still wins.
     const loose = await readSaves([
