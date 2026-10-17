@@ -225,3 +225,86 @@ describe("resetCurrentUser", () => {
     ).resolves.toEqual({ items: 4, spaces: 3, memberships: 4 });
   });
 });
+
+describe("locateTripStops", () => {
+  async function tripFixture() {
+    const fixture = await anonymousFixtureUser();
+    const spaceId = await fixture.backend.run(async (ctx) => {
+      const userId = fixture.userId;
+      const spaceId = await ctx.db.insert("spaces", {
+        userId,
+        name: "Lisbon trip",
+        dynamic: false,
+      });
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Lisbon in a day",
+        tags: [],
+        searchText: "Lisbon in a day",
+      });
+      const stop = (name: string) => ({
+        itemId,
+        name,
+        why: "In the reel",
+        slot: "morning" as const,
+      });
+      await ctx.db.insert("trips", {
+        userId,
+        spaceId,
+        pace: "easy",
+        days: [
+          {
+            areas: [],
+            stops: [stop("Belém Tower"), stop("Time Out Market")],
+            gaps: [],
+          },
+        ],
+        wishlist: [stop("Miradouro da Graça")],
+        considered: 1,
+      });
+      return spaceId;
+    });
+    return { ...fixture, spaceId };
+  }
+
+  it("pins the named stops and lays the trip out again", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, client, spaceId } = await tripFixture();
+
+    const located = await client.mutation(api.devFixtures.locateTripStops, {
+      spaceId,
+      places: [
+        { name: "belém tower", lat: 38.6916, lng: -9.216 },
+        { name: "Time Out Market", lat: 38.7069, lng: -9.1458 },
+      ],
+    });
+
+    expect(located).toBe(2);
+    const trip = await backend.run(async (ctx) =>
+      ctx.db
+        .query("trips")
+        .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+        .first(),
+    );
+    const placed = [
+      ...trip!.days.flatMap((day) => day.stops),
+      ...trip!.wishlist,
+    ]
+      .filter((stop) => stop.lat !== undefined)
+      .map((stop) => stop.name)
+      .sort();
+    expect(placed).toEqual(["Belém Tower", "Time Out Market"]);
+    expect(trip!.locatedAt).toBeTypeOf("number");
+  });
+
+  it("is unavailable unless anonymous development auth is enabled", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "false");
+    const { client, spaceId } = await tripFixture();
+
+    await expect(
+      client.mutation(api.devFixtures.locateTripStops, { spaceId, places: [] }),
+    ).rejects.toThrow(/fixtures are disabled/);
+  });
+});

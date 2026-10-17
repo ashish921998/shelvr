@@ -61,18 +61,16 @@ function StopRow({
   stop,
   index,
   color,
-  order,
   onPress,
 }: {
   stop: TripStopView;
   index: number;
   color: string;
-  order: number;
   onPress: () => void;
 }) {
   return (
     <Animated.View
-      entering={FadeInDown.delay(80 + order * 60)
+      entering={FadeInDown.delay(80 + index * 60)
         .springify()
         .damping(18)}
       exiting={FadeOut.duration(150)}
@@ -175,7 +173,6 @@ export function TripDayPanel({
               key={`${activeDay}-${stop.itemId}-${stop.name}`}
               stop={stop}
               index={index}
-              order={index}
               color={color}
               onPress={() => onSelectStop(index)}
             />

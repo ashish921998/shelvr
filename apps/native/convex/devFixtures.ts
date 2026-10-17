@@ -8,6 +8,7 @@ import {
   requireUserId,
 } from "./model/auth";
 import { insertMembership } from "./model/memberships";
+import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
 
 const RESET_LIMIT = 200;
@@ -239,5 +240,53 @@ export const resetCurrentUser = mutation({
     });
 
     return { items: 4, spaces: 3, memberships: 4 };
+  },
+});
+
+/**
+ * Pins a trip on a development deployment that has no Apple Maps key: sets
+ * where each named stop is, as `trips.makeTrip` would have, and lays the trip
+ * out again from those points. Same guards as the fixture reset. Returns how
+ * many stops got a point.
+ */
+export const locateTripStops = mutation({
+  args: {
+    spaceId: v.id("spaces"),
+    places: v.array(
+      v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+    ),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireDevelopmentAnonymousUser(ctx, userId);
+    const trip = await ctx.db
+      .query("trips")
+      .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
+      .first();
+    if (trip === null || trip.userId !== userId) {
+      throw new Error("Trip not found");
+    }
+    const points = new Map(
+      args.places.map((place) => [place.name.trim().toLowerCase(), place]),
+    );
+    let located = 0;
+    const candidates: TripCandidate[] = [
+      ...trip.days.flatMap((day) => day.stops),
+      ...trip.wishlist,
+    ].map(({ lat: _lat, lng: _lng, ...stop }) => {
+      const point = points.get(stop.name.trim().toLowerCase());
+      if (point) located++;
+      return {
+        ...stop,
+        ...(point ? { location: { lat: point.lat, lng: point.lng } } : {}),
+      };
+    });
+    const laid = buildTrip(candidates, {
+      days: trip.days.length,
+      pace: trip.pace,
+    });
+    await ctx.db.patch(trip._id, { ...laid, locatedAt: Date.now() });
+    return located;
   },
 });

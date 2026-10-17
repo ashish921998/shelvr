@@ -119,12 +119,13 @@ export function directionsUrl(
   city: string | undefined,
 ): string {
   const label = [stop.name, stop.area, city].filter(Boolean).join(", ");
-  const located = stop.lat !== undefined && stop.lng !== undefined;
+  const destination =
+    stop.lat !== undefined && stop.lng !== undefined
+      ? `${stop.lat},${stop.lng}`
+      : label;
   if (Platform.OS === "ios") {
-    const destination = located ? `${stop.lat},${stop.lng}` : label;
     return `https://maps.apple.com/?daddr=${encodeURIComponent(destination)}&q=${encodeURIComponent(stop.name)}&dirflg=w`;
   }
-  const destination = located ? `${stop.lat},${stop.lng}` : label;
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`;
 }
 

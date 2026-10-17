@@ -87,15 +87,15 @@ function Dot({
   progress: SharedValue<number>;
 }) {
   const style = useAnimatedStyle(() => {
-    const t = interpolate(
+    const at = interpolate(
       progress.value,
       [index, index + 0.35],
       [0, 1],
       "clamp",
     );
     // A small overshoot, so each stop lands like a dropped pin.
-    const pop = t < 1 ? Easing.back(2.2)(t) : 1;
-    return { opacity: t, transform: [{ scale: pop }] };
+    const pop = at < 1 ? Easing.back(2.2)(at) : 1;
+    return { opacity: at, transform: [{ scale: pop }] };
   });
   return (
     <Animated.View

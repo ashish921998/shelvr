@@ -7,7 +7,9 @@ import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import {
   MAX_TRIP_DAYS,
   MIN_TRIP_DAYS,
+  formatTripDay,
   toDateKey,
+  tripDayDate,
   type TripPace,
   type TripRequest,
 } from "@/lib/trip";
@@ -161,6 +163,15 @@ function StartDate({
   }
   return (
     <Animated.View entering={FadeIn.duration(200)} style={styles.dateRow}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("trip.clearDate")}
+        onPress={() => onChange(null)}
+        hitSlop={8}
+        style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
+      >
+        <AppSymbolIcon name="xmark" size={12} tintColor={theme.colors.muted} />
+      </Pressable>
       {Platform.OS === "ios" ? (
         <DateTimePicker
           value={value}
@@ -170,6 +181,7 @@ function StartDate({
           accentColor={theme.colors.primary}
           themeVariant={isDarkThemeName(rt.themeName) ? "dark" : "light"}
           locale={formattingLocale()}
+          style={styles.compactPicker}
           onValueChange={(_, date) => onChange(date)}
         />
       ) : (
@@ -180,11 +192,7 @@ function StartDate({
             hitSlop={8}
           >
             <ThemedText variant="secondaryLabel">
-              {value.toLocaleDateString(formattingLocale(), {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })}
+              {formatTripDay(value)}
             </ThemedText>
           </Pressable>
           {androidOpen ? (
@@ -200,15 +208,6 @@ function StartDate({
           ) : null}
         </>
       )}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("trip.clearDate")}
-        onPress={() => onChange(null)}
-        hitSlop={8}
-        style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
-      >
-        <AppSymbolIcon name="xmark" size={12} tintColor={theme.colors.muted} />
-      </Pressable>
     </Animated.View>
   );
 }
@@ -229,10 +228,10 @@ export function TripPlanForm({
   const [days, setDays] = useState(initial?.days ?? 3);
   const [pace, setPace] = useState<TripPace>(initial?.pace ?? "balanced");
   const [start, setStart] = useState<Date | null>(() => {
-    if (!initial?.startDate) return null;
-    const [y, m, d] = initial.startDate.split("-").map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.getTime() >= new Date().setHours(0, 0, 0, 0) ? date : null;
+    const date = tripDayDate(initial?.startDate, 0);
+    return date && date.getTime() >= new Date().setHours(0, 0, 0, 0)
+      ? date
+      : null;
   });
   // The sheet offers the six cities most saves name.
   const offered = cities.slice(0, 6);
@@ -393,9 +392,16 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryText,
   },
   dateRow: {
+    flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     gap: theme.gap(1),
+  },
+  // The compact picker sizes to its date; without a floor it is laid out
+  // narrower than the text and clips the year.
+  compactPicker: {
+    minWidth: 132,
   },
   clear: {
     width: 24,

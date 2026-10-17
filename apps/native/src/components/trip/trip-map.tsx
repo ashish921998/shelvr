@@ -109,9 +109,7 @@ export function TripMap({
       }),
   );
 
-  const route = active
-    .slice(0, Math.max(revealed, 0))
-    .map((s) => s.coordinates);
+  const route = active.slice(0, revealed).map((s) => s.coordinates);
 
   if (process.env.EXPO_OS === "ios") {
     return (

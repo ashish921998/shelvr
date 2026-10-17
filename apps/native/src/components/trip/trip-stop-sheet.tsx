@@ -190,12 +190,15 @@ export function TripStopSheet({
           label={t("trip.directions")}
           onPress={onDirections}
         />
-        <Action
-          icon="arrow.left.arrow.right"
-          label={t("trip.swap")}
-          disabled={!canSwap || swapping}
-          onPress={onSwap}
-        />
+        {/* Swap shows only while another saved place could take this spot. */}
+        {canSwap ? (
+          <Action
+            icon="arrow.left.arrow.right"
+            label={t("trip.swap")}
+            disabled={swapping}
+            onPress={onSwap}
+          />
+        ) : null}
         <Action
           icon="checkmark"
           label={visited ? t("plan.been") : t("plan.weWent")}

@@ -22,6 +22,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -30,7 +31,6 @@ import { Linking, Pressable, ScrollView, View } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
   FadeOut,
   LinearTransition,
   SlideInDown,
@@ -38,9 +38,23 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withRepeat,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
+
+/** Panel content rising into place, by transform only. */
+function rise() {
+  "worklet";
+  return {
+    initialValues: { transform: [{ translateY: 18 }] },
+    animations: {
+      transform: [
+        { translateY: withSpring(0, { duration: 420, dampingRatio: 0.9 }) },
+      ],
+    },
+  };
+}
 
 /** The space's covers drifting slowly behind the form while there is no map. */
 function CoverBackdrop({ covers }: { covers: string[] }) {
@@ -62,9 +76,13 @@ function CoverBackdrop({ covers }: { covers: string[] }) {
   const down = useAnimatedStyle(() => ({
     transform: [{ translateY: -40 + 40 * drift.value }],
   }));
-  const columns = [0, 1, 2].map((c) =>
-    covers.filter((_, i) => i % 3 === c).slice(0, 5),
-  );
+  // Covers repeat until each column runs past the sheet, so a space with a
+  // few photos still fills the backdrop with no empty band.
+  const tiles =
+    covers.length === 0
+      ? []
+      : Array.from({ length: 24 }, (_, i) => covers[i % covers.length]);
+  const columns = [0, 1, 2].map((c) => tiles.filter((_, i) => i % 3 === c));
   return (
     <View style={styles.backdrop} pointerEvents="none">
       {columns.map((column, c) => (
@@ -72,9 +90,9 @@ function CoverBackdrop({ covers }: { covers: string[] }) {
           key={c}
           style={[styles.backdropColumn, c === 1 ? down : up]}
         >
-          {column.map((uri) => (
+          {column.map((uri, i) => (
             <Image
-              key={uri}
+              key={i}
               source={{ uri }}
               style={styles.backdropCover}
               contentFit="cover"
@@ -87,14 +105,11 @@ function CoverBackdrop({ covers }: { covers: string[] }) {
   );
 }
 
-function errorCode(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("data" in error)) {
-    return undefined;
-  }
-  const data = (error as { data?: unknown }).data;
-  return typeof data === "object" && data !== null && "code" in data
-    ? String((data as { code: unknown }).code)
-    : undefined;
+function isNothingToSwap(error: unknown): boolean {
+  return (
+    error instanceof ConvexError &&
+    (error.data as { code?: unknown } | null)?.code === "nothing_to_swap"
+  );
 }
 
 export default function TripScreen() {
@@ -194,7 +209,7 @@ export default function TripScreen() {
       analytics.capture("trip_stop_swapped", { day: selected.day });
       if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
     } catch (error) {
-      if (errorCode(error) !== "nothing_to_swap") {
+      if (!isNothingToSwap(error)) {
         analytics.captureError("trip_swap_failed", error);
       }
     } finally {
@@ -360,7 +375,14 @@ export default function TripScreen() {
       <Animated.View
         entering={SlideInDown.springify().damping(20)}
         layout={LinearTransition.springify().damping(22)}
-        style={[styles.panel, overMap ? styles.panelOverMap : styles.panelFull]}
+        style={[
+          styles.panel,
+          overMap ? styles.panelOverMap : styles.panelFull,
+          // The day list and a stop keep one height, so switching days or
+          // opening a stop never makes the sheet jump.
+          (mode === "days" || mode === "stop") &&
+            (overMap ? styles.panelOverMapFixed : styles.panelFullFixed),
+        ]}
       >
         <View style={styles.grabber} />
         <ScrollView
@@ -370,10 +392,9 @@ export default function TripScreen() {
         >
           <Animated.View
             key={mode}
-            entering={FadeInDown.duration(260).withInitialValues({
-              opacity: 0,
-              transform: [{ translateY: 16 }],
-            })}
+            // Rises without fading: Liquid Glass (the Build button) does not
+            // draw under a parent whose opacity animates from zero.
+            entering={rise}
             exiting={FadeOut.duration(140)}
           >
             {panel}
@@ -402,7 +423,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   backdropColumn: {
     flex: 1,
     gap: theme.gap(1),
-    paddingTop: rt.insets.top,
+    // Clear of the status bar and the back button.
+    paddingTop: rt.insets.top + theme.gap(7),
   },
   backdropCover: {
     width: "100%",
@@ -432,6 +454,12 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   panelFull: {
     maxHeight: rt.screen.height - rt.insets.top - theme.gap(7),
+  },
+  panelOverMapFixed: {
+    height: rt.screen.height * 0.52,
+  },
+  panelFullFixed: {
+    height: rt.screen.height - rt.insets.top - theme.gap(7),
   },
   grabber: {
     alignSelf: "center",

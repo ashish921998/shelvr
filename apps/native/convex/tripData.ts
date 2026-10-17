@@ -36,8 +36,8 @@ function cityKey(city: string): string {
 }
 
 /** The space's ready saves, newest filed first: saved rows plus legacy rows
- * (no status reads as saved), bounded. */
-async function loadTripSaves(
+ * (no status reads as saved), bounded. Shared with "Make a plan". */
+export async function loadReadySaves(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   userId: string,
@@ -94,11 +94,17 @@ function countCities(items: Doc<"items">[]): { city: string; count: number }[] {
     .sort((a, b) => b.count - a.count);
 }
 
-function toSource(item: Doc<"items">, join: Doc<"spaceItems">): PlanSource {
+/** What the model reads of one save. */
+export function toPlanSource(
+  item: Doc<"items">,
+  join: Doc<"spaceItems">,
+): PlanSource {
   return {
     itemId: item._id,
     title: item.title,
     description: item.description,
+    // A note's words live in `note`; a link can carry the user's note too,
+    // and either may be what names the place.
     content:
       [item.note, item.content]
         .filter(Boolean)
@@ -107,6 +113,7 @@ function toSource(item: Doc<"items">, join: Doc<"spaceItems">): PlanSource {
     url: item.url,
     siteName: item.siteName,
     author: item.author,
+    // The save's own Maps actions plus any steered for this space.
     places: [...(item.intents ?? []), ...(join.intents ?? [])]
       .filter((intent) => intent.kind === "open_maps")
       .map((intent) => intent.value),
@@ -145,7 +152,7 @@ export const claimTripInternal = internalMutation({
       .trim()
       .slice(0, MAX_CITY_CHARS);
     const wanted = asked !== undefined ? cityKey(asked) : "";
-    const saves = (await loadTripSaves(ctx, args.spaceId, userId)).filter(
+    const saves = (await loadReadySaves(ctx, args.spaceId, userId)).filter(
       ({ item }) =>
         wanted === "" ||
         (item.cities ?? []).length === 0 ||
@@ -155,7 +162,7 @@ export const claimTripInternal = internalMutation({
       wanted !== ""
         ? asked
         : countCities(saves.map(({ item }) => item))[0]?.city;
-    const sources = saves.map(({ item, join }) => toSource(item, join));
+    const sources = saves.map(({ item, join }) => toPlanSource(item, join));
     if (sources.length === 0) {
       return { spaceName: space.name, city, sources, been: [] };
     }
@@ -183,7 +190,6 @@ export const claimMapLookupsInternal = internalMutation({
   args: { count: v.number() },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    if (!Number.isInteger(args.count) || args.count < 1) return false;
     const { ok } = await rateLimiter.limit(ctx, "appleMapsGlobal", {
       count: args.count,
     });
@@ -250,15 +256,15 @@ export const swapTripStop = mutation({
     await requireProEntitlement(ctx, userId);
     let dayIndex = -1;
     let stopIndex = -1;
-    trip.days.forEach((day, d) => {
-      const s = day.stops.findIndex(
+    for (const [d, day] of trip.days.entries()) {
+      stopIndex = day.stops.findIndex(
         (stop) => stop.itemId === args.itemId && stop.name === args.name,
       );
-      if (s !== -1 && dayIndex === -1) {
+      if (stopIndex !== -1) {
         dayIndex = d;
-        stopIndex = s;
+        break;
       }
-    });
+    }
     // Only places whose save still exists may take the stop's spot.
     const live: TripStop[] = [];
     for (const stop of trip.wishlist) {
@@ -368,7 +374,7 @@ export const tripCities = query({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) return [];
-    const saves = await loadTripSaves(ctx, args.spaceId, userId);
+    const saves = await loadReadySaves(ctx, args.spaceId, userId);
     return countCities(saves.map(({ item }) => item));
   },
 });
