@@ -222,6 +222,12 @@ describe("promotional offers", () => {
       status: 200,
       body: { message: { messageIdentifier: messageId } },
     });
+    // The fixture's product id resolves only through the prototype here.
+    const inherited = Object.create(offers) as typeof offers;
+    expect(await answerWith({ signingKey, offers: inherited })).toEqual({
+      status: 200,
+      body: { message: { messageIdentifier: messageId } },
+    });
   });
 
   it("falls back to the plain message when the key is unset or broken", async () => {

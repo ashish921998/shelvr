@@ -146,8 +146,13 @@ export async function answerRetentionRequest(
       : {},
   };
   const { productId, originalTransactionId } = payload;
+  // Own keys only, so a product id like "constructor" is never an offer.
   const offer =
-    typeof productId === "string" ? options.offers?.[productId] : undefined;
+    typeof productId === "string" &&
+    options.offers &&
+    Object.hasOwn(options.offers, productId)
+      ? options.offers[productId]
+      : undefined;
   if (!offer) return plain;
   if (!options.signingKey) return { ...plain, reason: "offer_key_unset" };
   if (typeof originalTransactionId !== "string" || !originalTransactionId)
