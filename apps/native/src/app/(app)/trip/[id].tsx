@@ -120,12 +120,17 @@ export default function TripScreen() {
   const [swapping, setSwapping] = useState(false);
   const [lastRequest, setLastRequest] = useState<TripRequest | null>(null);
 
+  // Unique: two saves from one site often share a cover, and covers key
+  // their tiles.
   const covers = useMemo(
-    () =>
-      (space?.items ?? []).flatMap((item) => {
-        const uri = item.imageUrl ?? item.heroImageUrl;
-        return uri ? [uri] : [];
-      }),
+    () => [
+      ...new Set(
+        (space?.items ?? []).flatMap((item) => {
+          const uri = item.imageUrl ?? item.heroImageUrl;
+          return uri ? [uri] : [];
+        }),
+      ),
+    ],
     [space],
   );
 
@@ -178,13 +183,13 @@ export default function TripScreen() {
   };
 
   const swap = async () => {
-    if (!trip || !selected) return;
+    if (!trip || !selected || !selectedStop) return;
     setSwapping(true);
     try {
       await swapTripStop({
         tripId: trip._id,
-        day: selected.day,
-        stop: selected.stop,
+        itemId: selectedStop.itemId,
+        name: selectedStop.name,
       });
       analytics.capture("trip_stop_swapped", { day: selected.day });
       if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();

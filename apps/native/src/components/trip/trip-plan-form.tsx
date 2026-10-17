@@ -234,14 +234,16 @@ export function TripPlanForm({
     const date = new Date(y, m - 1, d);
     return date.getTime() >= new Date().setHours(0, 0, 0, 0) ? date : null;
   });
+  // The sheet offers the six cities most saves name.
+  const offered = cities.slice(0, 6);
   const initialCity = Math.max(
     0,
-    cities.findIndex(
+    offered.findIndex(
       (c) => c.city.toLowerCase() === initial?.city?.toLowerCase(),
     ),
   );
   const [cityIndex, setCityIndex] = useState(initialCity);
-  const city = cities[cityIndex]?.city;
+  const city = offered[cityIndex]?.city;
   const askCity = cities.length >= 2;
 
   return (
@@ -260,7 +262,7 @@ export function TripPlanForm({
           <ThemedText variant="bodyLabel">{t("trip.whichCity")}</ThemedText>
           <TripSegments
             scroll
-            labels={cities.slice(0, 6).map((c) => c.city)}
+            labels={offered.map((c) => c.city)}
             selected={cityIndex}
             onSelect={setCityIndex}
             tintFor={() => theme.colors.primary}

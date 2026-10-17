@@ -28,6 +28,8 @@ import { requireProEntitlement } from "./subscriptions";
 
 /** A trip reads the same saves a plan does: the space's newest filed. */
 const MAX_TRIP_ITEMS = MAX_PLAN_ITEMS;
+/** A city name the client sends: it goes into the prompt and to Apple. */
+const MAX_CITY_CHARS = 80;
 
 function cityKey(city: string): string {
   return city.replace(/\s+/g, " ").trim().toLowerCase();
@@ -138,7 +140,11 @@ export const claimTripInternal = internalMutation({
     if (!(await aiAllowed(ctx, userId))) {
       throw aiConsentRequiredError();
     }
-    const wanted = args.city !== undefined ? cityKey(args.city) : "";
+    const asked = args.city
+      ?.replace(/\s+/g, " ")
+      .trim()
+      .slice(0, MAX_CITY_CHARS);
+    const wanted = asked !== undefined ? cityKey(asked) : "";
     const saves = (await loadTripSaves(ctx, args.spaceId, userId)).filter(
       ({ item }) =>
         wanted === "" ||
@@ -147,7 +153,7 @@ export const claimTripInternal = internalMutation({
     );
     const city =
       wanted !== ""
-        ? args.city?.trim()
+        ? asked
         : countCities(saves.map(({ item }) => item))[0]?.city;
     const sources = saves.map(({ item, join }) => toSource(item, join));
     if (sources.length === 0) {
@@ -231,7 +237,9 @@ export const saveTripInternal = internalMutation({
  * second swap can bring it back. No model call.
  */
 export const swapTripStop = mutation({
-  args: { tripId: v.id("trips"), day: v.number(), stop: v.number() },
+  // The stop by its save and name, not by position: the client sees the trip
+  // without stops whose save was deleted, so its indexes can differ.
+  args: { tripId: v.id("trips"), itemId: v.id("items"), name: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -240,7 +248,28 @@ export const swapTripStop = mutation({
       throw new Error("Trip not found");
     }
     await requireProEntitlement(ctx, userId);
-    const swapped = swapStop(trip, args.day, args.stop);
+    let dayIndex = -1;
+    let stopIndex = -1;
+    trip.days.forEach((day, d) => {
+      const s = day.stops.findIndex(
+        (stop) => stop.itemId === args.itemId && stop.name === args.name,
+      );
+      if (s !== -1 && dayIndex === -1) {
+        dayIndex = d;
+        stopIndex = s;
+      }
+    });
+    // Only places whose save still exists may take the stop's spot.
+    const live: TripStop[] = [];
+    for (const stop of trip.wishlist) {
+      const item = await ctx.db.get(stop.itemId);
+      if (item !== null && item.userId === userId) live.push(stop);
+    }
+    const swapped = swapStop(
+      { days: trip.days, wishlist: live },
+      dayIndex,
+      stopIndex,
+    );
     if (swapped === null) {
       throw new ConvexError({
         code: "nothing_to_swap",

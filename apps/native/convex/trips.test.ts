@@ -338,10 +338,11 @@ describe("makeTrip", () => {
   });
 
   it("swaps a stop for a wishlist place, and says when none is left", async () => {
-    const { t, spaceId } = await setup([
+    const seeded = await setup([
       ...LISBON_SAVES,
       { title: "Lost In esplanada for the view" },
     ]);
+    const { t, spaceId } = seeded;
     // Newest filed first: Lost In 1, Taberna 2, Park 3, Pastéis 4.
     const pick = (saveNumber: number, name: string, slot: string) => ({
       saveNumber,
@@ -368,7 +369,14 @@ describe("makeTrip", () => {
     });
     if (tripId === null) throw new Error("no trip");
 
-    await t.mutation(api.tripData.swapTripStop, { tripId, day: 0, stop: 2 });
+    const park = (await t.query(api.tripData.getSpaceTrip, { spaceId }))
+      ?.days[0].stops[2];
+    if (!park) throw new Error("no stop");
+    await t.mutation(api.tripData.swapTripStop, {
+      tripId,
+      itemId: park.itemId,
+      name: park.name,
+    });
 
     const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
     expect(trip?.days[0].stops.map((s) => s.name)).toEqual([
@@ -378,7 +386,23 @@ describe("makeTrip", () => {
     ]);
     expect(trip?.wishlist.map((s) => s.name)).toEqual(["Park"]);
     await expect(
-      t.mutation(api.tripData.swapTripStop, { tripId, day: 0, stop: 9 }),
+      t.mutation(api.tripData.swapTripStop, {
+        tripId,
+        itemId: park.itemId,
+        name: "Not on the trip",
+      }),
+    ).rejects.toMatchObject({ data: { code: "nothing_to_swap" } });
+    // Park's save is deleted: it may not come back into the day.
+    const { base } = seeded;
+    const lostIn = trip?.days[0].stops[2];
+    if (!lostIn) throw new Error("no stop");
+    await base.run((ctx) => ctx.db.delete(park.itemId));
+    await expect(
+      t.mutation(api.tripData.swapTripStop, {
+        tripId,
+        itemId: lostIn.itemId,
+        name: lostIn.name,
+      }),
     ).rejects.toMatchObject({ data: { code: "nothing_to_swap" } });
   });
 

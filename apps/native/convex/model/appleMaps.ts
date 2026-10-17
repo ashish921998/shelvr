@@ -6,6 +6,8 @@ import { signAppleJwt } from "./appleClient";
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
 const SEARCH_TIMEOUT_MS = 8_000;
+/** A search reply is a few kilobytes; anything far larger is not one. */
+const MAX_REPLY_BYTES = 256 * 1024;
 /** A place this far from the trip's city is a different place with the same
  * name, not the one the save meant. */
 export const MAX_CITY_DISTANCE_KM = 80;
@@ -56,12 +58,26 @@ export async function appleMapsAccessToken(
       signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    const body: unknown = await response.json();
+    const body = await readJson(response);
     const token =
       typeof body === "object" && body !== null && "accessToken" in body
         ? body.accessToken
         : undefined;
     return typeof token === "string" && token !== "" ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The reply's JSON, or null when it is not JSON or is too large to be a
+ * Maps reply. */
+async function readJson(response: Response): Promise<unknown> {
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (declared > MAX_REPLY_BYTES) return null;
+  const text = await response.text();
+  if (text.length > MAX_REPLY_BYTES) return null;
+  try {
+    return JSON.parse(text) as unknown;
   } catch {
     return null;
   }
@@ -129,7 +145,7 @@ export async function appleMapsLookup(
       signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    return firstPlace(await response.json());
+    return firstPlace(await readJson(response));
   } catch {
     return null;
   }
