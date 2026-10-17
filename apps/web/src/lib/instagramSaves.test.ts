@@ -230,8 +230,8 @@ describe("toCsv", () => {
         url: "https://www.instagram.com/p/AAA/",
         kind: "post",
         author: "=cmd",
-        // Noon UTC is the same calendar day in every time zone.
-        savedAt: Date.UTC(2024, 0, 2, 12),
+        // Local noon, because toCsv writes the viewer's own calendar day.
+        savedAt: new Date(2024, 0, 2, 12).getTime(),
         collections: ["Recipes", "Dinner, quick"],
       },
     ]);
