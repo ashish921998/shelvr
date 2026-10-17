@@ -10,7 +10,6 @@ import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
-  syncLocale: vi.fn(async () => true),
   presentPaywall: vi.fn(),
   observed: vi.fn(),
   presentExitSheet: vi.fn(),
@@ -110,7 +109,7 @@ vi.mock("@/lib/trial-cancellation", () => ({
 }));
 vi.mock("./revenuecat-locale", () => ({
   revenueCatLocale: () => "en",
-  syncRevenueCatUILocale: () => mock.syncLocale(),
+  syncRevenueCatUILocale: async () => true,
 }));
 vi.mock("@convex/_generated/api", () => ({ api: { subscriptions: {} } }));
 vi.mock("@convex/model/entitlement", () => ({
@@ -149,7 +148,6 @@ beforeEach(() => {
   mock.hidePro = false;
   mock.forceExitOffer = false;
   mock.presentPaywall.mockReset();
-  mock.syncLocale.mockReset().mockResolvedValue(true);
   mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
@@ -257,73 +255,10 @@ describe("presentPaywall concurrency", () => {
     mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
 
     void openPaywall(router, "share");
-    // The first attempt reaches the sheet before it goes stale.
-    await vi.advanceTimersByTimeAsync(10);
-    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
+    vi.advanceTimersByTime(SHEET_STALE_MS);
     await openPaywall(router, "share");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
-  });
-
-  it("settles a Pro gate once its own presentation goes stale, without routing", async () => {
-    const { openPaywall } = await loadReady();
-    vi.useFakeTimers();
-    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
-
-    const outcome = openPaywall(router, "share");
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
-
-    await expect(outcome).resolves.toBe(false);
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("still counts a purchase made on a sheet the person kept open past the bound", async () => {
-    const { openPaywall } = await loadReady();
-    const { resumeBlockedAction } = await import("./paywall-funnel");
-    vi.useFakeTimers();
-    const sheet = deferred<string>();
-    mock.presentPaywall.mockReturnValueOnce(sheet.promise);
-
-    const outcome = openPaywall(router, "share");
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
-    await expect(outcome).resolves.toBe(false);
-
-    sheet.resolve("PURCHASED");
-    await vi.advanceTimersByTimeAsync(0);
-    resumeBlockedAction("share");
-
-    expect(mock.capture).toHaveBeenCalledWith(
-      "paywall_blocked_action_resumed",
-      expect.objectContaining({ purchased_since_block: true }),
-    );
-  });
-
-  it("puts no sheet up once its attempt has been presumed gone", async () => {
-    const { openPaywall } = await loadReady();
-    vi.useFakeTimers();
-    const locale = deferred<boolean>();
-    mock.syncLocale.mockReturnValueOnce(locale.promise);
-
-    const outcome = openPaywall(router, "share");
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
-    await expect(outcome).resolves.toBe(false);
-
-    locale.resolve(true);
-    await vi.advanceTimersByTimeAsync(50);
-    expect(mock.presentPaywall).not.toHaveBeenCalled();
-  });
-
-  it("tells onboarding its paywall is gone once the presentation goes stale", async () => {
-    const { openPaywallKeepingExitOffer } = await loadReady();
-    vi.useFakeTimers();
-    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
-
-    const outcome = openPaywallKeepingExitOffer(router, "onboarding", false);
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
-
-    await expect(outcome).resolves.toBe("unavailable");
-    expect(push).not.toHaveBeenCalled();
   });
 });
 
@@ -489,53 +424,6 @@ describe("exit offer after a paywall close", () => {
         package_id: "annual_exit",
       }),
     );
-  });
-
-  it("puts no exit offer up once the attempt has been presumed gone", async () => {
-    const { openPaywall } = await loadReady();
-    vi.useFakeTimers();
-    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
-    // The offering lookup is unbounded and outlives the attempt.
-    const eligibility = deferred<Record<string, { status: number }>>();
-    mock.checkEligibility.mockReturnValueOnce(eligibility.promise);
-
-    const outcome = openPaywall(router, "onboarding");
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
-    await expect(outcome).resolves.toBe(false);
-
-    eligibility.resolve({ annual_exit: { status: 2 } });
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(mock.presentExitSheet).not.toHaveBeenCalled();
-    expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
-  });
-
-  it("leaves a newer attempt's exit offer claim alone when a stale lookup returns", async () => {
-    const { openPaywall } = await loadReady();
-    vi.useFakeTimers();
-    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
-    // The first attempt's offering lookup outlives the attempt.
-    const eligibility = deferred<Record<string, { status: number }>>();
-    mock.checkEligibility.mockReturnValueOnce(eligibility.promise);
-
-    const first = openPaywall(router, "onboarding");
-    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS);
-    await expect(first).resolves.toBe(false);
-
-    // A retry closes its paywall and is shown the exit offer.
-    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
-    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
-    const second = openPaywall(router, "onboarding");
-    await vi.advanceTimersByTimeAsync(1_000);
-    await expect(second).resolves.toBe(false);
-    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
-    const claim = mock.store.get("shelvr.exitOffer.shownAt.user_1");
-    expect(claim).toBeDefined();
-
-    // The stale lookup returns late; the retry's claim must survive it.
-    eligibility.resolve({ annual_exit: { status: 2 } });
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
-    expect(mock.store.get("shelvr.exitOffer.shownAt.user_1")).toBe(claim);
   });
 
   it("skips the exit offer in an e2e run that hides Pro", async () => {

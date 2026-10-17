@@ -13,7 +13,6 @@ import {
   readPaywallContext,
   readPaywallOffering,
   recordAccess,
-  markBlockedActionPurchased,
   recordBlockedAction,
   restoreCameBackEmpty,
   resumeBlockedAction,
@@ -361,7 +360,6 @@ async function presentPaywallImpl(
 ): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
-  const epoch = presentationEpoch;
   analytics.capture("paywall_requested", properties);
   // Started before the identity gate and awaited after it, so the cached
   // RevenueCat reads never add their own wait in front of the sheet.
@@ -395,10 +393,6 @@ async function presentPaywallImpl(
     // dates nothing: the paywall falls back to its undated labels instead of
     // claiming a length the offer may not have.
     const { offering, trial } = await readPaywallOffering();
-    if (epoch !== presentationEpoch) {
-      failed("presumed_gone");
-      return "unavailable";
-    }
     const customVariables = trial && trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
@@ -411,8 +405,8 @@ async function presentPaywallImpl(
     }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     const outcome = mapPaywallResult(result);
-    if (outcome !== "cancelled" || epoch !== presentationEpoch) return outcome;
-    return (await presentExitOffer(rcui, placement, epoch)) ?? outcome;
+    if (outcome !== "cancelled") return outcome;
+    return (await presentExitOffer(rcui, placement)) ?? outcome;
   } catch {
     return "unavailable";
   }
@@ -471,7 +465,6 @@ function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
 async function presentExitOffer(
   rcui: NonNullable<ReturnType<typeof getRCUI>>,
   sourcePlacement: string,
-  epoch: number,
 ): Promise<PaywallOutcome | null> {
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
@@ -494,23 +487,19 @@ async function presentExitOffer(
     ? await findForcedExitOffering(rc)
     : await findExitOffering(exitOfferDeps(rc));
   if (!offering) return null;
-  // The lookup above is unbounded: if the attempt was presumed gone while it
-  // ran, a newer attempt may already hold the claim, so this one stays out.
-  if (epoch !== presentationEpoch) return null;
-  const claim = String(now);
   try {
     // Claim before presenting, so a crash mid-sheet can't repeat it.
-    SecureStore.setItem(key, claim);
+    SecureStore.setItem(key, String(now));
   } catch {
     return null;
   }
   notifyExitOffer();
+  // UIKit refuses to present while the first paywall is still dismissing.
+  await waitForSheetTransition();
   // A sheet that never appeared must not open the window.
   // Awaited before the sheet latch clears, so a later claim can't race it.
   const release = async () => {
     try {
-      // Hand back only our own claim, never one a newer attempt made since.
-      if (SecureStore.getItem(key) !== claim) return;
       if (lastShownAt === null) await SecureStore.deleteItemAsync(key);
       else SecureStore.setItem(key, String(lastShownAt));
     } catch {
@@ -518,14 +507,6 @@ async function presentExitOffer(
     }
     notifyExitOffer();
   };
-  // UIKit refuses to present while the first paywall is still dismissing.
-  await waitForSheetTransition();
-  // The attempt can also be presumed gone during the transition wait; then
-  // its caller has moved on, so no sheet goes up and the claim is handed back.
-  if (epoch !== presentationEpoch) {
-    await release();
-    return null;
-  }
   const outcome = await showExitOffering(
     rcui,
     offering,
@@ -614,27 +595,20 @@ async function presentOpenExitOfferImpl(
   fallbackPlacement: string,
   paywallOnDecline = false,
 ): Promise<PaywallOutcome> {
-  const epoch = presentationEpoch;
-  // Every branch below follows an await, so each checks that the attempt
-  // has not been presumed gone meanwhile before it puts another sheet up.
-  const fallback = (): Promise<PaywallOutcome> =>
-    epoch === presentationEpoch
-      ? presentPaywallImpl(fallbackPlacement)
-      : Promise.resolve("unavailable");
-  if (!(await awaitRcSyncReady())) return fallback();
+  if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   const rcui = getRCUI();
   const endsAt = userId
     ? exitOfferEndsAt(readShownAt(userId), Date.now())
     : null;
-  if (!rc || !rcui || endsAt === null) return fallback();
+  if (!rc || !rcui || endsAt === null)
+    return presentPaywallImpl(fallbackPlacement);
   if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
   const offering = await findExitOffering(exitOfferDeps(rc));
   // The lookup can outlast the window; never sell the offer after it closes.
   if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
-    return fallback();
-  if (epoch !== presentationEpoch) return "unavailable";
+    return presentPaywallImpl(fallbackPlacement);
   // Only the person's own close counts. A sheet closed by its deadline or by
   // a torn-down host must not put another paywall in front of them.
   let declined = false;
@@ -650,7 +624,7 @@ async function presentOpenExitOfferImpl(
   // The offer carries one plan, so declining it must still leave the trial
   // and the other plans one step away. Closing that paywall is inside the
   // cooldown and does not open the offer again.
-  return fallback();
+  return presentPaywallImpl(fallbackPlacement);
 }
 
 function subscribeExitOffer(onChange: () => void): () => void {
@@ -689,11 +663,6 @@ export function useExitOfferEndsAt(userId: string | undefined): number | null {
 // A RevenueCat promise that never settles must not hold the latch for the
 // life of the process; past this age the sheet is presumed gone.
 const SHEET_STALE_MS = 5 * 60_000;
-
-// Bumped when a presentation is presumed gone, so the attempt it belonged to
-// puts no sheet up after its caller has moved on: not the paywall a slow
-// locale sync was waiting to show, and not the exit offer after a late close.
-let presentationEpoch = 0;
 
 type OpenSheet = {
   startedAt: number;
@@ -753,42 +722,8 @@ export function isPaywallPending(): boolean {
   return liveSheet() !== null;
 }
 
-/**
- * `owned` is false when this call joined a presentation someone else opened;
- * `stale` when the sheet was presumed gone rather than closed.
- */
-type Presentation = { outcome: PaywallOutcome; owned: boolean; stale: boolean };
-
-/**
- * A native promise that never settles (UIKit refused to present, so
- * RevenueCat's result handler never fires) would otherwise hold its caller for
- * the life of the process. At the age `liveSheet` presumes the sheet gone, the
- * caller hears `unavailable` too, so onboarding can finish and a Pro gate can
- * be tapped again. The app cannot tell that sheet from one a person has kept
- * open this long, so the presentation stays subscribed: a purchase made on it
- * after the bound still reaches `onLateSuccess` (the entitlement itself is
- * recorded by the presentation either way).
- */
-function presumeGoneWhenStale(
-  present: Promise<PaywallOutcome>,
-  onStale: () => void,
-  onLateSuccess: () => void,
-): Promise<PaywallOutcome> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const stale = new Promise<PaywallOutcome>((resolve) => {
-    timer = setTimeout(() => {
-      onStale();
-      resolve("unavailable");
-      present.then(
-        (outcome) => {
-          if (outcome === "success") onLateSuccess();
-        },
-        () => undefined,
-      );
-    }, SHEET_STALE_MS);
-  });
-  return Promise.race([present, stale]).finally(() => clearTimeout(timer));
-}
+/** `owned` is false when this call joined a presentation someone else opened. */
+type Presentation = { outcome: PaywallOutcome; owned: boolean };
 
 async function presentPaywall(
   placement = "pro_gate",
@@ -804,25 +739,15 @@ async function presentPaywall(
   const live = liveSheet();
   if (live) {
     const outcome = live.paywall ? await live.paywall : "cancelled";
-    return { outcome, owned: false, stale: false };
+    return { outcome, owned: false };
   }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
-  let stale = false;
-  sheet.paywall = presumeGoneWhenStale(
-    present(),
-    () => {
-      stale = true;
-      presentationEpoch += 1;
-    },
-    // The owner already reported no purchase; the resumed-action event must
-    // still know one landed.
-    () => markBlockedActionPurchased(placement),
-  ).finally(() => {
+  sheet.paywall = present().finally(() => {
     // A stale sheet may already have been replaced; only release our own.
     releaseSheet(sheet);
   });
   openSheet = sheet;
-  return { outcome: await sheet.paywall, owned: true, stale };
+  return { outcome: await sheet.paywall, owned: true };
 }
 
 /**
@@ -835,12 +760,10 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
-  const { outcome, owned, stale } = await presentPaywall(placement);
+  const { outcome, owned } = await presentPaywall(placement);
   // Only the caller that opened the sheet may route. Joined callers share the
-  // same `unavailable`, and a second push stacks a second paywall screen. A
-  // sheet presumed gone does not route either: a paywall screen minutes after
-  // the tap is not what was asked for.
-  if (owned && !stale && shouldOpenPaywallFallback(outcome)) {
+  // same `unavailable`, and a second push stacks a second paywall screen.
+  if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
   // The gated action did not run. Whatever the sheet resolved to, the caller
@@ -854,10 +777,10 @@ export async function openPaywall(
 export async function openExitOffer(
   router: ReturnType<typeof useRouter>,
 ): Promise<boolean> {
-  const { outcome, owned, stale } = await presentPaywall("home_countdown", () =>
+  const { outcome, owned } = await presentPaywall("home_countdown", () =>
     presentOpenExitOfferImpl("home_countdown", "home_card"),
   );
-  if (owned && !stale && shouldOpenPaywallFallback(outcome)) {
+  if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
   return outcome === "success";
@@ -877,14 +800,13 @@ export async function openPaywallKeepingExitOffer(
   placement: string,
   paywallOnDecline: boolean,
 ): Promise<PaywallOutcome> {
-  const { outcome, owned, stale } = await presentPaywall(placement, () =>
+  const { outcome, owned } = await presentPaywall(placement, () =>
     presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
   );
   // Onboarding finishes whatever the outcome, which swaps the screens under
   // a pushed fallback. The app's own Pro gates offer the paywall again.
   if (
     owned &&
-    !stale &&
     shouldOpenPaywallFallback(outcome) &&
     placement !== "onboarding"
   ) {
