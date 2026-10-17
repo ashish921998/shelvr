@@ -28,8 +28,21 @@ type Props = {
 const inWindow = (index: number, top: number) =>
   index >= top - MOUNT_WINDOW && index <= top + 1;
 
+const HintOverlay = () => {
+  const { isDragging } = useDeckAnimation();
+  const rHintsStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(isDragging.get() ? 1 : 0, motion.timing.fade),
+  }));
+
+  return (
+    <Animated.View style={[styles.hints, rHintsStyle]} pointerEvents="none">
+      <TidyHints />
+    </Animated.View>
+  );
+};
+
 const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
-  const { isDragging, currentIndex } = useDeckAnimation();
+  const { currentIndex } = useDeckAnimation();
 
   // Only cards near the top decode their image, keeping memory flat across a
   // batch of full-screen photos. Membership is derived from the shared
@@ -50,10 +63,6 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
       }
     },
   );
-
-  const rHintsStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(isDragging.get() ? 1 : 0, motion.timing.fade),
-  }));
 
   return (
     <TidyCardContainer index={index}>
@@ -77,9 +86,7 @@ const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
           </Text>
         </View>
       )}
-      <Animated.View style={[styles.hints, rHintsStyle]} pointerEvents="none">
-        <TidyHints />
-      </Animated.View>
+      {mounted && <HintOverlay />}
     </TidyCardContainer>
   );
 };
