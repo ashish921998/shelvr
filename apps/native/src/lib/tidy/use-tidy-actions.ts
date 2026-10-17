@@ -85,8 +85,6 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
           { saveSource: "photo_import" },
         );
         if (result.status === "saved") {
-          // Return the created itemId so undo can delete the item even
-          // mid-upload.
           return result.itemId;
         }
         // A settled failure no longer rejects (the hook returns a failed
