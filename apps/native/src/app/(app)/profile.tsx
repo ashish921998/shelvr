@@ -6,19 +6,16 @@ import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
 import { useAppearanceMode } from "@/lib/appearance-runtime";
-import {
-  openPaywall,
-  useEntitlement,
-  waitForSheetTransition,
-} from "@/lib/entitlement";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { manageSubscription } from "@/lib/manage-subscription";
+import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
@@ -31,6 +28,9 @@ export default function ProfileScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
+  // Typed to the one event used here: the native stack's transitionEnd isn't
+  // in expo-router's generic navigation type.
+  const navigation = useNavigation() as ClosingScreen;
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
@@ -74,12 +74,12 @@ export default function ProfileScreen() {
   // after the same dismissal.
   const openSubscription = async () => {
     if (loading) return;
+    const dismissProfile = () => closeScreen(navigation, () => router.back());
     if (!opensPaywall) {
-      await manageSubscription(() => router.back());
+      await manageSubscription(dismissProfile);
       return;
     }
-    router.back();
-    await waitForSheetTransition();
+    await dismissProfile();
     void openPaywall(
       router,
       status === "lapsed" ? "profile_lapsed" : "profile",

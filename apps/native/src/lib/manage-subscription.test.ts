@@ -30,7 +30,9 @@ beforeEach(() => {
 });
 
 it("presents Customer Center only after the sheets are gone", async () => {
-  await manageSubscription(() => mock.order.push("dismissed"));
+  await manageSubscription(() => {
+    mock.order.push("dismissed");
+  });
   expect(mock.order).toEqual(["dismissed", "settled", "customer-center"]);
   expect(mock.alert).not.toHaveBeenCalled();
 });
