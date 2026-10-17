@@ -251,8 +251,8 @@ export function TripPlanForm({
       ? date
       : null;
   });
-  // The sheet offers the six cities most saves name.
-  const offered = cities.slice(0, 6);
+  // Every city the saves name, most saves first; the row scrolls sideways.
+  const offered = cities;
   const initialCity = Math.max(
     0,
     offered.findIndex(
