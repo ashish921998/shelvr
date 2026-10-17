@@ -8,7 +8,7 @@ export type SavedPost = {
   collections: string[];
 };
 
-export type SavesSummary = {
+type SavesSummary = {
   count: number;
   accounts: number;
   reels: number;
@@ -126,7 +126,7 @@ function records(data: unknown): unknown[] {
 /** saved_posts.json or saved_collections.json. In the collections file a
  * record without a post link names the collection the records after it
  * belong to. */
-export function parseSavesJson(text: string): SavedPost[] {
+function parseSavesJson(text: string, isCollections: boolean): SavedPost[] {
   let data: unknown;
   try {
     data = JSON.parse(text);
@@ -139,7 +139,7 @@ export function parseSavesJson(text: string): SavedPost[] {
     const found = scan(record, {});
     const title = (record as { title?: unknown }).title;
     if (!found.url) {
-      collection = displayName(found.name ?? title);
+      if (isCollections) collection = displayName(found.name ?? title);
       return [];
     }
     const author = displayName(title) ?? displayName(found.name);
@@ -157,7 +157,7 @@ export function parseSavesJson(text: string): SavedPost[] {
 
 /** The HTML flavour of the download carries the links but no reliable
  * author or date markup, so only the links are kept. */
-export function parseSavesHtml(text: string): SavedPost[] {
+function parseSavesHtml(text: string): SavedPost[] {
   return [...text.matchAll(/href="([^"]+)"/gi)].flatMap(([, href]) => {
     const url = postUrl(href.replace(/&amp;/g, "&"));
     return url ? [{ url, kind: kindOf(url), collections: [] }] : [];
@@ -167,7 +167,7 @@ export function parseSavesHtml(text: string): SavedPost[] {
 export function parseSavesFile(name: string, text: string): SavedPost[] {
   return /\.html?$/i.test(name) || text.trimStart().startsWith("<")
     ? parseSavesHtml(text)
-    : parseSavesJson(text);
+    : parseSavesJson(text, /saved_collections\./i.test(name));
 }
 
 /** One row per post, newest first. A post found in several files keeps the
@@ -234,7 +234,9 @@ export function summarize(saves: SavedPost[]): SavesSummary {
 export function matchesQuery(save: SavedPost, query: string): boolean {
   const needle = query.trim().toLowerCase().replace(/^@/, "");
   if (!needle) return true;
-  return [save.author ?? "", save.url, ...save.collections].some((field) =>
+  // The link is left out: every link shares "instagram.com/p/", so a short
+  // query would match all of them.
+  return [save.author ?? "", ...save.collections].some((field) =>
     field.toLowerCase().includes(needle),
   );
 }
@@ -270,7 +272,7 @@ export type ZipSource = {
   read(start: number, end: number): Promise<Uint8Array>;
 };
 
-export function fileSource(file: Blob): ZipSource {
+function fileSource(file: Blob): ZipSource {
   return {
     size: file.size,
     read: async (start, end) =>
@@ -343,7 +345,7 @@ function zip64Extra(
   return {};
 }
 
-export async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
+async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
   const directory = await centralDirectory(source);
   if (!directory) return [];
   const bytes = await source.read(
@@ -429,7 +431,12 @@ export type ReadResult =
   | { ok: true; saves: SavedPost[]; format: "zip" | "json" | "html" }
   | {
       ok: false;
-      reason: "no_saves" | "no_saved_files" | "too_large" | "unreadable";
+      reason:
+        | "no_saves"
+        | "no_saved_files"
+        | "too_large"
+        | "unreadable"
+        | "old_browser";
     };
 
 // A loose saved_posts.json is a few MB even for heavy savers; anything far
@@ -449,6 +456,11 @@ export async function readSaves(files: File[]): Promise<ReadResult> {
     for (const file of files) {
       const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
       if (isZip(head)) {
+        // Unzipping needs DecompressionStream (Safari 16.4+); an older
+        // browser can still open the loose saved_posts.json.
+        if (typeof DecompressionStream === "undefined") {
+          return { ok: false, reason: "old_browser" };
+        }
         format = "zip";
         found.push(...(await savedFilesInZip(fileSource(file))));
       } else if (file.size > MAX_LOOSE_FILE_BYTES) {

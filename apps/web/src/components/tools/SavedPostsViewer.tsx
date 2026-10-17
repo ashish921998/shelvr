@@ -31,18 +31,18 @@ const PROBLEMS: Record<Extract<ReadResult, { ok: false }>["reason"], string> = {
     "That file is too big to be saved_posts.json. Choose the zip, or the saved_posts.json file inside it.",
   unreadable:
     "Couldn’t read that file. Try the zip from Instagram as it downloaded, without renaming it.",
+  old_browser:
+    "This browser can’t open zip files. Update it, or unzip the download and choose saved_posts.json.",
 };
 
 const dateFormat = new Intl.DateTimeFormat("en", {
   day: "numeric",
   month: "short",
   year: "numeric",
-  timeZone: "UTC",
 });
 const monthFormat = new Intl.DateTimeFormat("en", {
   month: "short",
   year: "numeric",
-  timeZone: "UTC",
 });
 
 type Loaded = { saves: SavedPost[]; sample: boolean };
@@ -113,6 +113,7 @@ function Picker({
   function drop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
+    if (busy) return;
     onOpen([...event.dataTransfer.files]);
   }
 
@@ -210,7 +211,7 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
   ].filter(Boolean);
 
   return (
-    <section aria-live="polite">
+    <section>
       {sample && (
         <p className="mb-4 rounded-xl bg-ember-soft px-4 py-3 text-sm text-ink-soft">
           This is a made-up sample.{" "}
@@ -232,6 +233,13 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
         </p>
         {facts.length > 0 && (
           <p className="mt-2 text-[15px] text-muted">{facts.join(" · ")}</p>
+        )}
+        {summary.accounts === 0 && !summary.oldestAt && (
+          <p className="mt-3 rounded-xl bg-ember-soft px-4 py-3 text-sm text-ink-soft">
+            This is the HTML version of the download, which leaves out who
+            posted each save and when. Request it again with the format set to
+            JSON to see both.
+          </p>
         )}
 
         {summary.collections.length > 0 && (
@@ -274,7 +282,7 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
           />
         </label>
 
-        <p className="mt-4 text-sm text-muted">
+        <p aria-live="polite" className="mt-4 text-sm text-muted">
           {query.trim()
             ? `${matches.length.toLocaleString("en")} of ${saves.length.toLocaleString("en")} match`
             : "Newest first"}
@@ -301,7 +309,9 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-white px-5 text-[15px] font-semibold text-ink transition hover:bg-paper-deep"
           >
             <ArrowDownTrayIcon aria-hidden className="size-5" />
-            Download as spreadsheet (CSV)
+            {matches.length < saves.length
+              ? `Download these ${matches.length.toLocaleString("en")} (CSV)`
+              : "Download as spreadsheet (CSV)"}
           </button>
           <button
             type="button"

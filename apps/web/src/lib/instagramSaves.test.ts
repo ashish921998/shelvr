@@ -1,5 +1,5 @@
 import { deflateRawSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   fixMojibake,
@@ -45,6 +45,15 @@ const savedPosts = JSON.stringify({
       },
     },
     { title: "broken", string_map_data: { "Saved on": { href: "nope" } } },
+    {
+      title: "plants.daily",
+      string_map_data: {
+        "Saved on": {
+          href: "https://www.instagram.com/p/FFF/",
+          timestamp: 1650000000,
+        },
+      },
+    },
   ],
 });
 
@@ -100,7 +109,9 @@ describe("postUrl", () => {
 describe("parseSavesFile", () => {
   it("reads saved_posts.json", () => {
     const saves = parseSavesFile("saved_posts.json", savedPosts);
-    expect(saves).toHaveLength(3);
+    expect(saves).toHaveLength(4);
+    // A record without a usable link is skipped, not read as a collection.
+    expect(saves[3].collections).toEqual([]);
     expect(saves[0]).toEqual({
       url: "https://www.instagram.com/p/AAA/",
       kind: "post",
@@ -169,6 +180,7 @@ describe("mergeSaves and summarize", () => {
     expect(saves.map((save) => save.url)).toEqual([
       "https://www.instagram.com/p/CCC/",
       "https://www.instagram.com/p/AAA/",
+      "https://www.instagram.com/p/FFF/",
       "https://www.instagram.com/reel/BBB/",
     ]);
     expect(saves[1].collections).toEqual(["Recipes"]);
@@ -176,12 +188,13 @@ describe("mergeSaves and summarize", () => {
 
   it("counts accounts, reels and the oldest save", () => {
     expect(summarize(saves)).toEqual({
-      count: 3,
-      accounts: 2,
+      count: 4,
+      accounts: 3,
       reels: 1,
       oldestAt: 1420070400 * 1000,
       topAccounts: [
         { author: "chef.anna", count: 2 },
+        { author: "plants.daily", count: 1 },
         { author: "travel.jo", count: 1 },
       ],
       collections: [
@@ -194,7 +207,8 @@ describe("mergeSaves and summarize", () => {
   it("filters by account, collection or @handle", () => {
     expect(saves.filter((s) => matchesQuery(s, "@chef")).length).toBe(2);
     expect(saves.filter((s) => matchesQuery(s, "lisbon")).length).toBe(1);
-    expect(saves.filter((s) => matchesQuery(s, "  ")).length).toBe(3);
+    expect(saves.filter((s) => matchesQuery(s, "  ")).length).toBe(4);
+    expect(saves.filter((s) => matchesQuery(s, "p")).length).toBe(3);
   });
 });
 
@@ -305,7 +319,7 @@ describe("readSaves", () => {
       "instagram.zip",
     );
     const fromZip = await readSaves([zipFile]);
-    expect(fromZip.ok && fromZip.saves.length).toBe(3);
+    expect(fromZip.ok && fromZip.saves.length).toBe(4);
     expect(fromZip.ok && fromZip.format).toBe("zip");
 
     // Collections listed first: the saved_posts date still wins.
@@ -328,5 +342,27 @@ describe("readSaves", () => {
       ok: false,
       reason: "no_saves",
     });
+  });
+});
+
+describe("readSaves without DecompressionStream", () => {
+  it("asks for the loose file instead of calling a zip unreadable", async () => {
+    vi.stubGlobal("DecompressionStream", undefined);
+    try {
+      const zipFile = new File(
+        [
+          zip([
+            { name: "saved/saved_posts.json", text: savedPosts },
+          ]) as BlobPart,
+        ],
+        "instagram.zip",
+      );
+      expect(await readSaves([zipFile])).toEqual({
+        ok: false,
+        reason: "old_browser",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
