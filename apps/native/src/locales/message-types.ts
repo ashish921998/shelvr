@@ -572,6 +572,9 @@ export type MessageParams = {
   "promise.title": undefined;
   "promise.titleAccent": undefined;
   "promise.body": undefined;
+  "promise.firstSaveIn": { space: string };
+  "promise.firstSaveSaved": undefined;
+  "promise.spacesPicked": undefined;
   "promise.eyebrow": undefined;
   "promise.share": undefined;
   "promise.reminderTonight": undefined;

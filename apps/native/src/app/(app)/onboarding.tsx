@@ -378,6 +378,8 @@ export default function OnboardingScreen() {
           {step === "promise" && (
             <PromiseStep
               reminder={reminder}
+              saved={saved}
+              spaces={spaces}
               leaving={paywall.asked}
               onCommit={paywall.ask}
             />

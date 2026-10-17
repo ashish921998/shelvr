@@ -2,7 +2,12 @@ import { t, useAppLocale } from "@/lib/i18n";
 import type { ReminderSlot } from "@/lib/first-save-reminder";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton } from "@/components/onboarding/parts";
+import type { DemoSaved } from "@/lib/use-demo-save";
 import type { TextMessageKey } from "@/locales/message-types";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -21,10 +26,16 @@ const REMINDER_LINE: Record<ReminderSlot, TextMessageKey> = {
  */
 export function PromiseStep({
   reminder,
+  saved,
+  spaces,
   leaving,
   onCommit,
 }: {
   reminder: ReminderSlot | null;
+  /** The first save, when the demo step made one. */
+  saved: DemoSaved | null;
+  /** The spaces picked earlier in onboarding. */
+  spaces: string[];
   /** `onCommit` ran and the paywall is on its way. */
   leaving: boolean;
   onCommit: () => void;
@@ -45,7 +56,7 @@ export function PromiseStep({
           {t("promise.title")}{" "}
           <Text style={styles.headlineAccent}>{t("promise.titleAccent")}</Text>
         </Text>
-        <Text style={styles.support}>{t("promise.body")}</Text>
+        <Recap saved={saved} spaces={spaces} />
       </View>
 
       <View style={styles.card}>
@@ -62,6 +73,44 @@ export function PromiseStep({
         <CtaButton label={t("promise.cta")} onPress={onCommit} busy={leaving} />
         <Text style={styles.note}>{t("promise.note")}</Text>
       </View>
+    </View>
+  );
+}
+
+/**
+ * Plays back what the person did before the paywall: where their first save
+ * went, or that their spaces are picked. Spaces are only created once
+ * onboarding finishes, so nothing here calls the shelf ready.
+ */
+function Recap({
+  saved,
+  spaces,
+}: {
+  saved: DemoSaved | null;
+  spaces: string[];
+}) {
+  const item = useQuery(
+    convexQuery(api.items.getItem, saved ? { id: saved.itemId } : "skip"),
+  ).data;
+  if (saved === null) {
+    return (
+      <Text style={styles.support}>
+        {t(spaces.length > 0 ? "promise.spacesPicked" : "promise.body")}
+      </Text>
+    );
+  }
+  const space = saved.savedSpaceNames[0];
+  const image = item?.heroImageUrl ?? item?.imageUrl;
+  return (
+    <View style={styles.recap}>
+      {image ? (
+        <Image source={image} style={styles.thumb} contentFit="cover" />
+      ) : null}
+      <Text style={styles.recapText}>
+        {space
+          ? t("promise.firstSaveIn", { space })
+          : t("promise.firstSaveSaved")}
+      </Text>
     </View>
   );
 }
@@ -84,6 +133,26 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryText,
   },
   support: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    lineHeight: 21,
+    color: theme.colors.muted,
+  },
+  recap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    marginTop: theme.gap(0.5),
+  },
+  thumb: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.sm,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primarySoft,
+  },
+  recapText: {
+    flex: 1,
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     lineHeight: 21,
