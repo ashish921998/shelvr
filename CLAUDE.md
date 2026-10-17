@@ -271,6 +271,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Next.js App Router marketing site only (no auth or product UI); server routes may call Convex
   for marketing forms such as platform waitlists
 - Landing page at `/`. The product experience lives in the native app
+- Free tool pages for search traffic, each with one App Store button: `/instagram-saved-posts-viewer`
+  reads a visitor's Instagram data download entirely in the browser (`src/lib/instagramSaves.ts`)
 
 ### Native (`apps/native`)
 
