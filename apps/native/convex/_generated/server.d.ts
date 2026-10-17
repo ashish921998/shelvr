@@ -25,6 +25,9 @@ import type { DataModel } from "./dataModel.js";
  * Typesafe environment variables declared in `convex.config.ts`.
  */
 type Env = {
+  readonly APPLE_MAPS_KEY_ID: string | undefined;
+  readonly APPLE_MAPS_PRIVATE_KEY: string | undefined;
+  readonly APPLE_MAPS_TEAM_ID: string | undefined;
   readonly APPLE_RETENTION_MESSAGE_ID: string | undefined;
   readonly APPLE_REVOKE_KEY_ID: string | undefined;
   readonly APPLE_REVOKE_PRIVATE_KEY: string | undefined;

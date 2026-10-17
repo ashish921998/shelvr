@@ -12,14 +12,13 @@ function encodeJson(value: unknown): string {
   return base64Url(new TextEncoder().encode(JSON.stringify(value)));
 }
 
-/** Apple's client secret: a short-lived ES256 JWT signed with the team's .p8
- * key. WebCrypto's ECDSA signature is already the raw r||s form a JWT wants. */
-export async function clientSecret(config: {
-  clientId: string;
-  privateKey: string;
-  keyId: string;
-  teamId: string;
-}): Promise<string> {
+/** An ES256 JWT signed with one of the team's .p8 keys. WebCrypto's ECDSA
+ * signature is already the raw r||s form a JWT wants. */
+export async function signAppleJwt(
+  config: { privateKey: string; keyId: string },
+  claims: Record<string, unknown>,
+  header: Record<string, unknown> = {},
+): Promise<string> {
   const der = Uint8Array.from(
     atob(
       config.privateKey
@@ -37,22 +36,31 @@ export async function clientSecret(config: {
     false,
     ["sign"],
   );
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const signed = `${encodeJson({ alg: "ES256", kid: config.keyId })}.${encodeJson(
-    {
-      iss: config.teamId,
-      iat: issuedAt,
-      exp: issuedAt + 300,
-      aud: "https://appleid.apple.com",
-      sub: config.clientId,
-    },
-  )}`;
+  const signed = `${encodeJson({ alg: "ES256", kid: config.keyId, ...header })}.${encodeJson(claims)}`;
   const signature = await crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" },
     key,
     new TextEncoder().encode(signed),
   );
   return `${signed}.${base64Url(new Uint8Array(signature))}`;
+}
+
+/** Apple's client secret: a short-lived ES256 JWT signed with the team's .p8
+ * key. */
+export async function clientSecret(config: {
+  clientId: string;
+  privateKey: string;
+  keyId: string;
+  teamId: string;
+}): Promise<string> {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return signAppleJwt(config, {
+    iss: config.teamId,
+    iat: issuedAt,
+    exp: issuedAt + 300,
+    aud: "https://appleid.apple.com",
+    sub: config.clientId,
+  });
 }
 
 /**

@@ -138,6 +138,15 @@ describe("deleteCurrentUserAccount", () => {
         itemId: seeded.noteId,
         visitedAt: 1700000000002,
       });
+      // A trip lists the places the user plans to go.
+      await ctx.db.insert("trips", {
+        userId,
+        spaceId: seeded.spaceId,
+        pace: "easy",
+        days: [],
+        wishlist: [],
+        considered: 1,
+      });
     });
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -183,6 +192,12 @@ describe("deleteCurrentUserAccount", () => {
         await ctx.db
           .query("placeVisits")
           .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(0);
+      expect(
+        await ctx.db
+          .query("trips")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
           .collect(),
       ).toHaveLength(0);
       expect(await ctx.db.system.get("_storage", seeded.storageId)).toBeNull();

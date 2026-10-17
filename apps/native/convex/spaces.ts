@@ -36,6 +36,7 @@ import {
   type MembershipSummary,
 } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import { deleteTripsForSpace } from "./tripData";
 
 const spaceFields = {
   _id: v.id("spaces"),
@@ -432,6 +433,7 @@ export const deleteSpace = mutation({
     // reader null-checks the space, and the AI never suggests into a space it
     // cannot load.
     await ctx.db.delete(space._id);
+    await deleteTripsForSpace(ctx, space._id);
     const more = await deleteMembershipsForSpace(
       ctx,
       space._id,
