@@ -225,11 +225,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`aiRecommendForSpace.ts`** (`"use node"`): ranked-plus-recency recommendations,
   scheduled by space creation and dynamic enabling; creates suggestions only.
   Both modules and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
-- **`model/pageRead.ts`**: everything about reading a saved link's page. `readPage(url)` is the
-  one entry point: it picks the reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
-  embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
-  image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
-  schema.org recipe. Host-specific knowledge stays in this file, not in `ai.ts`.
+- **`model/pageRead.ts`**: the single `readPage(url)` entry point and host dispatcher.
+  **`model/pageReadCore.ts`** holds shared page data, bounded fetches, HTML extraction
+  (Mozilla **Readability** via `linkedom`) and schema.org recipe helpers.
+  **`model/readers/youtube.ts`**, **`model/readers/x.ts`**, **`model/readers/instagram.ts`**,
+  **`model/readers/pinterest.ts`** and **`model/readers/tiktok.ts`** own each platform's
+  reader and fallback. Full YouTube descriptions and verified Instagram captions follow linked
+  recipe markup first, then the existing complete-caption recipe path.
+  Host-specific knowledge stays in the page readers, never in `ai.ts`.
 - **`model/safeFetch.ts`**, **`model/externalUrl.ts`**: every backend fetch of an external URL
   goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).
   `externalUrl.ts` is the runtime-agnostic URL policy and host detection (`linkSource`,
@@ -393,6 +396,9 @@ needed at runtime by the features that use them:
   ones included, without a deploy. See
   [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY`: SerpAPI key for `findProductLinks`. The search fails without it
+- `YOUTUBE_API_KEY` — optional YouTube Data API v3 key for video descriptions and metadata.
+  Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
+  oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
 - `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
   cooking TikTok or reel whose caption has no recipe (`model/videoTranscript.ts`, about $0.002
   each, rate limited per user and globally). Transcripts are fetched only while the switch is

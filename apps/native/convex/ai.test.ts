@@ -139,6 +139,12 @@ describe("firstLinkedUrl", () => {
         "saved from https://in.pinterest.com/pin/1/ and https://pin.it/abc",
       ),
     ).toBe(undefined);
+    expect(
+      firstLinkedUrl(
+        "https://m.youtube.com/watch?v=1 https://vm.tiktok.com/a https://l.instagram.com/?u=x https://cook.example/dal",
+      ),
+    ).toBe("https://cook.example/dal");
+    expect(firstLinkedUrl("https://box.com/dal")).toBe("https://box.com/dal");
     expect(firstLinkedUrl("no links here")).toBeUndefined();
     expect(firstLinkedUrl(undefined)).toBeUndefined();
   });
@@ -923,6 +929,14 @@ describe("parseInstagramEmbed", () => {
     expect(parseInstagramEmbed(REEL_EMBED).brokenMedia).toBeUndefined();
   });
 
+  it("keeps escaped markup as text and leaves no tag behind", () => {
+    const embed =
+      '<div class="Caption">Salt &amp;lt;3 and <b>pepper</b> <script<div class="CaptionComments">';
+    expect(parseInstagramEmbed(embed).caption).toBe(
+      "Salt &lt;3 and pepper script",
+    );
+  });
+
   it("returns nothing from a page without an embed", () => {
     expect(parseInstagramEmbed(SHELL_PAGE)).toEqual({
       caption: undefined,
@@ -1604,12 +1618,13 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
-  it("marks an Instagram reel short-form and asks for a recipe from its caption", async () => {
+  it("marks an Instagram reel short-form and allows its full caption recipe path", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({
       status: "ok",
       askForRecipe: true,
+      page: { caption: true },
       shortForm: { site: "Instagram", video: true },
     });
     expect(read.status === "ok" && read.page.content).toContain(
