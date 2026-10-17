@@ -9,11 +9,20 @@ import {
   type LayoutRectangle,
 } from "react-native";
 import Animated, {
+  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+// The pill moves across the row, so it eases in and out; a tap carries no
+// velocity for a spring to keep.
+const GLIDE = {
+  duration: motion.duration.enter,
+  easing: motion.easing.inOut,
+  reduceMotion: ReduceMotion.System,
+};
 
 type Props = {
   labels: string[];
@@ -54,14 +63,14 @@ export function TripSegments({
       measured.set(true);
       return;
     }
-    x.set(withSpring(target.x, motion.spring.drag));
-    width.set(withSpring(target.width, motion.spring.drag));
+    x.set(withTiming(target.x, GLIDE));
+    width.set(withTiming(target.width, GLIDE));
   }, [target, x, width, measured]);
 
   const pill = useAnimatedStyle(() => ({
-    opacity: measured.value ? 1 : 0,
-    width: width.value,
-    transform: [{ translateX: x.value }],
+    opacity: measured.get() ? 1 : 0,
+    width: width.get(),
+    transform: [{ translateX: x.get() }],
   }));
 
   const row = (

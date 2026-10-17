@@ -1,5 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
+import { fadeIn, motion } from "@/lib/motion";
 import { dayColor } from "@/lib/trip";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
@@ -31,6 +32,13 @@ const STOPS = [
 ];
 const DOT = 22;
 const STEP_MS = 1800;
+const STEP_OUT = FadeOut.duration(motion.duration.feedback).easing(
+  motion.easing.out,
+);
+const coverIn = (index: number) =>
+  FadeIn.duration(motion.duration.enter)
+    .delay(index * 60)
+    .easing(motion.easing.out);
 const STEPS: TextMessageKey[] = [
   "trip.buildingRead",
   "trip.buildingFind",
@@ -55,7 +63,7 @@ function Segment({
       { rotate: `${angle}rad` },
       {
         scaleX: interpolate(
-          progress.value,
+          progress.get(),
           [index + 0.35, index + 1],
           [0, 1],
           "clamp",
@@ -88,13 +96,14 @@ function Dot({
 }) {
   const style = useAnimatedStyle(() => {
     const at = interpolate(
-      progress.value,
+      progress.get(),
       [index, index + 0.35],
       [0, 1],
       "clamp",
     );
-    // A small overshoot, so each stop lands like a dropped pin.
-    const pop = at < 1 ? Easing.back(2.2)(at) : 1;
+    // Each stop lands like a dropped pin: in from 60%, never from nothing,
+    // with a slight overshoot for the fall.
+    const pop = at < 1 ? 0.6 + 0.4 * Easing.back(1.6)(at) : 1;
     return { opacity: at, transform: [{ scale: pop }] };
   });
   return (
@@ -130,13 +139,13 @@ function Covers({ covers }: { covers: string[] }) {
     );
   }, [bob, reduced]);
   const styleA = useAnimatedStyle(() => ({
-    transform: [{ translateY: -6 * bob.value }, { rotate: "-8deg" }],
+    transform: [{ translateY: -6 * bob.get() }, { rotate: "-8deg" }],
   }));
   const styleB = useAnimatedStyle(() => ({
-    transform: [{ translateY: -6 * (1 - bob.value) }],
+    transform: [{ translateY: -6 * (1 - bob.get()) }],
   }));
   const styleC = useAnimatedStyle(() => ({
-    transform: [{ translateY: -6 * bob.value }, { rotate: "8deg" }],
+    transform: [{ translateY: -6 * bob.get() }, { rotate: "8deg" }],
   }));
   const styled = [styleA, styleB, styleC];
   return (
@@ -144,7 +153,7 @@ function Covers({ covers }: { covers: string[] }) {
       {covers.slice(0, 3).map((uri, i) => (
         <Animated.View
           key={uri}
-          entering={FadeIn.delay(i * 120).duration(300)}
+          entering={coverIn(i)}
           style={[styles.cover, styles.coverAt(i), styled[i]]}
         >
           <Image source={{ uri }} style={styles.fill} contentFit="cover" />
@@ -200,8 +209,8 @@ export function TripBuilding({ covers }: { covers: string[] }) {
       <View style={styles.stepLine} accessibilityLiveRegion="polite">
         <Animated.View
           key={step}
-          entering={FadeIn.duration(260)}
-          exiting={FadeOut.duration(180)}
+          entering={fadeIn}
+          exiting={STEP_OUT}
           style={styles.stepText}
         >
           <ThemedText variant="subheadLabel" style={styles.muted}>

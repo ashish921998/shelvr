@@ -14,7 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Pins of the open day arrive one after another, and the day's route grows
 // with them, so switching days reads as the day being walked.
-const PIN_STAGGER_MS = 110;
+const PIN_STAGGER_MS = 80;
 
 export type StopRef = { day: number; stop: number };
 

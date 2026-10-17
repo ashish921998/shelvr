@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { isDarkThemeName } from "@/lib/appearance";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
+import { fadeIn, motion } from "@/lib/motion";
 import {
   MAX_TRIP_DAYS,
   MIN_TRIP_DAYS,
@@ -18,7 +19,6 @@ import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   FadeOutDown,
@@ -28,6 +28,24 @@ import Animated, {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PACES: TripPace[] = ["easy", "balanced", "packed"];
+
+// The day count rolls the way the tap went: a small state change, so it
+// is short and eases out.
+const ROLL = {
+  up: {
+    in: FadeInUp.duration(motion.duration.state).easing(motion.easing.out),
+    out: FadeOutUp.duration(motion.duration.feedback).easing(motion.easing.out),
+  },
+  down: {
+    in: FadeInDown.duration(motion.duration.state).easing(motion.easing.out),
+    out: FadeOutDown.duration(motion.duration.feedback).easing(
+      motion.easing.out,
+    ),
+  },
+};
+const RESIZE = LinearTransition.duration(motion.duration.enter).easing(
+  motion.easing.inOut,
+);
 
 function paceLabel(pace: TripPace): string {
   switch (pace) {
@@ -115,8 +133,8 @@ function DayStepper({
       <View style={styles.stepValue}>
         <Animated.View
           key={days}
-          entering={(direction === 1 ? FadeInUp : FadeInDown).duration(220)}
-          exiting={(direction === 1 ? FadeOutUp : FadeOutDown).duration(160)}
+          entering={(direction === 1 ? ROLL.up : ROLL.down).in}
+          exiting={(direction === 1 ? ROLL.up : ROLL.down).out}
           style={styles.stepNumber}
         >
           <ThemedText variant="header">{days}</ThemedText>
@@ -162,7 +180,7 @@ function StartDate({
     );
   }
   return (
-    <Animated.View entering={FadeIn.duration(200)} style={styles.dateRow}>
+    <Animated.View entering={fadeIn} style={styles.dateRow}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("trip.clearDate")}
@@ -246,7 +264,7 @@ export function TripPlanForm({
   const askCity = cities.length >= 2;
 
   return (
-    <Animated.View layout={LinearTransition.duration(220)} style={styles.form}>
+    <Animated.View layout={RESIZE} style={styles.form}>
       <View style={styles.heading}>
         <ThemedText variant="sheetTitle">
           {city ? t("trip.planTitle", { city }) : t("trip.planTitleNoCity")}

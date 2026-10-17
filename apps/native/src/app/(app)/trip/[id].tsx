@@ -10,6 +10,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceVisits } from "@/lib/make-plan";
+import { motion } from "@/lib/motion";
 import {
   dayColor,
   directionsUrl,
@@ -41,23 +42,34 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withRepeat,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
+
+// Captured by the worklet below on its own, not through `motion`.
+const ENTER = motion.timing.enter;
 
 /** Panel content rising into place, by transform only. */
 function rise() {
   "worklet";
   return {
-    initialValues: { transform: [{ translateY: 18 }] },
+    initialValues: { transform: [{ translateY: 12 }] },
     animations: {
-      transform: [
-        { translateY: withSpring(0, { duration: 420, dampingRatio: 0.9 }) },
-      ],
+      transform: [{ translateY: withTiming(0, ENTER) }],
     },
   };
 }
+
+// The panel comes up on the iOS sheet curve; when its content changes height
+// it resizes in place, easing both ways. The map fades in under it.
+const PANEL_IN = SlideInDown.duration(300).easing(
+  Easing.bezier(0.32, 0.72, 0, 1),
+);
+const PANEL_RESIZE = LinearTransition.duration(motion.duration.enter).easing(
+  motion.easing.inOut,
+);
+const MAP_IN = FadeIn.duration(300).easing(motion.easing.out);
+const CONTENT_OUT = FadeOut.duration(140).easing(motion.easing.out);
 
 /** The space's covers drifting slowly behind the form while there is no map. */
 function CoverBackdrop({ covers }: { covers: string[] }) {
@@ -74,10 +86,10 @@ function CoverBackdrop({ covers }: { covers: string[] }) {
     );
   }, [drift, reduced]);
   const up = useAnimatedStyle(() => ({
-    transform: [{ translateY: -40 * drift.value }],
+    transform: [{ translateY: -40 * drift.get() }],
   }));
   const down = useAnimatedStyle(() => ({
-    transform: [{ translateY: -40 + 40 * drift.value }],
+    transform: [{ translateY: -40 + 40 * drift.get() }],
   }));
   // Covers repeat until each column runs past the sheet, so a space with a
   // few photos still fills the backdrop with no empty band.
@@ -369,7 +381,7 @@ export default function TripScreen() {
   return (
     <View style={styles.screen}>
       {overMap && trip ? (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.fill}>
+        <Animated.View entering={MAP_IN} style={styles.fill}>
           <TripMap
             trip={trip}
             activeDay={day}
@@ -382,8 +394,8 @@ export default function TripScreen() {
         <CoverBackdrop covers={covers} />
       )}
       <Animated.View
-        entering={SlideInDown.springify().damping(20)}
-        layout={LinearTransition.springify().damping(22)}
+        entering={PANEL_IN}
+        layout={PANEL_RESIZE}
         style={[
           styles.panel,
           overMap ? styles.panelOverMap : styles.panelFull,
@@ -404,7 +416,7 @@ export default function TripScreen() {
             // Rises without fading: Liquid Glass (the Build button) does not
             // draw under a parent whose opacity animates from zero.
             entering={rise}
-            exiting={FadeOut.duration(140)}
+            exiting={CONTENT_OUT}
           >
             {panel}
           </Animated.View>

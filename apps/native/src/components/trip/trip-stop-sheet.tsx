@@ -2,18 +2,32 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { slotLabel } from "@/components/trip/trip-day-panel";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
+import { fadeIn, motion, motionCSS } from "@/lib/motion";
 import type { TripStopView } from "@/lib/trip";
 import { Image } from "expo-image";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
-  FadeIn,
-  ZoomIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
+  useReducedMotion,
+  withTiming,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+// Captured by the worklet below on its own, not through `motion`.
+const ENTER = motion.timing.enter;
+
+/** A new stop's cover settles in from just under full size, never from
+ * nothing. */
+function coverIn() {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.95 }] },
+    animations: {
+      opacity: withTiming(1, ENTER),
+      transform: [{ scale: withTiming(1, ENTER) }],
+    },
+  };
+}
 
 type Props = {
   stop: TripStopView;
@@ -47,8 +61,8 @@ function Action({
   accessibilityLabel?: string;
 }) {
   const { theme } = useUnistyles();
-  const pop = useSharedValue(1);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const reducedMotion = useReducedMotion();
+  const [pressed, setPressed] = useState(false);
   const tint = filled
     ? theme.colors.onTint
     : active
@@ -56,22 +70,30 @@ function Action({
       : theme.colors.foreground;
   return (
     <Animated.View
-      style={[styles.actionWrap, filled && styles.actionWide, style]}
+      style={[
+        styles.actionWrap,
+        filled && styles.actionWide,
+        // Pressed on touch down, back on release: the app's press feedback.
+        {
+          transform: [
+            {
+              scale: pressed && !reducedMotion ? motion.scale.pressed : 1,
+            },
+          ],
+          transitionProperty: "transform",
+          transitionDuration: motion.duration.feedback,
+          transitionTimingFunction: motionCSS.out,
+        },
+      ]}
     >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ disabled, selected: active }}
         disabled={disabled}
-        onPress={() => {
-          pop.set(
-            withSequence(
-              withSpring(0.92, { duration: 120 }),
-              withSpring(1, { duration: 300, dampingRatio: 0.5 }),
-            ),
-          );
-          onPress();
-        }}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        onPress={onPress}
         style={({ pressed }) => [
           styles.action,
           filled ? styles.actionFilled : styles.actionOpen,
@@ -122,7 +144,7 @@ export function TripStopSheet({
         >
           <Animated.View
             key={`${stop.itemId}-${stop.name}`}
-            entering={ZoomIn.springify().damping(16)}
+            entering={coverIn}
             style={[
               styles.cover,
               // A save with no image gets the day's tint and a map mark, not
@@ -151,7 +173,7 @@ export function TripStopSheet({
         </Pressable>
         <Animated.View
           key={`text-${stop.itemId}-${stop.name}`}
-          entering={FadeIn.duration(220)}
+          entering={fadeIn}
           style={styles.text}
         >
           <ThemedText variant="captionStrong" style={{ color }}>

@@ -1,6 +1,7 @@
 import { TripSegments } from "@/components/trip/trip-segments";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
+import { fadeIn, motion } from "@/lib/motion";
 import {
   dayColor,
   formatTripDay,
@@ -11,6 +12,7 @@ import {
   type TripStopView,
 } from "@/lib/trip";
 import { Image } from "expo-image";
+import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   FadeIn,
@@ -19,6 +21,20 @@ import Animated, {
   LinearTransition,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
+
+// Rows come in one after another, 40ms apart, with no overshoot: nothing
+// was flicked. A swap reflows the list on screen, so that eases both ways.
+const STAGGER_MS = 40;
+const ROW_OUT = FadeOut.duration(motion.duration.feedback).easing(
+  motion.easing.out,
+);
+const REFLOW = LinearTransition.duration(motion.duration.enter).easing(
+  motion.easing.inOut,
+);
+const rowIn = (index: number) =>
+  FadeInDown.duration(motion.duration.enter)
+    .delay(index * STAGGER_MS)
+    .easing(motion.easing.out);
 
 export function slotLabel(slot: TripSlot): string {
   switch (slot) {
@@ -68,14 +84,9 @@ function StopRow({
   color: string;
   onPress: () => void;
 }) {
+  const entering = useMemo(() => rowIn(index), [index]);
   return (
-    <Animated.View
-      entering={FadeInDown.delay(80 + index * 60)
-        .springify()
-        .damping(18)}
-      exiting={FadeOut.duration(150)}
-      layout={LinearTransition.springify().damping(20)}
-    >
+    <Animated.View entering={entering} exiting={ROW_OUT} layout={REFLOW}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${index + 1}. ${stop.name}, ${slotLabel(stop.slot)}`}
@@ -152,11 +163,7 @@ export function TripDayPanel({
         />
       </View>
       {day ? (
-        <Animated.View
-          key={activeDay}
-          entering={FadeIn.duration(220)}
-          style={styles.body}
-        >
+        <Animated.View key={activeDay} entering={fadeIn} style={styles.body}>
           <View style={styles.heading}>
             <ThemedText variant="title">{dayTitle(day, activeDay)}</ThemedText>
             <ThemedText variant="caption" style={styles.muted}>
@@ -180,8 +187,10 @@ export function TripDayPanel({
           {day.gaps.map((gap, i) => (
             <Animated.View
               key={`gap-${activeDay}-${gap}`}
-              entering={FadeIn.delay(160 + (day.stops.length + i) * 60)}
-              layout={LinearTransition}
+              entering={FadeIn.duration(motion.duration.enter)
+                .delay((day.stops.length + i) * STAGGER_MS)
+                .easing(motion.easing.out)}
+              layout={REFLOW}
               style={styles.gap}
             >
               <ThemedText variant="caption" style={styles.muted}>
