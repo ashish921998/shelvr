@@ -337,6 +337,51 @@ describe("makeTrip", () => {
     );
   });
 
+  it("swaps a stop for a wishlist place, and says when none is left", async () => {
+    const { t, spaceId } = await setup([
+      ...LISBON_SAVES,
+      { title: "Lost In esplanada for the view" },
+    ]);
+    // Newest filed first: Lost In 1, Taberna 2, Park 3, Pastéis 4.
+    const pick = (saveNumber: number, name: string, slot: string) => ({
+      saveNumber,
+      name,
+      area: "",
+      why: "Go",
+      slot,
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          pick(4, "Pastéis de Belém", "morning"),
+          pick(2, "Taberna da Rua das Flores", "dinner"),
+          pick(3, "Park", "evening"),
+          pick(1, "Lost In", "evening"),
+        ],
+      },
+    });
+    // An easy day holds three stops, so Lost In waits on the wishlist.
+    const { tripId } = await t.action(api.trips.makeTrip, {
+      spaceId,
+      days: 1,
+      pace: "easy",
+    });
+    if (tripId === null) throw new Error("no trip");
+
+    await t.mutation(api.tripData.swapTripStop, { tripId, day: 0, stop: 2 });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(trip?.days[0].stops.map((s) => s.name)).toEqual([
+      "Pastéis de Belém",
+      "Taberna da Rua das Flores",
+      "Lost In",
+    ]);
+    expect(trip?.wishlist.map((s) => s.name)).toEqual(["Park"]);
+    await expect(
+      t.mutation(api.tripData.swapTripStop, { tripId, day: 0, stop: 9 }),
+    ).rejects.toMatchObject({ data: { code: "nothing_to_swap" } });
+  });
+
   it("requires Pro", async () => {
     const { t, spaceId } = await setup(LISBON_SAVES, { pro: false });
 

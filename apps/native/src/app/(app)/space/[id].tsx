@@ -23,6 +23,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { canMakePlan } from "@/lib/make-plan";
+import { canPlanTrip } from "@/lib/trip";
 
 /** Saved items a space needs before "Make a plan" shows. */
 
@@ -37,6 +38,7 @@ export default function SpaceScreen() {
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
   const { guard: planGuard } = usePaywallGuard("make_plan");
+  const { guard: tripGuard } = usePaywallGuard("plan_trip");
 
   // Suggestions lead the feed (they're the ones asking for a decision),
   // wearing the sparkle badge; saved items follow. Item detail rebuilds this
@@ -100,6 +102,30 @@ export default function SpaceScreen() {
       router.push({ pathname: "/plan/[id]", params: { id: space._id } }),
     );
   };
+
+  const canTrip = canPlanTrip(space.items);
+  const planTrip = () => {
+    void tripGuard(() =>
+      router.push({ pathname: "/trip/[id]", params: { id: space._id } }),
+    );
+  };
+
+  // A travel space leads with its trip; "Make a plan" stays beside it.
+  const tripPill = canTrip ? (
+    <Pressable
+      accessibilityRole="button"
+      onPress={planTrip}
+      hitSlop={8}
+      style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
+    >
+      <AppSymbolIcon
+        name="airplane"
+        size={14}
+        tintColor={theme.colors.onTint}
+      />
+      <Text style={styles.planText}>{t("trip.make")}</Text>
+    </Pressable>
+  ) : null;
 
   const planPill = canPlan ? (
     <Pressable
@@ -218,8 +244,9 @@ export default function SpaceScreen() {
           source={{ from: "space", spaceId: id }}
           firstItemZoomTarget
           ListHeaderComponent={
-            suggestionCount > 0 || planPill ? (
+            suggestionCount > 0 || planPill || tripPill ? (
               <View style={styles.headerPills}>
+                {tripPill}
                 {planPill}
                 {suggestionCount > 0 ? (
                   <Animated.View

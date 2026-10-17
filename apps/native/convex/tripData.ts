@@ -1,5 +1,5 @@
-import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
@@ -14,6 +14,7 @@ import {
 } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
+  swapStop,
   tripDayValidator,
   tripPaceValidator,
   tripSlotValidator,
@@ -221,6 +222,33 @@ export const saveTripInternal = internalMutation({
     }
     await deleteTripsForSpace(ctx, args.spaceId);
     return await ctx.db.insert("trips", { userId, ...args });
+  },
+});
+
+/**
+ * "Swap": trades one stop for the wishlist place that best takes its spot
+ * (same time of day, then nearest). The stop moves to the wishlist, so a
+ * second swap can bring it back. No model call.
+ */
+export const swapTripStop = mutation({
+  args: { tripId: v.id("trips"), day: v.number(), stop: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const trip = await ctx.db.get(args.tripId);
+    if (trip === null || trip.userId !== userId) {
+      throw new Error("Trip not found");
+    }
+    await requireProEntitlement(ctx, userId);
+    const swapped = swapStop(trip, args.day, args.stop);
+    if (swapped === null) {
+      throw new ConvexError({
+        code: "nothing_to_swap",
+        message: "No other saved place to swap in",
+      });
+    }
+    await ctx.db.patch(trip._id, swapped);
+    return null;
   },
 });
 

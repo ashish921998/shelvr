@@ -178,7 +178,7 @@ function areaKey(area: string | undefined): string {
 }
 
 /** Up to two areas, most stops first, as the saves write them. */
-function dayAreas(stops: TripCandidate[]): string[] {
+function dayAreas(stops: { area?: string }[]): string[] {
   const counts = new Map<string, { label: string; count: number }>();
   for (const stop of stops) {
     const key = areaKey(stop.area);
@@ -224,6 +224,11 @@ function orderDay(stops: TripCandidate[]): TripCandidate[] {
 }
 
 const MEALS: TripSlot[] = ["lunch", "dinner"];
+
+/** Meals a day has no saved place for; an empty day has no gaps. */
+function dayGaps(slots: Set<TripSlot>, stopCount: number): TripSlot[] {
+  return stopCount === 0 ? [] : MEALS.filter((meal) => !slots.has(meal));
+}
 
 /**
  * Lays out ranked places (best first) as `days` days at `pace`. Places past
@@ -280,8 +285,7 @@ export function buildTrip(
       return {
         areas: dayAreas(stops),
         stops: stops.map(toStop),
-        gaps:
-          stops.length === 0 ? [] : MEALS.filter((meal) => !slots.has(meal)),
+        gaps: dayGaps(slots, stops.length),
       };
     });
   return {
@@ -332,4 +336,53 @@ export function validStartDate(value: string | undefined): string | undefined {
 export function clampDays(days: number): number {
   if (!Number.isFinite(days)) return 3;
   return Math.min(MAX_TRIP_DAYS, Math.max(MIN_TRIP_DAYS, Math.round(days)));
+}
+
+/**
+ * Swaps one stop for the best wishlist place to take its spot: the same time
+ * of day first, then the nearest to it, then the best ranked. The stop goes
+ * to the end of the wishlist. Null when the wishlist is empty or the stop is
+ * not there.
+ */
+export function swapStop(
+  trip: { days: TripDay[]; wishlist: TripStop[] },
+  dayIndex: number,
+  stopIndex: number,
+): { days: TripDay[]; wishlist: TripStop[] } | null {
+  const day = trip.days[dayIndex];
+  const stop = day?.stops[stopIndex];
+  if (stop === undefined || trip.wishlist.length === 0) return null;
+  const at = (s: TripStop): LatLng | null =>
+    s.lat !== undefined && s.lng !== undefined
+      ? { lat: s.lat, lng: s.lng }
+      : null;
+  const from = at(stop);
+  const score = (s: TripStop, rank: number) => {
+    const point = at(s);
+    const distance =
+      from !== null && point !== null ? distanceKm(from, point) : 1_000;
+    return [s.slot === stop.slot ? 0 : 1, distance, rank];
+  };
+  const ranked = trip.wishlist
+    .map((s, rank) => ({ rank, key: score(s, rank) }))
+    .sort(
+      (a, b) =>
+        a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2],
+    );
+  const best = ranked[0].rank;
+  const replacement = trip.wishlist[best];
+  const stops = day.stops.map((s, i) => (i === stopIndex ? replacement : s));
+  const days = trip.days.map((d, i) =>
+    i === dayIndex
+      ? {
+          areas: dayAreas(stops),
+          stops,
+          gaps: dayGaps(new Set(stops.map((s) => s.slot)), stops.length),
+        }
+      : d,
+  );
+  return {
+    days,
+    wishlist: [...trip.wishlist.filter((_, i) => i !== best), stop],
+  };
 }

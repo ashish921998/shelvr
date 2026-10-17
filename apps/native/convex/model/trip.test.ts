@@ -6,8 +6,10 @@ import {
   clampDays,
   clusterPlaces,
   keepNearby,
+  swapStop,
   validStartDate,
   type TripCandidate,
+  type TripStop,
 } from "./trip";
 
 // Two Lisbon neighbourhoods about 3 km apart.
@@ -170,5 +172,63 @@ describe("clampDays", () => {
     expect(clampDays(9)).toBe(5);
     expect(clampDays(2.6)).toBe(3);
     expect(clampDays(Number.NaN)).toBe(3);
+  });
+});
+
+describe("swapStop", () => {
+  const stop = (name: string, fields: Partial<TripStop> = {}): TripStop => ({
+    itemId: `item-${name}` as Id<"items">,
+    name,
+    why: "Worth it",
+    slot: "afternoon",
+    ...fields,
+  });
+
+  it("takes the nearest wishlist place for the same time of day", () => {
+    const trip = {
+      days: [
+        {
+          areas: [],
+          stops: [stop("Lunch spot", { slot: "lunch", ...ALFAMA })],
+          gaps: ["dinner" as const],
+        },
+      ],
+      wishlist: [
+        stop("Far lunch", { slot: "lunch", ...BELEM }),
+        stop("Near sight", { ...near(ALFAMA, 1) }),
+        stop("Near lunch", { slot: "lunch", ...near(ALFAMA, 1) }),
+      ],
+    };
+    const swapped = swapStop(trip, 0, 0);
+    expect(swapped?.days[0].stops.map((s) => s.name)).toEqual(["Near lunch"]);
+    expect(swapped?.days[0].gaps).toEqual(["dinner"]);
+    expect(swapped?.wishlist.map((s) => s.name)).toEqual([
+      "Far lunch",
+      "Near sight",
+      "Lunch spot",
+    ]);
+  });
+
+  it("names the meal the swap leaves uncovered", () => {
+    const trip = {
+      days: [
+        {
+          areas: [],
+          stops: [stop("Dinner", { slot: "dinner" })],
+          gaps: ["lunch" as const],
+        },
+      ],
+      wishlist: [stop("Sight")],
+    };
+    expect(swapStop(trip, 0, 0)?.days[0].gaps).toEqual(["lunch", "dinner"]);
+  });
+
+  it("is null with nothing to swap in", () => {
+    const trip = {
+      days: [{ areas: [], stops: [stop("A")], gaps: [] }],
+      wishlist: [],
+    };
+    expect(swapStop(trip, 0, 0)).toBeNull();
+    expect(swapStop({ ...trip, wishlist: [stop("B")] }, 0, 3)).toBeNull();
   });
 });

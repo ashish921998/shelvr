@@ -300,7 +300,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`,
+  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
   `digest/[id]`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
