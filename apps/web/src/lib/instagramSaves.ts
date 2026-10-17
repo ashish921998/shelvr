@@ -291,6 +291,10 @@ const EOCD = 0x06054b50;
 const ZIP64_LOCATOR = 0x07064b50;
 const CENTRAL = 0x02014b50;
 const MAX_U32 = 0xffffffff;
+// A saved_posts.json is a few MB even for heavy savers; anything far larger
+// is not that file and would only freeze a phone. The zip's directory gets
+// the same cap, since its size comes from the file itself.
+const MAX_SAVES_FILE_BYTES = 50 * 1024 * 1024;
 
 function u64(view: DataView, at: number): number {
   return view.getUint32(at, true) + view.getUint32(at + 4, true) * 2 ** 32;
@@ -348,6 +352,9 @@ function zip64Extra(
 async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
   const directory = await centralDirectory(source);
   if (!directory) return [];
+  if (directory.size > MAX_SAVES_FILE_BYTES) {
+    throw new Error("directory_too_large");
+  }
   const bytes = await source.read(
     directory.offset,
     directory.offset + directory.size,
@@ -387,10 +394,6 @@ async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
   }
   return entries;
 }
-
-// A saved_posts.json is a few MB even for heavy savers; anything far larger
-// is not that file and would only freeze a phone.
-const MAX_SAVES_FILE_BYTES = 50 * 1024 * 1024;
 
 async function inflate(data: Uint8Array): Promise<Uint8Array> {
   const reader = new Blob([data as BlobPart])
