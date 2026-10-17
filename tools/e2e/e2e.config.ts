@@ -42,6 +42,9 @@ export default {
   // to relaunch the app or clear its keychain while it is loaded; give device
   // actions room so a slow simctl is not reported as a failed flow.
   actionTimeout: 90_000,
+  // Hooks run on their own 30s budget; the onboarding flow's afterEach clears
+  // the keychain, which needs the same room.
+  cleanupTimeout: 90_000,
   agents: {
     default: {
       model: google(process.env.E2E_MODEL ?? "gemini-3.8-flash"),
