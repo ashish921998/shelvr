@@ -296,7 +296,7 @@ jobs:
           node -e '
             if (!require("fs").existsSync(".e2e/report.json")) process.exit(0);
             const report = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8"));
-            const watched = /name: "(Profile|Add|New space)"/;
+            const watched = /name: "(Profile|Add|New space|Spaces|Search)"/;
             const walk = (node) => {
               if (Array.isArray(node)) return node.forEach(walk);
               if (!node || typeof node !== "object") return;

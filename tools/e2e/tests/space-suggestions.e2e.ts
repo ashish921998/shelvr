@@ -26,9 +26,10 @@ test(
 
     // As in create-space: the form can fail to open on the first tap, and
     // text typed while its sheet rises can miss the field.
-    await tapTab(screen, "Spaces");
+    const newSpace = screen.getByRole("button", "New space");
+    await tapTab(screen, "Spaces", newSpace);
     const field = screen.getByRole("textbox");
-    await tapUntilVisible(screen.getByRole("button", "New space"), field, {
+    await tapUntilVisible(newSpace, field, {
       waitMs: 5000,
       timeout: 60_000,
     });
