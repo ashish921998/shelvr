@@ -1,13 +1,15 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "@convex/_generated/api";
 import type { DataModel, Doc, Id } from "@convex/_generated/dataModel";
 import { ConvexError } from "convex/values";
 import {
+  MAX_SPACE_DESCRIPTION_LENGTH,
   MAX_SPACE_NAME_LENGTH,
+  SPACE_DESCRIPTION_TOO_LONG_MESSAGE,
   SPACE_NAME_EMPTY_MESSAGE,
   SPACE_NAME_TOO_LONG_MESSAGE,
 } from "./model/spaceName";
@@ -26,24 +28,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-async function entitledUser(userId: string): Promise<TestCtx> {
-  const t = newConvexTest().withIdentity({
-    subject: `${userId}|session-1`,
-  });
-  await t.run(async (ctx) => {
-    await ctx.db.insert("subscriptions", {
-      userId,
-      status: "pro",
-      expiresAt: Date.now() + 60_000,
-      updatedAt: Date.now(),
-    });
-  });
-  return t;
+async function entitledUser(): Promise<{ t: TestCtx; userId: string }> {
+  return await signedInUser(newConvexTest(), { pro: true });
 }
 
 /** A user with no subscription row at all: the not-entitled path. */
-function freeUser(userId: string): TestCtx {
-  return newConvexTest().withIdentity({ subject: `${userId}|session-1` });
+async function freeUser(): Promise<{ t: TestCtx; userId: string }> {
+  return await signedInUser(newConvexTest());
 }
 
 /** Insert a ready link with a stored cover for previews. */
@@ -87,7 +78,7 @@ async function steeringJobs(t: TestCtx) {
 
 describe("space creation", () => {
   it("is idempotent by trimmed name for onboarding retries", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
 
     const first = await t.mutation(api.spaces.createSpace, {
       name: "  Read later  ",
@@ -101,7 +92,7 @@ describe("space creation", () => {
     await t.run(async (ctx) => {
       const subscription = await ctx.db
         .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
       if (subscription === null) throw new Error("Subscription not found");
       await ctx.db.patch(subscription._id, {
@@ -123,14 +114,47 @@ describe("space creation", () => {
       async (ctx) =>
         await ctx.db
           .query("spaces")
-          .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+          .withIndex("by_user", (q) => q.eq("userId", userId))
           .collect(),
     );
     expect(spaces).toHaveLength(1);
   });
 
+  it("bounds the description, which the recommendation prompt carries", async () => {
+    const { t } = await entitledUser();
+    const atLimit = "x".repeat(MAX_SPACE_DESCRIPTION_LENGTH);
+
+    const tooLong = await t
+      .mutation(api.spaces.createSpace, {
+        name: "Too long",
+        description: atLimit + "x",
+      })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(tooLong).toBeInstanceOf(ConvexError);
+    expect((tooLong as ConvexError<string>).data).toBe(
+      SPACE_DESCRIPTION_TOO_LONG_MESSAGE,
+    );
+    const stored = await t.run((ctx) =>
+      ctx.db
+        .query("spaces")
+        .filter((q) => q.eq(q.field("name"), "Too long"))
+        .collect(),
+    );
+    expect(stored).toHaveLength(0);
+
+    const id = await t.mutation(api.spaces.createSpace, {
+      name: "At limit",
+      description: atLimit,
+    });
+    const space = await t.run((ctx) => ctx.db.get(id));
+    expect(space?.description).toBe(atLimit);
+  });
+
   it("bounds the name on create and rename with a message the client can show", async () => {
-    const t = await entitledUser("user-a");
+    const { t } = await entitledUser();
     const atLimit = "x".repeat(MAX_SPACE_NAME_LENGTH);
     const overLimit = atLimit + "x";
 
@@ -173,12 +197,12 @@ describe("space creation", () => {
   });
 
   it("leaves a space named before the limit usable: replay finds it, edits keep it", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const legacyName = "y".repeat(MAX_SPACE_NAME_LENGTH + 5);
     const legacyId = await t.run(
       async (ctx) =>
         await ctx.db.insert("spaces", {
-          userId: "user-a",
+          userId,
           name: legacyName,
           dynamic: false,
         }),
@@ -216,14 +240,14 @@ describe("space creation", () => {
 
 describe("filing corrections", () => {
   it("undoes acceptance back to a suggestion without dismissing it", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const ids = await t.run(async (ctx) => {
       const spaceId = await ctx.db.insert("spaces", {
-        userId: "user-a",
+        userId,
         name: "Recipes",
       });
       const itemId = await ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "note",
         status: "ready",
         tags: [],
@@ -232,7 +256,7 @@ describe("filing corrections", () => {
       await ctx.db.insert("spaceItems", {
         itemId,
         spaceId,
-        userId: "user-a",
+        userId,
         status: "suggested",
       });
       return { itemId, spaceId };
@@ -255,15 +279,15 @@ describe("filing corrections", () => {
   });
 
   it("keeps a removal through both AI passes and lets an explicit undo restore membership", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const ids = await t.run(async (ctx) => {
       const spaceId = await ctx.db.insert("spaces", {
-        userId: "user-a",
+        userId,
         name: "Recipes",
         dynamic: true,
       });
       const itemId = await ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "note",
         status: "ready",
         note: "Pasta",
@@ -272,7 +296,7 @@ describe("filing corrections", () => {
       });
       await ctx.db.insert("spaceItems", {
         ...{ itemId, spaceId },
-        userId: "user-a",
+        userId,
       });
       return { itemId, spaceId };
     });
@@ -304,7 +328,7 @@ describe("filing corrections", () => {
   });
 
   it("rejects corrections against another user's item or space", async () => {
-    const t = await entitledUser("user-a");
+    const { t } = await entitledUser();
     const ids = await t.run(async (ctx) => ({
       itemId: await ctx.db.insert("items", {
         userId: "user-b",
@@ -332,7 +356,7 @@ describe("filing corrections", () => {
 
 describe("denormalized space summary", () => {
   it("counts and previews follow add, accept, remove, item delete", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
@@ -344,10 +368,10 @@ describe("denormalized space summary", () => {
       suggestedPreviewItemIds: [],
     });
 
-    const a = await seedItem(t, "user-a", "a");
-    const b = await seedItem(t, "user-a", "b");
-    const c = await seedItem(t, "user-a", "c");
-    const d = await seedItem(t, "user-a", "d");
+    const a = await seedItem(t, userId, "a");
+    const b = await seedItem(t, userId, "b");
+    const c = await seedItem(t, userId, "c");
+    const d = await seedItem(t, userId, "d");
     for (const itemId of [a, b, c, d]) {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
@@ -359,7 +383,7 @@ describe("denormalized space summary", () => {
     });
 
     // A suggestion is counted in its own bucket and previewed separately.
-    const s = await seedItem(t, "user-a", "s");
+    const s = await seedItem(t, userId, "s");
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId,
       itemIds: [s],
@@ -421,13 +445,13 @@ describe("denormalized space summary", () => {
   });
 
   it("undo and dismiss move rows between buckets; setSpacesForItem withdraws suggestions", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
       dynamic: true,
     });
-    const x = await seedItem(t, "user-a", "x");
-    const y = await seedItem(t, "user-a", "y");
+    const x = await seedItem(t, userId, "x");
+    const y = await seedItem(t, userId, "y");
     await t.mutation(internal.items.setSpacesForItem, {
       itemId: x,
       spaceIds: [spaceId],
@@ -470,13 +494,13 @@ describe("denormalized space summary", () => {
   });
 
   it("acceptAllSuggestions flips every row and counts them as saved", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
     const ids: Id<"items">[] = [];
     for (const label of ["p", "q", "r", "s"]) {
-      ids.push(await seedItem(t, "user-a", label));
+      ids.push(await seedItem(t, userId, label));
     }
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId,
@@ -496,13 +520,13 @@ describe("denormalized space summary", () => {
   });
 
   it("deleting a space removes its joins and the row", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
     const keep = await t.mutation(api.spaces.createSpace, { name: "Keep" });
-    const a = await seedItem(t, "user-a", "a");
-    const b = await seedItem(t, "user-a", "b");
+    const a = await seedItem(t, userId, "a");
+    const b = await seedItem(t, userId, "b");
     await t.mutation(api.spaces.addItemToSpace, { itemId: a, spaceId });
     await t.mutation(api.spaces.addItemToSpace, { itemId: b, spaceId });
     await t.mutation(api.spaces.addItemToSpace, { itemId: a, spaceId: keep });
@@ -519,12 +543,12 @@ describe("denormalized space summary", () => {
   });
 
   it("listSpaces reads counts and covers from the space row, not the joins", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
-    const withImage = await seedItem(t, "user-a", "img");
-    const noImage = await seedItem(t, "user-a", "note", false);
+    const withImage = await seedItem(t, userId, "img");
+    const noImage = await seedItem(t, userId, "note", false);
     await t.mutation(api.spaces.addItemToSpace, { itemId: withImage, spaceId });
     await t.mutation(api.spaces.addItemToSpace, { itemId: noImage, spaceId });
 
@@ -563,29 +587,29 @@ describe("denormalized space summary", () => {
   });
 
   it("lists legacy rows without a summary from a bounded fallback, and backfills them", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     // Written the old way: no summary fields at all.
     const legacy = await t.run((ctx) =>
-      ctx.db.insert("spaces", { userId: "user-a", name: "Legacy" }),
+      ctx.db.insert("spaces", { userId, name: "Legacy" }),
     );
-    const a = await seedItem(t, "user-a", "a");
-    const b = await seedItem(t, "user-a", "b");
-    const s = await seedItem(t, "user-a", "s");
+    const a = await seedItem(t, userId, "a");
+    const b = await seedItem(t, userId, "b");
+    const s = await seedItem(t, userId, "s");
     await t.run(async (ctx) => {
       // A legacy status-less row reads as saved.
       await ctx.db.insert("spaceItems", {
-        userId: "user-a",
+        userId,
         spaceId: legacy,
         itemId: a,
       });
       await ctx.db.insert("spaceItems", {
-        userId: "user-a",
+        userId,
         spaceId: legacy,
         itemId: b,
         status: "saved",
       });
       await ctx.db.insert("spaceItems", {
-        userId: "user-a",
+        userId,
         spaceId: legacy,
         itemId: s,
         status: "suggested",
@@ -610,7 +634,7 @@ describe("denormalized space summary", () => {
 
     // A second legacy space, empty, so the backfill needs two batches of one.
     const empty = await t.run((ctx) =>
-      ctx.db.insert("spaces", { userId: "user-a", name: "Empty legacy" }),
+      ctx.db.insert("spaces", { userId, name: "Empty legacy" }),
     );
     const result = await t.mutation(internal.spaces.backfillSpaceCounters, {
       batchSize: 1,
@@ -659,14 +683,14 @@ describe("denormalized space summary", () => {
   });
 
   it("refills saved previews from the saved bucket even under a pile of newer dismissed rows", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
-    const a = await seedItem(t, "user-a", "a");
-    const b = await seedItem(t, "user-a", "b");
-    const c = await seedItem(t, "user-a", "c");
-    const d = await seedItem(t, "user-a", "d");
+    const a = await seedItem(t, userId, "a");
+    const b = await seedItem(t, userId, "b");
+    const c = await seedItem(t, userId, "c");
+    const d = await seedItem(t, userId, "d");
     for (const itemId of [a, b, c, d]) {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
@@ -675,14 +699,14 @@ describe("denormalized space summary", () => {
     await t.run(async (ctx) => {
       for (let i = 0; i < 60; i++) {
         const itemId = await ctx.db.insert("items", {
-          userId: "user-a",
+          userId,
           type: "note",
           status: "ready",
           tags: [],
           searchText: `d${i}`,
         });
         await ctx.db.insert("spaceItems", {
-          userId: "user-a",
+          userId,
           spaceId,
           itemId,
           status: "dismissed",
@@ -704,14 +728,14 @@ describe("denormalized space summary", () => {
   });
 
   it("refills the saved bucket from legacy status-less rows too", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
-    const legacy = await seedItem(t, "user-a", "legacy");
+    const legacy = await seedItem(t, userId, "legacy");
     await t.run((ctx) =>
       ctx.db.insert("spaceItems", {
-        userId: "user-a",
+        userId,
         spaceId,
         itemId: legacy,
       }),
@@ -719,9 +743,9 @@ describe("denormalized space summary", () => {
     // The direct insert bypassed the summary; heal the count by hand so the
     // refill condition (count > list length) holds.
     await t.run((ctx) => ctx.db.patch(spaceId, { savedCount: 1 }));
-    const a = await seedItem(t, "user-a", "a");
-    const b = await seedItem(t, "user-a", "b");
-    const c = await seedItem(t, "user-a", "c");
+    const a = await seedItem(t, userId, "a");
+    const b = await seedItem(t, userId, "b");
+    const c = await seedItem(t, userId, "c");
     for (const itemId of [a, b, c]) {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
@@ -737,24 +761,24 @@ describe("denormalized space summary", () => {
   });
 
   it("backfill stops a batch when its read budget is spent and resumes at the next space", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaces: Id<"spaces">[] = [];
     for (const name of ["one", "two", "three"]) {
       const spaceId = await t.run((ctx) =>
-        ctx.db.insert("spaces", { userId: "user-a", name }),
+        ctx.db.insert("spaces", { userId, name }),
       );
       spaces.push(spaceId);
       await t.run(async (ctx) => {
         for (let i = 0; i < 5; i++) {
           const itemId = await ctx.db.insert("items", {
-            userId: "user-a",
+            userId,
             type: "note",
             status: "ready",
             tags: [],
             searchText: `${name}${i}`,
           });
           await ctx.db.insert("spaceItems", {
-            userId: "user-a",
+            userId,
             spaceId,
             itemId,
             status: "saved",
@@ -882,15 +906,15 @@ describe("denormalized space summary", () => {
   });
 
   it("heals a small legacy row on its first write", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const legacy = await t.run((ctx) =>
-      ctx.db.insert("spaces", { userId: "user-a", name: "Legacy" }),
+      ctx.db.insert("spaces", { userId, name: "Legacy" }),
     );
-    const a = await seedItem(t, "user-a", "a");
-    const b = await seedItem(t, "user-a", "b");
+    const a = await seedItem(t, userId, "a");
+    const b = await seedItem(t, userId, "b");
     await t.run((ctx) =>
       ctx.db.insert("spaceItems", {
-        userId: "user-a",
+        userId,
         spaceId: legacy,
         itemId: a,
         status: "saved",
@@ -910,13 +934,13 @@ describe("steering spend controls", () => {
   it("blocks a burst of addItemToSpace past the steerItem capacity and rolls the add back", async () => {
     // steerItem capacity is 40; the 41st add in a tight loop must be rejected
     // so a leaked/shared Pro account can't loop and burn LLM spend.
-    const t = await entitledUser("rate-user");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
     for (let i = 0; i < 40; i++) {
-      const itemId = await seedItem(t, "rate-user", `i${i}`, false);
+      const itemId = await seedItem(t, userId, `i${i}`, false);
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
-    const over = await seedItem(t, "rate-user", "over", false);
+    const over = await seedItem(t, userId, "over", false);
     await expect(
       t.mutation(api.spaces.addItemToSpace, { itemId: over, spaceId }),
     ).rejects.toThrow();
@@ -933,11 +957,11 @@ describe("steering spend controls", () => {
   });
 
   it("acceptAllSuggestions keeps accepting once the steering budget is spent", async () => {
-    const t = await entitledUser("rate-user");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
     const ids: Id<"items">[] = [];
     for (let i = 0; i < 42; i++) {
-      ids.push(await seedItem(t, "rate-user", `i${i}`, false));
+      ids.push(await seedItem(t, userId, `i${i}`, false));
     }
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId,
@@ -955,13 +979,13 @@ describe("steering spend controls", () => {
   });
 
   it("does not spend a steering token when the item is still processing", async () => {
-    const t = await entitledUser("user-a");
+    const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, {
       name: "Recipes",
     });
     const processing = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "link",
         status: "processing",
         tags: [],
@@ -977,10 +1001,10 @@ describe("steering spend controls", () => {
   });
 
   it("files items for a non-entitled user but never schedules steering", async () => {
-    const t = freeUser("free-user");
+    const { t, userId } = await freeUser();
     const spaceId = await t.run((ctx) =>
       ctx.db.insert("spaces", {
-        userId: "free-user",
+        userId,
         name: "Mine",
         savedCount: 0,
         suggestedCount: 0,
@@ -988,9 +1012,9 @@ describe("steering spend controls", () => {
         suggestedPreviewItemIds: [],
       }),
     );
-    const a = await seedItem(t, "free-user", "a");
-    const s = await seedItem(t, "free-user", "s");
-    const s2 = await seedItem(t, "free-user", "s2");
+    const a = await seedItem(t, userId, "a");
+    const s = await seedItem(t, userId, "s");
+    const s2 = await seedItem(t, userId, "s2");
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId,
       itemIds: [s, s2],
@@ -1019,7 +1043,7 @@ describe("steering spend controls", () => {
 
   it("rate-limits the recommendation pass on createSpace and on enabling dynamic", async () => {
     // recommendSpace capacity is 10. Retries of an existing name never spend.
-    const t = await entitledUser("rate-user");
+    const { t, userId } = await entitledUser();
     for (let i = 0; i < 10; i++) {
       await t.mutation(api.spaces.createSpace, { name: `Space ${i}` });
     }
@@ -1033,7 +1057,7 @@ describe("steering spend controls", () => {
     const spaces = await t.run((ctx) =>
       ctx.db
         .query("spaces")
-        .withIndex("by_user", (q) => q.eq("userId", "rate-user"))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect(),
     );
     expect(spaces).toHaveLength(10);
@@ -1052,7 +1076,7 @@ describe("steering spend controls", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     expect(
-      jobs.filter((job) => job.name === "ai:recommendForSpace"),
+      jobs.filter((j) => j.name === "aiRecommendForSpace:recommendForSpace"),
     ).toHaveLength(10);
   });
 });

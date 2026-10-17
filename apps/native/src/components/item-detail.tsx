@@ -16,6 +16,7 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { withoutSourceLink } from "@/lib/source-link";
 import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
 import { convexQuery } from "@convex-dev/react-query";
@@ -35,7 +36,6 @@ import {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
@@ -47,6 +47,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CardRow = FunctionReturnType<
   typeof api.items.listItemsPage
@@ -116,7 +117,7 @@ function useItemDetailData(item: DetailItem) {
     withSpaces === undefined &&
     !fullRowFailed;
 
-  // Lexical-similarity strip for the bottom of the page (v0 — a vector index
+  // Lexical-similarity strip for the bottom of the page (v0, a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
   // Conditional queries use the 'skip' sentinel, not `enabled` (see the
   // pager): a disabled React Query still subscribes through the Convex
@@ -148,7 +149,7 @@ function useItemDetailData(item: DetailItem) {
 // Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
 // is stable across swipes (Convex query data, staleTime Infinity). Without this,
 // every parent re-render (setActiveId on each swipe) re-rendered every mounted
-// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
+// page and its ~100+ paragraph Text nodes, the dominant swipe cost profiled.
 export const ItemDetail = memo(function ItemDetail({
   item,
   isZoomTarget,
@@ -165,7 +166,7 @@ export const ItemDetail = memo(function ItemDetail({
 
   // iOS keeps a transparent header (blur band behind it, full-bleed hero), so
   // its pages pad the header band in. Android owns an opaque toolbar (see
-  // item/[id].tsx), so its content already starts below the header — padding
+  // item/[id].tsx), so its content already starts below the header. Padding
   // by the header height there would open a blank band under the toolbar.
   const headerInset = Platform.OS === "ios" ? headerHeight : 0;
 
@@ -207,18 +208,26 @@ export const ItemDetail = memo(function ItemDetail({
   }
 
   // The item's own actions, plus any purpose-steered ones from the space this
-  // page was opened through (deduped — steering may echo a general intent).
+  // page was opened through (deduped: steering may echo a general intent).
   const intents = (() => {
     const base = item.intents ?? [];
     const scoped = item.spaceIntents ?? [];
     const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
-    return [
-      ...base,
-      ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
-    ];
+    // An action that only reopens the save's own page repeats the source line.
+    return withoutSourceLink(
+      [
+        ...base,
+        ...scoped.filter(
+          (i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`),
+        ),
+      ],
+      item.url,
+    );
   })();
 
-  if (heroUri && isMediaSave(item)) {
+  // `detail`, not `item`: a row from a search or a space carries the recipe
+  // itself, and getItem fills it in for one that only has the card's flag.
+  if (heroUri && isMediaSave(detail)) {
     return (
       <MediaViewerPage
         item={item}
@@ -239,7 +248,7 @@ export const ItemDetail = memo(function ItemDetail({
         details={
           bodyPending ? (
             <View style={styles.bodyPending}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <StitchRing />
             </View>
           ) : (
             <ItemSheetBody
@@ -266,7 +275,7 @@ export const ItemDetail = memo(function ItemDetail({
     (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
-  // frame allows, but never taller than the cap — and when the cap bites, pull
+  // frame allows, but never taller than the cap, and when the cap bites, pull
   // the width back in too so the image keeps its shape and the frame hugs it
   // (no cropping, no lopsided gap). The frame insets the image by its own
   // horizontal margin + padding.
@@ -277,16 +286,20 @@ export const ItemDetail = memo(function ItemDetail({
   };
   const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
+  // A post on this layout is one with a recipe (see isMediaSave). Its poster
+  // is a short, cropped band that opens the post, so the recipe it was saved
+  // for starts on the first screen.
+  const heroKind = pageHeroKind(item, social);
+  const poster = heroKind === "poster";
+
   const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
       recyclingKey={item._id}
-      contentFit="contain"
-      style={
-        item.isSticker
-          ? [styles.hero, { aspectRatio: heroAspect, maxHeight: maxHeroHeight }]
-          : [styles.heroImage, { width: heroWidth, height: heroHeight }]
-      }
+      {...pageHeroLook(heroKind, heroAspect, maxHeroHeight, {
+        width: heroWidth,
+        height: heroHeight,
+      })}
     />
   ) : null;
 
@@ -307,8 +320,10 @@ export const ItemDetail = memo(function ItemDetail({
       heroImage
     );
 
+  // A recipe post's other photos stay on the post: here they would push the
+  // recipe back below the fold.
   const moreMedia =
-    social && item.url
+    social && item.url && !poster
       ? (item.media ?? []).slice(1).map((media, index) => (
           <View key={index} style={[styles.heroContainer, styles.moreMedia]}>
             <PostMediaButton
@@ -329,7 +344,7 @@ export const ItemDetail = memo(function ItemDetail({
 
   const heroBlock = heroUri ? (
     <>
-      <View style={item.isSticker ? undefined : styles.heroContainer}>
+      <View style={heroKind === "framed" ? styles.heroContainer : undefined}>
         {isZoomTarget ? (
           <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
         ) : (
@@ -363,7 +378,7 @@ export const ItemDetail = memo(function ItemDetail({
       <ScrollView {...scrollProps}>
         {heroBlock}
         <View style={styles.bodyPending}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <StitchRing />
         </View>
       </ScrollView>
     );
@@ -386,6 +401,36 @@ export const ItemDetail = memo(function ItemDetail({
     </ScrollView>
   );
 });
+
+type PageHeroKind = "poster" | "sticker" | "framed";
+
+function pageHeroKind(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): PageHeroKind {
+  if (item.isSticker) return "sticker";
+  return social ? "poster" : "framed";
+}
+
+/** The page hero's fit and box: a recipe post's short cropped poster, a
+ * full-bleed sticker, or a photo sized to its matted frame. */
+function pageHeroLook(
+  kind: PageHeroKind,
+  aspect: number,
+  maxHeight: number,
+  framed: { width: number; height: number },
+) {
+  if (kind === "poster") {
+    return { contentFit: "cover" as const, style: styles.poster };
+  }
+  return {
+    contentFit: "contain" as const,
+    style:
+      kind === "sticker"
+        ? [styles.hero, { aspectRatio: aspect, maxHeight }]
+        : [styles.heroImage, framed],
+  };
+}
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
@@ -451,7 +496,9 @@ function ItemPageBody({
     return (
       <View style={styles.body}>
         <NoteEditor key={item._id} item={detail} />
-        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
@@ -468,7 +515,7 @@ function ItemPageBody({
       <SaveStatusNotice item={item} centered />
 
       {item.status === "ready" ? (
-        <ItemSpaces spaces={spaces} style={styles.centeredText} />
+        <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
       {item.url ? (
@@ -493,7 +540,9 @@ function ItemPageBody({
 
       <IntentsRow item={item} intents={intents} />
 
-      {item.description ? (
+      {/* A post saved for its recipe goes straight to the tabs: the summary
+          only restates the dish the title and poster already name. */}
+      {item.description && !(social && detail.recipe) ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
@@ -538,7 +587,9 @@ function ItemSheetBody({
   useAppLocale();
   return (
     <View style={styles.body}>
-      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+      {item.status === "ready" ? (
+        <ItemSpaces itemId={item._id} spaces={spaces} />
+      ) : null}
 
       {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
 
@@ -567,9 +618,19 @@ function DetailSections({
   social,
 }: Omit<DetailBodyProps, "spaces">) {
   const { theme } = useUnistyles();
+  // Keyed by item so a recycled pager page opens a new recipe on Ingredients.
+  const recipe = detail.recipe ? (
+    <RecipeSection key={item._id} recipe={detail.recipe} />
+  ) : null;
+  // A post's recipe is what it was saved for, so it comes first and stands in
+  // for the caption it was lifted from: a recipe caption is the same
+  // ingredients and steps again, plus hashtags the tags already carry.
+  const recipeFirst = social !== undefined && recipe !== null;
   return (
     <>
-      {social && paragraphs.length > 0 ? (
+      {recipeFirst ? recipe : null}
+
+      {social && !recipeFirst && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>
@@ -582,11 +643,10 @@ function DetailSections({
       ) : null}
 
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
-          the ingredients and steps out of the story around them. A social post
-          keeps its caption above and gains the recipe its caption described or
-          linked to; a recipe screenshot gets the card under the photo. */}
-      {detail.recipe ? (
-        <RecipeSection recipe={detail.recipe} />
+          the ingredients and steps out of the story around them. A recipe
+          screenshot gets the card under the photo. */}
+      {recipeFirst ? null : recipe ? (
+        recipe
       ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
@@ -691,7 +751,7 @@ function saveState(item: DetailItem, now: number): SaveState | null {
     return "partial";
   }
   // The page loaded but had no extractable article: the URL itself is the
-  // save. Explained, but not retryable — a re-run would reach the same result.
+  // save. Explained, but not retryable: a re-run would reach the same result.
   return item.enrichment === "no_article" ? "no_article" : null;
 }
 
@@ -719,7 +779,7 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  * the URL alone. Without this a failed item renders as an untitled page with no
  * explanation and no way forward, indistinguishable from one still processing.
  *
- * A `not_found` page is gone for good, so it gets no retry — only a reason.
+ * A `not_found` page is gone for good, so it gets no retry, only a reason.
  */
 // `centered` follows the link layout, whose title, source and chips all sit on
 // the centre axis; the note layout keeps the notice flush with its editor.
@@ -758,10 +818,7 @@ function SaveStatusNotice({
   if (processing && state === null) {
     return (
       <View style={[styles.processingRow, centered && styles.centeredRow]}>
-        <ActivityIndicator
-          size="small"
-          color={onMedia ? "white" : theme.colors.primary}
-        />
+        <StitchRing color={onMedia ? "white" : undefined} />
         <Text style={[styles.processingText, onMedia && styles.onMediaText]}>
           {t("item.reading")}
         </Text>
@@ -825,7 +882,7 @@ function SaveStatusNotice({
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
           {retrying ? (
-            <ActivityIndicator size="small" color={theme.colors.primaryText} />
+            <StitchRing size={14} color={theme.colors.primaryText} />
           ) : (
             <AppSymbolIcon
               name="arrow.clockwise"
@@ -869,6 +926,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(2),
     // The sheet body is already inset; the frames bring their own margin.
     marginHorizontal: -theme.gap(2),
+  },
+  poster: {
+    width: "100%",
+    height: 250,
+    backgroundColor: theme.colors.surfaceMuted,
   },
   heroImage: {
     borderRadius: theme.radius.md,

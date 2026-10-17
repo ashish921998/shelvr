@@ -2,13 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import { nextLocalHourAt } from "./model/notificationSchedule";
 import { DEFAULT_REMINDER_HOUR } from "./model/saveReminders";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-09-25T18:00:00Z");
-const USER = "user-a";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -52,10 +51,14 @@ async function setup({
   saves?: Save[];
 } = {}) {
   const t = newConvexTest();
-  const ids: Id<"items">[] = [];
   const order = saves
     .map((save, index) => ({ save, index }))
     .sort((a, b) => b.save[0] - a.save[0]);
+  // The account row must predate the oldest back-dated save, for the same
+  // creation-time reason.
+  vi.setSystemTime(NOW - ((order[0]?.save[0] ?? 0) + 1) * DAY);
+  const { t: user, userId } = await signedInUser(t);
+  const ids: Id<"items">[] = [];
   for (const {
     save: [daysAgo, fields],
     index,
@@ -63,7 +66,7 @@ async function setup({
     vi.setSystemTime(NOW - daysAgo * DAY);
     ids[index] = await t.run((ctx) =>
       ctx.db.insert("items", {
-        userId: USER,
+        userId,
         status: "ready",
         tags: [],
         searchText: "",
@@ -74,7 +77,7 @@ async function setup({
   vi.setSystemTime(NOW);
   await t.run(async (ctx) => {
     await ctx.db.insert("notificationPreferences", {
-      userId: USER,
+      userId,
       weeklyShelfEnabled: false,
       nextDigestAt: NOW + 7 * DAY,
       timezone: "UTC",
@@ -84,7 +87,7 @@ async function setup({
     });
     if (device)
       await ctx.db.insert("notificationDevices", {
-        userId: USER,
+        userId,
         token: "token-a",
         platform: "ios",
         locale: "en",
@@ -94,7 +97,7 @@ async function setup({
   });
   const prepare = (now = NOW) =>
     t.mutation(internal.notifications.prepareSaveReminder, {
-      userId: USER,
+      userId,
       now,
     });
   /** Makes the user due again at `now`, as the next day's cron tick would. */
@@ -102,7 +105,7 @@ async function setup({
     t.run(async (ctx) => {
       const row = await ctx.db
         .query("notificationPreferences")
-        .withIndex("by_user", (q) => q.eq("userId", USER))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
       await ctx.db.patch(row!._id, { nextReminderAt: now });
     });
@@ -112,19 +115,29 @@ async function setup({
     t.run((ctx) =>
       ctx.db
         .query("notificationPreferences")
-        .withIndex("by_user", (q) => q.eq("userId", USER))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique(),
     );
   const open = (itemId: Id<"items">, at: number) =>
     t.run((ctx) =>
       ctx.db.insert("itemReads", {
-        userId: USER,
+        userId,
         itemId,
         firstOpenedAt: at,
         lastOpenedAt: at,
       }),
     );
-  return { t, ids, prepare, due, reminders, preferencesRow, open };
+  return {
+    t,
+    user,
+    userId,
+    ids,
+    prepare,
+    due,
+    reminders,
+    preferencesRow,
+    open,
+  };
 }
 
 const json = (data: unknown) =>
@@ -181,12 +194,12 @@ describe("choosing a save reminder", () => {
   });
 
   it("stays quiet on a day the weekly shelf already went out", async () => {
-    const { t, prepare, reminders, preferencesRow } = await setup({
+    const { t, prepare, reminders, preferencesRow, userId } = await setup({
       saves: [[2, article]],
     });
     await t.run((ctx) =>
       ctx.db.insert("weeklyDigests", {
-        userId: USER,
+        userId,
         weekStart: NOW,
         itemIds: [],
         createdAt: NOW - 9 * 60 * 60 * 1000,
@@ -213,7 +226,7 @@ describe("choosing a save reminder", () => {
   });
 
   it("slows down after three ignored reminders and recovers on an open", async () => {
-    const { t, ids, prepare, due, reminders, open } = await setup({
+    const { t, ids, prepare, due, reminders, open, userId } = await setup({
       saves: [
         [2, article],
         [12, article],
@@ -225,7 +238,7 @@ describe("choosing a save reminder", () => {
     await t.run(async (ctx) => {
       for (const [index, itemId] of ignored.entries())
         await ctx.db.insert("saveReminders", {
-          userId: USER,
+          userId,
           itemId,
           kind: "read",
           createdAt: NOW - (index + 2) * DAY,
@@ -241,12 +254,12 @@ describe("choosing a save reminder", () => {
   });
 
   it("tries a save again after a reminder that never reached the user, but only once", async () => {
-    const { t, ids, prepare, due, reminders } = await setup({
+    const { t, ids, prepare, due, reminders, userId } = await setup({
       saves: [[2, article]],
     });
     await t.run((ctx) =>
       ctx.db.insert("saveReminders", {
-        userId: USER,
+        userId,
         itemId: ids[0],
         kind: "read",
         createdAt: NOW - 3 * DAY,
@@ -293,7 +306,7 @@ describe("reminder preferences", () => {
     await off.prepare();
     expect((await off.preferencesRow())?.nextReminderAt).toBeUndefined();
 
-    const { t, prepare, preferencesRow, reminders } = await setup({
+    const { prepare, preferencesRow, reminders, user } = await setup({
       device: false,
       saves: [[2, article]],
     });
@@ -301,23 +314,19 @@ describe("reminder preferences", () => {
     expect((await preferencesRow())?.nextReminderAt).toBeUndefined();
     expect(await reminders()).toEqual([]);
 
-    await t
-      .withIdentity({ subject: `${USER}|session-1` })
-      .mutation(api.notifications.registerDevice, {
-        token: "token-b",
-        platform: "android",
-      });
+    await user.mutation(api.notifications.registerDevice, {
+      token: "token-b",
+      platform: "android",
+    });
     expect((await preferencesRow())?.nextReminderAt).toBe(NOW + DAY);
   });
 
   it("moves the reminder slot when the shelf settings change timezone", async () => {
-    const { t, preferencesRow } = await setup();
-    await t
-      .withIdentity({ subject: `${USER}|session-1` })
-      .mutation(api.notifications.setPreferences, {
-        weeklyShelfEnabled: false,
-        timezone: "Asia/Kolkata",
-      });
+    const { preferencesRow, user } = await setup();
+    await user.mutation(api.notifications.setPreferences, {
+      weeklyShelfEnabled: false,
+      timezone: "Asia/Kolkata",
+    });
     const row = await preferencesRow();
     expect(row?.timezone).toBe("Asia/Kolkata");
     expect(row?.nextReminderAt).toBe(
@@ -327,7 +336,7 @@ describe("reminder preferences", () => {
 
   it("turns reminders on and off from the client", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    const { t: user } = await signedInUser(t);
     const read = () => user.query(api.notifications.getPreferences, {});
     expect((await read()).remindersEnabled).toBe(false);
     await user.mutation(api.notifications.registerDevice, {
@@ -361,7 +370,7 @@ describe("reminder preferences", () => {
 
   it("follows a user to a new timezone when they switch reminders on", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    const { t: user } = await signedInUser(t);
     await user.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -384,7 +393,7 @@ describe("reminder preferences", () => {
 
   it("follows a device that registers from a new timezone", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    const { t: user } = await signedInUser(t);
     const register = (timezone?: string) =>
       user.mutation(api.notifications.registerDevice, {
         token: "token-a",
@@ -411,7 +420,7 @@ describe("reminder preferences", () => {
 
   it("moves the shelf but not reminders the user turned off", async () => {
     const t = newConvexTest();
-    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    const { t: user } = await signedInUser(t);
     await user.mutation(api.notifications.registerDevice, {
       token: "token-a",
       platform: "ios",
@@ -488,12 +497,12 @@ describe("reminder preferences", () => {
   });
 
   it("drains reminders with the account", async () => {
-    const { t, prepare, reminders } = await setup({ saves: [[2, article]] });
+    const { prepare, reminders, user } = await setup({
+      saves: [[2, article]],
+    });
     await prepare();
     expect(await reminders()).toHaveLength(1);
-    await t
-      .withIdentity({ subject: `${USER}|session-1` })
-      .mutation(api.users.deleteCurrentUserAccount, {});
+    await user.mutation(api.users.deleteCurrentUserAccount, {});
     expect(await reminders()).toEqual([]);
   });
 });
@@ -611,7 +620,7 @@ describe("delivering a save reminder", () => {
   });
 
   it("records one send event once the receipt settles", async () => {
-    const { t, reminder } = await queued();
+    const { t, reminder, userId } = await queued();
     vi.stubGlobal(
       "fetch",
       vi
@@ -638,7 +647,7 @@ describe("delivering a save reminder", () => {
     const jobs = await telemetry();
     expect(jobs).toHaveLength(1);
     expect(jobs[0].args[0]).toMatchObject({
-      userId: USER,
+      userId,
       notificationId: reminder._id,
       kind: "read_reminder",
       itemCount: 1,
@@ -746,10 +755,10 @@ describe("delivering a save reminder", () => {
   });
 
   it("counts a reminder one device confirmed, even if another never answered", async () => {
-    const { t, reminder } = await queued();
+    const { t, reminder, userId } = await queued();
     await t.run((ctx) =>
       ctx.db.insert("notificationDevices", {
-        userId: USER,
+        userId,
         token: "token-b",
         platform: "android",
         enabled: true,

@@ -1,16 +1,15 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { useEntitlement } from "@/lib/entitlement";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { SampleRow } from "@/components/onboarding/sample-card";
 import {
-  SampleCard,
-  SampleRow,
-  ShareHint,
-} from "@/components/onboarding/sample-card";
+  PracticePost,
+  ShareSteps,
+} from "@/components/onboarding/practice-post";
 import { CelebrationBadge } from "@/components/onboarding/celebration";
 import { settleIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
@@ -63,7 +62,6 @@ export function SharePracticeStep({
   onFinish: () => void;
 }) {
   useAppLocale();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
@@ -175,13 +173,9 @@ export function SharePracticeStep({
           )}
         </View>
         <Animated.View entering={SETTLE_CTA}>
-          {/* Saving is Pro: anyone without it gets the paywall from here. */}
+          {/* The promise step comes next, and the paywall after it. */}
           <CtaButton
-            label={t(
-              entitled || entitlementLoading
-                ? "sharePractice.toShelf"
-                : "reveal.keepSaving",
-            )}
+            label={t("common.continue")}
             onPress={onFinish}
             busy={leaving}
           />
@@ -193,19 +187,20 @@ export function SharePracticeStep({
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
+        <Text style={styles.eyebrow}>{t("sharePractice.eyebrow")}</Text>
         <Text
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         >
           {t("sharePractice.title")}
         </Text>
-        <Text style={styles.support}>{t("sharePractice.body")}</Text>
       </View>
 
+      {/* Above the post, so the sheet never covers it while it is open. */}
+      <ShareSteps active={sheetOpen ? 2 : 1} />
       {sample === undefined ? null : (
-        <SampleCard
+        <PracticePost
           sample={sample}
-          action="share"
           disabled={sheetOpen || leaving}
           onPress={() => void share()}
         />
@@ -213,7 +208,6 @@ export function SharePracticeStep({
       {wrongApp ? (
         <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
       ) : null}
-      <ShareHint />
       <Text style={styles.tip}>
         {t(
           Platform.OS === "ios"
@@ -241,6 +235,13 @@ const styles = StyleSheet.create((theme) => ({
   head: {
     gap: theme.gap(1),
   },
+  eyebrow: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: theme.colors.primaryText,
+  },
   headline: {
     fontFamily: theme.fonts.display,
     fontSize: 28,
@@ -257,7 +258,7 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     lineHeight: 18,
-    color: theme.colors.faint,
+    color: theme.colors.muted,
   },
   error: {
     fontFamily: theme.fonts.regular,

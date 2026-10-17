@@ -9,7 +9,7 @@ import {
   isFeedbackInboxConfigured,
 } from "./feedback";
 import { classifyResendError, formatResendError } from "./model/resend";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser } from "./test.setup";
 import type { Id } from "./_generated/dataModel";
 
 const INBOX = "support@shelvr.app";
@@ -30,26 +30,16 @@ function setup() {
   return newConvexTest();
 }
 
-/** A synthetic subject identity; the users row only needs to exist when the
- * test asserts on the account email. */
-function as(t: ReturnType<typeof newConvexTest>, userId: string) {
-  return t.withIdentity({ subject: `${userId}|session-1` });
-}
-
-/** A real users row + session so claimDelivery can read the account email. */
+/** A signed-in user whose account carries `email`; claimDelivery reads the
+ * address from the users row, so it must be a real row. */
 async function signedInWithEmail(
   t: ReturnType<typeof newConvexTest>,
   email?: string,
 ) {
-  const userId = await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", email ? { email } : {});
-    await ctx.db.insert("authSessions", {
-      userId,
-      expirationTime: Date.now() + 60_000,
-    });
-    return userId;
+  return await signedInUser(t, {
+    email,
+    session: true,
   });
-  return { t: as(t, userId as string), userId: userId as string };
 }
 
 function okFetch() {
@@ -155,7 +145,7 @@ describe("submitFeedback", () => {
 
   it("rejects empty and over-long messages instead of truncating them", async () => {
     const t = setup();
-    const signedIn = as(t, "user-validate");
+    const { t: signedIn } = await signedInWithEmail(t);
     await expect(
       signedIn.mutation(api.feedback.submitFeedback, {
         message: "   ",
@@ -174,7 +164,7 @@ describe("submitFeedback", () => {
     // No inbox env: nothing is scheduled, so the row can be inspected without
     // a delivery action pending behind the test.
     const t = newConvexTest();
-    const signedIn = as(t, "user-context");
+    const { t: signedIn } = await signedInWithEmail(t);
     const result = await signedIn.mutation(api.feedback.submitFeedback, {
       message: "hello",
       surface: "profile",
@@ -188,7 +178,7 @@ describe("submitFeedback", () => {
 
   it("rate limits rapid submissions per user", async () => {
     const t = newConvexTest();
-    const signedIn = as(t, "user-rate");
+    const { t: signedIn } = await signedInWithEmail(t);
     const args = { message: "hi", surface: "profile" as const };
     await signedIn.mutation(api.feedback.submitFeedback, args);
     await signedIn.mutation(api.feedback.submitFeedback, args);
@@ -255,7 +245,7 @@ describe("delivery retries", () => {
       deliveryError: "provider_error:500",
     });
 
-    // The log line carries category/status/attempt only — never the message
+    // The log line carries category/status/attempt only, never the message
     // or the account email.
     const logged = errorSpy.mock.calls
       .map((call) => String(call[0]))

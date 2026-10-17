@@ -52,7 +52,7 @@ function useWidgetCleanup(isAuthenticated: boolean, isLoading: boolean) {
  * reset PostHog once and drop every Convex query cache entry so its
  * subscriptions stop and a later account can never observe the previous
  * user's data. Other sign-out flows (e.g. notification device sessions) do
- * not reset analytics themselves — this hook is the single owner.
+ * not reset analytics themselves: this hook is the single owner.
  */
 export function useAnalyticsIdentity(): null {
   const { isAuthenticated, isLoading } = useConvexAuth();

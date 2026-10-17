@@ -13,7 +13,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 /**
- * One local notification an hour before the exit offer closes, sent only to
+ * One local notification three hours before the exit offer closes, sent only to
  * people who tapped "Remind me" on the Home countdown. A reminder about a
  * discount is promotional, and App Review guideline 4.5.4 requires explicit
  * opt-in through in-app consent language plus a way to opt out, so nothing is

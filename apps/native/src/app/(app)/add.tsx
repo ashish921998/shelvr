@@ -12,7 +12,6 @@ import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -31,6 +30,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+import { typedLink } from "@/lib/url";
 
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
@@ -38,22 +38,6 @@ type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
 /** Shared by the up-front guard and by the server's `pro_required` refusal, so
  * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
-
-/** Read a link from the clipboard for the article prefill. `getUrlAsync` is
- * iOS-only, so Android reads the raw string and keeps it only when it parses as
- * an http(s) URL. A failed read resolves to null instead of rejecting. */
-async function readClipboardUrl(): Promise<string | null> {
-  try {
-    if (Platform.OS === "ios") {
-      return (await Clipboard.getUrlAsync()) ?? null;
-    }
-    const text = (await Clipboard.getStringAsync()).trim();
-    if (text === "") return null;
-    return new URL(text).protocol.startsWith("http") ? text : null;
-  } catch {
-    return null;
-  }
-}
 
 function ActionButton({
   icon,
@@ -168,7 +152,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro — route to the paywall before composing if not entitled.
+  // Saving is Pro: route to the paywall before composing if not entitled.
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
 
@@ -187,18 +171,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
-
-  // Prefill the article field with a link already on the clipboard.
-  useEffect(() => {
-    if (mode !== "article") return;
-    let active = true;
-    readClipboardUrl().then((url) => {
-      if (active && url) setValue((current) => current || url);
-    });
-    return () => {
-      active = false;
-    };
-  }, [mode]);
 
   // Android's Material sheet resizes to the composer over ~300ms, and a
   // keyboard opened mid-resize can land behind it, so focus once it settles.
@@ -232,6 +204,13 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const save = async () => {
     if (!canSave) return;
+    // Checked here so typed text that is not a link never reaches the server,
+    // whose refusal would only surface as the generic failure alert.
+    const link = mode === "article" ? typedLink(trimmed) : null;
+    if (mode === "article" && link === null) {
+      Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
+      return;
+    }
     setSaving(true);
     // The first-save funnel: the submission's attempt event, with the entry
     // source the server's `item_saved` will carry too.
@@ -246,7 +225,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
     try {
       if (mode === "article") {
         await createLinkItem({
-          url: trimmed,
+          url: link ?? trimmed,
           spaceId: pinnedSpaceId,
           operationId,
           analyticsSessionId: analytics.sessionId(),
@@ -325,7 +304,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
         }}
       />
       {/* Each platform mounts exactly one persistent title so changes cascade
-          between "Save something" / "New note" / "Save an article". */}
+          between "Save something" / "New note" / "Save a link". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
           <AnimatedText text={title} style={styles.heading} truncate />
@@ -385,7 +364,8 @@ function AddContent({ close, openCamera }: AddContentProps) {
           onSubmitEditing={isArticle ? save : undefined}
           editable={!saving}
         />
-      ) : (
+      ) : null}
+      {isComposer ? null : (
         <View style={styles.actions}>
           <ActionButton
             testID="add-option-note"

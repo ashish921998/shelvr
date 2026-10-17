@@ -94,14 +94,14 @@ export default function MapScreen() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
   // Only photos with coordinates, already filtered server-side, so the map
   // never subscribes to the feed.
-  const { data: items } = useQuery({
-    ...convexQuery(
+  const { data: items } = useQuery(
+    convexQuery(
       api.items.listLocatedItems,
       // 'skip', not `enabled`: a disabled React Query still subscribes
       // through the Convex adapter (see the pager).
       !entitlementLoading && entitled ? {} : "skip",
     ),
-  });
+  );
 
   const located = useMemo<Located[]>(
     () =>
@@ -146,7 +146,7 @@ export default function MapScreen() {
     return <ScreenLoader label={t("loading.map")} />;
   }
 
-  // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
+  // Map is a Pro feature: a lapsed user who deep-links here is bounced to the
   // paywall instead of seeing the map. ProGate's CTA presents the paywall
   // under this screen's own placement, so its attempts stay separable from
   // Tidy's in the paywall funnel.

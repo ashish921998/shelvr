@@ -6,21 +6,21 @@
  *
  *   1. scheme/credential/port/length policy from externalUrl.ts, re-run on
  *      every redirect target;
- *   2. DNS answers resolved and classified with ipaddr.js — only globally
- *      routable unicast addresses are allowed — and the validated address is
+ *   2. DNS answers resolved and classified with ipaddr.js: only globally
+ *      routable unicast addresses are allowed, and the validated address is
  *      the one handed to the actual socket via undici's connect.lookup, so
  *      validation cannot be bypassed by a second, independent resolution
  *      (DNS rebinding);
  *   3. manual redirects, at most MAX_REDIRECTS hops, each target revalidated
  *      before the next request, each redirect body cancelled;
- *   4. a single total deadline (AbortController) covering DNS and every hop —
+ *   4. a single total deadline (AbortController) covering DNS and every hop:
  *      a resolver that never completes still times out;
  *   5. bounded streaming readers that honor Content-Length when present and
  *      still stop after actual bytes exceed the limit, cancelling the body;
  *   6. a narrow result type exposing only bounded bytes, the final validated
- *      URL, status, and sanitized metadata — never the underlying Response
+ *      URL, status, and sanitized metadata, never the underlying Response
  *      whose text()/json()/arrayBuffer() would bypass the limits;
- *   7. errors/logs carry only a policy code and identifiers — never
+ *   7. errors/logs carry only a policy code and identifiers, never
  *      credentials, query strings, redirect locations, response bodies, or
  *      resolved addresses.
  *
@@ -78,7 +78,7 @@ export function isSafeFetchError(e: unknown): e is SafeFetchErrorClass {
 
 /**
  * ipaddr.js `range()` returns the broad class of an address. We allow only
- * `unicast` — globally routable addresses — and reject everything else:
+ * `unicast`, globally routable addresses, and reject everything else:
  * loopback, private (RFC1918), linkLocal, multicast, reserved, and
  * documentation/test ranges. IPv4-mapped IPv6 addresses are parsed by
  * ipaddr.js and their mapped IPv4 is classified, so ::ffff:127.0.0.1 is
@@ -105,7 +105,7 @@ export function isPublicAddress(address: string): boolean {
 /**
  * Validate the destination host of an already-parsed URL. IP-literal hosts
  * (e.g. `http://127.0.0.1/`) are classified directly here because Node's
- * net.connect does NOT call connect.lookup for IP literals — it connects
+ * net.connect does NOT call connect.lookup for IP literals: it connects
  * straight to the address, which would bypass the validating DNS lookup.
  * DNS-name hosts are left to the validating lookup at connection time.
  *
@@ -134,7 +134,7 @@ function assertHostAllowed(url: string): void {
   try {
     ipaddr.parse(hostname);
   } catch {
-    // Not an IP literal — it's a DNS name; the validating lookup handles it.
+    // Not an IP literal: it's a DNS name; the validating lookup handles it.
     return;
   }
   // It IS an IP literal: classify it. Reuse isPublicAddress so IPv4-mapped
@@ -156,7 +156,7 @@ export type DnsResolver = (
 
 /**
  * Hard ceiling on a single DNS resolution. Node's dns.lookup has no built-in
- * timeout — it relies on the OS getaddrinfo, which can hang for tens of seconds
+ * timeout: it relies on the OS getaddrinfo, which can hang for tens of seconds
  * against a non-responsive resolver. undici does not wire the request AbortSignal
  * to the lookup phase, so a hung lookup would outlive the per-request deadline
  * returned to the caller, dangling a connection attempt. This bound fails the
@@ -234,7 +234,7 @@ export function makeValidatingLookup(resolver: DnsResolver) {
       );
       return;
     }
-    // Reject if ANY answer is unsafe — do not pick a convenient public one from
+    // Reject if ANY answer is unsafe: do not pick a convenient public one from
     // a mixed set. This defeats DNS rebinding that returns a public + private.
     for (const a of addresses) {
       if (!isPublicAddress(a.address)) {
@@ -286,7 +286,7 @@ function getSharedDispatcher(): Dispatcher {
 }
 
 // ---------------------------------------------------------------------------
-// Result type (narrow — never exposes the raw Response)
+// Result type (narrow: never exposes the raw Response)
 // ---------------------------------------------------------------------------
 
 type SafeFetchOk = {
@@ -301,7 +301,7 @@ type SafeFetchOk = {
   bytes: Uint8Array;
   /** Set only when `onOverflow: "truncate"` actually fired, so `bytes` is a
    * prefix of what the server sent. A caller that needs the whole document to
-   * be right — parsing structured markup, say — must refuse a truncated read
+   * be right, parsing structured markup, say, must refuse a truncated read
    * instead of parsing the prefix, because a cut document can still parse into
    * a plausible-looking partial answer. */
   truncated?: true;
@@ -465,22 +465,12 @@ function followRedirect(
     }
     throw new SafeFetchErrorClass("fetch_failed", "invalid redirect target");
   }
-  try {
-    assertHostAllowed(nextUrl);
-  } catch (e) {
-    if (isSafeFetchError(e)) {
-      throw e;
-    }
-    throw new SafeFetchErrorClass(
-      "blocked_destination",
-      "redirect target rejected",
-    );
-  }
+  assertHostAllowed(nextUrl);
   return nextUrl;
 }
 
 /** Pre-check a declared Content-Length against the cap before streaming.
- * Skipped in truncate mode — the reader stops at maxBytes and returns the
+ * Skipped in truncate mode: the reader stops at maxBytes and returns the
  * prefix instead of failing. */
 async function rejectOversizeContentLength(
   response: Dispatcher.ResponseData,
@@ -576,9 +566,6 @@ async function safeFetchThrowing(
           "content type not allowed",
         );
       }
-      // Pre-check a declared Content-Length against the cap before streaming.
-      // Skip this pre-check in truncate mode — the reader will stop at maxBytes
-      // and return the prefix instead of failing.
       if (onOverflow === "error") {
         await rejectOversizeContentLength(response, maxBytes);
       }
@@ -637,7 +624,7 @@ async function dispatch(
     ]);
   } catch (e) {
     // Translate a raw transport error into a safe-fetch error. We must not
-    // leak the URL (it may carry a query secret) — only a code propagates.
+    // leak the URL (it may carry a query secret). Only a code propagates.
     if (e instanceof SafeFetchErrorClass) {
       throw e;
     }
@@ -752,7 +739,7 @@ export function decodeWithContentType(
     try {
       return new TextDecoder(charset).decode(bytes);
     } catch {
-      // Unsupported charset label — fall back to UTF-8.
+      // Unsupported charset label: fall back to UTF-8.
     }
   }
   return new TextDecoder("utf-8").decode(bytes);

@@ -10,11 +10,10 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | string
   | undefined;
 
-const REPLAY_VARIANTS = new Set<unknown>([
-  "development",
-  "preview",
-  "production",
-]);
+// Production never records. Apple's guideline 2.5.14 requires explicit consent
+// and a visible indicator for recording user activity, and the app has
+// neither. Replay stays a development and preview tool.
+const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
 
 // Distributed builds report crashes; local development does not. A dev machine
 // crash on an unmerged branch would otherwise open an error issue next to
@@ -37,7 +36,7 @@ const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
 export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
 // Expo and other native modules reject with a `CodedError` whose message is a
-// generated code token — `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
+// generated code token: `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
 // the failing module and holds no user content (no spaces, URLs, or free text),
 // so it is safe to keep. Without it a native crash reaches error tracking as the
 // bare class name ("Error"), naming nothing that failed. The pattern only admits
@@ -71,7 +70,7 @@ function redactExceptionProperties(properties: unknown): void {
       };
     });
   }
-  // Only rewrite the message when the SDK captured one — an unconditional
+  // Only rewrite the message when the SDK captured one: an unconditional
   // assignment would stamp an undefined `$exception_message` key onto every
   // lifecycle and custom event passing through the hook.
   if ("$exception_message" in record) {
@@ -110,10 +109,9 @@ export const posthog =
         // product gain. Fail closed, as replay and exception autocapture do.
         capturePushNotificationSubscriptions: false,
         capturePushNotificationOpened: false,
-        // Visual masking was verified on a signed preview build on 2026-09-28,
-        // so production records too, at the same sample rate. Fail closed: only
-        // builds that declare a known variant record, so a missing `extra` can
-        // never turn replay on.
+        // Fail closed: only builds that declare a development or preview
+        // variant record, so a production build or a missing `extra` can never
+        // turn replay on.
         enableSessionReplay: REPLAY_VARIANTS.has(
           Constants.expoConfig?.extra?.variant,
         ),
@@ -123,13 +121,12 @@ export const posthog =
           maskAllSandboxedViews: true,
           captureLog: false,
           captureNetworkTelemetry: false,
-          // Every session, while the user base is small enough that a 20%
-          // sample would yield a handful of recordings a week. Lower it once
-          // volume makes sampling worth it. Decided 2026-09-29.
+          // Every session: only development and preview builds record, so
+          // there is no volume to sample down.
           sampleRate: 1,
           throttleDelayMs: 1000,
         },
-        // The object form resolves omitted keys to false — an empty
+        // The object form resolves omitted keys to false: an empty
         // `console: []` alone silently disables crash capture. Exceptions are
         // additionally gated server-side by the project's "exception
         // autocapture" remote config.
@@ -196,7 +193,7 @@ export async function resetIfIdentified(client: PostHog): Promise<void> {
 }
 
 /** True when the client analytics boundary may capture. The single canonical
- * check — every analytics facade (feedback, cancel survey) delegates here
+ * check: every analytics facade (feedback, cancel survey) delegates here
  * instead of re-deriving availability from the client's state. */
 export function isAnalyticsAvailable(): boolean {
   return posthog !== undefined && !posthog.isDisabled && !posthog.optedOut;

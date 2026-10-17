@@ -7,7 +7,17 @@ const app = defineApp({
     // Id of the Apple-approved message POST /retention-messaging names on the
     // cancel sheet. Unset, the reply is empty and Apple shows its default.
     APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
+    // Signs the client secret for Apple's token revocation on account
+    // deletion (convex/appleRevoke.ts): the .p8 contents, its key id, and the
+    // team id. Without all three the revocation is skipped.
+    APPLE_REVOKE_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_REVOKE_KEY_ID: v.optional(v.string()),
+    APPLE_REVOKE_TEAM_ID: v.optional(v.string()),
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
+    // Swaps Gemini for the deterministic fake in model/fakeAi.ts. Honoured only
+    // on a local e2e backend (see fakeAiLocks there); a cloud deployment
+    // refuses it and logs that it did.
+    E2E_FAKE_AI: v.optional(v.string()),
     GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     POSTHOG_HOST: v.optional(v.string()),
@@ -30,6 +40,12 @@ const app = defineApp({
     // reminders stop at their next attempt, with no deploy.
     SAVE_REMINDERS_ENABLED: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
+    // Treg token (treg.to) for spoken transcripts of recipe videos
+    // (convex/model/videoTranscript.ts). Used only while
+    // VIDEO_TRANSCRIPTS_ENABLED is "true"; set that to anything else to stop
+    // them at the next save, with no deploy.
+    TREG_API_KEY: v.optional(v.string()),
+    VIDEO_TRANSCRIPTS_ENABLED: v.optional(v.string()),
     // Shared with the marketing site's server; authenticates POST /waitlist/join.
     WAITLIST_SHARED_SECRET: v.optional(v.string()),
   },

@@ -2,7 +2,6 @@ export type RevenueCatEvent = {
   type?: string;
   userId?: string;
   expiresAt?: number;
-  gracePeriodExpiresAt?: number;
   productId?: string;
   periodType?: string;
   cancelReason?: string;
@@ -13,7 +12,7 @@ export type RevenueCatEvent = {
 };
 
 /** Parse the subset of a RevenueCat webhook used by the entitlement sync.
- * Returns `undefined` only when the body is not a readable object — the caller
+ * Returns `undefined` only when the body is not a readable object: the caller
  * then returns HTTP 400. A readable event missing `type` or `app_user_id`
  * returns a partial object with those fields as `undefined` so the caller can
  * respond HTTP 200 (acknowledging the event so RevenueCat stops retrying)
@@ -26,19 +25,17 @@ export function parseRevenueCatEvent(
   const event = readRecord(readRecord(body)?.event);
   if (event === undefined) return undefined;
 
-  const type = readString(event?.type);
-  const userId = readString(event?.app_user_id);
-  const expiresAt = readNumber(event?.expiration_at_ms);
-  const gracePeriodExpiresAt = readNumber(event?.grace_period_expiration_at_ms);
-  const productId = readString(event?.product_id);
-  const periodType = readString(event?.period_type);
-  const eventTimestampMs = readNumber(event?.event_timestamp_ms);
+  const type = readString(event.type);
+  const userId = readString(event.app_user_id);
+  const expiresAt = readNumber(event.expiration_at_ms);
+  const productId = readString(event.product_id);
+  const periodType = readString(event.period_type);
+  const eventTimestampMs = readNumber(event.event_timestamp_ms);
 
   return {
     type,
     userId,
     expiresAt,
-    gracePeriodExpiresAt,
     productId,
     periodType,
     cancelReason: readString(event.cancel_reason),
@@ -77,22 +74,38 @@ export function mapRevenueCatStatus(
   }
 }
 
-/** The instant Pro access should actually end for a webhook event.
- * A BILLING_ISSUE reports the original, already-past expiry in
- * `expiration_at_ms` and the store's billing retry window in a separate
- * `grace_period_expiration_at_ms`, so writing the former revokes access while
- * the charge is still being retried. The grace field is read only for that
- * event type, because an unconditional maximum of the two would extend an
- * entitlement past its end if the field ever rode along on an EXPIRATION, and
- * over-granting Pro is the worse failure.
- */
-export function resolveExpiresAt(event: RevenueCatEvent): number {
-  if (
-    event.type === "BILLING_ISSUE" &&
-    event.gracePeriodExpiresAt !== undefined
-  )
-    return event.gracePeriodExpiresAt;
-  return event.expiresAt ?? 0;
+/** Events whose current access must come from RevenueCat, not the webhook body. */
+export function requiresAuthoritativeReconciliation(
+  event: RevenueCatEvent,
+): boolean {
+  switch (event.type) {
+    case "BILLING_ISSUE":
+    case "REFUND_REVERSED":
+      return true;
+    case "NON_RENEWING_PURCHASE":
+      // A dashboard grant. A lifetime one carries no expiry, which the
+      // webhook path would read as "nothing to record"; the snapshot reports
+      // its real end, or none for lifetime.
+      return event.periodType === "PROMOTIONAL";
+    case "CANCELLATION":
+      // A failed charge sends BILLING_ERROR with the already-past expiry; only
+      // the snapshot knows the billing grace window. A cancelled dashboard
+      // grant may be a sticky lifetime row, as under EXPIRATION.
+      return (
+        event.cancelReason === "CUSTOMER_SUPPORT" ||
+        event.cancelReason === "BILLING_ERROR" ||
+        event.periodType === "PROMOTIONAL"
+      );
+    case "EXPIRATION":
+      // A revoked dashboard grant may have been stored as a sticky lifetime
+      // row, which only an authoritative snapshot can lapse.
+      return (
+        event.expirationReason === "CUSTOMER_SUPPORT" ||
+        event.periodType === "PROMOTIONAL"
+      );
+    default:
+      return false;
+  }
 }
 
 function readStringArray(value: unknown): string[] | undefined {
@@ -112,7 +125,9 @@ type RevenueCatSnapshot = {
   productId?: string;
 };
 
-/** Read only the project's Pro entitlement; malformed responses must not revoke access. */
+/** Read only the project's Pro entitlement; malformed responses must not revoke access.
+ * Billing grace is honoured only from this authoritative snapshot, never the webhook body.
+ */
 export function parseRevenueCatSnapshot(
   body: unknown,
   entitlementIdentifier = "Shelvr Pro",

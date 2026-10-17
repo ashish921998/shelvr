@@ -27,6 +27,7 @@ const mock = vi.hoisted(() => ({
     </button>
   ),
   nothing: () => null,
+  steps: ({ active }: { active: number }) => <div>{`step-${active}`}</div>,
   row: ({ sample }: { sample: { pageHeading: string } }) => (
     <div>{sample.pageHeading}</div>
   ),
@@ -44,9 +45,6 @@ vi.mock("react-native-reanimated", () => ({
   default: { View: mock.view, Text: mock.text },
 }));
 vi.mock("@/lib/motion", () => ({ settleIn: () => ({}) }));
-vi.mock("@/lib/entitlement", () => ({
-  useEntitlement: () => ({ entitled: true, loading: false }),
-}));
 vi.mock("@/components/onboarding/celebration", () => ({
   CelebrationBadge: mock.nothing,
 }));
@@ -76,9 +74,11 @@ vi.mock("@/components/onboarding/parts", () => ({
   GhostButton: mock.button,
 }));
 vi.mock("@/components/onboarding/sample-card", () => ({
-  SampleCard: mock.card,
   SampleRow: mock.row,
-  ShareHint: mock.nothing,
+}));
+vi.mock("@/components/onboarding/practice-post", () => ({
+  PracticePost: mock.card,
+  ShareSteps: mock.steps,
 }));
 
 const { SharePracticeStep } =
@@ -97,6 +97,38 @@ beforeEach(() => {
 });
 
 describe("share practice", () => {
+  it("says up front that this share is a practice run", () => {
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("sharePractice.eyebrow")).toBeTruthy();
+  });
+
+  it("lights the Shelvr step while the share sheet is open", async () => {
+    let finish!: (result: string) => void;
+    mock.present.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("step-1")).toBeTruthy();
+    fireEvent.click(screen.getByText("share-sample"));
+    expect(screen.getByText("step-2")).toBeTruthy();
+    await act(async () => finish("dismissed"));
+    expect(screen.getByText("step-1")).toBeTruthy();
+  });
+
   it("skips the practice when a share is already held, so it is not replaced", () => {
     mock.payloads = [{ value: "https://mine.test", shareType: "url" }];
     const onFinish = vi.fn();

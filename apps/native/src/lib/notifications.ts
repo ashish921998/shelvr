@@ -1,5 +1,6 @@
 import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
+import { clearTrialReminder } from "@/lib/trial-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
 import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
@@ -112,11 +113,13 @@ export function NotificationSessionProvider({
           await signOut();
           await clearExitOfferReminder();
           await clearFirstSaveReminder();
+          await clearTrialReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
           await clearExitOfferReminder();
           await clearFirstSaveReminder();
+          await clearTrialReminder();
         },
         clearWidget: clearRecentSavesWidget,
         // Fallback for a failed post-deletion sign-out: no auth edge may fire
@@ -215,7 +218,7 @@ function notificationField(
 
 /**
  * The route a notification carries, if any. Exported because the splash gate
- * decides whether to stand down from the same rule this navigates by — a push
+ * decides whether to stand down from the same rule this navigates by. A push
  * with no `url` goes nowhere, so it is not a reason to skip the animation.
  */
 export function getNotificationUrl(

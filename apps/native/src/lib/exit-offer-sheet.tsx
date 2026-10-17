@@ -35,7 +35,7 @@ type Request = {
   offering: PurchasesOffering;
   customVariables?: CustomVariables;
   endsAt: number;
-  /** Fires with the package's identifier the moment the user taps purchase —
+  /** Fires with the package's identifier the moment the user taps purchase,
    * the one purchase-start signal RevenueCat's component API exposes. */
   onPurchaseStarted?: (packageId: string) => void;
   /** Fires when the person closes the sheet themselves, not when the deadline
@@ -192,6 +192,7 @@ export function ExitOfferSheetHost() {
           onPress={() => finish("CANCELLED", true)}
           accessibilityRole="button"
           accessibilityLabel={t("common.close")}
+          testID="exit-offer-close"
           hitSlop={12}
           style={[styles.close, { top: insets.top + 8 }]}
         >

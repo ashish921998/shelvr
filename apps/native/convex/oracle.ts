@@ -2,7 +2,7 @@
 
 import { generateObject } from "ai";
 import { internalAction } from "./_generated/server";
-import { MODEL, modelCallOptions } from "./ai";
+import { MODEL, modelCallOptions } from "./model/aiProvider";
 import { readPage } from "./model/pageRead";
 import { logEvent } from "./model/log";
 import {

@@ -24,6 +24,8 @@ const mock = vi.hoisted(() => ({
   useQuery: vi.fn(),
   isEntitled: vi.fn(() => false),
   store: new Map<string, string>(),
+  hidePro: false,
+  forceExitOffer: false,
   apiKey: {
     REVENUECAT_API_KEY: "appl_test" as string | undefined,
     REVENUECAT_DISABLED_BY_BUILD: false,
@@ -75,6 +77,10 @@ vi.mock("./exit-offer-sheet", () => ({
   whenExitSheetDismissed: () => mock.dismissed(),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
+vi.mock("@/lib/e2e-hide-pro", () => ({
+  isProHiddenForE2E: () => mock.hidePro,
+  isExitOfferForcedForE2E: () => mock.hidePro && mock.forceExitOffer,
+}));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
   setItem: (key: string, value: string) => void mock.store.set(key, value),
@@ -139,6 +145,8 @@ async function loadReady() {
 }
 
 beforeEach(() => {
+  mock.hidePro = false;
+  mock.forceExitOffer = false;
   mock.presentPaywall.mockReset();
   mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
@@ -313,6 +321,32 @@ describe("restore from the paywall", () => {
   });
 });
 
+describe("trial eligibility for copy", () => {
+  const current = {
+    identifier: "default",
+    availablePackages: [{ product: { identifier: "annual" } }],
+  };
+
+  it.each([
+    ["eligible", 2, true],
+    ["ineligible", 1, false],
+    ["unknown", 0, false],
+  ])("an %s account reads %s", async (_label, status, expected) => {
+    mock.getOfferings.mockResolvedValue({ current, all: {} });
+    mock.checkEligibility.mockResolvedValue({ annual: { status } });
+    const { readTrialEligible } = await loadReady();
+
+    await expect(readTrialEligible()).resolves.toBe(expected);
+  });
+
+  it("reads no when the store cannot be reached", async () => {
+    mock.getOfferings.mockRejectedValue(new Error("offline"));
+    const { readTrialEligible } = await loadReady();
+
+    await expect(readTrialEligible()).resolves.toBe(false);
+  });
+});
+
 describe("customer center latch", () => {
   it("refuses the Customer Center while a paywall is live", async () => {
     const { openPaywall, presentCustomerCenter } = await loadReady();
@@ -392,6 +426,45 @@ describe("exit offer after a paywall close", () => {
     );
   });
 
+  it("skips the exit offer in an e2e run that hides Pro", async () => {
+    const { openPaywall } = await loadReady();
+    mock.hidePro = true;
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+
+    await expect(openPaywall(router, "home_card")).resolves.toBe(false);
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
+  });
+
+  it("shows the exit offer again in an e2e run that asks for it", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+    await openPaywall(router, "home_card");
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+
+    // Shown a moment ago, so a plain run would wait a month.
+    mock.hidePro = true;
+    mock.forceExitOffer = true;
+    await openPaywall(router, "home_card");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes the exit offering as it is in an e2e run that asks for it", async () => {
+    const { openPaywall } = await loadReady();
+    mock.hidePro = true;
+    mock.forceExitOffer = true;
+    mock.checkEligibility.mockResolvedValue({ annual_exit: { status: 0 } });
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
+
+    await openPaywall(router, "home_card");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+  });
+
   it("waits a month before offering it again", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("CANCELLED");
@@ -457,7 +530,7 @@ describe("exit offer after a paywall close", () => {
     // First tap: paywall, then the exit offer on close.
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
 
@@ -465,7 +538,7 @@ describe("exit offer after a paywall close", () => {
     mock.presentExitSheet.mockResolvedValueOnce("PURCHASED");
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(true);
+    ).resolves.toBe("success");
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
     expect(mock.capture).toHaveBeenCalledWith(
@@ -489,7 +562,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(true);
+    ).resolves.toBe("success");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
@@ -506,7 +579,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
@@ -521,7 +594,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
@@ -537,7 +610,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", false),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
@@ -553,7 +626,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).not.toHaveBeenCalled();
@@ -561,6 +634,18 @@ describe("exit offer after a paywall close", () => {
       "paywall_requested",
       expect.objectContaining({ placement: "onboarding" }),
     );
+  });
+
+  it("tells onboarding when its paywall could not show, without routing", async () => {
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("ERROR");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", false),
+    ).resolves.toBe("unavailable");
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("holds the sheet latch until the exit sheet has slid away", async () => {

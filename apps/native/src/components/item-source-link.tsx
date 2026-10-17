@@ -2,7 +2,7 @@ import { analytics, type AnalyticsItem } from "@/lib/analytics";
 import { t } from "@/lib/i18n";
 import { displayHost } from "@/lib/url";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import * as WebBrowser from "expo-web-browser";
+import { openInAppBrowser } from "@/lib/in-app-browser";
 import {
   Pressable,
   Text,
@@ -20,7 +20,7 @@ type SourceItem = AnalyticsItem & {
 // `onClosed` runs once the in-app browser is dismissed (or failed to open).
 export function openItemSource(item: SourceItem, onClosed?: () => void): void {
   if (!item.url) return;
-  void WebBrowser.openBrowserAsync(item.url)
+  void openInAppBrowser(item.url)
     .then(() => analytics.itemAction(item, "open_source"))
     .catch(() => {})
     .finally(() => onClosed?.());

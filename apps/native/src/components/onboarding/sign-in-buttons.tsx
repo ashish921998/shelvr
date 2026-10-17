@@ -2,8 +2,9 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import type { OAuthProvider, useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { GhostButton } from "@/components/onboarding/parts";
-import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
+import { Platform, Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRow } from "@/components/ui/stitch-loader";
 
 /** Apple (iOS), Google and the dev login, with the failure line and, unless
  * the caller leaves it out, the privacy note. The caller owns the OAuth
@@ -29,6 +30,8 @@ export function SignInButtons({
         <Text style={styles.error}>{t("demo.signInFailed")}</Text>
       ) : null}
 
+      <Text style={styles.aiNote}>{t("aiConsent.signInNote")}</Text>
+
       {Platform.OS === "ios" ? (
         <Pressable
           onPress={() => signIn("apple")}
@@ -41,7 +44,7 @@ export function SignInButtons({
           ]}
         >
           {pendingProvider === "apple" ? (
-            <ActivityIndicator color={theme.colors.background} />
+            <StitchRow color={theme.colors.background} />
           ) : (
             <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
               {t("account.apple")}
@@ -59,7 +62,7 @@ export function SignInButtons({
         ]}
       >
         {pendingProvider === "google" ? (
-          <ActivityIndicator color={theme.colors.foreground} />
+          <StitchRow color={theme.colors.foreground} />
         ) : (
           <Text style={styles.authBtnText}>{t("account.google")}</Text>
         )}
@@ -106,6 +109,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   authBtnTextApple: {
     color: theme.colors.background,
+  },
+  aiNote: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
   },
   privacy: {
     fontFamily: theme.fonts.regular,

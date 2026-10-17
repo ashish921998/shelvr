@@ -1,8 +1,8 @@
 import { FlashList } from "@shopify/flash-list";
-import { Link } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type Props = {
   items: FeedItem[];
@@ -31,7 +31,6 @@ export function MasonryFeed({
   ListHeaderComponent: listHeaderComponent,
   onScrollBeginDrag,
 }: Props) {
-  const { theme } = useUnistyles();
   return (
     <FlashList
       data={items}
@@ -40,15 +39,13 @@ export function MasonryFeed({
       numColumns={numColumns}
       optimizeItemArrangement
       keyExtractor={(item) => item._id}
-      renderItem={({ item, index }) =>
-        firstItemZoomTarget && index === 0 ? (
-          <Link.AppleZoomTarget>
-            <ItemCard item={item} source={source} />
-          </Link.AppleZoomTarget>
-        ) : (
-          <ItemCard item={item} source={source} />
-        )
-      }
+      renderItem={({ item, index }) => (
+        <ItemCard
+          item={item}
+          source={source}
+          zoomTarget={firstItemZoomTarget === true && index === 0}
+        />
+      )}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -66,7 +63,7 @@ export function MasonryFeed({
       ListFooterComponent={
         loadingMore ? (
           <View style={styles.footer}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <StitchRing />
           </View>
         ) : null
       }

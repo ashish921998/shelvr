@@ -1,6 +1,7 @@
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
+  firstSaveReminderTicket,
   reminderOptions,
   scheduleFirstSaveReminder,
   type ReminderSlot,
@@ -10,14 +11,14 @@ import {
   requestNotificationPermission,
 } from "@/lib/notification-token";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { SaveSummary } from "@/components/onboarding/save-summary";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
-import { AppSymbolIcon } from "@/components/symbol";
+import { useNotificationSession } from "@/lib/notifications";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -65,10 +66,12 @@ export function NotificationsStep({
   onAdvance,
 }: {
   saved: DemoSaved | null;
-  onAdvance: () => void;
+  /** Gets the slot only when a reminder was actually scheduled. */
+  onAdvance: (scheduled?: ReminderSlot) => void;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const { session } = useNotificationSession();
   const [options, setOptions] = useState(() => reminderOptions(new Date()));
   const [picked, setPicked] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -130,7 +133,11 @@ export function NotificationsStep({
     if (done.current || saved === null || expired()) return;
     done.current = true;
     setBusy(true);
+    // Taken before the permission prompt: a sign-out while it waits clears
+    // the reminder, and this save must not be scheduled after that.
+    const ticket = firstSaveReminderTicket();
     let granted = false;
+    let scheduled = false;
     try {
       granted = await requestNotificationPermission();
       if (granted && expired()) {
@@ -143,10 +150,32 @@ export function NotificationsStep({
           itemId: saved.itemId,
           title: title || t("onboarding.remindFallbackTitle"),
           at: choice.at,
+          ticket,
         });
+        // A sign-out during the prompt makes the schedule a no-op.
+        scheduled = firstSaveReminderTicket() === ticket;
       }
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
+    }
+    // The pledge above the button is a Sunday look-back, so the same yes turns
+    // the Weekly shelf on. Skipped if the account changed during the prompt.
+    // Not awaited: it needs the network, and an offline mutation waits for a
+    // reconnect instead of failing, which would hold this step.
+    if (granted && firstSaveReminderTicket() === ticket) {
+      void session.setWeeklyShelf(true).then(
+        (enabled) => {
+          // false: no push token; undefined: another operation was running.
+          if (enabled !== true) {
+            analytics.captureError(
+              "weekly_shelf_preference_failed",
+              new Error(enabled === false ? "not_registered" : "busy"),
+            );
+          }
+        },
+        (error: unknown) =>
+          analytics.captureError("weekly_shelf_preference_failed", error),
+      );
     }
     analytics.capture("onboarding_reminder", {
       action: "remind",
@@ -154,7 +183,7 @@ export function NotificationsStep({
       granted,
     });
     setBusy(false);
-    advanceRef.current();
+    advanceRef.current(scheduled ? choice.slot : undefined);
   };
 
   const skip = () => {
@@ -180,38 +209,16 @@ export function NotificationsStep({
         </Text>
       </Text>
 
-      <View style={styles.save}>
-        <View style={styles.thumb}>
-          {image ? (
-            <Image
-              source={image}
-              style={styles.thumbImage}
-              contentFit="cover"
-            />
-          ) : (
-            <AppSymbolIcon
-              name="link"
-              size={18}
-              tintColor={theme.colors.primaryText}
-            />
-          )}
-        </View>
-        <View style={styles.saveText}>
-          <Text style={styles.saveTitle} numberOfLines={2}>
-            {title || t("onboarding.remindFallbackTitle")}
-          </Text>
-          <Text style={styles.saveMeta} numberOfLines={1}>
-            {host
-              ? `${host} · ${t("onboarding.remindSavedNow")}`
-              : t("onboarding.remindSavedNow")}
-          </Text>
-          {tag ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
+      <SaveSummary
+        image={image}
+        title={title || t("onboarding.remindFallbackTitle")}
+        meta={
+          host
+            ? `${host} · ${t("onboarding.remindSavedNow")}`
+            : t("onboarding.remindSavedNow")
+        }
+        tag={tag}
+      />
 
       <View
         accessibilityRole="radiogroup"
@@ -245,8 +252,8 @@ export function NotificationsStep({
       </View>
 
       <View style={styles.foot}>
-        {/* The person's own promise. Shelvr schedules nothing for Sundays
-            here, so the line promises nothing on the app's side. */}
+        {/* The person's promise; tapping the reminder turns the Weekly shelf
+            on to keep it. */}
         <Text style={styles.pledge}>{t("onboarding.remindPledge")}</Text>
         <CtaButton
           label={t(SLOT_CTA[choice.slot])}
@@ -258,6 +265,9 @@ export function NotificationsStep({
           onPress={skip}
           disabled={busy}
         />
+        {/* The same yes also turns on the Weekly shelf and lets save
+            reminders arrive, so the screen says so before the OS asks. */}
+        <Text style={styles.consent}>{t("onboarding.remindConsent")}</Text>
       </View>
     </View>
   );
@@ -276,59 +286,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   headlineAccent: {
     color: theme.colors.primaryText,
-  },
-  save: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(2),
-    padding: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  thumb: {
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primarySoft,
-  },
-  thumbImage: {
-    width: "100%",
-    height: "100%",
-  },
-  saveText: {
-    flex: 1,
-    gap: theme.gap(0.5),
-  },
-  saveTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    lineHeight: 21,
-    color: theme.colors.foreground,
-  },
-  saveMeta: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    color: theme.colors.muted,
-  },
-  tag: {
-    alignSelf: "flex-start",
-    marginTop: theme.gap(0.5),
-    paddingHorizontal: theme.gap(1.25),
-    paddingVertical: theme.gap(0.5),
-    borderRadius: 999,
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  tagText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    color: theme.colors.muted,
   },
   options: {
     gap: theme.gap(1),
@@ -369,6 +326,13 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     color: theme.colors.foreground,
     marginBottom: theme.gap(0.5),
+  },
+  consent: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    color: theme.colors.muted,
   },
   foot: {
     marginTop: "auto",

@@ -52,8 +52,8 @@ function submissionContext() {
  * state resets naturally on close. Nothing is sent until the user taps Send;
  * the typed message goes to Convex (never PostHog) and is masked in session
  * replays via the global posthog config (maskAllTextInputs in lib/posthog.ts).
- * Success is reported honestly: "accepted" means Convex persisted the row —
- * inbox delivery is a server-side projection the client never claims as sent.
+ * Success is reported honestly: "accepted" means Convex persisted the row.
+ * Inbox delivery is a server-side projection the client never claims as sent.
  * A failed send keeps the draft on screen with the support channel offered.
  */
 export function FeedbackModal({
@@ -78,7 +78,7 @@ export function FeedbackModal({
 
   // A resolved-but-null user has no account to submit against, so the form
   // offers the support channel instead of a Send that does nothing. Analytics
-  // availability is irrelevant here — feedback goes to Convex, not PostHog.
+  // availability is irrelevant here: feedback goes to Convex, not PostHog.
   const available = user !== null;
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export function FeedbackModal({
   const canSend = flow !== "sending" && !!user && message.trim().length > 0;
 
   /** Send through Convex. "accepted" means ONLY that Convex persisted the
-   * submission — the support inbox email is a server-side projection the
+   * submission: the support inbox email is a server-side projection the
    * client never claims as sent. Any failure (offline, validation, rate
    * limit) returns "failed" so the draft stays editable and the support
    * channel is offered; nothing is captured beyond the bounded shape
@@ -108,7 +108,7 @@ export function FeedbackModal({
         });
         // Capture the content-free projection state only after Convex
         // acknowledges the row is durable: surface, char count, and the
-        // delivery category — never the message.
+        // delivery category, never the message.
         analytics.capture("feedback_submitted", {
           surface,
           char_count: message.length,
@@ -142,7 +142,7 @@ export function FeedbackModal({
       setFlow("sent");
     } else {
       // The draft stays on screen, editable and re-sendable, with the
-      // support channel offered — and the invitation is not marked
+      // support channel offered, and the invitation is not marked
       // submitted, so nothing pretends the feedback landed.
       setFlow("failed");
     }

@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DemoSaved } from "./live-demo";
+import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { NotificationsStep } from "./notifications";
 
 type Children = { children?: ReactNode };
@@ -19,6 +20,7 @@ const mock = vi.hoisted(() => ({
   state: vi.fn(),
   request: vi.fn(),
   schedule: vi.fn(),
+  weekly: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
   item: undefined as unknown,
@@ -58,6 +60,9 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: mock.captureError },
 }));
+vi.mock("@/lib/notifications", () => ({
+  useNotificationSession: () => ({ session: { setWeeklyShelf: mock.weekly } }),
+}));
 vi.mock("@/lib/use-large-text", () => ({ HEADLINE_MAX_SCALE: 1.5 }));
 vi.mock("@/lib/notification-token", () => ({
   notificationPermissionState: mock.state,
@@ -92,6 +97,7 @@ beforeEach(() => {
   mock.state.mockResolvedValue("ask");
   mock.request.mockResolvedValue(true);
   mock.schedule.mockResolvedValue(undefined);
+  mock.weekly.mockResolvedValue(true);
   mock.item = {
     title: "Lemon pasta",
     url: "https://www.bonappetit.com/recipe",
@@ -143,18 +149,93 @@ describe("NotificationsStep", () => {
     fireEvent.click(screen.getByText("onboarding.remindWeekend"));
     expect(mock.request).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("onboarding.remindCtaWeekend"));
-    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledWith("weekend"));
     expect(mock.request).toHaveBeenCalledOnce();
     expect(mock.schedule).toHaveBeenCalledWith({
       itemId: "item-1",
       title: "Lemon pasta",
       at: new Date(2026, 9, 10, 10, 0),
+      ticket: expect.any(Number),
     });
     expect(mock.capture).toHaveBeenCalledWith("onboarding_reminder", {
       action: "remind",
       slot: "weekend",
       granted: true,
     });
+  });
+
+  it("turns the Weekly shelf on with the reminder", async () => {
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.schedule).toHaveBeenCalledOnce();
+    expect(mock.weekly).toHaveBeenCalledWith(true);
+  });
+
+  it("leaves the Weekly shelf off when the OS prompt is declined", async () => {
+    mock.request.mockResolvedValue(false);
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    // Nothing was scheduled, so the promise step names no reminder.
+    expect(onAdvance).toHaveBeenCalledWith(undefined);
+    expect(mock.weekly).not.toHaveBeenCalled();
+  });
+
+  it("still schedules the reminder and moves on when the Weekly shelf fails", async () => {
+    mock.weekly.mockRejectedValue(new Error("offline"));
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.schedule).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "weekly_shelf_preference_failed",
+        expect.any(Error),
+      ),
+    );
+  });
+
+  it("moves on without waiting for the Weekly shelf while offline", async () => {
+    // An offline Convex mutation neither resolves nor rejects.
+    mock.weekly.mockReturnValue(new Promise(() => {}));
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+  });
+
+  it("reports a Weekly shelf that could not be turned on", async () => {
+    mock.weekly.mockResolvedValue(false);
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "weekly_shelf_preference_failed",
+        expect.any(Error),
+      ),
+    );
+  });
+
+  it("leaves the Weekly shelf alone when the account signs out during the prompt", async () => {
+    let answer: (granted: boolean) => void = () => {};
+    mock.request.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => (answer = resolve)),
+    );
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    void clearFirstSaveReminder().catch(() => {});
+    await act(async () => answer(true));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.weekly).not.toHaveBeenCalled();
+  });
+
+  it("turns the Weekly shelf on even when scheduling fails", async () => {
+    mock.schedule.mockRejectedValue(new Error("no"));
+    const onAdvance = renderStep();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.weekly).toHaveBeenCalledWith(true);
   });
 
   it("shows fresh times instead of scheduling one that has passed", async () => {
@@ -183,6 +264,7 @@ describe("NotificationsStep", () => {
     vi.setSystemTime(new Date(2026, 9, 7, 20, 1));
     await act(async () => answer(true));
     expect(mock.schedule).not.toHaveBeenCalled();
+    expect(mock.weekly).not.toHaveBeenCalled();
     expect(onAdvance).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("onboarding.remindCtaTomorrow"));
     await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());

@@ -34,6 +34,7 @@ import {
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -105,6 +106,7 @@ export function MediaViewerPage({
   details,
 }: Props) {
   useAppLocale();
+  const reducedMotion = useReducedMotion();
   const { theme } = useUnistyles();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -330,7 +332,7 @@ export function MediaViewerPage({
               onPress={() =>
                 scrollRef.current?.scrollTo({
                   y: pageHeight,
-                  animated: true,
+                  animated: !reducedMotion,
                 })
               }
               style={({ pressed }) => [

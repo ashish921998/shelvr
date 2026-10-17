@@ -18,6 +18,7 @@ const mock = vi.hoisted(() => ({
   clearWidget: vi.fn(async () => true),
   revokeSiri: vi.fn(async () => {}),
   clearFirstSave: vi.fn(async () => {}),
+  clearTrial: vi.fn(async () => {}),
   captureError: vi.fn(),
   capture: vi.fn(),
   push: vi.fn(),
@@ -39,6 +40,9 @@ vi.mock("@/lib/exit-offer-reminder", () => ({
 }));
 vi.mock("@/lib/first-save-reminder", () => ({
   clearFirstSaveReminder: mock.clearFirstSave,
+}));
+vi.mock("@/lib/trial-reminder", () => ({
+  clearTrialReminder: mock.clearTrial,
 }));
 vi.mock("@/lib/widget-sync", () => ({
   clearRecentSavesWidget: mock.clearWidget,
@@ -152,6 +156,21 @@ describe("notification session lifecycle", () => {
     });
     expect(order).toEqual(["revoke", "signOut"]);
   });
+  it.each(["signOut", "deleteAccount"] as const)(
+    "%s clears the trial reminders",
+    async (action) => {
+      mock.clearTrial.mockClear();
+      const { result } = renderSession();
+      await waitFor(() =>
+        expect(result.current.session.isRegistered()).toBe(true),
+      );
+      await act(async () => {
+        await result.current.session[action]();
+      });
+      // Deleting also signs out, so the clear can run twice; it is idempotent.
+      expect(mock.clearTrial).toHaveBeenCalled();
+    },
+  );
   it.each(["signOut", "deleteAccount"] as const)(
     "%s clears the reminder that names the first save",
     async (action) => {

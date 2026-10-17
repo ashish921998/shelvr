@@ -43,6 +43,9 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
 export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
+/** How a sign-in ran: the system's Sign in with Apple sheet on iOS, or a web
+ * session, which is every other provider and Apple where the sheet is missing. */
+export type AuthMethod = "native" | "web";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -77,6 +80,8 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 /** The funnel stage vocabulary for `save_kind`. */
 type SaveKind = "link" | "note" | "image";
 
+type NextUpKind = "read" | "cook" | "watch" | "open";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
@@ -94,11 +99,16 @@ type AnalyticsEventProperties = {
   // ended it and count repeat starts by one person without guessing on time.
   auth_started: {
     provider: string;
+    method: AuthMethod;
     surface: OAuthSurface;
     auth_attempt_id: string;
   };
   auth_cancelled: {
     provider: string;
+    method: AuthMethod;
+    // Set when a web session ended before its sheet could have shown and was
+    // reopened once. The outcome is the second session's.
+    auto_retry?: true;
     elapsed_ms: number;
     browser_ms: number;
     surface: OAuthSurface;
@@ -114,7 +124,12 @@ type AnalyticsEventProperties = {
   };
   auth_failed: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     stage: "request" | "browser" | "exchange";
+    // The native module's own code (ERR_REQUEST_FAILED and the like), when the
+    // failure came from one. A fixed vocabulary, never a message.
+    error_code?: string;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -123,6 +138,8 @@ type AnalyticsEventProperties = {
   // identify-time signal and also fires on every signed-in cold start.
   auth_succeeded: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -165,7 +182,7 @@ type AnalyticsEventProperties = {
     package_id: string;
   };
   // A purchase or restore made the Convex `subscriptions` row visible to the
-  // client — the webhook delivered, the query updated. `delay_ms` measures
+  // client: the webhook delivered, the query updated. `delay_ms` measures
   // the purchase-to-entitlement path, not the whole funnel.
   entitlement_activated: {
     status: "trialing" | "pro" | "lifetime";
@@ -184,7 +201,7 @@ type AnalyticsEventProperties = {
   item_action: ItemProperties & { action: ItemAction };
   // The first-save funnel's client legs. `save_attempt_started` fires when a
   // submission actually begins (a composer save tap, a share entry, or an
-  // image operation) — after the auth and Pro gates, which the paywall and
+  // image operation), after the auth and Pro gates, which the paywall and
   // auth events already cover. `save_source` matches the server's
   // `item_saved`, and idempotent operations join on `operation_id`.
   // `save_failed` carries the bounded stage; content, URLs, and error text
@@ -203,14 +220,6 @@ type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
-  // Fired only when a bulk import created at least one link.
-  links_imported: {
-    url_count: number;
-    created: number;
-    skipped: number;
-    invalid: number;
-    not_processed: number;
-  };
   // Photo saves fail as data, never as thrown errors, so error tracking never
   // sees them. `reason` is one of three fixed words, never the message text.
   images_save_failed: { reason: ImageSaveFailureReason; image_count: number };
@@ -228,10 +237,18 @@ type AnalyticsEventProperties = {
   item_deleted: { item_type: AnalyticsItem["type"] };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
-  space_created: { dynamic: boolean };
-  space_updated: { dynamic: boolean };
+  space_created: { dynamic: boolean; auto_file: boolean };
+  space_updated: { dynamic: boolean; auto_file: boolean };
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
+  // "Make a plan" on a space. `considered` is the saves read, `place_count`
+  // the shortlist size (0 = nothing named a place).
+  plan_made: { considered: number; place_count: number };
+  plan_failed: { reason: "ai_consent" | "error" };
+  plan_picked: { place_count: number };
+  plan_place_opened: { rank: number };
+  plan_place_visited: { visited: boolean };
+  plan_shared: { place_count: number; picked: boolean };
   onboarding_completed: {
     // Always empty since the pileup question was removed. Kept so existing
     // PostHog insights keep a stable property shape.
@@ -249,7 +266,7 @@ type AnalyticsEventProperties = {
     $set: { save_pileup: string[]; save_types: string[] };
   };
   // Feedback events never carry message text; see lib/feedback.ts. The
-  // submission event fires only after Convex acknowledges persistence — the
+  // submission event fires only after Convex acknowledges persistence. The
   // message itself lives in Convex and the support inbox, never in PostHog.
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
@@ -260,7 +277,7 @@ type AnalyticsEventProperties = {
     delivery: "scheduled" | "unconfigured";
   };
   // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
-  // space names — only the outcome of the user's one real demo save.
+  // space names. Only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
   // A first-save pick, before any sign-in. `sample` is a ready-made link
@@ -298,6 +315,11 @@ type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
+  // "Open this next" card on Home (lib/next-up.ts). The kind only: never the
+  // save's title or URL.
+  next_up_shown: { kind: NextUpKind };
+  next_up_opened: { kind: NextUpKind };
+  next_up_dismissed: { kind: NextUpKind };
   // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
   // per account per launch. `saved` is the real-save count, demo excluded.
   save_progress_card_shown: { saved: number };
@@ -323,8 +345,8 @@ type AnalyticsEventProperties = {
   exit_offer_reminder_opt_out: Record<string, never>;
   exit_offer_expired_open: Record<string, never>;
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
-  // never free text. A response is stated intent, NOT proof of cancellation —
-  // only the server-side webhook events (trial_cancelled, …) count as
+  // never free text. A response is stated intent, NOT proof of cancellation.
+  // Only the server-side webhook events (trial_cancelled, …) count as
   // cancellations; funnels must never divide by survey responses.
   // Only the prompted outcome: a cold start that finds an existing grant is
   // not a decision the user just made.
@@ -334,6 +356,13 @@ type AnalyticsEventProperties = {
   notification_opened: { notification_kind: string; notification_id: string };
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
+  };
+  // Third-party AI consent (lib/ai-consent.ts). `shown` is the card;
+  // `answered` also covers the Settings switch.
+  ai_consent_shown: Record<string, never>;
+  ai_consent_answered: {
+    granted: boolean;
+    surface: "card" | "settings" | "sign_in";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;

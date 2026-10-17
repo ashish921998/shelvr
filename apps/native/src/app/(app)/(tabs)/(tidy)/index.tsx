@@ -91,7 +91,7 @@ export default function TidyScreen() {
 
   return (
     // Keyed by batch so every batch remounts fresh shared values and deck
-    // state — indices always start at the top card.
+    // state: indices always start at the top card.
     <DeckAnimationProvider key={batchId} lastIndex={batch.length - 1}>
       <TidyDeckView
         batch={batch}

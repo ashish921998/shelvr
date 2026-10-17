@@ -75,6 +75,7 @@ const SF_TO_MATERIAL = {
   "tray.and.arrow.up": "move_up",
   "arrow.up": "arrow_upward",
   "doc.text": "description",
+  "fork.knife": "restaurant",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 

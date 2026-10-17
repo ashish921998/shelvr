@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
 import { useUnistyles } from "react-native-unistyles";
+import { dropMenuDismissTouch } from "@/components/ui/action-menu";
 import { isDarkThemeName } from "@/lib/appearance";
 import {
   NotificationSessionProvider,
@@ -21,6 +22,7 @@ import { NavThemeProvider } from "@/lib/nav-theme";
 import { useAnalyticsIdentity } from "@/lib/analytics-identity";
 import { useAppIntentsSignOutReset } from "@/lib/app-intents";
 import { useConvexQueryHealing } from "@/lib/convex-query-healing";
+import { useSignOutWhenAccountGone } from "@/lib/account-gone";
 import { posthog } from "@/lib/posthog";
 
 // Expo Router reads the root boundary from this module's exports.
@@ -42,7 +44,7 @@ function NotificationSetup() {
 }
 
 /** Owns analytics identify/reset and the Convex cache clearing on the auth
- * edge. See useAnalyticsIdentity — the one session boundary. */
+ * edge. See useAnalyticsIdentity, the one session boundary. */
 function AnalyticsIdentity() {
   useAnalyticsIdentity();
   return null;
@@ -52,6 +54,12 @@ function AnalyticsIdentity() {
  * Convex Auth reports signed out. */
 function AppIntentsSignOutReset() {
   useAppIntentsSignOutReset();
+  return null;
+}
+
+/** Signs out a device whose account was deleted from another device. */
+function AccountGoneSignOut() {
+  useSignOutWhenAccountGone();
   return null;
 }
 
@@ -72,7 +80,7 @@ function EntitlementSync() {
 export default function RootLayout() {
   const router = useRouter();
   const { rt } = useUnistyles();
-  // The launch animation plays once per process, over the booting app — and
+  // The launch animation plays once per process, over the booting app, and
   // not at all when a share intent, deep link or notification is taking the
   // user somewhere specific.
   const { showSplash, finishSplash } = useSplashGate();
@@ -93,7 +101,10 @@ export default function RootLayout() {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView
+      style={{ flex: 1 }}
+      onStartShouldSetResponderCapture={dropMenuDismissTouch}
+    >
       <ConvexAuthProvider
         client={convex}
         storage={authStorage}
@@ -127,6 +138,7 @@ export default function RootLayout() {
           <PostHogScreenTracking />
           <NotificationSetup />
           <ConvexQueryHealer />
+          <AccountGoneSignOut />
           <NotificationSessionProvider>
             {posthog ? (
               <PostHogProvider client={posthog} autocapture={false}>

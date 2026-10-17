@@ -14,6 +14,7 @@ import {
 
 const mock = vi.hoisted(() => ({
   authenticated: true,
+  consentBlocked: false,
   create: vi.fn(),
   retry: vi.fn(),
   query: {
@@ -27,6 +28,7 @@ const mock = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
+  clearLegacyDemo: vi.fn(),
   recordShareSaved: vi.fn(),
   releaseSavedShare: vi.fn(),
 }));
@@ -34,6 +36,9 @@ const mock = vi.hoisted(() => ({
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
   useMutation: (ref: string) => (ref === "create" ? mock.create : mock.retry),
+}));
+vi.mock("@/lib/ai-consent", () => ({
+  useAiConsent: () => ({ savesBlocked: mock.consentBlocked }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -59,7 +64,7 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   setPendingDemo: mock.setPendingDemo,
-  clearLegacyDemoUrlIfSaved: vi.fn(),
+  clearLegacyDemoUrlIfSaved: mock.clearLegacyDemo,
   resolveOnboardingSpaceName: (id: string) => `name:${id}`,
 }));
 vi.mock("@/lib/onboarding-demo", () => ({
@@ -68,7 +73,10 @@ vi.mock("@/lib/onboarding-demo", () => ({
     url === "https://sample.test/ready-made"
       ? "recipes"
       : null,
-  isDemoSample: (url: string) => url === "https://sample.test/ready-made",
+  findSample: (url: string) =>
+    url === "https://sample.test/ready-made"
+      ? { pageHeading: "Ready-made heading" }
+      : undefined,
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
@@ -116,16 +124,177 @@ function captured(event: string) {
 
 beforeEach(() => {
   mock.authenticated = true;
+  mock.consentBlocked = false;
   mock.create.mockReset();
   mock.retry.mockReset();
   mock.capture.mockReset();
   mock.setPendingDemo.mockReset();
+  mock.clearLegacyDemo.mockReset();
   mock.recordShareSaved.mockReset();
   mock.query = { data: undefined, isError: false, isSuccess: false };
   mock.queryArgs = undefined;
 });
 
 describe("useDemoSave", () => {
+  it.each(["direct", "preview"] as const)(
+    "times out an unresolved %s submission and rearms without resubmitting",
+    async (path) => {
+      vi.useFakeTimers();
+      try {
+        mock.create.mockReturnValue(new Promise(() => {}));
+        mock.authenticated = path === "direct";
+        const { result, rerender, onAdvance } = renderDemo();
+        act(() =>
+          result.current.submitUrl(
+            path === "preview"
+              ? "https://sample.test/ready-made"
+              : "https://example.com/",
+          ),
+        );
+        if (path === "preview") {
+          act(() => result.current.previewed());
+          act(() => vi.advanceTimersByTime(30_000));
+          expect(result.current.submissionTimedOut).toBe(false);
+          expect(mock.create).not.toHaveBeenCalled();
+          mock.authenticated = true;
+          rerender();
+        }
+        act(() => vi.advanceTimersByTime(14_999));
+        expect(result.current.submissionTimedOut).toBe(false);
+        act(() => vi.advanceTimersByTime(1));
+        expect(result.current.submissionTimedOut).toBe(true);
+        if (path === "preview") expect(result.current.view).toBe("auth");
+        act(() => result.current.keepWaiting());
+        expect(result.current.submissionTimedOut).toBe(false);
+        act(() => vi.advanceTimersByTime(14_999));
+        expect(result.current.submissionTimedOut).toBe(false);
+        act(() => vi.advanceTimersByTime(1));
+        expect(result.current.submissionTimedOut).toBe(true);
+        expect(mock.create).toHaveBeenCalledTimes(1);
+        expect(mock.retry).not.toHaveBeenCalled();
+        expect(onAdvance).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not count AI consent waiting toward the submission deadline", () => {
+    vi.useFakeTimers();
+    try {
+      mock.consentBlocked = true;
+      mock.create.mockReturnValue(new Promise(() => {}));
+      const { result, rerender } = renderDemo();
+      act(() => result.current.submitUrl("https://example.com/"));
+      act(() => vi.advanceTimersByTime(30_000));
+      expect(result.current.submissionTimedOut).toBe(false);
+      expect(mock.create).not.toHaveBeenCalled();
+      mock.consentBlocked = false;
+      rerender();
+      act(() => vi.advanceTimersByTime(14_999));
+      expect(result.current.submissionTimedOut).toBe(false);
+      act(() => vi.advanceTimersByTime(1));
+      expect(result.current.submissionTimedOut).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ["continue", "resolve"],
+    ["continue", "reject"],
+    ["unmount", "resolve"],
+    ["unmount", "reject"],
+  ] as const)(
+    "fences late %s / %s submission results",
+    async (exit, outcome) => {
+      let resolve!: (value: ReturnType<typeof saved>) => void;
+      let reject!: (error: Error) => void;
+      mock.create.mockReturnValue(
+        new Promise((yes, no) => {
+          resolve = yes;
+          reject = no;
+        }),
+      );
+      const { result, unmount, onSaved, onAdvance } = renderDemo();
+      act(() => result.current.submitSharedUrl("https://example.com/"));
+      expect(mock.setPendingDemo).toHaveBeenCalledTimes(1);
+      if (exit === "continue") {
+        act(() => {
+          result.current.continueAfterTimeout();
+          result.current.continueAfterTimeout();
+        });
+        expect(onAdvance).toHaveBeenCalledTimes(1);
+        expect(mock.setPendingDemo).not.toHaveBeenCalledWith(null);
+        expect(captured("onboarding_demo_result")).toEqual([
+          ["onboarding_demo_result", { outcome: "timeout" }],
+        ]);
+      } else {
+        unmount();
+      }
+      // A newer incoming-share session (including the same URL) must retain
+      // ownership: the stale create result cannot release any share.
+      mock.setPendingDemo.mockClear();
+      mock.releaseSavedShare.mockClear();
+      mock.recordShareSaved.mockClear();
+      mock.capture.mockClear();
+      await flush(() =>
+        outcome === "resolve" ? resolve(saved()) : reject(new Error("offline")),
+      );
+      expect(onSaved).not.toHaveBeenCalled();
+      expect(onAdvance).toHaveBeenCalledTimes(exit === "continue" ? 1 : 0);
+      expect(mock.setPendingDemo).not.toHaveBeenCalled();
+      expect(mock.clearLegacyDemo).not.toHaveBeenCalled();
+      expect(mock.releaseSavedShare).not.toHaveBeenCalled();
+      expect(mock.recordShareSaved).not.toHaveBeenCalled();
+      expect(mock.capture).not.toHaveBeenCalled();
+      expect(mock.create).toHaveBeenCalledTimes(1);
+      expect(mock.retry).not.toHaveBeenCalled();
+    },
+  );
+
+  it("starts a fresh processing deadline when a slow submission finally lands", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolve!: (value: ReturnType<typeof saved>) => void;
+      mock.create.mockReturnValue(
+        new Promise((yes) => {
+          resolve = yes;
+        }),
+      );
+      const { result, onSaved, onAdvance } = renderDemo();
+      act(() => result.current.submitUrl("https://example.com/"));
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(result.current.submissionTimedOut).toBe(true);
+      await flush(() => resolve(saved()));
+      expect(result.current.submissionTimedOut).toBe(false);
+      expect(result.current.timedOut).toBe(false);
+      expect(onSaved).toHaveBeenCalledOnce();
+      act(() => vi.advanceTimersByTime(14_999));
+      expect(result.current.timedOut).toBe(false);
+      act(() => vi.advanceTimersByTime(1));
+      expect(result.current.timedOut).toBe(true);
+      expect(onAdvance).not.toHaveBeenCalled();
+      expect(mock.create).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still handles a live completion-side-effect failure", async () => {
+    mock.create.mockResolvedValue(saved());
+    mock.setPendingDemo
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error("storage unavailable");
+      });
+    const { result, onSaved } = renderDemo();
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.error).toBe("demo.saveFailed");
+    expect(result.current.submitting).toBe(false);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("asks for sign-in first, then saves the same link once signed in", async () => {
     mock.authenticated = false;
     mock.create.mockResolvedValue(saved());
@@ -145,8 +314,10 @@ describe("useDemoSave", () => {
     rerender();
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.create).toHaveBeenCalledTimes(1);
+    // A typed link is no sample, so the classifier names it.
     expect(mock.create).toHaveBeenCalledWith({
       url: "https://sample.test/recipe",
+      title: undefined,
       spaceName: "name:recipes",
       analyticsSessionId: "session",
     });
@@ -154,7 +325,7 @@ describe("useDemoSave", () => {
       itemId: ITEM_ID,
       savedSpaceNames: [],
     });
-    expect(mock.queryArgs).toEqual({ id: ITEM_ID });
+    await waitFor(() => expect(mock.queryArgs).toEqual({ id: ITEM_ID }));
     expect(captured("onboarding_demo_submitted")).toHaveLength(1);
   });
 
@@ -407,6 +578,37 @@ describe("useDemoSave", () => {
     expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
   });
 
+  it("holds a signed-in save until the AI consent answer, then sends it once", async () => {
+    mock.consentBlocked = true;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(mock.create).not.toHaveBeenCalled();
+
+    mock.consentBlocked = false;
+    rerender();
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(mock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/" }),
+    );
+  });
+
+  it("does not send a save resumed after sign-in while the answer is missing", async () => {
+    mock.authenticated = false;
+    mock.consentBlocked = true;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+    act(() => result.current.submitUrl("https://example.com/"));
+
+    mock.authenticated = true;
+    rerender();
+    await flush(() => {});
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+
   it("records a resumed share on a fresh mount, including a reused save", async () => {
     mock.create.mockResolvedValue(saved(true));
     const { result } = renderDemo({
@@ -501,6 +703,10 @@ describe("useDemoSave", () => {
       result.current.submitUrl("https://sample.test/ready-made"),
     );
     expect(mock.create).toHaveBeenCalledTimes(2);
+    // The save keeps the heading its preview showed.
+    expect(mock.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "Ready-made heading" }),
+    );
     expect(result.current.view).toBe("reading");
     expect(onSaved).toHaveBeenCalledWith({
       itemId: ITEM_ID,

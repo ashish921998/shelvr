@@ -52,16 +52,14 @@ module.exports = async ({ github, context, core }) => {
   core.setOutput("deployable", "true");
 };
 
-// The verdict above is reached before the production environment asks a human
-// to approve, and that ask has no time limit, so main can advance while it
-// waits. Run this after the gate, where a stale commit is worth failing for:
-// someone is already looking, and they just approved something that moved.
+// main can advance while a deploy waits in the shared concurrency queue.
+// Recheck inside the acting job so a stale commit cannot roll back the backend.
 module.exports.requireTip = async ({ github, context, core }) => {
   const sha = selectedSha(context);
   const tip = await mainTip({ github, context });
   if (tip !== sha) {
     core.setFailed(
-      `main advanced to ${tip} while this deploy waited for approval, so deploying ${sha} would move the backend backwards. Approve the run for the new tip instead.`,
+      `main advanced to ${tip} while this deploy was queued, so deploying ${sha} would move the backend backwards. Run the deployment for the new tip instead.`,
     );
   }
 };

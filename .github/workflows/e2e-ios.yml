@@ -1,0 +1,325 @@
+name: e2e ios
+
+# Runs the flows in tools/e2e that need no real model on an iOS simulator
+# against a local Convex backend built from the same commit. Not a required check yet: it
+# reports, and a failure does not block a merge. Once it has a clean record it
+# moves into ci.yml, so deploys wait on it too.
+#
+# No secrets: the backend is a throwaway local deployment (CONVEX_AGENT_MODE
+# anonymous), so a fork's pull request runs it the same way. The backend's
+# model is the deterministic fake in convex/model/fakeAi.ts, which classifies
+# a note from its own words, so save-note runs here, and serves the fixture
+# pages in the same file, so save-link-fixture saves a link with no network
+# read. It also suggests the saves that share a word with a new space's name,
+# so space-suggestions sees a seeded save suggested. Two flows are left out because the fake cannot stand in for them:
+# save-link and save-image judge the screen with a real model.
+
+on:
+  pull_request:
+    paths:
+      - "apps/native/**"
+      - "tools/e2e/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "patches/**"
+      - ".github/workflows/e2e-ios.yml"
+  # A push to main refreshes the cached build that pull requests restore.
+  push:
+    branches: [main]
+    paths:
+      - "apps/native/**"
+      - "tools/e2e/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "patches/**"
+      - ".github/workflows/e2e-ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the run on its old commit. On main
+# every commit keeps its own run, in a group of its own: merges landing close
+# together used to cancel each other (four on 2026-10-15), so main never built
+# the record of clean runs this check needs before it can be required.
+concurrency:
+  group: e2e-ios-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  E2E_TELEMETRY_DISABLED: "1"
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8
+
+jobs:
+  ios:
+    name: e2e ios
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.33.0
+
+      # e2e needs Node 22.12 or later, above the root package's minimum.
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The development build only changes when its native fingerprint does,
+      # so the key is that fingerprint plus the Xcode that compiled it, plus
+      # how it was signed.
+      - name: Native fingerprint
+        id: fingerprint
+        working-directory: apps/native
+        run: |
+          hash=$(node "$(dirname "$(node -p 'require.resolve("expo-updates/package.json")')")/bin/cli.js" \
+            fingerprint:generate --platform ios | node -p 'JSON.parse(require("fs").readFileSync(0)).hash')
+          xcode=$(xcodebuild -version | tr -d ' \n')
+          echo "key=e2e-ios-dev-adhoc-$hash-$xcode" >> "$GITHUB_OUTPUT"
+          # The XCTest runner depends on agent-device and Xcode only, so an
+          # unrelated lockfile change does not cost a 2.5 minute rebuild.
+          device=$(node -p 'require("../../node_modules/agent-device/package.json").version')
+          echo "runner-key=agent-device-$device-$xcode" >> "$GITHUB_OUTPUT"
+
+      # Restore and save are split so a build is kept even when a flow fails
+      # later in the job; actions/cache saves only after a successful job.
+      - name: Restore the development build
+        id: build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/native/build/e2e/ShelvrDev.app
+          key: ${{ steps.fingerprint.outputs.key }}
+
+      - name: Build the development build
+        id: build
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        working-directory: apps/native
+        run: |
+          npx expo prebuild -p ios --clean
+          mkdir -p build/e2e
+          # Signed ad hoc, not unsigned: an unsigned app carries no
+          # entitlements, and the simulator then refuses its Keychain reads
+          # ("A required entitlement isn't present"), which expo-secure-store
+          # and so sign-in depend on. Ad hoc needs no team or profile.
+          xcodebuild -workspace ios/ShelvrDev.xcworkspace -scheme ShelvrDev \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/derived \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
+            PROVISIONING_PROFILE_SPECIFIER= \
+            > build/xcodebuild.log 2>&1 || { tail -200 build/xcodebuild.log; exit 1; }
+          cp -R build/derived/Build/Products/Debug-iphonesimulator/ShelvrDev.app build/e2e/
+
+      - name: Save the development build
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/native/build/e2e/ShelvrDev.app
+          key: ${{ steps.fingerprint.outputs.key }}
+
+      # agent-device compiles its XCUITest runner on first use.
+      - name: Restore the agent-device runner
+        id: runner-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.agent-device
+          key: ${{ steps.fingerprint.outputs.runner-key }}
+
+      # The picker taps in save-image are measured on an iPhone 17, and the
+      # other flows run on any iPhone; the runtime is the newest the image has.
+      - name: Boot a simulator and install the build
+        run: |
+          runtime=$(xcrun simctl list runtimes available -j | node -p '
+            JSON.parse(require("fs").readFileSync(0)).runtimes
+              .filter((r) => r.platform === "iOS").at(-1).identifier')
+          echo "runtime $runtime"
+          udid=$(xcrun simctl create e2e "iPhone 17" "$runtime")
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" apps/native/build/e2e/ShelvrDev.app
+          echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
+
+      # A cold runner build can outlast the budget e2e gives the engine to
+      # start (seen: "boot failed: Daemon request timed out"), so it is built
+      # here with a budget of its own. The daemon is stopped afterwards so it
+      # does not hold the runner the run's own daemon needs.
+      - name: Prepare the XCTest runner
+        id: prepare-runner
+        run: |
+          node node_modules/agent-device/bin/agent-device.mjs prepare ios-runner \
+            --platform ios --udid "$E2E_DEVICE" --timeout 900000
+          node node_modules/agent-device/bin/agent-device.mjs daemon stop
+
+      - name: Save the agent-device runner
+        if: ${{ !cancelled() && steps.prepare-runner.outcome == 'success' && steps.runner-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.agent-device
+          key: ${{ steps.fingerprint.outputs.runner-key }}
+
+      # A throwaway deployment on this machine. The first `convex dev --once`
+      # creates it and writes its URLs to .env.local, then stops at the push,
+      # which needs the required model key; the env is set after that. The key
+      # is a placeholder, which together with E2E_FAKE_AI, dev sign-in and the
+      # loopback URL is what lets the fake model answer. A call it has no
+      # answer for fails.
+      #
+      # The runner is several times slower than Convex's servers, and its
+      # queries have run past the 1 s production limit (`legalConsent:get`,
+      # the first sign-in), failing a flow on a timeout no user would see.
+      # The local backend reads its limits from the environment the CLI
+      # passes it, so this one allows 10 s.
+      - name: Start a local Convex backend
+        working-directory: apps/native
+        env:
+          CONVEX_AGENT_MODE: anonymous
+          DATABASE_UDF_USER_TIMEOUT_SECONDS: "10"
+        run: |
+          keys=$(node --input-type=module -e '
+            import { exportJWK, exportPKCS8, generateKeyPair } from "jose";
+            const { privateKey, publicKey } = await generateKeyPair("RS256", { extractable: true });
+            const jwk = await exportJWK(publicKey);
+            console.log(JSON.stringify({
+              privateKey: (await exportPKCS8(privateKey)).trimEnd().replace(/\n/g, " "),
+              jwks: JSON.stringify({ keys: [{ use: "sig", ...jwk }] }),
+            }));')
+          npx convex dev --once --typecheck disable --codegen disable || true
+          test -f .env.local
+          npx convex env set GOOGLE_GENERATIVE_AI_API_KEY ci-no-model
+          npx convex env set AUTH_ENABLE_ANONYMOUS true
+          npx convex env set E2E_FAKE_AI local-v1
+          npx convex env set JWT_PRIVATE_KEY -- "$(node -p 'JSON.parse(process.argv[1]).privateKey' "$keys")"
+          npx convex env set JWKS -- "$(node -p 'JSON.parse(process.argv[1]).jwks' "$keys")"
+          nohup npx convex dev --typecheck disable --codegen disable --tail-logs always \
+            > "$RUNNER_TEMP/convex.log" 2>&1 &
+          for _ in $(seq 1 120); do
+            grep -q "Convex functions ready" "$RUNNER_TEMP/convex.log" && break
+            sleep 2
+          done
+          grep -q "Convex functions ready" "$RUNNER_TEMP/convex.log" || { cat "$RUNNER_TEMP/convex.log"; exit 1; }
+          # The first anonymous sign-in on a cold backend has run past the
+          # 1 s function limit and failed the first flow's setup. Sign in
+          # once here, as a throwaway user, so the flows meet a warm backend.
+          # The first attempt may time out; the second must succeed.
+          npx convex run auth:signIn '{"provider":"anonymous","params":{}}' > /dev/null ||
+            npx convex run auth:signIn '{"provider":"anonymous","params":{}}' > /dev/null
+          # The push wrote the local URLs into .env.local, which Metro reads.
+          # The run's Metro gets no other environment from this job, so the
+          # dev sign-in flag and the Development Test Store key (pinned in
+          # app.config.js) go into the same file.
+          {
+            echo "EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true"
+            echo "EXPO_PUBLIC_REVENUECAT_TEST_KEY=test_VOYicTvOGPXCBFMVdHzyxRndiRi"
+          } >> .env.local
+          cat .env.local
+
+      # The app opens Metro's bundle URL directly (tests/launch.ts), and the
+      # dev launcher gives it 10 s. Build the bundle once beforehand, so the
+      # run's Metro starts from a warm transform cache, and log how long a
+      # cold build takes on this runner.
+      - name: Warm the bundle
+        working-directory: apps/native
+        run: |
+          nohup pnpm exec expo start --dev-client --port 8091 > "$RUNNER_TEMP/metro-warm.log" 2>&1 &
+          for _ in $(seq 1 90); do curl -s localhost:8091/status | grep -q running && break; sleep 2; done
+          curl -s localhost:8091/status | grep -q running || { cat "$RUNNER_TEMP/metro-warm.log"; exit 1; }
+          url=$(node --input-type=module -e '
+            const { LAUNCH_ARGUMENTS } = await import(process.argv[1]);
+            console.log(LAUNCH_ARGUMENTS[LAUNCH_ARGUMENTS.indexOf("--initialUrl") + 1]);
+          ' "$GITHUB_WORKSPACE/tools/e2e/tests/launch.ts")
+          for pass in cold warm; do
+            curl -sS --fail -m 600 -o /dev/null -w "$pass bundle %{http_code} %{size_download} bytes %{time_total}s\n" "$url"
+          done
+          pkill -f -- "--port 8091" || true
+          for _ in $(seq 1 30); do curl -s localhost:8091/status > /dev/null || exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/metro-warm.log"
+          echo "::error::Metro on 8091 did not stop; the run could not start its own"
+          exit 1
+
+      - name: Run the flows
+        working-directory: tools/e2e
+        # Tells the flows that need the fake (save-link-fixture,
+        # space-suggestions) that the backend runs it.
+        env:
+          E2E_FAKE_AI: local-v1
+        run: >-
+          pnpm exec e2e run
+          tests/search.e2e.ts
+          tests/search-no-results.e2e.ts
+          tests/create-space.e2e.ts
+          tests/paywall.e2e.ts
+          tests/save-note.e2e.ts
+          tests/save-link-fixture.e2e.ts
+          tests/space-suggestions.e2e.ts
+          tests/onboarding.e2e.ts
+          --reporter list,junit
+
+      # tapUntilVisible taps again when a tap was lost. The run still passes
+      # then, so a recovered tap is surfaced here as a warning on the pull
+      # request instead of disappearing into the report.
+      - name: Flag recovered taps
+        if: ${{ !cancelled() }}
+        working-directory: tools/e2e
+        run: |
+          node -e '
+            if (!require("fs").existsSync(".e2e/report.json")) process.exit(0);
+            const report = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8"));
+            const watched = /name: "(Profile|Add|New space)"/;
+            const walk = (node) => {
+              if (Array.isArray(node)) return node.forEach(walk);
+              if (!node || typeof node !== "object") return;
+              if (Array.isArray(node.steps)) {
+                const taps = {};
+                for (const step of node.steps)
+                  if (step.api === "locator.tap" && watched.test(step.label ?? ""))
+                    taps[step.label] = (taps[step.label] ?? 0) + 1;
+                for (const [label, count] of Object.entries(taps))
+                  if (count > 1) console.log(`::warning title=Recovered tap::${count} taps on ${label} in one test; a tap was lost`);
+              }
+              Object.values(node).forEach(walk);
+            };
+            walk(report);
+          '
+
+      # The screen each failed test ended on, and Metro's last lines, in the
+      # job log itself, so a failure reads without downloading the artifact.
+      - name: Print what failed tests saw
+        if: ${{ failure() }}
+        working-directory: tools/e2e
+        run: |
+          find .e2e/artifacts -path '*/failure/screen.txt' 2>/dev/null | while read -r f; do
+            echo "::group::$f"; cat "$f"; echo "::endgroup::"
+          done
+          echo "::group::metro.log (last 200 lines)"; tail -200 .e2e/metro.log 2>/dev/null || true; echo "::endgroup::"
+          echo "::group::app log (dev launcher and network errors)"
+          xcrun simctl spawn "$E2E_DEVICE" log show --last 60m --style compact \
+            --predicate 'process == "ShelvrDev"' 2>/dev/null \
+            | grep -iE "devlauncher|manifest|NSURLError|bundle|error" | tail -150 || true
+          echo "::endgroup::"
+
+      - name: Copy the backend log
+        if: ${{ !cancelled() }}
+        run: cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
+
+      - name: Upload the run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-ios
+          path: tools/e2e/.e2e
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

@@ -14,7 +14,6 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { Id } from "@convex/_generated/dataModel";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
@@ -24,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 type Space = { _id: Id<"spaces">; name: string };
 
@@ -56,6 +56,9 @@ export function ArticleReaderView({
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  // A picture that fails to load falls back to the monogram too. Keyed by
+  // URL, so a recycled page with a new picture tries it.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
   const window = useWindowDimensions();
 
   // Media after the last stored paragraph shows at the end.
@@ -127,22 +130,39 @@ export function ArticleReaderView({
     .filter(Boolean)
     .join(" · ");
 
-  const thumbnail = heroUri ? (
-    <Image
-      source={{ uri: heroUri }}
-      recyclingKey={item._id}
-      contentFit="cover"
-      style={styles.thumbnailImage}
-    />
-  ) : (
-    <View style={styles.thumbnailFallback}>
-      <AppSymbolIcon
-        name="link"
-        size={22}
-        tintColor={theme.colors.primaryText}
+  // A save with no picture shows its site's first letter, like a book spine.
+  // Array.from keeps an emoji or other astral first character whole.
+  const monogram = Array.from(displayHost(item.url))[0]?.toLocaleUpperCase();
+  const thumbnail =
+    heroUri && heroUri !== failedUri ? (
+      <Image
+        source={{ uri: heroUri }}
+        recyclingKey={item._id}
+        contentFit="cover"
+        style={styles.thumbnailImage}
+        onError={() => setFailedUri(heroUri)}
       />
-    </View>
-  );
+    ) : (
+      // Not collapsable: the zoom target flattens a plain view, which drew
+      // the fallback as an empty box.
+      <View collapsable={false} style={styles.thumbnailFallback}>
+        {monogram ? (
+          <Text
+            style={styles.monogram}
+            maxFontSizeMultiplier={1}
+            accessible={false}
+          >
+            {monogram}
+          </Text>
+        ) : (
+          <AppSymbolIcon
+            name="link"
+            size={22}
+            tintColor={theme.colors.primaryText}
+          />
+        )}
+      </View>
+    );
 
   return (
     <ScrollView
@@ -158,7 +178,7 @@ export function ArticleReaderView({
       <View style={styles.body}>
         {item.status === "processing" ? (
           <View style={styles.processingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <StitchRing />
             <Text style={styles.processingText}>{t("item.reading")}</Text>
           </View>
         ) : null}
@@ -188,7 +208,9 @@ export function ArticleReaderView({
               ) : null}
             </View>
 
-            {item.description ? (
+            {/* A recipe page goes straight to its tabs: the summary only
+                restates the dish the title already names. */}
+            {item.description && !item.recipe ? (
               <Text numberOfLines={2} style={styles.description}>
                 {item.description}
               </Text>
@@ -228,14 +250,16 @@ export function ArticleReaderView({
           </View>
         ) : null}
 
-        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
 
         {/* A recipe page replaces the article body: the classifier already
             lifted the ingredients and steps out of the story around them. The
             article's own images go with that story, since their positions are
             paragraph-relative and the paragraphs are gone. */}
         {item.recipe ? (
-          <RecipeSection recipe={item.recipe} />
+          <RecipeSection key={item._id} recipe={item.recipe} />
         ) : (
           <View style={styles.article}>
             {paragraphs.map((paragraph, index) => (
@@ -309,6 +333,12 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
+  },
+  monogram: {
+    fontFamily: theme.fonts.display,
+    fontSize: 34,
+    lineHeight: 40,
+    color: theme.colors.primaryText,
   },
   summaryCopy: {
     flex: 1,

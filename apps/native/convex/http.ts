@@ -6,13 +6,9 @@ import { auth } from "./auth";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
-  resolveExpiresAt,
-  type RevenueCatEvent,
+  requiresAuthoritativeReconciliation,
 } from "./model/revenuecat";
-import {
-  reconcileRevenueCatCustomers,
-  reconcileRevenueCatTransfer,
-} from "./model/revenuecatTransfer";
+import { reconcileRevenueCatCustomers } from "./model/revenuecatReconcile";
 import { bearerToken, sha256Hex } from "./model/captureTokens";
 import {
   parseImageBegin,
@@ -142,7 +138,7 @@ auth.addHttpRoutes(http);
  *
  * The Convex Auth user id is configured as the RevenueCat app user id (the
  * client calls `Purchases.logIn(convexUserId)` on sign-in), so the event's
- * current `app_user_id` is the same `userId` every other table keys on — no
+ * current `app_user_id` is the same `userId` every other table keys on. No
  * client-supplied id is trusted.
  */
 http.route({
@@ -164,12 +160,12 @@ http.route({
     try {
       body = await req.json();
     } catch {
-      // Unreadable/non-JSON body — RevenueCat should not retry these.
+      // Unreadable/non-JSON body: RevenueCat should not retry these.
       return new Response("Bad payload", { status: 400 });
     }
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
-      // Body was not a readable object — reject so RevenueCat doesn't retry.
+      // Body was not a readable object: reject so RevenueCat doesn't retry.
       return new Response("Bad payload", { status: 400 });
     }
 
@@ -182,10 +178,9 @@ http.route({
         return new Response("Invalid transfer event", { status: 400 });
       }
       try {
-        await reconcileRevenueCatTransfer(
+        await reconcileRevenueCatCustomers(
           ctx,
-          event.transferredFrom,
-          event.transferredTo,
+          [...event.transferredFrom, ...event.transferredTo],
           event.eventTimestampMs,
         );
       } catch {
@@ -198,7 +193,7 @@ http.route({
     }
 
     // A readable event missing required identity or ordering fields is
-    // malformed but acknowledged — return 200 so RevenueCat stops retrying a
+    // malformed but acknowledged: return 200 so RevenueCat stops retrying a
     // non-actionable event rather than hammering the endpoint.
     if (
       event.type === undefined ||
@@ -210,31 +205,28 @@ http.route({
 
     const { type, userId, productId, periodType, eventTimestampMs } = event;
 
-    if (requiresRefundReconciliation(event)) {
+    if (requiresAuthoritativeReconciliation(event)) {
       try {
         await reconcileRevenueCatCustomers(ctx, [userId], eventTimestampMs);
       } catch (error) {
-        logEvent("error", "revenuecat_refund_reconciliation_failed", {
+        logEvent("error", "revenuecat_reconciliation_failed", {
+          event_type: type,
           error_name: errorName(error),
         });
-        return new Response("Refund reconciliation unavailable", {
+        return new Response("Subscription reconciliation unavailable", {
           status: 503,
         });
       }
-      const payment = parsePaymentTelemetry(body);
-      if (payment)
-        await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
-      return new Response(null, { status: 200 });
+    } else {
+      const status = mapRevenueCatStatus(type, periodType);
+      await ctx.runMutation(internal.subscriptions.upsertSubscription, {
+        userId,
+        status,
+        expiresAt: event.expiresAt ?? 0,
+        productId,
+        eventTimestampMs,
+      });
     }
-
-    const status = mapRevenueCatStatus(type, periodType);
-    await ctx.runMutation(internal.subscriptions.upsertSubscription, {
-      userId,
-      status,
-      expiresAt: resolveExpiresAt(event),
-      productId,
-      eventTimestampMs,
-    });
     const payment = parsePaymentTelemetry(body);
     if (payment)
       await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
@@ -308,7 +300,10 @@ http.route({
     const secret = env.WAITLIST_SHARED_SECRET;
     if (
       !secret ||
-      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+      !(await secureCompare(
+        secret,
+        req.headers.get(WAITLIST_SECRET_HEADER) ?? "",
+      ))
     )
       return json({ error: "unauthorized" }, 401);
     const route = req.headers.get("x-shelvr-body-route");
@@ -317,7 +312,7 @@ http.route({
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
         route,
-        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
       return json({ ok: true }, 200);
     } catch (error) {
@@ -490,7 +485,6 @@ function captureUnauthorized(): Response {
   return json({ error: "unauthorized" }, 401);
 }
 
-/** Maps a refused capture to its response. Never logs content or URLs. */
 function isSavableUrl(url: string): boolean {
   try {
     normalizeExternalUrl(url);
@@ -501,6 +495,7 @@ function isSavableUrl(url: string): boolean {
   }
 }
 
+/** Maps a refused capture to its response. Never logs content or URLs. */
 function captureFailure(route: CaptureRoute, error: unknown): Response {
   const code = saveErrorCode(error);
   if (code === "pro_required") return json({ error: code }, 402);
@@ -643,15 +638,6 @@ http.route({
   }),
 });
 
-function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
-  if (event.type === "REFUND_REVERSED") return true;
-  if (event.type === "CANCELLATION")
-    return event.cancelReason === "CUSTOMER_SUPPORT";
-  if (event.type === "EXPIRATION")
-    return event.expirationReason === "CUSTOMER_SUPPORT";
-  return false;
-}
-
 export default http;
 
 http.route({
@@ -661,13 +647,16 @@ http.route({
     const secret = env.WAITLIST_SHARED_SECRET;
     if (
       !secret ||
-      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+      !(await secureCompare(
+        secret,
+        req.headers.get(WAITLIST_SECRET_HEADER) ?? "",
+      ))
     )
       return json({ error: "unauthorized" }, 401);
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
         route: "waitlist",
-        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
       const { token } = JSON.parse(await readBoundedText(req, 1024)) as {
         token?: unknown;

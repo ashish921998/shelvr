@@ -188,8 +188,8 @@ export const captureItemProcessed = internalAction({
       timestamp: args.finishedAt,
       properties: {
         $process_person_profile: false,
-        // Joins to `item_saved` by id, so the save funnel's last leg —
-        // did the persisted item become usable — is one query.
+        // Joins to `item_saved` by id, so the save funnel's last leg
+        // (did the persisted item become usable) is one query.
         item_id: args.itemId,
         item_type: args.itemType,
         outcome: args.outcome,

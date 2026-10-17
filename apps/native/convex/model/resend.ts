@@ -6,7 +6,7 @@ import { v, type Infer } from "convex/values";
  * text, so the response body is never read; the category plus HTTP status is
  * enough to triage an outage. `invalid_request` (feedback sends) and
  * `invalid_recipient` (waitlist contacts) are the two surface vocabularies
- * for a rejected payload — a consumer picks its own label when classifying.
+ * for a rejected payload: a consumer picks its own label when classifying.
  */
 export const resendErrorCategoryValidator = v.union(
   v.literal("rate_limited"),

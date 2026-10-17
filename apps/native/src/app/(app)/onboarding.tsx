@@ -42,9 +42,11 @@ import {
 import { InterestsStep } from "@/components/onboarding/interests";
 import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
+import { PromiseStep } from "@/components/onboarding/promise";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import { AppSymbolIcon } from "@/components/symbol";
+import type { ReminderSlot } from "@/lib/first-save-reminder";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
@@ -58,8 +60,9 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   interests: 0.2,
   setup: 0.35,
   demo: 0.5,
-  notifications: 0.75,
-  share: 1,
+  notifications: 0.7,
+  share: 0.85,
+  promise: 1,
 };
 const READING_PROGRESS = 0.625;
 
@@ -105,7 +108,10 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
-  const [saved, setSaved] = useState<DemoSaved | null>(null);
+  // Restored so a relaunch on the reminder step still offers to remind.
+  const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
+  // Not restored: after a relaunch the promise names no reminder.
+  const [reminder, setReminder] = useState<ReminderSlot | null>(null);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -132,8 +138,8 @@ export default function OnboardingScreen() {
   const interests = spaces.filter(isInterest);
 
   useEffect(() => {
-    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
-  }, [kinds, spaces, stepIndex]);
+    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
+  }, [kinds, spaces, stepIndex, saved]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -227,6 +233,8 @@ export default function OnboardingScreen() {
       dropPracticeShare(practiceSample?.url);
       finish();
     },
+    // Not a decline: the practice share stays held for the share screen.
+    onUnavailable: finish,
   });
 
   if (showSignIn) {
@@ -350,14 +358,28 @@ export default function OnboardingScreen() {
           )}
 
           {step === "notifications" && (
-            <NotificationsStep saved={saved} onAdvance={advance} />
+            <NotificationsStep
+              saved={saved}
+              onAdvance={(scheduled) => {
+                setReminder(scheduled ?? null);
+                advance();
+              }}
+            />
           )}
 
           {step === "share" && (
             <SharePracticeStep
               sample={practiceSample}
               leaving={paywall.asked}
-              onFinish={paywall.ask}
+              onFinish={advance}
+            />
+          )}
+
+          {step === "promise" && (
+            <PromiseStep
+              reminder={reminder}
+              leaving={paywall.asked}
+              onCommit={paywall.ask}
             />
           )}
         </ScrollView>

@@ -1,3 +1,5 @@
+import { AiConsentCard } from "@/components/ai-consent";
+import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
@@ -15,10 +17,51 @@ import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
-import { Platform } from "react-native";
-import { useUnistyles } from "react-native-unistyles";
+import { Platform, View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+/**
+ * The AI consent gate. Every save path, and every hook that saves on its own
+ * (onboarding replay, a resumed share, queued Siri captures), lives in
+ * AppStack below, so holding AppStack back is what guarantees nothing is
+ * saved before the answer.
+ *
+ * Past onboarding, AppStack is not mounted at all until the answer is known.
+ * During onboarding it has to stay mounted, since unmounting would lose the
+ * flow's place: the card covers it instead, and the one save that can run
+ * there (`useDemoSave`) waits on the same answer.
+ */
 export default function AppLayout() {
+  useAppLocale();
+  const { onboarded } = useOnboarding();
+  const consent = useAiConsent();
+  const { asking } = consent;
+
+  if (onboarded && consent.savesBlocked) {
+    return asking ? (
+      <AiConsentCard />
+    ) : (
+      <ScreenLoader label={t("loading.app")} />
+    );
+  }
+
+  return (
+    <>
+      <AppStack />
+      {asking ? (
+        <View style={styles.cover}>
+          <AiConsentCard />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  cover: { ...StyleSheet.absoluteFillObject },
+});
+
+function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -99,6 +142,10 @@ export default function AppLayout() {
             }}
           />
           <Stack.Screen
+            name="plan/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
             name="add"
             options={
               Platform.OS === "android"
@@ -151,19 +198,6 @@ export default function AppLayout() {
             options={{
               presentation: "formSheet",
               headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-          <Stack.Screen
-            name="import"
-            options={{
-              presentation: "formSheet",
-              headerShown: true,
-              headerTransparent: false,
-              headerStyle: { backgroundColor: theme.colors.background },
-              headerBackButtonDisplayMode: "minimal",
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },

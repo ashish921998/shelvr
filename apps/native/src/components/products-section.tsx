@@ -1,20 +1,15 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { AppSymbolIcon } from "@/components/symbol";
+import { openInAppBrowser } from "@/lib/in-app-browser";
 import { useFindLinks } from "@/lib/use-find-links";
 import { Image } from "expo-image";
-import * as WebBrowser from "expo-web-browser";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StitchRing } from "@/components/ui/stitch-loader";
 
 // Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched
-// from the toolbar's action menu (an idle item renders no inline chip — it
+// from the toolbar's action menu (an idle item renders no inline chip: it
 // made every sparse detail page noisier). Post-search states still render
 // inline: results as product cards, a spinner while searching, and a retry
 // chip when the search failed.
@@ -47,7 +42,7 @@ export function ProductsSection({
     return (
       <View style={styles.findLinksRow}>
         <View style={styles.chip}>
-          <ActivityIndicator size="small" color={theme.colors.primaryText} />
+          <StitchRing size={14} color={theme.colors.primaryText} />
           <Text style={styles.chipLabel}>{t("products.finding")}</Text>
         </View>
       </View>
@@ -74,7 +69,7 @@ export function ProductsSection({
                 styles.productCard,
                 pressed && { opacity: 0.85 },
               ]}
-              onPress={() => WebBrowser.openBrowserAsync(product.url)}
+              onPress={() => openInAppBrowser(product.url)}
             >
               {product.thumbnailUrl ? (
                 <Image
@@ -112,7 +107,7 @@ export function ProductsSection({
     );
   }
 
-  // Idle (never searched): nothing inline — the trigger lives in the action
+  // Idle (never searched): nothing inline. The trigger lives in the action
   // menu. Only a failed search (retry affordance) or a completed empty search
   // ("No matches") needs a chip here.
   if (item.productsStatus === undefined) {
@@ -129,7 +124,7 @@ export function ProductsSection({
         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       >
         {finding ? (
-          <ActivityIndicator size="small" color={theme.colors.primaryText} />
+          <StitchRing size={14} color={theme.colors.primaryText} />
         ) : (
           <AppSymbolIcon
             name="bag"

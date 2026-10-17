@@ -2,15 +2,9 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-
-type TestBackend = ReturnType<typeof newConvexTest>;
-
-function asUser(backend: TestBackend, userId: string) {
-  return backend.withIdentity({ subject: `${userId}|session-1` });
-}
 
 async function insertItem(
   backend: TestBackend,
@@ -36,12 +30,12 @@ async function insertItem(
 describe("saveProgress", () => {
   it("counts ready saves up to the goal", async () => {
     const backend = newConvexTest();
-    const t = asUser(backend, "u1");
+    const { t, userId } = await signedInUser(backend);
     expect(await t.query(api.items.saveProgress, {})).toEqual({
       saved: 0,
       goal: 3,
     });
-    for (let i = 0; i < 5; i += 1) await insertItem(backend, "u1");
+    for (let i = 0; i < 5; i += 1) await insertItem(backend, userId);
     expect(await t.query(api.items.saveProgress, {})).toEqual({
       saved: 3,
       goal: 3,
@@ -50,22 +44,22 @@ describe("saveProgress", () => {
 
   it("leaves out the onboarding demo, fixtures, unfinished saves and other users", async () => {
     const backend = newConvexTest();
-    const t = asUser(backend, "u1");
-    const demoItem = await insertItem(backend, "u1");
+    const { t, userId } = await signedInUser(backend);
+    const demoItem = await insertItem(backend, userId);
     await backend.run((ctx) =>
       ctx.db.insert("onboardingDemos", {
-        userId: "u1",
+        userId,
         itemId: demoItem,
         createdAt: Date.now(),
       }),
     );
     for (let i = 0; i < 5; i += 1)
-      await insertItem(backend, "u1", { fixtureKey: `seed-${i}` });
-    await insertItem(backend, "u1", { status: "processing" });
-    await insertItem(backend, "u1", { status: "failed" });
-    await insertItem(backend, "u2");
-    await insertItem(backend, "u1");
-    await insertItem(backend, "u1");
+      await insertItem(backend, userId, { fixtureKey: `seed-${i}` });
+    await insertItem(backend, userId, { status: "processing" });
+    await insertItem(backend, userId, { status: "failed" });
+    await insertItem(backend, "someone-else");
+    await insertItem(backend, userId);
+    await insertItem(backend, userId);
     expect(await t.query(api.items.saveProgress, {})).toEqual({
       saved: 2,
       goal: 3,

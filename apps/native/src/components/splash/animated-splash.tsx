@@ -26,7 +26,7 @@ import {
 } from "./timeline";
 
 // Shelvr's launch animation. A thread draws down the screen and hand-sketched
-// saves — notes, recipes, articles, photos, products — gather onto a shelf at
+// saves (notes, recipes, articles, photos, products) gather onto a shelf at
 // the centre, where they settle into stitches; the S pops in over the row, the
 // wordmark unfurls beside it as the lockup slides into place, and the strapline
 // arrives last.
@@ -112,8 +112,8 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         },
       ),
     );
-    // A late deep link can dismiss the splash before the clock runs out —
-    // stop it rather than leaving it ticking on the UI thread, and firing
+    // A late deep link can dismiss the splash before the clock runs out.
+    // Stop it rather than leaving it ticking on the UI thread, and firing
     // `onFinish` a second time, on exactly the path the early dismissal is
     // there to speed up.
     return () => cancelAnimation(clock);
@@ -124,7 +124,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
 
   // The lockup needs no horizontal offset of its own. The row is centred by
   // its parent and the clip below is a flex child, so opening the clip widens
-  // the row and slides the mark left on its own — the mark starts centred and
+  // the row and slides the mark left on its own: the mark starts centred and
   // ends beside the wordmark. (The web prototype used `clip-path`, which does
   // not affect layout, so there it took an explicit counter-translation.)
   const rowStyle = useAnimatedStyle(() => ({
@@ -207,8 +207,8 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
 
       {/* Held invisible until the wordmark is measured: the row's baseline
           comes from the wordmark, so the S only takes its final place once
-          the wordmark is mounted. Revealing it earlier could show the S jump
-          — visible with reduced motion, where it is drawn from frame one. */}
+          the wordmark is mounted. Revealing it earlier could show the S jump,
+          visible with reduced motion, where it is drawn from frame one. */}
       <View
         style={[
           styles.lockupLayer,

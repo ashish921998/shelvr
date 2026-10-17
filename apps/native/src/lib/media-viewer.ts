@@ -12,16 +12,22 @@ type MediaCandidate = {
   imageUrl?: string | null;
   heroImageUrl?: string | null;
   isSticker?: boolean;
+  // A card says `hasRecipe`; a full row carries the recipe itself.
+  hasRecipe?: boolean;
+  recipe?: unknown;
 };
 
 /**
  * Whether a save opens in the full-screen media viewer: a social post (reel,
  * short, carousel) that has a picture to show. Photos, articles, notes and
  * plain links keep the page layout, where the save's space, tags and similar
- * saves sit on the first screen.
+ * saves sit on the first screen. So does a post with a recipe: the recipe is
+ * what it was saved for, so it leads under a short poster instead of waiting
+ * below a full-screen video.
  */
 export function isMediaSave(item: MediaCandidate | undefined): boolean {
   if (!item || item.isSticker) return false;
+  if (item.hasRecipe || item.recipe !== undefined) return false;
   if (!(item.imageUrl ?? item.heroImageUrl)) return false;
   return socialPost(item) !== undefined;
 }
