@@ -161,7 +161,19 @@ jobs:
         run: |
           node node_modules/agent-device/bin/agent-device.mjs prepare ios-runner \
             --platform ios --udid "$E2E_DEVICE" --timeout 900000
-          node node_modules/agent-device/bin/agent-device.mjs daemon stop
+          # stop refuses a daemon whose info file has no start time (run
+          # 39049617284) and fails the job though the runner is ready, so it
+          # is then stopped by the pid it recorded.
+          if ! node node_modules/agent-device/bin/agent-device.mjs daemon stop; then
+            echo "::warning::agent-device would not stop its daemon; stopping it by pid"
+            for info in $(find "$HOME/.agent-device" -name daemon.json 2>/dev/null); do
+              pid=$(node -p "require('$info').pid") || continue
+              kill "$pid" || continue
+              # Wait for it to exit, so the runner cache saved next does not
+              # catch its state files mid-shutdown.
+              for _ in $(seq 30); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+            done
+          fi
 
       - name: Save the agent-device runner
         if: ${{ !cancelled() && steps.prepare-runner.outcome == 'success' && steps.runner-cache.outputs.cache-hit != 'true' }}
