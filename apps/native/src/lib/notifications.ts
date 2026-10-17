@@ -58,7 +58,7 @@ export function useNotificationSession() {
   return { session, operation };
 }
 
-function getNotificationTimezone(): string | undefined {
+function getNotificationTimezone(): string {
   return (
     Localization.getCalendars()[0]?.timeZone ??
     Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -85,23 +85,22 @@ export function NotificationSessionProvider({
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
-        saveToken: (token, locale) =>
+        getTimezone: getNotificationTimezone,
+        saveToken: (registration) =>
           registerDevice({
-            token,
-            locale,
+            ...registration,
             platform: Platform.OS === "ios" ? "ios" : "android",
-            timezone: getNotificationTimezone(),
           }),
         revokeToken: (token) => unregisterDevice({ token }),
-        setWeeklyShelf: (enabled) =>
+        setWeeklyShelf: (enabled, timezone) =>
           setPreferences({
             weeklyShelfEnabled: enabled,
-            timezone: getNotificationTimezone(),
+            timezone,
           }),
-        setSaveReminders: async (enabled) => {
+        setSaveReminders: async (enabled, timezone) => {
           await setSaveReminders({
             enabled,
-            timezone: getNotificationTimezone(),
+            timezone,
           });
           // The onboarding reminder is a save reminder too, so the switch
           // turns it off with the rest.
