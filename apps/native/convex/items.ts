@@ -3210,14 +3210,6 @@ export const failStaleProcessingItems = internalMutation({
   },
 });
 
-/**
- * The classifier's per-item output: which dynamic spaces this new save fits.
- * Writes are `suggested`-only, except into a space the user set to
- * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
- * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
- * or removed here, so the pipeline cannot clobber a user decision by
- * construction. Existing suggestions not in the new set are withdrawn.
- */
 /** True when the space auto-files this save: on, and the save is newer. */
 function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
   return (
@@ -3227,6 +3219,14 @@ function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
   );
 }
 
+/**
+ * The classifier's per-item output: which dynamic spaces this new save fits.
+ * Writes are `suggested`-only, except into a space the user set to
+ * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
+ * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
+ * or removed here, so the pipeline cannot clobber a user decision by
+ * construction. Existing suggestions not in the new set are withdrawn.
+ */
 export const setSpacesForItem = internalMutation({
   args: {
     itemId: v.id("items"),

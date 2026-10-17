@@ -25,8 +25,6 @@ import { usePaywallGuard } from "@/lib/entitlement";
 import { canMakePlan } from "@/lib/make-plan";
 import { canPlanTrip } from "@/lib/trip";
 
-/** Saved items a space needs before "Make a plan" shows. */
-
 export default function SpaceScreen() {
   useAppLocale();
   const { id } = useLocalSearchParams<{ id: string }>();
