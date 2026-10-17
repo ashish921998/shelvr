@@ -24,6 +24,7 @@ import { useAppIntentsSignOutReset } from "@/lib/app-intents";
 import { useConvexQueryHealing } from "@/lib/convex-query-healing";
 import { useSignOutWhenAccountGone } from "@/lib/account-gone";
 import { posthog } from "@/lib/posthog";
+import { resolveRootHref } from "@/lib/home-href";
 
 // Expo Router reads the root boundary from this module's exports.
 export { RootErrorBoundary as ErrorBoundary } from "@/components/root-error-boundary";
@@ -114,7 +115,7 @@ export default function RootLayout() {
         replaceURL={(url) => {
           // `url` is a relative href (e.g. "/"); typed routes can't prove it's
           // in the union, so route it through the Href type Expo Router takes.
-          router.replace(url as Href);
+          router.replace(resolveRootHref(url) as Href);
           return Promise.resolve();
         }}
       >

@@ -338,7 +338,9 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
         expect(mock.router.back).toHaveBeenCalledOnce();
         expect(mock.router.replace).not.toHaveBeenCalled();
       } else {
-        expect(mock.router.replace).toHaveBeenCalledWith("/");
+        expect(mock.router.replace).toHaveBeenCalledWith(
+          "/(app)/(tabs)/(home)",
+        );
         expect(mock.router.back).not.toHaveBeenCalled();
       }
     },

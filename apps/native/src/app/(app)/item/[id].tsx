@@ -426,7 +426,7 @@ function useRemoveFromSpace({
         goTo(neighbor._id);
         writeParams(neighbor._id);
       } else if (router.canGoBack()) router.back();
-      else router.replace("/");
+      else router.replace("/(app)/(tabs)/(home)");
     } catch {
       Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
     } finally {
@@ -748,7 +748,7 @@ function ItemScreenContent() {
           animated: !reducedMotion,
         });
       } else if (router.canGoBack()) router.back();
-      else router.replace("/");
+      else router.replace("/(app)/(tabs)/(home)");
     } catch {
       Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
     }

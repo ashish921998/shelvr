@@ -45,7 +45,7 @@ export default function ProfileScreen() {
     }
     // A development reload or direct link can restore Profile as the root
     // route. In that state there is no history entry for Android Back to pop.
-    router.replace("/");
+    router.replace("/(app)/(tabs)/(home)");
   };
 
   const proLabel =
