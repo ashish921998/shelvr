@@ -230,6 +230,17 @@ function dayGaps(slots: Set<TripSlot>, stopCount: number): TripSlot[] {
   return stopCount === 0 ? [] : MEALS.filter((meal) => !slots.has(meal));
 }
 
+/** A day of these stops, with the areas and meal gaps they make. */
+export function dayOf<Stop extends Pick<TripStop, "area" | "slot">>(
+  stops: Stop[],
+): { areas: string[]; stops: Stop[]; gaps: TripSlot[] } {
+  return {
+    areas: dayAreas(stops),
+    stops,
+    gaps: dayGaps(new Set(stops.map((s) => s.slot)), stops.length),
+  };
+}
+
 /**
  * Lays out ranked places (best first) as `days` days at `pace`. Places past
  * the trip's room, and any no day can take, go to `wishlist` in rank order.
@@ -279,15 +290,7 @@ export function buildTrip(
       : Math.min(...group.map((c) => rank.get(c) ?? Infinity));
   const days = [...groups]
     .sort((a, b) => firstRank(a) - firstRank(b))
-    .map((group): TripDay => {
-      const stops = orderDay(group);
-      const slots = new Set(stops.map(slotOf));
-      return {
-        areas: dayAreas(stops),
-        stops: stops.map(toStop),
-        gaps: dayGaps(slots, stops.length),
-      };
-    });
+    .map((group): TripDay => dayOf(orderDay(group).map(toStop)));
   return {
     days,
     wishlist: wishlist
@@ -348,7 +351,7 @@ export function swapStop(
   trip: { days: TripDay[]; wishlist: TripStop[] },
   dayIndex: number,
   stopIndex: number,
-): { days: TripDay[]; wishlist: TripStop[] } | null {
+): { days: TripDay[]; wishlist: TripStop[]; replacement: TripStop } | null {
   const day = trip.days[dayIndex];
   const stop = day?.stops[stopIndex];
   if (stop === undefined || trip.wishlist.length === 0) return null;
@@ -376,17 +379,10 @@ export function swapStop(
   const stops = day.stops
     .map((s, i) => (i === stopIndex ? replacement : s))
     .sort((a, b) => SLOT_RANK[a.slot] - SLOT_RANK[b.slot]);
-  const days = trip.days.map((d, i) =>
-    i === dayIndex
-      ? {
-          areas: dayAreas(stops),
-          stops,
-          gaps: dayGaps(new Set(stops.map((s) => s.slot)), stops.length),
-        }
-      : d,
-  );
+  const days = trip.days.map((d, i) => (i === dayIndex ? dayOf(stops) : d));
   return {
     days,
     wishlist: [...trip.wishlist.filter((_, i) => i !== best), stop],
+    replacement,
   };
 }

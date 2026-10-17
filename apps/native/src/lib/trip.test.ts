@@ -6,6 +6,7 @@ import {
   directionsUrl,
   fitCamera,
   locatedStops,
+  pickedStop,
   toDateKey,
   tripDayDate,
   type TripStopView,
@@ -118,6 +119,29 @@ describe("fitCamera", () => {
       expect(y).toBeGreaterThan(view.top);
       expect(y).toBeLessThan(view.height - view.bottom);
     }
+  });
+});
+
+describe("pickedStop", () => {
+  it("follows a stop that moved and loses one that left", () => {
+    const pick = {
+      day: 0,
+      itemId: "b" as TripStopView["itemId"],
+      name: "Park",
+    };
+    const moved = stop({ itemId: pick.itemId, name: pick.name });
+    const day = [
+      stop({ itemId: "a" as TripStopView["itemId"] }),
+      stop({ itemId: "c" as TripStopView["itemId"], name: "Taberna" }),
+      moved,
+    ];
+    expect(pickedStop([{ stops: day }], pick)).toEqual({
+      ref: { day: 0, stop: 2 },
+      view: moved,
+    });
+    expect(pickedStop([{ stops: day.slice(0, 2) }], pick)).toBeNull();
+    expect(pickedStop(undefined, pick)).toBeNull();
+    expect(pickedStop([{ stops: day }], null)).toBeNull();
   });
 });
 

@@ -14,6 +14,7 @@ import {
 } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
+  dayOf,
   swapStop,
   tripDayValidator,
   tripPaceValidator,
@@ -261,9 +262,11 @@ export const saveTripInternal = internalMutation({
  */
 export const swapTripStop = mutation({
   // The stop by its save and name, not by position: the client sees the trip
-  // without stops whose save was deleted, so its indexes can differ.
+  // without stops whose save was deleted, so its indexes can differ. Returns
+  // the stop that took its place, the same way, since the day is put back in
+  // time order and the newcomer can land at another position.
   args: { tripId: v.id("trips"), itemId: v.id("items"), name: v.string() },
-  returns: v.null(),
+  returns: v.object({ itemId: v.id("items"), name: v.string() }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const trip = await ctx.db.get(args.tripId);
@@ -298,8 +301,9 @@ export const swapTripStop = mutation({
         message: "No other saved place to swap in",
       });
     }
-    await ctx.db.patch(trip._id, swapped);
-    return null;
+    const { replacement, ...patch } = swapped;
+    await ctx.db.patch(trip._id, patch);
+    return { itemId: replacement.itemId, name: replacement.name };
   },
 });
 
@@ -332,7 +336,8 @@ const tripViewValidator = v.object({
 
 /**
  * The space's trip, or null when there is none. A stop whose save was
- * deleted since drops out; the rest of its day stays as it was.
+ * deleted or taken out of the space since drops out, and its day's areas
+ * and meal gaps are worked out again from the stops left.
  */
 export const getSpaceTrip = query({
   args: { spaceId: v.id("spaces") },
@@ -372,10 +377,7 @@ export const getSpaceTrip = query({
     return {
       ...rest,
       days: await Promise.all(
-        trip.days.map(async (day) => ({
-          ...day,
-          stops: await viewAll(day.stops),
-        })),
+        trip.days.map(async (day) => dayOf(await viewAll(day.stops))),
       ),
       wishlist: await viewAll(trip.wishlist),
     };

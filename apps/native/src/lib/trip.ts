@@ -145,6 +145,25 @@ export function fitCamera(
   };
 }
 
+/** A stop picked on one day, by its save and name. */
+export type StopPick = { day: number; itemId: Id<"items">; name: string };
+
+/** The picked stop and where it now sits in its day, or null once it is
+ * gone. Found by save and name, so a swap that reorders the day keeps it. */
+export function pickedStop(
+  days: Pick<TripDayView, "stops">[] | undefined,
+  pick: StopPick | null,
+): { ref: { day: number; stop: number }; view: TripStopView } | null {
+  if (pick === null) return null;
+  const stops = days?.[pick.day]?.stops ?? [];
+  const stop = stops.findIndex(
+    (s) => s.itemId === pick.itemId && s.name === pick.name,
+  );
+  return stop === -1
+    ? null
+    : { ref: { day: pick.day, stop }, view: stops[stop] };
+}
+
 /** Walking directions to a stop in the platform's maps app. */
 export function directionsUrl(
   stop: Pick<TripStopView, "name" | "area" | "lat" | "lng">,

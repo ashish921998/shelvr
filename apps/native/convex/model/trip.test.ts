@@ -238,11 +238,13 @@ describe("swapStop", () => {
       ],
       wishlist: [stop("Night view", { slot: "evening" })],
     };
-    expect(swapStop(trip, 0, 1)?.days[0].stops.map((s) => s.name)).toEqual([
+    const swapped = swapStop(trip, 0, 1);
+    expect(swapped?.days[0].stops.map((s) => s.name)).toEqual([
       "Breakfast",
       "Dinner",
       "Night view",
     ]);
+    expect(swapped?.replacement.name).toBe("Night view");
   });
 
   it("is null with nothing to swap in", () => {

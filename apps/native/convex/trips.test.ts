@@ -318,19 +318,24 @@ describe("makeTrip", () => {
     await base.run((ctx) =>
       ctx.db.patch(itemIds[0], { heroImageUrl: "https://example.com/a.jpg" }),
     );
-    const pick = (saveNumber: number, name: string) => ({
+    const pick = (
+      saveNumber: number,
+      name: string,
+      area: string,
+      slot: string,
+    ) => ({
       saveNumber,
       name,
-      area: "",
+      area,
       why: "Go",
-      slot: "afternoon",
+      slot,
     });
     generateObject.mockResolvedValue({
       object: {
         places: [
-          pick(3, "Pastéis de Belém"),
-          pick(2, "Park"),
-          pick(1, "Taberna da Rua das Flores"),
+          pick(3, "Pastéis de Belém", "Belém", "lunch"),
+          pick(2, "Park", "Chiado", "dinner"),
+          pick(1, "Taberna da Rua das Flores", "Chiado", "afternoon"),
         ],
       },
     });
@@ -338,6 +343,10 @@ describe("makeTrip", () => {
     const before = await t.query(api.tripData.getSpaceTrip, { spaceId });
     const first = before?.days[0].stops.find((s) => s.itemId === itemIds[0]);
     expect(first?.cover).toBe("https://example.com/a.jpg");
+    expect(before?.days[0]).toMatchObject({
+      areas: ["Belém"],
+      gaps: [],
+    });
 
     await t.mutation(api.spaces.removeItemFromSpace, {
       itemId: itemIds[0],
@@ -347,6 +356,8 @@ describe("makeTrip", () => {
     const after = await t.query(api.tripData.getSpaceTrip, { spaceId });
     expect(after?.days[0].stops.map((s) => s.itemId)).not.toContain(itemIds[0]);
     expect(after?.days[0].stops).toHaveLength(2);
+    // Its lunch and its area go with it.
+    expect(after?.days[0]).toMatchObject({ areas: [], gaps: ["lunch"] });
   });
 
   it("is removed with its space", async () => {
@@ -408,13 +419,14 @@ describe("makeTrip", () => {
     const park = (await t.query(api.tripData.getSpaceTrip, { spaceId }))
       ?.days[0].stops[2];
     if (!park) throw new Error("no stop");
-    await t.mutation(api.tripData.swapTripStop, {
+    const replacement = await t.mutation(api.tripData.swapTripStop, {
       tripId,
       itemId: park.itemId,
       name: park.name,
     });
 
     const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(replacement).toMatchObject({ name: "Lost In" });
     expect(trip?.days[0].stops.map((s) => s.name)).toEqual([
       "Pastéis de Belém",
       "Taberna da Rua das Flores",

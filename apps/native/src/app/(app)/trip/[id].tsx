@@ -14,8 +14,10 @@ import {
   dayColor,
   directionsUrl,
   locatedStops,
+  pickedStop,
   TRIP_PANEL_SHARE,
   useBuildTrip,
+  type StopPick,
   type TripRequest,
 } from "@/lib/trip";
 import { api } from "@convex/_generated/api";
@@ -132,7 +134,9 @@ export default function TripScreen() {
   const { isVisited, toggle: toggleVisited } = usePlaceVisits();
   const [editing, setEditing] = useState(false);
   const [activeDay, setActiveDay] = useState(0);
-  const [selected, setSelected] = useState<StopRef | null>(null);
+  // The open stop by its save and name, not its position: a swap puts the
+  // day back in time order, so the newcomer can land at another index.
+  const [selected, setSelected] = useState<StopPick | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [lastRequest, setLastRequest] = useState<TripRequest | null>(null);
 
@@ -156,10 +160,8 @@ export default function TripScreen() {
     () => (trip?.days ?? []).some((d) => locatedStops(d.stops).length > 0),
     [trip],
   );
-  const selectedStop =
-    selected && trip
-      ? trip.days[selected.day]?.stops[selected.stop]
-      : undefined;
+  const picked = pickedStop(trip?.days, selected);
+  const selectedStop = picked?.view;
 
   if (trip === undefined || space === undefined || cities === undefined) {
     return <ScreenLoader label={t("trip.loading")} />;
@@ -197,19 +199,22 @@ export default function TripScreen() {
   const selectStop = (ref: StopRef) => {
     if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
     analytics.capture("trip_stop_opened", { day: ref.day, stop: ref.stop });
+    const stop = trip?.days[ref.day]?.stops[ref.stop];
+    if (!stop) return;
     setActiveDay(ref.day);
-    setSelected(ref);
+    setSelected({ day: ref.day, itemId: stop.itemId, name: stop.name });
   };
 
   const swap = async () => {
     if (!trip || !selected || !selectedStop) return;
     setSwapping(true);
     try {
-      await swapTripStop({
+      const replacement = await swapTripStop({
         tripId: trip._id,
         itemId: selectedStop.itemId,
         name: selectedStop.name,
       });
+      setSelected({ day: selected.day, ...replacement });
       analytics.capture("trip_stop_swapped", { day: selected.day });
       if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
     } catch (error) {
@@ -300,22 +305,22 @@ export default function TripScreen() {
           />
         );
       case "stop":
-        return selectedStop && selected && trip ? (
+        return picked && trip ? (
           <TripStopSheet
-            stop={selectedStop}
-            index={selected.stop}
-            color={dayColor(selected.day)}
-            visited={isVisited(selectedStop)}
+            stop={picked.view}
+            index={picked.ref.stop}
+            color={dayColor(picked.ref.day)}
+            visited={isVisited(picked.view)}
             canSwap={trip.wishlist.length > 0}
             swapping={swapping}
             onClose={() => setSelected(null)}
             onDirections={openDirections}
             onSwap={() => void swap()}
-            onToggleVisited={() => toggleVisited(selectedStop)}
+            onToggleVisited={() => toggleVisited(picked.view)}
             onOpenSave={() =>
               router.push({
                 pathname: "/item/[id]",
-                params: { id: selectedStop.itemId },
+                params: { id: picked.view.itemId },
               })
             }
           />
@@ -368,7 +373,7 @@ export default function TripScreen() {
           <TripMap
             trip={trip}
             activeDay={day}
-            selected={selected}
+            selected={picked?.ref ?? null}
             onSelect={selectStop}
             onMapPress={() => setSelected(null)}
           />
