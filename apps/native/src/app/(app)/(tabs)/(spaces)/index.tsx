@@ -88,8 +88,6 @@ function CoverStack({
         1.9,
       )
     : 1;
-  const position = CARD_POSITION;
-
   return (
     <View style={[styles.stack, { aspectRatio: ratio }]}>
       {BACKS.map((back, i) => (
@@ -99,7 +97,7 @@ function CoverStack({
             styles.card,
             styles.cardBlank,
             !cover && styles.cardEmptyBack,
-            position,
+            CARD_POSITION,
             {
               transform: [
                 { translateX: back.tx },
@@ -117,7 +115,7 @@ function CoverStack({
           style={[
             styles.card,
             styles.coverFrame,
-            position,
+            CARD_POSITION,
             { transform: [{ rotate: `${seededUnit(`${seed}-top`) * 2}deg` }] },
           ]}
         >
@@ -138,7 +136,7 @@ function CoverStack({
           style={[
             styles.card,
             styles.cardEmpty,
-            position,
+            CARD_POSITION,
             { transform: [{ rotate: `${seededUnit(`${seed}-top`) * 2}deg` }] },
           ]}
         >
