@@ -284,6 +284,7 @@ type ZipEntry = {
   name: string;
   method: number;
   compressedSize: number;
+  uncompressedSize: number;
   offset: number;
 };
 
@@ -335,8 +336,15 @@ function zip64Extra(
     const length = view.getUint16(at + 2, true);
     if (id === 0x0001) {
       let field = at + 4;
-      const values: { compressedSize?: number; offset?: number } = {};
-      if (needs.uncompressed) field += 8;
+      const values: {
+        compressedSize?: number;
+        offset?: number;
+        uncompressedSize?: number;
+      } = {};
+      if (needs.uncompressed) {
+        values.uncompressedSize = u64(view, field);
+        field += 8;
+      }
       if (needs.compressed) {
         values.compressedSize = u64(view, field);
         field += 8;
@@ -366,7 +374,7 @@ async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
     if (view.getUint32(at, true) !== CENTRAL) break;
     const method = view.getUint16(at + 10, true);
     let compressedSize = view.getUint32(at + 20, true);
-    const uncompressedSize = view.getUint32(at + 24, true);
+    let uncompressedSize = view.getUint32(at + 24, true);
     const nameLength = view.getUint16(at + 28, true);
     const extraLength = view.getUint16(at + 30, true);
     const commentLength = view.getUint16(at + 32, true);
@@ -375,7 +383,11 @@ async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
     const name = decoder.decode(
       bytes.subarray(nameStart, nameStart + nameLength),
     );
-    if (compressedSize === MAX_U32 || offset === MAX_U32) {
+    if (
+      compressedSize === MAX_U32 ||
+      uncompressedSize === MAX_U32 ||
+      offset === MAX_U32
+    ) {
       const wide = zip64Extra(
         view,
         nameStart + nameLength,
@@ -387,9 +399,10 @@ async function zipEntries(source: ZipSource): Promise<ZipEntry[]> {
         },
       );
       compressedSize = wide.compressedSize ?? compressedSize;
+      uncompressedSize = wide.uncompressedSize ?? uncompressedSize;
       offset = wide.offset ?? offset;
     }
-    entries.push({ name, method, compressedSize, offset });
+    entries.push({ name, method, compressedSize, uncompressedSize, offset });
     at = nameStart + nameLength + extraLength + commentLength;
   }
   return entries;
@@ -430,7 +443,11 @@ async function entryText(source: ZipSource, entry: ZipEntry): Promise<string> {
   if (entry.method !== 0 && entry.method !== 8) {
     throw new Error("unsupported_compression");
   }
-  if (entry.compressedSize > MAX_SAVES_FILE_BYTES) {
+  // The declared sizes can lie, so inflate() still counts what it writes.
+  if (
+    entry.compressedSize > MAX_SAVES_FILE_BYTES ||
+    entry.uncompressedSize > MAX_SAVES_FILE_BYTES
+  ) {
     throw new Error("entry_too_large");
   }
   const raw = await source.read(dataStart, dataStart + entry.compressedSize);

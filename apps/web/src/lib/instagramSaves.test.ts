@@ -316,6 +316,18 @@ describe("savedFilesInZip", () => {
     );
   });
 
+  it("refuses an entry whose declared size is over the cap", async () => {
+    const bytes = zip([{ name: "saved/saved_posts.json", text: savedPosts }]);
+    const view = new DataView(bytes.buffer);
+    const central = bytes.findIndex(
+      (_, i) => i + 4 <= bytes.length && view.getUint32(i, true) === 0x02014b50,
+    );
+    view.setUint32(central + 24, 60 * 1024 * 1024, true);
+    await expect(savedFilesInZip(source(bytes))).rejects.toThrow(
+      "entry_too_large",
+    );
+  });
+
   it("finds nothing in a zip without saves or in a non-zip", async () => {
     expect(
       await savedFilesInZip(source(zip([{ name: "a.txt", text: "hi" }]))),
