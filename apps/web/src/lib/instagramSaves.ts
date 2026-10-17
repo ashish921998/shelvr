@@ -231,6 +231,17 @@ export function summarize(saves: SavedPost[]): SavesSummary {
   };
 }
 
+/** A tapped account or collection chip: an exact match, unlike the search
+ * box, so "Travel" leaves out "Travel ideas". */
+export type SavesPick = { kind: "author" | "collection"; value: string };
+
+export function matchesPick(save: SavedPost, pick: SavesPick | null): boolean {
+  if (!pick) return true;
+  return pick.kind === "author"
+    ? save.author === pick.value
+    : save.collections.includes(pick.value);
+}
+
 export function matchesQuery(save: SavedPost, query: string): boolean {
   const needle = query.trim().toLowerCase().replace(/^@/, "");
   if (!needle) return true;
@@ -247,12 +258,19 @@ function csvCell(value: string): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+// The viewer's own day, matching the dates the page shows.
+function localDay(ms: number): string {
+  const date = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function toCsv(saves: SavedPost[]): string {
   const rows = saves.map((save) =>
     [
       save.author ?? "",
       save.kind,
-      save.savedAt ? new Date(save.savedAt).toISOString().slice(0, 10) : "",
+      save.savedAt ? localDay(save.savedAt) : "",
       save.collections.join("; "),
       save.url,
     ]
@@ -456,18 +474,30 @@ async function entryText(source: ZipSource, entry: ZipEntry): Promise<string> {
 }
 
 /** The saved_posts / saved_collections files inside a data download zip. */
+// A real download has one saved_posts and one saved_collections file. A few
+// more allows for odd layouts without letting a crafted zip unpack hundreds.
+const MAX_SAVED_ENTRIES = 8;
+
 export async function savedFilesInZip(
   source: ZipSource,
 ): Promise<{ name: string; text: string }[]> {
-  const wanted = (await zipEntries(source)).filter((entry) =>
-    SAVED_FILES.test(entry.name),
-  );
-  return Promise.all(
-    wanted.map(async (entry) => ({
-      name: entry.name,
-      text: await entryText(source, entry),
-    })),
-  );
+  const wanted = (await zipEntries(source))
+    .filter((entry) => SAVED_FILES.test(entry.name))
+    .slice(0, MAX_SAVED_ENTRIES);
+  const files: { name: string; text: string }[] = [];
+  let total = 0;
+  // One at a time, so at most one entry is unpacked in memory at once.
+  for (const entry of wanted) {
+    try {
+      const text = await entryText(source, entry);
+      total += text.length;
+      if (total > MAX_SAVES_FILE_BYTES * 2) break;
+      files.push({ name: entry.name, text });
+    } catch {
+      // A broken saved_collections should not lose a good saved_posts.
+    }
+  }
+  return files;
 }
 
 export function isZip(head: Uint8Array): boolean {
@@ -501,27 +531,34 @@ function postsFirst(name: string): number {
 export async function readSaves(files: File[]): Promise<ReadResult> {
   try {
     const found: { name: string; text: string }[] = [];
-    let format: "zip" | "json" | "html" = "json";
+    let sawZip = false;
+    let zipNeedsNewerBrowser = false;
+    let looseBytes = 0;
     for (const file of files) {
       const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
       if (isZip(head)) {
+        sawZip = true;
         // Unzipping needs DecompressionStream (Safari 16.4+); an older
         // browser can still open the loose saved_posts.json.
         if (typeof DecompressionStream === "undefined") {
-          return { ok: false, reason: "old_browser" };
+          zipNeedsNewerBrowser = true;
+          continue;
         }
-        format = "zip";
         found.push(...(await savedFilesInZip(fileSource(file))));
-      } else if (file.size > MAX_SAVES_FILE_BYTES) {
-        return { ok: false, reason: "too_large" };
       } else {
-        if (/\.html?$/i.test(file.name)) format = "html";
+        looseBytes += file.size;
+        if (looseBytes > MAX_SAVES_FILE_BYTES) {
+          return { ok: false, reason: "too_large" };
+        }
         found.push({ name: file.name, text: await file.text() });
       }
     }
-    if (format === "zip" && found.length === 0) {
-      return { ok: false, reason: "no_saved_files" };
+    if (found.length === 0) {
+      if (zipNeedsNewerBrowser) return { ok: false, reason: "old_browser" };
+      if (sawZip) return { ok: false, reason: "no_saved_files" };
     }
+    const fromHtml = found.some((file) => /\.html?$/i.test(file.name));
+    const format = sawZip ? "zip" : fromHtml ? "html" : "json";
     const saves = mergeSaves(
       [...found]
         .sort((a, b) => postsFirst(a.name) - postsFirst(b.name))
@@ -532,7 +569,7 @@ export async function readSaves(files: File[]): Promise<ReadResult> {
           ok: true,
           saves,
           format,
-          fromHtml: found.some((file) => /\.html?$/i.test(file.name)),
+          fromHtml,
         }
       : { ok: false, reason: "no_saves" };
   } catch {

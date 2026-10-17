@@ -12,12 +12,14 @@ import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { useAppStoreLink } from "@/lib/appStoreLink";
 import { sampleSaves } from "@/lib/instagramSample";
 import {
+  matchesPick,
   matchesQuery,
   readSaves,
   summarize,
   toCsv,
   type ReadResult,
   type SavedPost,
+  type SavesPick,
 } from "@/lib/instagramSaves";
 
 const PAGE = 50;
@@ -195,14 +197,24 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
   const { saves, sample, fromHtml } = loaded;
   const summary = useMemo(() => summarize(saves), [saves]);
   const [query, setQuery] = useState("");
+  const [pick, setPick] = useState<SavesPick | null>(null);
   const [shown, setShown] = useState(PAGE);
   const matches = useMemo(
-    () => saves.filter((save) => matchesQuery(save, query)),
-    [saves, query],
+    () =>
+      saves.filter(
+        (save) => matchesPick(save, pick) && matchesQuery(save, query),
+      ),
+    [saves, pick, query],
   );
+  const filtering = pick !== null || query.trim() !== "";
 
-  function filter(value: string) {
+  function search(value: string) {
     setQuery(value);
+    setShown(PAGE);
+  }
+
+  function choose(next: SavesPick | null) {
+    setPick(next);
     setShown(PAGE);
   }
 
@@ -254,8 +266,10 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
               text: c.name,
               count: c.count,
             }))}
-            active={query}
-            onPick={filter}
+            active={pick?.kind === "collection" ? pick.value : null}
+            onPick={(value) =>
+              choose(value === null ? null : { kind: "collection", value })
+            }
           />
         )}
         {summary.topAccounts.length > 0 && (
@@ -266,8 +280,10 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
               text: `@${a.author}`,
               count: a.count,
             }))}
-            active={query}
-            onPick={filter}
+            active={pick?.kind === "author" ? pick.value : null}
+            onPick={(value) =>
+              choose(value === null ? null : { kind: "author", value })
+            }
           />
         )}
 
@@ -280,14 +296,14 @@ function Results({ loaded, onReset }: { loaded: Loaded; onReset: () => void }) {
           <input
             type="search"
             value={query}
-            onChange={(event) => filter(event.target.value)}
+            onChange={(event) => search(event.target.value)}
             placeholder="Search by account or collection"
             className="min-h-12 w-full rounded-xl border border-line-strong bg-white pr-4 pl-11 text-base text-ink outline-none transition placeholder:text-muted focus:border-ember-deep focus:ring-2 focus:ring-ember/25"
           />
         </label>
 
         <p aria-live="polite" className="mt-4 text-sm text-muted">
-          {query.trim()
+          {filtering
             ? `${matches.length.toLocaleString("en")} of ${saves.length.toLocaleString("en")} match`
             : "Newest first"}
         </p>
@@ -340,8 +356,8 @@ function ChipRow({
 }: {
   label: string;
   items: { key: string; text: string; count: number }[];
-  active: string;
-  onPick: (value: string) => void;
+  active: string | null;
+  onPick: (value: string | null) => void;
 }) {
   return (
     <div className="mt-5">
@@ -356,7 +372,7 @@ function ChipRow({
               key={item.key}
               type="button"
               aria-pressed={on}
-              onClick={() => onPick(on ? "" : item.key)}
+              onClick={() => onPick(on ? null : item.key)}
               className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition ${
                 on
                   ? "border-ink bg-ink text-paper"

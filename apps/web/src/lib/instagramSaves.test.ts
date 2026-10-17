@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fixMojibake,
   isZip,
+  matchesPick,
   matchesQuery,
   mergeSaves,
   parseSavesFile,
@@ -210,6 +211,16 @@ describe("mergeSaves and summarize", () => {
     expect(saves.filter((s) => matchesQuery(s, "  ")).length).toBe(4);
     expect(saves.filter((s) => matchesQuery(s, "p")).length).toBe(3);
   });
+
+  it("filters a tapped chip by exact account or collection", () => {
+    const pick = (kind: "author" | "collection", value: string) =>
+      saves.filter((s) => matchesPick(s, { kind, value })).length;
+    expect(pick("author", "chef.anna")).toBe(2);
+    expect(pick("author", "anna")).toBe(0);
+    expect(pick("collection", "Recipes")).toBe(1);
+    expect(pick("collection", "Recipe")).toBe(0);
+    expect(saves.filter((s) => matchesPick(s, null)).length).toBe(4);
+  });
 });
 
 describe("toCsv", () => {
@@ -219,7 +230,8 @@ describe("toCsv", () => {
         url: "https://www.instagram.com/p/AAA/",
         kind: "post",
         author: "=cmd",
-        savedAt: Date.UTC(2024, 0, 2),
+        // Noon UTC is the same calendar day in every time zone.
+        savedAt: Date.UTC(2024, 0, 2, 12),
         collections: ["Recipes", "Dinner, quick"],
       },
     ]);
@@ -311,21 +323,26 @@ describe("savedFilesInZip", () => {
         text: " ".repeat(51 * 1024 * 1024),
       },
     ]);
-    await expect(savedFilesInZip(source(bomb))).rejects.toThrow(
-      "entry_too_large",
-    );
+    expect(await savedFilesInZip(source(bomb))).toEqual([]);
   });
 
-  it("refuses an entry whose declared size is over the cap", async () => {
-    const bytes = zip([{ name: "saved/saved_posts.json", text: savedPosts }]);
+  it("skips an oversized entry but keeps the good one", async () => {
+    const bytes = zip([
+      { name: "saved/saved_posts.json", text: savedPosts },
+      { name: "saved/saved_collections.json", text: savedCollections },
+    ]);
     const view = new DataView(bytes.buffer);
-    const central = bytes.findIndex(
-      (_, i) => i + 4 <= bytes.length && view.getUint32(i, true) === 0x02014b50,
-    );
+    let central = -1;
+    for (let i = bytes.length - 4; i >= 0; i -= 1) {
+      if (view.getUint32(i, true) === 0x02014b50) {
+        central = i;
+        break;
+      }
+    }
+    // Declare the last (collections) entry as 60 MB unpacked.
     view.setUint32(central + 24, 60 * 1024 * 1024, true);
-    await expect(savedFilesInZip(source(bytes))).rejects.toThrow(
-      "entry_too_large",
-    );
+    const files = await savedFilesInZip(source(bytes));
+    expect(files.map((file) => file.name)).toEqual(["saved/saved_posts.json"]);
   });
 
   it("finds nothing in a zip without saves or in a non-zip", async () => {
@@ -394,6 +411,12 @@ describe("readSaves without DecompressionStream", () => {
         ok: false,
         reason: "old_browser",
       });
+      // A loose saved_posts.json picked alongside still opens.
+      const withLoose = await readSaves([
+        zipFile,
+        new File([savedPosts], "saved_posts.json"),
+      ]);
+      expect(withLoose.ok && withLoose.saves.length).toBe(4);
     } finally {
       vi.unstubAllGlobals();
     }
