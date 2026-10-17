@@ -14,6 +14,7 @@ import {
   dayColor,
   directionsUrl,
   locatedStops,
+  TRIP_PANEL_SHARE,
   useBuildTrip,
   type TripRequest,
 } from "@/lib/trip";
@@ -378,9 +379,9 @@ export default function TripScreen() {
         style={[
           styles.panel,
           overMap ? styles.panelOverMap : styles.panelFull,
-          // The day list and a stop keep one height, so switching days or
-          // opening a stop never makes the sheet jump.
-          (mode === "days" || mode === "stop") &&
+          // The day list keeps one height, so switching days never makes
+          // the sheet jump; a stop sheet is as tall as its content.
+          mode === "days" &&
             (overMap ? styles.panelOverMapFixed : styles.panelFullFixed),
         ]}
       >
@@ -456,7 +457,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     maxHeight: rt.screen.height - rt.insets.top - theme.gap(7),
   },
   panelOverMapFixed: {
-    height: rt.screen.height * 0.52,
+    height: rt.screen.height * TRIP_PANEL_SHARE,
   },
   panelFullFixed: {
     height: rt.screen.height - rt.insets.top - theme.gap(7),

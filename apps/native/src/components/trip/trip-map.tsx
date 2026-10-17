@@ -3,6 +3,7 @@ import {
   dayColor,
   fitCamera,
   locatedStops,
+  TRIP_PANEL_SHARE,
   type LatLng,
   type Trip,
 } from "@/lib/trip";
@@ -76,12 +77,16 @@ export function TripMap({
       ? reveal.count
       : 0;
 
+  const { width, height } = rt.screen;
+  // The header covers the top of the map and the day list its lower half.
+  const top = rt.insets.top + theme.gap(7);
   const camera = useMemo(() => {
     const points: LatLng[] = active.map((s) => s.coordinates);
     return fitCamera(
       points.length > 0 ? points : days.flat().map((s) => s.coordinates),
+      { width, height, top, bottom: height * TRIP_PANEL_SHARE },
     );
-  }, [active, days]);
+  }, [active, days, width, height, top]);
 
   useEffect(() => {
     if (camera) ref.current?.setCameraPosition(camera);

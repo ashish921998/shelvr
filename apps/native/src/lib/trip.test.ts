@@ -71,21 +71,53 @@ describe("locatedStops", () => {
 });
 
 describe("fitCamera", () => {
+  const view = { width: 400, height: 860, top: 100, bottom: 450 };
+
   it("is undefined with nothing to show", () => {
-    expect(fitCamera([])).toBeUndefined();
+    expect(fitCamera([], view)).toBeUndefined();
   });
 
   it("zooms out further for a wider day", () => {
-    const tight = fitCamera([
-      { latitude: 38.71, longitude: -9.13 },
-      { latitude: 38.712, longitude: -9.135 },
-    ]);
-    const wide = fitCamera([
-      { latitude: 38.69, longitude: -9.21 },
-      { latitude: 38.72, longitude: -9.13 },
-    ]);
+    const tight = fitCamera(
+      [
+        { latitude: 38.71, longitude: -9.13 },
+        { latitude: 38.712, longitude: -9.135 },
+      ],
+      view,
+    );
+    const wide = fitCamera(
+      [
+        { latitude: 38.69, longitude: -9.21 },
+        { latitude: 38.72, longitude: -9.13 },
+      ],
+      view,
+    );
     expect(tight?.zoom).toBeGreaterThan(wide?.zoom ?? Infinity);
     expect(wide?.coordinates.longitude).toBeCloseTo(-9.17);
+  });
+
+  it("keeps every point inside the map left above the panel", () => {
+    const points = [
+      { latitude: 38.6916, longitude: -9.216 },
+      { latitude: 38.6979, longitude: -9.2068 },
+      { latitude: 38.7121, longitude: -9.1394 },
+    ];
+    const camera = fitCamera(points, view)!;
+    // Project each point to screen points the way the map does.
+    const lngPerPoint = 360 / (view.width * 2 ** camera.zoom);
+    const cos = Math.cos((camera.coordinates.latitude * Math.PI) / 180);
+    for (const point of points) {
+      const x =
+        view.width / 2 +
+        (point.longitude - camera.coordinates.longitude) / lngPerPoint;
+      const y =
+        view.height / 2 -
+        (point.latitude - camera.coordinates.latitude) / (lngPerPoint * cos);
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(view.width);
+      expect(y).toBeGreaterThan(view.top);
+      expect(y).toBeLessThan(view.height - view.bottom);
+    }
   });
 });
 

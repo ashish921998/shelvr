@@ -123,7 +123,12 @@ export function TripStopSheet({
           <Animated.View
             key={`${stop.itemId}-${stop.name}`}
             entering={ZoomIn.springify().damping(16)}
-            style={styles.cover}
+            style={[
+              styles.cover,
+              // A save with no image gets the day's tint and a map mark, not
+              // an empty grey tile.
+              !stop.cover && { backgroundColor: `${color}26` },
+            ]}
           >
             {stop.cover ? (
               <Image
@@ -132,7 +137,11 @@ export function TripStopSheet({
                 contentFit="cover"
                 transition={200}
               />
-            ) : null}
+            ) : (
+              <View style={styles.noCover}>
+                <AppSymbolIcon name="map" size={28} tintColor={color} />
+              </View>
+            )}
             <View style={[styles.coverBadge, { backgroundColor: color }]}>
               <ThemedText variant="captionStrong" style={styles.onTint}>
                 {index + 1}
@@ -230,6 +239,11 @@ const styles = StyleSheet.create((theme) => ({
   fill: {
     width: "100%",
     height: "100%",
+  },
+  noCover: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
   },
   coverBadge: {
     position: "absolute",
