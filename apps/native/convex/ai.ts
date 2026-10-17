@@ -176,12 +176,6 @@ const intentsPromptBlock = (maxIntents: number): string =>
 // to understand the piece. It doesn't read the whole thing.
 const MAX_CONTENT_CHARS = 8000;
 
-/**
- * Reduce a caught error to a safe log category. Fetch-policy errors expose only
- * their stable code; anything else retains the error's constructor name (e.g.
- * TypeError) for observability without leaking data, never the error's message
- * or cause, which may carry a URL, response body, or resolved address.
- */
 /** Queues the purpose-steering pass for an item in each given space. */
 async function scheduleSteeringFor(
   ctx: ActionCtx,
@@ -196,6 +190,12 @@ async function scheduleSteeringFor(
   }
 }
 
+/**
+ * Reduce a caught error to a safe log category. Fetch-policy errors expose only
+ * their stable code; anything else retains the error's constructor name (e.g.
+ * TypeError) for observability without leaking data, never the error's message
+ * or cause, which may carry a URL, response body, or resolved address.
+ */
 export function summarizeError(error: unknown): string {
   if (error instanceof StoredImageError) return `stored_image:${error.code}`;
   // A model call that hit its AbortSignal.timeout deadline. Its own stable
@@ -1077,10 +1077,7 @@ export const processItem = internalAction({
       const spaces = allSpaces.filter((s) => s.dynamic === true);
       const spacesBlock = spacesPromptBlock(spaces);
 
-      const allowedAtStart = await ctx.runQuery(internal.aiConsent.isAllowed, {
-        userId: item.userId,
-        itemId: item._id,
-      });
+      const allowedAtStart = await itemAllowed(ctx, item);
       let outcome: AnalysisOutcome;
       if (item.type === "link") {
         outcome = await analyzeLinkItem(
@@ -1128,7 +1125,6 @@ export const processItem = internalAction({
         allowedAtStart && !aiAllowed
           ? withoutModel(item, page)
           : outcome.result;
-      // Map returned space names back to ids (case-insensitive, trimmed).
       const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
       const { tags, description, intents, cities } = classifiedFields(
@@ -1350,12 +1346,7 @@ export const findProductLinks = internalAction({
       }
       // findLinks refuses a declined user up front; this covers a decline
       // that landed after the search was scheduled.
-      if (
-        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
-          userId: item.userId,
-          itemId: item._id,
-        }))
-      ) {
+      if (!(await itemAllowed(ctx, item))) {
         await fail();
         return null;
       }
@@ -1528,10 +1519,7 @@ export const steerItemForSpace = internalAction({
         space === null ||
         item.status !== "ready" ||
         item.userId !== space.userId ||
-        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
-          userId: item.userId,
-          itemId: item._id,
-        }))
+        !(await itemAllowed(ctx, item))
       ) {
         return null;
       }

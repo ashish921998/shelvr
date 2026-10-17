@@ -949,23 +949,6 @@ export const claimPlanInternal = internalMutation({
 });
 
 /**
- * Item ids that already have any membership row for a space. The
- * recommendation pass excludes them up front so the model's picks aren't
- * wasted on items the user already filed or dismissed.
- */
-export const listMemberItemIdsInternal = internalQuery({
-  args: { spaceId: v.id("spaces") },
-  returns: v.array(v.id("items")),
-  handler: async (ctx, args) => {
-    const joins = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
-      .collect();
-    return joins.map((join) => join.itemId);
-  },
-});
-
-/**
  * Ids of spaces the user has directly filed this item into. processItem uses
  * these to kick off the purpose-steering pass once classification lands (a
  * couch saved to "apartment shopping" wants a shopping link on that shelf).
