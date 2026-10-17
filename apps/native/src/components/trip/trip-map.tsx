@@ -94,7 +94,10 @@ export function TripMap({
 
   const pins = days.flatMap((stops, day) =>
     stops
-      .filter((s) => day !== activeDay || s.index < revealed)
+      // `revealed` counts located stops, so compare each pin's place among
+      // them, not its place in the day: a stop Apple could not place has no
+      // pin and must not hold back the ones after it.
+      .filter((_, located) => day !== activeDay || located < revealed)
       .map((s) => {
         const at: StopRef = { day, stop: s.index };
         const isSelected = selected?.day === day && selected.stop === s.index;
