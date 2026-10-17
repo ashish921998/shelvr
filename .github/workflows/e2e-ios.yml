@@ -172,6 +172,9 @@ jobs:
               # Wait for it to exit, so the runner cache saved next does not
               # catch its state files mid-shutdown.
               for _ in $(seq 30); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+              # The runner cache saves all of ~/.agent-device; keep the dead
+              # daemon's state files out of it.
+              kill -0 "$pid" 2>/dev/null || rm -f "$info" "$(dirname "$info")/daemon.lock"
             done
           fi
 
