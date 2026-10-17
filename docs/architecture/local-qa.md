@@ -4,6 +4,9 @@ How to get a branch or worktree running on a simulator and into the state a
 check needs. Device ids, installed builds and anything else that belongs to one
 machine stay out of this file.
 
+For Tidy resource measurements, use the [hint profiling protocol](tidy-hint-profiling.md).
+Simulator checks are exploratory, not physical-device performance acceptance.
+
 Each "seen" date is when the behaviour was last observed. Re-check an old one
 before relying on it.
 
