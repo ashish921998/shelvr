@@ -176,7 +176,7 @@ function writePendingRecord(record: PendingRecord | null) {
   );
 }
 
-function ensureOperationId(): string {
+export function getOrCreatePendingOperationId(): string {
   const existing = readPendingRecord();
   if (existing !== null) return existing.operationId;
   const operationId = createOperationId();
@@ -247,10 +247,6 @@ export function getPendingSpaces(): string[] {
 /** Read-only: unlike getOrCreatePendingOperationId, never writes a record. */
 export function getPendingOperationId(): string | null {
   return readPendingRecord()?.operationId ?? null;
-}
-
-export function getOrCreatePendingOperationId(): string {
-  return ensureOperationId();
 }
 
 /** Older builds queued this save until purchase. Preserve that intent. */
@@ -344,7 +340,7 @@ export function hasPending(): boolean {
 /** Freeze a preset's persisted name before its first creation. Display labels
  * may change language, but demo and completion must use the same identity. */
 export function resolveOnboardingSpaceName(id: string): string {
-  ensureOperationId();
+  getOrCreatePendingOperationId();
   const record = readPendingRecord();
   if (record === null) throw new Error("Onboarding state unavailable");
   if (Object.hasOwn(record.spaceNames, id)) return record.spaceNames[id];
