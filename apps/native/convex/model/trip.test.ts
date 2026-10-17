@@ -223,6 +223,28 @@ describe("swapStop", () => {
     expect(swapStop(trip, 0, 0)?.days[0].gaps).toEqual(["lunch", "dinner"]);
   });
 
+  it("keeps the day in time order when the newcomer has another slot", () => {
+    const trip = {
+      days: [
+        {
+          areas: [],
+          stops: [
+            stop("Breakfast", { slot: "morning" }),
+            stop("Lunch", { slot: "lunch" }),
+            stop("Dinner", { slot: "dinner" }),
+          ],
+          gaps: [],
+        },
+      ],
+      wishlist: [stop("Night view", { slot: "evening" })],
+    };
+    expect(swapStop(trip, 0, 1)?.days[0].stops.map((s) => s.name)).toEqual([
+      "Breakfast",
+      "Dinner",
+      "Night view",
+    ]);
+  });
+
   it("is null with nothing to swap in", () => {
     const trip = {
       days: [{ areas: [], stops: [stop("A")], gaps: [] }],

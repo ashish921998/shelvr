@@ -313,6 +313,42 @@ describe("makeTrip", () => {
     expect(trip?.days[0].stops).toEqual([]);
   });
 
+  it("drops a stop removed from the space and shows a link's image", async () => {
+    const { t, base, spaceId, itemIds } = await setup(LISBON_SAVES);
+    await base.run((ctx) =>
+      ctx.db.patch(itemIds[0], { heroImageUrl: "https://example.com/a.jpg" }),
+    );
+    const pick = (saveNumber: number, name: string) => ({
+      saveNumber,
+      name,
+      area: "",
+      why: "Go",
+      slot: "afternoon",
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          pick(3, "Pastéis de Belém"),
+          pick(2, "Park"),
+          pick(1, "Taberna da Rua das Flores"),
+        ],
+      },
+    });
+    await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
+    const before = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const first = before?.days[0].stops.find((s) => s.itemId === itemIds[0]);
+    expect(first?.cover).toBe("https://example.com/a.jpg");
+
+    await t.mutation(api.spaces.removeItemFromSpace, {
+      itemId: itemIds[0],
+      spaceId,
+    });
+
+    const after = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(after?.days[0].stops.map((s) => s.itemId)).not.toContain(itemIds[0]);
+    expect(after?.days[0].stops).toHaveLength(2);
+  });
+
   it("is removed with its space", async () => {
     const { t, base, spaceId } = await setup(LISBON_SAVES);
     generateObject.mockResolvedValue({

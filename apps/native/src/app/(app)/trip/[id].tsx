@@ -165,10 +165,13 @@ export default function TripScreen() {
     return <ScreenLoader label={t("trip.loading")} />;
   }
 
+  // A new trip is stored before its subscription delivers it; until then
+  // the screen keeps building rather than flash the form or the old trip.
+  const arrived = state.status === "arriving" && trip?._id === state.tripId;
   const mode =
-    state.status === "building"
+    state.status === "building" || (state.status === "arriving" && !arrived)
       ? "building"
-      : state.status !== "idle"
+      : state.status !== "idle" && !arrived
         ? "message"
         : trip === null || editing
           ? "plan"

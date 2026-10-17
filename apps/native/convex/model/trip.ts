@@ -371,7 +371,11 @@ export function swapStop(
     );
   const best = ranked[0].rank;
   const replacement = trip.wishlist[best];
-  const stops = day.stops.map((s, i) => (i === stopIndex ? replacement : s));
+  // The newcomer can have another time of day, so the day is put back in
+  // time order; the sort is stable, so the walk order within a slot holds.
+  const stops = day.stops
+    .map((s, i) => (i === stopIndex ? replacement : s))
+    .sort((a, b) => SLOT_RANK[a.slot] - SLOT_RANK[b.slot]);
   const days = trip.days.map((d, i) =>
     i === dayIndex
       ? {

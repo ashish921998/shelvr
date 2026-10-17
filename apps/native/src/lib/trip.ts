@@ -171,14 +171,17 @@ export type TripRequest = {
 type BuildState =
   | { status: "idle" }
   | { status: "building" }
+  // Made and stored; the screen keeps building until `getSpaceTrip` shows it.
+  | { status: "arriving"; tripId: Id<"trips"> }
   | { status: "empty"; considered: number }
   | { status: "ai_off" }
   | { status: "error" };
 
 /**
  * Runs `trips.makeTrip`. The stored trip arrives through `getSpaceTrip`'s
- * subscription, so a success here only clears the building state; "empty"
- * means no save named a place and the last trip, if any, stays.
+ * subscription, which can land after the action returns, so a success
+ * leaves "arriving" with the new trip's id; "empty" means no save named a
+ * place and the last trip, if any, stays.
  */
 export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
   const makeTrip = useAction(api.trips.makeTrip);
@@ -199,7 +202,7 @@ export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
           setState({ status: "empty", considered: result.considered });
           return false;
         }
-        setState({ status: "idle" });
+        setState({ status: "arriving", tripId: result.tripId });
         return true;
       } catch (error) {
         const aiOff = isAiConsentRequired(error);

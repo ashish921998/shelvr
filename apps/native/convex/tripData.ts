@@ -22,6 +22,7 @@ import {
   type TripStop,
 } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
+import { effectiveStatus, getMembership } from "./model/memberships";
 
 // The database half of "Plan my trip" (trips.ts is the action): what the
 // trip may read, the stored trip, and the reads the trip screen makes.
@@ -197,6 +198,22 @@ export const claimMapLookupsInternal = internalMutation({
   },
 });
 
+/** A stop's save, while the caller still owns it and it is still saved in
+ * the trip's space; null once it was deleted or removed from the space. */
+async function liveSave(
+  ctx: QueryCtx,
+  stop: TripStop,
+  userId: string,
+  spaceId: Id<"spaces">,
+): Promise<Doc<"items"> | null> {
+  const item = await ctx.db.get(stop.itemId);
+  if (item === null || item.userId !== userId) return null;
+  const membership = await getMembership(ctx, stop.itemId, spaceId);
+  return membership !== null && effectiveStatus(membership) === "saved"
+    ? item
+    : null;
+}
+
 /** Removes a space's trips. A space holds at most one, so one read covers
  * it; the bound only guards against a race that left two. */
 export async function deleteTripsForSpace(
@@ -265,11 +282,10 @@ export const swapTripStop = mutation({
         break;
       }
     }
-    // Only places whose save still exists may take the stop's spot.
+    // Only places whose save is still in the space may take the stop's spot.
     const live: TripStop[] = [];
     for (const stop of trip.wishlist) {
-      const item = await ctx.db.get(stop.itemId);
-      if (item !== null && item.userId === userId) live.push(stop);
+      if (await liveSave(ctx, stop, userId, trip.spaceId)) live.push(stop);
     }
     const swapped = swapStop(
       { days: trip.days, wishlist: live },
@@ -333,11 +349,12 @@ export const getSpaceTrip = query({
     if (trip === null || trip.userId !== userId) return null;
 
     const view = async (stop: TripStop) => {
-      const item = await ctx.db.get(stop.itemId);
-      if (item === null || item.userId !== userId) return null;
+      const item = await liveSave(ctx, stop, userId, args.spaceId);
+      if (item === null) return null;
+      // An image save's stored file, else a link's page image.
       const cover = item.storageId
         ? await ctx.storage.getUrl(item.storageId)
-        : null;
+        : (item.heroImageUrl ?? null);
       const creator = item.author ?? item.siteName;
       return {
         ...stop,
