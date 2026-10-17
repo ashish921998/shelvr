@@ -253,13 +253,13 @@ export function TripPlanForm({
   });
   // Every city the saves name, most saves first; the row scrolls sideways.
   const offered = cities;
-  const initialCity = Math.max(
+  // Kept by name: the list reorders as saves finish, so an index could
+  // drift to another city while the sheet is open.
+  const [picked, setPicked] = useState(initial?.city);
+  const cityIndex = Math.max(
     0,
-    offered.findIndex(
-      (c) => c.city.toLowerCase() === initial?.city?.toLowerCase(),
-    ),
+    offered.findIndex((c) => c.city.toLowerCase() === picked?.toLowerCase()),
   );
-  const [cityIndex, setCityIndex] = useState(initialCity);
   const city = offered[cityIndex]?.city;
   const askCity = cities.length >= 2;
 
@@ -281,7 +281,7 @@ export function TripPlanForm({
             scroll
             labels={offered.map((c) => c.city)}
             selected={cityIndex}
-            onSelect={setCityIndex}
+            onSelect={(index) => setPicked(offered[index]?.city)}
             tintFor={() => theme.colors.primary}
             accessibilityLabel={t("trip.whichCity")}
           />
