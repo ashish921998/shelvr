@@ -269,7 +269,7 @@ export default function PlanScreen() {
   const { data: latestLink } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
   );
-  const { state, retry } = useMakePlan(spaceId, locale);
+  const { state, retry } = useMakePlan(spaceId, locale, latestLink);
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
   // Votes show only while the open link holds the shortlist on screen.

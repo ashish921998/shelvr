@@ -27,14 +27,35 @@ export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
 
 const LOADING: PlanState = { status: "loading" };
 
+/** The space's open vote link, as far as the plan screen needs it. */
+type SharedShortlist = {
+  expiresAt: number;
+  places: { name: string; area?: string; why: string; itemId: Id<"items"> }[];
+};
+
 /**
  * Runs `plans.makePlan` for a space once per space and locale, and again on
  * `retry`. A late answer from an earlier run never overwrites a newer one, and
  * an answer for another space or locale reads as loading, never as ready.
+ *
+ * `shared` is the space's open vote link (undefined while it loads). When one
+ * is open on arrival, the screen shows its shortlist instead of asking the
+ * model again, so the owner comes back to the places people are voting on.
+ * Only `retry` replaces it.
  */
-export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
+export function useMakePlan(
+  spaceId: Id<"spaces">,
+  locale: string,
+  shared: SharedShortlist | null | undefined,
+) {
   const makePlan = useAction(api.plans.makePlan);
   const key = `${spaceId}:${locale}`;
+  // Read once per arrival: a link made from this screen must not reset it.
+  const sharedRef = useRef(shared);
+  useEffect(() => {
+    sharedRef.current = shared;
+  });
+  const linkLoaded = shared !== undefined;
   const [result, setResult] = useState<{
     key: string;
     state: PlanState;
@@ -65,15 +86,31 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
   );
 
   useEffect(() => {
+    if (!linkLoaded) return;
     const current = ++run.current;
-    void load(current).then((next) => {
-      if (current === run.current) setResult({ key, state: next });
+    const link = sharedRef.current;
+    const next: Promise<PlanState> =
+      link && link.expiresAt > Date.now() && link.places.length > 0
+        ? Promise.resolve({
+            status: "ready",
+            places: link.places.map(({ name, area, why, itemId }) => ({
+              name,
+              ...(area !== undefined ? { area } : {}),
+              why,
+              itemId,
+            })),
+            considered: link.places.length,
+            planId: current,
+          })
+        : load(current);
+    void next.then((state) => {
+      if (current === run.current) setResult({ key, state });
     });
     return () => {
       // Unmounted or regenerating: drop whatever the in-flight run returns.
       run.current += 1;
     };
-  }, [load, key]);
+  }, [load, key, linkLoaded]);
 
   const retry = useCallback(async () => {
     const current = ++run.current;
@@ -335,7 +372,7 @@ export function planVoteUrl(token: string): string {
 export function usePlanAsk(
   spaceId: Id<"spaces">,
   places: PlanPlace[],
-  current: { token: string } | null,
+  current: { token: string; expiresAt: number } | null,
 ) {
   const createPlanShare = useMutation(api.planShares.createPlanShare);
   const [asking, setAsking] = useState(false);
@@ -348,7 +385,7 @@ export function usePlanAsk(
     setAsking(true);
     try {
       const token =
-        current?.token ??
+        (current && current.expiresAt > Date.now() ? current.token : null) ??
         (await createPlanShare({
           spaceId,
           places: places.map((place) => ({
@@ -392,11 +429,11 @@ async function sharePlanLink(token: string, placeCount: number) {
  * The open link, when it holds exactly the places on screen. A regenerated
  * plan is a new shortlist, so the old link's votes do not belong on it.
  */
-export function linkForPlan<T extends { places: { name: string }[] }>(
-  link: T | null | undefined,
-  places: PlanPlace[],
-): T | null {
-  if (!link || places.length === 0) return null;
+export function linkForPlan<
+  T extends { expiresAt: number; places: { name: string }[] },
+>(link: T | null | undefined, places: PlanPlace[], now = Date.now()): T | null {
+  // A cached query can outlive the link's week; a closed link has no votes to show.
+  if (!link || places.length === 0 || link.expiresAt <= now) return null;
   const keys = (names: { name: string }[]) =>
     names
       .map((entry) => placeKey(entry.name))

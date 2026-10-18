@@ -131,7 +131,7 @@ describe("useMakePlan", () => {
       .mockReturnValueOnce(second.promise);
 
     const { result, rerender } = renderHook(
-      ({ locale }) => useMakePlan(SPACE, locale),
+      ({ locale }) => useMakePlan(SPACE, locale, null),
       { initialProps: { locale: "en" } },
     );
     await waitFor(() => expect(result.current.state.status).toBe("ready"));
@@ -147,12 +147,72 @@ describe("useMakePlan", () => {
     expect(state.status === "ready" && state.places[0].name).toBe("Beta");
   });
 
+  it("waits for the vote link, then shows its shortlist without the model", async () => {
+    const shared = {
+      expiresAt: Date.now() + 60_000,
+      places: [
+        {
+          name: "Tigre",
+          area: "Baixa",
+          why: "Seafood",
+          itemId: "item" as Id<"items">,
+        },
+      ],
+    };
+    const { result, rerender } = renderHook(
+      ({ link }: { link: typeof shared | null | undefined }) =>
+        useMakePlan(SPACE, "en", link),
+      { initialProps: { link: undefined as typeof shared | undefined } },
+    );
+    expect(result.current.state.status).toBe("loading");
+    rerender({ link: shared });
+    await waitFor(() => expect(result.current.state.status).toBe("ready"));
+    expect(result.current.state).toMatchObject({ places: shared.places });
+    expect(mocks.makePlan).not.toHaveBeenCalled();
+
+    // A new plan is the owner's call.
+    mocks.makePlan.mockResolvedValue({
+      places: [place("Alpha")],
+      considered: 3,
+    });
+    await act(() => result.current.retry());
+    expect(result.current.state).toMatchObject({ places: [place("Alpha")] });
+  });
+
+  it("asks the model when the link has closed", async () => {
+    mocks.makePlan.mockResolvedValue({
+      places: [place("Alpha")],
+      considered: 3,
+    });
+    const closed = {
+      expiresAt: Date.now() - 1,
+      places: [
+        { name: "Tigre", why: "Seafood", itemId: "item" as Id<"items"> },
+      ],
+    };
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", closed));
+    await waitFor(() => expect(result.current.state.status).toBe("ready"));
+    expect(mocks.makePlan).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes a new link when the open one has closed since it loaded", async () => {
+    mocks.setVisited.mockResolvedValue("fresh");
+    mocks.share.mockResolvedValue({ action: "sharedAction" });
+    const places = [place("Tigre")];
+    const { result } = renderHook(() =>
+      usePlanAsk(SPACE, places, { token: "old", expiresAt: Date.now() - 1 }),
+    );
+    await act(() => result.current.ask());
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.share.mock.calls[0][0].message).toContain("/p/fresh");
+  });
+
   it("gives every answer its own plan id", async () => {
     mocks.makePlan.mockResolvedValue({
       places: [place("Alpha")],
       considered: 3,
     });
-    const { result } = renderHook(() => useMakePlan(SPACE, "en"));
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
     await waitFor(() => expect(result.current.state.status).toBe("ready"));
     const first = result.current.state;
 
@@ -318,7 +378,10 @@ describe("usePlanAsk", () => {
   it("sends the open link again instead of replacing it", async () => {
     mocks.share.mockResolvedValue({ action: "dismissedAction" });
     const { result } = renderHook(() =>
-      usePlanAsk(SPACE, places, { token: "open" }),
+      usePlanAsk(SPACE, places, {
+        token: "open",
+        expiresAt: Date.now() + 60_000,
+      }),
     );
 
     await act(() => result.current.ask());

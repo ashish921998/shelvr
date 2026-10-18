@@ -147,6 +147,7 @@ describe("planVoteUrl and daysLeft", () => {
 describe("linkForPlan", () => {
   const link = {
     token: "t",
+    expiresAt: Date.now() + 60_000,
     places: [{ name: "Tigre" }, { name: "Sweet Linda" }],
   };
 
@@ -158,5 +159,11 @@ describe("linkForPlan", () => {
     expect(linkForPlan(link, [place("Tigre"), place("Bastian")])).toBeNull();
     expect(linkForPlan(link, [])).toBeNull();
     expect(linkForPlan(null, [place("Tigre")])).toBeNull();
+  });
+
+  it("drops a link once its week is over", () => {
+    const shortlist = [place("Tigre"), place("Sweet Linda")];
+    expect(linkForPlan(link, shortlist, link.expiresAt)).toBeNull();
+    expect(linkForPlan(link, shortlist, link.expiresAt - 1)).toBe(link);
   });
 });
