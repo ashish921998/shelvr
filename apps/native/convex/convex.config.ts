@@ -7,6 +7,17 @@ const app = defineApp({
     // Id of the Apple-approved message POST /retention-messaging names on the
     // cancel sheet. Unset, the reply is empty and Apple shows its default.
     APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
+    // Promotional offers on the cancel sheet: a JSON object from product id to
+    // { offerIdentifier, messageIdentifier } (see model/retentionMessaging.ts).
+    // A product left out, or any of the three IAP key values unset, gets the
+    // plain message instead.
+    APPLE_RETENTION_OFFERS: v.optional(v.string()),
+    // The Apple In-App Purchase key (App Store Connect > Users and Access >
+    // Integrations > In-App Purchase) that signs those offers: the .p8
+    // contents, its key id, and the issuer id on that page.
+    APPLE_IAP_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_IAP_KEY_ID: v.optional(v.string()),
+    APPLE_IAP_ISSUER_ID: v.optional(v.string()),
     // Signs the Apple Maps Server API token for trip pins (convex/trips.ts):
     // a MapKit key's .p8 contents, its key id, and the team id. Without all
     // three, trips are made without pins.

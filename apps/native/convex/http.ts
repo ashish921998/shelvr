@@ -26,6 +26,7 @@ import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
 import {
   RETENTION_MAX_BODY_BYTES,
   answerRetentionRequest,
+  parseRetentionOffers,
 } from "./model/retentionMessaging";
 import { saveErrorCode } from "./model/saveErrors";
 import {
@@ -262,7 +263,7 @@ function json(body: unknown, status: number): Response {
  * while a subscriber views the page where they can cancel, and the reply picks
  * the message shown on the cancel sheet. The request is authenticated by its
  * signature alone, so there is no shared secret. Apple allows 700 ms, which is
- * why this reads no database.
+ * why this reads no database: offers come from deployment variables.
  */
 http.route({
   path: "/retention-messaging",
@@ -280,13 +281,27 @@ http.route({
       });
       return json({ error: "bad_request" }, 400);
     }
+    const keyId = env.APPLE_IAP_KEY_ID;
+    const issuerId = env.APPLE_IAP_ISSUER_ID;
+    const privateKey = env.APPLE_IAP_PRIVATE_KEY;
     const reply = await answerRetentionRequest(body, {
       root: APPLE_ROOT_CA_G3,
       now: Date.now(),
       messageId: env.APPLE_RETENTION_MESSAGE_ID,
+      offers: parseRetentionOffers(env.APPLE_RETENTION_OFFERS),
+      signingKey:
+        keyId && issuerId && privateKey
+          ? { keyId, issuerId, privateKey }
+          : undefined,
     });
     if (reply.reason)
-      logEvent("warn", "retention_request_rejected", { reason: reply.reason });
+      logEvent(
+        "warn",
+        reply.status === 200
+          ? "retention_offer_skipped"
+          : "retention_request_rejected",
+        { reason: reply.reason },
+      );
     return json(reply.body, reply.status);
   }),
 });

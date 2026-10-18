@@ -35,6 +35,7 @@ import type * as model_appleClient from "../model/appleClient.js";
 import type * as model_appleIdToken from "../model/appleIdToken.js";
 import type * as model_appleJws from "../model/appleJws.js";
 import type * as model_appleMaps from "../model/appleMaps.js";
+import type * as model_appleSigning from "../model/appleSigning.js";
 import type * as model_appleTokens from "../model/appleTokens.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "model/appleIdToken": typeof model_appleIdToken;
   "model/appleJws": typeof model_appleJws;
   "model/appleMaps": typeof model_appleMaps;
+  "model/appleSigning": typeof model_appleSigning;
   "model/appleTokens": typeof model_appleTokens;
   "model/auth": typeof model_auth;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;

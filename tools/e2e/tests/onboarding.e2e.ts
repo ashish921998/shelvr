@@ -1,4 +1,4 @@
-import { test } from "@e2e-dev/mobile";
+import { afterEach, test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
 import {
@@ -10,6 +10,15 @@ import {
 } from "./fresh-onboarding.ts";
 import { LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall } from "./paywall-sheet.ts";
+
+// A run that stops partway leaves a signed-in user mid-onboarding, which the
+// seeded flows after this one cannot get past (CI run 39048570372: seven
+// files timed out on the reminder step). Clearing the keychain leaves the
+// app on the opener, where they start from.
+afterEach(async ({ device }) => {
+  await device.closeApp().catch(() => undefined);
+  await device.clearKeychain();
+});
 
 // A first-time user who saved one link, relaunched on the reminder step,
 // took the promise and declined the paywall at the end. Pro is hidden for

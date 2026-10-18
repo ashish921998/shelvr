@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { signAppleJwt } from "./appleClient";
+import { signEs256Jwt } from "./appleSigning";
 
 // Apple Maps Server API: where a saved place is, for the trip map. Free up to
 // 25,000 calls a day per team (shared with MapKit JS); over that it answers
@@ -41,15 +41,15 @@ export async function appleMapsAccessToken(
   try {
     // Inside the try: a malformed key means no pins, not a failed trip.
     const issuedAt = Math.floor(Date.now() / 1000);
-    const authToken = await signAppleJwt(
-      config,
+    const authToken = await signEs256Jwt(
+      config.privateKey,
+      { kid: config.keyId, typ: "JWT" },
       {
         iss: config.teamId,
         iat: issuedAt,
         exp: issuedAt + 300,
         scope: "server_api",
       },
-      { typ: "JWT" },
     );
     const response = await fetchImpl(`${API}/token`, {
       headers: { Authorization: `Bearer ${authToken}` },
