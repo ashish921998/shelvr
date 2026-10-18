@@ -3,7 +3,7 @@
 import { generateObject } from "ai";
 import { ConvexError, v } from "convex/values";
 import { z } from "zod";
-import { action, env, type ActionCtx } from "./_generated/server";
+import { action, env } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { summarizeError } from "./ai";
@@ -68,7 +68,6 @@ const tripSchema = z.object({
     .describe(`At most ${MAX_TRIP_PLACES} places, best first.`),
 });
 
-/** "Name, area, city", leaving out the city when the area already says it. */
 function lookupQuery(
   candidate: TripCandidate,
   city: string | undefined,
@@ -87,7 +86,6 @@ function lookupQuery(
  * land far from the city are dropped.
  */
 async function locate(
-  ctx: ActionCtx,
   candidates: TripCandidate[],
   city: string | undefined,
 ): Promise<(LatLng | null)[] | null> {
@@ -117,13 +115,9 @@ async function locate(
 }
 
 /**
- * "Plan my trip": turns a travel space's saves into a day-by-day trip. One
- * model call picks the places the saves name and when in the day each fits;
- * Apple Maps says where they are; `buildTrip` groups them into one area a
- * day. Every stop is one of the user's saves. The trip replaces the space's
- * last one. `tripId` is null when no save named a place, and `considered`
- * says how many saves were read, so the client can tell that from an empty
- * space.
+ * Replaces the space's trip with places grounded in its saves. A null
+ * `tripId` leaves the old trip intact; `considered` distinguishes an empty
+ * space from saves that named no places.
  */
 export const makeTrip = action({
   // `city` narrows a space whose saves span cities. `locale` is the app's
@@ -207,7 +201,7 @@ export const makeTrip = action({
       return { tripId: null, considered: sources.length };
     }
 
-    const found = await locate(ctx, candidates, city);
+    const found = await locate(candidates, city);
     const located = candidates.map((candidate, i) => {
       const location = found?.[i];
       return location ? { ...candidate, location } : candidate;

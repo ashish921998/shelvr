@@ -26,10 +26,6 @@ import {
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 
-// The database half of "Plan my trip" (trips.ts is the action): what the
-// trip may read, the stored trip, and the reads the trip screen makes.
-
-/** A city name the client sends: it goes into the prompt and to Apple. */
 const MAX_CITY_CHARS = 80;
 
 function tidyCity(city: string): string {
@@ -134,7 +130,6 @@ export async function beenPlaces(
   return visits.map((visit) => visit.name);
 }
 
-/** What the model reads of one save. */
 export function toPlanSource(
   item: Doc<"items">,
   join: Doc<"spaceItems">,
@@ -237,7 +232,6 @@ export async function deleteTripsForSpace(
   }
 }
 
-/** Stores a finished trip in place of the space's last one. */
 export const saveTripInternal = internalMutation({
   args: {
     spaceId: v.id("spaces"),

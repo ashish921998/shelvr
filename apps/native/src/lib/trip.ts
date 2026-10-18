@@ -18,8 +18,7 @@ export type Trip = NonNullable<
 export type TripDayView = Trip["days"][number];
 export type TripStopView = TripDayView["stops"][number];
 
-/** Saves in a space that name a city before "Plan my trip" shows: enough to
- * read as a travel space, not a reading list that mentions one place. */
+// Avoid offering trips for a reading list that merely mentions a place.
 const TRIP_MIN_CITY_SAVES = 3;
 
 /** A travel space: at least three ready saves name a city. */
@@ -194,12 +193,9 @@ type BuildState =
   | { status: "error" };
 
 /**
- * Runs `trips.makeTrip`. The stored trip arrives through `getSpaceTrip`'s
- * subscription, which can land after the action returns, so a success
- * leaves "arriving" until the screen sees a trip other than the one it had,
- * then `reset`s; any newer trip counts, since a rebuild elsewhere deletes the
- * one this build made. "empty" means no save named a place and the last
- * trip, if any, stays.
+ * Wait for the subscription after a successful build. Any newer trip counts:
+ * a concurrent rebuild can replace this action's result before it arrives.
+ * An empty result leaves the previous trip intact.
  */
 export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
   const makeTrip = useAction(api.trips.makeTrip);
