@@ -145,6 +145,32 @@ describe("NotificationsStep", () => {
     );
   });
 
+  it("reports a Maps launch that fails instead of logging the action", async () => {
+    const failure = new Error("no handler");
+    mock.runIntent.mockRejectedValue(failure);
+    mock.item = {
+      title: "Old Town Square",
+      url: "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/",
+      tags: ["Prague"],
+      intents: [
+        {
+          kind: "open_maps",
+          label: "Find it",
+          value: "Old Town Square, Prague",
+        },
+      ],
+    };
+    renderStep();
+    fireEvent.click(screen.getByText("plan.openMaps"));
+    await waitFor(() =>
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "onboarding_open_maps_failed",
+        failure,
+      ),
+    );
+    expect(mock.itemAction).not.toHaveBeenCalled();
+  });
+
   it("shows no Maps chip for a save that is not a place", () => {
     renderStep();
     expect(screen.queryByText("plan.openMaps")).toBeNull();

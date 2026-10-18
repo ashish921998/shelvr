@@ -231,7 +231,12 @@ export function NotificationsStep({
               onPress={() => {
                 void runIntent("open_maps", maps.value)
                   .then(() => analytics.itemAction(item, "open_maps"))
-                  .catch(() => {});
+                  .catch((error: unknown) =>
+                    analytics.captureError(
+                      "onboarding_open_maps_failed",
+                      error,
+                    ),
+                  );
               }}
             />
           ) : undefined
