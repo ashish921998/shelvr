@@ -9,6 +9,7 @@ import {
   MAX_BEEN_PLACES,
   MAX_PLAN_ITEMS,
   PLAN_CONTENT_CHARS,
+  placeKey,
   planSourceValidator,
   type PlanSource,
 } from "./model/plan";
@@ -337,7 +338,8 @@ const tripViewValidator = v.object({
 /**
  * The space's trip, or null when there is none. A stop whose save was
  * deleted or taken out of the space since drops out, and its day's areas
- * and meal gaps are worked out again from the stops left.
+ * and meal gaps are worked out again from the stops left. `been` is read
+ * from the user's "We went" marks now, not from when the trip was made.
  */
 export const getSpaceTrip = query({
   args: { spaceId: v.id("spaces") },
@@ -353,9 +355,15 @@ export const getSpaceTrip = query({
       .first();
     if (trip === null || trip.userId !== userId) return null;
 
-    const view = async (stop: TripStop) => {
+    const view = async ({ been: _been, ...stop }: TripStop) => {
       const item = await liveSave(ctx, stop, userId, args.spaceId);
       if (item === null) return null;
+      const visit = await ctx.db
+        .query("placeVisits")
+        .withIndex("by_user_and_key", (q) =>
+          q.eq("userId", userId).eq("key", placeKey(stop.name)),
+        )
+        .unique();
       // An image save's stored file, else a link's page image.
       const cover = item.storageId
         ? await ctx.storage.getUrl(item.storageId)
@@ -363,6 +371,7 @@ export const getSpaceTrip = query({
       const creator = item.author ?? item.siteName;
       return {
         ...stop,
+        ...(visit !== null ? { been: true } : {}),
         ...(cover !== null ? { cover } : {}),
         ...(creator !== undefined ? { creator } : {}),
         ...(item.url !== undefined ? { url: item.url } : {}),

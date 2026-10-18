@@ -190,8 +190,9 @@ export type TripRequest = {
 type BuildState =
   | { status: "idle" }
   | { status: "building" }
-  // Made and stored; the screen keeps building until `getSpaceTrip` shows it.
-  | { status: "arriving"; tripId: Id<"trips"> }
+  // Made and stored; the screen keeps building until `getSpaceTrip` shows a
+  // trip other than `previous`, the one the space had when the build began.
+  | { status: "arriving"; previous: Id<"trips"> | null }
   | { status: "empty"; considered: number }
   | { status: "ai_off" }
   | { status: "error" };
@@ -199,15 +200,20 @@ type BuildState =
 /**
  * Runs `trips.makeTrip`. The stored trip arrives through `getSpaceTrip`'s
  * subscription, which can land after the action returns, so a success
- * leaves "arriving" with the new trip's id; "empty" means no save named a
- * place and the last trip, if any, stays.
+ * leaves "arriving" until the screen sees a trip other than the one it had,
+ * then `reset`s; any newer trip counts, since a rebuild elsewhere deletes the
+ * one this build made. "empty" means no save named a place and the last
+ * trip, if any, stays.
  */
 export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
   const makeTrip = useAction(api.trips.makeTrip);
   const [state, setState] = useState<BuildState>({ status: "idle" });
 
   const build = useCallback(
-    async (request: TripRequest): Promise<boolean> => {
+    async (
+      request: TripRequest,
+      previous: Id<"trips"> | null,
+    ): Promise<boolean> => {
       setState({ status: "building" });
       try {
         const result = await makeTrip({ spaceId, locale, ...request });
@@ -221,7 +227,7 @@ export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
           setState({ status: "empty", considered: result.considered });
           return false;
         }
-        setState({ status: "arriving", tripId: result.tripId });
+        setState({ status: "arriving", previous });
         return true;
       } catch (error) {
         const aiOff = isAiConsentRequired(error);

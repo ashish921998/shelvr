@@ -175,13 +175,18 @@ export default function TripScreen() {
   const picked = pickedStop(trip?.days, selected);
   const selectedStop = picked?.view;
 
+  // A new trip is stored before its subscription delivers it; until then
+  // the screen keeps building rather than flash the form or the old trip.
+  const arrived =
+    state.status === "arriving" && !!trip && trip._id !== state.previous;
+  useEffect(() => {
+    if (arrived) reset();
+  }, [arrived, reset]);
+
   if (trip === undefined || space === undefined || cities === undefined) {
     return <ScreenLoader label={t("trip.loading")} />;
   }
 
-  // A new trip is stored before its subscription delivers it; until then
-  // the screen keeps building rather than flash the form or the old trip.
-  const arrived = state.status === "arriving" && trip?._id === state.tripId;
   const mode =
     state.status === "building" || (state.status === "arriving" && !arrived)
       ? "building"
@@ -196,7 +201,7 @@ export default function TripScreen() {
   const onBuild = (request: TripRequest) => {
     setLastRequest(request);
     setSelected(null);
-    void build(request).then((made) => {
+    void build(request, trip?._id ?? null).then((made) => {
       if (!made) return;
       setEditing(false);
       setActiveDay(0);

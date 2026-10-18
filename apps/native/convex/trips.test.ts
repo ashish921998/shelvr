@@ -313,6 +313,38 @@ describe("makeTrip", () => {
     expect(trip?.days[0].stops).toEqual([]);
   });
 
+  it('shows a stop\'s current "We went" mark, not the one it was made with', async () => {
+    const { t, spaceId, itemIds } = await setup(LISBON_SAVES);
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          {
+            saveNumber: 2,
+            name: "Park",
+            area: "",
+            why: "Sunset",
+            slot: "evening",
+          },
+        ],
+      },
+    });
+    await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
+    const stopOf = async () =>
+      (await t.query(api.tripData.getSpaceTrip, { spaceId }))?.days[0].stops[0];
+    expect((await stopOf())?.been).toBeUndefined();
+
+    const mark = (visited: boolean) =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId: itemIds[1],
+        name: "Park",
+        visited,
+      });
+    await mark(true);
+    expect((await stopOf())?.been).toBe(true);
+    await mark(false);
+    expect((await stopOf())?.been).toBeUndefined();
+  });
+
   it("drops a stop removed from the space and shows a link's image", async () => {
     const { t, base, spaceId, itemIds } = await setup(LISBON_SAVES);
     await base.run((ctx) =>

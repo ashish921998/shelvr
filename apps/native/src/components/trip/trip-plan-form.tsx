@@ -127,7 +127,12 @@ function DayStepper({
     <View
       style={styles.stepper}
       accessible
+      accessibilityRole="adjustable"
       accessibilityLabel={t("trip.dayCount", { count: days })}
+      accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+      onAccessibilityAction={(event) =>
+        step(event.nativeEvent.actionName === "increment" ? 1 : -1)
+      }
     >
       {stepButton(-1)}
       <View style={styles.stepValue}>

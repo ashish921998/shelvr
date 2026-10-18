@@ -33,6 +33,16 @@ export default function SpaceScreen() {
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
+  // A trip already made stays reachable after the space drops below the
+  // saves a new one needs, so only look it up then.
+  const { data: storedTrip } = useQuery(
+    convexQuery(
+      api.tripData.getSpaceTrip,
+      space && !canPlanTrip(space.items)
+        ? { spaceId: id as Id<"spaces"> }
+        : "skip",
+    ),
+  );
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
   const { guard: planGuard } = usePaywallGuard("make_plan");
@@ -101,7 +111,7 @@ export default function SpaceScreen() {
     );
   };
 
-  const canTrip = canPlanTrip(space.items);
+  const canTrip = canPlanTrip(space.items) || Boolean(storedTrip);
   const planTrip = () => {
     void tripGuard(() =>
       router.push({ pathname: "/trip/[id]", params: { id: space._id } }),
