@@ -284,7 +284,7 @@
   "plan.make": "Plan erstellen",
   "plan.button": "Planen",
   "plan.pickerTitle": "Was planst du?",
-  "plan.pickerBody": "Nur aus deinen Saves. Nichts erfunden.",
+  "plan.pickerBody": "Aus deinen Saves gebaut.",
   "plan.goOut": "Ausgehen",
   "plan.goOutBody": "Ein Ort für ein Date, ein Essen oder Zeit für dich",
   "plan.title": "Deine Auswahl",
@@ -319,8 +319,8 @@
   "trip.planTitle": "Plane deine Reise nach %{city}",
   "trip.planTitleNoCity": "Plane deine Reise",
   "trip.planBody": {
-    "one": "Nur aus deinem %{formattedCount} Save gebaut. Nichts erfunden.",
-    "other": "Nur aus deinen %{formattedCount} Saves gebaut. Nichts erfunden."
+    "one": "Jeder Stopp stammt aus deinem %{formattedCount} Save.",
+    "other": "Jeder Stopp stammt aus einem deiner %{formattedCount} Saves."
   },
   "trip.whichCity": "Welche Stadt?",
   "trip.howManyDays": "Wie viele Tage",

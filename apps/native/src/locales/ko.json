@@ -286,7 +286,7 @@
   "plan.make": "계획 세우기",
   "plan.button": "계획",
   "plan.pickerTitle": "무엇을 계획하나요?",
-  "plan.pickerBody": "저장한 것만으로 만들어요. 지어낸 건 없어요.",
+  "plan.pickerBody": "저장한 것으로 만들어요.",
   "plan.goOut": "외출",
   "plan.goOutBody": "데이트, 식사, 혼자만의 시간을 위한 장소 고르기",
   "plan.title": "추천 목록",
@@ -321,7 +321,7 @@
   "trip.planTitle": "%{city} 여행 계획하기",
   "trip.planTitleNoCity": "여행 계획하기",
   "trip.planBody": {
-    "other": "저장한 항목 %{formattedCount}개로만 만들어요. 지어낸 건 없어요."
+    "other": "모든 장소는 저장한 항목 %{formattedCount}개 중에서 나와요."
   },
   "trip.whichCity": "어느 도시인가요?",
   "trip.howManyDays": "며칠",

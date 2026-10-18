@@ -284,7 +284,7 @@
   "plan.make": "Make a plan",
   "plan.button": "Plan",
   "plan.pickerTitle": "What are you planning?",
-  "plan.pickerBody": "Built only from your saves. Nothing made up.",
+  "plan.pickerBody": "Built from your saves.",
   "plan.goOut": "Go out",
   "plan.goOutBody": "Pick a spot for a date, a meal or time to yourself",
   "plan.title": "Your shortlist",
@@ -319,8 +319,8 @@
   "trip.planTitle": "Plan your %{city} trip",
   "trip.planTitleNoCity": "Plan your trip",
   "trip.planBody": {
-    "one": "Built only from your %{formattedCount} save. Nothing made up.",
-    "other": "Built only from your %{formattedCount} saves. Nothing made up."
+    "one": "Every stop comes from your %{formattedCount} save.",
+    "other": "Every stop comes from one of your %{formattedCount} saves."
   },
   "trip.whichCity": "Which city?",
   "trip.howManyDays": "How many days",

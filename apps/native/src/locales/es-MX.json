@@ -284,7 +284,7 @@
   "plan.make": "Hacer un plan",
   "plan.button": "Planear",
   "plan.pickerTitle": "¿Qué estás planeando?",
-  "plan.pickerBody": "Hecho solo con lo que guardaste. Nada inventado.",
+  "plan.pickerBody": "Hecho con lo que guardaste.",
   "plan.goOut": "Salir",
   "plan.goOutBody": "Elige un lugar para una cita, una comida o un rato para ti",
   "plan.title": "Tu selección",
@@ -319,9 +319,9 @@
   "trip.planTitle": "Planea tu viaje a %{city}",
   "trip.planTitleNoCity": "Planea tu viaje",
   "trip.planBody": {
-    "one": "Hecho solo con tu %{formattedCount} guardado. Nada inventado.",
-    "many": "Hecho solo con tus %{formattedCount} guardados. Nada inventado.",
-    "other": "Hecho solo con tus %{formattedCount} guardados. Nada inventado."
+    "one": "Cada parada sale de tu %{formattedCount} guardado.",
+    "many": "Cada parada sale de uno de tus %{formattedCount} guardados.",
+    "other": "Cada parada sale de uno de tus %{formattedCount} guardados."
   },
   "trip.whichCity": "¿Qué ciudad?",
   "trip.howManyDays": "Cuántos días",
