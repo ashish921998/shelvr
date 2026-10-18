@@ -144,6 +144,9 @@ export const latestPlanShare = query({
         v.object({
           key: v.string(),
           name: v.string(),
+          area: v.optional(v.string()),
+          why: v.string(),
+          itemId: v.id("items"),
           picks: v.number(),
           passes: v.number(),
         }),
@@ -175,10 +178,14 @@ export const latestPlanShare = query({
       token: share.token,
       city: share.city,
       expiresAt: share.expiresAt,
-      voters: votes.length,
+      voters: votes.filter((vote) => vote.picks.length + vote.passes.length > 0)
+        .length,
       places: share.places.map((place) => ({
         key: place.key,
         name: place.name,
+        ...(place.area !== undefined ? { area: place.area } : {}),
+        why: place.why,
+        itemId: place.itemId,
         picks: votes.filter((vote) => vote.picks.includes(place.key)).length,
         passes: votes.filter((vote) => vote.passes.includes(place.key)).length,
       })),
@@ -294,8 +301,15 @@ export const recordPlanVote = internalMutation({
       });
       return "recorded";
     }
-    // An empty ballot from someone new holds no vote, so it takes no slot.
-    if (picks.length === 0 && passes.length === 0) return "recorded";
+    // An empty ballot from someone new holds no vote. With a revision it is
+    // still kept, so an earlier ballot of theirs that lands after it can't
+    // bring back a withdrawn pick; it shows as no voter in the tallies.
+    if (
+      picks.length === 0 &&
+      passes.length === 0 &&
+      args.revision === undefined
+    )
+      return "recorded";
     const voters = await ctx.db
       .query("planVotes")
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))

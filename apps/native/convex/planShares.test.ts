@@ -260,6 +260,58 @@ describe("votes", () => {
     ).toMatchObject({ voters: 0 });
   });
 
+  it("keeps a withdrawn pick withdrawn when the empty ballot lands first", async () => {
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    const ballot = (picks: string[], revision: number) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId: "new",
+        picks,
+        passes: [],
+        revision,
+        ip: "203.0.113.7",
+      });
+    // Picked then unpicked: the page-close ballot overtakes the first one.
+    expect(await ballot([], 2)).toBe("recorded");
+    expect(await ballot(["p0"], 1)).toBe("recorded");
+    expect(
+      await t.query(api.planShares.latestPlanShare, { spaceId }),
+    ).toMatchObject({
+      voters: 0,
+      places: [{ picks: 0 }, { picks: 0 }],
+    });
+  });
+
+  it("gives the owner each shared place back with its reason and save", async () => {
+    const { t, spaceId, places } = await setup();
+    await t.mutation(api.planShares.createPlanShare, { spaceId, places });
+    expect(
+      (await t.query(api.planShares.latestPlanShare, { spaceId }))?.places,
+    ).toEqual([
+      {
+        key: "p0",
+        name: "Thalassa",
+        area: "Vagator",
+        why: "Sunset dinner",
+        itemId: places[0].itemId,
+        picks: 0,
+        passes: 0,
+      },
+      {
+        key: "p1",
+        name: "Gunpowder",
+        why: "South Indian",
+        itemId: places[1].itemId,
+        picks: 0,
+        passes: 0,
+      },
+    ]);
+  });
+
   it("closes the link after a week", async () => {
     vi.useFakeTimers();
     const { backend, t, spaceId, places } = await setup();
