@@ -1,183 +1,23 @@
+import { StitchRing } from "@/components/ui/stitch-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
-import { fadeIn, motion } from "@/lib/motion";
 import type { TextMessageKey } from "@/locales/message-types";
-import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeOut,
-  interpolate,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-  type SharedValue,
-} from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// A line draws through five numbered dots while the text below cycles
-// through the three build steps.
-const STOPS = [
-  { x: 18, y: 78 },
-  { x: 82, y: 30 },
-  { x: 142, y: 70 },
-  { x: 200, y: 22 },
-  { x: 250, y: 64 },
-];
-const DOT = 22;
 const STEP_MS = 1800;
-const STEP_OUT = FadeOut.duration(motion.duration.feedback).easing(
-  motion.easing.out,
-);
-const coverIn = (index: number) =>
-  FadeIn.duration(motion.duration.enter)
-    .delay(index * 60)
-    .easing(motion.easing.out);
 const STEPS: TextMessageKey[] = [
   "trip.buildingRead",
   "trip.buildingFind",
   "trip.buildingGroup",
 ];
 
-function Segment({
-  index,
-  progress,
-}: {
-  index: number;
-  progress: SharedValue<number>;
-}) {
-  const from = STOPS[index];
-  const to = STOPS[index + 1];
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.hypot(dx, dy);
-  const angle = Math.atan2(dy, dx);
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { rotate: `${angle}rad` },
-      {
-        scaleX: interpolate(
-          progress.get(),
-          [index + 0.35, index + 1],
-          [0, 1],
-          "clamp",
-        ),
-      },
-    ],
-  }));
-  return (
-    <Animated.View
-      style={[
-        styles.segment,
-        {
-          left: from.x + DOT / 2,
-          top: from.y + DOT / 2 - 1,
-          width: length,
-        },
-        style,
-      ]}
-    />
-  );
-}
-
-function Dot({
-  index,
-  progress,
-}: {
-  index: number;
-  progress: SharedValue<number>;
-}) {
-  const style = useAnimatedStyle(() => {
-    const at = interpolate(
-      progress.get(),
-      [index, index + 0.35],
-      [0, 1],
-      "clamp",
-    );
-    // Scales from 60% to full size with a slight overshoot.
-    const pop = at < 1 ? 0.6 + 0.4 * Easing.back(1.6)(at) : 1;
-    return { opacity: at, transform: [{ scale: pop }] };
-  });
-  return (
-    <Animated.View
-      style={[styles.dot, { left: STOPS[index].x, top: STOPS[index].y }, style]}
-    >
-      <ThemedText variant="captionStrong" style={styles.dotLabel}>
-        {index + 1}
-      </ThemedText>
-    </Animated.View>
-  );
-}
-
-/** Up to three save covers that bob above the route. */
-function Covers({ covers }: { covers: string[] }) {
-  const reduced = useReducedMotion();
-  const bob = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) return;
-    bob.set(
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
-          withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad) }),
-        ),
-        -1,
-      ),
-    );
-  }, [bob, reduced]);
-  const styleA = useAnimatedStyle(() => ({
-    transform: [{ translateY: -6 * bob.get() }, { rotate: "-8deg" }],
-  }));
-  const styleB = useAnimatedStyle(() => ({
-    transform: [{ translateY: -6 * (1 - bob.get()) }],
-  }));
-  const styleC = useAnimatedStyle(() => ({
-    transform: [{ translateY: -6 * bob.get() }, { rotate: "8deg" }],
-  }));
-  const styled = [styleA, styleB, styleC];
-  return (
-    <View style={styles.covers}>
-      {covers.slice(0, 3).map((uri, i) => (
-        <Animated.View
-          key={uri}
-          entering={coverIn(i)}
-          style={[styles.cover, styles.coverAt(i), styled[i]]}
-        >
-          <Image source={{ uri }} style={styles.fill} contentFit="cover" />
-        </Animated.View>
-      ))}
-    </View>
-  );
-}
-
-/** What the trip screen shows while the trip is being made. */
-export function TripBuilding({ covers }: { covers: string[] }) {
+/** What the trip screen shows while the trip is being made: the app's loader
+ * over the build step, which advances and holds on the last one. */
+export function TripBuilding() {
   useAppLocale();
-  const reduced = useReducedMotion();
-  const progress = useSharedValue(reduced ? STOPS.length : 0);
   const [step, setStep] = useState(0);
-
-  useEffect(() => {
-    if (reduced) return;
-    progress.set(
-      withRepeat(
-        withSequence(
-          withTiming(STOPS.length, {
-            duration: 2600,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          withTiming(STOPS.length, { duration: 500 }),
-          withTiming(0, { duration: 0 }),
-        ),
-        -1,
-      ),
-    );
-  }, [progress, reduced]);
 
   useEffect(() => {
     const timer = setInterval(
@@ -189,27 +29,14 @@ export function TripBuilding({ covers }: { covers: string[] }) {
 
   return (
     <View style={styles.wrap}>
-      {covers.length > 0 ? <Covers covers={covers} /> : null}
-      <View style={styles.route}>
-        {STOPS.slice(0, -1).map((_, i) => (
-          <Segment key={i} index={i} progress={progress} />
-        ))}
-        {STOPS.map((_, i) => (
-          <Dot key={i} index={i} progress={progress} />
-        ))}
-      </View>
-      <View style={styles.stepLine} accessibilityLiveRegion="polite">
-        <Animated.View
-          key={step}
-          entering={fadeIn}
-          exiting={STEP_OUT}
-          style={styles.stepText}
-        >
-          <ThemedText variant="subheadLabel" style={styles.muted}>
-            {t(STEPS[step])}
-          </ThemedText>
-        </Animated.View>
-      </View>
+      <StitchRing size={28} />
+      <ThemedText
+        variant="subheadLabel"
+        style={styles.muted}
+        accessibilityLiveRegion="polite"
+      >
+        {t(STEPS[step])}
+      </ThemedText>
     </View>
   );
 }
@@ -218,65 +45,7 @@ const styles = StyleSheet.create((theme) => ({
   wrap: {
     alignItems: "center",
     gap: theme.gap(2),
-    paddingVertical: theme.gap(2),
-  },
-  covers: {
-    width: theme.gap(24),
-    height: theme.gap(13),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cover: {
-    position: "absolute",
-    width: theme.gap(8),
-    height: theme.gap(11),
-    borderRadius: theme.radius.md,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: theme.colors.surface,
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  coverAt: (index: number) => ({
-    left: theme.gap(2.5) + index * theme.gap(5.5),
-    zIndex: index === 1 ? 2 : 1,
-  }),
-  fill: {
-    width: "100%",
-    height: "100%",
-  },
-  route: {
-    width: 272,
-    height: 104,
-  },
-  segment: {
-    position: "absolute",
-    height: 2,
-    borderRadius: 1,
-    opacity: 0.7,
-    transformOrigin: "left",
-    backgroundColor: theme.colors.primary,
-  },
-  dot: {
-    position: "absolute",
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: theme.colors.surface,
-    backgroundColor: theme.colors.primary,
-  },
-  dotLabel: {
-    color: theme.colors.onTint,
-  },
-  stepLine: {
-    height: 24,
-    alignSelf: "stretch",
-    alignItems: "center",
-  },
-  stepText: {
-    position: "absolute",
+    paddingVertical: theme.gap(4),
   },
   muted: {
     color: theme.colors.muted,

@@ -27,7 +27,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, View } from "react-native";
@@ -37,10 +36,6 @@ import Animated, {
   FadeOut,
   LinearTransition,
   SlideInDown,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
@@ -70,55 +65,6 @@ const PANEL_RESIZE = LinearTransition.duration(motion.duration.enter).easing(
 );
 const MAP_IN = FadeIn.duration(300).easing(motion.easing.out);
 const CONTENT_OUT = FadeOut.duration(140).easing(motion.easing.out);
-
-/** Save covers that scroll slowly behind the form when the trip has no map. */
-function CoverBackdrop({ covers }: { covers: string[] }) {
-  const reduced = useReducedMotion();
-  const drift = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) return;
-    drift.set(
-      withRepeat(
-        withTiming(1, { duration: 14_000, easing: Easing.inOut(Easing.quad) }),
-        -1,
-        true,
-      ),
-    );
-  }, [drift, reduced]);
-  const up = useAnimatedStyle(() => ({
-    transform: [{ translateY: -40 * drift.get() }],
-  }));
-  const down = useAnimatedStyle(() => ({
-    transform: [{ translateY: -40 + 40 * drift.get() }],
-  }));
-  // Covers repeat until each column runs past the sheet, so a space with a
-  // few photos still fills the backdrop with no empty band.
-  const tiles =
-    covers.length === 0
-      ? []
-      : Array.from({ length: 24 }, (_, i) => covers[i % covers.length]);
-  const columns = [0, 1, 2].map((c) => tiles.filter((_, i) => i % 3 === c));
-  return (
-    <View style={styles.backdrop} pointerEvents="none">
-      {columns.map((column, c) => (
-        <Animated.View
-          key={c}
-          style={[styles.backdropColumn, c === 1 ? down : up]}
-        >
-          {column.map((uri, i) => (
-            <Image
-              key={i}
-              source={{ uri }}
-              style={styles.backdropCover}
-              contentFit="cover"
-            />
-          ))}
-        </Animated.View>
-      ))}
-      <View style={styles.backdropVeil} />
-    </View>
-  );
-}
 
 function isNothingToSwap(error: unknown): boolean {
   return (
@@ -151,20 +97,6 @@ export default function TripScreen() {
   const [selected, setSelected] = useState<StopPick | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [lastRequest, setLastRequest] = useState<TripRequest | null>(null);
-
-  // Unique: two saves from one site often share a cover, and covers key
-  // their tiles.
-  const covers = useMemo(
-    () => [
-      ...new Set(
-        (space?.items ?? []).flatMap((item) => {
-          const uri = item.imageUrl ?? item.heroImageUrl;
-          return uri ? [uri] : [];
-        }),
-      ),
-    ],
-    [space],
-  );
 
   const dayCount = trip?.days.length ?? 0;
   const day = Math.min(activeDay, Math.max(0, dayCount - 1));
@@ -258,7 +190,7 @@ export default function TripScreen() {
   const panel = (() => {
     switch (mode) {
       case "building":
-        return <TripBuilding covers={covers} />;
+        return <TripBuilding />;
       case "message":
         return (
           <View style={styles.message}>
@@ -394,9 +326,7 @@ export default function TripScreen() {
             onMapPress={() => setSelected(null)}
           />
         </Animated.View>
-      ) : (
-        <CoverBackdrop covers={covers} />
-      )}
+      ) : null}
       <Animated.View
         entering={PANEL_IN}
         layout={PANEL_RESIZE}
@@ -437,30 +367,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   fill: {
     ...StyleSheet.absoluteFillObject,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: "row",
-    gap: theme.gap(1),
-    paddingHorizontal: theme.gap(1),
-    overflow: "hidden",
-  },
-  backdropColumn: {
-    flex: 1,
-    gap: theme.gap(1),
-    // Clear of the status bar and the back button.
-    paddingTop: rt.insets.top + theme.gap(7),
-  },
-  backdropCover: {
-    width: "100%",
-    aspectRatio: 0.75,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  backdropVeil: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.background,
-    opacity: 0.55,
   },
   panel: {
     position: "absolute",

@@ -19,7 +19,7 @@ import Animated, {
   FadeOut,
   LinearTransition,
 } from "react-native-reanimated";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 
 // Rows fade in 40ms apart with no overshoot. A swap reflows the list with
 // ease-in-out.
@@ -138,7 +138,6 @@ export function TripDayPanel({
   useAppLocale();
   const day = trip.days[activeDay];
   const date = tripDayDate(trip.startDate, activeDay);
-  const { theme } = useUnistyles();
   const subtitle = [
     date ? formatTripDay(date) : null,
     t("trip.stopCount", { count: day?.stops.length ?? 0 }),
@@ -156,7 +155,7 @@ export function TripDayPanel({
           )}
           selected={activeDay}
           onSelect={onDayChange}
-          tintFor={() => theme.colors.primary}
+          tinted
         />
       </View>
       {day ? (

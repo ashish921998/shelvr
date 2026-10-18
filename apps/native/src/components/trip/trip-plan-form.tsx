@@ -18,31 +18,11 @@ import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-  FadeOutDown,
-  FadeOutUp,
-  LinearTransition,
-} from "react-native-reanimated";
+import Animated, { LinearTransition } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PACES: TripPace[] = ["easy", "balanced", "packed"];
 
-// The day number slides up on plus and down on minus, with a short
-// ease-out.
-const ROLL = {
-  up: {
-    in: FadeInUp.duration(motion.duration.state).easing(motion.easing.out),
-    out: FadeOutUp.duration(motion.duration.feedback).easing(motion.easing.out),
-  },
-  down: {
-    in: FadeInDown.duration(motion.duration.state).easing(motion.easing.out),
-    out: FadeOutDown.duration(motion.duration.feedback).easing(
-      motion.easing.out,
-    ),
-  },
-};
 const RESIZE = LinearTransition.duration(motion.duration.enter).easing(
   motion.easing.inOut,
 );
@@ -82,7 +62,7 @@ function Row({
   );
 }
 
-/** Days as a stepper whose number rolls up or down with each tap. */
+/** Days as a minus / plus stepper. */
 function DayStepper({
   days,
   onChange,
@@ -91,12 +71,10 @@ function DayStepper({
   onChange: (days: number) => void;
 }) {
   const { theme } = useUnistyles();
-  const [direction, setDirection] = useState<1 | -1>(1);
   const step = (by: 1 | -1) => {
     const next = days + by;
     if (next < MIN_TRIP_DAYS || next > MAX_TRIP_DAYS) return;
     if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
-    setDirection(by);
     onChange(next);
   };
   const stepButton = (by: 1 | -1) => {
@@ -135,16 +113,9 @@ function DayStepper({
       }
     >
       {stepButton(-1)}
-      <View style={styles.stepValue}>
-        <Animated.View
-          key={days}
-          entering={(direction === 1 ? ROLL.up : ROLL.down).in}
-          exiting={(direction === 1 ? ROLL.up : ROLL.down).out}
-          style={styles.stepNumber}
-        >
-          <ThemedText variant="header">{days}</ThemedText>
-        </Animated.View>
-      </View>
+      <ThemedText variant="header" style={styles.stepValue}>
+        {days}
+      </ThemedText>
       {stepButton(1)}
     </View>
   );
@@ -247,7 +218,6 @@ export function TripPlanForm({
   onCancel,
 }: Props) {
   useAppLocale();
-  const { theme } = useUnistyles();
   const [days, setDays] = useState(initial?.days ?? 3);
   const [pace, setPace] = useState<TripPace>(initial?.pace ?? "balanced");
   const [start, setStart] = useState<Date | null>(() => {
@@ -285,7 +255,7 @@ export function TripPlanForm({
             labels={cities.map((c) => c.city)}
             selected={cityIndex}
             onSelect={(index) => setPicked(cities[index]?.city)}
-            tintFor={() => theme.colors.primary}
+            tinted
             accessibilityLabel={t("trip.whichCity")}
           />
         </View>
@@ -396,13 +366,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   stepValue: {
     width: theme.gap(4),
-    height: 32,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepNumber: {
-    position: "absolute",
+    textAlign: "center",
   },
   dateLink: {
     flexDirection: "row",

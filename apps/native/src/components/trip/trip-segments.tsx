@@ -1,92 +1,35 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import { motion } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  View,
-  type LayoutRectangle,
-} from "react-native";
-import Animated, {
-  ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-// Ease-in-out timing rather than a spring, since a tap has no velocity to
-// carry.
-const GLIDE = {
-  duration: motion.duration.enter,
-  easing: motion.easing.inOut,
-  reduceMotion: ReduceMotion.System,
-};
+import { Pressable, ScrollView, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 type Props = {
   labels: string[];
   selected: number;
   onSelect: (index: number) => void;
-  /** The pill behind the selected label. Defaults to the surface color. */
-  tintFor?: (index: number) => string;
+  /** The selected pill is amber rather than the surface color. */
+  tinted?: boolean;
   /** Day tabs scroll sideways; the pace control fills its row. */
   scroll?: boolean;
   accessibilityLabel?: string;
 };
 
-/**
- * A row of choices with one pill that glides to the selected one, used for
- * the trip's pace, its city and its day tabs.
- */
+/** A row of pill choices, used for the trip's pace, its city and its day
+ * tabs. */
 export function TripSegments({
   labels,
   selected,
   onSelect,
-  tintFor,
+  tinted = false,
   scroll = false,
   accessibilityLabel,
 }: Props) {
-  const { theme } = useUnistyles();
-  const [layouts, setLayouts] = useState<Record<number, LayoutRectangle>>({});
-  const x = useSharedValue(0);
-  const width = useSharedValue(0);
-  const target = layouts[selected];
-  const measured = useSharedValue(false);
-
-  useEffect(() => {
-    if (target === undefined) return;
-    if (!measured.get()) {
-      // First layout: the pill starts where it belongs, no slide from 0.
-      x.set(target.x);
-      width.set(target.width);
-      measured.set(true);
-      return;
-    }
-    x.set(withTiming(target.x, GLIDE));
-    width.set(withTiming(target.width, GLIDE));
-  }, [target, x, width, measured]);
-
-  const pill = useAnimatedStyle(() => ({
-    opacity: measured.get() ? 1 : 0,
-    width: width.get(),
-    transform: [{ translateX: x.get() }],
-  }));
-
   const row = (
     <View
       style={[styles.row, !scroll && styles.fill]}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
     >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.pill,
-          { backgroundColor: tintFor?.(selected) ?? theme.colors.surface },
-          pill,
-        ]}
-      />
       {labels.map((label, index) => {
         const active = index === selected;
         return (
@@ -94,23 +37,23 @@ export function TripSegments({
             key={`${index}-${label}`}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            onLayout={(event) => {
-              const layout = event.nativeEvent.layout;
-              setLayouts((prev) => ({ ...prev, [index]: layout }));
-            }}
             onPress={() => {
               if (active) return;
               if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
               onSelect(index);
             }}
             hitSlop={4}
-            style={[styles.segment, !scroll && styles.segmentFill]}
+            style={[
+              styles.segment,
+              !scroll && styles.segmentFill,
+              active && (tinted ? styles.tintedPill : styles.pill),
+            ]}
           >
             <ThemedText
               variant={active ? "labelStrong" : "label"}
               numberOfLines={1}
               style={
-                active ? (tintFor ? styles.onTint : styles.active) : styles.idle
+                active ? (tinted ? styles.onTint : styles.active) : styles.idle
               }
             >
               {label}
@@ -150,23 +93,22 @@ const styles = StyleSheet.create((theme) => ({
   fill: {
     alignSelf: "stretch",
   },
-  pill: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 999,
-    borderCurve: "continuous",
-  },
   segment: {
     minHeight: 36,
     paddingHorizontal: theme.gap(1.75),
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 999,
+    borderCurve: "continuous",
   },
   segmentFill: {
     flex: 1,
+  },
+  pill: {
+    backgroundColor: theme.colors.surface,
+  },
+  tintedPill: {
+    backgroundColor: theme.colors.primary,
   },
   active: {
     color: theme.colors.foreground,
