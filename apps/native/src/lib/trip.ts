@@ -91,15 +91,14 @@ export function locatedStops(
 /** Share of the screen the day list covers over the map. */
 export const TRIP_PANEL_SHARE = 0.52;
 
-/** The map's size and what covers it: the header above, the panel below. */
+/** The map's size and what covers it: the header above, the panel below.
+ * Apple Maps centers a region between the header and the home indicator
+ * (`safeBottom`), measured on an iPhone 17 Pro simulator. */
 type MapView = {
   width: number;
   height: number;
   top: number;
   bottom: number;
-  // The device's safe area: Apple Maps centers a region inside it, not in
-  // the whole map.
-  safeTop: number;
   safeBottom: number;
 };
 
@@ -139,7 +138,7 @@ export function fitCamera(
   const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
   const latPerPoint = (360 * cos) / (view.width * 2 ** zoom);
   const regionMiddle =
-    view.safeTop + (view.height - view.safeTop - view.safeBottom) / 2;
+    view.top + (view.height - view.top - view.safeBottom) / 2;
   const visibleMiddle = view.top + visible / 2;
   return {
     // Moved so the points sit in the middle of the visible part, not where

@@ -76,7 +76,6 @@ describe("fitCamera", () => {
     height: 860,
     top: 100,
     bottom: 450,
-    safeTop: 62,
     safeBottom: 34,
   };
 
@@ -113,20 +112,29 @@ describe("fitCamera", () => {
     // Project each point to screen points the way the map does.
     const lngPerPoint = 360 / (view.width * 2 ** camera.zoom);
     const cos = Math.cos((camera.coordinates.latitude * Math.PI) / 180);
+    const ys: number[] = [];
     for (const point of points) {
       const x =
         view.width / 2 +
         (point.longitude - camera.coordinates.longitude) / lngPerPoint;
-      // Apple Maps puts the region's center in the middle of the safe area.
+      // Apple Maps puts the region's center between the header and the
+      // home indicator.
       const y =
-        view.safeTop +
-        (view.height - view.safeTop - view.safeBottom) / 2 -
+        view.top +
+        (view.height - view.top - view.safeBottom) / 2 -
         (point.latitude - camera.coordinates.latitude) / (lngPerPoint * cos);
+      ys.push(y);
       expect(x).toBeGreaterThan(0);
       expect(x).toBeLessThan(view.width);
       expect(y).toBeGreaterThan(view.top);
       expect(y).toBeLessThan(view.height - view.bottom);
     }
+    // Centered in the band between the header and the panel.
+    const visible = view.height - view.top - view.bottom;
+    expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(
+      view.top + visible / 2,
+      0,
+    );
   });
 });
 

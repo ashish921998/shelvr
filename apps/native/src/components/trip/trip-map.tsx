@@ -90,11 +90,10 @@ export function TripMap({
         height,
         top,
         bottom: height * TRIP_PANEL_SHARE,
-        safeTop: rt.insets.top,
         safeBottom: rt.insets.bottom,
       },
     );
-  }, [active, days, width, height, top, rt.insets.top, rt.insets.bottom]);
+  }, [active, days, width, height, top, rt.insets.bottom]);
 
   useEffect(() => {
     if (camera) ref.current?.setCameraPosition(camera);
