@@ -4,7 +4,7 @@ import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ItemSpaces } from "@/components/item-spaces";
 import { PostMediaButton } from "@/components/post-media-button";
-import { displayHost } from "@/lib/url";
+import { displayHost, siteMonogram } from "@/lib/url";
 import { SimilarGrid } from "@/components/similar-grid";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import type { DetailItem } from "@/components/item-detail";
@@ -131,8 +131,7 @@ export function ArticleReaderView({
     .join(" · ");
 
   // A save with no picture shows its site's first letter, like a book spine.
-  // Array.from keeps an emoji or other astral first character whole.
-  const monogram = Array.from(displayHost(item.url))[0]?.toLocaleUpperCase();
+  const monogram = siteMonogram(item.url);
   const thumbnail =
     heroUri && heroUri !== failedUri ? (
       <Image
@@ -315,7 +314,7 @@ const styles = StyleSheet.create((theme) => ({
     overflow: "hidden",
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
   thumbnailImage: {

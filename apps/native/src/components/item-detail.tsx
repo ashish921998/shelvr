@@ -4,6 +4,7 @@ import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
+import { SiteButton, SitePanel } from "@/components/site-panel";
 import { ItemSpaces } from "@/components/item-spaces";
 import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
@@ -19,6 +20,8 @@ import { runIntent } from "@/lib/intents";
 import { withoutSourceLink } from "@/lib/source-link";
 import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
+import { isYouTubeVideoUrl } from "@/lib/url";
+import { letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +32,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
 import {
   memo,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -269,10 +273,8 @@ export const ItemDetail = memo(function ItemDetail({
   // the title, description, and actions below it.
   const maxHeroHeight = height * 0.55;
 
-  // Source shape; OG images default to 1200×630 (≈1.91).
-  const heroAspect =
-    item.aspectRatio ??
-    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
+  const letterboxed = letterboxedVideoRatio(item.url, item.aspectRatio);
+  const heroAspect = pageHeroAspect(item, social, letterboxed);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap, and when the cap bites, pull
@@ -296,10 +298,13 @@ export const ItemDetail = memo(function ItemDetail({
     <Image
       source={{ uri: heroUri }}
       recyclingKey={item._id}
-      {...pageHeroLook(heroKind, heroAspect, maxHeroHeight, {
-        width: heroWidth,
-        height: heroHeight,
-      })}
+      {...pageHeroLook(
+        heroKind,
+        heroAspect,
+        maxHeroHeight,
+        { width: heroWidth, height: heroHeight },
+        letterboxed !== undefined,
+      )}
     />
   ) : null;
 
@@ -307,11 +312,12 @@ export const ItemDetail = memo(function ItemDetail({
     openItemSource(item);
   };
 
+  const opensAs = heroOpensAs(item, social);
   const hero =
-    heroImage && social && item.url ? (
+    heroImage && opensAs && item.url ? (
       <PostMediaButton
-        site={social.site}
-        playable={social.playable}
+        site={opensAs.site}
+        playable={opensAs.playable}
         onPress={openPost}
       >
         {heroImage}
@@ -342,17 +348,23 @@ export const ItemDetail = memo(function ItemDetail({
         ))
       : null;
 
+  const zoomable = (target: ReactNode) =>
+    isZoomTarget ? (
+      <Link.AppleZoomTarget>{target}</Link.AppleZoomTarget>
+    ) : (
+      target
+    );
+  const sitePanel = !heroUri && showsSitePanel(item, social, bodyPending);
+
   const heroBlock = heroUri ? (
     <>
       <View style={heroKind === "framed" ? styles.heroContainer : undefined}>
-        {isZoomTarget ? (
-          <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
-        ) : (
-          hero
-        )}
+        {zoomable(hero)}
       </View>
       {moreMedia}
     </>
+  ) : sitePanel ? (
+    zoomable(<SitePanel url={item.url} />)
   ) : null;
 
   const scrollProps = {
@@ -396,11 +408,44 @@ export const ItemDetail = memo(function ItemDetail({
         paragraphs={paragraphs}
         social={social}
         intents={intents}
-        heroUri={heroUri}
+        hasHero={heroBlock !== null}
       />
     </ScrollView>
   );
 });
+
+const YOUTUBE: SocialPost = { site: "YouTube", playable: true };
+
+/** A link that is neither a post nor an article: a product, a video, any page
+ * Shelvr read no body from. Its page leads with one button to the site. */
+function plainLink(item: DetailItem, social: SocialPost | undefined): boolean {
+  return item.type === "link" && social === undefined;
+}
+
+/** What the hero opens when tapped: a post on its site, or a YouTube video,
+ * which plays there and so gets the same play button a video post does. */
+function heroOpensAs(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): SocialPost | undefined {
+  if (social) return social;
+  return plainLink(item, social) && isYouTubeVideoUrl(item.url)
+    ? YOUTUBE
+    : undefined;
+}
+
+/** Whether a plain link with no picture shows its site's panel in its place.
+ * While the body loads the page may still become the reader, so the panel
+ * waits, unless the save already says it has no article; then it is up for
+ * the card's zoom. */
+function showsSitePanel(
+  item: DetailItem,
+  social: SocialPost | undefined,
+  bodyPending: boolean,
+): boolean {
+  if (bodyPending && item.enrichment === undefined) return false;
+  return plainLink(item, social);
+}
 
 type PageHeroKind = "poster" | "sticker" | "framed";
 
@@ -412,19 +457,36 @@ function pageHeroKind(
   return social ? "poster" : "framed";
 }
 
+/** The hero's shape: a letterboxed video thumbnail's video, else the
+ * picture's own, else the usual shape of what was saved (OpenGraph images
+ * default to 1200×630, about 1.91). */
+function pageHeroAspect(
+  item: DetailItem,
+  social: SocialPost | undefined,
+  letterboxed: number | undefined,
+): number {
+  return (
+    letterboxed ??
+    item.aspectRatio ??
+    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4)
+  );
+}
+
 /** The page hero's fit and box: a recipe post's short cropped poster, a
- * full-bleed sticker, or a photo sized to its matted frame. */
+ * full-bleed sticker, or a photo sized to its matted frame. A letterboxed
+ * video thumbnail fills its frame, which crops the black bars away. */
 function pageHeroLook(
   kind: PageHeroKind,
   aspect: number,
   maxHeight: number,
   framed: { width: number; height: number },
+  letterboxed: boolean,
 ) {
   if (kind === "poster") {
     return { contentFit: "cover" as const, style: styles.poster };
   }
   return {
-    contentFit: "contain" as const,
+    contentFit: letterboxed ? ("cover" as const) : ("contain" as const),
     style:
       kind === "sticker"
         ? [styles.hero, { aspectRatio: aspect, maxHeight }]
@@ -485,10 +547,10 @@ function ItemPageBody({
   paragraphs,
   social,
   intents,
-  heroUri,
+  hasHero,
 }: DetailBodyProps & {
   intents: ItemIntent[];
-  heroUri: string | null | undefined;
+  hasHero: boolean;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -509,7 +571,7 @@ function ItemPageBody({
       style={[
         styles.body,
         // The ScrollView already clears the header; only a hero needs a gap.
-        heroUri ? { paddingTop: theme.gap(5) } : null,
+        hasHero ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
       <SaveStatusNotice item={item} centered />
@@ -518,27 +580,37 @@ function ItemPageBody({
         <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
-      {item.url ? (
-        <View style={styles.titleContainer}>
-          <ItemSourceLink
-            item={item}
-            icon={social?.playable ? "play.rectangle" : "safari"}
-            iconSize={15}
-            arrowSize={11}
-            iconTintColor={theme.colors.muted}
-            arrowTintColor={theme.colors.faint}
-            label={
-              social && item.author
-                ? `${item.author} · ${social.site}`
-                : undefined
-            }
-            style={styles.sourceRow}
-            textStyle={styles.sourceText}
-          />
+      {item.url && plainLink(item, social) ? (
+        // The site button leads, with the other actions close under it.
+        <View style={styles.siteActions}>
+          <SiteButton item={item} />
+          <IntentsRow item={item} intents={intents} />
         </View>
-      ) : null}
+      ) : (
+        <>
+          {item.url ? (
+            <View style={styles.titleContainer}>
+              <ItemSourceLink
+                item={item}
+                icon={social?.playable ? "play.rectangle" : "safari"}
+                iconSize={15}
+                arrowSize={11}
+                iconTintColor={theme.colors.muted}
+                arrowTintColor={theme.colors.faint}
+                label={
+                  social && item.author
+                    ? `${item.author} · ${social.site}`
+                    : undefined
+                }
+                style={styles.sourceRow}
+                textStyle={styles.sourceText}
+              />
+            </View>
+          ) : null}
 
-      <IntentsRow item={item} intents={intents} />
+          <IntentsRow item={item} intents={intents} />
+        </>
+      )}
 
       {/* A post saved for its recipe goes straight to the tabs: the summary
           only restates the dish the title and poster already name. */}
@@ -546,7 +618,7 @@ function ItemPageBody({
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
-      {item.url && !detail.content ? (
+      {item.url && !detail.content && !plainLink(item, social) ? (
         <Pressable
           style={styles.urlRow}
           accessibilityRole="link"
@@ -724,13 +796,7 @@ function TagsRow({ tags }: { tags: string[] }) {
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState =
-  | "image_too_large"
-  | "gone"
-  | "failed"
-  | "stalled"
-  | "partial"
-  | "no_article";
+type SaveState = "image_too_large" | "gone" | "failed" | "stalled" | "partial";
 
 function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status === "failed") {
@@ -747,12 +813,9 @@ function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status !== "ready") {
     return null;
   }
-  if (item.enrichment === "partial") {
-    return "partial";
-  }
-  // The page loaded but had no extractable article: the URL itself is the
-  // save. Explained, but not retryable: a re-run would reach the same result.
-  return item.enrichment === "no_article" ? "no_article" : null;
+  // "no_article" (the page read fine, with no article body) is no fault: a
+  // product or a video has none. Its page leads with the site button instead.
+  return item.enrichment === "partial" ? "partial" : null;
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
@@ -761,7 +824,6 @@ const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
   failed: "item.pageFailed",
   stalled: "item.stalled",
   partial: "item.partial",
-  no_article: "item.noArticle",
 };
 
 function noticeFor(state: SaveState, type: DetailItem["type"]): string {
@@ -833,19 +895,9 @@ function SaveStatusNotice({
   return (
     <View style={[styles.noticeRow, centered && styles.centeredRow]}>
       <AppSymbolIcon
-        name={
-          state === "no_article"
-            ? "info.circle"
-            : "exclamationmark.triangle.fill"
-        }
+        name="exclamationmark.triangle.fill"
         size={14}
-        tintColor={
-          state === "gone"
-            ? theme.colors.faint
-            : state === "no_article"
-              ? theme.colors.muted
-              : theme.colors.danger
-        }
+        tintColor={state === "gone" ? theme.colors.faint : theme.colors.danger}
       />
       <Text
         style={[
@@ -856,8 +908,7 @@ function SaveStatusNotice({
       >
         {noticeFor(state, item.type)}
       </Text>
-      {isTerminalFailure(item.failureReason) ||
-      state === "no_article" ? null : (
+      {isTerminalFailure(item.failureReason) ? null : (
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
@@ -906,10 +957,10 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     // Full-bleed so the card image (a die-cut sticker) zooms edge-to-edge.
   },
-  // Non-sticker heroes get the same white matted frame as the home cards, so
+  // Non-sticker heroes get the same matted frame as the home cards, so
   // the padded look carries through the Apple zoom into this screen.
   heroContainer: {
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     // Hug the image so a capped portrait sits as a centered card rather than
     // leaving a gap in a full-width frame.
     alignSelf: "center",
@@ -976,6 +1027,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   centeredText: {
     textAlign: "center",
+  },
+  siteActions: {
+    gap: theme.gap(1.5),
   },
   titleContainer: {
     gap: theme.gap(1),

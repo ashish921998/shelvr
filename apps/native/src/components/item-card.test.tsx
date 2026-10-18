@@ -4,7 +4,9 @@ import { cloneElement, isValidElement, type ReactNode } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { MenuView } from "@expo/ui/community/menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Image } from "expo-image";
 import { ItemCard, type FeedItem } from "./item-card";
+import { textFaceCopy } from "./item-card-face";
 
 // Every query below goes through the accessibility tree, so the mocks resolve
 // role and name the way the platform does rather than echoing whichever prop
@@ -487,5 +489,181 @@ describe("inside a space", () => {
   it("leaves a suggestion to Add and Dismiss", () => {
     const menu = menuIn({ title: "Miso soup recipe", suggested: true });
     expect(menu).not.toContain("Remove from this space");
+  });
+});
+
+describe("a save with no picture", () => {
+  it("prints a link's summary on its face, under the site's letter, and its title once below", () => {
+    render(
+      <ItemCard
+        item={{
+          ...base,
+          title: "Poäng armchair",
+          description: "A bent birch armchair.",
+          url: "https://www.ikea.com/us/en/p/poang-armchair-50240603/",
+        }}
+      />,
+    );
+    expect(screen.getByText("I")).toBeTruthy();
+    expect(screen.getByText("A bent birch armchair.")).toBeTruthy();
+    expect(screen.getAllByText("Poäng armchair")).toHaveLength(1);
+  });
+
+  it("puts the title on the face when there is nothing else to print", () => {
+    render(
+      <ItemCard
+        item={{ ...base, title: "Poäng armchair", url: "https://ikea.com" }}
+      />,
+    );
+    expect(screen.getAllByText("Poäng armchair")).toHaveLength(1);
+  });
+
+  it("prints a note's own words with its title in the caption", () => {
+    render(
+      <ItemCard
+        item={{
+          ...base,
+          type: "note",
+          title: "Gift ideas",
+          note: "Pottery class for Mum",
+        }}
+      />,
+    );
+    expect(screen.getByText("Pottery class for Mum")).toBeTruthy();
+    expect(screen.getAllByText("Gift ideas")).toHaveLength(1);
+  });
+});
+
+it("crops the black bars off a YouTube video's 4:3 thumbnail", () => {
+  vi.mocked(Image).mockClear();
+  render(
+    <ItemCard
+      item={{
+        ...base,
+        title: "Never Gonna Give You Up",
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        // The client only gets Shelvr's stored copy, never YouTube's address.
+        imageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
+        aspectRatio: 4 / 3,
+      }}
+    />,
+  );
+  const picture = vi.mocked(Image).mock.calls[0][0] as {
+    contentFit: string;
+    style: unknown[];
+  };
+  expect(picture.contentFit).toBe("cover");
+  expect(picture.style[1]).toEqual({ aspectRatio: 16 / 9 });
+});
+
+describe("textFaceCopy", () => {
+  it("names a save by whatever it has, without repeating it in the caption", () => {
+    expect(textFaceCopy({ ...base, title: "Ramen" })).toEqual({
+      body: "Ramen",
+    });
+    expect(textFaceCopy({ ...base, description: "Quick miso ramen." })).toEqual(
+      { body: "Quick miso ramen." },
+    );
+    expect(
+      textFaceCopy({ ...base, status: "failed" }, "Couldn't save"),
+    ).toEqual({ body: "Couldn't save" });
+    expect(textFaceCopy({ ...base, url: "https://www.ikea.com/p/1" })).toEqual({
+      body: "ikea.com",
+    });
+  });
+
+  it("leaves a note's own heading to the caption instead of printing it twice", () => {
+    const note = { ...base, type: "note" as const, title: "Mum's Gift Ideas" };
+    expect(
+      textFaceCopy({
+        ...note,
+        note: "Gift ideas for Mum\nLinen apron and a good bread knife.",
+      }),
+    ).toEqual({
+      body: "Linen apron and a good bread knife.",
+      captionTitle: "Mum's Gift Ideas",
+    });
+    // Only the heading: the owner's words, with the caption left empty.
+    expect(textFaceCopy({ ...note, note: "Gift ideas for Mum" })).toEqual({
+      body: "Gift ideas for Mum",
+    });
+    // A first line that says more than the title is the note itself.
+    expect(
+      textFaceCopy({
+        ...note,
+        note: "Gift ideas for Mum and Dad\nLinen apron.",
+      }),
+    ).toEqual({
+      body: "Gift ideas for Mum and Dad\nLinen apron.",
+      captionTitle: "Mum's Gift Ideas",
+    });
+  });
+
+  it("doesn't repeat a first-line title a note saved without AI carries", () => {
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Buy oat milk",
+        note: "Buy oat milk",
+      }),
+    ).toEqual({ body: "Buy oat milk" });
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Pottery class for Mum",
+        note: "Pottery class for Mum\nSaturday 10am",
+      }),
+    ).toEqual({ body: "Saturday 10am", captionTitle: "Pottery class for Mum" });
+    // A title that only starts the first line is a summary, not a cut.
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        note: "Gift ideas for Mum and Dad\nLinen apron.",
+      }),
+    ).toEqual({
+      body: "Gift ideas for Mum and Dad\nLinen apron.",
+      captionTitle: "Gift ideas",
+    });
+  });
+
+  it("keeps a long first line whole when the title is its 80-character cut", () => {
+    const line =
+      "Mum said the best route is the coastal path from Cascais to Guincho, stop at the café by the lighthouse for lunch";
+    const note = `${line}\nBring sunscreen`;
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: line.slice(0, 80),
+        note,
+      }),
+    ).toEqual({ body: note });
+    // A cut that ends on a space is stored with it.
+    const spaced =
+      "Things to pack for the Lisbon trip next month: passport, adapters, sunscreen, a hat and a book";
+    expect(spaced[79]).toBe(" ");
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: spaced.slice(0, 80),
+        note: `${spaced}\nBook the airport taxi`,
+      }),
+    ).toEqual({ body: `${spaced}\nBook the airport taxi` });
+  });
+
+  it("reads a note's words, not a link summary it never has", () => {
+    expect(
+      textFaceCopy({
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        description: "ignored",
+      }),
+    ).toEqual({ body: "Gift ideas" });
   });
 });

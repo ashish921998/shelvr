@@ -55,11 +55,13 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Analytics:** `src/lib/analytics.ts` holds the typed client event map
   (`AnalyticsEventProperties`); server capture is `convex/analytics.ts`. Read
   those rather than grepping call sites.
-- **Link reading:** `convex/model/pageRead.ts` (`readPage`, per-host readers) on
-  top of `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
+- **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
+  shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
+  per-host readers in `convex/model/readers/`, on top of
+  `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
 - **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
-  and `convex/model/pageRead.ts` (about 1,650). Embedding and recommendation actions
+  and `convex/model/pageReadCore.ts` (about 550). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
