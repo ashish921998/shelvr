@@ -137,12 +137,17 @@ export default function PlanVote({
   // The ballot still waiting on that pause. Leaving the page sends it at once,
   // with keepalive so the request outlives the tab.
   const pending = useRef<Ballot | undefined>(undefined);
+  // The newest ballot handed to the queue whose request hasn't started yet,
+  // because an earlier one is still out. Leaving the page sends it too.
+  const queued = useRef<Ballot | undefined>(undefined);
 
   const send = (next: Choices, revision: number) => {
     voter.current ??= voterId();
     const body = ballot(token, voter.current, next, revision);
     storeIfNewer(pendingKey(token), { choices: next, revision });
+    queued.current = { choices: next, revision };
     queue.current = queue.current.then(async () => {
+      if (queued.current?.revision === revision) queued.current = undefined;
       try {
         const response = await fetch("/api/plan-vote", {
           method: "POST",
@@ -209,8 +214,10 @@ export default function PlanVote({
   useEffect(() => {
     const leave = () => {
       clearTimeout(timer.current);
-      const next = pending.current;
+      // The ballot still settling is newer than any in the queue.
+      const next = pending.current ?? queued.current;
       pending.current = undefined;
+      queued.current = undefined;
       if (!next) return;
       voter.current ??= voterId();
       storeIfNewer(pendingKey(token), next);

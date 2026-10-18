@@ -103,6 +103,28 @@ describe("PlanVote", () => {
     expect(container.textContent).toContain("Saved. Ashish will see");
   });
 
+  it("sends a vote waiting behind a slow one when the page closes", async () => {
+    fetchMock
+      .mockImplementationOnce(() => new Promise<Response>(() => undefined))
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    tap("Yes to Masque");
+    await settle();
+    // The second ballot waits in the queue behind the first request.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ keepalive: true });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      picks: ["p0", "p1"],
+    });
+  });
+
   it("says they will see the picks when the sender has no name", () => {
     act(() => root.render(<PlanVote token="tok" places={places} />));
     expect(container.textContent).toContain(
