@@ -184,9 +184,6 @@ function pinterestSourceLink(
   }
 }
 
-/** The pin as a page. Its description is the caption and the only content;
- * the board, video flag, and source page title travel as their own fields
- * for the prompt to render. */
 /** A pinner's display name. Pinterest encodes some names more than once
  * ("A &amp;amp; B"), so entities are decoded until the name stops changing. */
 function pinterestName(name: string | null | undefined): string | undefined {
@@ -199,6 +196,9 @@ function pinterestName(name: string | null | undefined): string | undefined {
   return decoded || undefined;
 }
 
+/** The pin as a page. Its description is the caption and the only content;
+ * the board, video flag, and source page title travel as their own fields
+ * for the prompt to render. */
 export function pinterestPage(pin: PinterestPin): PageData | undefined {
   const image = pinterestImage(pin.images);
   const description = pin.description

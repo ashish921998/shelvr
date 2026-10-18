@@ -4,6 +4,7 @@ import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
+import { SiteButton, SitePanel } from "@/components/site-panel";
 import { ItemSpaces } from "@/components/item-spaces";
 import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
@@ -16,8 +17,11 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { withoutSourceLink } from "@/lib/source-link";
 import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
+import { isYouTubeVideoUrl } from "@/lib/url";
+import { letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -28,6 +32,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
 import {
   memo,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -211,13 +216,21 @@ export const ItemDetail = memo(function ItemDetail({
     const base = item.intents ?? [];
     const scoped = item.spaceIntents ?? [];
     const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
-    return [
-      ...base,
-      ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
-    ];
+    // An action that only reopens the save's own page repeats the source line.
+    return withoutSourceLink(
+      [
+        ...base,
+        ...scoped.filter(
+          (i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`),
+        ),
+      ],
+      item.url,
+    );
   })();
 
-  if (heroUri && isMediaSave(item)) {
+  // `detail`, not `item`: a row from a search or a space carries the recipe
+  // itself, and getItem fills it in for one that only has the card's flag.
+  if (heroUri && isMediaSave(detail)) {
     return (
       <MediaViewerPage
         item={item}
@@ -259,10 +272,8 @@ export const ItemDetail = memo(function ItemDetail({
   // the title, description, and actions below it.
   const maxHeroHeight = height * 0.55;
 
-  // Source shape; OG images default to 1200×630 (≈1.91).
-  const heroAspect =
-    item.aspectRatio ??
-    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
+  const letterboxed = letterboxedVideoRatio(item.url, item.aspectRatio);
+  const heroAspect = pageHeroAspect(item, social, letterboxed);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap, and when the cap bites, pull
@@ -276,16 +287,23 @@ export const ItemDetail = memo(function ItemDetail({
   };
   const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
+  // A post on this layout is one with a recipe (see isMediaSave). Its poster
+  // is a short, cropped band that opens the post, so the recipe it was saved
+  // for starts on the first screen.
+  const heroKind = pageHeroKind(item, social);
+  const poster = heroKind === "poster";
+
   const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
       recyclingKey={item._id}
-      contentFit="contain"
-      style={
-        item.isSticker
-          ? [styles.hero, { aspectRatio: heroAspect, maxHeight: maxHeroHeight }]
-          : [styles.heroImage, { width: heroWidth, height: heroHeight }]
-      }
+      {...pageHeroLook(
+        heroKind,
+        heroAspect,
+        maxHeroHeight,
+        { width: heroWidth, height: heroHeight },
+        letterboxed !== undefined,
+      )}
     />
   ) : null;
 
@@ -293,11 +311,12 @@ export const ItemDetail = memo(function ItemDetail({
     openItemSource(item);
   };
 
+  const opensAs = heroOpensAs(item, social);
   const hero =
-    heroImage && social && item.url ? (
+    heroImage && opensAs && item.url ? (
       <PostMediaButton
-        site={social.site}
-        playable={social.playable}
+        site={opensAs.site}
+        playable={opensAs.playable}
         onPress={openPost}
       >
         {heroImage}
@@ -306,8 +325,10 @@ export const ItemDetail = memo(function ItemDetail({
       heroImage
     );
 
+  // A recipe post's other photos stay on the post: here they would push the
+  // recipe back below the fold.
   const moreMedia =
-    social && item.url
+    social && item.url && !poster
       ? (item.media ?? []).slice(1).map((media, index) => (
           <View key={index} style={[styles.heroContainer, styles.moreMedia]}>
             <PostMediaButton
@@ -326,17 +347,23 @@ export const ItemDetail = memo(function ItemDetail({
         ))
       : null;
 
+  const zoomable = (target: ReactNode) =>
+    isZoomTarget ? (
+      <Link.AppleZoomTarget>{target}</Link.AppleZoomTarget>
+    ) : (
+      target
+    );
+  const sitePanel = !heroUri && showsSitePanel(item, social, bodyPending);
+
   const heroBlock = heroUri ? (
     <>
-      <View style={item.isSticker ? undefined : styles.heroContainer}>
-        {isZoomTarget ? (
-          <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
-        ) : (
-          hero
-        )}
+      <View style={heroKind === "framed" ? styles.heroContainer : undefined}>
+        {zoomable(hero)}
       </View>
       {moreMedia}
     </>
+  ) : sitePanel ? (
+    zoomable(<SitePanel url={item.url} />)
   ) : null;
 
   const scrollProps = {
@@ -380,11 +407,91 @@ export const ItemDetail = memo(function ItemDetail({
         paragraphs={paragraphs}
         social={social}
         intents={intents}
-        heroUri={heroUri}
+        hasHero={heroBlock !== null}
       />
     </ScrollView>
   );
 });
+
+const YOUTUBE: SocialPost = { site: "YouTube", playable: true };
+
+/** A link that is neither a post nor an article: a product, a video, any page
+ * Shelvr read no body from. Its page leads with one button to the site. */
+function plainLink(item: DetailItem, social: SocialPost | undefined): boolean {
+  return item.type === "link" && social === undefined;
+}
+
+/** What the hero opens when tapped: a post on its site, or a YouTube video,
+ * which plays there and so gets the same play button a video post does. */
+function heroOpensAs(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): SocialPost | undefined {
+  if (social) return social;
+  return plainLink(item, social) && isYouTubeVideoUrl(item.url)
+    ? YOUTUBE
+    : undefined;
+}
+
+/** Whether a plain link with no picture shows its site's panel in its place.
+ * While the body loads the page may still become the reader, so the panel
+ * waits, unless the save already says it has no article; then it is up for
+ * the card's zoom. */
+function showsSitePanel(
+  item: DetailItem,
+  social: SocialPost | undefined,
+  bodyPending: boolean,
+): boolean {
+  if (bodyPending && item.enrichment === undefined) return false;
+  return plainLink(item, social);
+}
+
+type PageHeroKind = "poster" | "sticker" | "framed";
+
+function pageHeroKind(
+  item: DetailItem,
+  social: SocialPost | undefined,
+): PageHeroKind {
+  if (item.isSticker) return "sticker";
+  return social ? "poster" : "framed";
+}
+
+/** The hero's shape: a letterboxed video thumbnail's video, else the
+ * picture's own, else the usual shape of what was saved (OpenGraph images
+ * default to 1200×630, about 1.91). */
+function pageHeroAspect(
+  item: DetailItem,
+  social: SocialPost | undefined,
+  letterboxed: number | undefined,
+): number {
+  return (
+    letterboxed ??
+    item.aspectRatio ??
+    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4)
+  );
+}
+
+/** The page hero's fit and box: a recipe post's short cropped poster, a
+ * full-bleed sticker, or a photo sized to its matted frame. A letterboxed
+ * video thumbnail fills its frame, which crops the black bars away. */
+function pageHeroLook(
+  kind: PageHeroKind,
+  aspect: number,
+  maxHeight: number,
+  framed: { width: number; height: number },
+  letterboxed: boolean,
+) {
+  if (kind === "poster") {
+    return { contentFit: "cover" as const, style: styles.poster };
+  }
+  return {
+    contentFit: letterboxed ? ("cover" as const) : ("contain" as const),
+    style:
+      kind === "sticker"
+        ? [styles.hero, { aspectRatio: aspect, maxHeight }]
+        : [styles.heroImage, framed],
+  };
+}
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
@@ -439,10 +546,10 @@ function ItemPageBody({
   paragraphs,
   social,
   intents,
-  heroUri,
+  hasHero,
 }: DetailBodyProps & {
   intents: ItemIntent[];
-  heroUri: string | null | undefined;
+  hasHero: boolean;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -463,7 +570,7 @@ function ItemPageBody({
       style={[
         styles.body,
         // The ScrollView already clears the header; only a hero needs a gap.
-        heroUri ? { paddingTop: theme.gap(5) } : null,
+        hasHero ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
       <SaveStatusNotice item={item} centered />
@@ -472,33 +579,45 @@ function ItemPageBody({
         <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
-      {item.url ? (
-        <View style={styles.titleContainer}>
-          <ItemSourceLink
-            item={item}
-            icon={social?.playable ? "play.rectangle" : "safari"}
-            iconSize={15}
-            arrowSize={11}
-            iconTintColor={theme.colors.muted}
-            arrowTintColor={theme.colors.faint}
-            label={
-              social && item.author
-                ? `${item.author} · ${social.site}`
-                : undefined
-            }
-            style={styles.sourceRow}
-            textStyle={styles.sourceText}
-          />
+      {item.url && plainLink(item, social) ? (
+        // The site button leads, with the other actions close under it.
+        <View style={styles.siteActions}>
+          <SiteButton item={item} />
+          <IntentsRow item={item} intents={intents} />
         </View>
-      ) : null}
+      ) : (
+        <>
+          {item.url ? (
+            <View style={styles.titleContainer}>
+              <ItemSourceLink
+                item={item}
+                icon={social?.playable ? "play.rectangle" : "safari"}
+                iconSize={15}
+                arrowSize={11}
+                iconTintColor={theme.colors.muted}
+                arrowTintColor={theme.colors.faint}
+                label={
+                  social && item.author
+                    ? `${item.author} · ${social.site}`
+                    : undefined
+                }
+                style={styles.sourceRow}
+                textStyle={styles.sourceText}
+              />
+            </View>
+          ) : null}
 
-      <IntentsRow item={item} intents={intents} />
+          <IntentsRow item={item} intents={intents} />
+        </>
+      )}
 
-      {item.description ? (
+      {/* A post saved for its recipe goes straight to the tabs: the summary
+          only restates the dish the title and poster already name. */}
+      {item.description && !(social && detail.recipe) ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
-      {item.url && !detail.content ? (
+      {item.url && !detail.content && !plainLink(item, social) ? (
         <Pressable
           style={styles.urlRow}
           accessibilityRole="link"
@@ -570,9 +689,19 @@ function DetailSections({
   social,
 }: Omit<DetailBodyProps, "spaces">) {
   const { theme } = useUnistyles();
+  // Keyed by item so a recycled pager page opens a new recipe on Ingredients.
+  const recipe = detail.recipe ? (
+    <RecipeSection key={item._id} recipe={detail.recipe} />
+  ) : null;
+  // A post's recipe is what it was saved for, so it comes first and stands in
+  // for the caption it was lifted from: a recipe caption is the same
+  // ingredients and steps again, plus hashtags the tags already carry.
+  const recipeFirst = social !== undefined && recipe !== null;
   return (
     <>
-      {social && paragraphs.length > 0 ? (
+      {recipeFirst ? recipe : null}
+
+      {social && !recipeFirst && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>
@@ -585,12 +714,10 @@ function DetailSections({
       ) : null}
 
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
-          the ingredients and steps out of the story around them. A social post
-          keeps its caption above and gains the recipe its caption described or
-          linked to; a recipe screenshot gets the card under the photo. Keyed
-          by item so a recycled pager page opens a new recipe on Ingredients. */}
-      {detail.recipe ? (
-        <RecipeSection key={item._id} recipe={detail.recipe} />
+          the ingredients and steps out of the story around them. A recipe
+          screenshot gets the card under the photo. */}
+      {recipeFirst ? null : recipe ? (
+        recipe
       ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
@@ -668,13 +795,7 @@ function TagsRow({ tags }: { tags: string[] }) {
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState =
-  | "image_too_large"
-  | "gone"
-  | "failed"
-  | "stalled"
-  | "partial"
-  | "no_article";
+type SaveState = "image_too_large" | "gone" | "failed" | "stalled" | "partial";
 
 function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status === "failed") {
@@ -691,12 +812,9 @@ function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status !== "ready") {
     return null;
   }
-  if (item.enrichment === "partial") {
-    return "partial";
-  }
-  // The page loaded but had no extractable article: the URL itself is the
-  // save. Explained, but not retryable: a re-run would reach the same result.
-  return item.enrichment === "no_article" ? "no_article" : null;
+  // "no_article" (the page read fine, with no article body) is no fault: a
+  // product or a video has none. Its page leads with the site button instead.
+  return item.enrichment === "partial" ? "partial" : null;
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
@@ -705,7 +823,6 @@ const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
   failed: "item.pageFailed",
   stalled: "item.stalled",
   partial: "item.partial",
-  no_article: "item.noArticle",
 };
 
 function noticeFor(state: SaveState, type: DetailItem["type"]): string {
@@ -777,19 +894,9 @@ function SaveStatusNotice({
   return (
     <View style={[styles.noticeRow, centered && styles.centeredRow]}>
       <AppSymbolIcon
-        name={
-          state === "no_article"
-            ? "info.circle"
-            : "exclamationmark.triangle.fill"
-        }
+        name="exclamationmark.triangle.fill"
         size={14}
-        tintColor={
-          state === "gone"
-            ? theme.colors.faint
-            : state === "no_article"
-              ? theme.colors.muted
-              : theme.colors.danger
-        }
+        tintColor={state === "gone" ? theme.colors.faint : theme.colors.danger}
       />
       <Text
         style={[
@@ -800,8 +907,7 @@ function SaveStatusNotice({
       >
         {noticeFor(state, item.type)}
       </Text>
-      {isTerminalFailure(item.failureReason) ||
-      state === "no_article" ? null : (
+      {isTerminalFailure(item.failureReason) ? null : (
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
@@ -850,10 +956,10 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     // Full-bleed so the card image (a die-cut sticker) zooms edge-to-edge.
   },
-  // Non-sticker heroes get the same white matted frame as the home cards, so
+  // Non-sticker heroes get the same matted frame as the home cards, so
   // the padded look carries through the Apple zoom into this screen.
   heroContainer: {
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     // Hug the image so a capped portrait sits as a centered card rather than
     // leaving a gap in a full-width frame.
     alignSelf: "center",
@@ -870,6 +976,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(2),
     // The sheet body is already inset; the frames bring their own margin.
     marginHorizontal: -theme.gap(2),
+  },
+  poster: {
+    width: "100%",
+    height: 250,
+    backgroundColor: theme.colors.surfaceMuted,
   },
   heroImage: {
     borderRadius: theme.radius.md,
@@ -915,6 +1026,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   centeredText: {
     textAlign: "center",
+  },
+  siteActions: {
+    gap: theme.gap(1.5),
   },
   titleContainer: {
     gap: theme.gap(1),

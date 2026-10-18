@@ -1,13 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-interface Props {
-  tone?: "light" | "dark";
-}
-
-const Logo = ({ tone = "dark" }: Props) => {
-  const textClass = tone === "light" ? "text-white" : "text-ink";
-
+const Logo = () => {
   return (
     <Link href="/" className="group inline-flex items-center gap-2.5">
       <Image
@@ -18,7 +12,7 @@ const Logo = ({ tone = "dark" }: Props) => {
         aria-hidden
         className="h-8 w-8"
       />
-      <span className={`font-[family-name:var(--font-display)] text-[1.7rem] tracking-wide ${textClass}`}>
+      <span className="font-[family-name:var(--font-display)] text-[1.7rem] tracking-wide text-ink">
         shelvr
       </span>
     </Link>

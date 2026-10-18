@@ -7,6 +7,23 @@ const app = defineApp({
     // Id of the Apple-approved message POST /retention-messaging names on the
     // cancel sheet. Unset, the reply is empty and Apple shows its default.
     APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
+    // Promotional offers on the cancel sheet: a JSON object from product id to
+    // { offerIdentifier, messageIdentifier } (see model/retentionMessaging.ts).
+    // A product left out, or any of the three IAP key values unset, gets the
+    // plain message instead.
+    APPLE_RETENTION_OFFERS: v.optional(v.string()),
+    // The Apple In-App Purchase key (App Store Connect > Users and Access >
+    // Integrations > In-App Purchase) that signs those offers: the .p8
+    // contents, its key id, and the issuer id on that page.
+    APPLE_IAP_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_IAP_KEY_ID: v.optional(v.string()),
+    APPLE_IAP_ISSUER_ID: v.optional(v.string()),
+    // Signs the Apple Maps Server API token for trip pins (convex/trips.ts):
+    // a MapKit key's .p8 contents, its key id, and the team id. Without all
+    // three, trips are made without pins.
+    APPLE_MAPS_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_MAPS_KEY_ID: v.optional(v.string()),
+    APPLE_MAPS_TEAM_ID: v.optional(v.string()),
     // Signs the client secret for Apple's token revocation on account
     // deletion (convex/appleRevoke.ts): the .p8 contents, its key id, and the
     // team id. Without all three the revocation is skipped.
@@ -14,6 +31,10 @@ const app = defineApp({
     APPLE_REVOKE_KEY_ID: v.optional(v.string()),
     APPLE_REVOKE_TEAM_ID: v.optional(v.string()),
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
+    // Swaps Gemini for the deterministic fake in model/fakeAi.ts. Honoured only
+    // on a local e2e backend (see fakeAiLocks there); a cloud deployment
+    // refuses it and logs that it did.
+    E2E_FAKE_AI: v.optional(v.string()),
     GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     POSTHOG_HOST: v.optional(v.string()),

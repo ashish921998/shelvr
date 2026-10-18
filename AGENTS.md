@@ -43,8 +43,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`; pasted
-  link lists in `src/lib/import-links.ts`.
+  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.
@@ -80,6 +79,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
+- **Measuring a reviewer:** `tools/review-eval` holds past PRs that shipped a
+  bug, plus clean ones, to score catch rate and false alarms.
 
 ## Naming conventions
 
@@ -149,6 +150,9 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 
 ## Deployment
 
+- `main` requires pull requests and up-to-date `check` and `convex api contract`
+  checks, including for admins; no approving review is required. The production
+  environment permits only `main` and has no human approval gate.
 - `deploy.yml` runs after CI completes on `main` and deploys Convex
   production, nothing else. No approval gate: CI, each acting job's freshness
   check, and the pull request's public-contract check hold the line. One-time

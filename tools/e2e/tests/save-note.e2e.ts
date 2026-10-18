@@ -6,6 +6,7 @@ import {
   chooseAddOption,
   SHEET_TRANSITION_MS,
   startOnSeededHome,
+  fillField,
 } from "./seeded-home.ts";
 
 startOnSeededHome();
@@ -17,7 +18,7 @@ const NOTE = "Ask the landlord about the quokka mural";
 // words reach the search index only once the model has processed it.
 test("saves a note and finds it by its own words", async ({ screen }) => {
   await chooseAddOption(screen, screen.getByTestId("add-option-note"));
-  await screen.getByTestId("add-note-input").fill(NOTE);
+  await fillField(screen.getByTestId("add-note-input"), NOTE);
   await screen.getByRole("button", "Save").tap();
   // The tab bar stays in the tree under the Add sheet, and the tree has no
   // signal for a sheet that is still sliding away, so a tap sent the moment
@@ -28,8 +29,9 @@ test("saves a note and finds it by its own words", async ({ screen }) => {
   });
   await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
 
-  await tapTab(screen, "Search");
-  await screen.getByRole("textbox", "Search your saves").fill("quokka");
+  const search = screen.getByRole("textbox", "Search your saves");
+  await tapTab(screen, "Search", search);
+  await fillField(search, "quokka");
 
   // The model titles the note, so the result's label is not known ahead of
   // time. Once the search has answered, the result is the only button on the

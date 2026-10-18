@@ -220,14 +220,6 @@ type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
-  // Fired only when a bulk import created at least one link.
-  links_imported: {
-    url_count: number;
-    created: number;
-    skipped: number;
-    invalid: number;
-    not_processed: number;
-  };
   // Photo saves fail as data, never as thrown errors, so error tracking never
   // sees them. `reason` is one of three fixed words, never the message text.
   images_save_failed: { reason: ImageSaveFailureReason; image_count: number };
@@ -257,6 +249,18 @@ type AnalyticsEventProperties = {
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
   plan_shared: { place_count: number; picked: boolean };
+  // "Plan my trip" on a travel space. `made` is false when no save named a
+  // place, so no trip was stored.
+  trip_made: {
+    considered: number;
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    made: boolean;
+  };
+  trip_failed: { reason: "ai_consent" | "error" };
+  trip_stop_opened: { day: number; stop: number };
+  trip_directions_opened: { located: boolean };
+  trip_stop_swapped: { day: number };
   onboarding_completed: {
     // Always empty since the pileup question was removed. Kept so existing
     // PostHog insights keep a stable property shape.

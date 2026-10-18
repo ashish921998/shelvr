@@ -131,3 +131,40 @@ export const MAX_ITEM_TITLE_CHARS = 200;
  * the UTF-8 bytes stay under 300 KB and the item document stays far below
  * Convex's 1 MiB limit alongside its other fields. */
 export const MAX_NOTE_TEXT_CHARS = 100_000;
+
+/** Most cities one save can name. A save names a few places at most, and
+ * the "Where are you going?" choice only needs the main ones. */
+export const MAX_ITEM_CITIES = 3;
+
+const MAX_CITY_CHARS = 60;
+const NOT_A_CITY = new Set(["unknown", "n/a", "none", "various", "online"]);
+
+/**
+ * The cities a classifier named for a save, cleaned for storage: trimmed,
+ * single-spaced, without trailing punctuation, one entry per city ignoring
+ * case, and at most MAX_ITEM_CITIES. Placeholders such as "unknown" are
+ * dropped, so an empty list means the save names no city we know.
+ */
+export function normalizeCities(raw: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const cities: string[] = [];
+  for (const entry of raw ?? []) {
+    const city = entry
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[.,;:!?]+$/, "");
+    const key = city.toLowerCase();
+    if (
+      city === "" ||
+      city.length > MAX_CITY_CHARS ||
+      NOT_A_CITY.has(key) ||
+      seen.has(key)
+    ) {
+      continue;
+    }
+    seen.add(key);
+    cities.push(city);
+    if (cities.length === MAX_ITEM_CITIES) break;
+  }
+  return cities;
+}

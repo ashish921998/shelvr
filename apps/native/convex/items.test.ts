@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest, signedInUser } from "./test.setup";
+import { newConvexTest, seedNotes, signedInUser } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -212,6 +212,36 @@ describe("listItemsPage", () => {
     const full = await t.query(api.items.getItem, { id });
     expect(full?.content).toContain("Article body 0");
     expect(full?.products).toHaveLength(1);
+  });
+
+  it("flags a card whose save has a recipe, without shipping the recipe", async () => {
+    const { t, userId } = await as();
+    const [plainId] = await seedFeed(t, userId, 1);
+    const recipeId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Mushroom rice reel",
+        url: "https://www.instagram.com/reel/abc/",
+        recipe: {
+          name: "Mushroom rice",
+          ingredients: ["rice"],
+          steps: ["cook"],
+        },
+        tags: [],
+        searchText: "mushroom rice",
+      }),
+    );
+
+    const { page } = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    const recipeRow = page.find((row) => row._id === recipeId);
+    const plainRow = page.find((row) => row._id === plainId);
+    expect(recipeRow?.hasRecipe).toBe(true);
+    expect(recipeRow).not.toHaveProperty("recipe");
+    expect(plainRow).not.toHaveProperty("hasRecipe");
   });
 
   it("only returns the caller's items", async () => {
@@ -2544,6 +2574,39 @@ describe("poster storage compensation", () => {
       expect(await ctx.db.system.get("_storage", shared)).not.toBeNull();
     });
   });
+
+  it("stores the cities a run read and keeps them when a later run has none", async () => {
+    const t = newConvexTest();
+    const itemId = await t.run(async (ctx) => {
+      return await ctx.db.insert("items", {
+        userId: "city-owner",
+        type: "link",
+        status: "processing",
+        tags: [],
+        searchText: "",
+      });
+    });
+    const finalize = async (cities?: string[]) =>
+      await t.mutation(internal.items.finalizeItem, {
+        itemId,
+        title: "Date spots",
+        description: "Bars in Bandra",
+        tags: [],
+        ...(cities !== undefined ? { cities } : {}),
+        status: "ready",
+      });
+
+    await finalize(["Mumbai"]);
+    await finalize();
+    expect(
+      await t.run(async (ctx) => (await ctx.db.get(itemId))?.cities),
+    ).toEqual(["Mumbai"]);
+
+    await finalize([]);
+    expect(
+      await t.run(async (ctx) => (await ctx.db.get(itemId))?.cities),
+    ).toEqual([]);
+  });
 });
 
 describe("failed saves and retry", () => {
@@ -2972,6 +3035,62 @@ describe("photo rejection before classification", () => {
       }),
     );
     await t.mutation(api.items.findLinks, { id });
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "searching",
+    });
+  });
+
+  it("lets a product search whose action died be pressed again", async () => {
+    const { t, userId } = await as();
+    const id = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        note: "chair",
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.mutation(api.items.findLinks, { id });
+    // The search action is killed (a deploy, a timeout) before it writes.
+    await t.run(async (ctx) => {
+      for (const job of await ctx.db.system
+        .query("_scheduled_functions")
+        .collect()) {
+        if (job.name.includes("findProductLinks")) {
+          await ctx.scheduler.cancel(job._id);
+        }
+      }
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "failed",
+    });
+
+    await t.mutation(api.items.findLinks, { id });
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "searching",
+    });
+  });
+
+  it("leaves a newer product search alone when an older one expires", async () => {
+    const { t, userId } = await as();
+    const id = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        tags: [],
+        searchText: "",
+        productsStatus: "searching",
+        productsSearchStartedAt: 2,
+      }),
+    );
+    await t.mutation(internal.items.expireProductSearch, {
+      itemId: id,
+      startedAt: 1,
+    });
     expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
       productsStatus: "searching",
     });
@@ -3693,6 +3812,29 @@ describe("share links", () => {
     expect(
       await owner.query(internal.items.getSharePreview, { token: token! }),
     ).not.toBeNull();
+  });
+
+  it("stops serving the preview the moment account deletion starts", async () => {
+    const { t, userId } = await as();
+    // Enough older saves that the cleanup spans several batches, so the
+    // shared item and its link are still stored after the first transaction.
+    await seedNotes(t, userId as Id<"users">, 150);
+    const itemId = await seedItem(t, userId);
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+
+    const link = await t.run((ctx) =>
+      ctx.db
+        .query("shareLinks")
+        .withIndex("by_token", (q) => q.eq("token", token!))
+        .unique(),
+    );
+    expect(link).not.toBeNull();
+    expect(await t.run((ctx) => ctx.db.get(itemId))).not.toBeNull();
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
   });
 
   it("stops serving the preview once the item is deleted", async () => {
