@@ -16,8 +16,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The pill moves across the row, so it eases in and out; a tap carries no
-// velocity for a spring to keep.
+// Ease-in-out timing rather than a spring, since a tap has no velocity to
+// carry.
 const GLIDE = {
   duration: motion.duration.enter,
   easing: motion.easing.inOut,

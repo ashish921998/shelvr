@@ -21,8 +21,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// A route drawing itself across a little map: five stops, each popping in
-// as the line reaches it, while the steps below say what Shelvr is doing.
+// A line draws through five numbered dots while the text below cycles
+// through the three build steps.
 const STOPS = [
   { x: 18, y: 78 },
   { x: 82, y: 30 },
@@ -101,8 +101,7 @@ function Dot({
       [0, 1],
       "clamp",
     );
-    // Each stop lands like a dropped pin: in from 60%, never from nothing,
-    // with a slight overshoot for the fall.
+    // Scales from 60% to full size with a slight overshoot.
     const pop = at < 1 ? 0.6 + 0.4 * Easing.back(1.6)(at) : 1;
     return { opacity: at, transform: [{ scale: pop }] };
   });
@@ -122,7 +121,7 @@ function Dot({
   );
 }
 
-/** Covers of the space's saves, drifting gently over the route. */
+/** Up to three save covers that bob above the route. */
 function Covers({ covers }: { covers: string[] }) {
   const reduced = useReducedMotion();
   const bob = useSharedValue(0);

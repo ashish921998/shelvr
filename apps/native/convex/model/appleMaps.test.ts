@@ -80,13 +80,10 @@ describe("firstPlace", () => {
       firstPlace({
         results: [
           { name: "No coordinate" },
-          {
-            coordinate: { latitude: 38.71, longitude: -9.13 },
-            formattedAddressLines: ["Rua 1", "Lisboa"],
-          },
+          { coordinate: { latitude: 38.71, longitude: -9.13 } },
         ],
       }),
-    ).toEqual({ lat: 38.71, lng: -9.13, address: "Rua 1, Lisboa" });
+    ).toEqual({ lat: 38.71, lng: -9.13 });
   });
 
   it("is null for an empty or malformed reply", () => {
@@ -112,7 +109,7 @@ describe("appleMapsLookup", () => {
       "tok",
       "search",
       "Pastéis de Belém, Lisbon",
-      { near: { lat: 38.7, lng: -9.1 } },
+      { lat: 38.7, lng: -9.1 },
       fetchImpl as unknown as typeof fetch,
     );
     expect(place).toEqual({ lat: 1, lng: 2 });
@@ -137,7 +134,7 @@ describe("appleMapsLookup", () => {
         "tok",
         "geocode",
         "Lisbon",
-        {},
+        undefined,
         spent as unknown as typeof fetch,
       ),
     ).toBeNull();
@@ -146,7 +143,7 @@ describe("appleMapsLookup", () => {
         "tok",
         "geocode",
         "Lisbon",
-        {},
+        undefined,
         down as unknown as typeof fetch,
       ),
     ).toBeNull();

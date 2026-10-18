@@ -52,15 +52,6 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "Plan my trip" sends the same saves and gets up to 35 places back, then
   // looks each one up in Apple Maps. Trips are re-made less often than plans.
   makeTrip: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
-  // Apple Maps Server API calls across every account. Apple's free tier is
-  // 25,000 a day per team, shared with MapKit JS; this keeps room under it.
-  // A spent bucket makes trips without pins, never refuses them.
-  appleMapsGlobal: {
-    kind: "token bucket",
-    rate: 20000,
-    period: DAY,
-    capacity: 2000,
-  },
   // A spoken transcript of a recipe video whose caption had no recipe (one
   // paid Treg call, about $0.002, plus one model call). Per user: room for a
   // cooking binge, fatal to a loop. Global: about $4 a day at most, whatever

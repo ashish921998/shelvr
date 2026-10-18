@@ -12,7 +12,6 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsLookup,
-  type FoundPlace,
   type LatLng,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
@@ -26,11 +25,11 @@ import {
 } from "./model/plan";
 import {
   buildTrip,
-  clampDays,
   keepNearby,
+  MAX_TRIP_DAYS,
   MAX_TRIP_PLACES,
+  MIN_TRIP_DAYS,
   tripPaceValidator,
-  validStartDate,
   type TripCandidate,
 } from "./model/trip";
 
@@ -87,25 +86,17 @@ function lookupQuery(
 }
 
 /**
- * Where each candidate is, by Apple Maps. Null for each one when the key is
- * unset, the daily bucket is spent, or Apple cannot be reached; the trip is
- * then made without pins. Lookups that land far from the city are dropped.
+ * Where each candidate is, by Apple Maps. Null when the key is unset or
+ * Apple cannot be reached; the trip is then made without pins. Lookups that
+ * land far from the city are dropped.
  */
 async function locate(
   ctx: ActionCtx,
   candidates: TripCandidate[],
   city: string | undefined,
-): Promise<(FoundPlace | null)[] | null> {
+): Promise<(LatLng | null)[] | null> {
   const config = appleMapsConfig(env);
   if (config === null || candidates.length === 0) return null;
-  const allowed: boolean = await ctx.runMutation(
-    internal.tripData.claimMapLookupsInternal,
-    { count: candidates.length + (city ? 1 : 0) },
-  );
-  if (!allowed) {
-    logEvent("warn", "trip_map_quota_spent", { places: candidates.length });
-    return null;
-  }
   const token = await appleMapsAccessToken(config);
   if (token === null) {
     logEvent("warn", "trip_map_token_failed", {});
@@ -115,7 +106,7 @@ async function locate(
   const centre: LatLng | null = city
     ? await appleMapsLookup(token, "geocode", city)
     : null;
-  const found: (FoundPlace | null)[] = [];
+  const found: (LatLng | null)[] = [];
   for (let i = 0; i < candidates.length; i += LOOKUP_BATCH) {
     const batch = candidates.slice(i, i + LOOKUP_BATCH);
     if (Date.now() - started > LOOKUP_BUDGET_MS) {
@@ -129,14 +120,13 @@ async function locate(
             token,
             "search",
             lookupQuery(candidate, city),
-            centre ? { near: { lat: centre.lat, lng: centre.lng } } : {},
+            centre ?? undefined,
           ),
         ),
       )),
     );
   }
-  const kept = keepNearby(found, centre);
-  return found.map((place, i) => (kept[i] === null ? null : place));
+  return keepNearby(found, centre);
 }
 
 /**
@@ -167,7 +157,10 @@ export const makeTrip = action({
     ctx,
     args,
   ): Promise<{ tripId: Id<"trips"> | null; considered: number }> => {
-    const days = clampDays(args.days);
+    const days = Math.min(
+      MAX_TRIP_DAYS,
+      Math.max(MIN_TRIP_DAYS, Math.round(args.days)),
+    );
     // Annotated: inferring through `internal` is circular for an action.
     const claim: {
       spaceName: string;
@@ -229,28 +222,19 @@ export const makeTrip = action({
 
     const found = await locate(ctx, candidates, city);
     const located = candidates.map((candidate, i) => {
-      const place = found?.[i];
-      return place
-        ? {
-            ...candidate,
-            location: { lat: place.lat, lng: place.lng },
-            ...(place.address !== undefined ? { address: place.address } : {}),
-          }
-        : candidate;
+      const location = found?.[i];
+      return location ? { ...candidate, location } : candidate;
     });
     const trip = buildTrip(located, { days, pace: args.pace });
-    const startDate = validStartDate(args.startDate);
     const tripId: Id<"trips"> = await ctx.runMutation(
       internal.tripData.saveTripInternal,
       {
         spaceId: args.spaceId,
         ...(city !== undefined ? { city } : {}),
         pace: args.pace,
-        ...(startDate !== undefined ? { startDate } : {}),
+        ...(args.startDate !== undefined ? { startDate: args.startDate } : {}),
         days: trip.days,
         wishlist: trip.wishlist,
-        considered: sources.length,
-        ...(found !== null ? { locatedAt: Date.now() } : {}),
       },
     );
     logEvent("info", "make_trip_succeeded", {

@@ -550,9 +550,6 @@ export default defineSchema({
     days: v.array(tripDayValidator),
     // Places the days had no room for, best first.
     wishlist: v.array(tripStopValidator),
-    // Saves read to make the trip.
-    considered: v.number(),
-    locatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_space", ["spaceId"]),

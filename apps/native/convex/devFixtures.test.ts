@@ -262,7 +262,6 @@ describe("locateTripStops", () => {
           },
         ],
         wishlist: [stop("Miradouro da Graça")],
-        considered: 1,
       });
       return spaceId;
     });
@@ -296,7 +295,6 @@ describe("locateTripStops", () => {
       .map((stop) => stop.name)
       .sort();
     expect(placed).toEqual(["Belém Tower", "Time Out Market"]);
-    expect(trip!.locatedAt).toBeTypeOf("number");
   });
 
   it("is unavailable unless anonymous development auth is enabled", async () => {

@@ -118,7 +118,7 @@ export default function SpaceScreen() {
     );
   };
 
-  // A travel space leads with its trip; "Make a plan" stays beside it.
+  // The trip pill comes first, then "Make a plan".
   const tripPill = canTrip ? (
     <Pressable
       accessibilityRole="button"

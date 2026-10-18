@@ -29,13 +29,15 @@ import { effectiveStatus, getMembership } from "./model/memberships";
 // The database half of "Plan my trip" (trips.ts is the action): what the
 // trip may read, the stored trip, and the reads the trip screen makes.
 
-/** A trip reads the same saves a plan does: the space's newest filed. */
-const MAX_TRIP_ITEMS = MAX_PLAN_ITEMS;
 /** A city name the client sends: it goes into the prompt and to Apple. */
 const MAX_CITY_CHARS = 80;
 
+function tidyCity(city: string): string {
+  return city.replace(/\s+/g, " ").trim();
+}
+
 function cityKey(city: string): string {
-  return city.replace(/\s+/g, " ").trim().toLowerCase();
+  return tidyCity(city).toLowerCase();
 }
 
 /** The space's ready saves, newest filed first: saved rows plus legacy rows
@@ -53,12 +55,12 @@ export async function loadReadySaves(
           q.eq("spaceId", spaceId).eq("status", status),
         )
         .order("desc")
-        .take(MAX_TRIP_ITEMS),
+        .take(MAX_PLAN_ITEMS),
     ),
   );
   const joins = [...saved, ...legacy]
     .sort((a, b) => b._creationTime - a._creationTime)
-    .slice(0, MAX_TRIP_ITEMS);
+    .slice(0, MAX_PLAN_ITEMS);
   const saves: { item: Doc<"items">; join: Doc<"spaceItems"> }[] = [];
   for (const join of joins) {
     const item = await ctx.db.get(join.itemId);
@@ -83,7 +85,7 @@ function countCities(items: Doc<"items">[]): { city: string; count: number }[] {
       if (key === "" || seen.has(key)) continue;
       seen.add(key);
       const entry = counts.get(key) ?? { count: 0, spellings: new Map() };
-      const spelling = city.replace(/\s+/g, " ").trim();
+      const spelling = tidyCity(city);
       entry.count++;
       entry.spellings.set(spelling, (entry.spellings.get(spelling) ?? 0) + 1);
       counts.set(key, entry);
@@ -150,10 +152,10 @@ export const claimTripInternal = internalMutation({
     if (!(await aiAllowed(ctx, userId))) {
       throw aiConsentRequiredError();
     }
-    const asked = args.city
-      ?.replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_CITY_CHARS);
+    const asked =
+      args.city !== undefined
+        ? tidyCity(args.city).slice(0, MAX_CITY_CHARS)
+        : undefined;
     const wanted = asked !== undefined ? cityKey(asked) : "";
     const saves = (await loadReadySaves(ctx, args.spaceId, userId)).filter(
       ({ item }) =>
@@ -181,22 +183,6 @@ export const claimTripInternal = internalMutation({
       sources,
       been: visits.map((visit) => visit.name),
     };
-  },
-});
-
-/**
- * Claims `count` Apple Maps calls from the deployment-wide daily bucket,
- * which sits under Apple's free 25,000 a day. False when it is spent: the
- * trip is then made without a map, never refused.
- */
-export const claimMapLookupsInternal = internalMutation({
-  args: { count: v.number() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    const { ok } = await rateLimiter.limit(ctx, "appleMapsGlobal", {
-      count: args.count,
-    });
-    return ok;
   },
 });
 
@@ -240,8 +226,6 @@ export const saveTripInternal = internalMutation({
     startDate: v.optional(v.string()),
     days: v.array(tripDayValidator),
     wishlist: v.array(tripStopValidator),
-    considered: v.number(),
-    locatedAt: v.optional(v.number()),
   },
   returns: v.id("trips"),
   handler: async (ctx, args) => {
@@ -310,11 +294,12 @@ export const swapTripStop = mutation({
 
 const tripStopViewValidator = v.object({
   ...tripStopValidator.fields,
-  // The save's cover, its creator ("@handle" or the site), and its link, for
-  // the stop sheet.
+  // The user marked this place "We went".
+  been: v.optional(v.boolean()),
+  // The save's cover and its creator ("@handle" or the site), for the stop
+  // sheet.
   cover: v.optional(v.string()),
   creator: v.optional(v.string()),
-  url: v.optional(v.string()),
 });
 
 const tripViewValidator = v.object({
@@ -331,8 +316,6 @@ const tripViewValidator = v.object({
     }),
   ),
   wishlist: v.array(tripStopViewValidator),
-  considered: v.number(),
-  locatedAt: v.optional(v.number()),
 });
 
 /**
@@ -353,9 +336,9 @@ export const getSpaceTrip = query({
       .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
       .order("desc")
       .first();
-    if (trip === null || trip.userId !== userId) return null;
+    if (trip === null) return null;
 
-    const view = async ({ been: _been, ...stop }: TripStop) => {
+    const view = async (stop: TripStop) => {
       const item = await liveSave(ctx, stop, userId, args.spaceId);
       if (item === null) return null;
       const visit = await ctx.db
@@ -374,7 +357,6 @@ export const getSpaceTrip = query({
         ...(visit !== null ? { been: true } : {}),
         ...(cover !== null ? { cover } : {}),
         ...(creator !== undefined ? { creator } : {}),
-        ...(item.url !== undefined ? { url: item.url } : {}),
       };
     };
     const viewAll = async (stops: TripStop[]) =>

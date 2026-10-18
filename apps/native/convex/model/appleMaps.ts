@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { signAppleJwt } from "./appleClient";
 
 // Apple Maps Server API: where a saved place is, for the trip map. Free up to
@@ -6,8 +7,6 @@ import { signAppleJwt } from "./appleClient";
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
 const SEARCH_TIMEOUT_MS = 8_000;
-/** A search reply is a few kilobytes; anything far larger is not one. */
-const MAX_REPLY_BYTES = 256 * 1024;
 /** A place this far from the trip's city is a different place with the same
  * name, not the one the save meant. */
 export const MAX_CITY_DISTANCE_KM = 80;
@@ -19,8 +18,6 @@ export type AppleMapsConfig = {
 };
 
 export type LatLng = { lat: number; lng: number };
-
-export type FoundPlace = LatLng & { address?: string };
 
 /** The deployment's Maps key, or null while any of the three is unset. */
 export function appleMapsConfig(env: {
@@ -58,7 +55,7 @@ export async function appleMapsAccessToken(
       signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    const body = await readJson(response);
+    const body: unknown = await response.json().catch(() => null);
     const token =
       typeof body === "object" && body !== null && "accessToken" in body
         ? body.accessToken
@@ -69,55 +66,27 @@ export async function appleMapsAccessToken(
   }
 }
 
-/** The reply's JSON, or null when it is not JSON or is too large to be a
- * Maps reply. */
-async function readJson(response: Response): Promise<unknown> {
-  const declared = Number(response.headers.get("content-length") ?? 0);
-  if (declared > MAX_REPLY_BYTES) return null;
-  const text = await response.text();
-  if (text.length > MAX_REPLY_BYTES) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function isNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
+const replySchema = z.object({
+  results: z.array(z.unknown()),
+});
+const placeSchema = z.object({
+  coordinate: z.object({
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  }),
+});
 
 /** The first result of a search or geocode reply that has a usable
  * coordinate. */
-export function firstPlace(body: unknown): FoundPlace | null {
-  if (typeof body !== "object" || body === null || !("results" in body)) {
-    return null;
-  }
-  const results = body.results;
-  if (!Array.isArray(results)) return null;
-  for (const result of results as unknown[]) {
-    if (typeof result !== "object" || result === null) continue;
-    const coordinate = (result as { coordinate?: unknown }).coordinate;
-    if (typeof coordinate !== "object" || coordinate === null) continue;
-    const { latitude, longitude } = coordinate as {
-      latitude?: unknown;
-      longitude?: unknown;
-    };
-    if (!isNumber(latitude) || !isNumber(longitude)) continue;
-    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) continue;
-    const lines = (result as { formattedAddressLines?: unknown })
-      .formattedAddressLines;
-    const address = Array.isArray(lines)
-      ? lines
-          .filter((line): line is string => typeof line === "string")
-          .join(", ")
-          .slice(0, 200)
-      : "";
-    return {
-      lat: latitude,
-      lng: longitude,
-      ...(address !== "" ? { address } : {}),
-    };
+export function firstPlace(body: unknown): LatLng | null {
+  const reply = replySchema.safeParse(body);
+  if (!reply.success) return null;
+  for (const result of reply.data.results) {
+    const place = placeSchema.safeParse(result);
+    if (place.success) {
+      const { latitude, longitude } = place.data.coordinate;
+      return { lat: latitude, lng: longitude };
+    }
   }
   return null;
 }
@@ -131,21 +100,20 @@ export async function appleMapsLookup(
   accessToken: string,
   kind: "search" | "geocode",
   query: string,
-  options: { near?: LatLng; lang?: string } = {},
+  near?: LatLng,
   fetchImpl: typeof fetch = fetch,
-): Promise<FoundPlace | null> {
+): Promise<LatLng | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
-  if (options.near !== undefined) {
-    params.set("searchLocation", `${options.near.lat},${options.near.lng}`);
+  if (near !== undefined) {
+    params.set("searchLocation", `${near.lat},${near.lng}`);
   }
-  if (options.lang !== undefined) params.set("lang", options.lang);
   try {
     const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    return firstPlace(await readJson(response));
+    return firstPlace(await response.json().catch(() => null));
   } catch {
     return null;
   }

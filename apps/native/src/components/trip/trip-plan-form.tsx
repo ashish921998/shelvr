@@ -29,8 +29,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PACES: TripPace[] = ["easy", "balanced", "packed"];
 
-// The day count rolls the way the tap went: a small state change, so it
-// is short and eases out.
+// The day number slides up on plus and down on minus, with a short
+// ease-out.
 const ROLL = {
   up: {
     in: FadeInUp.duration(motion.duration.state).easing(motion.easing.out),
@@ -256,16 +256,14 @@ export function TripPlanForm({
       ? date
       : null;
   });
-  // Every city the saves name, most saves first; the row scrolls sideways.
-  const offered = cities;
   // Kept by name: the list reorders as saves finish, so an index could
   // drift to another city while the sheet is open.
   const [picked, setPicked] = useState(initial?.city);
   const cityIndex = Math.max(
     0,
-    offered.findIndex((c) => c.city.toLowerCase() === picked?.toLowerCase()),
+    cities.findIndex((c) => c.city.toLowerCase() === picked?.toLowerCase()),
   );
-  const city = offered[cityIndex]?.city;
+  const city = cities[cityIndex]?.city;
   const askCity = cities.length >= 2;
 
   return (
@@ -284,9 +282,9 @@ export function TripPlanForm({
           <ThemedText variant="bodyLabel">{t("trip.whichCity")}</ThemedText>
           <TripSegments
             scroll
-            labels={offered.map((c) => c.city)}
+            labels={cities.map((c) => c.city)}
             selected={cityIndex}
-            onSelect={(index) => setPicked(offered[index]?.city)}
+            onSelect={(index) => setPicked(cities[index]?.city)}
             tintFor={() => theme.colors.primary}
             accessibilityLabel={t("trip.whichCity")}
           />

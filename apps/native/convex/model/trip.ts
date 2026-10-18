@@ -54,9 +54,6 @@ export const tripStopValidator = v.object({
   // or the map was off; the stop still shows in the day's list.
   lat: v.optional(v.number()),
   lng: v.optional(v.number()),
-  address: v.optional(v.string()),
-  // The user marked this place "We went".
-  been: v.optional(v.boolean()),
 });
 export type TripStop = Infer<typeof tripStopValidator>;
 
@@ -74,15 +71,6 @@ export type TripDay = Infer<typeof tripDayValidator>;
 export type TripCandidate = PlanPlace & {
   slot: TripSlot | "any";
   location?: LatLng;
-  address?: string;
-};
-
-const SLOT_RANK: Record<TripSlot, number> = {
-  morning: 0,
-  lunch: 1,
-  afternoon: 2,
-  dinner: 3,
-  evening: 4,
 };
 
 /** "any" (a sight, a shop) fills the afternoon. */
@@ -100,8 +88,6 @@ function toStop(candidate: TripCandidate): TripStop {
     ...(candidate.location !== undefined
       ? { lat: candidate.location.lat, lng: candidate.location.lng }
       : {}),
-    ...(candidate.address !== undefined ? { address: candidate.address } : {}),
-    ...(candidate.been ? { been: true } : {}),
   };
 }
 
@@ -197,12 +183,9 @@ function dayAreas(stops: { area?: string }[]): string[] {
 /** Time of day first; inside one slot, the walk goes to the nearest next
  * stop. Unlocated stops keep the model's order. */
 function orderDay(stops: TripCandidate[]): TripCandidate[] {
-  const bySlot = [...stops].sort(
-    (a, b) => SLOT_RANK[slotOf(a)] - SLOT_RANK[slotOf(b)],
-  );
   const ordered: TripCandidate[] = [];
   for (const slot of TRIP_SLOTS) {
-    const group = bySlot.filter((stop) => slotOf(stop) === slot);
+    const group = stops.filter((stop) => slotOf(stop) === slot);
     while (group.length > 0) {
       const from = ordered[ordered.length - 1]?.location;
       let pick = 0;
@@ -323,24 +306,6 @@ export function keepNearby(
   );
 }
 
-/** A start date the client sent, kept only as a real "YYYY-MM-DD" day. */
-export function validStartDate(value: string | undefined): string | undefined {
-  if (value === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return undefined;
-  }
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === value
-    ? value
-    : undefined;
-}
-
-/** The days a client asked for, held to 1..5. */
-export function clampDays(days: number): number {
-  if (!Number.isFinite(days)) return 3;
-  return Math.min(MAX_TRIP_DAYS, Math.max(MIN_TRIP_DAYS, Math.round(days)));
-}
-
 /**
  * Swaps one stop for the best wishlist place to take its spot: the same time
  * of day first, then the nearest to it, then the best ranked. The stop goes
@@ -378,7 +343,7 @@ export function swapStop(
   // time order; the sort is stable, so the walk order within a slot holds.
   const stops = day.stops
     .map((s, i) => (i === stopIndex ? replacement : s))
-    .sort((a, b) => SLOT_RANK[a.slot] - SLOT_RANK[b.slot]);
+    .sort((a, b) => TRIP_SLOTS.indexOf(a.slot) - TRIP_SLOTS.indexOf(b.slot));
   const days = trip.days.map((d, i) => (i === dayIndex ? dayOf(stops) : d));
   return {
     days,

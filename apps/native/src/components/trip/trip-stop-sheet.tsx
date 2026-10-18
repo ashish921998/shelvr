@@ -13,11 +13,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Captured by the worklet below on its own, not through `motion`.
+// A module constant, so the worklet captures this timing object and not
+// all of `motion`.
 const ENTER = motion.timing.enter;
 
-/** A new stop's cover settles in from just under full size, never from
- * nothing. */
+/** A new stop's cover fades in and scales up from 95%. */
 function coverIn() {
   "worklet";
   return {
@@ -221,7 +221,6 @@ export function TripStopSheet({
           label={t("trip.directions")}
           onPress={onDirections}
         />
-        {/* Swap shows only while another saved place could take this spot. */}
         {canSwap ? (
           <Action
             icon="arrow.left.arrow.right"

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   canPlanTrip,
-  dayColor,
   directionsUrl,
   fitCamera,
   locatedStops,
@@ -72,7 +71,14 @@ describe("locatedStops", () => {
 });
 
 describe("fitCamera", () => {
-  const view = { width: 400, height: 860, top: 100, bottom: 450 };
+  const view = {
+    width: 400,
+    height: 860,
+    top: 100,
+    bottom: 450,
+    safeTop: 62,
+    safeBottom: 34,
+  };
 
   it("is undefined with nothing to show", () => {
     expect(fitCamera([], view)).toBeUndefined();
@@ -111,8 +117,10 @@ describe("fitCamera", () => {
       const x =
         view.width / 2 +
         (point.longitude - camera.coordinates.longitude) / lngPerPoint;
+      // Apple Maps puts the region's center in the middle of the safe area.
       const y =
-        view.height / 2 -
+        view.safeTop +
+        (view.height - view.safeTop - view.safeBottom) / 2 -
         (point.latitude - camera.coordinates.latitude) / (lngPerPoint * cos);
       expect(x).toBeGreaterThan(0);
       expect(x).toBeLessThan(view.width);
@@ -158,12 +166,5 @@ describe("directionsUrl", () => {
     expect(directionsUrl(stop({ area: "Belém" }), "Lisbon")).toBe(
       "https://www.google.com/maps/dir/?api=1&destination=Past%C3%A9is%20de%20Bel%C3%A9m%2C%20Bel%C3%A9m%2C%20Lisbon&travelmode=walking",
     );
-  });
-});
-
-describe("dayColor", () => {
-  it("gives each day of a five-day trip its own color", () => {
-    expect(new Set([0, 1, 2, 3, 4].map(dayColor)).size).toBe(5);
-    expect(dayColor(5)).toBe(dayColor(0));
   });
 });

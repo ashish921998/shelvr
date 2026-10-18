@@ -22,8 +22,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// Rows come in one after another, 40ms apart, with no overshoot: nothing
-// was flicked. A swap reflows the list on screen, so that eases both ways.
+// Rows fade in 40ms apart with no overshoot. A swap reflows the list with
+// ease-in-out.
 const STAGGER_MS = 40;
 const ROW_OUT = FadeOut.duration(motion.duration.feedback).easing(
   motion.easing.out,

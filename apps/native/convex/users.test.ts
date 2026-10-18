@@ -145,7 +145,6 @@ describe("deleteCurrentUserAccount", () => {
         pace: "easy",
         days: [],
         wishlist: [],
-        considered: 1,
       });
     });
 

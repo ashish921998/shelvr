@@ -12,8 +12,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Pins of the open day arrive one after another, and the day's route grows
-// with them, so switching days reads as the day being walked.
+// The open day's pins appear 80ms apart, and its route line extends with
+// them.
 const PIN_STAGGER_MS = 80;
 
 export type StopRef = { day: number; stop: number };
@@ -25,8 +25,9 @@ function parsePin(id: string | undefined): StopRef | null {
   return Number.isInteger(day) && Number.isInteger(stop) ? { day, stop } : null;
 }
 
-/** Other days' pins stay on the map, faded, so the whole trip is visible. */
-const FADED = "59";
+/** Hex alpha suffix (about 35%) for other days' pins, so the whole trip
+ * stays visible. */
+const FADED_ALPHA = "59";
 
 type Props = {
   trip: Trip;
@@ -84,9 +85,16 @@ export function TripMap({
     const points: LatLng[] = active.map((s) => s.coordinates);
     return fitCamera(
       points.length > 0 ? points : days.flat().map((s) => s.coordinates),
-      { width, height, top, bottom: height * TRIP_PANEL_SHARE },
+      {
+        width,
+        height,
+        top,
+        bottom: height * TRIP_PANEL_SHARE,
+        safeTop: rt.insets.top,
+        safeBottom: rt.insets.bottom,
+      },
     );
-  }, [active, days, width, height, top]);
+  }, [active, days, width, height, top, rt.insets.top, rt.insets.bottom]);
 
   useEffect(() => {
     if (camera) ref.current?.setCameraPosition(camera);
@@ -111,7 +119,7 @@ export function TripMap({
             ? theme.colors.foreground
             : day === activeDay
               ? color
-              : `${color}${FADED}`,
+              : `${color}${FADED_ALPHA}`,
           textColor: isSelected ? color : theme.colors.onTint,
         };
       }),

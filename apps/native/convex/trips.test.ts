@@ -151,10 +151,8 @@ describe("makeTrip", () => {
       city: "Lisbon",
       pace: "balanced",
       startDate: "2026-11-03",
-      considered: 3,
       wishlist: [],
     });
-    expect(trip?.locatedAt).toBeUndefined();
     expect(trip?.days).toHaveLength(1);
     expect(trip?.days[0].gaps).toEqual(["lunch"]);
     expect(trip?.days[0].stops).toEqual([
@@ -165,7 +163,6 @@ describe("makeTrip", () => {
         why: "The custard tarts",
         slot: "morning",
         creator: "@lisboaeats",
-        url: "https://www.tiktok.com/@someone/video/1",
       },
       {
         itemId: itemIds[2],
@@ -173,7 +170,6 @@ describe("makeTrip", () => {
         name: "Taberna da Rua das Flores",
         why: "Petiscos",
         slot: "dinner",
-        url: "https://www.tiktok.com/@someone/video/1",
       },
     ]);
   });
@@ -195,7 +191,7 @@ describe("makeTrip", () => {
           : // The same name in Porto: dropped as another city.
             { latitude: 41.1579, longitude: -8.6291 };
       return Response.json({
-        results: [{ coordinate, formattedAddressLines: ["Somewhere"] }],
+        results: [{ coordinate }],
       });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -224,9 +220,8 @@ describe("makeTrip", () => {
     await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
 
     const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
-    expect(trip?.locatedAt).toEqual(expect.any(Number));
     const [tarts, taberna] = trip?.days[0].stops ?? [];
-    expect(tarts).toMatchObject({ lat: 38.6975, address: "Somewhere" });
+    expect(tarts.lat).toBe(38.6975);
     expect(taberna.lat).toBeUndefined();
     const queries = fetchMock.mock.calls.map(([input]) =>
       new URL(input).searchParams.get("q"),
@@ -291,28 +286,6 @@ describe("makeTrip", () => {
     expect(trips[0].pace).toBe("packed");
   });
 
-  it("drops a stop whose save was deleted", async () => {
-    const { t, base, spaceId, itemIds } = await setup(LISBON_SAVES);
-    generateObject.mockResolvedValue({
-      object: {
-        places: [
-          {
-            saveNumber: 2,
-            name: "Park",
-            area: "",
-            why: "Sunset",
-            slot: "evening",
-          },
-        ],
-      },
-    });
-    await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
-    await base.run((ctx) => ctx.db.delete(itemIds[1]));
-
-    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
-    expect(trip?.days[0].stops).toEqual([]);
-  });
-
   it('shows a stop\'s current "We went" mark, not the one it was made with', async () => {
     const { t, spaceId, itemIds } = await setup(LISBON_SAVES);
     generateObject.mockResolvedValue({
@@ -345,7 +318,7 @@ describe("makeTrip", () => {
     expect((await stopOf())?.been).toBeUndefined();
   });
 
-  it("drops a stop removed from the space and shows a link's image", async () => {
+  it("drops a stop whose save was removed or deleted, and shows a link's image", async () => {
     const { t, base, spaceId, itemIds } = await setup(LISBON_SAVES);
     await base.run((ctx) =>
       ctx.db.patch(itemIds[0], { heroImageUrl: "https://example.com/a.jpg" }),
@@ -390,6 +363,12 @@ describe("makeTrip", () => {
     expect(after?.days[0].stops).toHaveLength(2);
     // Its lunch and its area go with it.
     expect(after?.days[0]).toMatchObject({ areas: [], gaps: ["lunch"] });
+
+    await base.run((ctx) => ctx.db.delete(itemIds[1]));
+    const deleted = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(deleted?.days[0].stops.map((s) => s.name)).toEqual([
+      "Taberna da Rua das Flores",
+    ]);
   });
 
   it("is removed with its space", async () => {

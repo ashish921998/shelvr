@@ -286,7 +286,7 @@ export const locateTripStops = mutation({
       days: trip.days.length,
       pace: trip.pace,
     });
-    await ctx.db.patch(trip._id, { ...laid, locatedAt: Date.now() });
+    await ctx.db.patch(trip._id, laid);
     return located;
   },
 });

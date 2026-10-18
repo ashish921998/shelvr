@@ -97,6 +97,10 @@ type MapView = {
   height: number;
   top: number;
   bottom: number;
+  // The device's safe area: Apple Maps centers a region inside it, not in
+  // the whole map.
+  safeTop: number;
+  safeBottom: number;
 };
 
 // Room kept between the outer pins and the edges of the visible map.
@@ -134,11 +138,14 @@ export function fitCamera(
   );
   const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
   const latPerPoint = (360 * cos) / (view.width * 2 ** zoom);
+  const regionMiddle =
+    view.safeTop + (view.height - view.safeTop - view.safeBottom) / 2;
+  const visibleMiddle = view.top + visible / 2;
   return {
-    // Moved so the points sit in the middle of the visible part, not of the
-    // whole map.
+    // Moved so the points sit in the middle of the visible part, not where
+    // Apple Maps puts the region's center.
     coordinates: {
-      latitude: midLat - ((view.bottom - view.top) / 2) * latPerPoint,
+      latitude: midLat - (regionMiddle - visibleMiddle) * latPerPoint,
       longitude: (minLng + maxLng) / 2,
     },
     zoom,

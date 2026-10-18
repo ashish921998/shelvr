@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import {
   buildTrip,
-  clampDays,
   clusterPlaces,
   keepNearby,
   swapStop,
-  validStartDate,
   type TripCandidate,
   type TripStop,
 } from "./trip";
@@ -118,23 +116,6 @@ describe("buildTrip", () => {
     expect(belem?.stops.map((s) => s.name)).toEqual(["Place 2", "Place 3"]);
     expect(trip.days[0].areas).toEqual(["Alfama"]);
   });
-
-  it("keeps the been tag and the address", () => {
-    const trip = buildTrip(
-      [
-        candidate(1, {
-          been: true,
-          location: ALFAMA,
-          address: "Rua 1, Lisboa",
-        }),
-      ],
-      { days: 1, pace: "easy" },
-    );
-    expect(trip.days[0].stops[0]).toMatchObject({
-      been: true,
-      address: "Rua 1, Lisboa",
-    });
-  });
 });
 
 describe("keepNearby", () => {
@@ -154,24 +135,6 @@ describe("keepNearby", () => {
       BELEM,
       null,
     ]);
-  });
-});
-
-describe("validStartDate", () => {
-  it("keeps only a real calendar day", () => {
-    expect(validStartDate("2026-11-03")).toBe("2026-11-03");
-    expect(validStartDate("2026-02-30")).toBeUndefined();
-    expect(validStartDate("3 Nov")).toBeUndefined();
-    expect(validStartDate(undefined)).toBeUndefined();
-  });
-});
-
-describe("clampDays", () => {
-  it("holds days to one through five", () => {
-    expect(clampDays(0)).toBe(1);
-    expect(clampDays(9)).toBe(5);
-    expect(clampDays(2.6)).toBe(3);
-    expect(clampDays(Number.NaN)).toBe(3);
   });
 });
 

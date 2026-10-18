@@ -249,9 +249,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
   travel space's saves (one city's, when they span several), makes one model call that lists
   the places they name with a time of day each, looks each up in the Apple Maps Server API
-  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). Gaps
-  are named, never filled. `tripData.ts` holds the claim, the stored trip, and the
-  `getSpaceTrip` / `tripCities` reads. Without the Maps key a trip is still made, without pins.
+  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
+  with no saved place shows as a gap; the trip never adds a place the saves do not name.
+  `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
+  reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
@@ -377,8 +378,9 @@ needed at runtime by the features that use them:
   without them deletion still completes and the revocation is skipped with a log line
 - `APPLE_MAPS_PRIVATE_KEY` / `APPLE_MAPS_KEY_ID` / `APPLE_MAPS_TEAM_ID`: a MapKit key
   (`.p8` contents), its key id, and the Apple team id. `trips.ts` signs the Apple Maps Server
-  API token with them to pin a trip's stops (free up to 25,000 calls a day per team; the
-  `appleMapsGlobal` bucket stays under that). All optional: without them trips have no pins
+  API token with them to pin a trip's stops (free up to 25,000 calls a day per team; past
+  that Apple answers 429 and stops show without pins). All optional: without them trips have
+  no pins
 - `AUTH_ENABLE_ANONYMOUS`: set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY`: Google AI Studio API key for classification (used directly by

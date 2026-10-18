@@ -46,7 +46,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// Captured by the worklet below on its own, not through `motion`.
+// A module constant, so the worklet captures this timing object and not
+// all of `motion`.
 const ENTER = motion.timing.enter;
 
 /** Panel content rising into place, by transform only. */
@@ -71,7 +72,7 @@ const PANEL_RESIZE = LinearTransition.duration(motion.duration.enter).easing(
 const MAP_IN = FadeIn.duration(300).easing(motion.easing.out);
 const CONTENT_OUT = FadeOut.duration(140).easing(motion.easing.out);
 
-/** The space's covers drifting slowly behind the form while there is no map. */
+/** Save covers that scroll slowly behind the form when the trip has no map. */
 function CoverBackdrop({ covers }: { covers: string[] }) {
   const reduced = useReducedMotion();
   const drift = useSharedValue(0);
@@ -173,7 +174,6 @@ export default function TripScreen() {
     [trip],
   );
   const picked = pickedStop(trip?.days, selected);
-  const selectedStop = picked?.view;
 
   // A new trip is stored before its subscription delivers it; until then
   // the screen keeps building rather than flash the form or the old trip.
@@ -194,7 +194,7 @@ export default function TripScreen() {
         ? "message"
         : trip === null || editing
           ? "plan"
-          : selectedStop
+          : picked
             ? "stop"
             : "days";
 
@@ -223,16 +223,17 @@ export default function TripScreen() {
   };
 
   const swap = async () => {
-    if (!trip || !selected || !selectedStop) return;
+    if (!trip || !picked) return;
+    const { day: stopDay } = picked.ref;
     setSwapping(true);
     try {
       const replacement = await swapTripStop({
         tripId: trip._id,
-        itemId: selectedStop.itemId,
-        name: selectedStop.name,
+        itemId: picked.view.itemId,
+        name: picked.view.name,
       });
-      setSelected({ day: selected.day, ...replacement });
-      analytics.capture("trip_stop_swapped", { day: selected.day });
+      setSelected({ day: stopDay, ...replacement });
+      analytics.capture("trip_stop_swapped", { day: stopDay });
       if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
     } catch (error) {
       if (!isNothingToSwap(error)) {
@@ -244,11 +245,11 @@ export default function TripScreen() {
   };
 
   const openDirections = () => {
-    if (!selectedStop || !trip) return;
+    if (!picked || !trip) return;
     analytics.capture("trip_directions_opened", {
-      located: selectedStop.lat !== undefined,
+      located: picked.view.lat !== undefined,
     });
-    Linking.openURL(directionsUrl(selectedStop, trip.city)).catch(
+    Linking.openURL(directionsUrl(picked.view, trip.city)).catch(
       (error: unknown) =>
         analytics.captureError("trip_directions_failed", error),
     );
@@ -385,7 +386,7 @@ export default function TripScreen() {
   const overMap = hasMap && trip !== null;
   return (
     <View style={styles.screen}>
-      {overMap && trip ? (
+      {overMap ? (
         <Animated.View entering={MAP_IN} style={styles.fill}>
           <TripMap
             trip={trip}
