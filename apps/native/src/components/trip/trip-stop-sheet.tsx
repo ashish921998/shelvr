@@ -32,7 +32,6 @@ function coverIn() {
 type Props = {
   stop: TripStopView;
   index: number;
-  color: string;
   visited: boolean;
   canSwap: boolean;
   swapping: boolean;
@@ -121,7 +120,6 @@ function Action({
 export function TripStopSheet({
   stop,
   index,
-  color,
   visited,
   canSwap,
   swapping,
@@ -133,6 +131,7 @@ export function TripStopSheet({
 }: Props) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const color = theme.colors.primary;
   return (
     <View style={styles.sheet}>
       <View style={styles.top}>

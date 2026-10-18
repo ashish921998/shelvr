@@ -22,15 +22,6 @@ export type TripStopView = TripDayView["stops"][number];
  * read as a travel space, not a reading list that mentions one place. */
 const TRIP_MIN_CITY_SAVES = 3;
 
-/** Pin and chip color per day. Map pins sit on Apple's own map colors in
- * both appearances, so these are fixed rather than theme roles; day 1 is the
- * app's amber. */
-const DAY_COLORS = ["#e6a23c", "#3fb0a1", "#d37ec7", "#6f9be8", "#86bf5a"];
-
-export function dayColor(day: number): string {
-  return DAY_COLORS[day % DAY_COLORS.length];
-}
-
 /** A travel space: at least three ready saves name a city. */
 export function canPlanTrip(
   items: { status: string; cities?: string[] }[],

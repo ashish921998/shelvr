@@ -3,7 +3,6 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn, motion } from "@/lib/motion";
 import {
-  dayColor,
   formatTripDay,
   tripDayDate,
   type Trip,
@@ -20,7 +19,7 @@ import Animated, {
   FadeOut,
   LinearTransition,
 } from "react-native-reanimated";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Rows fade in 40ms apart with no overshoot. A swap reflows the list with
 // ease-in-out.
@@ -76,12 +75,10 @@ function dayTitle(day: TripDayView, index: number): string {
 function StopRow({
   stop,
   index,
-  color,
   onPress,
 }: {
   stop: TripStopView;
   index: number;
-  color: string;
   onPress: () => void;
 }) {
   const entering = useMemo(() => rowIn(index), [index]);
@@ -93,7 +90,7 @@ function StopRow({
         onPress={onPress}
         style={({ pressed }) => [styles.stop, pressed && styles.pressed]}
       >
-        <View style={[styles.badge, { backgroundColor: color }]}>
+        <View style={styles.badge}>
           <ThemedText variant="captionStrong" style={styles.onTint}>
             {index + 1}
           </ThemedText>
@@ -141,7 +138,7 @@ export function TripDayPanel({
   useAppLocale();
   const day = trip.days[activeDay];
   const date = tripDayDate(trip.startDate, activeDay);
-  const color = dayColor(activeDay);
+  const { theme } = useUnistyles();
   const subtitle = [
     date ? formatTripDay(date) : null,
     t("trip.stopCount", { count: day?.stops.length ?? 0 }),
@@ -159,7 +156,7 @@ export function TripDayPanel({
           )}
           selected={activeDay}
           onSelect={onDayChange}
-          tintFor={dayColor}
+          tintFor={() => theme.colors.primary}
         />
       </View>
       {day ? (
@@ -180,7 +177,6 @@ export function TripDayPanel({
               key={`${activeDay}-${stop.itemId}-${stop.name}`}
               stop={stop}
               index={index}
-              color={color}
               onPress={() => onSelectStop(index)}
             />
           ))}
@@ -235,6 +231,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: theme.colors.primary,
   },
   onTint: {
     color: theme.colors.onTint,

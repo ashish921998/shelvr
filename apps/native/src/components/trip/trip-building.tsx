@@ -1,7 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn, motion } from "@/lib/motion";
-import { dayColor } from "@/lib/trip";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
@@ -79,7 +78,6 @@ function Segment({
           left: from.x + DOT / 2,
           top: from.y + DOT / 2 - 1,
           width: length,
-          backgroundColor: dayColor(0),
         },
         style,
       ]}
@@ -107,12 +105,7 @@ function Dot({
   });
   return (
     <Animated.View
-      style={[
-        styles.dot,
-        { left: STOPS[index].x, top: STOPS[index].y },
-        { backgroundColor: dayColor(index < 3 ? 0 : 1) },
-        style,
-      ]}
+      style={[styles.dot, { left: STOPS[index].x, top: STOPS[index].y }, style]}
     >
       <ThemedText variant="captionStrong" style={styles.dotLabel}>
         {index + 1}
@@ -261,6 +254,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 1,
     opacity: 0.7,
     transformOrigin: "left",
+    backgroundColor: theme.colors.primary,
   },
   dot: {
     position: "absolute",
@@ -271,6 +265,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     borderWidth: 2,
     borderColor: theme.colors.surface,
+    backgroundColor: theme.colors.primary,
   },
   dotLabel: {
     color: theme.colors.onTint,

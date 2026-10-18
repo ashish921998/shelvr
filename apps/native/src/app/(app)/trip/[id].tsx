@@ -12,7 +12,6 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceVisits } from "@/lib/make-plan";
 import { motion } from "@/lib/motion";
 import {
-  dayColor,
   directionsUrl,
   locatedStops,
   pickedStop,
@@ -327,7 +326,6 @@ export default function TripScreen() {
           <TripStopSheet
             stop={picked.view}
             index={picked.ref.stop}
-            color={dayColor(picked.ref.day)}
             visited={isVisited(picked.view)}
             canSwap={trip.wishlist.length > 0}
             swapping={swapping}

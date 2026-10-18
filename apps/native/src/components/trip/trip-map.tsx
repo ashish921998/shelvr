@@ -1,6 +1,5 @@
 import { isDarkThemeName } from "@/lib/appearance";
 import {
-  dayColor,
   fitCamera,
   locatedStops,
   TRIP_PANEL_SHARE,
@@ -25,8 +24,8 @@ function parsePin(id: string | undefined): StopRef | null {
   return Number.isInteger(day) && Number.isInteger(stop) ? { day, stop } : null;
 }
 
-/** Hex alpha suffix (about 35%) for other days' pins, so the whole trip
- * stays visible. */
+/** Hex alpha suffix (about 35%) for other days' gray pins, so the whole trip
+ * stays visible behind the open day's amber. */
 const FADED_ALPHA = "59";
 
 type Props = {
@@ -118,7 +117,6 @@ export function TripMap({
       .map((s) => {
         const at: StopRef = { day, stop: s.index };
         const isSelected = selected?.day === day && selected.stop === s.index;
-        const color = dayColor(day);
         return {
           id: pinId(at),
           coordinates: s.coordinates,
@@ -127,9 +125,9 @@ export function TripMap({
           backgroundColor: isSelected
             ? theme.colors.foreground
             : day === activeDay
-              ? color
-              : `${color}${FADED_ALPHA}`,
-          textColor: isSelected ? color : theme.colors.onTint,
+              ? theme.colors.primary
+              : `${theme.colors.muted}${FADED_ALPHA}`,
+          textColor: isSelected ? theme.colors.primary : theme.colors.onTint,
         };
       }),
   );
@@ -155,7 +153,7 @@ export function TripMap({
                 {
                   id: `route-${activeDay}`,
                   coordinates: route,
-                  color: dayColor(activeDay),
+                  color: theme.colors.primary,
                   width: 3,
                 },
               ]
@@ -181,7 +179,7 @@ export function TripMap({
       }))}
       polylines={
         route.length >= 2
-          ? [{ coordinates: route, color: dayColor(activeDay), width: 8 }]
+          ? [{ coordinates: route, color: theme.colors.primary, width: 8 }]
           : []
       }
       onMarkerClick={(marker) => {
