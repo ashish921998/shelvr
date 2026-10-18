@@ -81,6 +81,10 @@ const lightTheme = {
     primaryText: "#935d09",
     border: "#ece3d1",
     imageBorder: "rgba(0, 0, 0, 0.07)",
+    // The mat around a saved picture (feed cards, space covers, the detail
+    // hero, the reader thumbnail, similar saves). Paper white here; the dark
+    // themes use their card surface so the mat reads as a mount, not a glare.
+    frame: "#ffffff",
     // Darkened from #c05a3a so destructive text clears 4.5:1 on paper
     // (4.84:1) and the background (4.57:1); on surfaceMuted (4.18:1) and
     // primarySoft (4.07:1) it stays under AA, so destructive labels must
@@ -115,6 +119,7 @@ const darkTheme = {
     primaryText: "#f0c078",
     border: "#332c20",
     imageBorder: "rgba(255, 255, 255, 0.07)",
+    frame: "#231e16",
     danger: "#e07a58",
     overlay: "rgba(0, 0, 0, 0.55)",
     // The amber fill is shared, so the dark label is too.
@@ -144,6 +149,7 @@ const darkNeutralTheme = {
     primaryText: "#ffd60a",
     border: "#2c3238",
     imageBorder: "rgba(255, 255, 255, 0.08)",
+    frame: "#1b1f24",
     danger: "#ff6f5e",
     overlay: "rgba(0, 0, 0, 0.6)",
     onTint: "#111417",
