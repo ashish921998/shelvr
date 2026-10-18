@@ -80,7 +80,7 @@ export default function SettingsScreen() {
   // direct link can restore Profile as the stack's root, where dismissAll
   // stops at Profile, so Home replaces it, as Profile's own close does.
   const closeAllSheets = () => {
-    const profileIsRoot = navigation.getState().routes[0]?.name !== "(tabs)";
+    const profileIsRoot = navigation.getState().routes[0]?.name === "profile";
     router.dismissAll();
     if (profileIsRoot) router.replace("/(app)/(tabs)/(home)");
   };
