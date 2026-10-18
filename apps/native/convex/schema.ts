@@ -538,8 +538,7 @@ export default defineSchema({
 
   // Trips made from a travel space ("Plan my trip"): days of stops, every
   // stop one of the user's saves. A new trip for the same space replaces the
-  // old one, so a space has at most one. `locatedAt` is when Apple Maps was
-  // asked where the stops are; absent when the map was off.
+  // old one, so a space has at most one.
   trips: defineTable({
     userId: v.string(),
     spaceId: v.id("spaces"),

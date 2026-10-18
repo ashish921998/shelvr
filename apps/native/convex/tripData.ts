@@ -99,6 +99,41 @@ function countCities(items: Doc<"items">[]): { city: string; count: number }[] {
     .sort((a, b) => b.count - a.count);
 }
 
+/**
+ * The checks "Make a plan" and "Plan my trip" share before they read a
+ * space for the model: the space is the caller's, and they are Pro and allow
+ * AI. Convex forwards an action caller's identity to its internal mutation,
+ * so authorization and the claim are one transaction.
+ */
+export async function claimSpaceForModel(
+  ctx: MutationCtx,
+  spaceId: Id<"spaces">,
+): Promise<{ userId: Id<"users">; space: Doc<"spaces"> }> {
+  const userId = await requireUserId(ctx);
+  const space = await ctx.db.get(spaceId);
+  if (space === null || space.userId !== userId) {
+    throw new Error("Space not found");
+  }
+  await requireProEntitlement(ctx, userId);
+  if (!(await aiAllowed(ctx, userId))) {
+    throw aiConsentRequiredError();
+  }
+  return { userId, space };
+}
+
+/** Places the user marked "We went", newest first. */
+export async function beenPlaces(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<string[]> {
+  const visits = await ctx.db
+    .query("placeVisits")
+    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(MAX_BEEN_PLACES);
+  return visits.map((visit) => visit.name);
+}
+
 /** What the model reads of one save. */
 export function toPlanSource(
   item: Doc<"items">,
@@ -141,17 +176,7 @@ export const claimTripInternal = internalMutation({
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    // Convex forwards the action caller's identity, so authorization and the
-    // claim are one transaction.
-    const userId = await requireUserId(ctx);
-    const space = await ctx.db.get(args.spaceId);
-    if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
-    }
-    await requireProEntitlement(ctx, userId);
-    if (!(await aiAllowed(ctx, userId))) {
-      throw aiConsentRequiredError();
-    }
+    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
     const asked =
       args.city !== undefined
         ? tidyCity(args.city).slice(0, MAX_CITY_CHARS)
@@ -172,16 +197,11 @@ export const claimTripInternal = internalMutation({
       return { spaceName: space.name, city, sources, been: [] };
     }
     await rateLimiter.limit(ctx, "makeTrip", { key: userId, throws: true });
-    const visits = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(MAX_BEEN_PLACES);
     return {
       spaceName: space.name,
       city,
       sources,
-      been: visits.map((visit) => visit.name),
+      been: await beenPlaces(ctx, userId),
     };
   },
 });

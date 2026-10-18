@@ -35,10 +35,6 @@ import {
 
 // Up to 60 saves in, up to 35 places out. The user is watching a spinner.
 const TRIP_TIMEOUT_MS = 30_000;
-// Apple Maps lookups run this many at a time, and stop starting new ones
-// once this long has passed; the rest of the stops show without a pin.
-const LOOKUP_BATCH = 8;
-const LOOKUP_BUDGET_MS = 20_000;
 
 const tripSchema = z.object({
   places: z
@@ -102,30 +98,21 @@ async function locate(
     logEvent("warn", "trip_map_token_failed", {});
     return null;
   }
-  const started = Date.now();
   const centre: LatLng | null = city
     ? await appleMapsLookup(token, "geocode", city)
     : null;
-  const found: (LatLng | null)[] = [];
-  for (let i = 0; i < candidates.length; i += LOOKUP_BATCH) {
-    const batch = candidates.slice(i, i + LOOKUP_BATCH);
-    if (Date.now() - started > LOOKUP_BUDGET_MS) {
-      found.push(...batch.map(() => null));
-      continue;
-    }
-    found.push(
-      ...(await Promise.all(
-        batch.map((candidate) =>
-          appleMapsLookup(
-            token,
-            "search",
-            lookupQuery(candidate, city),
-            centre ?? undefined,
-          ),
-        ),
-      )),
-    );
-  }
+  // Each lookup gives up on its own timeout, so one slow place shows
+  // without a pin rather than holding up the trip.
+  const found = await Promise.all(
+    candidates.map((candidate) =>
+      appleMapsLookup(
+        token,
+        "search",
+        lookupQuery(candidate, city),
+        centre ?? undefined,
+      ),
+    ),
+  );
   return keepNearby(found, centre);
 }
 

@@ -10,8 +10,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
-import { aiConsentRequiredError } from "./model/aiConsent";
-import { MAX_BEEN_PLACES, planSourceValidator } from "./model/plan";
+import { planSourceValidator } from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
@@ -30,7 +29,13 @@ import {
   type MembershipSummary,
 } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
-import { deleteTripsForSpace, loadReadySaves, toPlanSource } from "./tripData";
+import {
+  beenPlaces,
+  claimSpaceForModel,
+  deleteTripsForSpace,
+  loadReadySaves,
+  toPlanSource,
+} from "./tripData";
 
 const spaceFields = {
   _id: v.id("spaces"),
@@ -865,17 +870,7 @@ export const claimPlanInternal = internalMutation({
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    // Convex forwards the action caller's identity, so authorization and the
-    // claim are one transaction.
-    const userId = await requireUserId(ctx);
-    const space = await ctx.db.get(args.spaceId);
-    if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
-    }
-    await requireProEntitlement(ctx, userId);
-    if (!(await aiAllowed(ctx, userId))) {
-      throw aiConsentRequiredError();
-    }
+    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
     const sources = (await loadReadySaves(ctx, args.spaceId, userId)).map(
       ({ item, join }) => toPlanSource(item, join),
     );
@@ -886,15 +881,10 @@ export const claimPlanInternal = internalMutation({
       key: userId,
       throws: true,
     });
-    const visits = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(MAX_BEEN_PLACES);
     return {
       spaceName: space.name,
       sources,
-      been: visits.map((visit) => visit.name),
+      been: await beenPlaces(ctx, userId),
     };
   },
 });

@@ -1,7 +1,13 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { env, mutation, query, type MutationCtx } from "./_generated/server";
+import {
+  env,
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./_generated/server";
 import {
   isDevelopmentAnonymousUser,
   liveOwner,
@@ -246,10 +252,11 @@ export const resetCurrentUser = mutation({
 /**
  * Pins a trip on a development deployment that has no Apple Maps key: sets
  * where each named stop is, as `trips.makeTrip` would have, and lays the trip
- * out again from those points. Same guards as the fixture reset. Returns how
- * many stops got a point.
+ * out again from those points. Internal, so it is run from the CLI
+ * (`convex run devFixtures:locateTripStops`), with the fixture reset's guards
+ * on the trip's owner. Returns how many stops got a point.
  */
-export const locateTripStops = mutation({
+export const locateTripStops = internalMutation({
   args: {
     spaceId: v.id("spaces"),
     places: v.array(
@@ -258,15 +265,12 @@ export const locateTripStops = mutation({
   },
   returns: v.number(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
-    await requireDevelopmentAnonymousUser(ctx, userId);
     const trip = await ctx.db
       .query("trips")
       .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
       .first();
-    if (trip === null || trip.userId !== userId) {
-      throw new Error("Trip not found");
-    }
+    if (trip === null) throw new Error("Trip not found");
+    await requireDevelopmentAnonymousUser(ctx, trip.userId as Id<"users">);
     const points = new Map(
       args.places.map((place) => [place.name.trim().toLowerCase(), place]),
     );

@@ -2,15 +2,11 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { slotLabel } from "@/components/trip/trip-day-panel";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
-import { fadeIn, motion, motionCSS } from "@/lib/motion";
+import { fadeIn, motion } from "@/lib/motion";
 import type { TripStopView } from "@/lib/trip";
 import { Image } from "expo-image";
-import { useState } from "react";
 import { Pressable, View } from "react-native";
-import Animated, {
-  useReducedMotion,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { withTiming } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // A module constant, so the worklet captures this timing object and not
@@ -60,38 +56,18 @@ function Action({
   accessibilityLabel?: string;
 }) {
   const { theme } = useUnistyles();
-  const reducedMotion = useReducedMotion();
-  const [pressed, setPressed] = useState(false);
   const tint = filled
     ? theme.colors.onTint
     : active
       ? theme.colors.danger
       : theme.colors.foreground;
   return (
-    <Animated.View
-      style={[
-        styles.actionWrap,
-        filled && styles.actionWide,
-        // Pressed on touch down, back on release: the app's press feedback.
-        {
-          transform: [
-            {
-              scale: pressed && !reducedMotion ? motion.scale.pressed : 1,
-            },
-          ],
-          transitionProperty: "transform",
-          transitionDuration: motion.duration.feedback,
-          transitionTimingFunction: motionCSS.out,
-        },
-      ]}
-    >
+    <View style={[styles.actionWrap, filled && styles.actionWide]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ disabled, selected: active }}
         disabled={disabled}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
         onPress={onPress}
         style={({ pressed }) => [
           styles.action,
@@ -109,7 +85,7 @@ function Action({
           {label}
         </ThemedText>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 

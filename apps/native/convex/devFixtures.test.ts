@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { newConvexTest } from "./test.setup";
 
 afterEach(() => {
@@ -270,15 +270,18 @@ describe("locateTripStops", () => {
 
   it("pins the named stops and lays the trip out again", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
-    const { backend, client, spaceId } = await tripFixture();
+    const { backend, spaceId } = await tripFixture();
 
-    const located = await client.mutation(api.devFixtures.locateTripStops, {
-      spaceId,
-      places: [
-        { name: "belém tower", lat: 38.6916, lng: -9.216 },
-        { name: "Time Out Market", lat: 38.7069, lng: -9.1458 },
-      ],
-    });
+    const located = await backend.mutation(
+      internal.devFixtures.locateTripStops,
+      {
+        spaceId,
+        places: [
+          { name: "belém tower", lat: 38.6916, lng: -9.216 },
+          { name: "Time Out Market", lat: 38.7069, lng: -9.1458 },
+        ],
+      },
+    );
 
     expect(located).toBe(2);
     const trip = await backend.run(async (ctx) =>
@@ -299,10 +302,13 @@ describe("locateTripStops", () => {
 
   it("is unavailable unless anonymous development auth is enabled", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "false");
-    const { client, spaceId } = await tripFixture();
+    const { backend, spaceId } = await tripFixture();
 
     await expect(
-      client.mutation(api.devFixtures.locateTripStops, { spaceId, places: [] }),
+      backend.mutation(internal.devFixtures.locateTripStops, {
+        spaceId,
+        places: [],
+      }),
     ).rejects.toThrow(/fixtures are disabled/);
   });
 });

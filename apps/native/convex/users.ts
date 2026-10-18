@@ -324,7 +324,8 @@ async function deleteUserOwnedDataBatch(
   if (reads.length === DELETE_BATCH) return false;
 
   if (!(await deleteShareLinksBatch(ctx, userId))) return false;
-  if (!(await deleteTravelBatch(ctx, userId))) return false;
+  if (!(await deletePlaceVisitsBatch(ctx, userId))) return false;
+  if (!(await deleteTripsBatch(ctx, userId))) return false;
 
   const devices = await ctx.db
     .query("notificationDevices")
@@ -477,13 +478,12 @@ async function deletePlaceVisitsBatch(
   return visits.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch each of the user's "We went" places and trips.
- * Returns true when both tables are drained for this user. */
-async function deleteTravelBatch(
+/** Deletes up to one batch of the user's trips. Returns true when none are
+ * left. */
+async function deleteTripsBatch(
   ctx: MutationCtx,
   userId: string,
 ): Promise<boolean> {
-  if (!(await deletePlaceVisitsBatch(ctx, userId))) return false;
   const trips = await ctx.db
     .query("trips")
     .withIndex("by_user", (q) => q.eq("userId", userId))

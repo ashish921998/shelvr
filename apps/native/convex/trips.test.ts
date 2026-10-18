@@ -23,7 +23,10 @@ type Save = {
   author?: string;
 };
 
-async function setup(saves: Save[], options: { pro?: boolean } = {}) {
+async function setup(
+  saves: Save[],
+  options: { pro?: boolean; consent?: "declined" } = {},
+) {
   const base = newConvexTest();
   const seeded = await base.run(async (ctx) => {
     const userId = await ctx.db.insert("users", {});
@@ -32,6 +35,14 @@ async function setup(saves: Save[], options: { pro?: boolean } = {}) {
         userId,
         status: "pro",
         expiresAt: Date.now() + 60_000,
+        updatedAt: Date.now(),
+      });
+    }
+    if (options.consent) {
+      await ctx.db.insert("aiConsents", {
+        userId,
+        status: options.consent,
+        version: 1,
         updatedAt: Date.now(),
       });
     }
@@ -471,6 +482,15 @@ describe("makeTrip", () => {
     await expect(
       t.action(api.trips.makeTrip, { spaceId, days: 2, pace: "easy" }),
     ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    expect(generateObject).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing after the user declined AI processing", async () => {
+    const { t, spaceId } = await setup(LISBON_SAVES, { consent: "declined" });
+
+    await expect(
+      t.action(api.trips.makeTrip, { spaceId, days: 2, pace: "easy" }),
+    ).rejects.toMatchObject({ data: { code: "ai_consent_required" } });
     expect(generateObject).not.toHaveBeenCalled();
   });
 

@@ -270,8 +270,7 @@ export function TripPlanForm({
           <StartDate value={start} onChange={setStart} />
         </Row>
         <View style={styles.divider} />
-        <View style={styles.paceRow}>
-          <ThemedText variant="bodyLabel">{t("trip.pace")}</ThemedText>
+        <Row label={t("trip.pace")}>
           <View style={styles.paceControl}>
             <TripSegments
               labels={PACES.map(paceLabel)}
@@ -280,7 +279,7 @@ export function TripPlanForm({
               accessibilityLabel={t("trip.pace")}
             />
           </View>
-        </View>
+        </Row>
       </View>
 
       <Button
@@ -332,12 +331,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     minHeight: theme.control.minHeight,
-    gap: theme.gap(2),
-  },
-  paceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     gap: theme.gap(2),
   },
   paceControl: {
