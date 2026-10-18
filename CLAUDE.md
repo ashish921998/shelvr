@@ -363,6 +363,12 @@ needed at runtime by the features that use them:
 - `APPLE_RETENTION_MESSAGE_ID`: id of the Apple-approved retention message
   `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
   the default message configured for the product
+- `APPLE_RETENTION_OFFERS`: JSON from product id to `{ offerIdentifier, messageIdentifier }`.
+  A listed product gets that App Store Connect promotional offer on the cancel sheet, signed
+  for the subscriber's original transaction; any other product gets the plain message
+- `APPLE_IAP_PRIVATE_KEY` / `APPLE_IAP_KEY_ID` / `APPLE_IAP_ISSUER_ID`: the Apple In-App
+  Purchase key (`.p8` contents), its key id and issuer id, which sign those offers. Unset,
+  `/retention-messaging` sends the plain message and logs `retention_offer_skipped`
 - `APPLE_REVOKE_PRIVATE_KEY` / `APPLE_REVOKE_KEY_ID` / `APPLE_REVOKE_TEAM_ID`: the Sign in
   with Apple key (`.p8` contents), its key id, and the Apple team id. `appleRevoke.ts` signs
   the client secret with them to revoke a deleted account's Apple token. All optional:
