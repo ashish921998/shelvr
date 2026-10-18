@@ -321,8 +321,6 @@
     "many": "%{formattedCount} días",
     "other": "%{formattedCount} días"
   },
-  "trip.moreDays": "Más días",
-  "trip.fewerDays": "Menos días",
   "trip.starting": "Inicio",
   "trip.addDate": "Añadir una fecha",
   "trip.clearDate": "Quitar la fecha",

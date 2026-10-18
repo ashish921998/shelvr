@@ -15,13 +15,17 @@ import {
   type TripRequest,
 } from "@/lib/trip";
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
-import * as Haptics from "expo-haptics";
+import { SegmentedControl } from "@expo/ui/community/segmented-control";
 import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PACES: TripPace[] = ["easy", "balanced", "packed"];
+const DAY_CHOICES = Array.from(
+  { length: MAX_TRIP_DAYS - MIN_TRIP_DAYS + 1 },
+  (_, index) => MIN_TRIP_DAYS + index,
+);
 
 const RESIZE = LinearTransition.duration(motion.duration.enter).easing(
   motion.easing.inOut,
@@ -62,61 +66,30 @@ function Row({
   );
 }
 
-/** Days as a minus / plus stepper. */
-function DayStepper({
-  days,
-  onChange,
+/** A label over a full-width native segmented control. The label comes
+ * first so VoiceOver reads it before the bare segment values. */
+function Segmented({
+  label,
+  values,
+  selected,
+  onSelect,
 }: {
-  days: number;
-  onChange: (days: number) => void;
+  label: string;
+  values: string[];
+  selected: number;
+  onSelect: (index: number) => void;
 }) {
-  const { theme } = useUnistyles();
-  const step = (by: 1 | -1) => {
-    const next = days + by;
-    if (next < MIN_TRIP_DAYS || next > MAX_TRIP_DAYS) return;
-    if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
-    onChange(next);
-  };
-  const stepButton = (by: 1 | -1) => {
-    const disabled = by === 1 ? days >= MAX_TRIP_DAYS : days <= MIN_TRIP_DAYS;
-    return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={by === 1 ? t("trip.moreDays") : t("trip.fewerDays")}
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        onPress={() => step(by)}
-        hitSlop={6}
-        style={({ pressed }) => [
-          styles.stepButton,
-          disabled && styles.disabled,
-          pressed && styles.pressed,
-        ]}
-      >
-        <AppSymbolIcon
-          name={by === 1 ? "plus" : "minus"}
-          size={14}
-          tintColor={theme.colors.foreground}
-        />
-      </Pressable>
-    );
-  };
+  const { theme, rt } = useUnistyles();
   return (
-    <View
-      style={styles.stepper}
-      accessible
-      accessibilityRole="adjustable"
-      accessibilityLabel={t("trip.dayCount", { count: days })}
-      accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
-      onAccessibilityAction={(event) =>
-        step(event.nativeEvent.actionName === "increment" ? 1 : -1)
-      }
-    >
-      {stepButton(-1)}
-      <ThemedText variant="header" style={styles.stepValue}>
-        {days}
-      </ThemedText>
-      {stepButton(1)}
+    <View style={styles.block}>
+      <ThemedText variant="bodyLabel">{label}</ThemedText>
+      <SegmentedControl
+        values={values}
+        selectedIndex={selected}
+        onChange={(event) => onSelect(event.nativeEvent.selectedSegmentIndex)}
+        appearance={isDarkThemeName(rt.themeName) ? "dark" : "light"}
+        tintColor={theme.colors.primarySoft}
+      />
     </View>
   );
 }
@@ -262,23 +235,21 @@ export function TripPlanForm({
       ) : null}
 
       <View style={styles.rows}>
-        <Row label={t("trip.howManyDays")}>
-          <DayStepper days={days} onChange={setDays} />
-        </Row>
+        <Segmented
+          label={t("trip.howManyDays")}
+          values={DAY_CHOICES.map(String)}
+          selected={DAY_CHOICES.indexOf(days)}
+          onSelect={(index) => setDays(DAY_CHOICES[index])}
+        />
+        <Segmented
+          label={t("trip.pace")}
+          values={PACES.map(paceLabel)}
+          selected={PACES.indexOf(pace)}
+          onSelect={(index) => setPace(PACES[index])}
+        />
         <View style={styles.divider} />
         <Row label={t("trip.starting")}>
           <StartDate value={start} onChange={setStart} />
-        </Row>
-        <View style={styles.divider} />
-        <Row label={t("trip.pace")}>
-          <View style={styles.paceControl}>
-            <TripSegments
-              labels={PACES.map(paceLabel)}
-              selected={PACES.indexOf(pace)}
-              onSelect={(index) => setPace(PACES[index])}
-              accessibilityLabel={t("trip.pace")}
-            />
-          </View>
         </Row>
       </View>
 
@@ -324,7 +295,7 @@ const styles = StyleSheet.create((theme) => ({
     marginHorizontal: -theme.gap(2),
   },
   rows: {
-    gap: theme.gap(1.5),
+    gap: theme.gap(2),
   },
   row: {
     flexDirection: "row",
@@ -333,33 +304,12 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: theme.control.minHeight,
     gap: theme.gap(2),
   },
-  paceControl: {
-    flexShrink: 1,
-    flexGrow: 1,
-    maxWidth: theme.gap(34),
+  block: {
+    gap: theme.gap(1),
   },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: theme.colors.border,
-  },
-  stepper: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
-  },
-  stepButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  stepValue: {
-    width: theme.gap(4),
-    textAlign: "center",
   },
   dateLink: {
     flexDirection: "row",
@@ -392,9 +342,6 @@ const styles = StyleSheet.create((theme) => ({
   cancel: {
     alignSelf: "center",
     paddingVertical: theme.gap(0.5),
-  },
-  disabled: {
-    opacity: theme.opacity.disabled,
   },
   pressed: {
     opacity: theme.opacity.pressed,

@@ -319,8 +319,6 @@
     "one": "%{formattedCount} day",
     "other": "%{formattedCount} days"
   },
-  "trip.moreDays": "More days",
-  "trip.fewerDays": "Fewer days",
   "trip.starting": "Starting",
   "trip.addDate": "Add a date",
   "trip.clearDate": "Remove the date",

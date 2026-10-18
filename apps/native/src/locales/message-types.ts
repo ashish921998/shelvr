@@ -314,8 +314,6 @@ export type MessageParams = {
   "trip.whichCity": undefined;
   "trip.howManyDays": undefined;
   "trip.dayCount": { count: number };
-  "trip.moreDays": undefined;
-  "trip.fewerDays": undefined;
   "trip.starting": undefined;
   "trip.addDate": undefined;
   "trip.clearDate": undefined;

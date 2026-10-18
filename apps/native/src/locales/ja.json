@@ -319,8 +319,6 @@
   "trip.dayCount": {
     "other": "%{formattedCount}日"
   },
-  "trip.moreDays": "日数を増やす",
-  "trip.fewerDays": "日数を減らす",
   "trip.starting": "開始日",
   "trip.addDate": "日付を追加",
   "trip.clearDate": "日付を削除",

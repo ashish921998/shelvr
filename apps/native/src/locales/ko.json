@@ -319,8 +319,6 @@
   "trip.dayCount": {
     "other": "%{formattedCount}일"
   },
-  "trip.moreDays": "하루 늘리기",
-  "trip.fewerDays": "하루 줄이기",
   "trip.starting": "시작일",
   "trip.addDate": "날짜 추가",
   "trip.clearDate": "날짜 지우기",
