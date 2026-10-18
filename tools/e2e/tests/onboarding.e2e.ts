@@ -1,4 +1,4 @@
-import { test } from "@e2e-dev/mobile";
+import { afterEach, test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
 import {
@@ -11,10 +11,19 @@ import {
 import { LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall } from "./paywall-sheet.ts";
 
-// A first-time user who saved one link, relaunched on the reminder step and
-// declined the paywall at the end. Pro is hidden for this user from the
-// relaunch on (src/lib/e2e-hide-pro.ts), as it is for a real new user, so
-// the end-of-onboarding paywall has someone to ask.
+// A run that stops partway leaves a signed-in user mid-onboarding, which the
+// seeded flows after this one cannot get past (CI run 39048570372: seven
+// files timed out on the reminder step). Clearing the keychain leaves the
+// app on the opener, where they start from.
+afterEach(async ({ device }) => {
+  await device.closeApp().catch(() => undefined);
+  await device.clearKeychain();
+});
+
+// A first-time user who saved one link, relaunched on the reminder step,
+// took the promise and declined the paywall at the end. Pro is hidden for
+// this user from the relaunch on (src/lib/e2e-hide-pro.ts), as it is for a
+// real new user, so the end-of-onboarding paywall has someone to ask.
 test("asks for the paywall at the end of onboarding, after a relaunch on the reminder step", async ({
   device,
   screen,
@@ -35,10 +44,12 @@ test("asks for the paywall at the end of onboarding, after a relaunch on the rem
   );
   await screen.getByRole("button", "Don't remind me").tap();
 
-  // The share practice, skipped, and then the paywall.
+  // The share practice, skipped, then the promise step, and then the
+  // paywall.
   await screen.getByRole("button", "I'll try it later").tap({
     timeout: 30_000,
   });
+  await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
   await expectPaywall(screen);
 
   // A close is a decline, and onboarding ends on Home. No exit offer
