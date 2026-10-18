@@ -113,13 +113,13 @@ export function youTubeVideo(
   if (!isYouTubeUrl(url)) return undefined;
   try {
     const { hostname, pathname, searchParams } = new URL(url ?? "");
+    if (/^\/shorts\/[^/]+/.test(pathname)) return "short";
     if (hostname.toLowerCase() === "youtu.be") {
       return pathname.length > 1 ? "video" : undefined;
     }
     if (pathname === "/watch") {
-      return searchParams.has("v") ? "video" : undefined;
+      return searchParams.get("v") ? "video" : undefined;
     }
-    if (/^\/shorts\/[^/]+/.test(pathname)) return "short";
     return /^\/(live|clip|embed|v)\/[^/]+/.test(pathname) ? "video" : undefined;
   } catch {
     return undefined;

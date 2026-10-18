@@ -147,6 +147,8 @@ describe("youTubeVideo", () => {
     ["https://youtu.be/dQw4w9WgXcQ", "video"],
     ["https://www.youtube.com/embed/dQw4w9WgXcQ", "video"],
     ["https://m.youtube.com/shorts/abc123", "short"],
+    ["https://youtu.be/shorts/abc123", "short"],
+    ["https://www.youtube.com/watch?v=", undefined],
     ["https://www.youtube.com/@RickAstleyYT", undefined],
     ["https://vimeo.com/1", undefined],
   ] as const)("reads %s as %s", (url, kind) => {
