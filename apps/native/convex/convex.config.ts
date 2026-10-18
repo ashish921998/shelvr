@@ -18,6 +18,12 @@ const app = defineApp({
     APPLE_IAP_PRIVATE_KEY: v.optional(v.string()),
     APPLE_IAP_KEY_ID: v.optional(v.string()),
     APPLE_IAP_ISSUER_ID: v.optional(v.string()),
+    // Signs the Apple Maps Server API token for trip pins (convex/trips.ts):
+    // a MapKit key's .p8 contents, its key id, and the team id. Without all
+    // three, trips are made without pins.
+    APPLE_MAPS_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_MAPS_KEY_ID: v.optional(v.string()),
+    APPLE_MAPS_TEAM_ID: v.optional(v.string()),
     // Signs the client secret for Apple's token revocation on account
     // deletion (convex/appleRevoke.ts): the .p8 contents, its key id, and the
     // team id. Without all three the revocation is skipped.

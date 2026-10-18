@@ -1,14 +1,22 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { env, mutation, query, type MutationCtx } from "./_generated/server";
+import {
+  env,
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./_generated/server";
 import {
   isDevelopmentAnonymousUser,
   liveOwner,
   requireUserId,
 } from "./model/auth";
 import { insertMembership } from "./model/memberships";
+import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
+import { deleteTripsForSpace } from "./tripData";
 
 const RESET_LIMIT = 200;
 
@@ -109,7 +117,10 @@ export const resetCurrentUser = mutation({
     for (const row of memberships) await ctx.db.delete(row._id);
     for (const row of operations) await ctx.db.delete(row._id);
     for (const row of items) await ctx.db.delete(row._id);
-    for (const row of spaces) await ctx.db.delete(row._id);
+    for (const row of spaces) {
+      await deleteTripsForSpace(ctx, row._id);
+      await ctx.db.delete(row._id);
+    }
     for (const row of subscriptions) await ctx.db.delete(row._id);
     for (const storageId of storageIds) await safeDeleteStorage(ctx, storageId);
 
@@ -239,5 +250,51 @@ export const resetCurrentUser = mutation({
     });
 
     return { items: 4, spaces: 3, memberships: 4 };
+  },
+});
+
+/**
+ * Pins a trip on a development deployment that has no Apple Maps key: sets
+ * where each named stop is, as `trips.makeTrip` would have, and lays the trip
+ * out again from those points. Internal, so it is run from the CLI
+ * (`convex run devFixtures:locateTripStops`), with the fixture reset's guards
+ * on the trip's owner. Returns how many stops got a point.
+ */
+export const locateTripStops = internalMutation({
+  args: {
+    spaceId: v.id("spaces"),
+    places: v.array(
+      v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+    ),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const trip = await ctx.db
+      .query("trips")
+      .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
+      .first();
+    if (trip === null) throw new Error("Trip not found");
+    await requireDevelopmentAnonymousUser(ctx, trip.userId as Id<"users">);
+    const points = new Map(
+      args.places.map((place) => [place.name.trim().toLowerCase(), place]),
+    );
+    let located = 0;
+    const candidates: TripCandidate[] = [
+      ...trip.days.flatMap((day) => day.stops),
+      ...trip.wishlist,
+    ].map(({ lat: _lat, lng: _lng, ...stop }) => {
+      const point = points.get(stop.name.trim().toLowerCase());
+      if (point) located++;
+      return {
+        ...stop,
+        ...(point ? { location: { lat: point.lat, lng: point.lng } } : {}),
+      };
+    });
+    const laid = buildTrip(candidates, {
+      days: trip.days.length,
+      pace: trip.pace,
+    });
+    await ctx.db.patch(trip._id, laid);
+    return located;
   },
 });

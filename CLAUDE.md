@@ -80,6 +80,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemReads`: per-user read state, kept out of the item row
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
+  - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
+    user's saves; a new trip replaces the old one
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
@@ -244,6 +246,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   claims Pro, AI consent and the `makePlan` rate limit first; the pure prompt and sanitizing
   half (which drops a place no save names) is `model/plan.ts`. Places marked "We went"
   (`placeVisits.ts`, `setVisited`) go into the prompt and come back last, tagged `been`.
+- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
+  travel space's saves (one city's, when they span several), makes one model call that lists
+  the places they name with a time of day each, looks each up in the Apple Maps Server API
+  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
+  with no saved place shows as a gap; the trip never adds a place the saves do not name.
+  `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
+  reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
@@ -292,7 +301,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`,
+  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
   `digest/[id]`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
@@ -373,6 +382,11 @@ needed at runtime by the features that use them:
   with Apple key (`.p8` contents), its key id, and the Apple team id. `appleRevoke.ts` signs
   the client secret with them to revoke a deleted account's Apple token. All optional:
   without them deletion still completes and the revocation is skipped with a log line
+- `APPLE_MAPS_PRIVATE_KEY` / `APPLE_MAPS_KEY_ID` / `APPLE_MAPS_TEAM_ID`: a MapKit key
+  (`.p8` contents), its key id, and the Apple team id. `trips.ts` signs the Apple Maps Server
+  API token with them to pin a trip's stops (free up to 25,000 calls a day per team; past
+  that Apple answers 429 and stops show without pins). All optional: without them trips have
+  no pins
 - `AUTH_ENABLE_ANONYMOUS`: set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY`: Google AI Studio API key for classification (used directly by

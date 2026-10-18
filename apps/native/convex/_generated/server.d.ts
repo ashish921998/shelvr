@@ -28,6 +28,9 @@ type Env = {
   readonly APPLE_IAP_ISSUER_ID: string | undefined;
   readonly APPLE_IAP_KEY_ID: string | undefined;
   readonly APPLE_IAP_PRIVATE_KEY: string | undefined;
+  readonly APPLE_MAPS_KEY_ID: string | undefined;
+  readonly APPLE_MAPS_PRIVATE_KEY: string | undefined;
+  readonly APPLE_MAPS_TEAM_ID: string | undefined;
   readonly APPLE_RETENTION_MESSAGE_ID: string | undefined;
   readonly APPLE_RETENTION_OFFERS: string | undefined;
   readonly APPLE_REVOKE_KEY_ID: string | undefined;
