@@ -157,16 +157,22 @@ export default function PlanVote({
           if ((storedBallot(pendingKey(token))?.revision ?? 0) <= revision) {
             forget(pendingKey(token));
           }
-          setStatus("saved");
-          setMessage(undefined);
+          // A newer ballot still settling or queued keeps the page on
+          // "saving", so an earlier answer never reads as the latest tap saved.
+          if (revision === lastRevision.current) {
+            setStatus("saved");
+            setMessage(undefined);
+          }
           return;
         }
         const reply = (await response.json().catch(() => ({}))) as {
           message?: string;
         };
+        if (revision !== lastRevision.current) return;
         setStatus("error");
         setMessage(reply.message);
       } catch {
+        if (revision !== lastRevision.current) return;
         setStatus("error");
         setMessage(undefined);
       }
@@ -242,8 +248,8 @@ export default function PlanVote({
     status === "error"
       ? (message ?? "Couldn't save your vote. Try again.")
       : status === "saved"
-        ? `Saved. ${who} sees your picks in the app.`
-        : `${who} sees your picks in the app.`;
+        ? `Saved. ${who} will see your picks in the app.`
+        : `${who} will see your picks in the app.`;
 
   return (
     <div>

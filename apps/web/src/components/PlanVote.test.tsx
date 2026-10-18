@@ -71,11 +71,43 @@ describe("PlanVote", () => {
       passes: ["p1"],
     });
     expect(container.textContent).toContain(
-      "Saved. Ashish sees your picks in the app.",
+      "Saved. Ashish will see your picks in the app.",
     );
     expect(
       JSON.parse(window.localStorage.getItem("shelvr.planVote.tok")!),
     ).toMatchObject({ choices: { p0: "pick", p1: "pass" } });
+  });
+
+  it("keeps a second tap made while the first vote is saving", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    fetchMock
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => (answer = resolve)),
+      )
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    tap("Yes to Masque");
+    // The first answer lands while the second tap is still settling.
+    await act(async () => {
+      answer(new Response("{}", { status: 200 }));
+    });
+    expect(container.textContent).not.toContain("Saved.");
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      picks: ["p0", "p1"],
+    });
+    expect(container.textContent).toContain("Saved. Ashish will see");
+  });
+
+  it("says they will see the picks when the sender has no name", () => {
+    act(() => root.render(<PlanVote token="tok" places={places} />));
+    expect(container.textContent).toContain(
+      "They will see your picks in the app.",
+    );
   });
 
   it("numbers each ballot above the last", async () => {
