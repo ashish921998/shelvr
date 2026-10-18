@@ -116,7 +116,7 @@ export default function OracleApp() {
       }
       message = body.message;
     } catch {
-      message = undefined;
+      // A network failure falls through to the generic error below.
     }
     captureWebAnalyticsEvent("oracle_failed", { mode, status });
     setState({

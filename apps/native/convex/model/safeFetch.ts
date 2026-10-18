@@ -465,17 +465,7 @@ function followRedirect(
     }
     throw new SafeFetchErrorClass("fetch_failed", "invalid redirect target");
   }
-  try {
-    assertHostAllowed(nextUrl);
-  } catch (e) {
-    if (isSafeFetchError(e)) {
-      throw e;
-    }
-    throw new SafeFetchErrorClass(
-      "blocked_destination",
-      "redirect target rejected",
-    );
-  }
+  assertHostAllowed(nextUrl);
   return nextUrl;
 }
 
@@ -576,9 +566,6 @@ async function safeFetchThrowing(
           "content type not allowed",
         );
       }
-      // Pre-check a declared Content-Length against the cap before streaming.
-      // Skip this pre-check in truncate mode: the reader will stop at maxBytes
-      // and return the prefix instead of failing.
       if (onOverflow === "error") {
         await rejectOversizeContentLength(response, maxBytes);
       }

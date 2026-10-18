@@ -315,7 +315,10 @@ http.route({
     const secret = env.WAITLIST_SHARED_SECRET;
     if (
       !secret ||
-      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+      !(await secureCompare(
+        secret,
+        req.headers.get(WAITLIST_SECRET_HEADER) ?? "",
+      ))
     )
       return json({ error: "unauthorized" }, 401);
     const route = req.headers.get("x-shelvr-body-route");
@@ -324,7 +327,7 @@ http.route({
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
         route,
-        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
       return json({ ok: true }, 200);
     } catch (error) {
@@ -497,7 +500,6 @@ function captureUnauthorized(): Response {
   return json({ error: "unauthorized" }, 401);
 }
 
-/** Maps a refused capture to its response. Never logs content or URLs. */
 function isSavableUrl(url: string): boolean {
   try {
     normalizeExternalUrl(url);
@@ -508,6 +510,7 @@ function isSavableUrl(url: string): boolean {
   }
 }
 
+/** Maps a refused capture to its response. Never logs content or URLs. */
 function captureFailure(route: CaptureRoute, error: unknown): Response {
   const code = saveErrorCode(error);
   if (code === "pro_required") return json({ error: code }, 402);
@@ -659,13 +662,16 @@ http.route({
     const secret = env.WAITLIST_SHARED_SECRET;
     if (
       !secret ||
-      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+      !(await secureCompare(
+        secret,
+        req.headers.get(WAITLIST_SECRET_HEADER) ?? "",
+      ))
     )
       return json({ error: "unauthorized" }, 401);
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
         route: "waitlist",
-        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
       const { token } = JSON.parse(await readBoundedText(req, 1024)) as {
         token?: unknown;
