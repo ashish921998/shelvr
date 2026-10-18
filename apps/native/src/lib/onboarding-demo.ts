@@ -37,9 +37,9 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
   },
   {
     kind: "Travel",
-    url: "https://www.lonelyplanet.com/articles/best-things-to-do-in-prague",
-    pageHeading: "Prague: the best things to do",
-    domain: "lonelyplanet.com",
+    url: "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/",
+    pageHeading: "Old Town Square",
+    domain: "prague.eu",
   },
   {
     kind: "Videos",

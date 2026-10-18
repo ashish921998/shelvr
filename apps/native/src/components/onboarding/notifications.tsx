@@ -11,6 +11,8 @@ import {
   requestNotificationPermission,
 } from "@/lib/notification-token";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { IntentChip } from "@/components/intent-chip";
+import { runIntent } from "@/lib/intents";
 import { SaveSummary } from "@/components/onboarding/save-summary";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { useNotificationSession } from "@/lib/notifications";
@@ -199,6 +201,9 @@ export function NotificationsStep({
 
   const image = item?.heroImageUrl ?? item?.imageUrl;
   const tag = item?.tags[0];
+  // A place shows its payoff here, before the paywall: the save already
+  // knows where it is.
+  const maps = item?.intents?.find((intent) => intent.kind === "open_maps");
 
   return (
     <View style={styles.wrap}>
@@ -218,6 +223,19 @@ export function NotificationsStep({
             : t("onboarding.remindSavedNow")
         }
         tag={tag}
+        action={
+          item && maps ? (
+            <IntentChip
+              kind="open_maps"
+              label={t("plan.openMaps")}
+              onPress={() => {
+                void runIntent("open_maps", maps.value)
+                  .then(() => analytics.itemAction(item, "open_maps"))
+                  .catch(() => {});
+              }}
+            />
+          ) : undefined
+        }
       />
 
       <View
