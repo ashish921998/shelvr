@@ -286,6 +286,43 @@ describe("votes", () => {
     });
   });
 
+  it("keeps take-backs out of the voter cap", async () => {
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    const ballot = (voterId: string, picks: string[], ip: string) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId,
+        picks,
+        passes: [],
+        revision: 1,
+        ip,
+      });
+    for (let i = 0; i < MAX_PLAN_VOTERS; i++) {
+      expect(await ballot(`empty${i}`, [], `203.0.113.${i}`)).toBe("recorded");
+    }
+    for (let i = 0; i < MAX_PLAN_VOTERS; i++) {
+      expect(await ballot(`v${i}`, ["p0"], `198.51.100.${i}`)).toBe("recorded");
+    }
+    // Twenty voters are in, so a take-back can't become a twenty-first vote.
+    expect(
+      await backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId: "empty0",
+        picks: ["p1"],
+        passes: [],
+        revision: 2,
+        ip: "203.0.113.0",
+      }),
+    ).toBe("full");
+    expect(
+      await t.query(api.planShares.latestPlanShare, { spaceId }),
+    ).toMatchObject({ voters: MAX_PLAN_VOTERS });
+  });
+
   it("gives the owner each shared place back with its reason and save", async () => {
     const { t, spaceId, places } = await setup();
     await t.mutation(api.planShares.createPlanShare, { spaceId, places });

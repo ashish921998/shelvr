@@ -140,6 +140,9 @@ export default function PlanVote({
   // The newest ballot handed to the queue whose request hasn't started yet,
   // because an earlier one is still out. Leaving the page sends it too.
   const queued = useRef<Ballot | undefined>(undefined);
+  // The newest revision leaving the page already sent, so the queue skips it
+  // and anything older rather than sending it twice.
+  const sentOnLeave = useRef(0);
 
   const send = (next: Choices, revision: number) => {
     voter.current ??= voterId();
@@ -147,6 +150,7 @@ export default function PlanVote({
     storeIfNewer(pendingKey(token), { choices: next, revision });
     queued.current = { choices: next, revision };
     queue.current = queue.current.then(async () => {
+      if (revision <= sentOnLeave.current) return;
       if (queued.current?.revision === revision) queued.current = undefined;
       try {
         const response = await fetch("/api/plan-vote", {
@@ -219,6 +223,7 @@ export default function PlanVote({
       pending.current = undefined;
       queued.current = undefined;
       if (!next) return;
+      sentOnLeave.current = Math.max(sentOnLeave.current, next.revision);
       voter.current ??= voterId();
       storeIfNewer(pendingKey(token), next);
       void fetch("/api/plan-vote", {

@@ -103,9 +103,12 @@ describe("PlanVote", () => {
     expect(container.textContent).toContain("Saved. Ashish will see");
   });
 
-  it("sends a vote waiting behind a slow one when the page closes", async () => {
+  it("sends a vote waiting behind a slow one when the page closes, once", async () => {
+    let answer: (response: Response) => void = () => undefined;
     fetchMock
-      .mockImplementationOnce(() => new Promise<Response>(() => undefined))
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => (answer = resolve)),
+      )
       .mockResolvedValue(new Response("{}", { status: 200 }));
     render();
     tap("Yes to Bastian");
@@ -123,6 +126,13 @@ describe("PlanVote", () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
       picks: ["p0", "p1"],
     });
+    // The slow answer lands (a page kept in the back-forward cache): the
+    // queued ballot already went out, so it is not sent again.
+    await act(async () => {
+      answer(new Response("{}", { status: 200 }));
+    });
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("says they will see the picks when the sender has no name", () => {

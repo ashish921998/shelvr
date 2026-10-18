@@ -29,6 +29,11 @@ import { ipKey, ipNetwork } from "./model/clientIp";
 export const PLAN_SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Most people whose votes one link keeps. Past this a new voter is refused. */
 export const MAX_PLAN_VOTERS = 20;
+/**
+ * Most vote rows one link keeps. Beyond the voters, a visitor who picked and
+ * then took it all back keeps an empty row holding their ballot order.
+ */
+const MAX_VOTE_ROWS = MAX_PLAN_VOTERS * 2;
 const MAX_CITY_CHARS = 60;
 /** Shares a space or account deletion removes per transaction. */
 const DELETE_BATCH = 50;
@@ -173,13 +178,12 @@ export const latestPlanShare = query({
     const votes = await ctx.db
       .query("planVotes")
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
-      .take(MAX_PLAN_VOTERS);
+      .take(MAX_VOTE_ROWS);
     return {
       token: share.token,
       city: share.city,
       expiresAt: share.expiresAt,
-      voters: votes.filter((vote) => vote.picks.length + vote.passes.length > 0)
-        .length,
+      voters: votes.filter(hasVote).length,
       places: share.places.map((place) => ({
         key: place.key,
         name: place.name,
@@ -285,6 +289,7 @@ export const recordPlanVote = internalMutation({
         q.eq("shareId", share._id).eq("voterId", voterId),
       )
       .unique();
+    const empty = picks.length === 0 && passes.length === 0;
     if (existing !== null) {
       if (
         existing.revision !== undefined &&
@@ -292,6 +297,14 @@ export const recordPlanVote = internalMutation({
         args.revision < existing.revision
       ) {
         return "recorded";
+      }
+      // An empty row holds no voter, so turning it into a vote needs a slot.
+      if (
+        !empty &&
+        !hasVote(existing) &&
+        (await activeVoters(ctx, share._id)) >= MAX_PLAN_VOTERS
+      ) {
+        return "full";
       }
       await ctx.db.patch(existing._id, {
         picks,
@@ -303,18 +316,17 @@ export const recordPlanVote = internalMutation({
     }
     // An empty ballot from someone new holds no vote. With a revision it is
     // still kept, so an earlier ballot of theirs that lands after it can't
-    // bring back a withdrawn pick; it shows as no voter in the tallies.
-    if (
-      picks.length === 0 &&
-      passes.length === 0 &&
-      args.revision === undefined
-    )
-      return "recorded";
-    const voters = await ctx.db
+    // bring back a withdrawn pick. It takes no voter slot, and past the row
+    // cap it is dropped as before.
+    if (empty && args.revision === undefined) return "recorded";
+    const rows = await ctx.db
       .query("planVotes")
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
-      .take(MAX_PLAN_VOTERS);
-    if (voters.length >= MAX_PLAN_VOTERS) return "full";
+      .take(MAX_VOTE_ROWS);
+    if (rows.length >= MAX_VOTE_ROWS) return empty ? "recorded" : "full";
+    if (!empty && rows.filter(hasVote).length >= MAX_PLAN_VOTERS) {
+      return "full";
+    }
     await rateLimiter.limit(ctx, "planVoterSlot", {
       key: `${share._id}:${ipNetwork(args.ip)}`,
       throws: true,
@@ -331,11 +343,26 @@ export const recordPlanVote = internalMutation({
   },
 });
 
+function hasVote(vote: Doc<"planVotes">): boolean {
+  return vote.picks.length + vote.passes.length > 0;
+}
+
+async function activeVoters(
+  ctx: QueryCtx,
+  shareId: Id<"planShares">,
+): Promise<number> {
+  const rows = await ctx.db
+    .query("planVotes")
+    .withIndex("by_share_and_voter", (q) => q.eq("shareId", shareId))
+    .take(MAX_VOTE_ROWS);
+  return rows.filter(hasVote).length;
+}
+
 async function deleteShare(ctx: MutationCtx, share: Doc<"planShares">) {
   const votes = await ctx.db
     .query("planVotes")
     .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
-    .take(MAX_PLAN_VOTERS);
+    .take(MAX_VOTE_ROWS);
   for (const vote of votes) {
     await ctx.db.delete(vote._id);
   }
