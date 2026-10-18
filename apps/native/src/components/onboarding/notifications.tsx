@@ -158,8 +158,8 @@ export function NotificationsStep({
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
     }
-    // The pledge above the button is a Sunday look-back, so the same yes turns
-    // the Weekly shelf on. Skipped if the account changed during the prompt.
+    // The small print under the button says the same yes turns the Weekly
+    // shelf on. Skipped if the account changed during the prompt.
     // Not awaited: it needs the network, and an offline mutation waits for a
     // reconnect instead of failing, which would hold this step.
     if (granted && firstSaveReminderTicket() === ticket) {
@@ -252,9 +252,6 @@ export function NotificationsStep({
       </View>
 
       <View style={styles.foot}>
-        {/* The person's promise; tapping the reminder turns the Weekly shelf
-            on to keep it. */}
-        <Text style={styles.pledge}>{t("onboarding.remindPledge")}</Text>
         <CtaButton
           label={t(SLOT_CTA[choice.slot])}
           onPress={() => void remind()}
@@ -318,14 +315,6 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     color: theme.colors.muted,
-  },
-  pledge: {
-    fontFamily: theme.fonts.display,
-    fontSize: 19,
-    lineHeight: 25,
-    textAlign: "center",
-    color: theme.colors.foreground,
-    marginBottom: theme.gap(0.5),
   },
   consent: {
     fontFamily: theme.fonts.regular,
