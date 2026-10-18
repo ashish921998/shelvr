@@ -20,6 +20,11 @@ import {
   feedbackPlatformValidator,
   feedbackSurfaceValidator,
 } from "./model/feedbackFields";
+import {
+  tripDayValidator,
+  tripPaceValidator,
+  tripStopValidator,
+} from "./model/trip";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -567,6 +572,23 @@ export default defineSchema({
     revision: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_share_and_voter", ["shareId", "voterId"]),
+
+  // Trips made from a travel space ("Plan my trip"): days of stops, every
+  // stop one of the user's saves. A new trip for the same space replaces the
+  // old one, so a space has at most one.
+  trips: defineTable({
+    userId: v.string(),
+    spaceId: v.id("spaces"),
+    city: v.optional(v.string()),
+    pace: tripPaceValidator,
+    // "YYYY-MM-DD", the first day, when the user picked one.
+    startDate: v.optional(v.string()),
+    days: v.array(tripDayValidator),
+    // Places the days had no room for, best first.
+    wishlist: v.array(tripStopValidator),
+  })
+    .index("by_user", ["userId"])
+    .index("by_space", ["spaceId"]),
 
   // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
   // intents save without launching the JavaScript app, so they have no Convex

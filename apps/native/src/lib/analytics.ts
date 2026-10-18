@@ -254,6 +254,18 @@ type AnalyticsEventProperties = {
   plan_ask_failed: { reason: "link" | "share" };
   /** "Where are you going?" was answered; `city` false means Anywhere. */
   plan_city_chosen: { city: boolean; city_count: number };
+  // "Plan my trip" on a travel space. `made` is false when no save named a
+  // place, so no trip was stored.
+  trip_made: {
+    considered: number;
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    made: boolean;
+  };
+  trip_failed: { reason: "ai_consent" | "error" };
+  trip_stop_opened: { day: number; stop: number };
+  trip_directions_opened: { located: boolean };
+  trip_stop_swapped: { day: number };
   onboarding_completed: {
     // Always empty since the pileup question was removed. Kept so existing
     // PostHog insights keep a stable property shape.

@@ -37,11 +37,9 @@ test(
     // "membrillo" is only in the fixture page's description and text, so the
     // search answers once the page was read and classified, and the fake
     // keeps the page's own title.
-    await tapTab(screen, "Search");
-    await fillField(
-      screen.getByRole("textbox", "Search your saves"),
-      "membrillo",
-    );
+    const search = screen.getByRole("textbox", "Search your saves");
+    await tapTab(screen, "Search", search);
+    await fillField(search, "membrillo");
     await expect(
       screen.getByRole("button", new RegExp(`^${TITLE}`)),
     ).toHaveCount(1, { timeout: 60_000 });

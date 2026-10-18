@@ -46,6 +46,10 @@ const SF_TO_MATERIAL = {
   link: "link",
   safari: "language",
   map: "map",
+  airplane: "flight",
+  "arrow.triangle.turn.up.right.diamond.fill": "directions",
+  "arrow.left.arrow.right": "swap_horiz",
+  minus: "remove",
   magnifyingglass: "search",
   // Commerce
   bag: "shopping_bag",

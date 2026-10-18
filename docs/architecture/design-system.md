@@ -46,8 +46,11 @@ stays consistent.
 Components never hardcode hex values; they read `theme.colors.*` roles. Roles
 are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `foreground`, `muted`, `faint`, `primary`, `primaryForeground`, `primarySoft`,
-`primaryText`, `border`, `imageBorder`, `danger`, `overlay`, `onOverlay`,
-`onTint`, `keep`, `onKeep`, and `tabTint`. Content drawn on a filled tint
+`primaryText`, `border`, `imageBorder`, `frame`, `danger`, `overlay`,
+`onOverlay`, `onTint`, `keep`, `onKeep`, and `tabTint`. `frame` is the mat
+around a saved picture (feed cards, space covers, the detail hero): paper
+white in the light theme and the card surface in the dark ones, so a photo
+never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
 `tabTint` is the tab bar tint. iOS `NativeTabs` paints the selected tab's icon

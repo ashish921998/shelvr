@@ -146,6 +146,10 @@ function AppStack() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
+            name="trip/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
             name="add"
             options={
               Platform.OS === "android"

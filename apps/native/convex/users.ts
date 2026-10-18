@@ -250,21 +250,18 @@ async function deleteAccountBatch(
  * Storage is deleted with the rows that reference it. */
 async function deleteUserOwnedDataBatch(
   ctx: MutationCtx,
-  userId: Id<"users"> | string,
+  userId: Id<"users">,
 ): Promise<boolean> {
-  const userKey = userId as string;
-
   // Capture tokens first, so Siri stops saving into the account the moment
   // deletion starts rather than after its saves have drained.
-  if (!(await deleteCaptureTokensBatch(ctx, userId as Id<"users">)))
-    return false;
+  if (!(await deleteCaptureTokensBatch(ctx, userId))) return false;
 
   // Raw deletes on purpose: every spaceItems write normally goes through
   // model/memberships.ts to keep the space summary exact, but these spaces
   // are deleted in the same pass, so patching their counters would be waste.
   const memberships = await ctx.db
     .query("spaceItems")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const row of memberships) {
     await ctx.db.delete(row._id);
@@ -273,7 +270,7 @@ async function deleteUserOwnedDataBatch(
 
   const spaces = await ctx.db
     .query("spaces")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const space of spaces) {
     await ctx.db.delete(space._id);
@@ -284,7 +281,7 @@ async function deleteUserOwnedDataBatch(
   // of article plus its search copy, so a full batch of them can read past
   // Convex's 16 MiB transaction limit and fail every retry.
   const { rows: items, bytes: itemBytes } = await takeWithinBytes(
-    ctx.db.query("items").withIndex("by_user", (q) => q.eq("userId", userKey)),
+    ctx.db.query("items").withIndex("by_user", (q) => q.eq("userId", userId)),
     { maxRows: DELETE_BATCH, maxBytes: DELETE_ITEM_READ_BYTES },
   );
   for (const item of items) {
@@ -299,7 +296,7 @@ async function deleteUserOwnedDataBatch(
   // Pending rows may still hold an unfinalized upload: delete that storage.
   const operations = await ctx.db
     .query("itemOperations")
-    .withIndex("by_user_operation", (q) => q.eq("userId", userKey))
+    .withIndex("by_user_operation", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const op of operations) {
     if (op.storageId !== undefined) {
@@ -311,7 +308,7 @@ async function deleteUserOwnedDataBatch(
 
   const demos = await ctx.db
     .query("onboardingDemos")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const demo of demos) {
     await ctx.db.delete(demo._id);
@@ -320,18 +317,18 @@ async function deleteUserOwnedDataBatch(
 
   const reads = await ctx.db
     .query("itemReads")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const read of reads) {
     await ctx.db.delete(read._id);
   }
   if (reads.length === DELETE_BATCH) return false;
 
-  if (!(await deleteSharingAndPlansBatch(ctx, userKey))) return false;
+  if (!(await deleteSharingAndPlansBatch(ctx, userId))) return false;
 
   const devices = await ctx.db
     .query("notificationDevices")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const device of devices) {
     await ctx.db.delete(device._id);
@@ -340,35 +337,35 @@ async function deleteUserOwnedDataBatch(
 
   const preferences = await ctx.db
     .query("notificationPreferences")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const preference of preferences) {
     await ctx.db.delete(preference._id);
   }
   if (preferences.length === DELETE_BATCH) return false;
 
-  if (!(await deleteSentNotificationsBatch(ctx, userKey))) return false;
+  if (!(await deleteSentNotificationsBatch(ctx, userId))) return false;
 
   // Feedback rows hold the user's authored messages, so they drain with the
   // account. Deleting a row cannot retract an already-delivered inbox email
   // (see docs/architecture/feedback.md); it only removes the Convex copy.
-  if (!(await deleteFeedbackBatch(ctx, userKey))) return false;
+  if (!(await deleteFeedbackBatch(ctx, userId))) return false;
 
   // Does not cancel the App Store subscription: only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (sub !== null) {
     await ctx.db.delete(sub._id);
   }
 
-  await deleteAiConsent(ctx, userKey);
+  await deleteAiConsent(ctx, userId);
 
   // The cancel-survey ask row is user-owned state; drain it with the rest.
   const survey = await ctx.db
     .query("cancelSurveys")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (survey !== null) {
     await ctx.db.delete(survey._id);
@@ -378,11 +375,11 @@ async function deleteUserOwnedDataBatch(
 
 async function deleteAiConsent(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<void> {
   const row = await ctx.db
     .query("aiConsents")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (row !== null) {
     await ctx.db.delete(row._id);
@@ -393,11 +390,11 @@ async function deleteAiConsent(
  * reminders. Returns true when both tables are drained for this user. */
 async function deleteSentNotificationsBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const digests = await ctx.db
     .query("weeklyDigests")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const digest of digests) {
     await ctx.db.delete(digest._id);
@@ -405,7 +402,7 @@ async function deleteSentNotificationsBatch(
   if (digests.length === DELETE_BATCH) return false;
   const reminders = await ctx.db
     .query("saveReminders")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const reminder of reminders) {
     await ctx.db.delete(reminder._id);
@@ -420,11 +417,11 @@ async function deleteSentNotificationsBatch(
  * (see docs/architecture/feedback.md). It only removes the Convex copy. */
 async function deleteFeedbackBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const feedback = await ctx.db
     .query("feedbackSubmissions")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const submission of feedback) {
     await ctx.db.delete(submission._id);
@@ -448,15 +445,16 @@ async function deleteCaptureTokensBatch(
   return tokens.length !== DELETE_BATCH;
 }
 
-/** Share links, "We went" places and plan vote links. True once all are gone. */
+/** Share links, "We went" places, trips and plan vote links. True once all are gone. */
 async function deleteSharingAndPlansBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   return (
-    (await deleteShareLinksBatch(ctx, userKey)) &&
-    (await deletePlaceVisitsBatch(ctx, userKey)) &&
-    (await deletePlanSharesForUser(ctx, userKey))
+    (await deleteShareLinksBatch(ctx, userId)) &&
+    (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deleteTripsBatch(ctx, userId)) &&
+    (await deletePlanSharesForUser(ctx, userId))
   );
 }
 
@@ -464,11 +462,11 @@ async function deleteSharingAndPlansBatch(
  * when the table is fully drained for this user. */
 async function deleteShareLinksBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const links = await ctx.db
     .query("shareLinks")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const link of links) {
     await ctx.db.delete(link._id);
@@ -480,16 +478,32 @@ async function deleteShareLinksBatch(
  * when the table is fully drained for this user. */
 async function deletePlaceVisitsBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const visits = await ctx.db
     .query("placeVisits")
-    .withIndex("by_user_and_visited", (q) => q.eq("userId", userKey))
+    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const visit of visits) {
     await ctx.db.delete(visit._id);
   }
   return visits.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's trips. Returns true when none are
+ * left. */
+async function deleteTripsBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  const trips = await ctx.db
+    .query("trips")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const trip of trips) {
+    await ctx.db.delete(trip._id);
+  }
+  return trips.length !== DELETE_BATCH;
 }
 
 /** Sessions (+ refresh tokens), accounts (+ verification codes), then users. */

@@ -53,6 +53,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // were classified, charged per save, at most ten per pass. Bounds a user
   // opening many old spaces in a row.
   cityBackfill: { kind: "token bucket", rate: 60, period: HOUR, capacity: 30 },
+  // "Plan my trip" sends the same saves and gets up to 35 places back, then
+  // looks each one up in Apple Maps. Trips are re-made less often than plans.
+  makeTrip: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
   // A spoken transcript of a recipe video whose caption had no recipe (one
   // paid Treg call, about $0.002, plus one model call). Per user: room for a
   // cooking binge, fatal to a loop. Global: about $4 a day at most, whatever
