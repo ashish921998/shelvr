@@ -43,9 +43,11 @@ export default function SettingsScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
-  // Typed to the one event used here: the native stack's transitionEnd isn't
-  // in expo-router's generic navigation type.
-  const navigation = useNavigation() as ClosingScreen;
+  // Typed to what is used here: the native stack's transitionEnd isn't in
+  // expo-router's generic navigation type.
+  const navigation = useNavigation() as ClosingScreen & {
+    getState: () => { routes: { name: string }[] };
+  };
   const { theme } = useUnistyles();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
@@ -72,6 +74,15 @@ export default function SettingsScreen() {
     } else {
       router.replace("/(app)/(tabs)/(home)");
     }
+  };
+
+  // Closes Settings and the Profile sheet under it. A development reload or
+  // direct link can restore Profile as the stack's root, where dismissAll
+  // stops at Profile, so Home replaces it, as Profile's own close does.
+  const closeAllSheets = () => {
+    const profileIsRoot = navigation.getState().routes[0]?.name !== "(tabs)";
+    router.dismissAll();
+    if (profileIsRoot) router.replace("/(app)/(tabs)/(home)");
   };
 
   const openExternal = (url: string) => {
@@ -168,7 +179,7 @@ export default function SettingsScreen() {
                 // presents only once both are gone.
                 onPress: () =>
                   void manageSubscription(() =>
-                    closeScreen(navigation, () => router.dismissAll()),
+                    closeScreen(navigation, closeAllSheets),
                   ),
               },
             ]

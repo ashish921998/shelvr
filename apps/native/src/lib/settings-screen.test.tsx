@@ -22,6 +22,8 @@ const mocks = vi.hoisted(() => ({
   setSaveReminders: vi.fn(),
   manageSubscription: vi.fn(),
   dismissAll: vi.fn(),
+  replace: vi.fn(),
+  stackRoot: "(tabs)",
   status: "none",
   preferences: { weeklyShelfEnabled: true, remindersEnabled: true } as
     | { weeklyShelfEnabled: boolean; remindersEnabled: boolean }
@@ -67,10 +69,13 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({
     back: vi.fn(),
     canGoBack: () => true,
-    replace: vi.fn(),
+    replace: mocks.replace,
     dismissAll: mocks.dismissAll,
   }),
-  useNavigation: () => ({ addListener: () => () => {} }),
+  useNavigation: () => ({
+    addListener: () => () => {},
+    getState: () => ({ routes: [{ name: mocks.stackRoot }] }),
+  }),
 }));
 // The screen's own flows are under test; its child settings have their own.
 vi.mock("@/components/ai-consent", () => ({
@@ -155,6 +160,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.preferences = { weeklyShelfEnabled: true, remindersEnabled: true };
   mocks.status = "none";
+  mocks.stackRoot = "(tabs)";
 });
 afterEach(cleanup);
 
@@ -209,8 +215,22 @@ it.each(["trialing", "pro"])(
     const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
     dismiss();
     expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).not.toHaveBeenCalled();
   },
 );
+
+it("replaces a root Profile with Home before Customer Center", () => {
+  mocks.status = "pro";
+  mocks.stackRoot = "profile";
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("account.delete"));
+  lastAlert().buttons[1].onPress?.();
+
+  const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+  dismiss();
+  expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+});
 
 it("reports a failed deletion and points to support", async () => {
   mocks.deleteAccount.mockRejectedValue(new Error("server"));
