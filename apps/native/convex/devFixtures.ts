@@ -16,6 +16,7 @@ import {
 import { insertMembership } from "./model/memberships";
 import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
+import { deleteTripsForSpace } from "./tripData";
 
 const RESET_LIMIT = 200;
 
@@ -116,7 +117,10 @@ export const resetCurrentUser = mutation({
     for (const row of memberships) await ctx.db.delete(row._id);
     for (const row of operations) await ctx.db.delete(row._id);
     for (const row of items) await ctx.db.delete(row._id);
-    for (const row of spaces) await ctx.db.delete(row._id);
+    for (const row of spaces) {
+      await deleteTripsForSpace(ctx, row._id);
+      await ctx.db.delete(row._id);
+    }
     for (const row of subscriptions) await ctx.db.delete(row._id);
     for (const storageId of storageIds) await safeDeleteStorage(ctx, storageId);
 

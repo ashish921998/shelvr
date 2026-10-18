@@ -143,6 +143,18 @@ describe("resetCurrentUser", () => {
       async (ctx) => await ctx.storage.store(new Blob(["old fixture"])),
     );
     const otherItemId = await backend.run(async (ctx) => {
+      const oldSpaceId = await ctx.db.insert("spaces", {
+        userId,
+        name: "Old trip",
+        dynamic: false,
+      });
+      await ctx.db.insert("trips", {
+        userId,
+        spaceId: oldSpaceId,
+        pace: "easy",
+        days: [],
+        wishlist: [],
+      });
       await ctx.db.insert("items", {
         userId,
         type: "image",
@@ -199,6 +211,12 @@ describe("resetCurrentUser", () => {
           .withIndex("by_user", (q) => q.eq("userId", userId))
           .unique(),
       ).toMatchObject({ status: "lifetime", productId: "dev.flow-fixtures" });
+      expect(
+        await ctx.db
+          .query("trips")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toEqual([]);
       expect(await ctx.db.system.get("_storage", storageId)).toBeNull();
       expect(await ctx.db.get(otherItemId)).not.toBeNull();
     });
