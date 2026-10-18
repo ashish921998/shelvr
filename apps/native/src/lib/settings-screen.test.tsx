@@ -70,6 +70,7 @@ vi.mock("expo-router", () => ({
     replace: vi.fn(),
     dismissAll: mocks.dismissAll,
   }),
+  useNavigation: () => ({ addListener: () => () => {} }),
 }));
 // The screen's own flows are under test; its child settings have their own.
 vi.mock("@/components/ai-consent", () => ({

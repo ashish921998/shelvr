@@ -37,6 +37,25 @@ it("presents Customer Center only after the sheets are gone", async () => {
   expect(mock.alert).not.toHaveBeenCalled();
 });
 
+it("waits for an asynchronous dismissal before settling", async () => {
+  let finish = () => {};
+  const done = manageSubscription(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = () => {
+          mock.order.push("dismissed");
+          resolve();
+        };
+      }),
+  );
+  await Promise.resolve();
+  expect(mock.order).toEqual([]);
+
+  finish();
+  await done;
+  expect(mock.order).toEqual(["dismissed", "settled", "customer-center"]);
+});
+
 it("points to the App Store when Customer Center cannot present", async () => {
   mock.present.mockResolvedValue(false);
   await manageSubscription(() => {});

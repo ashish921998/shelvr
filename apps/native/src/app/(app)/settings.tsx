@@ -11,12 +11,13 @@ import { restorePurchases, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
+import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -42,6 +43,9 @@ export default function SettingsScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
+  // Typed to the one event used here: the native stack's transitionEnd isn't
+  // in expo-router's generic navigation type.
+  const navigation = useNavigation() as ClosingScreen;
   const { theme } = useUnistyles();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
@@ -163,7 +167,9 @@ export default function SettingsScreen() {
                 // Settings sits on the Profile sheet, and Customer Center
                 // presents only once both are gone.
                 onPress: () =>
-                  void manageSubscription(() => router.dismissAll()),
+                  void manageSubscription(() =>
+                    closeScreen(navigation, () => router.dismissAll()),
+                  ),
               },
             ]
           : []),

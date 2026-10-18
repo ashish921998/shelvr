@@ -30,6 +30,7 @@ export function closeScreen(
   return new Promise((resolve) => {
     let off = () => {};
     let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const done = (delay: number) => {
       if (settled) return;
       settled = true;
@@ -38,7 +39,7 @@ export function closeScreen(
       if (delay > 0) setTimeout(resolve, delay);
       else resolve();
     };
-    const timeout = setTimeout(() => done(0), DISMISS_TIMEOUT_MS);
+    timeout = setTimeout(() => done(0), DISMISS_TIMEOUT_MS);
     off = screen.addListener("transitionEnd", (e) => {
       if (e.data?.closing) done(AFTER_DISMISS_MS);
     });

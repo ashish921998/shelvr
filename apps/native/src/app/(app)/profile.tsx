@@ -74,7 +74,7 @@ export default function ProfileScreen() {
   // after the same dismissal.
   const openSubscription = async () => {
     if (loading) return;
-    const dismissProfile = () => closeScreen(navigation, () => router.back());
+    const dismissProfile = () => closeScreen(navigation, closeProfile);
     if (!opensPaywall) {
       await manageSubscription(dismissProfile);
       return;
