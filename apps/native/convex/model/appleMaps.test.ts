@@ -63,6 +63,17 @@ describe("appleMapsAccessToken", () => {
     });
   });
 
+  it("is null for a malformed key", async () => {
+    const fetchImpl = vi.fn();
+    expect(
+      await appleMapsAccessToken(
+        { privateKey: "not-a-key", keyId: "K", teamId: "T" },
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("is null when Apple refuses", async () => {
     const fetchImpl = vi.fn(async () => new Response("", { status: 401 }));
     expect(
