@@ -310,19 +310,6 @@
   "plan.failedTitle": "Impossible de faire le plan",
   "plan.shareIntro": "Notre sélection de %{space} :",
   "plan.shareFooter": "Fait avec Shelvr %{url}",
-  "plan.cityTitle": "Où allez-vous?",
-  "plan.cityBody": "Le plan n'utilise que les lieux de cette ville.",
-  "plan.anywhere": "N'importe où",
-  "plan.placeCount": {
-    "one": "%{formattedCount} lieu",
-    "many": "%{formattedCount} lieux",
-    "other": "%{formattedCount} lieux"
-  },
-  "plan.inCity": {
-    "one": "%{city} · %{formattedCount} lieu",
-    "many": "%{city} · %{formattedCount} lieux",
-    "other": "%{city} · %{formattedCount} lieux"
-  },
   "plan.ask": "Demander à quelqu'un",
   "plan.askText": "Où va-t-on? Touche ✓ sur les lieux où tu irais : %{url}",
   "plan.askFailedTitle": "Impossible de créer le lien de vote",

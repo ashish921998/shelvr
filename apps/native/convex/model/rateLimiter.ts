@@ -49,10 +49,6 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "Make a plan" sends up to 60 saves in one prompt and gets 5 places back.
   // A user re-rolls a few times while deciding; a loop gets cut off.
   makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
-  // The city backfill: one small model call per save made before cities
-  // were classified, charged per save, at most ten per pass. Bounds a user
-  // opening many old spaces in a row.
-  cityBackfill: { kind: "token bucket", rate: 60, period: HOUR, capacity: 30 },
   // "Plan my trip" sends the same saves and gets up to 35 places back, then
   // looks each one up in Apple Maps. Trips are re-made less often than plans.
   makeTrip: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },

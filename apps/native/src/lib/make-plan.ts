@@ -32,13 +32,9 @@ const LOADING: PlanState = { status: "loading" };
  * `retry`. A late answer from an earlier run never overwrites a newer one, and
  * an answer for another space or locale reads as loading, never as ready.
  */
-export function useMakePlan(
-  spaceId: Id<"spaces">,
-  locale: string,
-  city?: string,
-) {
+export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
   const makePlan = useAction(api.plans.makePlan);
-  const key = `${spaceId}:${locale}:${city ?? ""}`;
+  const key = `${spaceId}:${locale}`;
   const [result, setResult] = useState<{
     key: string;
     state: PlanState;
@@ -50,11 +46,10 @@ export function useMakePlan(
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
-        const plan = await makePlan({ spaceId, locale, city });
+        const plan = await makePlan({ spaceId, locale });
         analytics.capture("plan_made", {
           considered: plan.considered,
           place_count: plan.places.length,
-          in_city: city !== undefined,
         });
         return { status: "ready", ...plan, planId };
       } catch (error) {
@@ -66,7 +61,7 @@ export function useMakePlan(
         return { status: aiOff ? "ai_off" : "error" };
       }
     },
-    [makePlan, spaceId, locale, city],
+    [makePlan, spaceId, locale],
   );
 
   useEffect(() => {
@@ -336,11 +331,7 @@ export function planVoteUrl(token: string): string {
  * sheet with it. A link nobody is sent still counts as this space's latest.
  * One ask at a time; a failed link says so, a cancelled sheet says nothing.
  */
-export function usePlanAsk(
-  spaceId: Id<"spaces">,
-  city: string | undefined,
-  places: PlanPlace[],
-) {
+export function usePlanAsk(spaceId: Id<"spaces">, places: PlanPlace[]) {
   const createPlanShare = useMutation(api.planShares.createPlanShare);
   const [asking, setAsking] = useState(false);
 
@@ -350,7 +341,6 @@ export function usePlanAsk(
     try {
       const token = await createPlanShare({
         spaceId,
-        city,
         places: places.map((place) => ({
           name: place.name,
           area: place.area,
@@ -362,10 +352,7 @@ export function usePlanAsk(
         message: t("plan.askText", { url: planVoteUrl(token) }),
       });
       if (result.action === Share.sharedAction) {
-        analytics.capture("plan_asked", {
-          place_count: places.length,
-          in_city: city !== undefined,
-        });
+        analytics.capture("plan_asked", { place_count: places.length });
       }
     } catch (error) {
       analytics.capture("plan_ask_failed", { reason: "link" });
@@ -374,48 +361,9 @@ export function usePlanAsk(
     } finally {
       setAsking(false);
     }
-  }, [asking, city, createPlanShare, places, spaceId]);
+  }, [asking, createPlanShare, places, spaceId]);
 
   return { ask, asking };
-}
-
-type CityCandidate = {
-  status: string;
-  /** Absent = never classified for cities. */
-  cities?: string[];
-};
-
-export type CityOption = { name: string; count: number };
-
-/**
- * What "Where are you going?" offers: each city the space's ready saves were
- * filed in, with how many name it, most first. `pending` counts the saves
- * never classified for cities, so the caller can ask the backend to read
- * them. The sheet is worth showing only with two or more cities.
- */
-export function cityOptions(items: CityCandidate[]): {
-  cities: CityOption[];
-  pending: number;
-} {
-  const counts = new Map<string, CityOption>();
-  let pending = 0;
-  for (const item of items) {
-    if (item.status !== "ready") continue;
-    if (item.cities === undefined) {
-      pending += 1;
-      continue;
-    }
-    for (const city of item.cities) {
-      const key = city.toLowerCase();
-      const option = counts.get(key) ?? { name: city, count: 0 };
-      option.count += 1;
-      counts.set(key, option);
-    }
-  }
-  const cities = [...counts.values()].sort(
-    (a, b) => b.count - a.count || a.name.localeCompare(b.name),
-  );
-  return { cities, pending };
 }
 
 /** The tallies an open vote link holds, by place. */

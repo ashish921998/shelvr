@@ -10,15 +10,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
-import { aiConsentRequiredError } from "./model/aiConsent";
-import {
-  cityBackfillSourceValidator,
-  MAX_PLAN_ITEMS,
-  PLAN_CONTENT_CHARS,
-  planSourceValidator,
-  type CityBackfillSource,
-} from "./model/plan";
-import { normalizeCities } from "./model/itemFields";
+import { planSourceValidator } from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
@@ -869,99 +861,6 @@ export const survivingCandidates = internalQuery({
   },
 });
 
-/** Whether a save's classified cities name `city` (already lower-cased). */
-function inCity(cities: string[] | undefined, city: string): boolean {
-  return (cities ?? []).some((name) => name.toLowerCase() === city);
-}
-
-/** Saves one city backfill pass reads, per space. */
-export const MAX_CITY_BACKFILL_ITEMS = 10;
-
-/**
- * The gate and the input for the city backfill (`plans.classifyCities`), in
- * one transaction: the caller owns the space, is Pro, has not declined AI
- * processing, and has tokens left for every save returned. Returns the
- * space's saved, ready items that were never classified for cities, newest
- * filed first and bounded. A space with none spends no token.
- */
-export const claimCityBackfillInternal = internalMutation({
-  args: { spaceId: v.id("spaces") },
-  returns: v.array(cityBackfillSourceValidator),
-  handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
-    const space = await ctx.db.get(args.spaceId);
-    if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
-    }
-    await requireProEntitlement(ctx, userId);
-    if (!(await aiAllowed(ctx, userId))) {
-      throw aiConsentRequiredError();
-    }
-    const [saved, legacy] = await Promise.all(
-      (["saved", undefined] as const).map((status) =>
-        ctx.db
-          .query("spaceItems")
-          .withIndex("by_space_and_status", (q) =>
-            q.eq("spaceId", args.spaceId).eq("status", status),
-          )
-          .order("desc")
-          .take(MAX_PLAN_ITEMS),
-      ),
-    );
-    const joins = [...saved, ...legacy]
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .slice(0, MAX_PLAN_ITEMS);
-    const sources: CityBackfillSource[] = [];
-    for (const join of joins) {
-      if (sources.length === MAX_CITY_BACKFILL_ITEMS) break;
-      const item = await ctx.db.get(join.itemId);
-      if (item === null || item.userId !== userId) continue;
-      // Absent means never classified for cities; an empty list is an answer.
-      if (item.status !== "ready" || item.cities !== undefined) continue;
-      sources.push({
-        itemId: item._id,
-        title: item.title,
-        description: item.description,
-        content:
-          [item.note, item.content]
-            .filter(Boolean)
-            .join("\n")
-            .slice(0, PLAN_CONTENT_CHARS) || undefined,
-        siteName: item.siteName,
-        places: [...(item.intents ?? []), ...(join.intents ?? [])]
-          .filter((intent) => intent.kind === "open_maps")
-          .map((intent) => intent.value),
-      });
-    }
-    if (sources.length === 0) return [];
-    const { ok } = await rateLimiter.limit(ctx, "cityBackfill", {
-      key: userId,
-      count: sources.length,
-    });
-    return ok ? sources : [];
-  },
-});
-
-/**
- * Writes the cities a backfill pass read for one save. Only a save still
- * never classified for cities takes them, so a classification that landed
- * meanwhile (a retry, an edit) is never overwritten, and the owner may have
- * turned AI off while the call was out.
- */
-export const setCitiesInternal = internalMutation({
-  args: { itemId: v.id("items"), cities: v.array(v.string()) },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    const item = await ctx.db.get(args.itemId);
-    if (item === null || item.status !== "ready" || item.cities !== undefined) {
-      return false;
-    }
-    if (!(await aiAllowed(ctx, item.userId))) return false;
-    await ctx.db.patch(item._id, { cities: normalizeCities(args.cities) });
-    return true;
-  },
-});
-
 /**
  * The gate and the input for "Make a plan" (`plans.makePlan`), in one
  * transaction: the caller owns the space, is Pro, has not declined AI
@@ -970,9 +869,7 @@ export const setCitiesInternal = internalMutation({
  * space spends no token, since no model call follows.
  */
 export const claimPlanInternal = internalMutation({
-  // `city` keeps only the saves whose classified cities name it (case
-  // folded), so a plan for Mumbai never deals a place in Goa.
-  args: { spaceId: v.id("spaces"), city: v.optional(v.string()) },
+  args: { spaceId: v.id("spaces") },
   returns: v.object({
     spaceName: v.string(),
     sources: v.array(planSourceValidator),
@@ -981,10 +878,9 @@ export const claimPlanInternal = internalMutation({
   }),
   handler: async (ctx, args) => {
     const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
-    const city = args.city?.trim().toLowerCase() || undefined;
-    const sources = (await loadReadySaves(ctx, args.spaceId, userId))
-      .filter(({ item }) => city === undefined || inCity(item.cities, city))
-      .map(({ item, join }) => toPlanSource(item, join));
+    const sources = (await loadReadySaves(ctx, args.spaceId, userId)).map(
+      ({ item, join }) => toPlanSource(item, join),
+    );
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };
     }

@@ -34,32 +34,6 @@ export const planSourceValidator = v.object({
 
 export type PlanSource = Infer<typeof planSourceValidator>;
 
-/** What the city backfill claim hands the action for one save. */
-export const cityBackfillSourceValidator = v.object({
-  itemId: v.id("items"),
-  title: v.optional(v.string()),
-  description: v.optional(v.string()),
-  content: v.optional(v.string()),
-  siteName: v.optional(v.string()),
-  // The `open_maps` values already on the save, often "Name, Area".
-  places: v.array(v.string()),
-});
-
-export type CityBackfillSource = Infer<typeof cityBackfillSourceValidator>;
-
-/** The prompt block for one save the city backfill reads. */
-export function cityBackfillLines(source: CityBackfillSource): string {
-  return [
-    `Title: ${source.title ?? "(untitled)"}`,
-    source.siteName ? `Site: ${source.siteName}` : "",
-    source.description ? `Description: ${source.description}` : "",
-    source.places.length > 0 ? `Places: ${source.places.join("; ")}` : "",
-    source.content ? `Text: ${clip(source.content, PLAN_CONTENT_CHARS)}` : "",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
-}
-
 export const planPlaceValidator = v.object({
   name: v.string(),
   area: v.optional(v.string()),
@@ -297,13 +271,6 @@ export function placeKey(name: string): string {
 }
 
 /** The prompt line for places already visited, or "" when there are none. */
-/** The prompt line that keeps a plan inside the city the user chose. */
-export function planCityLine(city: string | undefined): string {
-  const name = city?.trim() ?? "";
-  if (name === "") return "";
-  return `They are going out in ${name}. Every save below was filed as being there; pick only places in ${name}, and skip a save whose place is clearly somewhere else.`;
-}
-
 export function planBeenLine(names: string[]): string {
   if (names.length === 0) return "";
   const list = names.map((name) => clip(name, MAX_NAME_CHARS)).join("; ");

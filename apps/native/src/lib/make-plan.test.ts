@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   canMakePlan,
-  cityOptions,
   daysLeft,
   PLAN_SHARE_URL,
   placeLabel,
@@ -113,27 +112,6 @@ describe("deckOrder", () => {
   it("draws every card of a short deck once", () => {
     expect(deckOrder(2, 1)).toEqual([0, 1]);
     expect(deckOrder(0, 0)).toEqual([]);
-  });
-});
-
-describe("cityOptions", () => {
-  it("counts each city once per ready save, most first, and the unread ones", () => {
-    expect(
-      cityOptions([
-        { status: "ready", cities: ["Goa"] },
-        { status: "ready", cities: ["Mumbai", "goa"] },
-        { status: "ready", cities: ["Mumbai"] },
-        { status: "ready", cities: [] },
-        { status: "ready" },
-        { status: "processing", cities: ["Oslo"] },
-      ]),
-    ).toEqual({
-      cities: [
-        { name: "Goa", count: 2 },
-        { name: "Mumbai", count: 2 },
-      ],
-      pending: 1,
-    });
   });
 });
 

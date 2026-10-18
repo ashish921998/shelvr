@@ -312,15 +312,6 @@
   "plan.failedTitle": "계획을 세우지 못했어요",
   "plan.shareIntro": "%{space}에서 고른 추천 목록:",
   "plan.shareFooter": "Shelvr로 만듦 %{url}",
-  "plan.cityTitle": "어디로 가세요?",
-  "plan.cityBody": "플랜에는 그 도시의 장소만 사용합니다.",
-  "plan.anywhere": "어디든",
-  "plan.placeCount": {
-    "other": "장소 %{formattedCount}곳"
-  },
-  "plan.inCity": {
-    "other": "%{city} · 장소 %{formattedCount}곳"
-  },
   "plan.ask": "누군가에게 물어보기",
   "plan.askText": "어디로 갈까? 가고 싶은 곳에 ✓를 눌러줘: %{url}",
   "plan.askFailedTitle": "투표 링크를 만들지 못했어요",

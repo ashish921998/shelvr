@@ -311,11 +311,6 @@ export type MessageParams = {
   "plan.failedTitle": undefined;
   "plan.shareIntro": { space: string };
   "plan.shareFooter": { url: string };
-  "plan.cityTitle": undefined;
-  "plan.cityBody": undefined;
-  "plan.anywhere": undefined;
-  "plan.placeCount": { count: number };
-  "plan.inCity": { city: string; count: number };
   "plan.ask": undefined;
   "plan.askText": { url: string };
   "plan.askFailedTitle": undefined;

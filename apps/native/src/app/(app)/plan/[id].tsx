@@ -258,7 +258,7 @@ function PlanFooter({
 
 export default function PlanScreen() {
   const locale = useAppLocale();
-  const { id, city } = useLocalSearchParams<{ id: string; city?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -268,11 +268,10 @@ export default function PlanScreen() {
   const { data: votes } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
   );
-  const inCity = city || undefined;
-  const { state, retry } = useMakePlan(spaceId, locale, inCity);
+  const { state, retry } = useMakePlan(spaceId, locale);
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
-  const { ask, asking } = usePlanAsk(spaceId, inCity, places);
+  const { ask, asking } = usePlanAsk(spaceId, places);
   const planId = state.status === "ready" ? state.planId : null;
   const deck = usePlanDeck(planId, places.length);
   const { show } = deck;
@@ -388,11 +387,6 @@ export default function PlanScreen() {
               </ThemedText>
             ) : null}
             <ThemedText variant="largeTitle">{t("plan.title")}</ThemedText>
-            {city && hasPlaces ? (
-              <ThemedText variant="secondaryLabel" style={styles.muted}>
-                {t("plan.inCity", { city, count: places.length })}
-              </ThemedText>
-            ) : null}
           </View>
           {hasPlaces ? (
             <Pressable
