@@ -91,15 +91,16 @@ export function locatedStops(
 /** Share of the screen the day list covers over the map. */
 export const TRIP_PANEL_SHARE = 0.52;
 
-/** The map's size and what covers it: the header above, the panel below.
- * Apple Maps centers a region between the header and the home indicator
- * (`safeBottom`), measured on an iPhone 17 Pro simulator. */
+/** The map's size, what covers it (the header above, the panel below), and
+ * how the map draws a camera: `worldWidth` is the points 360° of longitude
+ * span at zoom 0, `centerY` where the camera's center lands on screen. */
 type MapView = {
   width: number;
   height: number;
   top: number;
   bottom: number;
-  safeBottom: number;
+  worldWidth: number;
+  centerY: number;
 };
 
 // Room kept between the outer pins and the edges of the visible map.
@@ -109,8 +110,7 @@ const MIN_SPAN = 0.004;
 
 /**
  * A camera that frames every point in the part of the map left visible
- * between the header and the panel, or undefined for none. The zoom follows
- * expo-maps on iOS: the map's width spans 360 / 2^zoom degrees of longitude.
+ * between the header and the panel, or undefined for none.
  */
 export function fitCamera(
   points: LatLng[],
@@ -129,22 +129,21 @@ export function fitCamera(
   const cos = Math.cos((midLat * Math.PI) / 180);
   const visible = Math.max(view.height - view.top - view.bottom, 1);
   const byWidth = Math.log2(
-    (360 * FIT_FILL) / Math.max(maxLng - minLng, MIN_SPAN),
+    (360 * FIT_FILL * view.width) /
+      (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
   );
   const byHeight = Math.log2(
     (360 * FIT_FILL * visible * cos) /
-      (view.width * Math.max(maxLat - minLat, MIN_SPAN)),
+      (view.worldWidth * Math.max(maxLat - minLat, MIN_SPAN)),
   );
   const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
-  const latPerPoint = (360 * cos) / (view.width * 2 ** zoom);
-  const regionMiddle =
-    view.top + (view.height - view.top - view.safeBottom) / 2;
+  const latPerPoint = (360 * cos) / (view.worldWidth * 2 ** zoom);
   const visibleMiddle = view.top + visible / 2;
   return {
     // Moved so the points sit in the middle of the visible part, not where
-    // Apple Maps puts the region's center.
+    // the map puts the camera's center.
     coordinates: {
-      latitude: midLat - (regionMiddle - visibleMiddle) * latPerPoint,
+      latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
       longitude: (minLng + maxLng) / 2,
     },
     zoom,

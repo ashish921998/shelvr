@@ -90,7 +90,17 @@ export function TripMap({
         height,
         top,
         bottom: height * TRIP_PANEL_SHARE,
-        safeBottom: rt.insets.bottom,
+        ...(process.env.EXPO_OS === "ios"
+          ? // expo-maps sets a region whose longitude spans the map's
+            // width; Apple centers it between the header and the home
+            // indicator (measured on an iPhone 17 Pro simulator).
+            {
+              worldWidth: width,
+              centerY: top + (height - top - rt.insets.bottom) / 2,
+            }
+          : // Google Maps: 256 dp span the world at zoom 0, and the camera's
+            // center is the map's.
+            { worldWidth: 256, centerY: height / 2 }),
       },
     );
   }, [active, days, width, height, top, rt.insets.bottom]);

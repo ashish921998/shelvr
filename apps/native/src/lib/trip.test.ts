@@ -76,7 +76,8 @@ describe("fitCamera", () => {
     height: 860,
     top: 100,
     bottom: 450,
-    safeBottom: 34,
+    worldWidth: 400,
+    centerY: 100 + (860 - 100 - 34) / 2,
   };
 
   it("is undefined with nothing to show", () => {
@@ -102,26 +103,26 @@ describe("fitCamera", () => {
     expect(wide?.coordinates.longitude).toBeCloseTo(-9.17);
   });
 
-  it("keeps every point inside the map left above the panel", () => {
+  it.each([
+    ["Apple Maps", view],
+    ["Google Maps", { ...view, worldWidth: 256, centerY: view.height / 2 }],
+  ])("keeps every point inside the visible map on %s", (_, map) => {
     const points = [
       { latitude: 38.6916, longitude: -9.216 },
       { latitude: 38.6979, longitude: -9.2068 },
       { latitude: 38.7121, longitude: -9.1394 },
     ];
-    const camera = fitCamera(points, view)!;
+    const camera = fitCamera(points, map)!;
     // Project each point to screen points the way the map does.
-    const lngPerPoint = 360 / (view.width * 2 ** camera.zoom);
+    const lngPerPoint = 360 / (map.worldWidth * 2 ** camera.zoom);
     const cos = Math.cos((camera.coordinates.latitude * Math.PI) / 180);
     const ys: number[] = [];
     for (const point of points) {
       const x =
         view.width / 2 +
         (point.longitude - camera.coordinates.longitude) / lngPerPoint;
-      // Apple Maps puts the region's center between the header and the
-      // home indicator.
       const y =
-        view.top +
-        (view.height - view.top - view.safeBottom) / 2 -
+        map.centerY -
         (point.latitude - camera.coordinates.latitude) / (lngPerPoint * cos);
       ys.push(y);
       expect(x).toBeGreaterThan(0);
