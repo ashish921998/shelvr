@@ -329,6 +329,32 @@ const YOUTUBE_HOSTS = new Set([
   "m.youtube.com",
   "music.youtube.com",
 ]);
+const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/** Only exact public video URL shapes may supply a Data API video id. */
+export function youtubeVideoId(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    // Require an absolute URL before applying the canonical fetch policy.
+    const url = new URL(normalizeExternalUrl(new URL(raw).href));
+    if (!YOUTUBE_HOSTS.has(url.hostname)) return undefined;
+
+    let candidate: string | null | undefined;
+    if (url.hostname === "youtu.be") {
+      candidate = url.pathname.slice(1);
+    } else if (url.pathname === "/watch") {
+      if (url.searchParams.getAll("v").length !== 1) return undefined;
+      candidate = url.searchParams.get("v");
+    } else {
+      candidate = url.pathname.match(/^\/(?:shorts|embed)\/([^/]+)$/)?.[1];
+    }
+    return candidate && YOUTUBE_VIDEO_ID.test(candidate)
+      ? candidate
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** True for a YouTube video link: youtube.com (www, m, music) and the youtu.be
  * short host. YouTube often answers a server's page load with a consent or

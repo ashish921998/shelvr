@@ -56,6 +56,7 @@ type Env = {
   readonly TREG_API_KEY: string | undefined;
   readonly VIDEO_TRANSCRIPTS_ENABLED: string | undefined;
   readonly WAITLIST_SHARED_SECRET: string | undefined;
+  readonly YOUTUBE_API_KEY: string | undefined;
 };
 
 /**
