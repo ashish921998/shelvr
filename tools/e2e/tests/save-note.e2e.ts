@@ -29,8 +29,9 @@ test("saves a note and finds it by its own words", async ({ screen }) => {
   });
   await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
 
-  await tapTab(screen, "Search");
-  await fillField(screen.getByRole("textbox", "Search your saves"), "quokka");
+  const search = screen.getByRole("textbox", "Search your saves");
+  await tapTab(screen, "Search", search);
+  await fillField(search, "quokka");
 
   // The model titles the note, so the result's label is not known ahead of
   // time. Once the search has answered, the result is the only button on the

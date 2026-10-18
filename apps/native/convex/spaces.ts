@@ -10,14 +10,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
-import { aiConsentRequiredError } from "./model/aiConsent";
-import {
-  MAX_BEEN_PLACES,
-  MAX_PLAN_ITEMS,
-  PLAN_CONTENT_CHARS,
-  planSourceValidator,
-  type PlanSource,
-} from "./model/plan";
+import { planSourceValidator } from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
@@ -37,6 +30,13 @@ import {
 } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
+import {
+  beenPlaces,
+  claimSpaceForModel,
+  deleteTripsForSpace,
+  loadReadySaves,
+  toPlanSource,
+} from "./tripData";
 
 const spaceFields = {
   _id: v.id("spaces"),
@@ -433,6 +433,7 @@ export const deleteSpace = mutation({
     // reader null-checks the space, and the AI never suggests into a space it
     // cannot load.
     await ctx.db.delete(space._id);
+    await deleteTripsForSpace(ctx, space._id);
     const more = await deleteSpaceRemains(ctx, space._id);
     if (more) {
       await ctx.scheduler.runAfter(0, internal.spaces.purgeSpaceMemberships, {
@@ -876,58 +877,10 @@ export const claimPlanInternal = internalMutation({
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    // Convex forwards the action caller's identity, so authorization and the
-    // claim are one transaction.
-    const userId = await requireUserId(ctx);
-    const space = await ctx.db.get(args.spaceId);
-    if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
-    }
-    await requireProEntitlement(ctx, userId);
-    if (!(await aiAllowed(ctx, userId))) {
-      throw aiConsentRequiredError();
-    }
-    // Saved rows plus legacy rows (no status reads as saved), each newest
-    // filed first and bounded, then merged.
-    const [saved, legacy] = await Promise.all(
-      (["saved", undefined] as const).map((status) =>
-        ctx.db
-          .query("spaceItems")
-          .withIndex("by_space_and_status", (q) =>
-            q.eq("spaceId", args.spaceId).eq("status", status),
-          )
-          .order("desc")
-          .take(MAX_PLAN_ITEMS),
-      ),
+    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
+    const sources = (await loadReadySaves(ctx, args.spaceId, userId)).map(
+      ({ item, join }) => toPlanSource(item, join),
     );
-    const joins = [...saved, ...legacy]
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .slice(0, MAX_PLAN_ITEMS);
-    const sources: PlanSource[] = [];
-    for (const join of joins) {
-      const item = await ctx.db.get(join.itemId);
-      if (item === null || item.userId !== userId) continue;
-      if (item.status !== "ready") continue;
-      sources.push({
-        itemId: item._id,
-        title: item.title,
-        description: item.description,
-        // A note's words live in `note`; a link can carry the user's note
-        // too, and either may be what names the place.
-        content:
-          [item.note, item.content]
-            .filter(Boolean)
-            .join("\n")
-            .slice(0, PLAN_CONTENT_CHARS) || undefined,
-        url: item.url,
-        siteName: item.siteName,
-        author: item.author,
-        // The save's own Maps actions plus any steered for this space.
-        places: [...(item.intents ?? []), ...(join.intents ?? [])]
-          .filter((intent) => intent.kind === "open_maps")
-          .map((intent) => intent.value),
-      });
-    }
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };
     }
@@ -935,15 +888,10 @@ export const claimPlanInternal = internalMutation({
       key: userId,
       throws: true,
     });
-    const visits = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(MAX_BEEN_PLACES);
     return {
       spaceName: space.name,
       sources,
-      been: visits.map((visit) => visit.name),
+      been: await beenPlaces(ctx, userId),
     };
   },
 });

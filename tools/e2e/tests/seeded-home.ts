@@ -150,17 +150,32 @@ async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
 }
 
 /**
- * Taps a tab bar item. The native tabs usually reach the accessibility tree
+ * Taps a tab bar item until `destination`, something only that tab's screen
+ * shows, is on screen. The native tabs usually reach the accessibility tree
  * as `tab`, but have come through as `button` (on CI, the first test after a
- * fresh install), so the tab bar is searched for either.
+ * fresh install), so the tab bar is searched for either. A tab tap has been
+ * lost too: the engine reported it, Home stayed selected, and the flow waited
+ * out its next step (main, 2026-10-15). The tab's own selected state is no
+ * check: once Search is open, the tab bar shows only a collapsed Home tab
+ * beside the search field, and Search is no longer in it.
  */
-export async function tapTab(screen: Screen, name: string): Promise<void> {
+export async function tapTab(
+  screen: Screen,
+  name: string,
+  destination: Locator,
+): Promise<void> {
   const tabBar = screen.getByRole("tablist");
-  const tab = tabBar.getByRole("tab", name);
-  await (
-    (await tab.isVisible()) ? tab : tabBar.getByRole("button", name)
-  ).tap();
+  const role = (await tabBar.getByRole("tab", name).isVisible())
+    ? "tab"
+    : "button";
+  await tapUntilVisible(tabBar.getByRole(role, name), destination, {
+    waitMs: TAB_WAIT_MS,
+    timeout: 30_000,
+  });
 }
+
+/** Long enough for a tab's screen to show after a tap that was accepted. */
+const TAB_WAIT_MS = 3000;
 
 /**
  * Fills a text field, recovering from the runner's "could not confirm the

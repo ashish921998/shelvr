@@ -49,6 +49,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "Make a plan" sends up to 60 saves in one prompt and gets 5 places back.
   // A user re-rolls a few times while deciding; a loop gets cut off.
   makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  // "Plan my trip" sends the same saves and gets up to 35 places back, then
+  // looks each one up in Apple Maps. Trips are re-made less often than plans.
+  makeTrip: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
   // A spoken transcript of a recipe video whose caption had no recipe (one
   // paid Treg call, about $0.002, plus one model call). Per user: room for a
   // cooking binge, fatal to a loop. Global: about $4 a day at most, whatever

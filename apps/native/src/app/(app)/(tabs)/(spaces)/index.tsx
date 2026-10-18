@@ -448,10 +448,10 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: "continuous",
     boxShadow: `0 6px 14px rgba(0,0,0,0.22), inset 0 0 0 1px ${theme.colors.imageBorder}`,
   },
-  // The cover: a white matte with a little padding around the photo, matching the
-  // home feed's item frame so a save looks the same fanned into a space.
+  // The cover: a matte with a little padding around the photo, the home feed's
+  // item frame, so a save looks the same fanned into a space.
   coverFrame: {
-    backgroundColor: "#ffffff",
+    backgroundColor: theme.colors.frame,
     padding: theme.gap(0.5),
     zIndex: 3,
   },
@@ -464,14 +464,14 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
-    // White (not surfaceMuted) so a transparent die-cut sticker cover shows white
-    // behind it, matching the matte instead of a grey block.
-    backgroundColor: "#ffffff",
+    // The matte's colour (not surfaceMuted) so a transparent die-cut sticker
+    // cover shows the matte behind it instead of a grey block.
+    backgroundColor: theme.colors.frame,
   },
-  // The blank cards behind, same white stock as the cover matte so the pile
+  // The blank cards behind, the same stock as the cover matte so the pile
   // reads as a stack of identical cards.
   cardBlank: {
-    backgroundColor: "#ffffff",
+    backgroundColor: theme.colors.frame,
     zIndex: 1,
   },
   cardEmptyBack: {

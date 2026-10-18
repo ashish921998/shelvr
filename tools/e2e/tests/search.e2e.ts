@@ -6,8 +6,9 @@ import { fillField, startOnSeededHome, tapTab } from "./seeded-home.ts";
 startOnSeededHome();
 
 test("finds a save by a word in its title", async ({ screen }) => {
-  await tapTab(screen, "Search");
-  await fillField(screen.getByRole("textbox", "Search your saves"), "ramen");
+  const search = screen.getByRole("textbox", "Search your saves");
+  await tapTab(screen, "Search", search);
+  await fillField(search, "ramen");
 
   // The query is debounced and runs on the backend, so the toBeVisible wait
   // covers the round trip. Then none of the other seeded saves may show.

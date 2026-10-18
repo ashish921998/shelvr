@@ -445,7 +445,7 @@ async function deleteCaptureTokensBatch(
   return tokens.length !== DELETE_BATCH;
 }
 
-/** Share links, "We went" places and plan vote links. True once all are gone. */
+/** Share links, "We went" places, trips and plan vote links. True once all are gone. */
 async function deleteSharingAndPlansBatch(
   ctx: MutationCtx,
   userId: string,
@@ -453,6 +453,7 @@ async function deleteSharingAndPlansBatch(
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deleteTripsBatch(ctx, userId)) &&
     (await deletePlanSharesForUser(ctx, userId))
   );
 }
@@ -487,6 +488,22 @@ async function deletePlaceVisitsBatch(
     await ctx.db.delete(visit._id);
   }
   return visits.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's trips. Returns true when none are
+ * left. */
+async function deleteTripsBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  const trips = await ctx.db
+    .query("trips")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const trip of trips) {
+    await ctx.db.delete(trip._id);
+  }
+  return trips.length !== DELETE_BATCH;
 }
 
 /** Sessions (+ refresh tokens), accounts (+ verification codes), then users. */
