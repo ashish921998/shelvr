@@ -9,6 +9,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { runIntent } from "@/lib/intents";
 import {
   daysLeft,
+  linkForPlan,
   placeLabel,
   planShareText,
   useMakePlan,
@@ -265,13 +266,15 @@ export default function PlanScreen() {
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: spaceId }),
   );
-  const { data: votes } = useQuery(
+  const { data: latestLink } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
   );
   const { state, retry } = useMakePlan(spaceId, locale);
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
-  const { ask, asking } = usePlanAsk(spaceId, places);
+  // Votes show only while the open link holds the shortlist on screen.
+  const votes = linkForPlan(latestLink, places);
+  const { ask, asking } = usePlanAsk(spaceId, places, votes);
   const planId = state.status === "ready" ? state.planId : null;
   const deck = usePlanDeck(planId, places.length);
   const { show } = deck;

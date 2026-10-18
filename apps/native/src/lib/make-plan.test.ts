@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import {
   canMakePlan,
   daysLeft,
+  linkForPlan,
   PLAN_SHARE_URL,
   placeLabel,
   planShareText,
@@ -140,5 +141,22 @@ describe("planVoteUrl and daysLeft", () => {
     expect(daysLeft(6.2 * day, 0)).toBe(7);
     expect(daysLeft(1000, 0)).toBe(1);
     expect(daysLeft(-day, 0)).toBe(1);
+  });
+});
+
+describe("linkForPlan", () => {
+  const link = {
+    token: "t",
+    places: [{ name: "Tigre" }, { name: "Sweet Linda" }],
+  };
+
+  it("keeps the link only while it holds the shortlist on screen", () => {
+    expect(linkForPlan(link, [place("sweet linda"), place("TIGRE")])).toBe(
+      link,
+    );
+    expect(linkForPlan(link, [place("Tigre")])).toBeNull();
+    expect(linkForPlan(link, [place("Tigre"), place("Bastian")])).toBeNull();
+    expect(linkForPlan(link, [])).toBeNull();
+    expect(linkForPlan(null, [place("Tigre")])).toBeNull();
   });
 });

@@ -5,22 +5,32 @@ import type { Id } from "@convex/_generated/dataModel";
 import {
   useMakePlan,
   usePlaceVisits,
+  usePlanAsk,
   usePlanDeck,
   usePlanPicker,
   type PlanPlace,
 } from "./make-plan";
 
-const mocks = vi.hoisted(() => ({ makePlan: vi.fn(), setVisited: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  makePlan: vi.fn(),
+  setVisited: vi.fn(),
+  share: vi.fn(),
+  alert: vi.fn(),
+  capture: vi.fn(),
+}));
 vi.mock("convex/react", () => ({
   useAction: () => mocks.makePlan,
   useMutation: () => mocks.setVisited,
 }));
 vi.mock("@convex/_generated/api", () => ({
-  api: { plans: {}, placeVisits: {} },
+  api: { plans: {}, placeVisits: {}, planShares: {} },
 }));
-vi.mock("react-native", () => ({ Alert: { alert: vi.fn() }, Share: {} }));
+vi.mock("react-native", () => ({
+  Alert: { alert: mocks.alert },
+  Share: { share: mocks.share, sharedAction: "sharedAction" },
+}));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: vi.fn(), captureError: vi.fn() },
+  analytics: { capture: mocks.capture, captureError: vi.fn() },
 }));
 
 const SPACE = "space1" as Id<"spaces">;
@@ -40,6 +50,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   mocks.makePlan.mockReset();
   mocks.setVisited.mockReset();
+  mocks.share.mockReset();
+  mocks.alert.mockReset();
+  mocks.capture.mockReset();
 });
 
 describe("usePlaceVisits", () => {
@@ -281,5 +294,78 @@ describe("usePlanDeck", () => {
     rerender({ planId: 2 });
 
     expect(result.current).toMatchObject({ front: 0, flipped: false });
+  });
+});
+
+describe("usePlanAsk", () => {
+  const places = [place("Tigre"), place("Sweet Linda")];
+
+  it("makes a link, then shares it", async () => {
+    mocks.setVisited.mockResolvedValue("tok1");
+    mocks.share.mockResolvedValue({ action: "sharedAction" });
+    const { result } = renderHook(() => usePlanAsk(SPACE, places, null));
+
+    await act(() => result.current.ask());
+
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.share.mock.calls[0][0].message).toContain("/p/tok1");
+    expect(mocks.capture).toHaveBeenCalledWith("plan_asked", {
+      place_count: 2,
+    });
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("sends the open link again instead of replacing it", async () => {
+    mocks.share.mockResolvedValue({ action: "dismissedAction" });
+    const { result } = renderHook(() =>
+      usePlanAsk(SPACE, places, { token: "open" }),
+    );
+
+    await act(() => result.current.ask());
+
+    expect(mocks.setVisited).not.toHaveBeenCalled();
+    expect(mocks.share.mock.calls[0][0].message).toContain("/p/open");
+    // A cancelled sheet is not a send and says nothing.
+    expect(mocks.capture).not.toHaveBeenCalledWith("plan_asked", {
+      place_count: 2,
+    });
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("asks once while a tap is still in flight", async () => {
+    const link = deferred<string>();
+    mocks.setVisited.mockReturnValue(link.promise);
+    mocks.share.mockResolvedValue({ action: "sharedAction" });
+    const { result } = renderHook(() => usePlanAsk(SPACE, places, null));
+
+    let first!: Promise<void>;
+    act(() => {
+      first = result.current.ask();
+      void result.current.ask();
+    });
+    link.resolve("tok");
+    await act(() => first);
+
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.share).toHaveBeenCalledTimes(1);
+  });
+
+  it("names which step failed", async () => {
+    mocks.setVisited.mockRejectedValue(new Error("limit"));
+    const { result } = renderHook(() => usePlanAsk(SPACE, places, null));
+    await act(() => result.current.ask());
+    expect(mocks.capture).toHaveBeenCalledWith("plan_ask_failed", {
+      reason: "link",
+    });
+    expect(mocks.share).not.toHaveBeenCalled();
+
+    mocks.capture.mockReset();
+    mocks.setVisited.mockResolvedValue("tok");
+    mocks.share.mockRejectedValue(new Error("no handler"));
+    await act(() => result.current.ask());
+    expect(mocks.capture).toHaveBeenCalledWith("plan_ask_failed", {
+      reason: "share",
+    });
+    expect(mocks.alert).toHaveBeenCalledTimes(2);
   });
 });

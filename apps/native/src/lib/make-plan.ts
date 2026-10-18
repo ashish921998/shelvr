@@ -327,43 +327,82 @@ export function planVoteUrl(token: string): string {
 }
 
 /**
- * "Ask someone": a fresh vote link for the places on screen, then the share
- * sheet with it. A link nobody is sent still counts as this space's latest.
- * One ask at a time; a failed link says so, a cancelled sheet says nothing.
+ * "Ask someone": the share sheet with a vote link for the places on screen.
+ * The open link is sent again while it holds this same shortlist, so votes
+ * already in stay on the deck; a new shortlist gets a fresh link. One ask at
+ * a time; a failed link or sheet says so, a cancelled sheet says nothing.
  */
-export function usePlanAsk(spaceId: Id<"spaces">, places: PlanPlace[]) {
+export function usePlanAsk(
+  spaceId: Id<"spaces">,
+  places: PlanPlace[],
+  current: { token: string } | null,
+) {
   const createPlanShare = useMutation(api.planShares.createPlanShare);
   const [asking, setAsking] = useState(false);
+  // A second tap can land before the `asking` render; this one cannot.
+  const busy = useRef(false);
 
   const ask = useCallback(async () => {
-    if (places.length === 0 || asking) return;
+    if (places.length === 0 || busy.current) return;
+    busy.current = true;
     setAsking(true);
     try {
-      const token = await createPlanShare({
-        spaceId,
-        places: places.map((place) => ({
-          name: place.name,
-          area: place.area,
-          why: place.why,
-          itemId: place.itemId,
-        })),
-      });
-      const result = await Share.share({
-        message: t("plan.askText", { url: planVoteUrl(token) }),
-      });
-      if (result.action === Share.sharedAction) {
-        analytics.capture("plan_asked", { place_count: places.length });
-      }
+      const token =
+        current?.token ??
+        (await createPlanShare({
+          spaceId,
+          places: places.map((place) => ({
+            name: place.name,
+            area: place.area,
+            why: place.why,
+            itemId: place.itemId,
+          })),
+        }));
+      await sharePlanLink(token, places.length);
     } catch (error) {
       analytics.capture("plan_ask_failed", { reason: "link" });
       analytics.captureError("plan_ask_failed", error);
       Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
     } finally {
+      busy.current = false;
       setAsking(false);
     }
-  }, [asking, createPlanShare, places, spaceId]);
+  }, [createPlanShare, current, places, spaceId]);
 
   return { ask, asking };
+}
+
+/** The share sheet for a made link. Its failure is reported, never thrown. */
+async function sharePlanLink(token: string, placeCount: number) {
+  try {
+    const result = await Share.share({
+      message: t("plan.askText", { url: planVoteUrl(token) }),
+    });
+    if (result.action === Share.sharedAction) {
+      analytics.capture("plan_asked", { place_count: placeCount });
+    }
+  } catch (error) {
+    analytics.capture("plan_ask_failed", { reason: "share" });
+    analytics.captureError("plan_ask_failed", error);
+    Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
+  }
+}
+
+/**
+ * The open link, when it holds exactly the places on screen. A regenerated
+ * plan is a new shortlist, so the old link's votes do not belong on it.
+ */
+export function linkForPlan<T extends { places: { name: string }[] }>(
+  link: T | null | undefined,
+  places: PlanPlace[],
+): T | null {
+  if (!link || places.length === 0) return null;
+  const keys = (names: { name: string }[]) =>
+    names
+      .map((entry) => placeKey(entry.name))
+      .sort()
+      .join("\n");
+  return keys(link.places) === keys(places) ? link : null;
 }
 
 /** The tallies an open vote link holds, by place. */
