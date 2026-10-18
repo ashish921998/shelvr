@@ -341,6 +341,14 @@
   "trip.buildingRead": "Lecture de vos enregistrements…",
   "trip.buildingFind": "Recherche de chaque lieu sur la carte…",
   "trip.buildingGroup": "Répartition en journées…",
+  "trip.revealSaves": {
+    "one": "%{formattedCount} enregistrement",
+    "many": "%{formattedCount} enregistrements",
+    "other": "%{formattedCount} enregistrements"
+  },
+  "trip.revealLanding": "atterrissage à %{city}",
+  "trip.revealLandingNoCity": "votre voyage se prépare",
+  "trip.revealSkip": "Touchez pour passer",
   "trip.dayTab": "Jour %{day}",
   "trip.dayTitleOne": "Jour %{day} · %{area}",
   "trip.dayTitleTwo": "Jour %{day} · %{first} et %{second}",

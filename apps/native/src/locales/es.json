@@ -341,6 +341,14 @@
   "trip.buildingRead": "Leyendo lo que guardaste…",
   "trip.buildingFind": "Buscando cada lugar en el mapa…",
   "trip.buildingGroup": "Agrupándolos por días…",
+  "trip.revealSaves": {
+    "one": "%{formattedCount} guardado",
+    "many": "%{formattedCount} guardados",
+    "other": "%{formattedCount} guardados"
+  },
+  "trip.revealLanding": "aterrizando en %{city}",
+  "trip.revealLandingNoCity": "planeando tu viaje",
+  "trip.revealSkip": "Toca para saltar",
   "trip.dayTab": "Día %{day}",
   "trip.dayTitleOne": "Día %{day} · %{area}",
   "trip.dayTitleTwo": "Día %{day} · %{first} y %{second}",

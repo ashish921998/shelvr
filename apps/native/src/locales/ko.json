@@ -339,6 +339,12 @@
   "trip.buildingRead": "저장한 항목을 읽는 중…",
   "trip.buildingFind": "지도에서 장소를 찾는 중…",
   "trip.buildingGroup": "날짜별로 나누는 중…",
+  "trip.revealSaves": {
+    "other": "저장 %{formattedCount}개"
+  },
+  "trip.revealLanding": "%{city}에 착륙 중",
+  "trip.revealLandingNoCity": "여행을 계획하는 중",
+  "trip.revealSkip": "탭하여 건너뛰기",
   "trip.dayTab": "%{day}일차",
   "trip.dayTitleOne": "%{day}일차 · %{area}",
   "trip.dayTitleTwo": "%{day}일차 · %{first}, %{second}",

@@ -339,6 +339,13 @@
   "trip.buildingRead": "Reading your saves…",
   "trip.buildingFind": "Finding each place on the map…",
   "trip.buildingGroup": "Grouping them into days…",
+  "trip.revealSaves": {
+    "one": "%{formattedCount} save",
+    "other": "%{formattedCount} saves"
+  },
+  "trip.revealLanding": "landing in %{city}",
+  "trip.revealLandingNoCity": "planning your trip",
+  "trip.revealSkip": "Tap to skip",
   "trip.dayTab": "Day %{day}",
   "trip.dayTitleOne": "Day %{day} · %{area}",
   "trip.dayTitleTwo": "Day %{day} · %{first} and %{second}",
