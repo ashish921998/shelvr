@@ -16,6 +16,13 @@ import {
 } from "@/lib/trip";
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import { SegmentedControl } from "@expo/ui/community/segmented-control";
+import { Host, Picker, Text } from "@expo/ui/swift-ui";
+import {
+  accessibilityLabel,
+  environment,
+  pickerStyle,
+  tag,
+} from "@expo/ui/swift-ui/modifiers";
 import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
@@ -67,29 +74,57 @@ function Row({
 }
 
 /** A label over a full-width native segmented control. The label comes
- * first so VoiceOver reads it before the bare segment values. */
+ * first so VoiceOver reads it before the segments; `spoken` gives a bare
+ * value like "2" its unit ("2 days") on iOS, which the Expo UI control
+ * cannot pass through. */
 function Segmented({
   label,
   values,
+  spoken,
   selected,
   onSelect,
 }: {
   label: string;
   values: string[];
+  spoken?: string[];
   selected: number;
   onSelect: (index: number) => void;
 }) {
   const { theme, rt } = useUnistyles();
+  const appearance = isDarkThemeName(rt.themeName) ? "dark" : "light";
   return (
     <View style={styles.block}>
       <ThemedText variant="bodyLabel">{label}</ThemedText>
-      <SegmentedControl
-        values={values}
-        selectedIndex={selected}
-        onChange={(event) => onSelect(event.nativeEvent.selectedSegmentIndex)}
-        appearance={isDarkThemeName(rt.themeName) ? "dark" : "light"}
-        tintColor={theme.colors.primarySoft}
-      />
+      {spoken && process.env.EXPO_OS === "ios" ? (
+        <Host matchContents={{ vertical: true }} ignoreSafeArea="all">
+          <Picker
+            selection={selected}
+            onSelectionChange={(index) => onSelect(index)}
+            modifiers={[
+              pickerStyle("segmented"),
+              environment("colorScheme", appearance),
+            ]}
+            label=""
+          >
+            {values.map((value, index) => (
+              <Text
+                key={value}
+                modifiers={[tag(index), accessibilityLabel(spoken[index])]}
+              >
+                {value}
+              </Text>
+            ))}
+          </Picker>
+        </Host>
+      ) : (
+        <SegmentedControl
+          values={values}
+          selectedIndex={selected}
+          onChange={(event) => onSelect(event.nativeEvent.selectedSegmentIndex)}
+          appearance={appearance}
+          tintColor={theme.colors.primarySoft}
+        />
+      )}
     </View>
   );
 }
@@ -238,6 +273,7 @@ export function TripPlanForm({
         <Segmented
           label={t("trip.howManyDays")}
           values={DAY_CHOICES.map(String)}
+          spoken={DAY_CHOICES.map((count) => t("trip.dayCount", { count }))}
           selected={DAY_CHOICES.indexOf(days)}
           onSelect={(index) => setDays(DAY_CHOICES[index])}
         />

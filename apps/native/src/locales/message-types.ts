@@ -283,6 +283,11 @@ export type MessageParams = {
   "spaces.emptyTitle": undefined;
   "spaces.emptyBody": undefined;
   "plan.make": undefined;
+  "plan.button": undefined;
+  "plan.pickerTitle": undefined;
+  "plan.pickerBody": undefined;
+  "plan.goOut": undefined;
+  "plan.goOutBody": undefined;
   "plan.title": undefined;
   "plan.reading": undefined;
   "plan.openMaps": undefined;
@@ -307,6 +312,10 @@ export type MessageParams = {
   "plan.shareIntro": { space: string };
   "plan.shareFooter": { url: string };
   "trip.make": undefined;
+  "trip.pickTitle": undefined;
+  "trip.pickBody": undefined;
+  "trip.yourTrip": { city: string };
+  "trip.yourTripNoCity": undefined;
   "trip.loading": undefined;
   "trip.planTitle": { city: string };
   "trip.planTitleNoCity": undefined;

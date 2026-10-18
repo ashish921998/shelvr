@@ -275,43 +275,44 @@ export default function TripScreen() {
         ) : null;
       case "days":
         return trip ? (
-          <View style={styles.days}>
-            <TripDayPanel
-              trip={trip}
-              activeDay={day}
-              onDayChange={(next) => {
-                setSelected(null);
-                setActiveDay(next);
-              }}
-              onSelectStop={(stop) => selectStop({ day, stop })}
-            />
-            <View style={styles.footer}>
-              {trip.wishlist.length > 0 ? (
-                <ThemedText variant="caption" style={styles.muted}>
-                  {t("trip.wishlistCount", { count: trip.wishlist.length })}
-                </ThemedText>
-              ) : null}
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  setSelected(null);
-                  setEditing(true);
-                }}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  styles.link,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText variant="secondaryLabel" style={styles.linkText}>
-                  {t("trip.change")}
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
+          <TripDayPanel
+            trip={trip}
+            activeDay={day}
+            onDayChange={(next) => {
+              setSelected(null);
+              setActiveDay(next);
+            }}
+            onSelectStop={(stop) => selectStop({ day, stop })}
+          />
         ) : null;
     }
   })();
+
+  // Pinned under the day list rather than scrolled with it, so "Change
+  // trip" stays in reach on a day with many stops.
+  const footer =
+    mode === "days" && trip ? (
+      <View style={styles.footer}>
+        {trip.wishlist.length > 0 ? (
+          <ThemedText variant="caption" style={styles.muted}>
+            {t("trip.wishlistCount", { count: trip.wishlist.length })}
+          </ThemedText>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setSelected(null);
+            setEditing(true);
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
+        >
+          <ThemedText variant="secondaryLabel" style={styles.linkText}>
+            {t("trip.change")}
+          </ThemedText>
+        </Pressable>
+      </View>
+    ) : null;
 
   const overMap = hasMap && trip !== null;
   return (
@@ -341,7 +342,10 @@ export default function TripScreen() {
       >
         <View style={styles.grabber} />
         <ScrollView
-          contentContainerStyle={styles.panelContent}
+          contentContainerStyle={[
+            styles.panelContent,
+            footer !== null && styles.panelContentAboveFooter,
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -355,6 +359,7 @@ export default function TripScreen() {
             {panel}
           </Animated.View>
         </ScrollView>
+        {footer}
       </Animated.View>
     </View>
   );
@@ -405,10 +410,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.gap(1),
     paddingBottom: rt.insets.bottom + theme.gap(2),
   },
-  days: {
-    gap: theme.gap(2),
+  panelContentAboveFooter: {
+    paddingBottom: theme.gap(1),
   },
   footer: {
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(1),
+    paddingBottom: rt.insets.bottom + theme.gap(2),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

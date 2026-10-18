@@ -7,6 +7,7 @@ import {
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import type { FeedItem } from "@/components/item-card";
 import { MasonryFeed } from "@/components/masonry-feed";
+import { PlanPickerSheet } from "@/components/plan-picker-sheet";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
@@ -16,7 +17,7 @@ import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderScrim } from "@/components/ui/header-scrim";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -33,16 +34,11 @@ export default function SpaceScreen() {
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
-  // A trip already made stays reachable after the space drops below the
-  // saves a new one needs, so only look it up then.
+  // A trip already made gets its own row under the title, one tap away.
   const { data: storedTrip } = useQuery(
-    convexQuery(
-      api.tripData.getSpaceTrip,
-      space && !canPlanTrip(space.items)
-        ? { spaceId: id as Id<"spaces"> }
-        : "skip",
-    ),
+    convexQuery(api.tripData.getSpaceTrip, { spaceId: id as Id<"spaces"> }),
   );
+  const [picking, setPicking] = useState(false);
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
   const { guard: planGuard } = usePaywallGuard("make_plan");
@@ -118,32 +114,50 @@ export default function SpaceScreen() {
     );
   };
 
-  // The trip pill comes first, then "Make a plan".
-  const tripPill = canTrip ? (
+  // One Plan button. It asks only when both kinds of plan can be made.
+  const openPlan = () => {
+    if (canPlan && canTrip) setPicking(true);
+    else if (canPlan) makePlan();
+    else planTrip();
+  };
+
+  const planPill =
+    canPlan || canTrip ? (
+      <Pressable
+        accessibilityRole="button"
+        onPress={openPlan}
+        hitSlop={8}
+        style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
+      >
+        <AppSymbolIcon name="map" size={14} tintColor={theme.colors.onTint} />
+        <Text style={styles.planText}>{t("plan.button")}</Text>
+      </Pressable>
+    ) : null;
+
+  const tripRow = storedTrip ? (
     <Pressable
       accessibilityRole="button"
       onPress={planTrip}
       hitSlop={8}
-      style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.tripRow, pressed && { opacity: 0.7 }]}
     >
       <AppSymbolIcon
         name="airplane"
-        size={14}
-        tintColor={theme.colors.onTint}
+        size={13}
+        tintColor={theme.colors.primaryText}
       />
-      <Text style={styles.planText}>{t("trip.make")}</Text>
-    </Pressable>
-  ) : null;
-
-  const planPill = canPlan ? (
-    <Pressable
-      accessibilityRole="button"
-      onPress={makePlan}
-      hitSlop={8}
-      style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
-    >
-      <AppSymbolIcon name="map" size={14} tintColor={theme.colors.onTint} />
-      <Text style={styles.planText}>{t("plan.make")}</Text>
+      <Text style={styles.tripText}>
+        {storedTrip.city
+          ? t("trip.yourTrip", { city: storedTrip.city })
+          : t("trip.yourTripNoCity")}
+        {" · "}
+        {t("trip.dayCount", { count: storedTrip.days.length })}
+      </Text>
+      <AppSymbolIcon
+        name="chevron.right"
+        size={11}
+        tintColor={theme.colors.primaryText}
+      />
     </Pressable>
   ) : null;
 
@@ -252,9 +266,9 @@ export default function SpaceScreen() {
           source={{ from: "space", spaceId: id }}
           firstItemZoomTarget
           ListHeaderComponent={
-            suggestionCount > 0 || planPill || tripPill ? (
+            suggestionCount > 0 || planPill || tripRow ? (
               <View style={styles.headerPills}>
-                {tripPill}
+                {tripRow}
                 {planPill}
                 {suggestionCount > 0 ? (
                   <Animated.View
@@ -293,6 +307,18 @@ export default function SpaceScreen() {
         />
         <HeaderScrim />
       </View>
+      <PlanPickerSheet
+        visible={picking}
+        onClose={() => setPicking(false)}
+        onGoOut={() => {
+          setPicking(false);
+          makePlan();
+        }}
+        onTrip={() => {
+          setPicking(false);
+          planTrip();
+        }}
+      />
     </>
   );
 }
@@ -335,6 +361,18 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 13,
     color: theme.colors.onTint,
+  },
+  tripRow: {
+    flexBasis: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(0.75),
+  },
+  tripText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
+    color: theme.colors.primaryText,
   },
   suggestionsPill: {
     flexDirection: "row",
