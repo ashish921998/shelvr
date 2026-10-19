@@ -60,8 +60,8 @@ import {
 import { AppState } from "react-native";
 import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
+  claimPurchaseBeforeSignIn,
   clearPurchaseBeforeSignIn,
-  hasPurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 
 /**
@@ -264,7 +264,7 @@ export function useEntitlementSync(): void {
       },
       onReady: () => {
         markRcUserSynced(sub);
-        if (!hasPurchaseBeforeSignIn()) return;
+        if (!claimPurchaseBeforeSignIn(sub)) return;
         attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})).then(
           clearPurchaseBeforeSignIn,
           (error) => analytics.captureError("purchase_sync_failed", error),
@@ -314,20 +314,34 @@ async function attachPurchaseBeforeSignIn(syncPurchase: () => Promise<null>) {
  */
 function startAnonymousRevenueCat(): () => void {
   let cancelled = false;
-  const attempt = _rcIdentitySync.then(async () => {
-    if (cancelled || _rcTargetUserId !== null) return;
-    await configureRevenueCat(undefined);
-    const rc = getPurchases();
-    if (!rc) throw new Error("revenuecat_module_unavailable");
-    if (!(await rc.isAnonymous())) await rc.logOut();
-    if (cancelled || _rcTargetUserId !== null) return;
-    _rcAnonymousReady = true;
+  // Retried like the signed-in sync: a failed setup would otherwise leave
+  // the onboarding paywall unavailable for the whole signed-out session.
+  const observer = startRevenueCatIdentitySync({
+    sync: () => {
+      const attempt = _rcIdentitySync.then(async () => {
+        if (cancelled || _rcTargetUserId !== null) return;
+        await configureRevenueCat(undefined);
+        const rc = getPurchases();
+        if (!rc) throw new Error("revenuecat_module_unavailable");
+        if (!(await rc.isAnonymous())) await rc.logOut();
+      });
+      _rcIdentitySync = attempt.catch(() => {});
+      return attempt;
+    },
+    onReady: () => {
+      if (cancelled || _rcTargetUserId !== null) return;
+      _rcAnonymousReady = true;
+    },
+    onError: (error) =>
+      analytics.captureError("revenuecat_anonymous_sync_failed", error),
   });
-  _rcIdentitySync = attempt.catch((error: unknown) => {
-    analytics.captureError("revenuecat_anonymous_sync_failed", error);
+  const subscription = AppState.addEventListener("change", (state) => {
+    if (state === "active") observer.retry();
   });
   return () => {
     cancelled = true;
+    observer.dispose();
+    subscription.remove();
   };
 }
 

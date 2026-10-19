@@ -28,7 +28,7 @@ const mock = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
-  queueDemoUrl: vi.fn(),
+  queueFirstSave: vi.fn(),
   clearLegacyDemo: vi.fn(),
   recordShareSaved: vi.fn(),
   releaseSavedShare: vi.fn(),
@@ -65,7 +65,6 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   setPendingDemo: mock.setPendingDemo,
-  queueDemoUrl: mock.queueDemoUrl,
   clearLegacyDemoUrlIfSaved: mock.clearLegacyDemo,
   resolveOnboardingSpaceName: (id: string) => `name:${id}`,
 }));
@@ -79,6 +78,9 @@ vi.mock("@/lib/onboarding-demo", () => ({
     url === "https://sample.test/ready-made"
       ? { pageHeading: "Ready-made heading" }
       : undefined,
+}));
+vi.mock("@/lib/queued-first-save", () => ({
+  queueFirstSave: mock.queueFirstSave,
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
@@ -131,7 +133,7 @@ beforeEach(() => {
   mock.retry.mockReset();
   mock.capture.mockReset();
   mock.setPendingDemo.mockReset();
-  mock.queueDemoUrl.mockReset();
+  mock.queueFirstSave.mockReset();
   mock.clearLegacyDemo.mockReset();
   mock.recordShareSaved.mockReset();
   mock.releaseSavedShare.mockReset();
@@ -894,8 +896,11 @@ describe("useDemoSave", () => {
     const { result, onAdvance } = renderDemo();
     act(() => result.current.submitUrl("https://sample.test/ready-made"));
     act(() => result.current.saveLater());
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(
-      "https://sample.test/ready-made",
+    expect(mock.queueFirstSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://sample.test/ready-made",
+        source: "direct",
+      }),
     );
     expect(mock.releaseSavedShare).toHaveBeenCalledWith(
       "https://sample.test/ready-made",
@@ -907,13 +912,13 @@ describe("useDemoSave", () => {
       ["onboarding_demo_deferred", { sample: true }],
     ]);
     act(() => result.current.saveLater());
-    expect(mock.queueDemoUrl).toHaveBeenCalledOnce();
+    expect(mock.queueFirstSave).toHaveBeenCalledOnce();
   });
 
   it("never queues a save once the account can make it", () => {
     const { result, onAdvance } = renderDemo();
     act(() => result.current.saveLater());
-    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(mock.queueFirstSave).not.toHaveBeenCalled();
     expect(onAdvance).not.toHaveBeenCalled();
   });
 });

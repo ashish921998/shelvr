@@ -31,6 +31,9 @@ vi.mock("@/lib/onboarding", () => ({
 vi.mock("@/lib/replay-onboarding", () => ({
   useReplayOnboarding: mocks.replay,
 }));
+vi.mock("@/lib/queued-first-save", () => ({
+  useQueuedFirstSave: vi.fn(),
+}));
 vi.mock("@/lib/share/use-resume-pending-share", () => ({
   useResumePendingShare: mocks.resumeShare,
 }));

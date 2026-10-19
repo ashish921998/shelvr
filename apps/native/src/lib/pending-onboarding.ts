@@ -255,8 +255,9 @@ export function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
 }
 
-/** A signed-out first save waits here until the account exists: the replay
- * saves it after sign-in, once the account is Pro. */
+/** A first save the replay makes once the account is Pro: one queued before
+ * sign-in whose account had already spent its free demo save
+ * (queued-first-save.ts). */
 export function queueDemoUrl(url: string) {
   getOrCreatePendingOperationId();
   const existing = readPendingRecord();

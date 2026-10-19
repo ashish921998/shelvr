@@ -2,9 +2,10 @@ import { afterEach, test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
 import {
-  REMINDER_STEP,
+  SHARE_LATER,
+  queueFirstSave,
   relaunchWith,
-  signInAndSaveFirst,
+  signInAfterOnboarding,
   startFreshOnboarding,
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
@@ -20,45 +21,39 @@ afterEach(async ({ device }) => {
   await device.clearKeychain();
 });
 
-// A first-time user who saved one link, relaunched on the reminder step,
-// took the promise and declined the paywall at the end. Pro is hidden for
-// this user from the relaunch on (src/lib/e2e-hide-pro.ts), as it is for a
-// real new user, so the end-of-onboarding paywall has someone to ask.
-test("asks for the paywall at the end of onboarding, after a relaunch on the reminder step", async ({
+// A first-time user who picked one link, relaunched mid-onboarding, took
+// the promise, declined the paywall at the end and only then signed in: the
+// paywall comes before the account, and sign-in is asked once. Pro is hidden
+// from the relaunch on (src/lib/e2e-hide-pro.ts), so the dev user, Pro on
+// the server, lands on Home without a second paywall.
+test("asks for the paywall at the end of onboarding, then sign-in once", async ({
   device,
   screen,
 }) => {
   await startFreshOnboarding({ device, screen });
   await walkToFirstSave(screen);
-  await screen.getByRole("button", /^Save it, /).tap();
-  await signInAndSaveFirst(screen);
+  await queueFirstSave(screen);
 
-  // A relaunch here resumes on the reminder step, not past it (PR #279
-  // skipped it).
-  const reminder = screen.getByText(REMINDER_STEP);
+  // A relaunch here resumes on the share practice, not past it.
+  const shareLater = screen.getByRole("button", SHARE_LATER);
   await relaunchWith(
     device,
     screen,
     [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
-    () => reminder.isVisible(),
+    () => shareLater.isVisible(),
   );
-  await screen.getByRole("button", "Don't remind me").tap();
 
   // The share practice, skipped, then the promise step, and then the
-  // paywall.
-  await screen.getByRole("button", "I'll try it later").tap({
-    timeout: 30_000,
-  });
+  // paywall, shown while still signed out.
+  await shareLater.tap();
   await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
   await expectPaywall(screen);
 
-  // A close is a decline, and onboarding ends on Home. No exit offer
-  // follows: hiding Pro skips it.
+  // A close is a decline. Signed out there is no exit offer, and the one
+  // sign-in follows.
   await screen.getByRole("button").first().tap();
   await expect(screen.getByRole("button", "Restore Purchases")).toBeHidden({
     timeout: 30_000,
   });
-  await expect(screen.getByRole("button", "Profile")).toBeVisible({
-    timeout: 30_000,
-  });
+  await signInAfterOnboarding(screen);
 });

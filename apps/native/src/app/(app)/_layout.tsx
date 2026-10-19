@@ -10,6 +10,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
+import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
@@ -72,6 +73,7 @@ function AppStack() {
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
+  useQueuedFirstSave();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
   useResumePendingShare();
   // Remind trialers two days before the yearly plan starts charging.

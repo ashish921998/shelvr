@@ -213,6 +213,23 @@ describe("selling before sign-in", () => {
     expect(mock.logOut).toHaveBeenCalledOnce();
   });
 
+  it("retries a failed anonymous setup, so the onboarding paywall still sells", async () => {
+    mock.auth = { isAuthenticated: false, isLoading: false };
+    mock.isAnonymous.mockRejectedValueOnce(new Error("offline"));
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "revenuecat_anonymous_sync_failed",
+      expect.any(Error),
+    );
+    await vi.waitFor(() => expect(mock.isAnonymous).toHaveBeenCalledTimes(2), {
+      timeout: 5000,
+    });
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", false),
+    ).resolves.toBe("success");
+  });
+
   it("does not start an anonymous customer while sign-in is still loading", async () => {
     mock.auth = { isAuthenticated: false, isLoading: true };
     await loadReady();
@@ -245,7 +262,7 @@ describe("selling before sign-in", () => {
         expect.any(Error),
       ),
     );
-    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("1");
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
   });
 
   it("still reads the account back when the store sync fails", async () => {
@@ -257,6 +274,16 @@ describe("selling before sign-in", () => {
       "revenuecat_purchase_attach_failed",
       expect.any(Error),
     );
+  });
+
+  it("never attaches a purchase another account already claimed", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "user:someone_else");
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
   });
 
   it("does not call the backend when nothing was bought before sign-in", async () => {

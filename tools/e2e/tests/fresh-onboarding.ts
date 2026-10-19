@@ -94,29 +94,36 @@ export async function relaunchWith(
   });
 }
 
-/** The reminder step's question (`onboarding.remindQuestion`). */
-export const REMINDER_STEP = /When should it come back\?/;
+/**
+ * Picks the featured sample while signed out. Its preview plays, then the
+ * step shows the save as it will be filed, with Continue, which queues it
+ * for after sign-in. The reminder step has no save to remind about and lets
+ * the flow straight on, so this ends on the share practice.
+ */
+export async function queueFirstSave(screen: Screen): Promise<void> {
+  await screen.getByRole("button", /^Save it, /).tap();
+  await screen.getByRole("button", "Continue").tap({ timeout: 60_000 });
+  await expect(screen.getByRole("button", SHARE_LATER)).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+/** The share practice's way on without sharing (`sharePractice.later`). */
+export const SHARE_LATER = "I'll try it later";
 
 /**
- * Signs in from the first-save step with the dev login, which onboarding
- * offers once a link is picked or shared, and waits for the reminder step.
- * The model is a placeholder on CI, so the save may never be read: whichever
- * way out the reading screen offers is taken, since the reminder step only
- * needs the save to exist.
+ * Signs in on the sign-in screen that follows a finished onboarding, the
+ * only sign-in a new user sees, and waits for Home. The AI disclosure may
+ * come up first.
  */
-export async function signInAndSaveFirst(screen: Screen): Promise<void> {
-  await screen.getByTestId("onboarding-dev-login").tap({ timeout: 60_000 });
-
-  const reminder = screen.getByText(REMINDER_STEP);
+export async function signInAfterOnboarding(screen: Screen): Promise<void> {
+  await screen.getByTestId("dev-login-button").tap({ timeout: 60_000 });
+  const home = screen.getByRole("button", "Profile");
   const keepAi = screen.getByRole("button", "Keep it on");
-  const skipWait = screen.getByRole("button", "Continue without waiting");
-  const afterFailure = screen.getByRole("button", "Continue");
   await pollUntil(
     async () => {
-      if (await reminder.isVisible()) return true;
+      if (await home.isVisible()) return true;
       if (await keepAi.isVisible()) await keepAi.tap();
-      else if (await skipWait.isVisible()) await skipWait.tap();
-      else if (await afterFailure.isVisible()) await afterFailure.tap();
       return false;
     },
     { timeout: 120_000 },
