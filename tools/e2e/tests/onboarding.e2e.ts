@@ -10,7 +10,7 @@ import {
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
 import { LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall } from "./paywall-sheet.ts";
+import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
 
 // A run that stops partway leaves a signed-in user mid-onboarding, which the
 // seeded flows after this one cannot get past (CI run 39048570372: seven
@@ -52,7 +52,7 @@ test("asks for the paywall at the end of onboarding, then sign-in once", async (
   // A close is a decline. Signed out there is no exit offer, and the one
   // sign-in follows.
   await screen.getByRole("button").first().tap();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeHidden({
+  await expect(paywallRestore(screen)).toBeHidden({
     timeout: 30_000,
   });
   await signInAfterOnboarding(screen);
