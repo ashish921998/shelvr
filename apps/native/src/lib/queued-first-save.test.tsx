@@ -151,6 +151,16 @@ describe("a first save queued before sign-in", () => {
     expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
   });
 
+  it("keeps the queued save when the server is only rate limiting", async () => {
+    mock.createDemoItem.mockRejectedValue(
+      new ConvexError({ kind: "RateLimited", name: "demo", retryAfter: 1 }),
+    );
+    queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
+    await mount();
+    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
+  });
+
   it("does nothing when nothing was queued", async () => {
     await mount();
     expect(mock.createDemoItem).not.toHaveBeenCalled();

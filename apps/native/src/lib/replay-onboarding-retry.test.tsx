@@ -246,4 +246,42 @@ describe("a purchase made before sign-in", () => {
     );
     expect(hasPending()).toBe(false);
   });
+
+  it("offers the paywall once the flag clears with no purchase found", async () => {
+    entitlement.entitled = false;
+    setPendingSpaces(["Recipes"]);
+    notePurchaseBeforeSignIn();
+    renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+
+    act(() => clearPurchaseBeforeSignIn());
+    await settle();
+
+    expect(openPaywall).toHaveBeenCalledOnce();
+  });
+});
+
+describe("a link handed to the replay while it runs", () => {
+  it("is saved by a fresh pass instead of cleared with the spaces", async () => {
+    let finishSpace: (id: string) => void = () => {};
+    createSpace.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSpace = resolve)),
+    );
+    createLinkItem.mockResolvedValue("item");
+    setPendingSpaces(["Recipes"]);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    await act(async () => {
+      queueDemoUrl("https://example.com/late");
+      finishSpace("space");
+    });
+    await settle();
+
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/late" }),
+    );
+    expect(hasPending()).toBe(false);
+  });
 });

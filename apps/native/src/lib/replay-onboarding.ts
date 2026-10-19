@@ -16,7 +16,11 @@ import {
   getPendingOnboardingRevision,
   updatePendingSpaces,
 } from "@/lib/pending-onboarding";
-import { hasPurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
+import {
+  getPurchaseBeforeSignInRevision,
+  hasPurchaseBeforeSignIn,
+  subscribePurchaseBeforeSignIn,
+} from "@/lib/purchase-before-sign-in";
 import {
   openPaywall,
   useEntitlement,
@@ -105,6 +109,12 @@ export function useReplayOnboarding() {
     getPendingOnboardingRevision,
     getPendingOnboardingRevision,
   );
+  // Wakes the replay when a purchase made before sign-in stops holding it.
+  const purchaseRevision = useSyncExternalStore(
+    subscribePurchaseBeforeSignIn,
+    getPurchaseBeforeSignInRevision,
+    getPurchaseBeforeSignInRevision,
+  );
 
   useEffect(() => {
     if (entitled !== settledEntitledRef.current) {
@@ -145,6 +155,7 @@ export function useReplayOnboarding() {
     // What this run left unfinished, read straight after its own writes so
     // work that arrives while a mutation is in flight is never mistaken for it.
     let remainderKey: string | null = null;
+    let lateDemoUrl = false;
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -191,7 +202,8 @@ export function useReplayOnboarding() {
               operationId: getOrCreatePendingOperationId(),
               analyticsSessionId: analytics.sessionId(),
             });
-            clearLegacyDemoUrl();
+            // Only the link this run saved: one handed over meanwhile stays.
+            if (getPendingDemoUrl() === legacyDemoUrl) clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
           } catch {
             return;
@@ -201,12 +213,20 @@ export function useReplayOnboarding() {
         // Only mark as done when all required mutations succeed.
         if (!allSpacesOk) return;
 
+        // A link handed over while this run was in flight (a queued first
+        // save whose account had spent its demo save) is not this run's to
+        // clear; a fresh pass saves it.
+        if (getPendingDemoUrl() !== null) {
+          lateDemoUrl = true;
+          return;
+        }
+
         ranRef.current = true;
         clearPending();
       } finally {
         // An entitlement change during the run asked for a fresh pass; marking
         // this work settled would make that pass skip it.
-        const entitlementRerun = rerunRef.current;
+        const entitlementRerun = rerunRef.current || lateDemoUrl;
         if (remainderKey !== null && !entitlementRerun) {
           settledWorkRef.current = remainderKey;
         }
@@ -233,6 +253,7 @@ export function useReplayOnboarding() {
     entitled,
     entitlementLoading,
     pendingRevision,
+    purchaseRevision,
     router,
     retryNonce,
   ]);

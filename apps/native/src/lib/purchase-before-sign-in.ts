@@ -12,9 +12,31 @@ const KEY = "shelvr.purchase.beforeSignIn";
 const UNCLAIMED = "1";
 const OWNER_PREFIX = "user:";
 
+// SecureStore is not reactive. The onboarding replay waits on this flag, so
+// it subscribes and wakes when the flag is cleared.
+let revision = 0;
+const listeners = new Set<() => void>();
+
+function write(value: string) {
+  SecureStore.setItem(KEY, value);
+  revision += 1;
+  for (const listener of listeners) listener();
+}
+
+export function subscribePurchaseBeforeSignIn(
+  listener: () => void,
+): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function getPurchaseBeforeSignInRevision(): number {
+  return revision;
+}
+
 export function notePurchaseBeforeSignIn() {
   try {
-    SecureStore.setItem(KEY, UNCLAIMED);
+    write(UNCLAIMED);
   } catch {
     // Best effort: the webhook still lands at the next renewal, and Restore
     // Purchases attaches it at once.
@@ -51,7 +73,7 @@ export function claimPurchaseBeforeSignIn(userId: string): boolean {
     return false;
   }
   try {
-    SecureStore.setItem(KEY, owner);
+    write(owner);
   } catch {
     // Unclaimed still attaches now; only a later account switch is at risk.
   }
@@ -60,7 +82,7 @@ export function claimPurchaseBeforeSignIn(userId: string): boolean {
 
 export function clearPurchaseBeforeSignIn() {
   try {
-    SecureStore.setItem(KEY, "");
+    write("");
   } catch {
     // Best effort; a stale flag only re-runs one harmless sync.
   }

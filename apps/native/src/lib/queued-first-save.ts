@@ -1,4 +1,5 @@
 import { api } from "@convex/_generated/api";
+import { isRateLimitedError } from "@convex/model/demoErrors";
 import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
@@ -76,7 +77,8 @@ export function useQueuedFirstSave() {
     const queued = readQueued();
     if (queued === null) return;
     // One attempt per mount: a failure that is not the server's answer (no
-    // network) waits for the next launch instead of retrying in a loop.
+    // network, a rate limit) waits for the next launch instead of retrying in
+    // a loop.
     ranRef.current = true;
     const { url, destination, source } = queued;
     createDemoItem({
@@ -100,8 +102,9 @@ export function useQueuedFirstSave() {
         analytics.captureError("onboarding_queued_save_failed", error);
         // The server turned the save down for good (the demo's item is
         // gone, or the link is invalid): the replay tries it as a normal
-        // save once the account is Pro.
-        if (error instanceof ConvexError) {
+        // save once the account is Pro. A rate limit is not an answer; the
+        // free save is tried again on the next launch.
+        if (error instanceof ConvexError && !isRateLimitedError(error)) {
           queueDemoUrl(url);
           clearQueued();
         }
