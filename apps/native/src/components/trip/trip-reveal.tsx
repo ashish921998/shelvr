@@ -156,7 +156,11 @@ export function TripReveal({
   // Where the city sits on screen; the globe moves it every frame of the dive.
   const pinX = useSharedValue(layout.landing.x);
   const pinY = useSharedValue(layout.landing.y);
-  const pin = useMemo(() => ({ x: pinX, y: pinY }), [pinX, pinY]);
+  const pinDive = useSharedValue(0);
+  const pin = useMemo(
+    () => ({ x: pinX, y: pinY, dive: pinDive }),
+    [pinX, pinY, pinDive],
+  );
   const [phase, setPhase] = useState<Exclude<Stage, "dive">>("lift");
   const stage: Stage = phase === "wait" && ready ? "dive" : phase;
   const [rolled, setRolled] = useState(0);
@@ -359,8 +363,6 @@ function Dot({
   pin: Pin;
   stage: Stage;
 }) {
-  // How far along its fall onto the city the dot is, 0 to 1.
-  const fall = useSharedValue(0);
   const scale = useSharedValue(0.5);
   const opacity = useSharedValue(0);
 
@@ -375,29 +377,33 @@ function Dot({
         -1,
       );
     } else if (stage === "dive") {
-      // Staggered starts, one landing: every dot reaches the city as the
-      // globe settles on it.
-      const delay = index * 15;
-      const timing = {
-        duration: GLOBE_DIVE_MS - delay,
-        easing: Easing.inOut(Easing.cubic),
-        reduceMotion: NEVER,
-      };
       opacity.value = withTiming(1, fade(150));
-      fall.value = withDelay(delay, withTiming(1, timing));
-      scale.value = withDelay(delay, withTiming(0.6, timing));
+      scale.value = withTiming(1, fade(150));
     }
-  }, [stage, index, fall, scale, opacity]);
+  }, [stage, index, scale, opacity]);
 
-  // The dot falls towards wherever the city is on the turning globe.
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [
-      { translateX: fall.value * (pin.x.value - dot.x) },
-      { translateY: fall.value * (pin.y.value - dot.y) },
-      { scale: scale.value },
-    ],
-  }));
+  // The dot falls towards wherever the city is on the turning globe, on the
+  // globe's own clock, so a dropped map frame holds the dots back with it.
+  // Staggered starts, one landing: every dot reaches the city as it settles.
+  const style = useAnimatedStyle(() => {
+    const delay = index * 15;
+    const share = Math.min(
+      1,
+      Math.max(
+        0,
+        (pin.dive.value * GLOBE_DIVE_MS - delay) / (GLOBE_DIVE_MS - delay),
+      ),
+    );
+    const fall = Easing.inOut(Easing.cubic)(share);
+    return {
+      opacity: opacity.value,
+      transform: [
+        { translateX: fall * (pin.x.value - dot.x) },
+        { translateY: fall * (pin.y.value - dot.y) },
+        { scale: scale.value * (1 - 0.4 * fall) },
+      ],
+    };
+  });
 
   return (
     <Animated.View
@@ -409,7 +415,12 @@ function Dot({
 
 /** Where the trip's city is on screen: the globe moves it every frame of the
  * dive, and the dots, the glow and the city's name follow it. */
-type Pin = { x: SharedValue<number>; y: SharedValue<number> };
+type Pin = {
+  x: SharedValue<number>;
+  y: SharedValue<number>;
+  /** How far the dive has gone in time, 0 to 1, as of the last map frame. */
+  dive: SharedValue<number>;
+};
 
 /** The city's name, on a pill just above the city. */
 function PinLabel({ pin, city }: { pin: Pin; city: string }) {
@@ -507,10 +518,15 @@ function Globe({
         setFrame({ paths, light: countryLight(camera.dive) });
         shown = paths.sphere !== "";
       }
-      if (aim && diveAt !== null) {
-        const point = globePin(camera, aim);
-        pin.x.value = point.x;
-        pin.y.value = point.y;
+      // With no pins the dots fall on the screen's centre, where the dive
+      // lands; they move on this frame's clock either way.
+      if (diveAt !== null) {
+        if (aim) {
+          const point = globePin(camera, aim);
+          pin.x.value = point.x;
+          pin.y.value = point.y;
+        }
+        pin.dive.value = Math.min(1, (t - diveAt) / GLOBE_DIVE_MS);
       }
       if (!globeSettled(t, diveAt)) handle = requestAnimationFrame(tick);
     };
