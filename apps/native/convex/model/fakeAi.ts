@@ -7,9 +7,12 @@ import type { wrapLanguageModel } from "ai";
  * placeholder model key, so every real model call fails and a save that needs
  * one can never finish. This model answers instead, from the saved content
  * itself, so a flow like save-note can run on every pull request with no
- * secret. It knows one call (a note's classification) and fails loudly on
- * anything else, so a flow that strays onto an unanswered call fails instead
- * of passing on an invented answer.
+ * secret. It knows three calls (a note's and a fixture page's
+ * classification, and a new space's recommendations) and fails loudly on
+ * anything else, so a flow that strays onto an unanswered
+ * call fails instead of passing on an invented answer. It recognizes them by
+ * the wording of the prompts in ai.ts; aiFakeModel.test.ts runs those real
+ * prompts through it, so a rewording that would strand the fake fails there.
  */
 
 type AnyLanguageModel = Parameters<typeof wrapLanguageModel>[0]["model"];
@@ -77,7 +80,7 @@ function isLoopback(url: string | undefined): boolean {
 /** The keys of itemAnalysisSchema in ai.ts, sorted: the plain note and
  * web page classification. The recipe and video variants add keys, so the
  * fake does not answer them. */
-const ANALYSIS_KEYS = "description,intents,spaceNames,tags,title";
+const ANALYSIS_KEYS = "cities,description,intents,spaceNames,tags,title";
 // Markers from the note and link prompts in ai.ts: their task lines, the
 // sections that carry the note or the page, and the intents block that
 // always closes both.
@@ -86,6 +89,12 @@ const NOTE_MARKER = "\n\nNote:\n";
 const LINK_TASK = "Analyze this saved web page";
 const CONTENT_MARKER = "\n\nPage content:\n";
 const INTENTS_MARKER = "\n\nAlso propose up to ";
+/** The key of recommendSchema in aiRecommendForSpace.ts, and the markers of
+ * its prompt: the task line, the space's name, and the numbered saves. */
+const RECOMMEND_KEYS = "itemNumbers";
+const RECOMMEND_TASK = "The user just created a space";
+const SPACE_NAME = /^Space name: "(.*)"$/m;
+const SAVES_MARKER = "Below is a numbered list of the user's saved items.";
 const TITLE_WORDS = 6;
 const MAX_TAGS = 6;
 
@@ -95,17 +104,20 @@ type Analysis = {
   tags: string[];
   spaceNames: string[];
   intents: never[];
+  cities: never[];
 };
 
 /** A web page as the fake reads it back out of the link prompt. */
 type PromptPage = { title?: string; description?: string; content?: string };
 
+/** Words of four letters or more, lowercased, as the fake compares them. */
+function wordsOf(text: string): Set<string> {
+  return new Set(text.toLowerCase().match(/\p{L}{4,}/gu) ?? []);
+}
+
 /** Unique lowercase words of four letters or more, as tags. */
 function tagsFrom(text: string): string[] {
-  return [...new Set(text.toLowerCase().match(/\p{L}{4,}/gu) ?? [])].slice(
-    0,
-    MAX_TAGS,
-  );
+  return [...wordsOf(text)].slice(0, MAX_TAGS);
 }
 
 /**
@@ -127,6 +139,7 @@ export function fakeNoteAnalysis(note: string): Analysis {
     tags: tagsFrom(note),
     spaceNames: [],
     intents: [],
+    cities: [],
   };
 }
 
@@ -145,6 +158,7 @@ export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
     tags: tagsFrom(`${page.title}\n${page.content ?? ""}`),
     spaceNames: [],
     intents: [],
+    cities: [],
   };
 }
 
@@ -180,6 +194,45 @@ export function pageFromPrompt(prompt: string): PromptPage | undefined {
   };
 }
 
+/** The saves listed after the prompt's saves instruction. A save starts at
+ * the line numbered one past the last, so a blank or numbered line inside a
+ * description stays part of its save. */
+function savesFromPrompt(prompt: string): string[] {
+  const marker = prompt.indexOf(SAVES_MARKER);
+  if (marker === -1) return [];
+  const start = prompt.indexOf("\n\n", marker);
+  if (start === -1) return [];
+  const saves: string[] = [];
+  for (const line of prompt.slice(start + 2).split("\n")) {
+    const next = `${saves.length + 1}. `;
+    if (line.startsWith(next)) saves.push(line.slice(next.length));
+    else if (saves.length > 0) saves[saves.length - 1] += `\n${line}`;
+  }
+  return saves;
+}
+
+/**
+ * What the fake recommends for a new space: every numbered save whose line
+ * shares a word of four letters or more with the space's name, so a flow
+ * that names a space after a seeded save sees exactly that save suggested.
+ * Undefined when the prompt is not a recommendation prompt. Exported pure for
+ * unit testing.
+ */
+export function fakeRecommendation(
+  prompt: string,
+): { itemNumbers: number[] } | undefined {
+  const name = prompt.includes(RECOMMEND_TASK)
+    ? SPACE_NAME.exec(prompt)?.[1]
+    : undefined;
+  if (name === undefined) return undefined;
+  const nameWords = wordsOf(name);
+  const itemNumbers = savesFromPrompt(prompt)
+    .map((save, i) => ({ save, number: i + 1 }))
+    .filter(({ save }) => [...wordsOf(save)].some((w) => nameWords.has(w)))
+    .map(({ number }) => number);
+  return { itemNumbers };
+}
+
 function promptText(options: CallOptions): string {
   return options.prompt
     .filter((message) => message.role === "user")
@@ -213,9 +266,17 @@ export class FakeAiUnansweredError extends Error {
 
 /** The answer to one call, or a thrown FakeAiUnansweredError. Exported for
  * unit testing. */
-export function fakeAnswer(options: CallOptions): Analysis {
-  if (schemaKeys(options) !== ANALYSIS_KEYS) throw new FakeAiUnansweredError();
+export function fakeAnswer(
+  options: CallOptions,
+): Analysis | { itemNumbers: number[] } {
+  const keys = schemaKeys(options);
   const prompt = promptText(options);
+  if (keys === RECOMMEND_KEYS) {
+    const picks = fakeRecommendation(prompt);
+    if (picks === undefined) throw new FakeAiUnansweredError();
+    return picks;
+  }
+  if (keys !== ANALYSIS_KEYS) throw new FakeAiUnansweredError();
   const note = noteFromPrompt(prompt);
   if (note !== undefined) return fakeNoteAnalysis(note);
   const page = pageFromPrompt(prompt);

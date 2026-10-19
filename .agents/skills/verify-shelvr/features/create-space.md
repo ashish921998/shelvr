@@ -21,11 +21,17 @@ space opens the paywall.
 `screen.getByLabel("Create space")` (a label without a button role), then
 `screen.getByRole("button", <name>)` in the list.
 
+`tests/space-suggestions.e2e.ts` creates `Ramen <timestamp>` the same way,
+opens it, and waits for `1 suggestion` and the `Weeknight Miso Ramen` card. It
+needs the fake model, which suggests the saves sharing a word with the name,
+so it runs in the `e2e ios` CI job and skips itself elsewhere.
+
 ## Proof
 
 A button named after the new space (`Pilot <timestamp>`) shows in the Spaces
-list. The space is a `spaces` row on the dev deployment. The suggestions pass
-is not checked.
+list. The space is a `spaces` row on the dev deployment. On CI, the new
+`Ramen` space's header reads `1 suggestion` over the seeded ramen card; with
+the real model the suggestions pass is not checked.
 
 ## Charters
 

@@ -9,14 +9,11 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { buildEmbeddingText, RECOMMEND_CANDIDATES } from "./model/embedding";
 import { logEvent, errorName } from "./model/log";
-import { MODEL, modelCallOptions, isModelTimeout } from "./model/aiProvider";
-import { fetchErrorCategory } from "./model/pageRead";
+import { MODEL, modelCallOptions } from "./model/aiProvider";
 import { embedQuery } from "./aiEmbeddingSweep";
+import { summarizeError } from "./ai";
 
 const RECOMMEND_TIMEOUT_MS = 45_000;
-function summarizeError(error: unknown): string {
-  return isModelTimeout(error) ? "model_timeout" : fetchErrorCategory(error);
-}
 
 const recommendSchema = z.object({
   itemNumbers: z

@@ -7,6 +7,23 @@ const app = defineApp({
     // Id of the Apple-approved message POST /retention-messaging names on the
     // cancel sheet. Unset, the reply is empty and Apple shows its default.
     APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
+    // Promotional offers on the cancel sheet: a JSON object from product id to
+    // { offerIdentifier, messageIdentifier } (see model/retentionMessaging.ts).
+    // A product left out, or any of the three IAP key values unset, gets the
+    // plain message instead.
+    APPLE_RETENTION_OFFERS: v.optional(v.string()),
+    // The Apple In-App Purchase key (App Store Connect > Users and Access >
+    // Integrations > In-App Purchase) that signs those offers: the .p8
+    // contents, its key id, and the issuer id on that page.
+    APPLE_IAP_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_IAP_KEY_ID: v.optional(v.string()),
+    APPLE_IAP_ISSUER_ID: v.optional(v.string()),
+    // Signs the Apple Maps Server API token for trip pins (convex/trips.ts):
+    // a MapKit key's .p8 contents, its key id, and the team id. Without all
+    // three, trips are made without pins.
+    APPLE_MAPS_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_MAPS_KEY_ID: v.optional(v.string()),
+    APPLE_MAPS_TEAM_ID: v.optional(v.string()),
     // Signs the client secret for Apple's token revocation on account
     // deletion (convex/appleRevoke.ts): the .p8 contents, its key id, and the
     // team id. Without all three the revocation is skipped.
@@ -40,6 +57,8 @@ const app = defineApp({
     // reminders stop at their next attempt, with no deploy.
     SAVE_REMINDERS_ENABLED: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
+    // Optional video descriptions; absent or failed reads retain oEmbed.
+    YOUTUBE_API_KEY: v.optional(v.string()),
     // Treg token (treg.to) for spoken transcripts of recipe videos
     // (convex/model/videoTranscript.ts). Used only while
     // VIDEO_TRANSCRIPTS_ENABLED is "true"; set that to anything else to stop

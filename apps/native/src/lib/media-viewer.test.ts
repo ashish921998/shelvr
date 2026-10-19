@@ -45,6 +45,19 @@ describe("isMediaSave", () => {
     ).toBe(false);
     expect(isMediaSave({ type: "note" })).toBe(false);
   });
+
+  it("keeps a post with a recipe on the page layout", () => {
+    const reel = {
+      type: "link" as const,
+      url: "https://www.instagram.com/reel/abc/",
+      heroImageUrl: "https://x/poster.jpg",
+    };
+    expect(isMediaSave({ ...reel, hasRecipe: true })).toBe(false);
+    expect(
+      isMediaSave({ ...reel, recipe: { ingredients: [], steps: [] } }),
+    ).toBe(false);
+    expect(isMediaSave(reel)).toBe(true);
+  });
 });
 
 describe("fitMedia", () => {

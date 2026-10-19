@@ -1,0 +1,239 @@
+import { analytics } from "@/lib/analytics";
+import { formattingLocale } from "@/lib/i18n";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { isAiConsentRequired } from "@convex/model/aiConsent";
+import type { TripPace, TripSlot } from "@convex/model/trip";
+import type { FunctionReturnType } from "convex/server";
+import { useAction } from "convex/react";
+import { useCallback, useState } from "react";
+import { Platform } from "react-native";
+
+export type { TripPace, TripSlot };
+export { MAX_TRIP_DAYS, MIN_TRIP_DAYS } from "@convex/model/trip";
+
+export type Trip = NonNullable<
+  FunctionReturnType<typeof api.tripData.getSpaceTrip>
+>;
+export type TripDayView = Trip["days"][number];
+export type TripStopView = TripDayView["stops"][number];
+
+// Avoid offering trips for a reading list that merely mentions a place.
+const TRIP_MIN_CITY_SAVES = 3;
+
+/** A travel space: at least three ready saves name a city. */
+export function canPlanTrip(
+  items: { status: string; cities?: string[] }[],
+): boolean {
+  return (
+    items.filter(
+      (item) => item.status === "ready" && (item.cities ?? []).length > 0,
+    ).length >= TRIP_MIN_CITY_SAVES
+  );
+}
+
+/** "YYYY-MM-DD" for a picked calendar day, in the user's own time zone. */
+export function toDateKey(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The calendar day `offset` days after a "YYYY-MM-DD" start, as a local
+ * date, or null without a start. */
+export function tripDayDate(
+  startDate: string | undefined,
+  offset: number,
+): Date | null {
+  if (startDate === undefined) return null;
+  const [year, month, day] = startDate.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day + offset);
+}
+
+/** "Fri, Nov 7" in the user's formatting locale. */
+export function formatTripDay(date: Date): string {
+  return date.toLocaleDateString(formattingLocale(), {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export type LatLng = { latitude: number; longitude: number };
+
+/** Stops Apple Maps placed, with their index in the day. */
+export function locatedStops(
+  stops: TripStopView[],
+): { stop: TripStopView; index: number; coordinates: LatLng }[] {
+  return stops.flatMap((stop, index) =>
+    stop.lat !== undefined && stop.lng !== undefined
+      ? [
+          {
+            stop,
+            index,
+            coordinates: { latitude: stop.lat, longitude: stop.lng },
+          },
+        ]
+      : [],
+  );
+}
+
+/** Share of the screen the day list covers over the map. */
+export const TRIP_PANEL_SHARE = 0.52;
+
+/** The map's size, what covers it (the header above, the panel below), and
+ * how the map draws a camera: `worldWidth` is the points 360° of longitude
+ * span at zoom 0, `centerY` where the camera's center lands on screen. */
+type MapView = {
+  width: number;
+  height: number;
+  top: number;
+  bottom: number;
+  worldWidth: number;
+  centerY: number;
+};
+
+// Room kept between the outer pins and the edges of the visible map.
+const FIT_FILL = 0.8;
+// Closest a day zooms in, so one stop still shows its streets.
+const MIN_SPAN = 0.004;
+
+/**
+ * A camera that frames every point in the part of the map left visible
+ * between the header and the panel, or undefined for none.
+ */
+export function fitCamera(
+  points: LatLng[],
+  view: MapView,
+): { coordinates: LatLng; zoom: number } | undefined {
+  if (points.length === 0) return undefined;
+  const lats = points.map((p) => p.latitude);
+  const lngs = points.map((p) => p.longitude);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const midLat = (minLat + maxLat) / 2;
+  // On the map a degree of latitude is 1 / cos(latitude) times taller than a
+  // degree of longitude is wide.
+  const cos = Math.cos((midLat * Math.PI) / 180);
+  const visible = Math.max(view.height - view.top - view.bottom, 1);
+  const byWidth = Math.log2(
+    (360 * FIT_FILL * view.width) /
+      (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
+  );
+  const byHeight = Math.log2(
+    (360 * FIT_FILL * visible * cos) /
+      (view.worldWidth * Math.max(maxLat - minLat, MIN_SPAN)),
+  );
+  const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
+  const latPerPoint = (360 * cos) / (view.worldWidth * 2 ** zoom);
+  const visibleMiddle = view.top + visible / 2;
+  return {
+    // Moved so the points sit in the middle of the visible part, not where
+    // the map puts the camera's center.
+    coordinates: {
+      latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
+      longitude: (minLng + maxLng) / 2,
+    },
+    zoom,
+  };
+}
+
+/** A stop picked on one day, by its save and name. */
+export type StopPick = { day: number; itemId: Id<"items">; name: string };
+
+/** The picked stop and where it now sits in its day, or null once it is
+ * gone. Found by save and name, so a swap that reorders the day keeps it. */
+export function pickedStop(
+  days: Pick<TripDayView, "stops">[] | undefined,
+  pick: StopPick | null,
+): { ref: { day: number; stop: number }; view: TripStopView } | null {
+  if (pick === null) return null;
+  const stops = days?.[pick.day]?.stops ?? [];
+  const stop = stops.findIndex(
+    (s) => s.itemId === pick.itemId && s.name === pick.name,
+  );
+  return stop === -1
+    ? null
+    : { ref: { day: pick.day, stop }, view: stops[stop] };
+}
+
+/** Walking directions to a stop in the platform's maps app. */
+export function directionsUrl(
+  stop: Pick<TripStopView, "name" | "area" | "lat" | "lng">,
+  city: string | undefined,
+): string {
+  const label = [stop.name, stop.area, city].filter(Boolean).join(", ");
+  const destination =
+    stop.lat !== undefined && stop.lng !== undefined
+      ? `${stop.lat},${stop.lng}`
+      : label;
+  if (Platform.OS === "ios") {
+    return `https://maps.apple.com/?daddr=${encodeURIComponent(destination)}&q=${encodeURIComponent(stop.name)}&dirflg=w`;
+  }
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`;
+}
+
+export type TripRequest = {
+  days: number;
+  pace: TripPace;
+  startDate?: string;
+  city?: string;
+};
+
+type BuildState =
+  | { status: "idle" }
+  | { status: "building" }
+  // Made and stored; the screen keeps building until `getSpaceTrip` shows a
+  // trip other than `previous`, the one the space had when the build began.
+  | { status: "arriving"; previous: Id<"trips"> | null }
+  | { status: "empty"; considered: number }
+  | { status: "ai_off" }
+  | { status: "error" };
+
+/**
+ * Wait for the subscription after a successful build. Any newer trip counts:
+ * a concurrent rebuild can replace this action's result before it arrives.
+ * An empty result leaves the previous trip intact.
+ */
+export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
+  const makeTrip = useAction(api.trips.makeTrip);
+  const [state, setState] = useState<BuildState>({ status: "idle" });
+
+  const build = useCallback(
+    async (
+      request: TripRequest,
+      previous: Id<"trips"> | null,
+    ): Promise<boolean> => {
+      setState({ status: "building" });
+      try {
+        const result = await makeTrip({ spaceId, locale, ...request });
+        analytics.capture("trip_made", {
+          considered: result.considered,
+          days: request.days,
+          pace: request.pace,
+          made: result.tripId !== null,
+        });
+        if (result.tripId === null) {
+          setState({ status: "empty", considered: result.considered });
+          return false;
+        }
+        setState({ status: "arriving", previous });
+        return true;
+      } catch (error) {
+        const aiOff = isAiConsentRequired(error);
+        analytics.capture("trip_failed", {
+          reason: aiOff ? "ai_consent" : "error",
+        });
+        if (!aiOff) analytics.captureError("make_trip_failed", error);
+        setState({ status: aiOff ? "ai_off" : "error" });
+        return false;
+      }
+    },
+    [makeTrip, spaceId, locale],
+  );
+
+  const reset = useCallback(() => setState({ status: "idle" }), []);
+  return { state, build, reset };
+}

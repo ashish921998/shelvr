@@ -373,12 +373,6 @@ export function ThreadCanvas({
     ),
   );
 
-  const toneColors = {
-    ink: palette.ink,
-    accent: palette.accent,
-    cool: palette.cool,
-  };
-
   return (
     <Canvas style={{ width, height }} pointerEvents="none">
       <Group transform={rootTransform}>
@@ -422,7 +416,7 @@ export function ThreadCanvas({
               key={`mark-${index}`}
               mark={mark}
               paths={glyphPaths[index]}
-              color={toneColors[mark.tone]}
+              color={palette[mark.tone]}
               clock={clock}
             />
           ))}
