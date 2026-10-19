@@ -128,10 +128,12 @@ export function SharePracticeStep({
   // when no sheet is pending. A sheet iOS refuses to show never answers, so
   // nothing here may wait on it: the post and "later" stay tappable.
   const pendingSince = useRef<number | null>(null);
+  // The sheet answered and its result is on its way (the dismiss wait).
+  const settling = useRef(false);
   const attempt = useRef(0);
 
   const share = async () => {
-    if (sample === undefined) return;
+    if (sample === undefined || settling.current) return;
     if (pendingSince.current !== null) {
       if (Date.now() - pendingSince.current < SHEET_STUCK_MS) return;
       report("sheet_stuck");
@@ -140,10 +142,21 @@ export function SharePracticeStep({
     pendingSince.current = Date.now();
     setWrongApp(false);
     setSheetOpen(true);
-    const result = await presentShareSheet(sample.url, hasIncomingShare);
+    const result = await presentShareSheet(
+      sample.url,
+      hasIncomingShare,
+      // The sheet answered, so it was up: a tap during the dismiss wait
+      // after it is not a stuck sheet.
+      () => {
+        if (current !== attempt.current) return;
+        pendingSince.current = null;
+        settling.current = true;
+      },
+    );
     // A newer tap took over from a sheet that never came up.
     if (current !== attempt.current) return;
     pendingSince.current = null;
+    settling.current = false;
     setSheetOpen(false);
     if (result === "shelvr") {
       markReceived();

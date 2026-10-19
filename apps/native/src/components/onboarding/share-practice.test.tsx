@@ -159,6 +159,38 @@ describe("share practice", () => {
     now.mockRestore();
   });
 
+  it("does not count a tap after a sheet that was up as a stuck one", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    let settle!: () => void;
+    let finish!: (result: string) => void;
+    mock.present.mockImplementationOnce(
+      (_url: string, _arrived: () => boolean, onSettled: () => void) =>
+        new Promise((resolve) => {
+          settle = onSettled;
+          finish = resolve;
+        }),
+    );
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("share-sample"));
+    // The sheet was up for a while, closed, and its result is on its way.
+    now.mockReturnValue(9_000);
+    settle();
+    fireEvent.click(screen.getByText("share-sample"));
+    expect(mock.present).toHaveBeenCalledTimes(1);
+    await act(async () => finish("shelvr"));
+    expect(received()).toHaveLength(1);
+    expect(mock.capture).not.toHaveBeenCalledWith("onboarding_share_practice", {
+      outcome: "sheet_stuck",
+    });
+    now.mockRestore();
+  });
+
   it("lets the person leave while a sheet is unanswered", () => {
     mock.present.mockReturnValue(new Promise(() => undefined));
     const onFinish = vi.fn();
