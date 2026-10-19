@@ -21,6 +21,7 @@ import {
 import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import {
+  EXIT_OFFERING_ID,
   EXIT_OFFER_WINDOW_MS,
   exitOfferDue,
   exitOfferEndsAt,
@@ -51,7 +52,7 @@ import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
-import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 
 /**
  * Shelvr Pro entitlement.
@@ -430,6 +431,22 @@ function readShownAt(userId: string): number | null {
   }
 }
 
+/**
+ * The exit offering for an e2e run that asked for the offer, taken as it is.
+ * With RevenueCat's Test Store the offering loads but the intro price checks
+ * in `findExitOffering` have not passed on CI, and what the run checks is
+ * the sheet, not who qualifies for it.
+ */
+async function findForcedExitOffering(
+  rc: NonNullable<ReturnType<typeof getPurchases>>,
+) {
+  try {
+    return (await rc.getOfferings()).all[EXIT_OFFERING_ID] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
   return {
     getOfferings: () => rc.getOfferings(),
@@ -452,9 +469,10 @@ async function presentExitOffer(
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   if (!userId || !rc) return null;
-  // The paywall e2e flow closes the paywall and expects Home, on a simulator
-  // whose offer may or may not be due.
-  if (isProHiddenForE2E()) return null;
+  // The paywall e2e flows close the paywall and expect Home, on a simulator
+  // whose offer may or may not be due, unless the run asked for the offer.
+  const forced = isExitOfferForcedForE2E();
+  if (isProHiddenForE2E() && !forced) return null;
   const key = exitOfferShownKey(userId);
   const now = Date.now();
   let lastShownAt: number | null;
@@ -463,8 +481,11 @@ async function presentExitOffer(
   } catch {
     return null;
   }
-  if (!exitOfferDue(sourcePlacement, lastShownAt, now)) return null;
-  const offering = await findExitOffering(exitOfferDeps(rc));
+  if (!exitOfferDue(sourcePlacement, forced ? null : lastShownAt, now))
+    return null;
+  const offering = forced
+    ? await findForcedExitOffering(rc)
+    : await findExitOffering(exitOfferDeps(rc));
   if (!offering) return null;
   try {
     // Claim before presenting, so a crash mid-sheet can't repeat it.

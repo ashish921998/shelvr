@@ -25,6 +25,7 @@ const mock = vi.hoisted(() => ({
   isEntitled: vi.fn(() => false),
   store: new Map<string, string>(),
   hidePro: false,
+  forceExitOffer: false,
   apiKey: {
     REVENUECAT_API_KEY: "appl_test" as string | undefined,
     REVENUECAT_DISABLED_BY_BUILD: false,
@@ -78,6 +79,7 @@ vi.mock("./exit-offer-sheet", () => ({
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("@/lib/e2e-hide-pro", () => ({
   isProHiddenForE2E: () => mock.hidePro,
+  isExitOfferForcedForE2E: () => mock.hidePro && mock.forceExitOffer,
 }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
@@ -144,6 +146,7 @@ async function loadReady() {
 
 beforeEach(() => {
   mock.hidePro = false;
+  mock.forceExitOffer = false;
   mock.presentPaywall.mockReset();
   mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
@@ -432,6 +435,34 @@ describe("exit offer after a paywall close", () => {
 
     expect(mock.presentExitSheet).not.toHaveBeenCalled();
     expect(mock.store.has("shelvr.exitOffer.shownAt.user_1")).toBe(false);
+  });
+
+  it("shows the exit offer again in an e2e run that asks for it", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+    await openPaywall(router, "home_card");
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+
+    // Shown a moment ago, so a plain run would wait a month.
+    mock.hidePro = true;
+    mock.forceExitOffer = true;
+    await openPaywall(router, "home_card");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes the exit offering as it is in an e2e run that asks for it", async () => {
+    const { openPaywall } = await loadReady();
+    mock.hidePro = true;
+    mock.forceExitOffer = true;
+    mock.checkEligibility.mockResolvedValue({ annual_exit: { status: 0 } });
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
+
+    await openPaywall(router, "home_card");
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
   });
 
   it("waits a month before offering it again", async () => {

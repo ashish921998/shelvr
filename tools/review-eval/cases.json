@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "pr42",
+      "kind": "bug",
+      "pr": 42,
+      "commit": "7dda0c717a5605583307d786d755cdc6f4f046f6",
+      "area": "convex contract",
+      "fixedBy": [46, 51],
+      "fixCommits": [
+        "e64a0f305b8e068470fa9e1f97889c156f913255",
+        "3a4942a550e91aa345d3874bbe06d9967f3e667d"
+      ],
+      "bugs": [
+        {
+          "id": "pr42a",
+          "visible": "diff",
+          "text": "listItems becomes paginated in place, changing a public Convex function's args and return shape, so installed builds break against the new backend (and the new bundle against the old one). Needs expand/contract."
+        },
+        {
+          "id": "pr42b",
+          "visible": "diff",
+          "text": "searchItems stops returning article bodies in place, another public return-shape change installed builds depend on."
+        }
+      ]
+    },
+    {
+      "id": "pr68",
+      "kind": "bug",
+      "pr": 68,
+      "commit": "2e7023821f6d8898ef94d03e97a0ac008c6d313d",
+      "area": "convex ai",
+      "fixedBy": [70],
+      "fixCommits": ["fafcc8550af549e7b4139d0f5ba427ad06b6f4ce"],
+      "bugs": [
+        {
+          "id": "pr68",
+          "visible": "diff",
+          "text": "The quiet re-classify after a note edit writes the model's new title over the note's existing title, so a note is renamed after every burst of typing: an AI pass overwriting user content."
+        }
+      ]
+    },
+    {
+      "id": "pr139",
+      "kind": "bug",
+      "pr": 139,
+      "commit": "c912469af52699354f2f9e4e65807e9cd4822bf7",
+      "area": "native billing",
+      "fixedBy": [187],
+      "fixCommits": ["2ba70407fea43f038c7a0dac70c1ab24bb102610"],
+      "bugs": [
+        {
+          "id": "pr139",
+          "visible": "product",
+          "text": "The refund-data consent is a blocking screen after onboarding, so every new iOS account sees an 'Updated terms' wall right after the paywall, for an optional opt-in whose decline equals the default."
+        }
+      ]
+    },
+    {
+      "id": "pr162",
+      "kind": "bug",
+      "pr": 162,
+      "commit": "a1b8fb8e34fa0b6b1474d3810c1b820d5ed92a08",
+      "area": "convex search",
+      "fixedBy": [176],
+      "fixCommits": ["bf0c0025a071ce6f1b936e547004ee587de5f9fe"],
+      "bugs": [
+        {
+          "id": "pr162a",
+          "visible": "diff",
+          "text": "similarItems' full-text fallback drops words under 4 characters, so older saves sharing only a short tag (art, diy, ux) are never found."
+        },
+        {
+          "id": "pr162b",
+          "visible": "diff",
+          "text": "The recall card says 'N earlier saves' for every match while showing at most 3."
+        }
+      ]
+    },
+    {
+      "id": "pr194",
+      "kind": "bug",
+      "pr": 194,
+      "commit": "a014b80619a454b2d2d3ff5ec39a57df3a7c7af5",
+      "area": "native paywall",
+      "fixedBy": [198],
+      "fixCommits": ["808cd4d6dcff40957928e30c4dcf622f9d0b13ae"],
+      "bugs": [
+        {
+          "id": "pr194",
+          "visible": "runtime",
+          "text": "The exit offer sheet hosts RevenueCat's paywall full-screen with no close of its own; when the design fails to render, RevenueCat's fallback has no close either, so the user is stuck until they buy or the offer ends."
+        }
+      ]
+    },
+    {
+      "id": "pr82",
+      "kind": "bug",
+      "pr": 82,
+      "commit": "387d46fe22a31ce4b9fd04d6509393bb52d58692",
+      "area": "convex page read",
+      "fixedBy": [118],
+      "fixCommits": ["a9a7e50ec5e598ab2cf7765db2df9392ba4187c8"],
+      "bugs": [
+        {
+          "id": "pr82",
+          "visible": "diff",
+          "text": "A page over the 1 MiB fetch cap arrives truncated, but the truncation is not surfaced, so recipe extraction can read a full ingredient list plus a method cut short and save it as a complete recipe that replaces the article."
+        }
+      ]
+    },
+    {
+      "id": "pr195",
+      "kind": "bug",
+      "pr": 195,
+      "commit": "2bc603a47bbeec40de48f37b7a0800998b84abf4",
+      "area": "convex page read",
+      "fixedBy": [234],
+      "fixCommits": ["f8233a19dd2173fd96501821bd167e6058ce8b0d"],
+      "bugs": [
+        {
+          "id": "pr195a",
+          "visible": "runtime",
+          "text": "pin.it resolution reads the landing page with a 64 KiB cap and stalls draining the rest until the 15 s deadline, so every pin.it link times out."
+        },
+        {
+          "id": "pr195b",
+          "visible": "runtime",
+          "text": "A deleted pin redirects to Pinterest home with 200 and saves as a blank 'Pinterest' item."
+        }
+      ]
+    },
+    {
+      "id": "pr91",
+      "kind": "bug",
+      "pr": 91,
+      "commit": "5948d4edc58519972249c22356eeff7796de60d7",
+      "area": "native widget",
+      "fixedBy": [146],
+      "fixCommits": ["fcf165317f0d359f5d28eb306f3f908b4c1a207a"],
+      "bugs": [
+        {
+          "id": "pr91",
+          "visible": "diff",
+          "text": "The widget sync guards its query with TanStack's `enabled`, which the Convex adapter ignores; with a 24 h gcTime the subscription outlives unmount and sign-out and keeps being re-evaluated with no identity."
+        }
+      ]
+    },
+    {
+      "id": "pr21",
+      "kind": "bug",
+      "pr": 21,
+      "commit": "a00ce3830bd16015536d4fd50c10c72eef006291",
+      "area": "convex notifications",
+      "fixedBy": [38],
+      "fixCommits": ["0792d8959f3a3e1f7169586cf5e2de812caa28fa"],
+      "bugs": [
+        {
+          "id": "pr21a",
+          "visible": "diff",
+          "text": "registerDevice re-binds an enabled push token row owned by another account, so pushes go to the wrong user."
+        },
+        {
+          "id": "pr21b",
+          "visible": "diff",
+          "text": "Client time zones are not validated, so one bad row makes digest preparation throw."
+        },
+        {
+          "id": "pr21c",
+          "visible": "diff",
+          "text": "Due digests are not paginated."
+        }
+      ]
+    },
+    {
+      "id": "pr175",
+      "kind": "bug",
+      "pr": 175,
+      "commit": "495b58030f7af87aee973fd89996bff9aa0e2dff",
+      "area": "native share",
+      "fixedBy": [183],
+      "fixCommits": ["3e964853d4d1495ab21c830dc156e896912f0e26"],
+      "bugs": [
+        {
+          "id": "pr175",
+          "visible": "runtime",
+          "text": "After Android process death the restored task replays the last share intent on cold start, and the share screen asks 'Save it again?' every launch for a batch that was already saved."
+        }
+      ]
+    },
+    {
+      "id": "pr279",
+      "kind": "bug",
+      "pr": 279,
+      "commit": "486fe27fdb7f1033554a6b396377c0705a3c0f6f",
+      "area": "native onboarding",
+      "fixedBy": [290],
+      "fixCommits": ["96b8a70ae16a7b9d912fd50f69fad151ae35170b"],
+      "bugs": [
+        {
+          "id": "pr279a",
+          "visible": "diff",
+          "text": "A paywall that never shows at the end of onboarding (RevenueCat not ready, offline) is counted as a decline: the practice share is dropped and starter spaces wait."
+        },
+        {
+          "id": "pr279b",
+          "visible": "runtime",
+          "text": "A relaunch on the reminder step skips the reminder."
+        }
+      ]
+    },
+    {
+      "id": "pr87",
+      "kind": "bug",
+      "pr": 87,
+      "commit": "6c14d39f7c93c3b3d512516948cc1bef7a2d7338",
+      "area": "native onboarding",
+      "fixedBy": [105],
+      "fixCommits": ["25c6f878dace9e3eb6a67a1e2738003ddfe5bdb7"],
+      "bugs": [
+        {
+          "id": "pr87",
+          "visible": "diff",
+          "text": "The onboarding demo saves through the real share sheet but never records the first-share flag, so demo completers land on Home and are shown how to share seconds after doing it."
+        }
+      ]
+    },
+    {
+      "id": "pr281",
+      "kind": "clean",
+      "pr": 281,
+      "commit": "8747002031916ce9a574ed1519f7ed0e65f83782",
+      "area": "convex page read",
+      "note": "YouTube titles via oEmbed; no later fix traced to it."
+    },
+    {
+      "id": "pr246",
+      "kind": "clean",
+      "pr": 246,
+      "commit": "a3eb7d52df3f8d2412eb78fca8578ce8287f4e0d",
+      "area": "convex http",
+      "note": "Apple Get Retention Message endpoint; no later fix traced to it."
+    },
+    {
+      "id": "pr231",
+      "kind": "clean",
+      "pr": 231,
+      "commit": "cd1061af6e0d1898e83f976ec0ebd425ec6595c1",
+      "area": "native paywall",
+      "note": "Shared sheet request store for exit offer and trial primer; no later fix traced to it."
+    },
+    {
+      "id": "pr258",
+      "kind": "clean",
+      "pr": 258,
+      "commit": "1579da92a6b05784b3ae50aff40af632e9ea5703",
+      "area": "native paywall",
+      "note": "Trial timeline dates passed to the paywall; no later fix traced to it."
+    },
+    {
+      "id": "pr262",
+      "kind": "clean",
+      "pr": 262,
+      "commit": "8c806409e6123ea8d400b6367d391bb4da57e9c4",
+      "area": "native notifications",
+      "note": "Weekly shelf opt-in preview copy matched to what is sent; no later fix traced to it."
+    },
+    {
+      "id": "pr135",
+      "kind": "clean",
+      "pr": 135,
+      "commit": "2f362ca42e19281ae2dc63b9089d022c2b8a8450",
+      "area": "convex feedback",
+      "note": "In-app feedback through Convex and the support inbox; only a dead-code cleanup touched its lines later."
+    },
+    {
+      "id": "pr203",
+      "kind": "clean",
+      "pr": 203,
+      "commit": "d0963c4bf5f4c06c575b25c8730a664aac19e965",
+      "area": "native analytics",
+      "note": "Funnel telemetry for saves, paywall and notifications; later changes to its lines were features, not fixes."
+    }
+  ]
+}

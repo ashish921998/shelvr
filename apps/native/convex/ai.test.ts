@@ -139,6 +139,12 @@ describe("firstLinkedUrl", () => {
         "saved from https://in.pinterest.com/pin/1/ and https://pin.it/abc",
       ),
     ).toBe(undefined);
+    expect(
+      firstLinkedUrl(
+        "https://m.youtube.com/watch?v=1 https://vm.tiktok.com/a https://l.instagram.com/?u=x https://cook.example/dal",
+      ),
+    ).toBe("https://cook.example/dal");
+    expect(firstLinkedUrl("https://box.com/dal")).toBe("https://box.com/dal");
     expect(firstLinkedUrl("no links here")).toBeUndefined();
     expect(firstLinkedUrl(undefined)).toBeUndefined();
   });
@@ -564,6 +570,7 @@ describe("processItem for X posts", () => {
           tags: ["food"],
           spaceNames: [],
           intents: [],
+          cities: [],
           recipe: {
             name: "Pancakes",
             servings: "4 servings",
@@ -612,6 +619,25 @@ describe("processItem for X posts", () => {
       ["photo", "https://pbs.twimg.com/media/FRu0eY2UUAE54PD.jpg?name=large"],
       ["photo", "https://pbs.twimg.com/media/FRu0eY9VcAEZluY.jpg?name=large"],
     ]);
+  });
+
+  it("stores the cities the classifier read, cleaned, on the save", async () => {
+    serveX({ status: 200, body: photosSyndication }, { status: 500 });
+    generateObject.mockResolvedValue({
+      object: {
+        title: "Date spots",
+        description: "Bars worth a night out.",
+        tags: ["bars"],
+        spaceNames: [],
+        intents: [],
+        cities: [" Mumbai. ", "mumbai", "Unknown", "Goa"],
+      },
+    });
+    const { item, card } = await saveLink(
+      "https://x.com/maruyo_/status/1521844593804906496",
+    );
+    expect(item?.cities).toEqual(["Mumbai", "Goa"]);
+    expect(card?.cities).toEqual(["Mumbai", "Goa"]);
   });
 
   it("still saves a TikTok from oEmbed with its poster copied to storage", async () => {
@@ -901,6 +927,14 @@ describe("parseInstagramEmbed", () => {
       brokenMedia: true,
     });
     expect(parseInstagramEmbed(REEL_EMBED).brokenMedia).toBeUndefined();
+  });
+
+  it("keeps escaped markup as text and leaves no tag behind", () => {
+    const embed =
+      '<div class="Caption">Salt &amp;lt;3 and <b>pepper</b> <script<div class="CaptionComments">';
+    expect(parseInstagramEmbed(embed).caption).toBe(
+      "Salt &lt;3 and pepper script",
+    );
   });
 
   it("returns nothing from a page without an embed", () => {
@@ -1584,12 +1618,13 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
-  it("marks an Instagram reel short-form and asks for a recipe from its caption", async () => {
+  it("marks an Instagram reel short-form and allows its full caption recipe path", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({
       status: "ok",
       askForRecipe: true,
+      page: { caption: true },
       shortForm: { site: "Instagram", video: true },
     });
     expect(read.status === "ok" && read.page.content).toContain(

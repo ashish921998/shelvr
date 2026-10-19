@@ -10,16 +10,9 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
-import { aiConsentRequiredError } from "./model/aiConsent";
-import {
-  MAX_BEEN_PLACES,
-  MAX_PLAN_ITEMS,
-  PLAN_CONTENT_CHARS,
-  planSourceValidator,
-  type PlanSource,
-} from "./model/plan";
+import { planSourceValidator } from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
-import { validateSpaceName } from "./model/spaceName";
+import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -36,6 +29,13 @@ import {
   type MembershipSummary,
 } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import {
+  beenPlaces,
+  claimSpaceForModel,
+  deleteTripsForSpace,
+  loadReadySaves,
+  toPlanSource,
+} from "./tripData";
 
 const spaceFields = {
   _id: v.id("spaces"),
@@ -303,6 +303,7 @@ export const createSpace = mutation({
       return existing[0]._id;
     }
     validateSpaceName(name);
+    const description = validateSpaceDescription(args.description);
 
     await requireProEntitlement(ctx, userId);
     // The recommendation pass is a paid model call; bound it before writing so
@@ -315,7 +316,7 @@ export const createSpace = mutation({
     const spaceId = await ctx.db.insert("spaces", {
       userId,
       name,
-      description: args.description,
+      description,
       dynamic: args.dynamic ?? false,
       // Auto-file only means anything on a dynamic space.
       ...(args.dynamic === true && args.autoFile === true
@@ -431,6 +432,7 @@ export const deleteSpace = mutation({
     // reader null-checks the space, and the AI never suggests into a space it
     // cannot load.
     await ctx.db.delete(space._id);
+    await deleteTripsForSpace(ctx, space._id);
     const more = await deleteMembershipsForSpace(
       ctx,
       space._id,
@@ -868,58 +870,10 @@ export const claimPlanInternal = internalMutation({
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    // Convex forwards the action caller's identity, so authorization and the
-    // claim are one transaction.
-    const userId = await requireUserId(ctx);
-    const space = await ctx.db.get(args.spaceId);
-    if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
-    }
-    await requireProEntitlement(ctx, userId);
-    if (!(await aiAllowed(ctx, userId))) {
-      throw aiConsentRequiredError();
-    }
-    // Saved rows plus legacy rows (no status reads as saved), each newest
-    // filed first and bounded, then merged.
-    const [saved, legacy] = await Promise.all(
-      (["saved", undefined] as const).map((status) =>
-        ctx.db
-          .query("spaceItems")
-          .withIndex("by_space_and_status", (q) =>
-            q.eq("spaceId", args.spaceId).eq("status", status),
-          )
-          .order("desc")
-          .take(MAX_PLAN_ITEMS),
-      ),
+    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
+    const sources = (await loadReadySaves(ctx, args.spaceId, userId)).map(
+      ({ item, join }) => toPlanSource(item, join),
     );
-    const joins = [...saved, ...legacy]
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .slice(0, MAX_PLAN_ITEMS);
-    const sources: PlanSource[] = [];
-    for (const join of joins) {
-      const item = await ctx.db.get(join.itemId);
-      if (item === null || item.userId !== userId) continue;
-      if (item.status !== "ready") continue;
-      sources.push({
-        itemId: item._id,
-        title: item.title,
-        description: item.description,
-        // A note's words live in `note`; a link can carry the user's note
-        // too, and either may be what names the place.
-        content:
-          [item.note, item.content]
-            .filter(Boolean)
-            .join("\n")
-            .slice(0, PLAN_CONTENT_CHARS) || undefined,
-        url: item.url,
-        siteName: item.siteName,
-        author: item.author,
-        // The save's own Maps actions plus any steered for this space.
-        places: [...(item.intents ?? []), ...(join.intents ?? [])]
-          .filter((intent) => intent.kind === "open_maps")
-          .map((intent) => intent.value),
-      });
-    }
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };
     }
@@ -927,33 +881,11 @@ export const claimPlanInternal = internalMutation({
       key: userId,
       throws: true,
     });
-    const visits = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(MAX_BEEN_PLACES);
     return {
       spaceName: space.name,
       sources,
-      been: visits.map((visit) => visit.name),
+      been: await beenPlaces(ctx, userId),
     };
-  },
-});
-
-/**
- * Item ids that already have any membership row for a space. The
- * recommendation pass excludes them up front so the model's picks aren't
- * wasted on items the user already filed or dismissed.
- */
-export const listMemberItemIdsInternal = internalQuery({
-  args: { spaceId: v.id("spaces") },
-  returns: v.array(v.id("items")),
-  handler: async (ctx, args) => {
-    const joins = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
-      .collect();
-    return joins.map((join) => join.itemId);
   },
 });
 

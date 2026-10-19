@@ -1,7 +1,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { clientIp } from "@/lib/convexForward";
+import {
+  clientIp,
+  WAITLIST_CLIENT_IP_HEADER,
+  WAITLIST_SECRET_HEADER,
+} from "@/lib/convexForward";
 import type { Metadata } from "next";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 
@@ -35,8 +39,8 @@ export default async function ConfirmationPage({
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-waitlist-secret": secret,
-          ...(ip ? { "x-shelvr-client-ip": ip } : {}),
+          [WAITLIST_SECRET_HEADER]: secret,
+          ...(ip ? { [WAITLIST_CLIENT_IP_HEADER]: ip } : {}),
         },
         body: JSON.stringify({ token }),
         signal: AbortSignal.timeout(20_000),

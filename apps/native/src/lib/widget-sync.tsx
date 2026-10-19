@@ -269,7 +269,7 @@ async function syncWidget(
         });
       }
       return {
-        id: item._id as string,
+        id: item._id,
         title: widgetTitle(item),
         subtitle: widgetSubtitle(item),
         kind: item.type,

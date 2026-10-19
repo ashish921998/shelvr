@@ -192,6 +192,7 @@ export function ExitOfferSheetHost() {
           onPress={() => finish("CANCELLED", true)}
           accessibilityRole="button"
           accessibilityLabel={t("common.close")}
+          testID="exit-offer-close"
           hitSlop={12}
           style={[styles.close, { top: insets.top + 8 }]}
         >

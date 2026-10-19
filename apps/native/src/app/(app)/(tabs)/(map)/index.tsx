@@ -94,14 +94,14 @@ export default function MapScreen() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
   // Only photos with coordinates, already filtered server-side, so the map
   // never subscribes to the feed.
-  const { data: items } = useQuery({
-    ...convexQuery(
+  const { data: items } = useQuery(
+    convexQuery(
       api.items.listLocatedItems,
       // 'skip', not `enabled`: a disabled React Query still subscribes
       // through the Convex adapter (see the pager).
       !entitlementLoading && entitled ? {} : "skip",
     ),
-  });
+  );
 
   const located = useMemo<Located[]>(
     () =>

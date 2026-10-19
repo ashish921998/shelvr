@@ -17,6 +17,7 @@ import {
   type JSONWebKeySet,
   type JWTPayload,
 } from "jose";
+import { sha256Hex } from "./captureTokens";
 
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys";
@@ -47,16 +48,6 @@ const fetchAppleKeys: AppleKeySource = async () => {
   if (!response.ok) throw new AppleIdTokenError("keys_unavailable");
   return (await response.json()) as JSONWebKeySet;
 };
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-}
 
 function failureOf(error: unknown): AppleIdTokenFailure {
   if (error instanceof errors.JWTExpired) return "expired";
