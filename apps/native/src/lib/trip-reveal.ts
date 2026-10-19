@@ -116,8 +116,10 @@ export function revealLayout(
   const sx = width / FRAME.width;
   const sy = height / FRAME.height;
   const cardWidth = (width - 24) / 2;
-  const cardHeight = cardWidth * 1.15;
   const gridTop = 228 * sy;
+  // Three rows fit below the grid once the cards have lifted 36pt, so a
+  // short screen never crops the last row.
+  const cardHeight = Math.min(cardWidth * 1.15, (height - gridTop + 36) / 3);
   const used = CARDS.slice(0, covers);
   const cards = used.map((card, index) => {
     const left = 12 + (index % 2) * cardWidth;
