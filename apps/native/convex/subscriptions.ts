@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { query, internalMutation, internalQuery } from "./_generated/server";
+import {
+  action,
+  query,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -9,6 +14,8 @@ import {
   requireUserId,
 } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
+import { rateLimiter } from "./model/rateLimiter";
+import { reconcileRevenueCatCustomers } from "./model/revenuecatReconcile";
 import { saveError } from "./model/saveErrors";
 
 const subscriptionStatusValidator = v.union(
@@ -47,6 +54,41 @@ export const getEntitlement = query({
       return { status: "none" as const };
     }
     return { status: sub.status, expiresAt: sub.expiresAt };
+  },
+});
+
+/** The caller of `syncPurchase`, charged one token of its rate limit. */
+export const claimPurchaseSync = internalMutation({
+  args: {},
+  returns: v.id("users"),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    await rateLimiter.limit(ctx, "purchaseSync", { key: userId, throws: true });
+    return userId;
+  },
+});
+
+/**
+ * Re-reads the caller's RevenueCat customer and records any Pro access it
+ * holds. A purchase made before sign-in belongs to an anonymous RevenueCat id,
+ * so its webhook names no account; signing in aliases it onto this one, and
+ * the client calls this once that `logIn` has finished. It only ever adds
+ * access: a customer with none leaves the row untouched.
+ */
+export const syncPurchase = action({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const userId = await ctx.runMutation(
+      internal.subscriptions.claimPurchaseSync,
+      {},
+    );
+    // Stamped before the read, so a webhook sent after it still applies.
+    const readAt = Date.now();
+    await reconcileRevenueCatCustomers(ctx, [userId], readAt, {
+      grantOnly: true,
+    });
+    return null;
   },
 });
 

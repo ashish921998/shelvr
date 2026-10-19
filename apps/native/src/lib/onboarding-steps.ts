@@ -14,7 +14,9 @@ export const ONBOARDING_STEPS = [
 // dropped the reveal step (the paywall opens when the share step is left), made the first save one tap on every platform, previews a ready-made
 // sample before sign-in, and takes a previewed sample from sign-in straight on.
 // 8 added the promise step after the share step; the paywall opens from it.
-export const ONBOARDING_FLOW_VERSION = 8;
+// 9 moved sign-in after the paywall: a signed-out first save waits for the
+// account, and the paywall sells before it exists.
+export const ONBOARDING_FLOW_VERSION = 9;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 

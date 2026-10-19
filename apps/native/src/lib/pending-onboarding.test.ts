@@ -8,6 +8,7 @@ import {
   getPendingDemoUrl,
   getPendingSpaces,
   hasPending,
+  queueDemoUrl,
   setOnboardingProgress,
   setPendingDemo,
   setPendingSpaces,
@@ -130,6 +131,25 @@ describe("onboarding recovery", () => {
     expect(getOnboardingProgress().demo).toBeNull();
     expect(getOnboardingProgress().spaces).toEqual(["Recipes"]);
     expect(hasPending()).toBe(true);
+  });
+});
+
+describe("a first save queued before sign-in", () => {
+  it("waits for the replay and survives finishing onboarding", () => {
+    queueDemoUrl("https://example.com/recipe");
+    expect(hasPending()).toBe(true);
+    setPendingSpaces([]);
+    expect(getPendingDemoUrl()).toBe("https://example.com/recipe");
+    expect(hasPending()).toBe(true);
+  });
+
+  it("keeps the onboarding progress beside it", () => {
+    setOnboardingProgress({ saveKinds: ["recipes"], spaces: ["a"], step: 3 });
+    queueDemoUrl("https://example.com/recipe");
+    expect(getOnboardingProgress()).toMatchObject({
+      saveKinds: ["recipes"],
+      step: 3,
+    });
   });
 });
 

@@ -292,6 +292,9 @@ type AnalyticsEventProperties = {
   // space names. Only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
+  // Signed out, a picked link queued for after sign-in (flow 9 onward).
+  // `sample` as in onboarding_demo_picked.
+  onboarding_demo_deferred: { sample: boolean };
   // A first-save pick, before any sign-in. `sample` is a ready-made link
   // (previewed when signed out); otherwise a pasted, typed or shared one.
   onboarding_demo_picked: { sample: boolean; signed_in: boolean };

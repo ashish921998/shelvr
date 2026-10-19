@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   open: vi.fn<() => Promise<"success" | "cancelled" | "unavailable">>(),
   purchased: vi.fn(),
   declined: vi.fn(),
+  beforeSignIn: vi.fn(),
 }));
 
 vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
@@ -19,6 +20,9 @@ vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => state.entitlement,
   openPaywallKeepingExitOffer: state.open,
+}));
+vi.mock("@/lib/purchase-before-sign-in", () => ({
+  notePurchaseBeforeSignIn: state.beforeSignIn,
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   notePurchasedDuringOnboarding: state.purchased,
@@ -46,11 +50,20 @@ describe("useOnboardingPaywall", () => {
     state.signedIn = true;
   });
 
-  it("lets a signed-out account through without a paywall", async () => {
+  it("sells to a signed-out account and remembers the purchase for sign-in", async () => {
     state.signedIn = false;
+    state.open.mockResolvedValue("success");
     const { onPro } = await ask({ entitled: false, loading: false });
-    expect(onPro).toHaveBeenCalledOnce();
-    expect(state.open).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    expect(state.open).toHaveBeenCalledOnce();
+    expect(state.beforeSignIn).toHaveBeenCalledOnce();
+  });
+
+  it("does not flag a signed-in purchase as made before sign-in", async () => {
+    state.open.mockResolvedValue("success");
+    const { onPro } = await ask({ entitled: false, loading: false });
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    expect(state.beforeSignIn).not.toHaveBeenCalled();
   });
 
   it("sends a Pro account on without a paywall", async () => {

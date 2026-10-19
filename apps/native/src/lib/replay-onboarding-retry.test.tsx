@@ -2,10 +2,16 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  getPendingDemoUrl,
   getPendingSpaces,
   hasPending,
+  queueDemoUrl,
   setPendingSpaces,
 } from "./pending-onboarding";
+import {
+  clearPurchaseBeforeSignIn,
+  notePurchaseBeforeSignIn,
+} from "./purchase-before-sign-in";
 import { useReplayOnboarding } from "./replay-onboarding";
 
 const storage = vi.hoisted(() => new Map<string, string>());
@@ -207,6 +213,37 @@ describe("useReplayOnboarding retries", () => {
       name: "Books",
       dynamic: true,
     });
+    expect(hasPending()).toBe(false);
+  });
+});
+
+describe("a purchase made before sign-in", () => {
+  it("waits for the purchase to reach the account instead of selling again, then saves the queued link", async () => {
+    entitlement.entitled = false;
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe");
+    setPendingSpaces(["Recipes"]);
+    notePurchaseBeforeSignIn();
+
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+    expect(createSpace).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBe("https://example.com/recipe");
+
+    clearPurchaseBeforeSignIn();
+    entitlement.entitled = true;
+    hook.rerender();
+    await settle();
+
+    expect(createSpace).toHaveBeenCalledWith({
+      name: "Recipes",
+      dynamic: true,
+    });
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/recipe" }),
+    );
     expect(hasPending()).toBe(false);
   });
 });

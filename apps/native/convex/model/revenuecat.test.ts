@@ -346,6 +346,33 @@ describe("RevenueCat parsing edge cases", () => {
     });
   });
 
+  it.each([
+    [
+      "the account an anonymous purchase was aliased to",
+      "$RCAnonymousID:abc",
+      ["$RCAnonymousID:abc", "user-1"],
+      "user-1",
+    ],
+    [
+      "an anonymous id with no account yet",
+      "$RCAnonymousID:abc",
+      ["$RCAnonymousID:abc"],
+      "$RCAnonymousID:abc",
+    ],
+    [
+      "an account's own id over its aliases",
+      "user-1",
+      ["$RCAnonymousID:abc", "user-2"],
+      "user-1",
+    ],
+  ])("names %s as the owner", (_case, appUserId, aliases, owner) => {
+    expect(
+      parseRevenueCatEvent({
+        event: { type: "RENEWAL", app_user_id: appUserId, aliases },
+      })?.userId,
+    ).toBe(owner);
+  });
+
   it("only reads transfer participants on TRANSFER events", () => {
     const parsed = parseRevenueCatEvent({
       event: {

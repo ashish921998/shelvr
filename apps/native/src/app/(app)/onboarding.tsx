@@ -20,6 +20,7 @@ import {
 import {
   clearPending,
   getOnboardingProgress,
+  getPendingDemoUrl,
   resolveOnboardingSpaceName,
   setOnboardingProgress,
   setPendingSpaces,
@@ -222,7 +223,7 @@ export default function OnboardingScreen() {
 
   const practiceSample = practiceShareSample(
     kinds,
-    getOnboardingProgress().demo?.url ?? null,
+    getOnboardingProgress().demo?.url ?? getPendingDemoUrl(),
   );
   const paywall = useOnboardingPaywall({
     onPro: finish,

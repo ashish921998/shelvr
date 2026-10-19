@@ -122,11 +122,6 @@ export function practiceShareSample(
   ].find((sample) => sample.url !== savedUrl);
 }
 
-/** A ready-made sample, which the demo can preview before sign-in. */
-export function isDemoSample(url: string): boolean {
-  return findSample(url) !== undefined;
-}
-
 /** The ready-made sample behind a URL, a kind's or a topic's. */
 export function findSample(url: string): DemoSample | undefined {
   return [...DEMO_SAMPLES, ...INTEREST_SAMPLES].find(

@@ -26,7 +26,10 @@ export function parseRevenueCatEvent(
   if (event === undefined) return undefined;
 
   const type = readString(event.type);
-  const userId = readString(event.app_user_id);
+  const userId = eventOwner(
+    readString(event.app_user_id),
+    readStringArray(event.aliases),
+  );
   const expiresAt = readNumber(event.expiration_at_ms);
   const productId = readString(event.product_id);
   const periodType = readString(event.period_type);
@@ -48,6 +51,20 @@ export function parseRevenueCatEvent(
         }
       : {}),
   };
+}
+
+const ANONYMOUS_PREFIX = "$RCAnonymousID:";
+
+/** A purchase made before sign-in is keyed to RevenueCat's anonymous id. Once
+ * the account signs in, `logIn` makes that id an alias of the account's own,
+ * so an event still keyed to the anonymous id belongs to that account. An
+ * anonymous id with no such alias stays as it is, and owns nothing here. */
+function eventOwner(
+  appUserId: string | undefined,
+  aliases: string[] | undefined,
+): string | undefined {
+  if (!appUserId?.startsWith(ANONYMOUS_PREFIX)) return appUserId;
+  return aliases?.find((id) => !id.startsWith(ANONYMOUS_PREFIX)) ?? appUserId;
 }
 
 /** Map RevenueCat lifecycle events to Shelvr's server-side entitlement state.

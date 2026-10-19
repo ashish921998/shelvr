@@ -2,7 +2,7 @@ import { revenueCatLocale, syncRevenueCatUILocale } from "./revenuecat-locale";
 import { api } from "@convex/_generated/api";
 import { isEntitled } from "@convex/model/entitlement";
 import { convexQuery } from "@convex-dev/react-query";
-import { useConvexAuth } from "convex/react";
+import { useAction, useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
@@ -50,9 +50,19 @@ import {
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { AppState } from "react-native";
 import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import {
+  clearPurchaseBeforeSignIn,
+  hasPurchaseBeforeSignIn,
+} from "@/lib/purchase-before-sign-in";
 
 /**
  * Shelvr Pro entitlement.
@@ -106,6 +116,10 @@ export type Entitlement = {
 let _rcTargetUserId: string | null = null;
 let _rcSyncedUserId: string | null = null;
 let _rcIdentitySync = Promise.resolve();
+// Signed out, RevenueCat runs as an anonymous customer. Only the onboarding
+// paywall sells there; signing in aliases that purchase onto the account.
+let _rcAnonymousReady = false;
+const ANONYMOUS_PLACEMENT = "onboarding";
 
 // Maximum time presentPaywall waits for RC identity sync before giving up and
 // letting the caller fall back to the paywall route. Long enough to cover a
@@ -117,6 +131,7 @@ function setRcTargetUserId(userId: string | null) {
   if (_rcTargetUserId === userId) return;
   _rcTargetUserId = userId;
   _rcSyncedUserId = null;
+  _rcAnonymousReady = false;
 }
 
 function markRcUserSynced(userId: string) {
@@ -136,10 +151,13 @@ function isRcSyncReady() {
  * key, logIn failure, RC outage) cannot wedge the UI forever: callers fall
  * back to a safe route. Shared by `presentPaywall` and `presentCustomerCenter`.
  */
-async function awaitRcSyncReady(): Promise<boolean> {
-  if (isRcSyncReady()) return true;
+async function awaitRcSyncReady(anonymous = false): Promise<boolean> {
+  const ready = anonymous
+    ? () => _rcTargetUserId === null && _rcAnonymousReady
+    : isRcSyncReady;
+  if (ready()) return true;
   return Promise.race([
-    _rcIdentitySync.then(() => isRcSyncReady()),
+    _rcIdentitySync.then(ready),
     new Promise<boolean>((r) =>
       setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS),
     ),
@@ -169,7 +187,9 @@ let configured = false;
  * call repeatedly; only configures once. Missing configuration is reported
  * by the identity sync observer and never marks the paywall ready.
  */
-async function configureRevenueCat(appUserID: string): Promise<void> {
+async function configureRevenueCat(
+  appUserID: string | undefined,
+): Promise<void> {
   if (configured) return;
   const rc = getPurchases();
   if (!rc) throw new Error("revenuecat_module_unavailable");
@@ -184,18 +204,24 @@ async function configureRevenueCat(appUserID: string): Promise<void> {
 
 /**
  * Keep RevenueCat's app user id in sync with the Convex Auth user id.
- * RevenueCat's `original_app_user_id` becomes the `userId` the webhook writes,
- * so it must match the `users` document id every other table keys on. Call once
- * after sign-in.
+ * The webhook writes the event's `app_user_id` (the last id RevenueCat saw)
+ * as the `userId`, so it must match the `users` document id every other table
+ * keys on. Call once after sign-in.
  *
  * Identity changes are serialized, and readiness is recorded for the current
  * user id only after `rc.logIn` succeeds. Sign-out or a user change clears it
  * immediately so `presentPaywall` cannot use a previous account's session.
  */
 export function useEntitlementSync(): void {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const sub = isAuthenticated ? (user?._id ?? null) : null;
+  const signedOut = !isAuthenticated && !isLoading;
+  const syncPurchase = useAction(api.subscriptions.syncPurchase);
+  const syncPurchaseRef = useRef(syncPurchase);
+  useEffect(() => {
+    syncPurchaseRef.current = syncPurchase;
+  });
   const entitlement = useEntitlement();
   // The status an `entitlement_activated` event may report: narrowed from
   // `useEntitlement`'s wider union to the entitled statuses.
@@ -213,7 +239,8 @@ export function useEntitlementSync(): void {
       // The funnel memory belongs to the account that earned it, so a
       // sign-out or account change drops it (see `forgetPaywallFunnel`).
       forgetPaywallFunnel();
-      return;
+      if (!signedOut || REVENUECAT_DISABLED_BY_BUILD) return;
+      return startAnonymousRevenueCat();
     }
     // A build that deliberately has no key would only burn the retry budget
     // and report the absence as a sync failure on every foreground. Readiness
@@ -235,7 +262,14 @@ export function useEntitlementSync(): void {
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
       },
-      onReady: () => markRcUserSynced(sub),
+      onReady: () => {
+        markRcUserSynced(sub);
+        if (!hasPurchaseBeforeSignIn()) return;
+        attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})).then(
+          clearPurchaseBeforeSignIn,
+          (error) => analytics.captureError("purchase_sync_failed", error),
+        );
+      },
       onError: reportRevenueCatIdentityError,
     });
     const subscription = AppState.addEventListener("change", (state) => {
@@ -248,11 +282,53 @@ export function useEntitlementSync(): void {
       subscription.remove();
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
-  }, [sub]);
+  }, [sub, signedOut]);
 
   // Purchase/restore -> backend entitlement available: the RevenueCat webhook
   // has written the row and the client's query now shows it.
   useEntitlementActivation(activeStatus);
+}
+
+/**
+ * A purchase made before sign-in belongs to the anonymous customer, and its
+ * webhook named no account. `logIn` merges it into an account with no
+ * anonymous history of its own, but only switches to one that has some, so the
+ * store receipt is synced onto this account either way. The backend then reads
+ * the account back from RevenueCat.
+ */
+async function attachPurchaseBeforeSignIn(syncPurchase: () => Promise<null>) {
+  try {
+    await getPurchases()?.syncPurchasesForResult();
+  } catch (error) {
+    // logIn's merge may already have attached it; the backend read decides.
+    analytics.captureError("revenuecat_purchase_attach_failed", error);
+  }
+  await syncPurchase();
+}
+
+/**
+ * Signed out: run RevenueCat as an anonymous customer so the onboarding
+ * paywall can sell before an account exists. A customer still logged in from
+ * a previous account is logged out first, so nothing lands on that account.
+ * Returns the effect cleanup.
+ */
+function startAnonymousRevenueCat(): () => void {
+  let cancelled = false;
+  const attempt = _rcIdentitySync.then(async () => {
+    if (cancelled || _rcTargetUserId !== null) return;
+    await configureRevenueCat(undefined);
+    const rc = getPurchases();
+    if (!rc) throw new Error("revenuecat_module_unavailable");
+    if (!(await rc.isAnonymous())) await rc.logOut();
+    if (cancelled || _rcTargetUserId !== null) return;
+    _rcAnonymousReady = true;
+  });
+  _rcIdentitySync = attempt.catch((error: unknown) => {
+    analytics.captureError("revenuecat_anonymous_sync_failed", error);
+  });
+  return () => {
+    cancelled = true;
+  };
 }
 
 function reportRevenueCatIdentityError(error: unknown) {
@@ -372,7 +448,11 @@ async function presentPaywallImpl(
     });
   // A purchase before RC identity sync would be attributed to an anonymous RC
   // user, breaking the webhook's userId mapping, so block until it completes.
-  if (!(await awaitRcSyncReady())) {
+  // The one exception is the onboarding paywall signed out: that purchase is
+  // anonymous on purpose, and signing in afterwards aliases it.
+  const anonymous =
+    placement === ANONYMOUS_PLACEMENT && _rcTargetUserId === null;
+  if (!(await awaitRcSyncReady(anonymous))) {
     failed("identity_not_ready");
     return "unavailable";
   }

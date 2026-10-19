@@ -7,6 +7,7 @@ import { demoDestination, findSample } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
+  queueDemoUrl,
   setPendingDemo,
   type PendingDemo,
 } from "@/lib/pending-onboarding";
@@ -493,6 +494,20 @@ export function useDemoSave({
     advance();
   };
 
+  // Signed out, the picked link waits for the account: the replay saves it
+  // after sign-in, which comes after the paywall at the end of onboarding.
+  const saveLater = () => {
+    if (advancedRef.current || canSave) return;
+    const url = state.authRequest?.url;
+    if (url === undefined) return;
+    analytics.capture("onboarding_demo_deferred", {
+      sample: findSample(url) !== undefined,
+    });
+    queueDemoUrl(url);
+    setPendingDemo(null);
+    advance();
+  };
+
   // Offline or during an outage no save can land, so the step lets the user
   // on with none; the reveal then has no item to show.
   const skip = () => {
@@ -531,6 +546,7 @@ export function useDemoSave({
     canAcceptShare,
     advance,
     skip,
+    saveLater,
     submitUrl,
     submitTyped,
     setError,

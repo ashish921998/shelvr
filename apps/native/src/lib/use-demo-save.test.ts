@@ -28,6 +28,7 @@ const mock = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
+  queueDemoUrl: vi.fn(),
   clearLegacyDemo: vi.fn(),
   recordShareSaved: vi.fn(),
   releaseSavedShare: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   setPendingDemo: mock.setPendingDemo,
+  queueDemoUrl: mock.queueDemoUrl,
   clearLegacyDemoUrlIfSaved: mock.clearLegacyDemo,
   resolveOnboardingSpaceName: (id: string) => `name:${id}`,
 }));
@@ -129,6 +131,7 @@ beforeEach(() => {
   mock.retry.mockReset();
   mock.capture.mockReset();
   mock.setPendingDemo.mockReset();
+  mock.queueDemoUrl.mockReset();
   mock.clearLegacyDemo.mockReset();
   mock.recordShareSaved.mockReset();
   mock.query = { data: undefined, isError: false, isSuccess: false };
@@ -883,6 +886,31 @@ describe("useDemoSave", () => {
     expect(result.current.view).toBe("share");
     expect(result.current.authUrl).toBe("");
     expect(mock.setPendingDemo).toHaveBeenLastCalledWith(null);
+  });
+
+  it("queues a signed-out first save for after sign-in and moves on", () => {
+    mock.authenticated = false;
+    const { result, onAdvance } = renderDemo();
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    act(() => result.current.saveLater());
+    expect(mock.queueDemoUrl).toHaveBeenCalledWith(
+      "https://sample.test/ready-made",
+    );
+    expect(mock.setPendingDemo).toHaveBeenLastCalledWith(null);
+    expect(mock.create).not.toHaveBeenCalled();
+    expect(onAdvance).toHaveBeenCalledOnce();
+    expect(captured("onboarding_demo_deferred")).toEqual([
+      ["onboarding_demo_deferred", { sample: true }],
+    ]);
+    act(() => result.current.saveLater());
+    expect(mock.queueDemoUrl).toHaveBeenCalledOnce();
+  });
+
+  it("never queues a save once the account can make it", () => {
+    const { result, onAdvance } = renderDemo();
+    act(() => result.current.saveLater());
+    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(onAdvance).not.toHaveBeenCalled();
   });
 });
 

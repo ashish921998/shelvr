@@ -249,9 +249,20 @@ export function getPendingOperationId(): string | null {
   return readPendingRecord()?.operationId ?? null;
 }
 
-/** Older builds queued this save until purchase. Preserve that intent. */
+/** A first save queued until sign-in and purchase (older builds queued one
+ * too). */
 export function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
+}
+
+/** A signed-out first save waits here until the account exists: the replay
+ * saves it after sign-in, once the account is Pro. */
+export function queueDemoUrl(url: string) {
+  getOrCreatePendingOperationId();
+  const existing = readPendingRecord();
+  if (existing === null) return;
+  writePendingRecord({ ...existing, demoUrl: url });
+  notifyChanged();
 }
 
 export function clearLegacyDemoUrl() {

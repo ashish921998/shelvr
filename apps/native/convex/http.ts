@@ -139,7 +139,9 @@ auth.addHttpRoutes(http);
  *
  * The Convex Auth user id is configured as the RevenueCat app user id (the
  * client calls `Purchases.logIn(convexUserId)` on sign-in), so the event's
- * current `app_user_id` is the same `userId` every other table keys on. No
+ * current `app_user_id` is the same `userId` every other table keys on. An
+ * event still keyed to the anonymous id of a purchase made before sign-in
+ * resolves to the account it was aliased to (`parseRevenueCatEvent`). No
  * client-supplied id is trusted.
  */
 http.route({

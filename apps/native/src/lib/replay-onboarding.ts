@@ -16,6 +16,7 @@ import {
   getPendingOnboardingRevision,
   updatePendingSpaces,
 } from "@/lib/pending-onboarding";
+import { hasPurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
 import {
   openPaywall,
   useEntitlement,
@@ -124,9 +125,13 @@ export function useReplayOnboarding() {
     }
     if (!hasPending()) return;
     if (pendingWorkKey() === settledWorkRef.current) return;
+    // A purchase made before sign-in is still on its way to the account
+    // (see purchase-before-sign-in.ts), so it is never sold a second time.
     if (
       !entitled &&
-      (awaitingEntitlementRef.current || onboardingPaywall !== "unseen")
+      (awaitingEntitlementRef.current ||
+        onboardingPaywall !== "unseen" ||
+        hasPurchaseBeforeSignIn())
     )
       return;
 
