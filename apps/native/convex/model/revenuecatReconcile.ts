@@ -3,8 +3,9 @@ import { env, type ActionCtx } from "../_generated/server";
 import { parseRevenueCatSnapshot } from "./revenuecat";
 
 /** Authoritative events (transfer, refund, billing issue) replace local access
- * with the current Pro entitlement. With `grantOnly`, a snapshot without access
- * is dropped, so a caller-triggered sync can add access but never take it. */
+ * with the current Pro entitlement. With `grantOnly`, a snapshot applies only
+ * where it gives more access than the stored row (see `applySnapshots`), so a
+ * caller-triggered sync can add access but never take or shorten it. */
 export async function reconcileRevenueCatCustomers(
   ctx: ActionCtx,
   userIds: string[],
@@ -32,12 +33,11 @@ export async function reconcileRevenueCatCustomers(
       body,
       env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro",
     );
-    if (grantOnly && snapshot.status === "lapsed") continue;
     snapshots.push({ userId, ...snapshot });
   }
-  if (snapshots.length === 0) return;
   await ctx.runMutation(internal.subscriptions.applySnapshots, {
     snapshots,
     eventTimestampMs,
+    ...(grantOnly ? { grantOnly } : {}),
   });
 }

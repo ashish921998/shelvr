@@ -311,6 +311,8 @@ export const liveOwners = internalQuery({
 export const applySnapshots = internalMutation({
   args: {
     eventTimestampMs: v.number(),
+    // Apply a snapshot only where it gives more access than the stored row.
+    grantOnly: v.optional(v.boolean()),
     snapshots: v.array(
       v.object({
         userId: v.id("users"),
@@ -321,9 +323,16 @@ export const applySnapshots = internalMutation({
     ),
   },
   returns: v.null(),
-  handler: async (ctx, { snapshots, eventTimestampMs }) => {
+  handler: async (ctx, { snapshots, eventTimestampMs, grantOnly }) => {
     // Nested writes share this transaction: a failed update rolls back both sides.
     for (const snapshot of snapshots) {
+      if (grantOnly) {
+        const existing = await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", snapshot.userId))
+          .unique();
+        if (!grantsMoreAccess(existing, snapshot)) continue;
+      }
       await ctx.runMutation(internal.subscriptions.upsertSubscription, {
         ...snapshot,
         eventTimestampMs,
@@ -333,6 +342,20 @@ export const applySnapshots = internalMutation({
     return null;
   },
 });
+
+/** Whether a RevenueCat snapshot gives more access than the stored row: no
+ * access never does, a lifetime row is never improved on, and otherwise the
+ * later expiry wins. */
+function grantsMoreAccess(
+  existing: Doc<"subscriptions"> | null,
+  snapshot: { status: SubscriptionStatus; expiresAt: number },
+): boolean {
+  if (snapshot.status === "lapsed") return false;
+  if (existing === null || existing.status === "lapsed") return true;
+  if (existing.status === "lifetime") return false;
+  if (snapshot.status === "lifetime") return true;
+  return snapshot.expiresAt > existing.expiresAt;
+}
 
 export const expireSubscription = internalMutation({
   args: { userId: v.string(), expiresAt: v.number() },

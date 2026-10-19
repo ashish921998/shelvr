@@ -55,6 +55,54 @@ describe("syncPurchase", () => {
     ]);
   });
 
+  it("never trades a lifetime row for RevenueCat's trial", async () => {
+    const f = await fixture();
+    await f.backend.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: f.userId,
+        status: "lifetime",
+        expiresAt: 0,
+        updatedAt: 1,
+      });
+    });
+    stubRevenueCatFetch(
+      revenuecatSnapshot({ productId: "annual", periodType: "trial" }),
+    );
+    await f.t.action(api.subscriptions.syncPurchase, {});
+    expect(await f.rows()).toMatchObject([
+      { userId: f.userId, status: "lifetime", expiresAt: 0 },
+    ]);
+  });
+
+  it("never shortens a longer expiry, and extends a shorter one", async () => {
+    const f = await fixture();
+    const later = Date.now() + 30 * 86_400_000;
+    await f.backend.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: f.userId,
+        status: "pro",
+        expiresAt: later,
+        productId: "annual",
+        updatedAt: 1,
+      });
+    });
+    stubRevenueCatFetch(
+      revenuecatSnapshot({ productId: "monthly", expiresAt: later - 60_000 }),
+    );
+    await f.t.action(api.subscriptions.syncPurchase, {});
+    expect(await f.rows()).toMatchObject([
+      { status: "pro", expiresAt: later, productId: "annual" },
+    ]);
+
+    stubRevenueCatFetch(
+      revenuecatSnapshot({ productId: "annual", expiresAt: later + 60_000 }),
+    );
+    await f.t.action(api.subscriptions.syncPurchase, {});
+    expect(await f.rows()).toMatchObject([
+      { status: "pro", expiresAt: later + 60_000 },
+    ]);
+  });
+
   it("refuses a signed-out caller", async () => {
     const f = await fixture();
     const fetchMock = stubRevenueCatFetch(revenuecatSnapshot());
