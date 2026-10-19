@@ -47,7 +47,8 @@ Components never hardcode hex values; they read `theme.colors.*` roles. Roles
 are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `foreground`, `muted`, `faint`, `primary`, `primaryForeground`, `primarySoft`,
 `primaryText`, `border`, `imageBorder`, `frame`, `danger`, `overlay`,
-`onOverlay`, `onTint`, `keep`, `onKeep`, and `tabTint`. `frame` is the mat
+`onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, and the Trip Reveal
+globe's `globeOcean`, `globeLand` and `globeLandEdge`. `frame` is the mat
 around a saved picture (feed cards, space covers, the detail hero): paper
 white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint

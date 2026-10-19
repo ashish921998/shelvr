@@ -2,8 +2,19 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { useBuildStep } from "@/components/trip/trip-building";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
-  GLOBE_CITY,
-  GLOBE_SIZE,
+  countryLight,
+  diveTarget,
+  globeCamera,
+  globePaths,
+  globeRegion,
+  globeSettled,
+  warmGlobe,
+  type GlobePaths,
+  type GlobeRegion,
+  type GlobeTarget,
+  tripCenter,
+} from "@/lib/trip-globe";
+import {
   REVEAL_TIMING,
   revealCovers,
   revealLayout,
@@ -15,13 +26,11 @@ import {
   Canvas,
   Circle,
   Group,
-  Oval,
   Path,
-  Skia,
 } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   FadeIn,
@@ -51,23 +60,19 @@ const SPRING = {
 };
 const fade = (duration: number) => ({ duration, reduceMotion: NEVER });
 
-/** Land shapes on the globe drawing, in its 500 x 500 box. */
-const LAND = [
-  "M95 140 q70 -45 140 -12 q55 30 45 90 q-30 45 -100 34 q-70 -12 -90 -60z",
-  "M150 300 q40 -10 60 20 q10 40 -20 70 q-30 10 -45 -20z",
-];
-const CITY_LAND =
-  "M318 150 q16 -14 24 8 q6 28 -10 52 q-12 14 -20 26 q-8 4 -6 -10 q10 -26 12 -48 q2 -16 0 -28z";
+type TripCenterInput = { days: Parameters<typeof tripCenter>[0] };
 
 /** Whether Trip Reveal is playing, and what it shows. `start` begins it when
  * it can play (there are covers and Reduce Motion is off) and says whether it
  * did; Reduce Motion gets the plain building panel instead. The save count is
- * taken at Build, so a save landing mid-reveal never restarts the count. */
+ * taken at Build, so a save landing mid-reveal never restarts the count.
+ * `built` is the new trip once it is in and shown, so the globe may dive
+ * into it. */
 export function useTripReveal(
   space: { items: Parameters<typeof revealCovers>[0] } | null | undefined,
   cities: { city: string }[] | undefined,
   request: { city?: string } | null,
-  built: boolean,
+  built: (TripCenterInput & { city?: string }) | null | undefined,
 ) {
   // The save count while the reveal plays, null when it is not playing.
   const [count, setCount] = useState<number | null>(null);
@@ -76,10 +81,17 @@ export function useTripReveal(
   // the new trip's again.
   const [held, setHeld] = useState(false);
   const reducedMotion = useReducedMotion();
-  const city =
+  const requested =
     request?.city ?? (cities?.length === 1 ? cities[0].city : undefined);
   const items = space?.items;
-  const covers = useMemo(() => revealCovers(items ?? [], city), [items, city]);
+  const covers = useMemo(
+    () => revealCovers(items ?? [], requested),
+    [items, requested],
+  );
+  const target = useMemo(
+    () => (built ? tripCenter(built.days) : null),
+    [built],
+  );
   const playable = !reducedMotion && covers.length > 0;
   const start = useCallback(
     (saves: number) => {
@@ -100,7 +112,8 @@ export function useTripReveal(
     count: count ?? 0,
     hidesMap: count !== null || (held && !built),
     covers,
-    city,
+    city: built?.city ?? requested,
+    target,
     start,
     end,
     cancel,
@@ -117,12 +130,15 @@ export function TripReveal({
   covers,
   count,
   city,
+  target,
   ready,
   onDone,
 }: {
   covers: RevealCover[];
   count: number;
   city?: string;
+  /** Where the globe dives: the middle of the trip's pins, or null. */
+  target: GlobeTarget | null;
   /** The trip has arrived, so the globe may dive. */
   ready: boolean;
   onDone: () => void;
@@ -173,7 +189,12 @@ export function TripReveal({
       exiting={FadeOut.duration(300)}
       style={styles.screen}
     >
-      <Globe stage={stage} globe={layout.globe} />
+      <Globe
+        stage={stage}
+        target={target}
+        city={city}
+        landing={layout.landing}
+      />
       {covers.map((cover, index) => (
         <Card
           key={cover.id}
@@ -376,120 +397,154 @@ function Dot({
   );
 }
 
-/** The globe: rises as the saves become dots, then dives into the city. */
+/** One frame of the globe, as SVG paths, and how lit the city's country is. */
+type GlobeFrame = { paths: GlobePaths; light: number };
+
+const SPIN_FRAME_MS = 1000 / 30;
+
+const HIDDEN: GlobeFrame = {
+  paths: { sphere: "", graticule: "", land: "", country: "" },
+  light: 0,
+};
+
+/** The globe: a real world map that rises as the saves become dots, spins
+ * while the trip is built, then turns to the trip and zooms into its
+ * country. Frames are drawn on the JS thread with d3 (trip-globe.ts), so they
+ * stop as soon as the camera settles. */
 function Globe({
   stage,
-  globe,
+  target,
+  city,
+  landing,
 }: {
   stage: Stage;
-  globe: ReturnType<typeof revealLayout>["globe"];
+  target: GlobeTarget | null;
+  city?: string;
+  landing: { x: number; y: number };
 }) {
-  const { theme } = useUnistyles();
-  const x = useSharedValue(0);
-  const y = useSharedValue(0);
-  const scale = useSharedValue(1);
+  const { theme, rt } = useUnistyles();
+  const [startedAt] = useState(Date.now);
+  const [frame, setFrame] = useState(HIDDEN);
+  // Set once, when the dive starts: when, and the close-up map to draw.
+  const dive = useRef<{ at: number; region: GlobeRegion } | null>(null);
   const glow = useSharedValue(0);
+  const lng = target?.lng;
+  const lat = target?.lat;
+  const width = rt.screen.width;
+  const height = rt.screen.height;
+
+  // Parsing the map takes a moment; do it while the saves lift off.
+  useEffect(warmGlobe, []);
 
   useEffect(() => {
-    if (stage === "dots") {
-      y.value = withSpring(globe.rise, SPRING.camera);
-    } else if (stage === "dive") {
-      x.value = withSpring(globe.diveX, SPRING.camera);
-      y.value = withSpring(globe.diveY, SPRING.camera);
-      scale.value = withSpring(3, SPRING.camera);
-      glow.value = withDelay(800, withTiming(0.85, fade(500)));
+    const aim = lng !== undefined && lat !== undefined ? { lng, lat } : null;
+    if (stage === "dive" && !dive.current) {
+      const at = Date.now() - startedAt;
+      const region = globeRegion(diveTarget(aim, at));
+      // With no pins the dive lands on open map, so no country lights up.
+      dive.current = {
+        at,
+        region: aim ? region : { ...region, country: null },
+      };
+      if (aim) glow.value = withDelay(800, withTiming(0.85, fade(500)));
     }
-  }, [stage, globe, x, y, scale, glow]);
+    const screen = { width, height };
+    let handle = 0;
+    let shown = false;
+    let drawn = -Infinity;
+    const tick = () => {
+      const t = Date.now() - startedAt;
+      const diveAt = dive.current?.at ?? null;
+      // The spin can run for as long as the build takes, so it draws at
+      // 30fps to spare the JS thread; the short dive gets every frame.
+      if (diveAt === null && t - drawn < SPIN_FRAME_MS) {
+        handle = requestAnimationFrame(tick);
+        return;
+      }
+      drawn = t;
+      const camera = globeCamera({ t, diveAt, ...screen, target: aim });
+      const paths = globePaths(camera, screen, dive.current?.region ?? null);
+      // Below the screen there is nothing to draw, so no render either.
+      if (paths.sphere !== "" || shown) {
+        setFrame({ paths, light: countryLight(camera.dive) });
+        shown = paths.sphere !== "";
+      }
+      if (!globeSettled(t, diveAt)) handle = requestAnimationFrame(tick);
+    };
+    handle = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(handle);
+  }, [stage, startedAt, lng, lat, width, height, glow]);
 
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: x.value },
-      { translateY: y.value },
-      { scale: scale.value },
-    ],
-  }));
-
-  // Parsed on render, not at module load, so a bundle without Skia can still
-  // import this file.
-  const land = useMemo(
-    () =>
-      LAND.map((d) => Skia.Path.MakeFromSVGString(d)).filter(
-        (path) => path !== null,
-      ),
-    [],
-  );
-  const cityLand = useMemo(() => Skia.Path.MakeFromSVGString(CITY_LAND), []);
-  const r = GLOBE_SIZE / 2 - 20;
-  const c = GLOBE_SIZE / 2;
-
+  const { paths, light } = frame;
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.globe,
-        {
-          left: globe.left,
-          top: globe.top,
-          transformOrigin: [GLOBE_CITY.x, GLOBE_CITY.y, 0],
-        },
-        style,
-      ]}
-    >
-      <Canvas style={styles.globeCanvas}>
-        <Circle cx={c} cy={c} r={r} color={theme.colors.primarySoft} />
-        <Circle
-          cx={c}
-          cy={c}
-          r={r}
-          color={theme.colors.border}
-          style="stroke"
-          strokeWidth={1.5}
-        />
-        {[
-          [r, 80],
-          [120, r],
-          [r, 160],
-        ].map(([rx, ry]) => (
-          <Oval
-            key={`${rx}:${ry}`}
-            x={c - rx}
-            y={c - ry}
-            width={rx * 2}
-            height={ry * 2}
+    <>
+      <Canvas style={styles.globe} pointerEvents="none">
+        {paths.sphere ? (
+          <Path path={paths.sphere} color={theme.colors.globeOcean} />
+        ) : null}
+        {paths.graticule ? (
+          <Path
+            path={paths.graticule}
             color={theme.colors.border}
             style="stroke"
             strokeWidth={1}
           />
-        ))}
-        {land.map((path, index) => (
+        ) : null}
+        {paths.land ? (
+          <>
+            <Path path={paths.land} color={theme.colors.globeLand} />
+            <Path
+              path={paths.land}
+              color={theme.colors.globeLandEdge}
+              style="stroke"
+              strokeWidth={0.8}
+            />
+          </>
+        ) : null}
+        {paths.country ? (
           <Path
-            key={index}
-            path={path}
+            path={paths.country}
             color={theme.colors.primary}
-            opacity={0.16}
+            opacity={0.85 * light}
           />
-        ))}
-        {cityLand ? (
-          <Path path={cityLand} color={theme.colors.primary} opacity={0.6} />
+        ) : null}
+        {paths.sphere ? (
+          <Path
+            path={paths.sphere}
+            color={theme.colors.globeLandEdge}
+            style="stroke"
+            strokeWidth={1.2}
+          />
         ) : null}
         <Group opacity={glow}>
           <Circle
-            cx={GLOBE_CITY.x}
-            cy={GLOBE_CITY.y}
+            cx={landing.x}
+            cy={landing.y}
             r={26}
             color={theme.colors.primary}
           >
-            <BlurMask blur={6} style="normal" />
+            <BlurMask blur={8} style="normal" />
           </Circle>
           <Circle
-            cx={GLOBE_CITY.x}
-            cy={GLOBE_CITY.y}
-            r={3}
-            color={theme.colors.primaryText}
+            cx={landing.x}
+            cy={landing.y}
+            r={4}
+            color={theme.colors.surface}
           />
         </Group>
       </Canvas>
-    </Animated.View>
+      {stage === "dive" && target && city ? (
+        <Animated.View
+          entering={FadeIn.delay(900).duration(300)}
+          pointerEvents="none"
+          style={[styles.pinLabel, { top: landing.y - 42 }]}
+        >
+          <ThemedText variant="subheadLabel" style={styles.pinText}>
+            {city}
+          </ThemedText>
+        </Animated.View>
+      ) : null}
+    </>
   );
 }
 
@@ -532,14 +587,21 @@ const styles = StyleSheet.create((theme, rt) => ({
     zIndex: 5,
   },
   globe: {
-    position: "absolute",
-    width: GLOBE_SIZE,
-    height: GLOBE_SIZE,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 4,
   },
-  globeCanvas: {
-    width: GLOBE_SIZE,
-    height: GLOBE_SIZE,
+  pinLabel: {
+    position: "absolute",
+    alignSelf: "center",
+    paddingHorizontal: theme.gap(1.375),
+    paddingVertical: theme.gap(0.625),
+    borderRadius: 999,
+    backgroundColor: theme.colors.surface,
+    boxShadow: "0 4px 12px rgba(43,36,24,0.18)",
+    zIndex: 6,
+  },
+  pinText: {
+    color: theme.colors.foreground,
   },
   caption: {
     position: "absolute",

@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  GLOBE_CITY,
-  REVEAL_COVERS,
-  revealCovers,
-  revealLayout,
-} from "./trip-reveal";
+import { REVEAL_COVERS, revealCovers, revealLayout } from "./trip-reveal";
 
 const save = (
   id: string,
@@ -55,8 +50,7 @@ describe("revealLayout", () => {
     expect(layout.cards[0]).toMatchObject({ left: 12, top: 228, width: 183 });
     expect(layout.cards[1].left).toBe(195);
     expect(layout.dots).toHaveLength(16);
-    expect(layout.globe.left).toBe(-55);
-    expect(layout.globe.diveX).toBe(-80);
+    expect(layout.landing).toEqual({ x: 195, y: 422 });
   });
 
   it("sends every card's centre to its own dot", () => {
@@ -67,12 +61,6 @@ describe("revealLayout", () => {
       expect(centreX).toBeCloseTo(layout.dots[index].x);
       expect(centreY).toBeCloseTo(layout.dots[index].y);
     }
-  });
-
-  it("dives the globe so its city sits where the dots land", () => {
-    const { globe, landing } = revealLayout(393, 852, 3);
-    expect(globe.left + GLOBE_CITY.x + globe.diveX).toBeCloseTo(landing.x);
-    expect(globe.top + GLOBE_CITY.y + globe.diveY).toBeCloseTo(landing.y);
   });
 
   it("keeps the extra dots when only a few saves have covers", () => {

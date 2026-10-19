@@ -101,6 +101,10 @@ const lightTheme = {
     // from #bf8114, which cleared only 3.06:1 on background, 3.25:1 on
     // surface and 2.80:1 on surfaceMuted: now 5.49, 5.82 and 5.03:1.
     tabTint: "#8a5a0b",
+    // Trip Reveal's globe: sea, land, and the coast and border lines.
+    globeOcean: "#e9eef0",
+    globeLand: "#e4d6bb",
+    globeLandEdge: "#cdbb98",
   },
 } as const;
 
@@ -128,6 +132,9 @@ const darkTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#e6a23c",
+    globeOcean: "#1f2a2e",
+    globeLand: "#3b3427",
+    globeLandEdge: "#54493a",
   },
 } as const;
 
@@ -158,6 +165,9 @@ const darkNeutralTheme = {
     onKeep: "#065f46",
     // Matches the previous hard-coded dark tab tint on this theme.
     tabTint: "#e6a23c",
+    globeOcean: "#1a2530",
+    globeLand: "#30363d",
+    globeLandEdge: "#48505a",
   },
 } as const;
 

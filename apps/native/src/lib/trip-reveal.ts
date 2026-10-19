@@ -1,6 +1,6 @@
 // Trip Reveal: the opening that plays while a trip is built. The saves lift
-// off as cards, turn into dots, and fall onto a globe that dives into the
-// city, then the trip map takes over. Positions and timings come from the
+// off as cards, turn into dots, and fall onto a globe (trip-globe.ts) that
+// dives into the city, then the trip map takes over. Positions and timings come from the
 // approved prototype, drawn on a 390 x 844 screen and scaled to the device.
 
 const FRAME = { width: 390, height: 844 };
@@ -77,10 +77,6 @@ const EXTRA_DOTS = [
   [210, 470],
 ] as const;
 
-export const GLOBE_SIZE = 500;
-/** The city's spot on the globe drawing, which the dive zooms into. */
-export const GLOBE_CITY = { x: 330, y: 190 };
-
 export type RevealCard = {
   left: number;
   top: number;
@@ -99,13 +95,6 @@ type RevealLayout = {
   dots: { x: number; y: number }[];
   /** Where the dots land: the city once the globe has dived. */
   landing: { x: number; y: number };
-  globe: {
-    left: number;
-    top: number;
-    rise: number;
-    diveX: number;
-    diveY: number;
-  };
 };
 
 /** Every position in the reveal for a screen of this size. */
@@ -140,19 +129,5 @@ export function revealLayout(
   const dots = [...used.map((card) => card.to), ...EXTRA_DOTS].map(
     ([x, y]) => ({ x: x * sx, y: y * sy }),
   );
-  const landing = { x: width / 2, y: height / 2 };
-  const globeLeft = width / 2 - GLOBE_SIZE / 2;
-  const globeTop = height + 56;
-  return {
-    cards,
-    dots,
-    landing,
-    globe: {
-      left: globeLeft,
-      top: globeTop,
-      rise: -440 * sy,
-      diveX: landing.x - (globeLeft + GLOBE_CITY.x),
-      diveY: landing.y - (globeTop + GLOBE_CITY.y),
-    },
-  };
+  return { cards, dots, landing: { x: width / 2, y: height / 2 } };
 }

@@ -102,7 +102,7 @@ export default function TripScreen() {
   // until it is skipped; the map and its pin drop wait for it.
   // The new trip is in and shown, so the reveal may dive into it.
   const built = state.status === "idle" && trip !== null;
-  const reveal = useTripReveal(space, cities, lastRequest, built);
+  const reveal = useTripReveal(space, cities, lastRequest, built ? trip : null);
 
   const dayCount = trip?.days.length ?? 0;
   const day = Math.min(activeDay, Math.max(0, dayCount - 1));
@@ -344,6 +344,7 @@ export default function TripScreen() {
           covers={reveal.covers}
           count={reveal.count}
           city={reveal.city}
+          target={reveal.target}
           ready={built}
           onDone={reveal.end}
         />

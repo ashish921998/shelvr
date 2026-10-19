@@ -20,7 +20,7 @@
     "audit": "pnpm audit --audit-level high",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run verify:codegen && pnpm run verify:agent-docs && pnpm run test:tools && pnpm run coverage && pnpm run knip && pnpm run syncpack:lint && pnpm run audit",
     "clean": "turbo run clean && rm -rf node_modules",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore --ignore-path .prettierignore",
     "prepare": "husky",
     "localization:generate": "node tools/generate-localizations.mjs"
   },
