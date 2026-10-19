@@ -169,7 +169,7 @@ export function TripReveal({
 
   return (
     <Animated.View
-      entering={FadeIn.duration(600)}
+      entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(300)}
       style={styles.screen}
     >
@@ -195,7 +195,8 @@ export function TripReveal({
         {stage === "dive" ? (
           <Animated.View
             key="count"
-            entering={FadeIn.duration(250)}
+            // Waits for the step text to fade out, so the two never overlap.
+            entering={FadeIn.delay(150).duration(250)}
             style={styles.count}
           >
             <ThemedText variant="hero" style={styles.number}>

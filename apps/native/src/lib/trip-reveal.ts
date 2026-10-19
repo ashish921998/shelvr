@@ -10,8 +10,9 @@ export const REVEAL_COVERS = 6;
 
 /** When each stage starts, in ms from Build. The dive waits for the trip. */
 export const REVEAL_TIMING = {
-  dots: 800,
-  wait: 2000,
+  /** Long enough to read the lifted saves before they shrink. */
+  dots: 1500,
+  wait: 2700,
   /** From the dive's start: the dots land on the city (one light haptic). */
   landed: 1100,
   /** From the dive's start: the map takes over. */
