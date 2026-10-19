@@ -397,7 +397,9 @@ async function presentPaywallImpl(
     const result = await observePaywallPresentation(
       enriched,
       () =>
-        rcui.presentPaywall({ offering, customVariables }).then(confirmRestore),
+        nativePresentation(() =>
+          rcui.presentPaywall({ offering, customVariables }),
+        ).then(confirmRestore),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
@@ -664,16 +666,47 @@ export function useExitOfferEndsAt(userId: string | undefined): number | null {
 // life of the process; past this age the sheet is presumed gone.
 const SHEET_STALE_MS = 5 * 60_000;
 
+// How long a native sheet gets to slide up. A touch on the app after that
+// means the sheet never came up: it covers the app while it is up.
+const NATIVE_SHOW_MS = 1500;
+
 type OpenSheet = {
   startedAt: number;
   // null while the Customer Center holds the latch.
   paywall: Promise<PaywallOutcome> | null;
+  // When the native paywall was asked for, while that call is unsettled.
+  nativeSince?: number;
 };
 let openSheet: OpenSheet | null = null;
+let lastAppTouchAt = 0;
+
+/**
+ * Called by the app root on every touch. UIKit can refuse a presentation
+ * (another sheet mid-transition) without ever settling RevenueCat's promise,
+ * which would hold the latch and swallow every paywall tap for minutes.
+ */
+export function noteAppTouch(): void {
+  lastAppTouchAt = Date.now();
+}
+
+function nativePresentation<T>(present: () => Promise<T>): Promise<T> {
+  const sheet = openSheet;
+  if (sheet) sheet.nativeSince = Date.now();
+  return present().finally(() => {
+    if (sheet) sheet.nativeSince = undefined;
+  });
+}
 
 function liveSheet(): OpenSheet | null {
   if (openSheet && Date.now() - openSheet.startedAt < SHEET_STALE_MS) {
-    return openSheet;
+    // The app took a touch after the native paywall had time to cover it,
+    // so the paywall never showed and its promise will not settle.
+    const since = openSheet.nativeSince;
+    if (since === undefined || lastAppTouchAt < since + NATIVE_SHOW_MS) {
+      return openSheet;
+    }
+    releaseSheet(openSheet);
+    return null;
   }
   openSheet = null;
   return null;

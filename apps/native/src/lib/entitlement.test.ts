@@ -262,6 +262,53 @@ describe("presentPaywall concurrency", () => {
   });
 });
 
+// UIKit can refuse a presentation mid-transition without RevenueCat ever
+// settling its promise. A reviewer's Create space and View Pro plans taps then
+// joined that dead sheet and did nothing.
+describe("a paywall that never came up", () => {
+  async function hungSheet() {
+    const mod = await loadReady();
+    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
+    void mod.openPaywall(router, "onboarding");
+    await vi.waitFor(() => expect(mock.presentPaywall).toHaveBeenCalled());
+    vi.useFakeTimers();
+    return mod;
+  }
+
+  it("presents again when the app takes a touch after it should have covered it", async () => {
+    const { openPaywall, noteAppTouch } = await hungSheet();
+    mock.presentPaywall.mockResolvedValueOnce("PURCHASED");
+
+    vi.advanceTimersByTime(1500);
+    noteAppTouch();
+
+    await expect(openPaywall(router, "new_space")).resolves.toBe(true);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+  });
+
+  it("still joins when no touch reached the app", async () => {
+    const { openPaywall, isPaywallPending } = await hungSheet();
+
+    vi.advanceTimersByTime(60_000);
+    void openPaywall(router, "share");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(isPaywallPending()).toBe(true);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+  });
+
+  it("still joins a touch made while the sheet could be sliding up", async () => {
+    const { openPaywall, noteAppTouch } = await hungSheet();
+
+    vi.advanceTimersByTime(500);
+    noteAppTouch();
+    void openPaywall(router, "home_card");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("paywall activation funnel", () => {
   it("reports entitlement activation after a purchase reaches Convex", async () => {
     const { openPaywall, hook } = await loadReady();
