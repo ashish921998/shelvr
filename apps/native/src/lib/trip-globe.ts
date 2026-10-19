@@ -286,6 +286,33 @@ export function globePaths(
   };
 }
 
+/** Where the target sits on screen this frame. The dots, the glow and the
+ * city's name follow it. While the target is on the far side it is held on
+ * the globe's edge, where it will come round, so nothing jumps as it does. */
+export function globePin(
+  camera: GlobeCamera,
+  target: GlobeTarget,
+): { x: number; y: number } {
+  const [x, y] = geoOrthographic()
+    .rotate(camera.rotate)
+    .scale(camera.scale)
+    .translate([camera.x, camera.y])([target.lng, target.lat]) ?? [
+    camera.x,
+    camera.y,
+  ];
+  const facing: [number, number] = [-camera.rotate[0], -camera.rotate[1]];
+  if (geoDistance(facing, [target.lng, target.lat]) < Math.PI / 2) {
+    return { x, y };
+  }
+  const away = Math.hypot(x - camera.x, y - camera.y);
+  // Exactly behind the centre: no direction to lean, so the top edge.
+  if (away < 1e-6) return { x: camera.x, y: camera.y - camera.scale };
+  return {
+    x: camera.x + ((x - camera.x) / away) * camera.scale,
+    y: camera.y + ((y - camera.y) / away) * camera.scale,
+  };
+}
+
 /** Parses the map ahead of its first frame, so that frame does not stall. */
 export const warmGlobe = () => void loadWorld();
 

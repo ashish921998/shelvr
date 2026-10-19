@@ -6,6 +6,7 @@ import {
   countryLight,
   globeCamera,
   globePaths,
+  globePin,
   globeRegion,
   globeSettled,
   tripCenter,
@@ -14,6 +15,7 @@ import { REVEAL_TIMING } from "./trip-reveal";
 
 const SCREEN = { width: 393, height: 852 };
 const LISBON = { lng: -9.139, lat: 38.722 };
+const TOKYO = { lng: 139.7, lat: 35.7 };
 const DEG = 180 / Math.PI;
 
 const project = (
@@ -182,5 +184,48 @@ describe("globePaths", () => {
     expect(globePaths(early, SCREEN, region).country).toBe("");
     expect(countryLight(landed.dive)).toBe(1);
     expect(globePaths(landed, SCREEN, region).country).toMatch(/^M/);
+  });
+});
+
+describe("globePin", () => {
+  it("follows the target onto the landing point", () => {
+    const at = (t: number) =>
+      globePin(
+        globeCamera({ t, diveAt: 5000, ...SCREEN, target: LISBON }),
+        LISBON,
+      );
+    const landed = at(5000 + GLOBE_DIVE_MS);
+    expect(landed?.x).toBeCloseTo(SCREEN.width / 2);
+    expect(landed?.y).toBeCloseTo(SCREEN.height / 2);
+  });
+
+  it("holds the target on the globe's edge while it is on the far side", () => {
+    // The spin has the far side of the globe facing Tokyo.
+    const camera = globeCamera({
+      t: 18515,
+      diveAt: null,
+      ...SCREEN,
+      target: null,
+    });
+    const edge = globePin(camera, { lng: 139.7, lat: 35.7 });
+    expect(Math.hypot(edge.x - camera.x, edge.y - camera.y)).toBeCloseTo(
+      camera.scale,
+    );
+  });
+
+  it("moves without a jump as the target comes round", () => {
+    let last = globePin(
+      globeCamera({ t: 18515, diveAt: 18515, ...SCREEN, target: TOKYO }),
+      TOKYO,
+    );
+    for (let step = 1; step <= 200; step++) {
+      const t = 18515 + (GLOBE_DIVE_MS * step) / 200;
+      const next = globePin(
+        globeCamera({ t, diveAt: 18515, ...SCREEN, target: TOKYO }),
+        TOKYO,
+      );
+      expect(Math.hypot(next.x - last.x, next.y - last.y)).toBeLessThan(60);
+      last = next;
+    }
   });
 });
