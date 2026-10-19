@@ -12,11 +12,12 @@ describe("restoreOnboardingStep", () => {
     [3, "demo"],
     [4, "notifications"],
     [5, "share"],
+    [6, "promise"],
   ] as const)("restores step %i to %s", (stored, expected) => {
     expect(restoreOnboardingStep(stored)).toBe(expected);
   });
 
-  it.each([null, -1, 6, 7, 1.5])(
+  it.each([null, -1, 7, 8, 1.5])(
     "restarts a missing or out-of-range index (%s) at the opener",
     (stored) => {
       expect(restoreOnboardingStep(stored)).toBe("opener");
@@ -34,7 +35,7 @@ describe("previousOnboardingStep", () => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
 
-  it.each(["opener", "demo"] as const)(
+  it.each(["opener", "demo", "promise"] as const)(
     "leaves %s without a fixed step to go back to",
     (step) => {
       expect(previousOnboardingStep(step)).toBeNull();

@@ -24,3 +24,20 @@ export function validateSpaceName(raw: string): string {
   }
   return name;
 }
+
+/** A space's description goes into the recommendation prompt and the space
+ * embedding, so it gets a bound too. No client sends one yet; this keeps a
+ * hand-built call from storing a megabyte and paying to send it. */
+export const MAX_SPACE_DESCRIPTION_LENGTH = 500;
+
+export const SPACE_DESCRIPTION_TOO_LONG_MESSAGE = `Space descriptions can be up to ${MAX_SPACE_DESCRIPTION_LENGTH} characters.`;
+
+/** Rejects an over-long description; undefined passes through. */
+export function validateSpaceDescription(
+  raw: string | undefined,
+): string | undefined {
+  if (raw !== undefined && raw.length > MAX_SPACE_DESCRIPTION_LENGTH) {
+    throw new ConvexError(SPACE_DESCRIPTION_TOO_LONG_MESSAGE);
+  }
+  return raw;
+}

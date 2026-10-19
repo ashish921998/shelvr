@@ -43,8 +43,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`; pasted
-  link lists in `src/lib/import-links.ts`.
+  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.
@@ -56,11 +55,13 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Analytics:** `src/lib/analytics.ts` holds the typed client event map
   (`AnalyticsEventProperties`); server capture is `convex/analytics.ts`. Read
   those rather than grepping call sites.
-- **Link reading:** `convex/model/pageRead.ts` (`readPage`, per-host readers) on
-  top of `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
+- **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
+  shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
+  per-host readers in `convex/model/readers/`, on top of
+  `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
 - **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
-  and `convex/model/pageRead.ts` (about 1,650). Embedding and recommendation actions
+  and `convex/model/pageReadCore.ts` (about 550). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
@@ -149,6 +150,9 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 
 ## Deployment
 
+- `main` requires pull requests and up-to-date `check` and `convex api contract`
+  checks, including for admins; no approving review is required. The production
+  environment permits only `main` and has no human approval gate.
 - `deploy.yml` runs after CI completes on `main` and deploys Convex
   production, nothing else. No approval gate: CI, each acting job's freshness
   check, and the pull request's public-contract check hold the line. One-time

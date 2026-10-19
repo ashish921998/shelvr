@@ -6,13 +6,19 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+// What the model writes when a post never says how many it serves. Saves made
+// before the prompt asked it to leave the field out still carry these.
+const NO_YIELD =
+  /^(not (specified|stated|mentioned|given)|unspecified|unknown|n\/?a|none|-)\.?$/i;
+
 /** Recipe markup often states the yield as a bare number ("4"); a phrase
- * ("Makes 16 cookies", "2 1/2 cups") is shown as written. */
-function servingsLabel(servings: string): string {
-  const count = Number(servings);
-  return /^\d+$/.test(servings.trim()) && count > 0
-    ? t("recipe.serves", { count })
-    : servings;
+ * ("Makes 16 cookies", "2 1/2 cups") is shown as written. A placeholder for a
+ * missing yield ("not specified") is not shown at all. */
+function servingsLabel(servings: string | undefined): string | null {
+  const text = servings?.trim();
+  if (!text || NO_YIELD.test(text)) return null;
+  const count = Number(text);
+  return /^\d+$/.test(text) && count > 0 ? t("recipe.serves", { count }) : text;
 }
 
 const INGREDIENTS = 0;
@@ -28,11 +34,10 @@ export function RecipeSection({ recipe }: { recipe: Recipe }) {
   useAppLocale();
   const { theme, rt } = useUnistyles();
   const [tab, setTab] = useState(INGREDIENTS);
+  const servings = servingsLabel(recipe.servings);
   return (
     <View style={styles.section}>
-      {recipe.servings ? (
-        <Text style={styles.servings}>{servingsLabel(recipe.servings)}</Text>
-      ) : null}
+      {servings ? <Text style={styles.servings}>{servings}</Text> : null}
 
       <SegmentedControl
         values={[t("recipe.ingredients"), t("recipe.steps")]}

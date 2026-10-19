@@ -17,7 +17,8 @@ the seeded dev user has.
 
 ## Driving it with e2e
 
-`tests/save-note.e2e.ts` pins it with no model. Locators:
+`tests/save-note.e2e.ts` pins it, and runs in the `e2e ios` CI job against
+the fake model in `convex/model/fakeAi.ts`. Locators:
 `screen.getByTestId("add-option-note")` (through `chooseAddOption`),
 `screen.getByTestId("add-note-input")`, `screen.getByRole("button", "Save")`,
 `screen.getByRole("tab", "Search")`,

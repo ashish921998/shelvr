@@ -146,6 +146,10 @@ function AppStack() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
+            name="trip/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
             name="add"
             options={
               Platform.OS === "android"
@@ -198,19 +202,6 @@ function AppStack() {
             options={{
               presentation: "formSheet",
               headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-          <Stack.Screen
-            name="import"
-            options={{
-              presentation: "formSheet",
-              headerShown: true,
-              headerTransparent: false,
-              headerStyle: { backgroundColor: theme.colors.background },
-              headerBackButtonDisplayMode: "minimal",
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },

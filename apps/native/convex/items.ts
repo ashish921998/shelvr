@@ -12,12 +12,13 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import {
   hasProEntitlementAt,
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
+import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
 import {
@@ -188,6 +189,7 @@ const itemFields = {
   articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
+  cities: v.optional(v.array(v.string())),
   products: v.optional(v.array(productValidator)),
   productsStatus: v.optional(productsStatusValidator),
   failureReason: v.optional(failureReasonValidator),
@@ -253,15 +255,23 @@ const enrichedItemWithSpacesValidator = v.object({
 // query, so consumers that need them go through `getItem`. Derived from
 // `enrichedItemValidator` so a new field lands in both shapes by default and
 // has to be dropped here on purpose.
-export const itemCardValidator = enrichedItemValidator.omit(
-  "userId",
-  "content",
-  "articleMedia",
-  "recipe",
-  "searchText",
-  "products",
-  "productsStatus",
-);
+export const itemCardValidator = enrichedItemValidator
+  .omit(
+    "userId",
+    "content",
+    "articleMedia",
+    "recipe",
+    "searchText",
+    "products",
+    "productsStatus",
+  )
+  .extend({
+    // The recipe stays behind `getItem`, but its presence decides how a
+    // detail page opens (a reel with a recipe leads with the recipe, not the
+    // full-screen video), so the card says whether there is one. Set only
+    // when true.
+    hasRecipe: v.optional(v.literal(true)),
+  });
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
@@ -280,11 +290,19 @@ export type ItemCard = Infer<typeof itemCardValidator>;
  */
 function stripEmbedding(
   item: Doc<"items">,
-): Omit<Doc<"items">, "embedding" | "embeddingVersion" | "embeddingAttempts"> {
+): Omit<
+  Doc<"items">,
+  | "embedding"
+  | "embeddingVersion"
+  | "embeddingAttempts"
+  | "productsSearchStartedAt"
+> {
   const {
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
+    // The product-search watchdog's fence, of no use to a client.
+    productsSearchStartedAt: _searchStartedAt,
     ...rest
   } = item;
   return rest;
@@ -312,13 +330,13 @@ async function toItemCard(
     userId: _userId,
     content: _content,
     articleMedia: _articleMedia,
-    recipe: _recipe,
+    recipe,
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
     ...card
   } = await enrichItem(ctx, item);
-  return card;
+  return recipe ? { ...card, hasRecipe: true } : card;
 }
 
 /** How much of a note's own text the search index carries. Notes are short;
@@ -1945,6 +1963,10 @@ async function hasSavedLink(
  * The batch draws one `bulkImport` token per link it would create, all or
  * nothing. When the bucket cannot cover the batch, nothing is created and
  * `rateLimited` tells the client to stop paging.
+ *
+ * The app no longer offers the import screen (removed 2026-10-15). This stays
+ * for installed builds that still have it; remove it once no build in the
+ * wild calls it.
  */
 export const importLinks = mutation({
   args: {
@@ -2177,10 +2199,22 @@ export const findLinks = mutation({
       throw aiConsentRequiredError();
     }
     await rateLimiter.limit(ctx, "findLinks", { key: userId, throws: true });
-    await ctx.db.patch(item._id, { productsStatus: "searching" });
+    const startedAt = Date.now();
+    await ctx.db.patch(item._id, {
+      productsStatus: "searching",
+      productsSearchStartedAt: startedAt,
+    });
     await ctx.scheduler.runAfter(0, internal.ai.findProductLinks, {
       itemId: item._id,
     });
+    // An action killed mid-search (a deploy, the action time limit) never
+    // writes a result, and "searching" refuses every later press. Past the
+    // action limit the search is dead, so it fails and can be retried.
+    await ctx.scheduler.runAfter(
+      PROCESSING_STALE_MS,
+      internal.items.expireProductSearch,
+      { itemId: item._id, startedAt },
+    );
     return null;
   },
 });
@@ -2418,6 +2452,9 @@ export const getSharePreview = internalQuery({
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
     if (link === null) return null;
+    // Deletion drains share links after the saves themselves, which can take
+    // several batches. The account stops sharing the moment deletion starts.
+    if ((await liveOwner(ctx, link.userId)) === null) return null;
     const item = await ctx.db.get(link.itemId);
     if (!item || item.userId !== link.userId || !isShareable(item)) return null;
 
@@ -2611,6 +2648,9 @@ export const finalizeItem = internalMutation({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
+    // Cities the classifier read, already normalized. Optional so runs queued
+    // before this argument existed still validate; absent leaves the row's.
+    cities: v.optional(v.array(v.string())),
     // The retrieval vector for the text this run classified, already
     // normalized and width-checked by the action. Optional because embedding
     // is best-effort: a run whose embed call failed still finalizes the item,
@@ -2638,6 +2678,7 @@ export const finalizeItem = internalMutation({
     const description = withdrawn ? (item.description ?? "") : args.description;
     const tags = withdrawn ? item.tags : args.tags;
     const intents = withdrawn ? item.intents : args.intents;
+    const cities = withdrawn ? item.cities : args.cities;
     const recipe = withdrawn ? item.recipe : args.recipe;
     // Race: the user pressed retry while this run was still awaiting the
     // model. The retry owns the item now; writing here would overwrite its
@@ -2681,6 +2722,9 @@ export const finalizeItem = internalMutation({
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents,
+      // Patching undefined would remove the field, so a run with no cities to
+      // offer keeps what an earlier run wrote.
+      ...(cities !== undefined ? { cities } : {}),
       status: args.status,
       // Always written so a successful retry clears a previous "partial" flag
       // and a previous failureReason (patching undefined removes the field).
@@ -3028,6 +3072,24 @@ export const setEmbeddingsInternal = internalMutation({
   },
 });
 
+export const expireProductSearch = internalMutation({
+  args: { itemId: v.id("items"), startedAt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      item.productsStatus !== "searching" ||
+      item.productsSearchStartedAt !== args.startedAt
+    ) {
+      return null;
+    }
+    logEvent("warn", "find_product_links_expired", { item_id: args.itemId });
+    await ctx.db.patch(args.itemId, { productsStatus: "failed" });
+    return null;
+  },
+});
+
 export const setProductsInternal = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -3148,14 +3210,6 @@ export const failStaleProcessingItems = internalMutation({
   },
 });
 
-/**
- * The classifier's per-item output: which dynamic spaces this new save fits.
- * Writes are `suggested`-only, except into a space the user set to
- * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
- * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
- * or removed here, so the pipeline cannot clobber a user decision by
- * construction. Existing suggestions not in the new set are withdrawn.
- */
 /** True when the space auto-files this save: on, and the save is newer. */
 function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
   return (
@@ -3165,6 +3219,14 @@ function autoFiles(space: Doc<"spaces">, item: Doc<"items">): boolean {
   );
 }
 
+/**
+ * The classifier's per-item output: which dynamic spaces this new save fits.
+ * Writes are `suggested`-only, except into a space the user set to
+ * auto-file, where a match for a save made since then is inserted as `saved`. Existing rows the user
+ * owns (`saved`, `dismissed`, or legacy status-less rows) are never changed
+ * or removed here, so the pipeline cannot clobber a user decision by
+ * construction. Existing suggestions not in the new set are withdrawn.
+ */
 export const setSpacesForItem = internalMutation({
   args: {
     itemId: v.id("items"),

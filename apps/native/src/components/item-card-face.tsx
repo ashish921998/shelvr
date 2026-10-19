@@ -1,9 +1,9 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
-import { clampRatio } from "@/lib/aspect-ratio";
+import { clampRatio, letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
-import { displayHost } from "@/lib/url";
+import { displayHost, siteMonogram } from "@/lib/url";
 import { shortFormSource } from "@convex/model/externalUrl";
 import { socialPost } from "@/lib/social-post";
 import type {
@@ -14,7 +14,7 @@ import type {
 import type { Infer } from "convex/values";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
-import { AppSymbolIcon } from "@/components/symbol";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { Text, View } from "react-native";
 import Animated, { useReducedMotion, ZoomOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -28,6 +28,7 @@ export type FeedItem = {
   type: "image" | "link" | "note";
   status: "processing" | "ready" | "failed";
   title?: string;
+  description?: string;
   url?: string;
   siteName?: string;
   author?: string;
@@ -82,6 +83,92 @@ export function cardTitles(item: FeedItem): (string | undefined)[] {
   ];
 }
 
+/**
+ * What a card without a picture prints on its face. A link shows its summary
+ * and a note its own words, in the display face, with the title in the
+ * caption under it like a photo card. Until both exist (still reading, or the
+ * save failed) the face carries whichever names the save best and the
+ * caption leaves the title out, so it never prints twice.
+ */
+export function textFaceCopy(
+  item: FeedItem,
+  failedLabel?: string,
+): { body: string; captionTitle?: string } {
+  // An empty title or summary names nothing, so it counts as missing.
+  const title = item.title || undefined;
+  const words =
+    (item.type === "note"
+      ? afterOwnHeading(item.note, title)
+      : item.description) || undefined;
+  if (title && words) return { body: words, captionTitle: title };
+  // A note that is only its heading still shows the words its owner wrote.
+  const name = item.type === "note" ? item.note || title : (title ?? words);
+  return { body: name ?? failedLabel ?? displayHost(item.url) };
+}
+
+// Where convex/ai.ts cuts a note's first line when it titles the note itself.
+const NOTE_TITLE_CUT = 80;
+
+// Words that change nothing about what a heading names.
+const FILLER_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "for",
+  "my",
+  "of",
+  "the",
+  "to",
+]);
+
+function headingWords(text: string): Set<string> {
+  const words = text.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  return new Set(
+    words.filter((word) => word.length > 1 && !FILLER_WORDS.has(word)),
+  );
+}
+
+/**
+ * A note's text after its first line when that line is the note's own heading
+ * for `title`: the same words in any order, so "Gift ideas for Mum" heads a
+ * note titled "Mum's Gift Ideas". The caption already prints the title, and
+ * the face would otherwise open with it again. Undefined when the note is only
+ * its heading, or when the title is a note saved without AI's first line cut
+ * at 80 characters, which the one-line caption would cut shorter still; the
+ * face then keeps the whole note and the caption gives way. The note itself
+ * otherwise.
+ */
+function afterOwnHeading(
+  note: string | undefined,
+  title: string | undefined,
+): string | undefined {
+  if (!note || !title) return note;
+  const [first = "", ...rest] = note.trim().split("\n");
+  const line = first.trim();
+  const cut = title.trim();
+  if (
+    line.length > NOTE_TITLE_CUT &&
+    line.slice(0, NOTE_TITLE_CUT).trim() === cut
+  ) {
+    return undefined;
+  }
+  const heading = headingWords(line);
+  const named = headingWords(title);
+  const same =
+    line === cut ||
+    (heading.size > 0 &&
+      heading.size === named.size &&
+      [...heading].every((word) => named.has(word)));
+  return same ? rest.join("\n").trim() || undefined : note;
+}
+
+// The mark on a text face when there is no site letter to show.
+const FACE_SYMBOL = {
+  image: "photo.stack",
+  link: "link",
+  note: "square.and.pencil",
+} as const satisfies Record<FeedItem["type"], AppSymbolName>;
+
 // Standard OpenGraph image shape (1200×630), the default when a link's real
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
@@ -112,12 +199,16 @@ function CardMedia({
           style={[
             item.isSticker ? styles.sticker : styles.image,
             {
-              aspectRatio: clampRatio(
-                item.aspectRatio,
-                isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
-                0.5,
-                2,
-              ),
+              // A letterboxed video thumbnail shows at its video's shape, so
+              // the cover fit crops the black bars away.
+              aspectRatio:
+                letterboxedVideoRatio(item.url, item.aspectRatio) ??
+                clampRatio(
+                  item.aspectRatio,
+                  isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
+                  0.5,
+                  2,
+                ),
             },
           ]}
         />
@@ -148,18 +239,30 @@ function CardMedia({
       </View>
     );
   }
+  // No picture: the site's letter (or a note's pencil) over the save's own
+  // words, so the tile reads as designed rather than still loading.
+  const monogram = item.type === "link" ? siteMonogram(item.url) : undefined;
   return (
     <View style={[styles.textFace, item.type === "note" && styles.noteFace]}>
-      {item.type === "link" && (
-        <AppSymbolIcon
-          name="link"
-          size={13}
-          tintColor={theme.colors.faint}
-          style={{ marginBottom: 6 }}
-        />
-      )}
-      <Text style={styles.textFaceTitle} numberOfLines={5}>
-        {item.title ?? item.note ?? failedLabel ?? displayHost(item.url)}
+      <View style={styles.faceMark}>
+        {monogram === undefined ? (
+          <AppSymbolIcon
+            name={FACE_SYMBOL[item.type]}
+            size={11}
+            tintColor={theme.colors.primaryText}
+          />
+        ) : (
+          <Text
+            style={styles.faceMonogram}
+            maxFontSizeMultiplier={1}
+            accessible={false}
+          >
+            {monogram}
+          </Text>
+        )}
+      </View>
+      <Text style={styles.textFaceBody} numberOfLines={5}>
+        {textFaceCopy(item, failedLabel).body}
       </Text>
     </View>
   );
@@ -176,6 +279,7 @@ function CardCaption({
   menuActions: ActionMenuItem[];
   theme: UnistylesTheme;
 }) {
+  const hostRow = item.type === "link" && Boolean(item.url);
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>
@@ -184,7 +288,7 @@ function CardCaption({
             {captionTitle}
           </Text>
         ) : null}
-        {item.type === "link" && item.url ? (
+        {hostRow ? (
           <View style={styles.captionHostRow}>
             <Text style={styles.captionHost} numberOfLines={1}>
               {shortFormSource(item.url)?.site ?? displayHost(item.url)}
@@ -201,7 +305,7 @@ function CardCaption({
         label={t("item.actions")}
         title={t("item.actions")}
         actions={menuActions}
-        style={styles.menuButton}
+        style={[styles.menuButton, !hostRow && styles.menuOnTitle]}
       >
         <AppSymbolIcon
           name="ellipsis"
@@ -261,12 +365,12 @@ export function ItemCardFace({
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const failedLabel = failureLabel(item);
-  // A tile without media already prints its title on the text face, so the
-  // caption repeats it only under an image.
+  // Under a picture the caption names the save; under a text face it names it
+  // only when the face shows other words (see textFaceCopy).
   const hasMedia = Boolean(item.imageUrl ?? item.heroImageUrl);
   const captionTitle = hasMedia
     ? cardTitles(item).find((title) => title !== undefined)
-    : undefined;
+    : textFaceCopy(item, failedLabel).captionTitle;
   return (
     <View
       style={[
@@ -323,7 +427,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 
   imageContainer: {
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     padding: theme.gap(0.5),
@@ -369,10 +473,13 @@ const styles = StyleSheet.create((theme) => ({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
+  // The mark heads the face and the words settle at its foot, so a short
+  // summary leaves its space in the middle rather than under the text.
   textFace: {
     padding: theme.gap(1.5),
-    minHeight: 96,
-    justifyContent: "center",
+    minHeight: 112,
+    justifyContent: "space-between",
+    gap: theme.gap(1.25),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
@@ -380,10 +487,23 @@ const styles = StyleSheet.create((theme) => ({
   noteFace: {
     backgroundColor: theme.colors.primarySoft,
   },
-  textFaceTitle: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
+  faceMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.background,
+  },
+  faceMonogram: {
+    fontFamily: theme.fonts.display,
+    fontSize: 14,
+    lineHeight: 17,
+    color: theme.colors.primaryText,
+  },
+  textFaceBody: {
+    ...theme.type.displaySmall,
+    lineHeight: 22,
     color: theme.colors.foreground,
   },
   caption: {
@@ -423,6 +543,14 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
+  },
+  // With no site line, the "…" centres on the title's line (13.5 from the
+  // caption's top) instead of hanging a line below it. The icon moves, not the
+  // button: a margin on it would not move the native menu's host, and would
+  // push the 44pt hit area up into the picture. A save whose title hasn't
+  // landed yet sits the same way, so its card keeps its height when it does.
+  menuOnTitle: {
+    paddingBottom: 25,
   },
   suggestedBadge: {
     position: "absolute",

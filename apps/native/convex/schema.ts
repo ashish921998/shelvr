@@ -20,6 +20,11 @@ import {
   feedbackPlatformValidator,
   feedbackSurfaceValidator,
 } from "./model/feedbackFields";
+import {
+  tripDayValidator,
+  tripPaceValidator,
+  tripStopValidator,
+} from "./model/trip";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -148,6 +153,11 @@ export default defineSchema({
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.
     intents: v.optional(v.array(intentValidator)),
+    // Cities of the places the save names ("Mumbai"), as the classifier read
+    // them and `normalizeCities` cleaned them. Lets a plan use only the places
+    // in one city. Optional so older rows validate; absent = never classified
+    // for cities, empty = classified and names no city.
+    cities: v.optional(v.array(v.string())),
     // Real product results from the user-triggered "Find links" pass
     // (SerpAPI Google Shopping). `productsStatus` tracks the in-flight action
     // so the button can show progress; absent = never searched.
@@ -170,6 +180,11 @@ export default defineSchema({
         v.literal("unavailable"),
       ),
     ),
+    // When the current "searching" began. The watchdog findLinks schedules
+    // flips that search to "failed" only while this still matches, so a dead
+    // action cannot leave the button spinning and a newer search is untouched.
+    // Server only: stripped before any item crosses a function boundary.
+    productsSearchStartedAt: v.optional(v.number()),
     // Why processing failed, so the client can say something true instead of
     // rendering an item that looks stuck forever. Only set with
     // `status: "failed"`; absent on pre-existing failed rows.
@@ -520,6 +535,23 @@ export default defineSchema({
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
+
+  // Trips made from a travel space ("Plan my trip"): days of stops, every
+  // stop one of the user's saves. A new trip for the same space replaces the
+  // old one, so a space has at most one.
+  trips: defineTable({
+    userId: v.string(),
+    spaceId: v.id("spaces"),
+    city: v.optional(v.string()),
+    pace: tripPaceValidator,
+    // "YYYY-MM-DD", the first day, when the user picked one.
+    startDate: v.optional(v.string()),
+    days: v.array(tripDayValidator),
+    // Places the days had no room for, best first.
+    wishlist: v.array(tripStopValidator),
+  })
+    .index("by_user", ["userId"])
+    .index("by_space", ["spaceId"]),
 
   // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
   // intents save without launching the JavaScript app, so they have no Convex

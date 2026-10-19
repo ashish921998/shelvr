@@ -25,12 +25,12 @@ export function parseRevenueCatEvent(
   const event = readRecord(readRecord(body)?.event);
   if (event === undefined) return undefined;
 
-  const type = readString(event?.type);
-  const userId = readString(event?.app_user_id);
-  const expiresAt = readNumber(event?.expiration_at_ms);
-  const productId = readString(event?.product_id);
-  const periodType = readString(event?.period_type);
-  const eventTimestampMs = readNumber(event?.event_timestamp_ms);
+  const type = readString(event.type);
+  const userId = readString(event.app_user_id);
+  const expiresAt = readNumber(event.expiration_at_ms);
+  const productId = readString(event.product_id);
+  const periodType = readString(event.period_type);
+  const eventTimestampMs = readNumber(event.event_timestamp_ms);
 
   return {
     type,
