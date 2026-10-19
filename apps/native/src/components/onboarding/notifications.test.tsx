@@ -121,7 +121,7 @@ describe("NotificationsStep", () => {
     expect(screen.getByText("onboarding.remindTonight")).toBeTruthy();
     expect(screen.getByText("onboarding.remindWeekend")).toBeTruthy();
     expect(screen.getByText("onboarding.remindNextWeek")).toBeTruthy();
-    expect(screen.getByText("onboarding.remindPledge")).toBeTruthy();
+    expect(screen.getByText("onboarding.remindConsent")).toBeTruthy();
   });
 
   it("moves on by itself when there is no save", async () => {
