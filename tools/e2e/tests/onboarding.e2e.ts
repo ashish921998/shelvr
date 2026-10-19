@@ -8,7 +8,7 @@ import {
   startFreshOnboarding,
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
-import { LAUNCH_ARGUMENTS } from "./launch.ts";
+import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall } from "./paywall-sheet.ts";
 
 // A run that stops partway leaves a signed-in user mid-onboarding, which the
@@ -64,11 +64,13 @@ test("asks for the paywall at the end of onboarding, after a relaunch on the rem
 
   // The native AppContext crash used to return a completed new user to
   // SpringBoard while mounting Home after a cold launch.
-  await relaunchWith(
-    device,
-    screen,
-    [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
-    () => screen.getByRole("button", "View Pro plans").isVisible(),
-  );
+  // Launch once: retrying here could hide a crash on the first attempt.
+  await device.openApp(BUNDLE_ID, {
+    relaunch: true,
+    launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
+  });
+  await expect(screen.getByRole("button", "View Pro plans")).toBeVisible({
+    timeout: 60_000,
+  });
   await expect(screen.getByRole("button", "Start yours")).toBeHidden();
 });
