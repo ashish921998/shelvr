@@ -269,21 +269,74 @@ describe("a paywall that never came up", () => {
   async function hungSheet() {
     const mod = await loadReady();
     mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
-    void mod.openPaywall(router, "onboarding");
+    const first = mod.openPaywall(router, "onboarding");
     await vi.waitFor(() => expect(mock.presentPaywall).toHaveBeenCalled());
     vi.useFakeTimers();
-    return mod;
+    return { ...mod, first };
   }
+
+  it("settles the dead sheet as a close once a touch proves it never showed", async () => {
+    const { openPaywall, noteAppTouch, first } = await hungSheet();
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+
+    vi.advanceTimersByTime(2000);
+    noteAppTouch();
+    await openPaywall(router, "new_space");
+
+    // The onboarding replay waiting on it keeps its work, and no fallback
+    // screen opens for a tap it never made.
+    await expect(first).resolves.toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
 
   it("presents again when the app takes a touch after it should have covered it", async () => {
     const { openPaywall, noteAppTouch } = await hungSheet();
     mock.presentPaywall.mockResolvedValueOnce("PURCHASED");
 
-    vi.advanceTimersByTime(1500);
+    vi.advanceTimersByTime(2000);
     noteAppTouch();
 
     await expect(openPaywall(router, "new_space")).resolves.toBe(true);
     expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips the exit offer when a dropped sheet settles after all", async () => {
+    mock.getOfferings.mockResolvedValue({
+      all: {
+        exit_offer: {
+          identifier: "exit_offer",
+          availablePackages: [
+            {
+              product: {
+                identifier: "annual_exit",
+                introPrice: { price: 19.99 },
+              },
+            },
+          ],
+        },
+      },
+    });
+    mock.checkEligibility.mockResolvedValue({ annual_exit: { status: 2 } });
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+    const { openPaywall, noteAppTouch, isPaywallPending } = await loadReady();
+    const slow = deferred<string>();
+    mock.presentPaywall.mockReturnValueOnce(slow.promise);
+    void openPaywall(router, "onboarding");
+    await vi.waitFor(() => expect(mock.presentPaywall).toHaveBeenCalled());
+    vi.useFakeTimers();
+    const next = deferred<string>();
+    mock.presentPaywall.mockReturnValueOnce(next.promise);
+
+    vi.advanceTimersByTime(2000);
+    noteAppTouch();
+    void openPaywall(router, "new_space");
+    await vi.advanceTimersByTimeAsync(0);
+    slow.resolve("CANCELLED");
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    // The late settle cannot release the newer sheet.
+    expect(isPaywallPending()).toBe(true);
   });
 
   it("still joins when no touch reached the app", async () => {
