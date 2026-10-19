@@ -40,6 +40,7 @@ import Animated, {
   FadeOut,
   ReduceMotion,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   type SharedValue,
@@ -446,20 +447,30 @@ function PinLabel({ pin, city }: { pin: Pin; city: string }) {
   );
 }
 
-/** One frame of the globe, as SVG paths, and how lit the city's country is. */
-type GlobeFrame = { paths: GlobePaths; light: number };
-
 const SPIN_FRAME_MS = 1000 / 30;
 
-const HIDDEN: GlobeFrame = {
-  paths: { sphere: "", graticule: "", land: "", country: "" },
-  light: 0,
-};
+/** Skia rejects an empty SVG path, so nothing to draw is a lone move. */
+const NOTHING = "M0 0";
+
+/** The globe's paths, held as shared values so each frame reaches the screen
+ * on the UI thread with the dots, not after a React render. */
+function useGlobePaths() {
+  const sphere = useSharedValue(NOTHING);
+  const graticule = useSharedValue(NOTHING);
+  const land = useSharedValue(NOTHING);
+  const country = useSharedValue(NOTHING);
+  return useMemo(
+    () => ({ sphere, graticule, land, country }),
+    [sphere, graticule, land, country],
+  );
+}
 
 /** The globe: a real world map that rises as the saves become dots, spins
  * while the trip is built, then turns to the trip and zooms into its
- * country. Frames are drawn on the JS thread with d3 (trip-globe.ts), so they
- * stop as soon as the camera settles. */
+ * country. Frames are worked out on the JS thread with d3 (trip-globe.ts)
+ * and stop as soon as the camera settles. Each one goes to Skia through
+ * shared values, in the same tick as the city's position and the dive's
+ * progress, so the map and the dots land on screen together. */
 function Globe({
   stage,
   target,
@@ -473,7 +484,9 @@ function Globe({
 }) {
   const { theme, rt } = useUnistyles();
   const [startedAt] = useState(Date.now);
-  const [frame, setFrame] = useState(HIDDEN);
+  const drawn = useGlobePaths();
+  const light = useSharedValue(0);
+  const countryOpacity = useDerivedValue(() => 0.85 * light.value);
   // Set once, when the dive starts: when, and the close-up map to draw.
   const dive = useRef<{ at: number; region: GlobeRegion } | null>(null);
   const glow = useSharedValue(0);
@@ -500,22 +513,25 @@ function Globe({
     const screen = { width, height };
     let handle = 0;
     let shown = false;
-    let drawn = -Infinity;
+    let drawnAt = -Infinity;
     const tick = () => {
       const t = Date.now() - startedAt;
       const diveAt = dive.current?.at ?? null;
       // The spin can run for as long as the build takes, so it draws at
       // 30fps to spare the JS thread; the short dive gets every frame.
-      if (diveAt === null && t - drawn < SPIN_FRAME_MS) {
+      if (diveAt === null && t - drawnAt < SPIN_FRAME_MS) {
         handle = requestAnimationFrame(tick);
         return;
       }
-      drawn = t;
+      drawnAt = t;
       const camera = globeCamera({ t, diveAt, ...screen, target: aim });
       const paths = globePaths(camera, screen, dive.current?.region ?? null);
-      // Below the screen there is nothing to draw, so no render either.
+      // Below the screen there is nothing to draw, so nothing to send.
       if (paths.sphere !== "" || shown) {
-        setFrame({ paths, light: countryLight(camera.dive) });
+        (Object.keys(drawn) as (keyof GlobePaths)[]).forEach((key) => {
+          drawn[key].value = paths[key] || NOTHING;
+        });
+        light.value = countryLight(camera.dive);
         shown = paths.sphere !== "";
       }
       // With no pins the dots fall on the screen's centre, where the dive
@@ -532,49 +548,36 @@ function Globe({
     };
     handle = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(handle);
-  }, [stage, startedAt, lng, lat, width, height, glow, pin]);
+  }, [stage, startedAt, lng, lat, width, height, glow, pin, drawn, light]);
 
-  const { paths, light } = frame;
   return (
     <>
       <Canvas style={styles.globe} pointerEvents="none">
-        {paths.sphere ? (
-          <Path path={paths.sphere} color={theme.colors.globeOcean} />
-        ) : null}
-        {paths.graticule ? (
-          <Path
-            path={paths.graticule}
-            color={theme.colors.border}
-            style="stroke"
-            strokeWidth={1}
-          />
-        ) : null}
-        {paths.land ? (
-          <>
-            <Path path={paths.land} color={theme.colors.globeLand} />
-            <Path
-              path={paths.land}
-              color={theme.colors.globeLandEdge}
-              style="stroke"
-              strokeWidth={0.8}
-            />
-          </>
-        ) : null}
-        {paths.country ? (
-          <Path
-            path={paths.country}
-            color={theme.colors.primary}
-            opacity={0.85 * light}
-          />
-        ) : null}
-        {paths.sphere ? (
-          <Path
-            path={paths.sphere}
-            color={theme.colors.globeLandEdge}
-            style="stroke"
-            strokeWidth={1.2}
-          />
-        ) : null}
+        <Path path={drawn.sphere} color={theme.colors.globeOcean} />
+        <Path
+          path={drawn.graticule}
+          color={theme.colors.border}
+          style="stroke"
+          strokeWidth={1}
+        />
+        <Path path={drawn.land} color={theme.colors.globeLand} />
+        <Path
+          path={drawn.land}
+          color={theme.colors.globeLandEdge}
+          style="stroke"
+          strokeWidth={0.8}
+        />
+        <Path
+          path={drawn.country}
+          color={theme.colors.primary}
+          opacity={countryOpacity}
+        />
+        <Path
+          path={drawn.sphere}
+          color={theme.colors.globeLandEdge}
+          style="stroke"
+          strokeWidth={1.2}
+        />
         <Group opacity={glow}>
           <Circle cx={pin.x} cy={pin.y} r={26} color={theme.colors.primary}>
             <BlurMask blur={8} style="normal" />
