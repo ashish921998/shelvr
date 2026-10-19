@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
 import { useUnistyles } from "react-native-unistyles";
+import { dropMenuDismissTouch } from "@/components/ui/action-menu";
 import { isDarkThemeName } from "@/lib/appearance";
 import {
   NotificationSessionProvider,
@@ -100,7 +101,10 @@ export default function RootLayout() {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView
+      style={{ flex: 1 }}
+      onStartShouldSetResponderCapture={dropMenuDismissTouch}
+    >
       <ConvexAuthProvider
         client={convex}
         storage={authStorage}

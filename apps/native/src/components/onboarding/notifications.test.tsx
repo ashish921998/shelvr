@@ -149,7 +149,7 @@ describe("NotificationsStep", () => {
     fireEvent.click(screen.getByText("onboarding.remindWeekend"));
     expect(mock.request).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("onboarding.remindCtaWeekend"));
-    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledWith("weekend"));
     expect(mock.request).toHaveBeenCalledOnce();
     expect(mock.schedule).toHaveBeenCalledWith({
       itemId: "item-1",
@@ -177,6 +177,8 @@ describe("NotificationsStep", () => {
     const onAdvance = renderStep();
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
     await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    // Nothing was scheduled, so the promise step names no reminder.
+    expect(onAdvance).toHaveBeenCalledWith(undefined);
     expect(mock.weekly).not.toHaveBeenCalled();
   });
 

@@ -11,6 +11,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { FlashList } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -87,8 +88,6 @@ function CoverStack({
         1.9,
       )
     : 1;
-  const position = CARD_POSITION;
-
   return (
     <View style={[styles.stack, { aspectRatio: ratio }]}>
       {BACKS.map((back, i) => (
@@ -98,7 +97,7 @@ function CoverStack({
             styles.card,
             styles.cardBlank,
             !cover && styles.cardEmptyBack,
-            position,
+            CARD_POSITION,
             {
               transform: [
                 { translateX: back.tx },
@@ -116,7 +115,7 @@ function CoverStack({
           style={[
             styles.card,
             styles.coverFrame,
-            position,
+            CARD_POSITION,
             { transform: [{ rotate: `${seededUnit(`${seed}-top`) * 2}deg` }] },
           ]}
         >
@@ -137,7 +136,7 @@ function CoverStack({
           style={[
             styles.card,
             styles.cardEmpty,
-            position,
+            CARD_POSITION,
             { transform: [{ rotate: `${seededUnit(`${seed}-top`) * 2}deg` }] },
           ]}
         >
@@ -223,9 +222,116 @@ function EmptySpaces({
   );
 }
 
+type SpaceSummary = FunctionReturnType<typeof api.spaces.listSpaces>[number];
+
+/** One pile in the spaces grid; a tap opens the space. */
+function SpaceCard({
+  space,
+  reducedMotion,
+  onDelete,
+}: {
+  space: SpaceSummary;
+  reducedMotion: boolean;
+  onDelete: (id: Id<"spaces">) => void;
+}) {
+  const { theme } = useUnistyles();
+  const router = useRouter();
+  const href = `/space/${space._id}` as const;
+  // `previews` can be briefly absent when the offline cache rehydrates an
+  // older query shape before the live refetch lands. The newest item is
+  // the cover; the rest of the pile is intentionally blank.
+  const cover = (space.previews ?? [])[0];
+  // As in item-card: on iOS expo-router hosts the trigger inside zero-size
+  // native views, and iOS drops every accessibility element under them, so
+  // the card is read from the cell instead. Android keeps it on the
+  // Pressable.
+  const cardA11y = {
+    accessible: true,
+    // `role`, not `accessibilityRole`, which Link's role="link" would shadow.
+    role: "button" as const,
+    accessibilityLabel: space.name,
+    // The cell stands in for the card, so it also carries the count the
+    // empty cover shows, as a value: the name stays the label tests and
+    // Voice Control match on.
+    accessibilityValue: {
+      text:
+        space.itemCount > 0
+          ? t("spaces.saveCount", { count: space.itemCount })
+          : space.suggestionCount > 0
+            ? t("spaces.suggestionCount", { count: space.suggestionCount })
+            : undefined,
+    },
+    accessibilityActions: [{ name: "delete", label: t("common.delete") }],
+    onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+      if (event.nativeEvent.actionName === "delete") {
+        onDelete(space._id);
+      }
+    },
+    onAccessibilityTap: () => router.push(href),
+    testID: space.fixtureKey ? `fixture-space-${space.fixtureKey}` : undefined,
+  };
+  const a11yOnCell = process.env.EXPO_OS === "ios";
+
+  return (
+    <Animated.View style={styles.cell} {...(a11yOnCell ? cardA11y : {})}>
+      <Link href={href} asChild>
+        <Link.Trigger withAppleZoom={!reducedMotion}>
+          {/* The whole card is the pressable that routes to the space. */}
+          <Pressable {...(a11yOnCell ? {} : cardA11y)}>
+            {/* Link.Trigger's Slot drops a Pressable style function,
+                so press feedback lives on this inner View. */}
+            {({ pressed }) => (
+              <View style={pressed ? styles.pressed : undefined}>
+                <CoverStack
+                  cover={cover}
+                  seed={space._id}
+                  name={space.name}
+                  itemCount={space.itemCount}
+                  suggestionCount={space.suggestionCount}
+                />
+                <View style={styles.caption}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {space.name}
+                  </Text>
+                  <ActionMenu
+                    label={t("spaces.actions")}
+                    title={t("spaces.actions")}
+                    actions={[
+                      {
+                        label: t("common.delete"),
+                        destructive: true,
+                        onPress: () => onDelete(space._id),
+                      },
+                    ]}
+                    style={styles.menuButton}
+                  >
+                    <AppSymbolIcon
+                      name="ellipsis"
+                      size={15}
+                      tintColor={theme.colors.foreground}
+                    />
+                  </ActionMenu>
+                </View>
+              </View>
+            )}
+          </Pressable>
+        </Link.Trigger>
+        <Link.Preview />
+        <Link.Menu>
+          <Link.MenuAction
+            title={t("common.delete")}
+            icon="trash"
+            destructive
+            onPress={() => onDelete(space._id)}
+          />
+        </Link.Menu>
+      </Link>
+    </Animated.View>
+  );
+}
+
 export default function SpacesScreen() {
   useAppLocale();
-  const { theme } = useUnistyles();
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
   const deleteSpace = useMutation(api.spaces.deleteSpace);
 
@@ -299,74 +405,13 @@ export default function SpacesScreen() {
         keyExtractor={(space) => space._id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        renderItem={({ item: space }) => {
-          // `previews` can be briefly absent when the offline cache rehydrates an
-          // older query shape before the live refetch lands. The newest item is
-          // the cover; the rest of the pile is intentionally blank.
-          const cover = (space.previews ?? [])[0];
-          return (
-            <Animated.View style={styles.cell}>
-              <Link href={`/space/${space._id}`} asChild>
-                <Link.Trigger withAppleZoom={!reducedMotion}>
-                  {/* The whole card is the pressable that routes to the space. */}
-                  <Pressable
-                    testID={
-                      space.fixtureKey
-                        ? `fixture-space-${space.fixtureKey}`
-                        : undefined
-                    }
-                  >
-                    {/* Link.Trigger's Slot drops a Pressable style function,
-                        so press feedback lives on this inner View. */}
-                    {({ pressed }) => (
-                      <View style={pressed ? styles.pressed : undefined}>
-                        <CoverStack
-                          cover={cover}
-                          seed={space._id}
-                          name={space.name}
-                          itemCount={space.itemCount}
-                          suggestionCount={space.suggestionCount}
-                        />
-                        <View style={styles.caption}>
-                          <Text style={styles.title} numberOfLines={1}>
-                            {space.name}
-                          </Text>
-                          <ActionMenu
-                            label={t("spaces.actions")}
-                            title={t("spaces.actions")}
-                            actions={[
-                              {
-                                label: t("common.delete"),
-                                destructive: true,
-                                onPress: () => confirmDelete(space._id),
-                              },
-                            ]}
-                            style={styles.menuButton}
-                          >
-                            <AppSymbolIcon
-                              name="ellipsis"
-                              size={15}
-                              tintColor={theme.colors.foreground}
-                            />
-                          </ActionMenu>
-                        </View>
-                      </View>
-                    )}
-                  </Pressable>
-                </Link.Trigger>
-                <Link.Preview />
-                <Link.Menu>
-                  <Link.MenuAction
-                    title={t("common.delete")}
-                    icon="trash"
-                    destructive
-                    onPress={() => confirmDelete(space._id)}
-                  />
-                </Link.Menu>
-              </Link>
-            </Animated.View>
-          );
-        }}
+        renderItem={({ item: space }) => (
+          <SpaceCard
+            space={space}
+            reducedMotion={reducedMotion}
+            onDelete={confirmDelete}
+          />
+        )}
       />
       <HeaderScrim />
     </View>
@@ -403,10 +448,10 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: "continuous",
     boxShadow: `0 6px 14px rgba(0,0,0,0.22), inset 0 0 0 1px ${theme.colors.imageBorder}`,
   },
-  // The cover: a white matte with a little padding around the photo, matching the
-  // home feed's item frame so a save looks the same fanned into a space.
+  // The cover: a matte with a little padding around the photo, the home feed's
+  // item frame, so a save looks the same fanned into a space.
   coverFrame: {
-    backgroundColor: "#ffffff",
+    backgroundColor: theme.colors.frame,
     padding: theme.gap(0.5),
     zIndex: 3,
   },
@@ -419,14 +464,14 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
-    // White (not surfaceMuted) so a transparent die-cut sticker cover shows white
-    // behind it, matching the matte instead of a grey block.
-    backgroundColor: "#ffffff",
+    // The matte's colour (not surfaceMuted) so a transparent die-cut sticker
+    // cover shows the matte behind it instead of a grey block.
+    backgroundColor: theme.colors.frame,
   },
-  // The blank cards behind, same white stock as the cover matte so the pile
+  // The blank cards behind, the same stock as the cover matte so the pile
   // reads as a stack of identical cards.
   cardBlank: {
-    backgroundColor: "#ffffff",
+    backgroundColor: theme.colors.frame,
     zIndex: 1,
   },
   cardEmptyBack: {

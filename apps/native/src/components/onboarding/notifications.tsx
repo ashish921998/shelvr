@@ -66,7 +66,8 @@ export function NotificationsStep({
   onAdvance,
 }: {
   saved: DemoSaved | null;
-  onAdvance: () => void;
+  /** Gets the slot only when a reminder was actually scheduled. */
+  onAdvance: (scheduled?: ReminderSlot) => void;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -136,6 +137,7 @@ export function NotificationsStep({
     // the reminder, and this save must not be scheduled after that.
     const ticket = firstSaveReminderTicket();
     let granted = false;
+    let scheduled = false;
     try {
       granted = await requestNotificationPermission();
       if (granted && expired()) {
@@ -150,6 +152,8 @@ export function NotificationsStep({
           at: choice.at,
           ticket,
         });
+        // A sign-out during the prompt makes the schedule a no-op.
+        scheduled = firstSaveReminderTicket() === ticket;
       }
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
@@ -179,7 +183,7 @@ export function NotificationsStep({
       granted,
     });
     setBusy(false);
-    advanceRef.current();
+    advanceRef.current(scheduled ? choice.slot : undefined);
   };
 
   const skip = () => {

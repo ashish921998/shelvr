@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampRatio } from "./aspect-ratio";
+import { clampRatio, letterboxedVideoRatio } from "./aspect-ratio";
 
 describe("clampRatio", () => {
   it("uses the fallback for missing and invalid ratios", () => {
@@ -15,5 +15,34 @@ describe("clampRatio", () => {
 
   it("preserves ratios within the limits", () => {
     expect(clampRatio(1.4, 1, 0.6, 1.9)).toBe(1.4);
+  });
+});
+
+describe("letterboxedVideoRatio", () => {
+  const video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+  // oEmbed's hqdefault is 480×360.
+  const stock = 480 / 360;
+
+  it("crops a YouTube video's 4:3 stock thumbnail to the video's 16:9", () => {
+    expect(letterboxedVideoRatio(video, stock)).toBe(16 / 9);
+    expect(letterboxedVideoRatio("https://youtu.be/dQw4w9WgXcQ", stock)).toBe(
+      16 / 9,
+    );
+    expect(
+      letterboxedVideoRatio("https://www.youtube.com/live/abc123", stock),
+    ).toBe(16 / 9);
+  });
+
+  it("leaves widescreen thumbnails, Shorts, channels and other sites alone", () => {
+    expect(letterboxedVideoRatio(video, 16 / 9)).toBeUndefined();
+    expect(letterboxedVideoRatio(video, undefined)).toBeUndefined();
+    expect(
+      letterboxedVideoRatio("https://www.youtube.com/shorts/abc123", stock),
+    ).toBeUndefined();
+    expect(
+      letterboxedVideoRatio("https://www.youtube.com/@RickAstleyYT", stock),
+    ).toBeUndefined();
+    expect(letterboxedVideoRatio("https://vimeo.com/1", stock)).toBeUndefined();
+    expect(letterboxedVideoRatio(undefined, stock)).toBeUndefined();
   });
 });
