@@ -109,8 +109,11 @@ export function tripCenter(
       ? sorted[middle]
       : (sorted[middle - 1] + sorted[middle]) / 2;
   };
+  // Stops either side of ±180° are moved next to the first, so their middle
+  // is not on the far side of the globe.
+  const lng = median(pins.map((pin) => nearestTurn(pins[0].lng, pin.lng)));
   return {
-    lng: median(pins.map((pin) => pin.lng)),
+    lng: ((((lng + 180) % 360) + 360) % 360) - 180,
     lat: median(pins.map((pin) => pin.lat)),
   };
 }

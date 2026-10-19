@@ -38,6 +38,18 @@ describe("tripCenter", () => {
     expect(center?.lng).toBeCloseTo(-9.125);
   });
 
+  it("stays on a trip that crosses the antimeridian", () => {
+    const center = tripCenter([
+      {
+        stops: [
+          { lat: -18.1, lng: 178.4 },
+          { lat: -17.5, lng: -178.8 },
+        ],
+      },
+    ]);
+    expect(center?.lng).toBeCloseTo(179.8);
+  });
+
   it("is null when no stop has a pin", () => {
     expect(tripCenter([{ stops: [{}, {}] }])).toBeNull();
     expect(tripCenter()).toBeNull();
