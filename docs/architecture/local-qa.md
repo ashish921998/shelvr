@@ -76,6 +76,21 @@ only loads bundles whose native fingerprint matches. Rebuild with
 
 ## Getting into a specific state
 
+- **Match the served paywall.** The development RevenueCat project's current
+  offering must mirror the production current offering. As of 2026-10-20,
+  both use `paywall_v3_exact`; development's older `default` offering is V1
+  and gives misleading copy/layout QA results. Check the current offering
+  before auditing the paywall; test-store prices remain separate from Apple.
+  The `exit_offer` must also have its migrated workflow published in the
+  dashboard. Publishing only its legacy paywall through the v2 API leaves
+  that workflow as a draft, so the SDK can show "No Paywall configured".
+- **Native crash regressions.** RevenueCat 10.9.1 resolves the embedded
+  paywall's native view as `PaywallView`, fixing the React Native view-manager
+  lookup crash when an exit offer mounts. Expo Modules Core 57.0.23 includes
+  the per-context view identity fix for `AppContextLost` on dev-client
+  startup/reload. Rebuild the development binary after these upgrades;
+  changing Metro alone cannot fix either native crash.
+
 - **First-run onboarding.** Terminate the app, then
   `xcrun simctl keychain <udid> reset`. This clears the auth token, the
   onboarded flag and pending onboarding progress together, so the next launch

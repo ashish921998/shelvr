@@ -4,6 +4,7 @@ import type { DemoSample } from "@/lib/onboarding-demo";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { SaveSummary } from "@/components/onboarding/save-summary";
+import { sampleImage } from "@/components/onboarding/sample-card";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
@@ -44,10 +45,8 @@ export function SampleSignIn({
         <Text style={styles.verdictMuted}>{t("reveal.previewSubtitle")}</Text>
       </Text>
 
-      {/* No picture yet: the save takes the page's own picture once it is
-          read, and a stand-in here would change under the person. */}
       <SaveSummary
-        image={null}
+        image={sampleImage(sample)}
         title={sample.pageHeading}
         meta={sample.domain}
       />

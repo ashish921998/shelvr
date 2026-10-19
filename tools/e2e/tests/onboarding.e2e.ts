@@ -54,11 +54,21 @@ test("asks for the paywall at the end of onboarding, after a relaunch on the rem
 
   // A close is a decline, and onboarding ends on Home. No exit offer
   // follows: hiding Pro skips it.
-  await screen.getByRole("button").first().tap();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeHidden({
+  await screen.getByRole("button", "Close").first().tap();
+  await expect(screen.getByRole("button", /Restore purchases/i)).toBeHidden({
     timeout: 30_000,
   });
   await expect(screen.getByRole("button", "Profile")).toBeVisible({
     timeout: 30_000,
   });
+
+  // The native AppContext crash used to return a completed new user to
+  // SpringBoard while mounting Home after a cold launch.
+  await relaunchWith(
+    device,
+    screen,
+    [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
+    () => screen.getByRole("button", "View Pro plans").isVisible(),
+  );
+  await expect(screen.getByRole("button", "Start yours")).toBeHidden();
 });

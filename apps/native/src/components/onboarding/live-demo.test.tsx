@@ -46,6 +46,7 @@ const mock = vi.hoisted(() => {
     },
     intake: { canAccept: (): boolean => true },
     nothing: () => null,
+    saveSummary: vi.fn((_props: { image?: unknown }) => null),
     view: ({ children }: Children) => <div>{children}</div>,
     text: ({ children }: Children) => <span>{children}</span>,
     modal: (
@@ -170,11 +171,12 @@ vi.mock("@/lib/use-incoming-share-url", () => ({
   },
 }));
 vi.mock("@/components/onboarding/save-summary", () => ({
-  SaveSummary: mock.nothing,
+  SaveSummary: mock.saveSummary,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
 const { DEMO_SAMPLES } = await import("@/lib/onboarding-demo");
+const { sampleImage } = await import("@/components/onboarding/sample-card");
 
 const props = {
   samples: [...DEMO_SAMPLES],
@@ -355,6 +357,10 @@ describe("first-save picker", () => {
     const { rerender } = render(step());
     expect(screen.getByText("reveal.previewSubtitle")).toBeTruthy();
     expect(linkField()).toBeNull();
+    expect(mock.saveSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ image: sampleImage(DEMO_SAMPLES[0]) }),
+      undefined,
+    );
 
     mock.demo.authUrl = "https://a.test/p";
     rerender(step());

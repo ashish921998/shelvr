@@ -12,9 +12,8 @@ startOnSeededHome();
  * close: the launch argument that hides Pro also skips it.
  */
 async function closePaywall(screen: Screen): Promise<void> {
-  // The close control has no label; it is the first button on the sheet.
-  await screen.getByRole("button").first().tap();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeHidden({
+  await screen.getByRole("button", "Close").first().tap();
+  await expect(screen.getByRole("button", /Restore purchases/i)).toBeHidden({
     timeout: 30_000,
   });
   await expect(screen.getByRole("button", "View Pro plans")).toBeVisible();
@@ -89,10 +88,12 @@ test("leaves the exit offer by the app's own close", async ({
 
   await viewPlans.tap();
   await expectPaywall(screen);
-  await screen.getByRole("button").first().tap();
+  await screen.getByRole("button", "Close").first().tap();
 
   const close = screen.getByTestId("exit-offer-close");
   await expect(close).toBeVisible({ timeout: 60_000 });
+  await expect(screen.getByText(/^Your first year/)).toBeVisible();
+  await expect(screen.getByText("No Paywall configured")).toBeHidden();
   await close.tap();
   await expect(close).toBeHidden({ timeout: 30_000 });
   // Home holds the offer open for its window in place of the Pro prompt.
