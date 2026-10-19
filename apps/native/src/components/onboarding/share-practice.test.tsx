@@ -206,6 +206,31 @@ describe("share practice", () => {
     expect(onFinish).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores a sheet that answers after the person left", async () => {
+    let answer: (result: string) => void = () => undefined;
+    mock.present.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const onFinish = vi.fn();
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={onFinish}
+      />,
+    );
+    fireEvent.click(screen.getByText("share-sample"));
+    fireEvent.click(screen.getByText("sharePractice.later"));
+    mock.capture.mockClear();
+    await act(async () => {
+      answer("failed");
+    });
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(mock.capture).not.toHaveBeenCalled();
+  });
+
   it("counts a closed sheet, so a sheet that opened shows in the funnel", async () => {
     mock.present.mockResolvedValue("dismissed");
     render(

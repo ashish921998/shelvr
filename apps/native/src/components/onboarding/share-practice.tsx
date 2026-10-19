@@ -172,6 +172,11 @@ export function SharePracticeStep({
   };
 
   const skip = () => {
+    // A sheet still pending answers into nothing: its result must not
+    // finish the step a second time or log after "skipped".
+    attempt.current += 1;
+    pendingSince.current = null;
+    settling.current = false;
     report("skipped");
     onFinish();
   };
