@@ -134,6 +134,7 @@ beforeEach(() => {
   mock.queueDemoUrl.mockReset();
   mock.clearLegacyDemo.mockReset();
   mock.recordShareSaved.mockReset();
+  mock.releaseSavedShare.mockReset();
   mock.query = { data: undefined, isError: false, isSuccess: false };
   mock.queryArgs = undefined;
 });
@@ -894,6 +895,9 @@ describe("useDemoSave", () => {
     act(() => result.current.submitUrl("https://sample.test/ready-made"));
     act(() => result.current.saveLater());
     expect(mock.queueDemoUrl).toHaveBeenCalledWith(
+      "https://sample.test/ready-made",
+    );
+    expect(mock.releaseSavedShare).toHaveBeenCalledWith(
       "https://sample.test/ready-made",
     );
     expect(mock.setPendingDemo).toHaveBeenLastCalledWith(null);

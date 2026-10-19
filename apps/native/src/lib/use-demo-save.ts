@@ -504,6 +504,9 @@ export function useDemoSave({
       sample: findSample(url) !== undefined,
     });
     queueDemoUrl(url);
+    // The queue owns the link now, so a held share of it is let go: the
+    // share screen must not offer it again, and the replay saves it once.
+    releaseSavedShare(url);
     setPendingDemo(null);
     advance();
   };
