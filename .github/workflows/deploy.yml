@@ -35,10 +35,8 @@ jobs:
           echo '::error::Deploy must be dispatched from main. Select main in the Run workflow branch selector.'
           exit 1
 
-  # Separate from the deploy so a commit that must not deploy never reaches the
-  # production environment. That environment asks a human to approve before any
-  # step runs, so deciding this inside the deploy job would request approval for
-  # a run whose first step then refuses it.
+  # Reject stale or unsuccessful commits before entering the main-only
+  # production environment. Deployments do not require a human approval.
   selected-commit:
     name: Check the selected commit
     if: |
@@ -78,10 +76,9 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
-      # The approval this job just waited on has no time limit, and queueing a
-      # later run does not invalidate this one, so main may have moved since the
-      # verdict that let this job start.
-      - name: Confirm main did not move while approval was pending
+      # Queueing a later run does not invalidate this one, so main may have
+      # moved since the verdict that let this job start.
+      - name: Confirm main did not move while this deploy was queued
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |

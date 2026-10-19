@@ -138,6 +138,14 @@ describe("deleteCurrentUserAccount", () => {
         itemId: seeded.noteId,
         visitedAt: 1700000000002,
       });
+      // A trip lists the places the user plans to go.
+      await ctx.db.insert("trips", {
+        userId,
+        spaceId: seeded.spaceId,
+        pace: "easy",
+        days: [],
+        wishlist: [],
+      });
     });
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -185,11 +193,65 @@ describe("deleteCurrentUserAccount", () => {
           .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
           .collect(),
       ).toHaveLength(0);
+      expect(
+        await ctx.db
+          .query("trips")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(0);
       expect(await ctx.db.system.get("_storage", seeded.storageId)).toBeNull();
       expect(
         await ctx.db.system.get("_storage", seeded.pendingStorageId),
       ).toBeNull();
     });
+  });
+
+  it("ends a pass on bytes read, so a batch of long articles stays under the read limit", async () => {
+    // Convex refuses a transaction that reads more than 16 MiB. A link save
+    // keeps up to 100k characters of article plus its search copy, so a
+    // full row-count batch of them can cross that and fail every retry.
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, t } = await signedInUser(backend, { pro: true });
+      const article = "x".repeat(100_000);
+      const count = 60;
+      await backend.run(async (ctx) => {
+        for (let i = 0; i < count; i++) {
+          await ctx.db.insert("items", {
+            userId,
+            type: "link",
+            status: "ready",
+            url: `https://example.com/${i}`,
+            tags: [],
+            content: article,
+            searchText: article,
+          });
+        }
+      });
+      const remaining = () =>
+        backend.run(
+          async (ctx) =>
+            (
+              await ctx.db
+                .query("items")
+                .withIndex("by_user", (q) => q.eq("userId", userId as string))
+                .collect()
+            ).length,
+        );
+
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      // 60 rows of ~200 KB each is ~12 MB: under the row cap, over the
+      // byte budget, so the first pass leaves some for the continuation.
+      expect(await remaining()).toBeGreaterThan(0);
+      expect(await remaining()).toBeLessThan(count);
+
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await remaining()).toBe(0);
+      expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("drains accounts larger than one batch via scheduled continuations", async () => {

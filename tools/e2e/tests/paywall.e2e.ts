@@ -2,19 +2,10 @@ import { test } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
+import { expectPaywall } from "./paywall-sheet.ts";
 import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
-
-async function expectPaywall(screen: Screen): Promise<void> {
-  await expect(screen.getByText("Shelvr Pro")).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(screen.getByRole("button", /^Monthly, /)).toBeVisible();
-  await expect(screen.getByRole("button", /^Annual, /)).toBeVisible();
-  await expect(screen.getByRole("button", "Continue")).toBeVisible();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeVisible();
-}
 
 /**
  * Closes the paywall and waits until Home is back. No exit offer follows the
@@ -69,4 +60,43 @@ test("shows the paywall instead of Add to someone without Pro", async ({
   ]) {
     await expect(screen.getByTestId(`fixture-item-${seeded}`)).toBeVisible();
   }
+});
+
+// The exit offer after a paywall close, asked for with a second launch
+// argument, since hiding Pro skips it otherwise. Its sheet hosts
+// RevenueCat's paywall full-screen, and when the design fails to render
+// RevenueCat's fallback has no close, so the app keeps a close of its own on
+// top (PR #194 shipped without one, and the offer could not be left).
+test("leaves the exit offer by the app's own close", async ({
+  device,
+  screen,
+}) => {
+  await device.openApp(BUNDLE_ID, {
+    relaunch: true,
+    launchArguments: [
+      ...LAUNCH_ARGUMENTS,
+      "-E2EHidePro",
+      "YES",
+      "-E2EExitOffer",
+      "YES",
+    ],
+  });
+  const viewPlans = screen.getByRole("button", "View Pro plans");
+  await expect(viewPlans).toBeVisible({ timeout: 180_000 });
+  await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+    timeout: 30_000,
+  });
+
+  await viewPlans.tap();
+  await expectPaywall(screen);
+  await screen.getByRole("button").first().tap();
+
+  const close = screen.getByTestId("exit-offer-close");
+  await expect(close).toBeVisible({ timeout: 60_000 });
+  await close.tap();
+  await expect(close).toBeHidden({ timeout: 30_000 });
+  // Home holds the offer open for its window in place of the Pro prompt.
+  await expect(screen.getByRole("button", "See the offer")).toBeVisible({
+    timeout: 30_000,
+  });
 });

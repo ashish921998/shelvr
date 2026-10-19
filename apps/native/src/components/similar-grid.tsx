@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { displayHost } from "@/lib/url";
+import { clampRatio, letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
@@ -14,10 +15,7 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
   const columns: [DetailItem[], DetailItem[]] = [[], []];
   const heights = [0, 0];
   for (const item of items) {
-    const ratio = Math.min(
-      Math.max(item.aspectRatio ?? (item.type === "link" ? 1.91 : 1), 0.5),
-      2,
-    );
+    const ratio = similarRatio(item);
     const column = heights[0] <= heights[1] ? 0 : 1;
     columns[column].push(item);
     heights[column] += 1 / ratio;
@@ -37,14 +35,21 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
   );
 }
 
+/** A card's picture shape, bounded so one extreme picture can't take over
+ * its column. A letterboxed video thumbnail takes its video's shape, so the
+ * cover fit crops the black bars away. */
+function similarRatio(item: DetailItem): number {
+  return (
+    letterboxedVideoRatio(item.url, item.aspectRatio) ??
+    clampRatio(item.aspectRatio, item.type === "link" ? 1.91 : 1, 0.5, 2)
+  );
+}
+
 function SimilarItemCard({ item }: { item: DetailItem }) {
   useAppLocale();
   const router = useRouter();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const aspectRatio = Math.min(
-    Math.max(item.aspectRatio ?? (item.type === "link" ? 1.91 : 1), 0.5),
-    2,
-  );
+  const aspectRatio = similarRatio(item);
   const title =
     item.title ??
     item.note ??
@@ -126,7 +131,7 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.85,
   },
   similarImageFrame: {
-    backgroundColor: "white",
+    backgroundColor: theme.colors.frame,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     padding: theme.gap(0.5),

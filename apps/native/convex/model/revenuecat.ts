@@ -25,12 +25,12 @@ export function parseRevenueCatEvent(
   const event = readRecord(readRecord(body)?.event);
   if (event === undefined) return undefined;
 
-  const type = readString(event?.type);
-  const userId = readString(event?.app_user_id);
-  const expiresAt = readNumber(event?.expiration_at_ms);
-  const productId = readString(event?.product_id);
-  const periodType = readString(event?.period_type);
-  const eventTimestampMs = readNumber(event?.event_timestamp_ms);
+  const type = readString(event.type);
+  const userId = readString(event.app_user_id);
+  const expiresAt = readNumber(event.expiration_at_ms);
+  const productId = readString(event.product_id);
+  const periodType = readString(event.period_type);
+  const eventTimestampMs = readNumber(event.event_timestamp_ms);
 
   return {
     type,
@@ -82,15 +82,27 @@ export function requiresAuthoritativeReconciliation(
     case "BILLING_ISSUE":
     case "REFUND_REVERSED":
       return true;
+    case "NON_RENEWING_PURCHASE":
+      // A dashboard grant. A lifetime one carries no expiry, which the
+      // webhook path would read as "nothing to record"; the snapshot reports
+      // its real end, or none for lifetime.
+      return event.periodType === "PROMOTIONAL";
     case "CANCELLATION":
       // A failed charge sends BILLING_ERROR with the already-past expiry; only
-      // the snapshot knows the billing grace window.
+      // the snapshot knows the billing grace window. A cancelled dashboard
+      // grant may be a sticky lifetime row, as under EXPIRATION.
       return (
         event.cancelReason === "CUSTOMER_SUPPORT" ||
-        event.cancelReason === "BILLING_ERROR"
+        event.cancelReason === "BILLING_ERROR" ||
+        event.periodType === "PROMOTIONAL"
       );
     case "EXPIRATION":
-      return event.expirationReason === "CUSTOMER_SUPPORT";
+      // A revoked dashboard grant may have been stored as a sticky lifetime
+      // row, which only an authoritative snapshot can lapse.
+      return (
+        event.expirationReason === "CUSTOMER_SUPPORT" ||
+        event.periodType === "PROMOTIONAL"
+      );
     default:
       return false;
   }

@@ -1,6 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { useEntitlement } from "@/lib/entitlement";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
@@ -63,7 +62,6 @@ export function SharePracticeStep({
   onFinish: () => void;
 }) {
   useAppLocale();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
@@ -175,13 +173,9 @@ export function SharePracticeStep({
           )}
         </View>
         <Animated.View entering={SETTLE_CTA}>
-          {/* Saving is Pro: anyone without it gets the paywall from here. */}
+          {/* The promise step comes next, and the paywall after it. */}
           <CtaButton
-            label={t(
-              entitled || entitlementLoading
-                ? "sharePractice.toShelf"
-                : "reveal.keepSaving",
-            )}
+            label={t("common.continue")}
             onPress={onFinish}
             busy={leaving}
           />

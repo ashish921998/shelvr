@@ -1,6 +1,8 @@
 import { beforeEach } from "@e2e-dev/mobile";
 import { type App, expect, type Locator, type Screen } from "e2e";
 
+import { pollUntil } from "./poll.ts";
+
 const BUNDLE_TIMEOUT = 180_000;
 
 /**
@@ -52,7 +54,13 @@ export function startOnSeededHome(): void {
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
-    if (await openerSignIn.isVisible()) await openerSignIn.tap();
+    // The opener's first tap can be lost the same way (onboarding and share
+    // leave a signed-out app on the opener for the next flow).
+    if (await openerSignIn.isVisible())
+      await tapUntilVisible(openerSignIn, devLogin, {
+        waitMs: 10_000,
+        timeout: 60_000,
+      });
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
     await answerAiConsent(screen, profile);
 
@@ -74,7 +82,13 @@ export function startOnSeededHome(): void {
       { timeout: 30_000 },
     );
     await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-    await screen.scrollUntilVisible(reset);
+    // Even then a swipe has moved nothing (seen on CI, once in about ten
+    // runs), so the scroll gets one more try after another settle.
+    await screen.scrollUntilVisible(reset).catch(async (error: unknown) => {
+      if (!String(error).includes("moved nothing")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
+      await screen.scrollUntilVisible(reset);
+    });
     await reset.tap();
     await screen.getByRole("button", "Reset").tap();
     await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
@@ -103,17 +117,15 @@ async function openApp(
   const launcher = screen.getByText("Searching for development servers...");
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
   await app.open();
-  await expect
-    .poll(
-      async () => {
-        if (await ready()) return true;
-        if (await launcher.isVisible()) await app.open();
-        else if (await keepAi.isVisible()) await keepAi.tap();
-        return false;
-      },
-      { timeout: BUNDLE_TIMEOUT },
-    )
-    .toBe(true);
+  await pollUntil(
+    async () => {
+      if (await ready()) return true;
+      if (await launcher.isVisible()) await app.open();
+      else if (await keepAi.isVisible()) await keepAi.tap();
+      return false;
+    },
+    { timeout: BUNDLE_TIMEOUT },
+  );
 }
 
 /** The AI consent card's yes (`aiConsent.allow` in en.json). */
@@ -127,11 +139,10 @@ const AI_CONSENT_ALLOW = "Keep it on";
  */
 async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
-  await expect
-    .poll(async () => (await home.isVisible()) || (await keepAi.isVisible()), {
-      timeout: 60_000,
-    })
-    .toBe(true);
+  await pollUntil(
+    async () => (await home.isVisible()) || (await keepAi.isVisible()),
+    { timeout: 60_000 },
+  );
   if (await keepAi.isVisible()) {
     await keepAi.tap();
     await expect(home).toBeVisible({ timeout: 30_000 });
@@ -139,16 +150,55 @@ async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
 }
 
 /**
- * Taps a tab bar item. The native tabs usually reach the accessibility tree
+ * Taps a tab bar item until `destination`, something only that tab's screen
+ * shows, is on screen. The native tabs usually reach the accessibility tree
  * as `tab`, but have come through as `button` (on CI, the first test after a
- * fresh install), so the tab bar is searched for either.
+ * fresh install), so the tab bar is searched for either. A tab tap has been
+ * lost too: the engine reported it, Home stayed selected, and the flow waited
+ * out its next step (main, 2026-10-15). The tab's own selected state is no
+ * check: once Search is open, the tab bar shows only a collapsed Home tab
+ * beside the search field, and Search is no longer in it.
  */
-export async function tapTab(screen: Screen, name: string): Promise<void> {
+export async function tapTab(
+  screen: Screen,
+  name: string,
+  destination: Locator,
+): Promise<void> {
   const tabBar = screen.getByRole("tablist");
-  const tab = tabBar.getByRole("tab", name);
-  await (
-    (await tab.isVisible()) ? tab : tabBar.getByRole("button", name)
-  ).tap();
+  const role = (await tabBar.getByRole("tab", name).isVisible())
+    ? "tab"
+    : "button";
+  await tapUntilVisible(tabBar.getByRole(role, name), destination, {
+    waitMs: TAB_WAIT_MS,
+    timeout: 30_000,
+  });
+}
+
+/** Long enough for a tab's screen to show after a tap that was accepted. */
+const TAB_WAIT_MS = 3000;
+
+/**
+ * Fills a text field, recovering from the runner's "could not confirm the
+ * typed text reached the field": the text may have landed in full, in part
+ * or not at all. Seen on CI in about one run in ten. As the runner's hint
+ * says, the field is read back: if it already holds `value` the fill
+ * counts, otherwise it is filled once more (`fill` replaces the content). A
+ * field that still ends up wrong fails on that second fill or later in the
+ * flow, so this does not pass over a field that really is broken.
+ */
+export async function fillField(field: Locator, value: string): Promise<void> {
+  try {
+    await field.fill(value);
+  } catch (error) {
+    if (!String(error).includes("could not confirm the typed text")) {
+      throw error;
+    }
+    const landed = await expect(field)
+      .toHaveValue(value, { timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!landed) await field.fill(value);
+  }
 }
 
 /**
@@ -162,19 +212,17 @@ export async function tapUntilVisible(
   result: Locator,
   { waitMs, timeout }: { waitMs: number; timeout: number },
 ): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        if (await result.isVisible()) return true;
-        await control.tap({ timeout: Math.min(waitMs, timeout) });
-        await expect(result)
-          .toBeVisible({ timeout: waitMs })
-          .catch(() => undefined);
-        return result.isVisible();
-      },
-      { timeout },
-    )
-    .toBe(true);
+  await pollUntil(
+    async () => {
+      if (await result.isVisible()) return true;
+      await control.tap({ timeout: Math.min(waitMs, timeout) });
+      await expect(result)
+        .toBeVisible({ timeout: waitMs })
+        .catch(() => undefined);
+      return result.isVisible();
+    },
+    { timeout },
+  );
 }
 
 /**
