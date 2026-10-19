@@ -9,6 +9,7 @@ import { socialPost } from "@/lib/social-post";
 import type {
   enrichmentValidator,
   failureReasonValidator,
+  intentValidator,
   PostMedia,
 } from "@convex/model/itemFields";
 import type { Infer } from "convex/values";
@@ -40,6 +41,7 @@ export type FeedItem = {
   isSticker?: boolean;
   failureReason?: Infer<typeof failureReasonValidator>;
   enrichment?: Infer<typeof enrichmentValidator>;
+  intents?: Infer<typeof intentValidator>[];
   tags: string[];
   // Suggested this item into the current space; it isn't a member
   // until the user accepts. Only ever set by the space screen.

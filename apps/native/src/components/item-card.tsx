@@ -2,6 +2,8 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import type { ActionMenuItem } from "@/components/ui/action-menu";
+import { IntentChip } from "@/components/intent-chip";
+import { runIntent } from "@/lib/intents";
 import {
   cardTitles,
   ItemCardFace,
@@ -217,6 +219,31 @@ function ItemCardView({
     ]);
   };
 
+  // A place on Home shows its Maps action on the card, as on the onboarding
+  // reminder step, so the save's payoff is one tap from the shelf. Only the
+  // save's own intents count: a space's steered ones belong to that space's
+  // page, and a suggestion isn't the user's save yet.
+  const maps =
+    source?.from === "home" && item.suggested !== true
+      ? item.intents?.find((intent) => intent.kind === "open_maps")
+      : undefined;
+  const openMaps = maps
+    ? () => {
+        void runIntent("open_maps", maps.value)
+          .then(() => {
+            if (item._creationTime !== undefined) {
+              analytics.itemAction(
+                { ...item, _creationTime: item._creationTime },
+                "open_maps",
+              );
+            }
+          })
+          .catch((error: unknown) =>
+            analytics.captureError("card_open_maps_failed", error),
+          );
+      }
+    : undefined;
+
   const menuActions = cardMenuActions({
     isSuggested,
     hasUrl: item.url !== undefined,
@@ -228,6 +255,16 @@ function ItemCardView({
     removeFromSpace: spaceId === undefined ? undefined : removeFromSpace,
     confirmDelete,
   });
+
+  const a11yOnCell = process.env.EXPO_OS === "ios";
+  // On iOS the cell is one element to VoiceOver, which hides the Maps chip
+  // under the card, so it is reached as one of the cell's actions. Android
+  // keeps the card's accessibility on the Pressable, so the chip stays its
+  // own button there.
+  const a11yActions =
+    openMaps && a11yOnCell
+      ? [...menuActions, { label: t("plan.openMaps"), onPress: openMaps }]
+      : menuActions;
 
   // Where the card's accessibility lives. On iOS, expo-router hosts the
   // trigger inside two native views with a zero-size frame (the zoom source
@@ -245,7 +282,7 @@ function ItemCardView({
     // so an accessibilityRole there would never reach the screen reader.
     role: "button" as const,
     accessibilityLabel,
-    accessibilityActions: menuActions.map(({ label }) => ({
+    accessibilityActions: a11yActions.map(({ label }) => ({
       name: label,
       label,
     })),
@@ -254,7 +291,7 @@ function ItemCardView({
     }: {
       nativeEvent: { actionName: string };
     }) => {
-      menuActions
+      a11yActions
         .find(({ label }) => label === nativeEvent.actionName)
         ?.onPress();
     },
@@ -264,7 +301,6 @@ function ItemCardView({
     onAccessibilityTap: () => router.push(href),
     testID: item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined,
   };
-  const a11yOnCell = process.env.EXPO_OS === "ios";
 
   const link = (
     <Link href={href} asChild>
@@ -356,6 +392,18 @@ function ItemCardView({
       ) : (
         link
       )}
+      {/* Outside the Link, so a tap opens Maps and never the card's zoom or
+          preview, which a native gesture would start before any JS
+          stopPropagation could. */}
+      {openMaps ? (
+        <View style={styles.mapsChip}>
+          <IntentChip
+            kind="open_maps"
+            label={t("plan.openMaps")}
+            onPress={openMaps}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -392,8 +440,17 @@ export const ItemCard = memo(
     sourceKey(prev.source) === sourceKey(next.source),
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((theme) => ({
   cell: {
     padding: 4,
+  },
+  mapsChip: {
+    alignSelf: "flex-start",
+    // Large text in a narrow column truncates the label instead of
+    // pushing the chip into the next column.
+    maxWidth: "100%",
+    // Clears the chip's hitSlop, so a tap just above it opens the card.
+    marginTop: theme.gap(1),
+    marginHorizontal: theme.gap(0.5),
   },
 }));
