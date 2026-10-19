@@ -27,8 +27,21 @@ const SETTLE_ROW = settleIn(600);
 const SETTLE_CTA = settleIn(850);
 
 /** "received" means the share reached Shelvr and waits for the share
- * screen, which saves it after onboarding; nothing is saved here. */
-type Outcome = "received" | "other_app" | "skipped" | "sheet_failed";
+ * screen, which saves it after onboarding; nothing is saved here.
+ * "sheet_stuck" means a tap reached the step while an earlier sheet was
+ * still unanswered, so that sheet never came up. */
+type Outcome =
+  | "received"
+  | "other_app"
+  | "dismissed"
+  | "sheet_stuck"
+  | "skipped"
+  | "sheet_failed";
+
+// The sheet covers the step once it is up, so a tap on the post this long
+// after asking for it means iOS never showed it. A quicker tap is a double
+// tap while the sheet slides up.
+const SHEET_STUCK_MS = 2000;
 
 /** The shares expo-sharing holds, as one comparable value; "" for none.
  * Android replaces the held batch instead of adding to it, so a new share
@@ -74,7 +87,11 @@ export function SharePracticeStep({
   const hasIncomingShare = useCallback(() => heldShares() !== "", []);
 
   const report = useCallback((outcome: Outcome) => {
-    if (outcome !== "other_app") {
+    if (
+      outcome === "received" ||
+      outcome === "skipped" ||
+      outcome === "sheet_failed"
+    ) {
       if (reported.current) return;
       reported.current = true;
     }
@@ -107,17 +124,34 @@ export function SharePracticeStep({
     false,
   );
 
+  // When the share sheet was asked for, while iOS has not answered; null
+  // when no sheet is pending. A sheet iOS refuses to show never answers, so
+  // nothing here may wait on it: the post and "later" stay tappable.
+  const pendingSince = useRef<number | null>(null);
+  const attempt = useRef(0);
+
   const share = async () => {
     if (sample === undefined) return;
+    if (pendingSince.current !== null) {
+      if (Date.now() - pendingSince.current < SHEET_STUCK_MS) return;
+      report("sheet_stuck");
+    }
+    const current = ++attempt.current;
+    pendingSince.current = Date.now();
     setWrongApp(false);
     setSheetOpen(true);
     const result = await presentShareSheet(sample.url, hasIncomingShare);
+    // A newer tap took over from a sheet that never came up.
+    if (current !== attempt.current) return;
+    pendingSince.current = null;
     setSheetOpen(false);
     if (result === "shelvr") {
       markReceived();
     } else if (result === "other_app") {
       setWrongApp(true);
       report("other_app");
+    } else if (result === "dismissed") {
+      report("dismissed");
     } else if (result === "failed") {
       report("sheet_failed");
       onFinish();
@@ -201,7 +235,7 @@ export function SharePracticeStep({
       {sample === undefined ? null : (
         <PracticePost
           sample={sample}
-          disabled={sheetOpen || leaving}
+          disabled={leaving}
           onPress={() => void share()}
         />
       )}
@@ -220,7 +254,7 @@ export function SharePracticeStep({
         <GhostButton
           label={t("sharePractice.later")}
           onPress={skip}
-          disabled={sheetOpen || leaving}
+          disabled={leaving}
         />
       </View>
     </View>
