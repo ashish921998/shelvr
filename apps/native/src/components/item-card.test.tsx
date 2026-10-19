@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { cloneElement, isValidElement, type ReactNode } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { MenuView } from "@expo/ui/community/menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Image } from "expo-image";
+import { analytics } from "@/lib/analytics";
+import { runIntent } from "@/lib/intents";
 import { ItemCard, type FeedItem } from "./item-card";
 import { textFaceCopy } from "./item-card-face";
 
@@ -160,6 +162,14 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn(), itemAction: vi.fn() },
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/lib/intents", () => ({ runIntent: vi.fn(async () => undefined) }));
+vi.mock("@/components/intent-chip", () => ({
+  IntentChip: vi.fn(
+    ({ label, onPress }: { label: string; onPress: () => void }) => (
+      <button onClick={onPress}>{label}</button>
+    ),
+  ),
+}));
 vi.mock("@/components/glass", () => ({
   GlassView: vi.fn(({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
@@ -665,5 +675,136 @@ describe("textFaceCopy", () => {
         description: "ignored",
       }),
     ).toEqual({ body: "Gift ideas" });
+  });
+});
+
+describe("a save that names a place", () => {
+  const os = process.env.EXPO_OS;
+  afterEach(() => {
+    process.env.EXPO_OS = os;
+  });
+
+  const place: FeedItem = {
+    ...base,
+    _creationTime: 1_700_000_000_000,
+    title: "Old Town Square",
+    url: "https://prague.eu/en/old-town-square",
+    intents: [
+      { kind: "open_url", label: "Open page", value: "https://prague.eu" },
+      { kind: "open_maps", label: "Open in Maps", value: "Old Town Square" },
+    ],
+  };
+
+  it("opens the place in Maps from the card and logs it once Maps opened", async () => {
+    render(<ItemCard item={place} source={{ from: "home" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open in Maps" }));
+    expect(runIntent).toHaveBeenCalledWith("open_maps", "Old Town Square");
+    await waitFor(() =>
+      expect(analytics.itemAction).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: "item-1" }),
+        "open_maps",
+      ),
+    );
+  });
+
+  it("reports a Maps launch that fails instead of logging the action", async () => {
+    const failure = new Error("no maps");
+    vi.mocked(runIntent).mockRejectedValueOnce(failure);
+    vi.mocked(analytics.itemAction).mockClear();
+    render(<ItemCard item={place} source={{ from: "home" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open in Maps" }));
+    await waitFor(() =>
+      expect(analytics.captureError).toHaveBeenCalledWith(
+        "card_open_maps_failed",
+        failure,
+      ),
+    );
+    expect(analytics.itemAction).not.toHaveBeenCalled();
+  });
+
+  it("shows no Maps chip on a save that is not a place", () => {
+    render(
+      <ItemCard
+        item={{ ...place, intents: [place.intents![0]] }}
+        source={{ from: "home" }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Open in Maps" })).toBeNull();
+  });
+
+  it("offers Open in Maps to VoiceOver, which reads the card as one element", () => {
+    process.env.EXPO_OS = "ios";
+    vi.mocked(View).mockClear();
+    vi.mocked(runIntent).mockClear();
+    render(<ItemCard item={place} source={{ from: "home" }} />);
+    const props = labelledProps(View, "Old Town Square");
+    expect(props.accessibilityActions?.map(({ label }) => label)).toEqual([
+      "Share",
+      "Change spaces",
+      "Delete",
+      "Open in Maps",
+    ]);
+    props.onAccessibilityAction?.({
+      nativeEvent: { actionName: "Open in Maps" },
+    } as never);
+    expect(runIntent).toHaveBeenCalledWith("open_maps", "Old Town Square");
+  });
+
+  it("keeps the chip to Home, where the save is the user's own", () => {
+    const { rerender } = render(
+      <ItemCard item={place} source={{ from: "search", q: "square" }} />,
+    );
+    expect(screen.queryByRole("button", { name: "Open in Maps" })).toBeNull();
+    rerender(
+      <ItemCard item={place} source={{ from: "space", spaceId: "space-1" }} />,
+    );
+    expect(screen.queryByRole("button", { name: "Open in Maps" })).toBeNull();
+    rerender(
+      <ItemCard
+        item={{ ...place, suggested: true }}
+        source={{ from: "space", spaceId: "space-1" }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Open in Maps" })).toBeNull();
+  });
+
+  it("shows the chip once the save's Maps action arrives", () => {
+    const pending = { ...place, intents: undefined };
+    const { rerender } = render(
+      <ItemCard item={pending} source={{ from: "home" }} />,
+    );
+    expect(screen.queryByRole("button", { name: "Open in Maps" })).toBeNull();
+    rerender(<ItemCard item={place} source={{ from: "home" }} />);
+    expect(screen.getByRole("button", { name: "Open in Maps" })).toBeTruthy();
+  });
+
+  it("leaves the chip as its own button on Android", () => {
+    process.env.EXPO_OS = "android";
+    vi.mocked(Pressable).mockClear();
+    render(<ItemCard item={place} source={{ from: "home" }} />);
+    const props = labelledProps(Pressable, "Old Town Square");
+    expect(props.accessibilityActions?.map(({ label }) => label)).toEqual([
+      "Share",
+      "Change spaces",
+      "Delete",
+    ]);
+    expect(screen.getByRole("button", { name: "Open in Maps" })).toBeTruthy();
+  });
+
+  it("opens Maps without logging a save that has no creation time", async () => {
+    vi.mocked(analytics.itemAction).mockClear();
+    vi.mocked(runIntent).mockClear();
+    render(
+      <ItemCard
+        item={{ ...place, _creationTime: undefined }}
+        source={{ from: "home" }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open in Maps" }));
+    await waitFor(() =>
+      expect(runIntent).toHaveBeenCalledWith("open_maps", "Old Town Square"),
+    );
+    await Promise.resolve();
+    expect(analytics.itemAction).not.toHaveBeenCalled();
   });
 });
