@@ -328,6 +328,9 @@
   "trip.dayCount": {
     "other": "%{formattedCount}일"
   },
+  "trip.daysFill": {
+    "other": "이 일정 강도로는 저장한 항목으로 약 %{formattedCount}일을 채울 수 있어요."
+  },
   "trip.starting": "시작일",
   "trip.addDate": "날짜 추가",
   "trip.clearDate": "날짜 지우기",

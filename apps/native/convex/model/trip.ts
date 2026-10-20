@@ -8,7 +8,7 @@ import type { PlanPlace } from "./plan";
 // into one area per day and orders each day.
 
 export const MIN_TRIP_DAYS = 1;
-export const MAX_TRIP_DAYS = 5;
+export const MAX_TRIP_DAYS = 15;
 
 export const tripPaceValidator = v.union(
   v.literal("easy"),
@@ -24,7 +24,7 @@ export const STOPS_PER_DAY: Record<TripPace, number> = {
   packed: 7,
 };
 
-/** Places the model may return: a packed five-day trip. */
+/** Places the model may return: a packed trip of the longest length. */
 export const MAX_TRIP_PLACES = STOPS_PER_DAY.packed * MAX_TRIP_DAYS;
 
 export const TRIP_SLOTS = [

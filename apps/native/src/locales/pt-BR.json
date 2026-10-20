@@ -330,6 +330,11 @@
     "many": "%{formattedCount} dias",
     "other": "%{formattedCount} dias"
   },
+  "trip.daysFill": {
+    "one": "Seus itens salvos preenchem cerca de %{formattedCount} dia nesse ritmo.",
+    "many": "Seus itens salvos preenchem cerca de %{formattedCount} dias nesse ritmo.",
+    "other": "Seus itens salvos preenchem cerca de %{formattedCount} dias nesse ritmo."
+  },
   "trip.starting": "Início",
   "trip.addDate": "Adicionar uma data",
   "trip.clearDate": "Remover a data",

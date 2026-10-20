@@ -3,7 +3,11 @@ import { formattingLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isAiConsentRequired } from "@convex/model/aiConsent";
-import type { TripPace, TripSlot } from "@convex/model/trip";
+import {
+  STOPS_PER_DAY,
+  type TripPace,
+  type TripSlot,
+} from "@convex/model/trip";
 import type { FunctionReturnType } from "convex/server";
 import { useAction } from "convex/react";
 import { useCallback, useState } from "react";
@@ -17,6 +21,12 @@ export type Trip = NonNullable<
 >;
 export type TripDayView = Trip["days"][number];
 export type TripStopView = TripDayView["stops"][number];
+
+/** About how many days a space's saves fill at a pace, counting one place a
+ * save; the builder leaves any further day empty. */
+export function daysSavesFill(saveCount: number, pace: TripPace): number {
+  return Math.max(1, Math.ceil(saveCount / STOPS_PER_DAY[pace]));
+}
 
 // Avoid offering trips for a reading list that merely mentions a place.
 const TRIP_MIN_CITY_SAVES = 3;

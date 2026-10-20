@@ -323,6 +323,7 @@ export type MessageParams = {
   "trip.whichCity": undefined;
   "trip.howManyDays": undefined;
   "trip.dayCount": { count: number };
+  "trip.daysFill": { count: number };
   "trip.starting": undefined;
   "trip.addDate": undefined;
   "trip.clearDate": undefined;

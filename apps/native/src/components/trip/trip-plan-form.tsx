@@ -8,6 +8,7 @@ import { fadeIn, motion } from "@/lib/motion";
 import {
   MAX_TRIP_DAYS,
   MIN_TRIP_DAYS,
+  daysSavesFill,
   formatTripDay,
   toDateKey,
   tripDayDate,
@@ -18,10 +19,10 @@ import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import { SegmentedControl } from "@expo/ui/community/segmented-control";
 import { Host, Picker, Text } from "@expo/ui/swift-ui";
 import {
-  accessibilityLabel,
   environment,
   pickerStyle,
   tag,
+  tint,
 } from "@expo/ui/swift-ui/modifiers";
 import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
@@ -74,57 +75,96 @@ function Row({
 }
 
 /** A label over a full-width native segmented control. The label comes
- * first so VoiceOver reads it before the segments; `spoken` gives a bare
- * value like "2" its unit ("2 days") on iOS, which the Expo UI control
- * cannot pass through. */
+ * first so VoiceOver reads it before the segments. */
 function Segmented({
   label,
   values,
-  spoken,
   selected,
   onSelect,
 }: {
   label: string;
   values: string[];
-  spoken?: string[];
   selected: number;
   onSelect: (index: number) => void;
 }) {
   const { theme, rt } = useUnistyles();
-  const appearance = isDarkThemeName(rt.themeName) ? "dark" : "light";
   return (
     <View style={styles.block}>
       <ThemedText variant="bodyLabel">{label}</ThemedText>
-      {spoken && process.env.EXPO_OS === "ios" ? (
-        <Host matchContents={{ vertical: true }} ignoreSafeArea="all">
+      <SegmentedControl
+        values={values}
+        selectedIndex={selected}
+        onChange={(event) => onSelect(event.nativeEvent.selectedSegmentIndex)}
+        appearance={isDarkThemeName(rt.themeName) ? "dark" : "light"}
+        tintColor={theme.colors.primarySoft}
+      />
+    </View>
+  );
+}
+
+/** How many days: the native menu of 1 to 15 days on iOS, the scrolling day
+ * pills on Android. Below it, when the saves cannot fill that many days at
+ * this pace, about how many they do fill. */
+function Days({
+  days,
+  onChange,
+  fill,
+}: {
+  days: number;
+  onChange: (days: number) => void;
+  fill: number;
+}) {
+  const { theme, rt } = useUnistyles();
+  const hint =
+    days > fill ? (
+      <ThemedText variant="caption" style={styles.muted}>
+        {t("trip.daysFill", { count: fill })}
+      </ThemedText>
+    ) : null;
+  if (process.env.EXPO_OS !== "ios") {
+    return (
+      <View style={styles.block}>
+        <ThemedText variant="bodyLabel">{t("trip.howManyDays")}</ThemedText>
+        <View style={styles.dayPills}>
+          <TripSegments
+            scroll
+            labels={DAY_CHOICES.map(String)}
+            selected={DAY_CHOICES.indexOf(days)}
+            onSelect={(index) => onChange(DAY_CHOICES[index])}
+            tinted
+            accessibilityLabel={t("trip.howManyDays")}
+          />
+        </View>
+        {hint}
+      </View>
+    );
+  }
+  return (
+    <View style={styles.block}>
+      <Row label={t("trip.howManyDays")}>
+        <Host matchContents ignoreSafeArea="all">
           <Picker
-            selection={selected}
-            onSelectionChange={(index) => onSelect(index)}
+            selection={DAY_CHOICES.indexOf(days)}
+            onSelectionChange={(index) => onChange(DAY_CHOICES[index])}
             modifiers={[
-              pickerStyle("segmented"),
-              environment("colorScheme", appearance),
+              pickerStyle("menu"),
+              tint(theme.colors.primaryText),
+              environment(
+                "colorScheme",
+                isDarkThemeName(rt.themeName) ? "dark" : "light",
+              ),
             ]}
-            label=""
+            label={t("trip.howManyDays")}
           >
-            {values.map((value, index) => (
-              <Text
-                key={value}
-                modifiers={[tag(index), accessibilityLabel(spoken[index])]}
-              >
-                {value}
+            {DAY_CHOICES.map((count, index) => (
+              <Text key={count} modifiers={[tag(index)]}>
+                {t("trip.dayCount", { count })}
               </Text>
             ))}
           </Picker>
         </Host>
-      ) : (
-        <SegmentedControl
-          values={values}
-          selectedIndex={selected}
-          onChange={(event) => onSelect(event.nativeEvent.selectedSegmentIndex)}
-          appearance={appearance}
-          tintColor={theme.colors.primarySoft}
-        />
-      )}
+      </Row>
+      {hint}
     </View>
   );
 }
@@ -270,12 +310,10 @@ export function TripPlanForm({
       ) : null}
 
       <View style={styles.rows}>
-        <Segmented
-          label={t("trip.howManyDays")}
-          values={DAY_CHOICES.map(String)}
-          spoken={DAY_CHOICES.map((count) => t("trip.dayCount", { count }))}
-          selected={DAY_CHOICES.indexOf(days)}
-          onSelect={(index) => setDays(DAY_CHOICES[index])}
+        <Days
+          days={days}
+          onChange={setDays}
+          fill={daysSavesFill(saveCount, pace)}
         />
         <Segmented
           label={t("trip.pace")}
@@ -342,6 +380,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   block: {
     gap: theme.gap(1),
+  },
+  dayPills: {
+    marginHorizontal: -theme.gap(2),
   },
   divider: {
     height: StyleSheet.hairlineWidth,

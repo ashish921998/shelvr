@@ -330,6 +330,11 @@
     "many": "%{formattedCount} jours",
     "other": "%{formattedCount} jours"
   },
+  "trip.daysFill": {
+    "one": "Vos enregistrements remplissent environ %{formattedCount} jour à ce rythme.",
+    "many": "Vos enregistrements remplissent environ %{formattedCount} jours à ce rythme.",
+    "other": "Vos enregistrements remplissent environ %{formattedCount} jours à ce rythme."
+  },
   "trip.starting": "Départ",
   "trip.addDate": "Ajouter une date",
   "trip.clearDate": "Retirer la date",

@@ -330,6 +330,11 @@
     "many": "%{formattedCount} días",
     "other": "%{formattedCount} días"
   },
+  "trip.daysFill": {
+    "one": "Tus guardados llenan unos %{formattedCount} día a este ritmo.",
+    "many": "Tus guardados llenan unos %{formattedCount} días a este ritmo.",
+    "other": "Tus guardados llenan unos %{formattedCount} días a este ritmo."
+  },
   "trip.starting": "Inicio",
   "trip.addDate": "Agregar una fecha",
   "trip.clearDate": "Quitar la fecha",

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   canPlanTrip,
+  daysSavesFill,
   directionsUrl,
   fitCamera,
   locatedStops,
@@ -40,6 +41,16 @@ describe("canPlanTrip", () => {
       false,
     );
     expect(canPlanTrip([save, save, save])).toBe(true);
+  });
+});
+
+describe("daysSavesFill", () => {
+  it("counts the days a pace fills, at least one", () => {
+    expect(daysSavesFill(8, "easy")).toBe(3);
+    expect(daysSavesFill(8, "balanced")).toBe(2);
+    expect(daysSavesFill(8, "packed")).toBe(2);
+    expect(daysSavesFill(7, "packed")).toBe(1);
+    expect(daysSavesFill(0, "balanced")).toBe(1);
   });
 });
 

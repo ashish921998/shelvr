@@ -328,6 +328,10 @@
     "one": "%{formattedCount} day",
     "other": "%{formattedCount} days"
   },
+  "trip.daysFill": {
+    "one": "Your saves fill about %{formattedCount} day at this pace.",
+    "other": "Your saves fill about %{formattedCount} days at this pace."
+  },
   "trip.starting": "Starting",
   "trip.addDate": "Add a date",
   "trip.clearDate": "Remove the date",
