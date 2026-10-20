@@ -32,14 +32,7 @@ import {
 } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   Easing,
@@ -47,9 +40,9 @@ import Animated, {
   FadeOut,
   ReduceMotion,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
-  type SharedValue,
   withDelay,
   withRepeat,
   withSequence,
@@ -160,14 +153,6 @@ export function TripReveal({
     () => revealLayout(rt.screen.width, rt.screen.height, covers.length),
     [rt.screen.width, rt.screen.height, covers.length],
   );
-  // Where the city sits on screen; the globe moves it every frame of the dive.
-  const pinX = useSharedValue(layout.landing.x);
-  const pinY = useSharedValue(layout.landing.y);
-  const pinDive = useSharedValue(0);
-  const pin = useMemo(
-    () => ({ x: pinX, y: pinY, dive: pinDive }),
-    [pinX, pinY, pinDive],
-  );
   const [phase, setPhase] = useState<Exclude<Stage, "dive">>("lift");
   const stage: Stage = phase === "wait" && ready ? "dive" : phase;
   const [rolled, setRolled] = useState(0);
@@ -208,21 +193,18 @@ export function TripReveal({
       exiting={FadeOut.duration(300)}
       style={styles.screen}
     >
-      <Globe stage={stage} target={target} city={city} pin={pin} />
+      <Globe
+        stage={stage}
+        target={target}
+        city={city}
+        dots={layout.dots}
+        landing={layout.landing}
+      />
       {covers.map((cover, index) => (
         <Card
           key={cover.id}
           cover={cover}
           card={layout.cards[index]}
-          stage={stage}
-        />
-      ))}
-      {layout.dots.map((dot, index) => (
-        <Dot
-          key={`${dot.x}:${dot.y}`}
-          index={index}
-          dot={dot}
-          pin={pin}
           stage={stage}
         />
       ))}
@@ -364,11 +346,13 @@ function Dot({
   dot,
   pin,
   stage,
+  color,
 }: {
   index: number;
   dot: { x: number; y: number };
   pin: Pin;
   stage: Stage;
+  color: string;
 }) {
   const scale = useSharedValue(0.5);
   const opacity = useSharedValue(0);
@@ -389,58 +373,50 @@ function Dot({
     }
   }, [stage, index, scale, opacity]);
 
-  // The dot falls towards wherever the city is on the turning globe, on the
-  // globe's own clock, so a dropped map frame holds the dots back with it.
+  const breathe = useDerivedValue(() => [{ scale: scale.value }]);
+
+  // The dot falls towards wherever the city is on the turning globe. It is
+  // drawn on the globe's canvas from the same map frame as the land, so the
+  // two always reach the screen together.
   // Staggered starts, one landing: every dot reaches the city as it settles.
-  const style = useAnimatedStyle(() => {
-    const delay = index * 15;
-    const share = Math.min(
-      1,
-      Math.max(
-        0,
-        (pin.dive.value * GLOBE_DIVE_MS - delay) / (GLOBE_DIVE_MS - delay),
-      ),
-    );
-    const fall = Easing.inOut(Easing.cubic)(share);
-    return {
-      opacity: opacity.value,
-      transform: [
-        { translateX: fall * (pin.x.value - dot.x) },
-        { translateY: fall * (pin.y.value - dot.y) },
-        { scale: scale.value * (1 - 0.4 * fall) },
-      ],
-    };
-  });
+  const delay = index * 15;
+  const share = Math.min(
+    1,
+    Math.max(0, (pin.dive * GLOBE_DIVE_MS - delay) / (GLOBE_DIVE_MS - delay)),
+  );
+  const fall = Easing.inOut(Easing.cubic)(share);
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[styles.dot, { left: dot.x - 5, top: dot.y - 5 }, style]}
-    />
+    <Group
+      transform={[
+        { translateX: dot.x + fall * (pin.x - dot.x) },
+        { translateY: dot.y + fall * (pin.y - dot.y) },
+        { scale: 1 - 0.4 * fall },
+      ]}
+    >
+      <Group opacity={opacity} transform={breathe}>
+        <Circle r={9} color={color} opacity={0.45}>
+          <BlurMask blur={5} style="normal" />
+        </Circle>
+        <Circle r={5} color={color} />
+      </Group>
+    </Group>
   );
 }
 
-/** Where the trip's city is on screen: the globe moves it every frame of the
- * dive, and the dots, the glow and the city's name follow it. */
-type Pin = {
-  x: SharedValue<number>;
-  y: SharedValue<number>;
-  /** How far the dive has gone in time, 0 to 1, as of the last map frame. */
-  dive: SharedValue<number>;
-};
+/** Where the trip's city is on screen in one map frame, and how far the dive
+ * has gone in time, 0 to 1. The dots, the glow and the city's name follow it. */
+type Pin = { x: number; y: number; dive: number };
 
 /** The city's name, on a pill just above the city. */
 function PinLabel({ pin, city }: { pin: Pin; city: string }) {
   const { rt } = useUnistyles();
   const width = rt.screen.width;
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: pin.x.value - width / 2 },
-      { translateY: pin.y.value - 42 },
-    ],
-  }));
+  const style = {
+    transform: [{ translateX: pin.x - width / 2 }, { translateY: pin.y - 42 }],
+  };
   return (
-    <Animated.View pointerEvents="none" style={[styles.pinRow, style]}>
+    <View pointerEvents="none" style={[styles.pinRow, style]}>
       <Animated.View
         entering={FadeIn.delay(900).duration(300)}
         style={styles.pinLabel}
@@ -449,16 +425,16 @@ function PinLabel({ pin, city }: { pin: Pin; city: string }) {
           {city}
         </ThemedText>
       </Animated.View>
-    </Animated.View>
+    </View>
   );
 }
 
 /** One frame of the globe, as SVG paths, how lit the city's country is, and
- * where the city is on it during the dive (no point when there are no pins). */
+ * where the city is on it during the dive. */
 type GlobeFrame = {
   paths: GlobePaths;
   light: number;
-  pin: { point: { x: number; y: number } | null; dive: number } | null;
+  pin: Pin | null;
 };
 
 const SPIN_FRAME_MS = 1000 / 30;
@@ -477,12 +453,15 @@ function Globe({
   stage,
   target,
   city,
-  pin,
+  dots,
+  landing,
 }: {
   stage: Stage;
   target: GlobeTarget | null;
   city?: string;
-  pin: Pin;
+  dots: { x: number; y: number }[];
+  /** Where the dots fall when the trip has no pins: the screen's centre. */
+  landing: { x: number; y: number };
 }) {
   const { theme, rt } = useUnistyles();
   const [startedAt] = useState(Date.now);
@@ -532,7 +511,7 @@ function Globe({
         diveAt === null
           ? null
           : {
-              point: aim ? globePin(camera, aim) : null,
+              ...(aim ? globePin(camera, aim) : landing),
               dive: Math.min(1, (t - diveAt) / GLOBE_DIVE_MS),
             };
       // Below the screen there is nothing to draw, so no render either.
@@ -544,20 +523,12 @@ function Globe({
     };
     handle = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(handle);
-  }, [stage, startedAt, lng, lat, width, height, glow]);
+  }, [stage, startedAt, lng, lat, width, height, glow, landing]);
 
-  // The dots, glow and name move only once React has committed the map frame
-  // they belong to, so a slow commit holds them back with the land.
-  useLayoutEffect(() => {
-    if (!frame.pin) return;
-    if (frame.pin.point) {
-      pin.x.set(frame.pin.point.x);
-      pin.y.set(frame.pin.point.y);
-    }
-    pin.dive.set(frame.pin.dive);
-  }, [frame, pin]);
-
+  // The land, the glow, the dots and the name all draw from this one frame,
+  // so a slow render holds them back together.
   const { paths, light } = frame;
+  const pin = frame.pin ?? { ...landing, dive: 0 };
   return (
     <>
       <Canvas style={styles.globe} pointerEvents="none">
@@ -604,6 +575,16 @@ function Globe({
           </Circle>
           <Circle cx={pin.x} cy={pin.y} r={4} color={theme.colors.surface} />
         </Group>
+        {dots.map((dot, index) => (
+          <Dot
+            key={`${dot.x}:${dot.y}`}
+            index={index}
+            dot={dot}
+            pin={pin}
+            stage={stage}
+            color={theme.colors.primary}
+          />
+        ))}
       </Canvas>
       {stage === "dive" && target && city ? (
         <PinLabel pin={pin} city={city} />
@@ -640,15 +621,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.gap(1.25),
     paddingVertical: theme.gap(1),
     color: theme.colors.foreground,
-  },
-  dot: {
-    position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.primary,
-    boxShadow: "0 0 10px 3px rgba(230,162,60,0.45)",
-    zIndex: 5,
   },
   globe: {
     ...StyleSheet.absoluteFillObject,
