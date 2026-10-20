@@ -16,7 +16,7 @@ async function closePaywall(screen: Screen): Promise<void> {
   await expect(paywallRestore(screen)).toBeHidden({
     timeout: 30_000,
   });
-  await expect(screen.getByRole("button", "View Pro plans")).toBeVisible();
+  await expect(screen.getByRole("button", "Profile")).toBeVisible();
 }
 
 // The dev user is always Pro, so the app is relaunched with the launch
@@ -110,12 +110,14 @@ test(
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    const viewPlans = screen.getByRole("button", "View Pro plans");
-    await expect(viewPlans).toBeVisible({ timeout: 180_000 });
+    const add = screen.getByRole("button", "Add");
+    await expect(add).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
-    await viewPlans.tap();
+    // A previous decline can leave Home's exit-offer card active. Add always
+    // opens the regular paywall, independently of that persisted offer.
+    await add.tap();
     await expectPaywall(screen);
 
     await screen.getByRole("button", "View all plans").tap();
