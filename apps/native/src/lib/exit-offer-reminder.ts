@@ -5,6 +5,9 @@ import { exitOfferReminderPlan } from "@/lib/exit-offer";
 import { t } from "@/lib/i18n";
 import { canNotify } from "@/lib/trial-reminder";
 import * as Notifications from "expo-notifications";
+// Named imports: expo-notifications 58 ships its enums in files the ESLint
+// import plugin cannot parse as modules, so `import/namespace` misses them.
+import { AndroidImportance } from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
@@ -62,7 +65,7 @@ async function ensureChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: t("notifications.trialChannel"),
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: AndroidImportance.DEFAULT,
   });
 }
 

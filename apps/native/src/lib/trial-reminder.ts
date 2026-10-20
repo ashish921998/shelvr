@@ -12,6 +12,9 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
+// Named imports: expo-notifications 58 ships its enums in files the ESLint
+// import plugin cannot parse as modules, so `import/namespace` misses them.
+import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
@@ -164,9 +167,9 @@ export function canNotify(
   if (Platform.OS !== "ios") return permission.granted;
   const status = permission.ios?.status;
   return (
-    status === Notifications.IosAuthorizationStatus.AUTHORIZED ||
-    status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
-    status === Notifications.IosAuthorizationStatus.EPHEMERAL
+    status === IosAuthorizationStatus.AUTHORIZED ||
+    status === IosAuthorizationStatus.PROVISIONAL ||
+    status === IosAuthorizationStatus.EPHEMERAL
   );
 }
 
@@ -197,7 +200,7 @@ export async function scheduleTrialReminder(
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: t("notifications.trialChannel"),
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: AndroidImportance.DEFAULT,
     });
   }
   // Cleared before the permission check, so switching nudges off takes

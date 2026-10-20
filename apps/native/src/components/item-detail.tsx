@@ -47,6 +47,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -178,7 +179,7 @@ export const ItemDetail = memo(function ItemDetail({
 
   // FlashList can recycle this page instance for a different item; a
   // recycled page must open at the top, not at the previous item's offset.
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const scrolledItemRef = useRef(item._id);
   useLayoutEffect(() => {
     if (scrolledItemRef.current === item._id) return;
