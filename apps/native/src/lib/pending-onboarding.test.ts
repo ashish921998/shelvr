@@ -1,10 +1,12 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearLegacyDemoUrl,
   clearLegacyDemoUrlIfSaved,
   clearPending,
   getOnboardingProgress,
   getOrCreatePendingOperationId,
+  getPendingDemoSpace,
   getPendingDemoUrl,
   getPendingSpaces,
   hasPending,
@@ -141,6 +143,14 @@ describe("a first save queued before sign-in", () => {
     setPendingSpaces([]);
     expect(getPendingDemoUrl()).toBe("https://example.com/recipe");
     expect(hasPending()).toBe(true);
+  });
+
+  it("keeps the space it was picked for until the link is cleared", () => {
+    queueDemoUrl("https://example.com/recipe", "Recipes");
+    setPendingSpaces(["Recipes"]);
+    expect(getPendingDemoSpace()).toBe("Recipes");
+    clearLegacyDemoUrl();
+    expect(getPendingDemoSpace()).toBeNull();
   });
 
   it("keeps the onboarding progress beside it", () => {

@@ -47,6 +47,9 @@ type PendingRecord = {
   operationId: string;
   spaces: string[];
   demoUrl: string | null;
+  /** The space `demoUrl` was picked for; null for the shelf alone, and on
+   * records written before it was kept. */
+  demoSpace: string | null;
   /** Absent on records written by an older flow. */
   progressVersion: number | null;
   saveKinds: string[];
@@ -132,6 +135,10 @@ function readPendingRecord(): PendingRecord | null {
       operationId: record.operationId,
       spaces,
       demoUrl: record.demoUrl === "" ? null : record.demoUrl,
+      demoSpace:
+        typeof record.demoSpace === "string" && record.demoSpace !== ""
+          ? record.demoSpace
+          : null,
       progressVersion:
         typeof record.progressVersion === "number"
           ? record.progressVersion
@@ -184,6 +191,7 @@ export function getOrCreatePendingOperationId(): string {
     operationId,
     spaces: [],
     demoUrl: null,
+    demoSpace: null,
     progressVersion: null,
     saveKinds: [],
     step: null,
@@ -212,6 +220,7 @@ function writePendingSpaces(
     operationId,
     spaces,
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
     progressVersion: existing?.progressVersion ?? null,
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
@@ -255,21 +264,26 @@ export function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
 }
 
-/** A first save the replay makes once the account is Pro: one queued before
- * sign-in whose account had already spent its free demo save
- * (queued-first-save.ts). */
-export function queueDemoUrl(url: string) {
+/** The space the queued first save was picked for, if any. */
+export function getPendingDemoSpace(): string | null {
+  return readPendingRecord()?.demoSpace ?? null;
+}
+
+/** A first save the replay makes once the account is Pro, filed into the
+ * space it was picked for: one queued before sign-in whose account had
+ * already spent its free demo save (queued-first-save.ts). */
+export function queueDemoUrl(url: string, space: string | null = null) {
   getOrCreatePendingOperationId();
   const existing = readPendingRecord();
   if (existing === null) return;
-  writePendingRecord({ ...existing, demoUrl: url });
+  writePendingRecord({ ...existing, demoUrl: url, demoSpace: space });
   notifyChanged();
 }
 
 export function clearLegacyDemoUrl() {
   const existing = readPendingRecord();
   if (existing === null || existing.demoUrl === null) return;
-  writePendingRecord({ ...existing, demoUrl: null });
+  writePendingRecord({ ...existing, demoUrl: null, demoSpace: null });
   notifyChanged();
 }
 
@@ -313,6 +327,7 @@ export function setOnboardingProgress(progress: {
     operationId,
     spaces: progress.spaces,
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
     progressVersion: PROGRESS_VERSION,
     saveKinds: progress.saveKinds,
     step: progress.step,
@@ -332,6 +347,7 @@ export function setPendingDemo(demo: PendingDemo | null) {
     operationId,
     spaces: existing?.spaces ?? [],
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
     progressVersion: existing?.progressVersion ?? null,
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   clearLegacyDemoUrl,
   clearPending,
+  getPendingDemoSpace,
   getPendingDemoUrl,
   getPendingSpaces,
   getPendingOperationId,
@@ -75,7 +76,8 @@ function pendingWorkKey(): string {
 
 /**
  * After onboarding is finished and the user signs in, replay the deferred
- * onboarding spaces, then present the paywall. Runs once.
+ * onboarding spaces, then present the paywall. Runs again only for work
+ * handed over after it finished (a queued first save's link).
  *
  * Mounted in (app)/_layout.tsx. Gated on `onboarded`: onboarding replay must
  * never fire mid-onboarding (the demo step's inline sign-in authenticates the
@@ -89,7 +91,6 @@ export function useReplayOnboarding() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
-  const ranRef = useRef(false);
   const runningRef = useRef(false);
   const startedEntitledRef = useRef(false);
   const rerunRef = useRef(false);
@@ -121,7 +122,7 @@ export function useReplayOnboarding() {
       settledEntitledRef.current = entitled;
       settledWorkRef.current = null;
     }
-    if (!isAuthenticated || ranRef.current) return;
+    if (!isAuthenticated) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
     if (runningRef.current) {
@@ -148,6 +149,7 @@ export function useReplayOnboarding() {
     const spaces = getPendingSpaces();
 
     const legacyDemoUrl = getPendingDemoUrl();
+    const legacyDemoSpace = getPendingDemoSpace();
 
     runningRef.current = true;
     startedEntitledRef.current = entitled;
@@ -197,8 +199,15 @@ export function useReplayOnboarding() {
             // No saveSource: this replays an onboarding demo, but
             // `onboarding_demo` is stamped server-side by createDemoItem and
             // the client must not claim it. No other literal is truthful here.
+            // The space it was picked for is usually a starter space made
+            // above; createSpace returns that one by name.
+            const spaceId =
+              legacyDemoSpace === null
+                ? undefined
+                : await createSpace({ name: legacyDemoSpace, dynamic: true });
             await createLinkItem({
               url: legacyDemoUrl,
+              spaceId,
               operationId: getOrCreatePendingOperationId(),
               analyticsSessionId: analytics.sessionId(),
             });
@@ -221,7 +230,6 @@ export function useReplayOnboarding() {
           return;
         }
 
-        ranRef.current = true;
         clearPending();
       } finally {
         // An entitlement change during the run asked for a fresh pass; marking

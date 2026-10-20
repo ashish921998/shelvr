@@ -59,7 +59,7 @@ export function getQueuedFirstSaveUrl(): string | null {
  * under a sample's own heading, so it lands whether or not the person bought.
  * Waits for the AI answer, as the demo step does. An account whose demo save
  * is already spent (it signed in before, on another install) hands the link
- * to the replay, which saves it once the account is Pro.
+ * and its space to the replay, which saves it there once the account is Pro.
  *
  * Mounted in (app)/_layout.tsx beside useReplayOnboarding.
  */
@@ -89,7 +89,7 @@ export function useQueuedFirstSave() {
     }).then(
       (result) => {
         if (result.reused && !result.urlMatchesRequest) {
-          queueDemoUrl(url);
+          queueDemoUrl(url, destination);
         } else {
           if (!result.reused) analytics.capture("onboarding_demo_submitted");
           if (source === "share" && result.urlMatchesRequest) {
@@ -105,7 +105,7 @@ export function useQueuedFirstSave() {
         // save once the account is Pro. A rate limit is not an answer; the
         // free save is tried again on the next launch.
         if (error instanceof ConvexError && !isRateLimitedError(error)) {
-          queueDemoUrl(url);
+          queueDemoUrl(url, destination);
           clearQueued();
         }
       },

@@ -284,4 +284,26 @@ describe("a link handed to the replay while it runs", () => {
     );
     expect(hasPending()).toBe(false);
   });
+
+  it("is saved, in the space it was picked for, when it arrives after the replay finished", async () => {
+    createSpace.mockImplementation(({ name }: { name: string }) =>
+      Promise.resolve(`space:${name}`),
+    );
+    createLinkItem.mockResolvedValue("item");
+    setPendingSpaces(["Recipes"]);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(hasPending()).toBe(false);
+
+    act(() => queueDemoUrl("https://example.com/after", "Recipes"));
+    await settle();
+
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://example.com/after",
+        spaceId: "space:Recipes",
+      }),
+    );
+    expect(hasPending()).toBe(false);
+  });
 });

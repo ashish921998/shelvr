@@ -265,6 +265,18 @@ describe("selling before sign-in", () => {
     expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
   });
 
+  it("retries a failed read on its own, so a paying user is not left without access", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    mock.syncPurchase.mockRejectedValueOnce(new Error("offline"));
+    await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledTimes(2), {
+      timeout: 5000,
+    });
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+  });
+
   it("still reads the account back when the store sync fails", async () => {
     mock.store.set("shelvr.purchase.beforeSignIn", "1");
     mock.syncPurchasesForResult.mockRejectedValue(new Error("store"));

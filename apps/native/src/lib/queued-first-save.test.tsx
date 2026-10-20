@@ -120,13 +120,13 @@ describe("a first save queued before sign-in", () => {
     expect(mock.createDemoItem.mock.calls[0][0].spaceName).toBeUndefined();
   });
 
-  it("hands the link to the Pro replay when the account's demo save is spent", async () => {
+  it("hands the link and its space to the Pro replay when the account's demo save is spent", async () => {
     mock.createDemoItem.mockResolvedValue(
       result({ reused: true, urlMatchesRequest: false, url: "https://old" }),
     );
-    queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
+    queueFirstSave({ url: SAMPLE, destination: "Recipes", source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE);
+    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, "Recipes");
     expect(getQueuedFirstSaveUrl()).toBeNull();
   });
 
@@ -140,7 +140,7 @@ describe("a first save queued before sign-in", () => {
     mock.createDemoItem.mockRejectedValue(new ConvexError({ code: "demo" }));
     queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE);
+    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, null);
     expect(getQueuedFirstSaveUrl()).toBeNull();
 
     mock.createDemoItem.mockRejectedValue(new Error("offline"));

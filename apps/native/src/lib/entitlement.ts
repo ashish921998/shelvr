@@ -248,6 +248,9 @@ export function useEntitlementSync(): void {
     if (REVENUECAT_DISABLED_BY_BUILD) return;
 
     let cancelled = false;
+    // Attaching a purchase made before sign-in has its own retries: by the
+    // time it runs the identity sync is ready, and its retry is a no-op.
+    let attach: ReturnType<typeof startRevenueCatIdentitySync> | null = null;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
         // Keep retries and account changes on the same serial queue.
@@ -264,21 +267,27 @@ export function useEntitlementSync(): void {
       },
       onReady: () => {
         markRcUserSynced(sub);
-        if (!claimPurchaseBeforeSignIn(sub)) return;
-        attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})).then(
-          clearPurchaseBeforeSignIn,
-          (error) => analytics.captureError("purchase_sync_failed", error),
-        );
+        if (cancelled || !claimPurchaseBeforeSignIn(sub)) return;
+        attach = startRevenueCatIdentitySync({
+          sync: () =>
+            attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})),
+          onReady: clearPurchaseBeforeSignIn,
+          onError: (error) =>
+            analytics.captureError("purchase_sync_failed", error),
+        });
       },
       onError: reportRevenueCatIdentityError,
     });
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") observer.retry();
+      if (state !== "active") return;
+      observer.retry();
+      attach?.retry();
     });
 
     return () => {
       cancelled = true;
       observer.dispose();
+      attach?.dispose();
       subscription.remove();
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
