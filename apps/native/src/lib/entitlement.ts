@@ -267,7 +267,16 @@ export function useEntitlementSync(): void {
       },
       onReady: () => {
         markRcUserSynced(sub);
-        if (cancelled || !claimPurchaseBeforeSignIn(sub)) return;
+        if (cancelled) return;
+        // A purchase that never reached the account within the attach
+        // window is let go (see purchase-before-sign-in.ts), and reported.
+        const claimed = claimPurchaseBeforeSignIn(sub, () =>
+          analytics.captureError(
+            "purchase_attach_expired",
+            new Error("purchase_attach_expired"),
+          ),
+        );
+        if (!claimed) return;
         attach = startRevenueCatIdentitySync({
           sync: () =>
             attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})),

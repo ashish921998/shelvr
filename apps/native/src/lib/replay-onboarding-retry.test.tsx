@@ -247,6 +247,36 @@ describe("a purchase made before sign-in", () => {
     expect(hasPending()).toBe(false);
   });
 
+  it("keeps waiting across a relaunch, then saves as soon as access shows", async () => {
+    entitlement.entitled = false;
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe");
+    setPendingSpaces(["Recipes"]);
+    notePurchaseBeforeSignIn();
+
+    // The app is closed before the purchase reaches the account.
+    const first = renderHook(() => useReplayOnboarding());
+    await settle();
+    first.unmount();
+    const relaunched = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+    expect(createSpace).not.toHaveBeenCalled();
+
+    // Access lands (the webhook, or the attach on this launch) while the
+    // flag is still set: the replay does not wait for the flag too.
+    entitlement.entitled = true;
+    relaunched.rerender();
+    await settle();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/recipe" }),
+    );
+    expect(createLinkItem).toHaveBeenCalledOnce();
+    expect(openPaywall).not.toHaveBeenCalled();
+    clearPurchaseBeforeSignIn();
+  });
+
   it("offers the paywall once the flag clears with no purchase found", async () => {
     entitlement.entitled = false;
     setPendingSpaces(["Recipes"]);

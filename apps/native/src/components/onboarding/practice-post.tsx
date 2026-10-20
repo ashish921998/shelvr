@@ -3,47 +3,17 @@ import type { DemoSample } from "@/lib/onboarding-demo";
 import { AppSymbolIcon } from "@/components/symbol";
 import { sampleImage } from "@/components/onboarding/sample-card";
 import { Image } from "expo-image";
-import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The share practice: a pretend post, styled like one in a social app, with a
-// coach mark on its Share button, and the two steps the real sheet takes.
+// The share practice: a pretend post, styled like one in a social app, and the
+// two steps the real sheet takes. The step's own button opens the sheet.
 
 const APP_ICON = require("../../../assets/icon.png");
 const SHARE_SIZE = 40;
 
-/** A ring that breathes out from the Share button, so the eye lands there. */
-function Pulse() {
-  const reducedMotion = useReducedMotion();
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    if (reducedMotion) return;
-    progress.set(
-      withRepeat(
-        withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }),
-        -1,
-      ),
-    );
-  }, [progress, reducedMotion]);
-  const ring = useAnimatedStyle(() => ({
-    opacity: 0.6 * (1 - progress.get()),
-    transform: [{ scale: 1 + 0.6 * progress.get() }],
-  }));
-  if (reducedMotion) return null;
-  return <Animated.View pointerEvents="none" style={[styles.pulse, ring]} />;
-}
-
-/** The pretend post. The whole card opens the real share sheet; the coach
- * mark points at its Share button, which is where the tap belongs in any app. */
+/** The pretend post. The whole card opens the real share sheet too; its Share
+ * button shows what to look for in any app. */
 export function PracticePost({
   sample,
   disabled,
@@ -56,59 +26,48 @@ export function PracticePost({
   useAppLocale();
   const { theme } = useUnistyles();
   return (
-    <View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${t("demo.shareThis")}, ${sample.pageHeading}, ${sample.domain}`}
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.post,
-          disabled
-            ? { opacity: theme.opacity.disabled }
-            : pressed && { opacity: theme.opacity.pressed },
-        ]}
-      >
-        <View style={styles.byline}>
-          <Image
-            source={sampleImage(sample)}
-            contentFit="cover"
-            style={styles.avatar}
-          />
-          <Text style={styles.author} numberOfLines={1}>
-            {sample.domain}
-          </Text>
-        </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t("demo.shareThis")}, ${sample.pageHeading}, ${sample.domain}`}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.post,
+        disabled
+          ? { opacity: theme.opacity.disabled }
+          : pressed && { opacity: theme.opacity.pressed },
+      ]}
+    >
+      <View style={styles.byline}>
         <Image
           source={sampleImage(sample)}
           contentFit="cover"
-          style={styles.image}
+          style={styles.avatar}
         />
-        {/* Title and Share on one row: the button is the only action, so
-            nothing else on the post competes with it. */}
-        <View style={styles.footer}>
-          <Text style={styles.title} numberOfLines={2}>
-            {sample.pageHeading}
-          </Text>
-          <View style={styles.shareWrap}>
-            {disabled ? null : <Pulse />}
-            <View style={styles.share}>
-              <AppSymbolIcon
-                name="square.and.arrow.up"
-                size={18}
-                tintColor={theme.colors.primaryForeground}
-              />
-            </View>
-          </View>
-        </View>
-      </Pressable>
-      <View style={styles.coachRow} pointerEvents="none">
-        <View style={styles.coach}>
-          <View style={styles.caret} />
-          <Text style={styles.coachText}>{t("sharePractice.coachTap")}</Text>
+        <Text style={styles.author} numberOfLines={1}>
+          {sample.domain}
+        </Text>
+      </View>
+      <Image
+        source={sampleImage(sample)}
+        contentFit="cover"
+        style={styles.image}
+      />
+      {/* Title and Share on one row: Share is the icon to look for in any
+          app, so nothing else on the post competes with it. */}
+      <View style={styles.footer}>
+        <Text style={styles.title} numberOfLines={2}>
+          {sample.pageHeading}
+        </Text>
+        <View style={styles.share}>
+          <AppSymbolIcon
+            name="square.and.arrow.up"
+            size={18}
+            tintColor={theme.colors.primaryForeground}
+          />
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -178,21 +137,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 20,
     color: theme.colors.foreground,
   },
-
-  shareWrap: {
-    width: SHARE_SIZE,
-    height: SHARE_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pulse: {
-    position: "absolute",
-    width: SHARE_SIZE,
-    height: SHARE_SIZE,
-    borderRadius: SHARE_SIZE / 2,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-  },
   share: {
     width: SHARE_SIZE,
     height: SHARE_SIZE,
@@ -200,32 +144,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
-  },
-  coachRow: {
-    alignItems: "flex-end",
-    marginTop: theme.gap(1),
-  },
-  coach: {
-    paddingHorizontal: theme.gap(1.5),
-    paddingVertical: theme.gap(0.75),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  // A small diamond under the bubble's top edge, lined up with the button.
-  caret: {
-    position: "absolute",
-    top: -5,
-    right: theme.gap(1.5) + SHARE_SIZE / 2 - 5,
-    width: 10,
-    height: 10,
-    transform: [{ rotate: "45deg" }],
-    backgroundColor: theme.colors.primary,
-  },
-  coachText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 14,
-    color: theme.colors.primaryForeground,
   },
   steps: {
     flexDirection: "row",
