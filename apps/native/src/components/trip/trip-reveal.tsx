@@ -220,7 +220,7 @@ export function TripReveal({
               {t("trip.revealSaves", { count: rolled })}
             </ThemedText>
             <ThemedText variant="subhead" style={styles.muted}>
-              {city
+              {city && target
                 ? t("trip.revealLanding", { city })
                 : t("trip.revealLandingNoCity")}
             </ThemedText>

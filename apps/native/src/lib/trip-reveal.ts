@@ -32,6 +32,10 @@ type RevealSave = {
 
 export type RevealCover = { id: string; title: string; imageUrl: string };
 
+/** A city as the trip builder matches it: spacing and case do not count. */
+const cityKey = (value: string) =>
+  value.replace(/\s+/g, " ").trim().toLowerCase();
+
 /** The saves that lift off: ready ones with a cover, the trip's city first. */
 export function revealCovers(
   items: readonly RevealSave[],
@@ -41,8 +45,10 @@ export function revealCovers(
     (item): item is RevealSave & { imageUrl: string } =>
       item.status === "ready" && !!item.imageUrl,
   );
+  const wanted = city === undefined ? undefined : cityKey(city);
   const inCity = (item: RevealSave) =>
-    city !== undefined && (item.cities ?? []).includes(city);
+    wanted !== undefined &&
+    (item.cities ?? []).some((name) => cityKey(name) === wanted);
   return [...covered.filter(inCity), ...covered.filter((item) => !inCity(item))]
     .slice(0, REVEAL_COVERS)
     .map((item) => ({

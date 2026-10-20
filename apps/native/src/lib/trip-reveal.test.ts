@@ -41,6 +41,23 @@ describe("revealCovers", () => {
       "lisbon2",
     ]);
   });
+
+  it("matches the trip's city the way the trip builder does", () => {
+    const items = [
+      ...Array.from({ length: 6 }, (_, i) =>
+        save(`other${i}`, { cities: ["Porto"] }),
+      ),
+      save("lower", { cities: ["lisbon"] }),
+      save("spaced", { cities: ["  Lisbon  "] }),
+      save("split", { cities: ["Rio  de   Janeiro"] }),
+    ];
+    expect(
+      revealCovers(items, "Lisbon")
+        .slice(0, 2)
+        .map((cover) => cover.id),
+    ).toEqual(["lower", "spaced"]);
+    expect(revealCovers(items, "rio de janeiro")[0].id).toBe("split");
+  });
 });
 
 describe("revealLayout", () => {
