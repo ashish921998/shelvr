@@ -3,11 +3,14 @@ import { arrivalCampaign } from "@/lib/appStore";
 type PageLocation = Pick<Location, "origin" | "pathname" | "search">;
 
 /**
- * The path a page view reports. A share page's path carries the token that
- * opens the shared item, so it is replaced, the same way `sharePageUrl` does.
+ * The path a page view reports. A share page's or plan vote page's path
+ * carries the token that opens it, so it is replaced, the same way
+ * `sharePageUrl` does.
  */
 function pageViewPath(pathname: string): string {
-  return pathname.startsWith("/i/") ? "/i/[token]" : pathname;
+  if (pathname.startsWith("/i/")) return "/i/[token]";
+  if (pathname.startsWith("/p/")) return "/p/[token]";
+  return pathname;
 }
 
 /**

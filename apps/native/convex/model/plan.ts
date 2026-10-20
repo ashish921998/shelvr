@@ -12,8 +12,8 @@ export const MAX_PLAN_PLACES = 5;
 /** Per-item body excerpt. Captions name the place early; the rest is noise. */
 export const PLAN_CONTENT_CHARS = 600;
 const MAX_NAME_CHARS = 80;
-const MAX_AREA_CHARS = 60;
-const MAX_WHY_CHARS = 140;
+export const MAX_AREA_CHARS = 60;
+export const MAX_WHY_CHARS = 140;
 /** Places marked "We went" that the claim hands the prompt, newest first. */
 export const MAX_BEEN_PLACES = 100;
 /** Longest place name a "We went" row stores. */

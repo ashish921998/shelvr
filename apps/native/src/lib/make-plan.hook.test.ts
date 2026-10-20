@@ -5,21 +5,32 @@ import type { Id } from "@convex/_generated/dataModel";
 import {
   useMakePlan,
   usePlaceVisits,
+  usePlanAsk,
   usePlanDeck,
   usePlanPicker,
   type PlanPlace,
 } from "./make-plan";
 
-const mocks = vi.hoisted(() => ({ makePlan: vi.fn(), setVisited: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  makePlan: vi.fn(),
+  setVisited: vi.fn(),
+  share: vi.fn(),
+  alert: vi.fn(),
+  capture: vi.fn(),
+}));
 vi.mock("convex/react", () => ({
   useAction: () => mocks.makePlan,
   useMutation: () => mocks.setVisited,
 }));
 vi.mock("@convex/_generated/api", () => ({
-  api: { plans: {}, placeVisits: {} },
+  api: { plans: {}, placeVisits: {}, planShares: {} },
+}));
+vi.mock("react-native", () => ({
+  Alert: { alert: mocks.alert },
+  Share: { share: mocks.share, sharedAction: "sharedAction" },
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: vi.fn(), captureError: vi.fn() },
+  analytics: { capture: mocks.capture, captureError: vi.fn() },
 }));
 
 const SPACE = "space1" as Id<"spaces">;
@@ -39,6 +50,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   mocks.makePlan.mockReset();
   mocks.setVisited.mockReset();
+  mocks.share.mockReset();
+  mocks.alert.mockReset();
+  mocks.capture.mockReset();
 });
 
 describe("usePlaceVisits", () => {
@@ -117,7 +131,7 @@ describe("useMakePlan", () => {
       .mockReturnValueOnce(second.promise);
 
     const { result, rerender } = renderHook(
-      ({ locale }) => useMakePlan(SPACE, locale),
+      ({ locale }) => useMakePlan(SPACE, locale, null),
       { initialProps: { locale: "en" } },
     );
     await waitFor(() => expect(result.current.state.status).toBe("ready"));
@@ -133,12 +147,72 @@ describe("useMakePlan", () => {
     expect(state.status === "ready" && state.places[0].name).toBe("Beta");
   });
 
+  it("waits for the vote link, then shows its shortlist without the model", async () => {
+    const shared = {
+      expiresAt: Date.now() + 60_000,
+      places: [
+        {
+          name: "Tigre",
+          area: "Baixa",
+          why: "Seafood",
+          itemId: "item" as Id<"items">,
+        },
+      ],
+    };
+    const { result, rerender } = renderHook(
+      ({ link }: { link: typeof shared | null | undefined }) =>
+        useMakePlan(SPACE, "en", link),
+      { initialProps: { link: undefined as typeof shared | undefined } },
+    );
+    expect(result.current.state.status).toBe("loading");
+    rerender({ link: shared });
+    await waitFor(() => expect(result.current.state.status).toBe("ready"));
+    expect(result.current.state).toMatchObject({ places: shared.places });
+    expect(mocks.makePlan).not.toHaveBeenCalled();
+
+    // A new plan is the owner's call.
+    mocks.makePlan.mockResolvedValue({
+      places: [place("Alpha")],
+      considered: 3,
+    });
+    await act(() => result.current.retry());
+    expect(result.current.state).toMatchObject({ places: [place("Alpha")] });
+  });
+
+  it("asks the model when the link has closed", async () => {
+    mocks.makePlan.mockResolvedValue({
+      places: [place("Alpha")],
+      considered: 3,
+    });
+    const closed = {
+      expiresAt: Date.now() - 1,
+      places: [
+        { name: "Tigre", why: "Seafood", itemId: "item" as Id<"items"> },
+      ],
+    };
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", closed));
+    await waitFor(() => expect(result.current.state.status).toBe("ready"));
+    expect(mocks.makePlan).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes a new link when the open one has closed since it loaded", async () => {
+    mocks.setVisited.mockResolvedValue("fresh");
+    mocks.share.mockResolvedValue({ action: "sharedAction" });
+    const places = [place("Tigre")];
+    const { result } = renderHook(() =>
+      usePlanAsk(SPACE, places, { token: "old", expiresAt: Date.now() - 1 }),
+    );
+    await act(() => result.current.ask());
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.share.mock.calls[0][0].message).toContain("/p/fresh");
+  });
+
   it("gives every answer its own plan id", async () => {
     mocks.makePlan.mockResolvedValue({
       places: [place("Alpha")],
       considered: 3,
     });
-    const { result } = renderHook(() => useMakePlan(SPACE, "en"));
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
     await waitFor(() => expect(result.current.state.status).toBe("ready"));
     const first = result.current.state;
 
@@ -280,5 +354,81 @@ describe("usePlanDeck", () => {
     rerender({ planId: 2 });
 
     expect(result.current).toMatchObject({ front: 0, flipped: false });
+  });
+});
+
+describe("usePlanAsk", () => {
+  const places = [place("Tigre"), place("Sweet Linda")];
+
+  it("makes a link, then shares it", async () => {
+    mocks.setVisited.mockResolvedValue("tok1");
+    mocks.share.mockResolvedValue({ action: "sharedAction" });
+    const { result } = renderHook(() => usePlanAsk(SPACE, places, null));
+
+    await act(() => result.current.ask());
+
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.share.mock.calls[0][0].message).toContain("/p/tok1");
+    expect(mocks.capture).toHaveBeenCalledWith("plan_asked", {
+      place_count: 2,
+    });
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("sends the open link again instead of replacing it", async () => {
+    mocks.share.mockResolvedValue({ action: "dismissedAction" });
+    const { result } = renderHook(() =>
+      usePlanAsk(SPACE, places, {
+        token: "open",
+        expiresAt: Date.now() + 60_000,
+      }),
+    );
+
+    await act(() => result.current.ask());
+
+    expect(mocks.setVisited).not.toHaveBeenCalled();
+    expect(mocks.share.mock.calls[0][0].message).toContain("/p/open");
+    // A cancelled sheet is not a send and says nothing.
+    expect(mocks.capture).not.toHaveBeenCalledWith("plan_asked", {
+      place_count: 2,
+    });
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("asks once while a tap is still in flight", async () => {
+    const link = deferred<string>();
+    mocks.setVisited.mockReturnValue(link.promise);
+    mocks.share.mockResolvedValue({ action: "sharedAction" });
+    const { result } = renderHook(() => usePlanAsk(SPACE, places, null));
+
+    let first!: Promise<void>;
+    act(() => {
+      first = result.current.ask();
+      void result.current.ask();
+    });
+    link.resolve("tok");
+    await act(() => first);
+
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.share).toHaveBeenCalledTimes(1);
+  });
+
+  it("names which step failed", async () => {
+    mocks.setVisited.mockRejectedValue(new Error("limit"));
+    const { result } = renderHook(() => usePlanAsk(SPACE, places, null));
+    await act(() => result.current.ask());
+    expect(mocks.capture).toHaveBeenCalledWith("plan_ask_failed", {
+      reason: "link",
+    });
+    expect(mocks.share).not.toHaveBeenCalled();
+
+    mocks.capture.mockReset();
+    mocks.setVisited.mockResolvedValue("tok");
+    mocks.share.mockRejectedValue(new Error("no handler"));
+    await act(() => result.current.ask());
+    expect(mocks.capture).toHaveBeenCalledWith("plan_ask_failed", {
+      reason: "share",
+    });
+    expect(mocks.alert).toHaveBeenCalledTimes(2);
   });
 });

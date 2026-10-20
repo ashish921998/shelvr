@@ -29,6 +29,7 @@ import {
   type MembershipSummary,
 } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
   claimSpaceForModel,
@@ -433,11 +434,7 @@ export const deleteSpace = mutation({
     // cannot load.
     await ctx.db.delete(space._id);
     await deleteTripsForSpace(ctx, space._id);
-    const more = await deleteMembershipsForSpace(
-      ctx,
-      space._id,
-      SPACE_DELETE_BATCH,
-    );
+    const more = await deleteSpaceRemains(ctx, space._id);
     if (more) {
       await ctx.scheduler.runAfter(0, internal.spaces.purgeSpaceMemberships, {
         spaceId: space._id,
@@ -447,16 +444,26 @@ export const deleteSpace = mutation({
   },
 });
 
+/** One batch of a deleted space's joins and vote links. True while more remain. */
+async function deleteSpaceRemains(
+  ctx: MutationCtx,
+  spaceId: Id<"spaces">,
+): Promise<boolean> {
+  const moreJoins = await deleteMembershipsForSpace(
+    ctx,
+    spaceId,
+    SPACE_DELETE_BATCH,
+  );
+  const sharesDone = await deletePlanSharesForSpace(ctx, spaceId);
+  return moreJoins || !sharesDone;
+}
+
 /** Continuation of deleteSpace for spaces with more joins than one batch. */
 export const purgeSpaceMemberships = internalMutation({
   args: { spaceId: v.id("spaces") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const more = await deleteMembershipsForSpace(
-      ctx,
-      args.spaceId,
-      SPACE_DELETE_BATCH,
-    );
+    const more = await deleteSpaceRemains(ctx, args.spaceId);
     if (more) {
       await ctx.scheduler.runAfter(0, internal.spaces.purgeSpaceMemberships, {
         spaceId: args.spaceId,

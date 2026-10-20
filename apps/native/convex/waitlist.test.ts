@@ -10,9 +10,8 @@ import {
   CONSENT_TEXT,
   CONSENT_VERSION,
   RESEND_MAX_ATTEMPTS,
-  UNKNOWN_IP_LIMITER_KEY,
-  normalizeIp,
 } from "./waitlist";
+import { UNKNOWN_IP_LIMITER_KEY, normalizeIp } from "./model/clientIp";
 import { classifyResendError, formatResendError } from "./model/resend";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
 import { newConvexTest } from "./test.setup";
@@ -28,7 +27,7 @@ afterEach(() => {
 type JoinBody = {
   email: string;
   product?: "shelvr" | "shelvr-android";
-  source?: "hero" | "preview" | "footer" | "unknown";
+  source?: "hero" | "preview" | "footer" | "plan" | "unknown";
 };
 
 /**
@@ -140,6 +139,25 @@ describe("POST /waitlist/join", () => {
         )
         .unique();
       expect(signup?.source).toBe("unknown");
+    });
+  });
+
+  it("stores an Android signup from a plan vote page as plan", async () => {
+    const t = setup();
+    const body = {
+      email: "voter@example.com",
+      product: "shelvr-android",
+      source: "plan",
+    } as const;
+    expect((await join(t, body)).status).toBe(200);
+    await t.run(async (ctx) => {
+      const signup = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q.eq("email", "voter@example.com").eq("product", "shelvr-android"),
+        )
+        .unique();
+      expect(signup?.source).toBe("plan");
     });
   });
 

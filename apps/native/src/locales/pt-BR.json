@@ -309,6 +309,20 @@
   "plan.failedTitle": "Não foi possível fazer o plano",
   "plan.shareIntro": "Nossa seleção de %{space}:",
   "plan.shareFooter": "Feito com Shelvr %{url}",
+  "plan.ask": "Perguntar a alguém",
+  "plan.askText": "Para onde vamos? Toque ✓ nos lugares que você toparia: %{url}",
+  "plan.askFailedTitle": "Não foi possível criar o link de votação",
+  "plan.voterCount": {
+    "one": "%{formattedCount} pessoa votou no seu link.",
+    "many": "%{formattedCount} pessoas votaram no seu link.",
+    "other": "%{formattedCount} pessoas votaram no seu link."
+  },
+  "plan.daysLeft": {
+    "one": "Falta %{formattedCount} dia.",
+    "many": "Faltam %{formattedCount} dias.",
+    "other": "Faltam %{formattedCount} dias."
+  },
+  "plan.tally": "%{picks} iriam, %{passes} passam",
   "trip.make": "Planejar minha viagem",
   "trip.pickTitle": "Uma viagem",
   "trip.pickBody": "Transforme seus lugares salvos em dias",
