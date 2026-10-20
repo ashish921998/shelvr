@@ -87,7 +87,6 @@ type Props = {
   // its undo), so a media caption must sit above it.
   reserveFooter: boolean;
   onSheetUnderHeader?: (itemId: string, under: boolean) => void;
-  onSourceBrowser?: (open: boolean) => void;
 };
 
 // Shared data for both render paths: the full document (list rows carry
@@ -160,7 +159,6 @@ export const ItemDetail = memo(function ItemDetail({
   pageHeight,
   reserveFooter,
   onSheetUnderHeader,
-  onSourceBrowser,
 }: Props) {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
@@ -242,7 +240,6 @@ export const ItemDetail = memo(function ItemDetail({
         headerInset={headerInset}
         reserveFooter={reserveFooter}
         onSheetUnderHeader={onSheetUnderHeader}
-        onSourceBrowser={onSourceBrowser}
         scrollRef={scrollRef}
         testID={
           item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined

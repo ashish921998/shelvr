@@ -2,7 +2,7 @@ import { analytics, type AnalyticsItem } from "@/lib/analytics";
 import { t } from "@/lib/i18n";
 import { displayHost } from "@/lib/url";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { openInAppBrowser } from "@/lib/in-app-browser";
+import { openLink } from "@/lib/open-link";
 import {
   Pressable,
   Text,
@@ -17,13 +17,11 @@ type SourceItem = AnalyticsItem & {
   siteName?: string;
 };
 
-// `onClosed` runs once the in-app browser is dismissed (or failed to open).
-export function openItemSource(item: SourceItem, onClosed?: () => void): void {
+export function openItemSource(item: SourceItem): void {
   if (!item.url) return;
-  void openInAppBrowser(item.url)
+  void openLink(item.url)
     .then(() => analytics.itemAction(item, "open_source"))
-    .catch(() => {})
-    .finally(() => onClosed?.());
+    .catch(() => {});
 }
 
 type Props = {
