@@ -32,7 +32,14 @@ import {
 } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   Easing,
@@ -446,14 +453,20 @@ function PinLabel({ pin, city }: { pin: Pin; city: string }) {
   );
 }
 
-/** One frame of the globe, as SVG paths, and how lit the city's country is. */
-type GlobeFrame = { paths: GlobePaths; light: number };
+/** One frame of the globe, as SVG paths, how lit the city's country is, and
+ * where the city is on it during the dive (no point when there are no pins). */
+type GlobeFrame = {
+  paths: GlobePaths;
+  light: number;
+  pin: { point: { x: number; y: number } | null; dive: number } | null;
+};
 
 const SPIN_FRAME_MS = 1000 / 30;
 
 const HIDDEN: GlobeFrame = {
   paths: { sphere: "", graticule: "", land: "", country: "" },
   light: 0,
+  pin: null,
 };
 
 /** The globe: a real world map that rises as the saves become dots, spins
@@ -513,26 +526,36 @@ function Globe({
       drawn = t;
       const camera = globeCamera({ t, diveAt, ...screen, target: aim });
       const paths = globePaths(camera, screen, dive.current?.region ?? null);
-      // Below the screen there is nothing to draw, so no render either.
-      if (paths.sphere !== "" || shown) {
-        setFrame({ paths, light: countryLight(camera.dive) });
-        shown = paths.sphere !== "";
-      }
       // With no pins the dots fall on the screen's centre, where the dive
       // lands; they move on this frame's clock either way.
-      if (diveAt !== null) {
-        if (aim) {
-          const point = globePin(camera, aim);
-          pin.x.value = point.x;
-          pin.y.value = point.y;
-        }
-        pin.dive.value = Math.min(1, (t - diveAt) / GLOBE_DIVE_MS);
+      const framePin =
+        diveAt === null
+          ? null
+          : {
+              point: aim ? globePin(camera, aim) : null,
+              dive: Math.min(1, (t - diveAt) / GLOBE_DIVE_MS),
+            };
+      // Below the screen there is nothing to draw, so no render either.
+      if (paths.sphere !== "" || shown || framePin) {
+        setFrame({ paths, light: countryLight(camera.dive), pin: framePin });
+        shown = paths.sphere !== "";
       }
       if (!globeSettled(t, diveAt)) handle = requestAnimationFrame(tick);
     };
     handle = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(handle);
-  }, [stage, startedAt, lng, lat, width, height, glow, pin]);
+  }, [stage, startedAt, lng, lat, width, height, glow]);
+
+  // The dots, glow and name move only once React has committed the map frame
+  // they belong to, so a slow commit holds them back with the land.
+  useLayoutEffect(() => {
+    if (!frame.pin) return;
+    if (frame.pin.point) {
+      pin.x.set(frame.pin.point.x);
+      pin.y.set(frame.pin.point.y);
+    }
+    pin.dive.set(frame.pin.dive);
+  }, [frame, pin]);
 
   const { paths, light } = frame;
   return (
