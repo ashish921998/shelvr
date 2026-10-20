@@ -62,6 +62,9 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.7,
   },
   label: {
+    // Lets the label truncate when its container is narrower than the chip.
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.primaryText,

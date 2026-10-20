@@ -1,5 +1,5 @@
 import { OnboardingProvider } from "@/lib/onboarding";
-import { useEntitlementSync } from "@/lib/entitlement";
+import { noteAppTouch, useEntitlementSync } from "@/lib/entitlement";
 import { analytics } from "@/lib/analytics";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { authStorage } from "@/lib/auth-storage";
@@ -103,7 +103,10 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView
       style={{ flex: 1 }}
-      onStartShouldSetResponderCapture={dropMenuDismissTouch}
+      onStartShouldSetResponderCapture={() => {
+        noteAppTouch();
+        return dropMenuDismissTouch();
+      }}
     >
       <ConvexAuthProvider
         client={convex}
