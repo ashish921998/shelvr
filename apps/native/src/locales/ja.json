@@ -311,6 +311,16 @@
   "plan.failedTitle": "プランを作れませんでした",
   "plan.shareIntro": "%{space}からの候補リスト：",
   "plan.shareFooter": "Shelvrで作成 %{url}",
+  "plan.ask": "誰かに聞く",
+  "plan.askText": "どこに行く？行きたい場所に✓を付けてね：%{url}",
+  "plan.askFailedTitle": "投票リンクを作成できませんでした",
+  "plan.voterCount": {
+    "other": "%{formattedCount}人があなたのリンクで投票しました。"
+  },
+  "plan.daysLeft": {
+    "other": "残り%{formattedCount}日。"
+  },
+  "plan.tally": "行きたい%{picks}、パス%{passes}",
   "trip.make": "旅行を計画",
   "trip.pickTitle": "旅行",
   "trip.pickBody": "保存した場所を日ごとのプランに",

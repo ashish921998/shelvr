@@ -2,15 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   canMakePlan,
+  daysLeft,
+  linkForPlan,
   PLAN_SHARE_URL,
   placeLabel,
   planShareText,
+  planVoteUrl,
   deckOrder,
   spinSteps,
+  votesFor,
   type PlanPlace,
 } from "./make-plan";
 
-vi.mock("convex/react", () => ({ useAction: vi.fn() }));
+vi.mock("convex/react", () => ({ useAction: vi.fn(), useMutation: vi.fn() }));
+vi.mock("react-native", () => ({ Alert: { alert: vi.fn() }, Share: {} }));
 vi.mock("@convex/_generated/api", () => ({ api: {} }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
@@ -108,5 +113,57 @@ describe("deckOrder", () => {
   it("draws every card of a short deck once", () => {
     expect(deckOrder(2, 1)).toEqual([0, 1]);
     expect(deckOrder(0, 0)).toEqual([]);
+  });
+});
+
+describe("votesFor", () => {
+  const votes = {
+    voters: 2,
+    expiresAt: 0,
+    places: [
+      { name: "Tigre", picks: 2, passes: 0 },
+      { name: "Sweet Linda", picks: 0, passes: 0 },
+    ],
+  };
+
+  it("finds a place's tally however it is spelled, and only when someone voted", () => {
+    expect(votesFor(votes, place("TIGRE "))).toEqual({ picks: 2, passes: 0 });
+    expect(votesFor(votes, place("Sweet Linda"))).toBeNull();
+    expect(votesFor(votes, place("Nowhere"))).toBeNull();
+    expect(votesFor(null, place("Tigre"))).toBeNull();
+  });
+});
+
+describe("planVoteUrl and daysLeft", () => {
+  it("builds the vote page and counts whole days, never below one", () => {
+    expect(planVoteUrl("k8Q2")).toBe("https://shelvr-web.vercel.app/p/k8Q2");
+    const day = 24 * 60 * 60 * 1000;
+    expect(daysLeft(6.2 * day, 0)).toBe(7);
+    expect(daysLeft(1000, 0)).toBe(1);
+    expect(daysLeft(-day, 0)).toBe(1);
+  });
+});
+
+describe("linkForPlan", () => {
+  const link = {
+    token: "t",
+    expiresAt: Date.now() + 60_000,
+    places: [{ name: "Tigre" }, { name: "Sweet Linda" }],
+  };
+
+  it("keeps the link only while it holds the shortlist on screen", () => {
+    expect(linkForPlan(link, [place("sweet linda"), place("TIGRE")])).toBe(
+      link,
+    );
+    expect(linkForPlan(link, [place("Tigre")])).toBeNull();
+    expect(linkForPlan(link, [place("Tigre"), place("Bastian")])).toBeNull();
+    expect(linkForPlan(link, [])).toBeNull();
+    expect(linkForPlan(null, [place("Tigre")])).toBeNull();
+  });
+
+  it("drops a link once its week is over", () => {
+    const shortlist = [place("Tigre"), place("Sweet Linda")];
+    expect(linkForPlan(link, shortlist, link.expiresAt)).toBeNull();
+    expect(linkForPlan(link, shortlist, link.expiresAt - 1)).toBe(link);
   });
 });

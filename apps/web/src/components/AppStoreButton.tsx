@@ -3,7 +3,7 @@
 import { useAppStoreLink } from "@/lib/appStoreLink";
 
 type AppStoreButtonProps = {
-  source: "header" | "hero" | "footer" | "share";
+  source: "header" | "hero" | "footer" | "share" | "plan";
   compact?: boolean;
   /** On a share page, the link's token, so the click credits that share. */
   shareToken?: string;
