@@ -529,7 +529,7 @@ function runEffect(
       void openPaywall(deps.router, "share");
       return;
     case "navigateHome":
-      deps.router.replace("/");
+      deps.router.replace("/(app)/(tabs)/(home)");
       return;
   }
 }

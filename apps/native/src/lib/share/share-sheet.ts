@@ -28,6 +28,8 @@ type ShareSheetResult =
 export async function presentShareSheet(
   url: string,
   arrived: () => boolean,
+  /** Runs as soon as the sheet answers, before the dismiss wait. */
+  onSettled?: () => void,
 ): Promise<ShareSheetResult> {
   let result: Awaited<ReturnType<typeof Share.share>>;
   try {
@@ -35,9 +37,11 @@ export async function presentShareSheet(
       Platform.OS === "ios" ? { url } : { message: url },
     );
   } catch (err) {
+    onSettled?.();
     analytics.captureError("onboarding_share_sheet_failed", err);
     return "failed";
   }
+  onSettled?.();
   await new Promise((resolve) => setTimeout(resolve, SHARE_SHEET_DISMISS_MS));
   if (arrived() || result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)) {
     return "shelvr";

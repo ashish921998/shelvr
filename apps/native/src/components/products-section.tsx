@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { AppSymbolIcon } from "@/components/symbol";
-import { openInAppBrowser } from "@/lib/in-app-browser";
+import { openLink } from "@/lib/open-link";
 import { useFindLinks } from "@/lib/use-find-links";
 import { Image } from "expo-image";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -69,7 +69,7 @@ export function ProductsSection({
                 styles.productCard,
                 pressed && { opacity: 0.85 },
               ]}
-              onPress={() => openInAppBrowser(product.url)}
+              onPress={() => void openLink(product.url).catch(() => {})}
             >
               {product.thumbnailUrl ? (
                 <Image

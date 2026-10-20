@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// The share practice's pretend post: the coach mark names the Share tap, the
-// card opens the sheet, and a disabled card neither opens it nor pulses.
+// The share practice's pretend post: the card opens the sheet, and a disabled
+// card does not.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -21,7 +21,6 @@ const mock = vi.hoisted(() => ({
       {children}
     </button>
   ),
-  pulse: () => <i data-testid="pulse" />,
   empty: () => null,
 }));
 
@@ -29,15 +28,6 @@ vi.mock("react-native", () => ({
   View: mock.view,
   Text: mock.text,
   Pressable: mock.pressable,
-}));
-vi.mock("react-native-reanimated", () => ({
-  default: { View: mock.pulse },
-  Easing: { out: () => () => 0, quad: () => 0 },
-  useAnimatedStyle: () => ({}),
-  useReducedMotion: () => false,
-  useSharedValue: () => ({ get: () => 0, set: () => undefined }),
-  withRepeat: () => 0,
-  withTiming: () => 0,
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
@@ -58,19 +48,16 @@ vi.mock("@/lib/i18n", () => ({
 const sample = DEMO_SAMPLES[1];
 
 describe("practice post", () => {
-  it("points at the Share tap and opens the sheet from the card", () => {
+  it("opens the sheet from the card", () => {
     const onPress = vi.fn();
     render(<PracticePost sample={sample} disabled={false} onPress={onPress} />);
-    expect(screen.getByText("sharePractice.coachTap")).toBeTruthy();
-    expect(screen.getByTestId("pulse")).toBeTruthy();
     fireEvent.click(screen.getByRole("button"));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it("stops pulsing and taking taps while the sheet is open", () => {
+  it("takes no taps while the step is leaving", () => {
     const onPress = vi.fn();
     render(<PracticePost sample={sample} disabled onPress={onPress} />);
-    expect(screen.queryByTestId("pulse")).toBeNull();
     fireEvent.click(screen.getByRole("button"));
     expect(onPress).not.toHaveBeenCalled();
   });

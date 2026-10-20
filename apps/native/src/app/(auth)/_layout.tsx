@@ -15,7 +15,7 @@ export default function AuthRoutesLayout() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href={"/"} />;
+    return <Redirect href="/(app)/(tabs)/(home)" />;
   }
 
   return (

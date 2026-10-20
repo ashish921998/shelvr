@@ -13,7 +13,43 @@ import {
   MAX_URL_LENGTH,
   normalizeExternalUrl,
   xStatusId,
+  youtubeVideoId,
 } from "./externalUrl";
+
+describe("youtubeVideoId", () => {
+  it.each([
+    "https://youtube.com/watch?v=Ab_cd-Ef123&feature=share",
+    "http://www.youtube.com/watch?v=Ab_cd-Ef123",
+    "https://m.youtube.com/shorts/Ab_cd-Ef123?si=tracking",
+    "https://www.youtube.com/embed/Ab_cd-Ef123",
+    "https://youtu.be/Ab_cd-Ef123?t=20",
+    "https://music.youtube.com/watch?v=Ab_cd-Ef123",
+    "https://youtube.com:443/watch?v=Ab_cd-Ef123",
+    "http://youtube.com:80/watch?v=Ab_cd-Ef123",
+  ])("reads a supported video URL: %s", (url) => {
+    expect(youtubeVideoId(url)).toBe("Ab_cd-Ef123");
+  });
+  it.each([
+    "https://youtube.com/watch",
+    "https://youtube.com/watch?v=short",
+    "https://youtube.com/watch?v=Ab_cd-Ef123&v=other",
+    "https://youtube.com/shorts/Ab_cd-Ef123/extra",
+    "https://youtu.be/Ab_cd-Ef123/extra",
+    "https://youtube.com/watch/extra?v=Ab_cd-Ef123",
+    "https://youtube.com/live/Ab_cd-Ef123",
+    "https://youtube.com.evil.test/watch?v=Ab_cd-Ef123",
+    "https://evil.youtube.com/watch?v=Ab_cd-Ef123",
+    "ftp://youtube.com/watch?v=Ab_cd-Ef123",
+    "https://user@youtube.com/watch?v=Ab_cd-Ef123",
+    "https://:password@youtube.com/watch?v=Ab_cd-Ef123",
+    "https://youtube.com:8443/watch?v=Ab_cd-Ef123",
+    "http://youtube.com:443/watch?v=Ab_cd-Ef123",
+    "youtube.com/watch?v=Ab_cd-Ef123",
+    "https://youtube.com/embed/Ab_cd-Ef12!",
+  ])("rejects unsupported or malformed URLs: %s", (url) => {
+    expect(youtubeVideoId(url)).toBeUndefined();
+  });
+});
 
 /** Assert the policy code thrown by normalizeExternalUrl for a given input. */
 function expectCode(raw: string, code: string): void {

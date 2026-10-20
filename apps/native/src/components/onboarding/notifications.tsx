@@ -11,6 +11,8 @@ import {
   requestNotificationPermission,
 } from "@/lib/notification-token";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { IntentChip } from "@/components/intent-chip";
+import { runIntent } from "@/lib/intents";
 import { SaveSummary } from "@/components/onboarding/save-summary";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { useNotificationSession } from "@/lib/notifications";
@@ -158,8 +160,8 @@ export function NotificationsStep({
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
     }
-    // The pledge above the button is a Sunday look-back, so the same yes turns
-    // the Weekly shelf on. Skipped if the account changed during the prompt.
+    // The small print under the button says the same yes turns the Weekly
+    // shelf on. Skipped if the account changed during the prompt.
     // Not awaited: it needs the network, and an offline mutation waits for a
     // reconnect instead of failing, which would hold this step.
     if (granted && firstSaveReminderTicket() === ticket) {
@@ -199,6 +201,9 @@ export function NotificationsStep({
 
   const image = item?.heroImageUrl ?? item?.imageUrl;
   const tag = item?.tags[0];
+  // A place shows its payoff here, before the paywall: the save already
+  // knows where it is.
+  const maps = item?.intents?.find((intent) => intent.kind === "open_maps");
 
   return (
     <View style={styles.wrap}>
@@ -218,6 +223,24 @@ export function NotificationsStep({
             : t("onboarding.remindSavedNow")
         }
         tag={tag}
+        action={
+          item && maps ? (
+            <IntentChip
+              kind="open_maps"
+              label={t("plan.openMaps")}
+              onPress={() => {
+                void runIntent("open_maps", maps.value)
+                  .then(() => analytics.itemAction(item, "open_maps"))
+                  .catch((error: unknown) =>
+                    analytics.captureError(
+                      "onboarding_open_maps_failed",
+                      error,
+                    ),
+                  );
+              }}
+            />
+          ) : undefined
+        }
       />
 
       <View
@@ -252,9 +275,6 @@ export function NotificationsStep({
       </View>
 
       <View style={styles.foot}>
-        {/* The person's promise; tapping the reminder turns the Weekly shelf
-            on to keep it. */}
-        <Text style={styles.pledge}>{t("onboarding.remindPledge")}</Text>
         <CtaButton
           label={t(SLOT_CTA[choice.slot])}
           onPress={() => void remind()}
@@ -318,14 +338,6 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     color: theme.colors.muted,
-  },
-  pledge: {
-    fontFamily: theme.fonts.display,
-    fontSize: 19,
-    lineHeight: 25,
-    textAlign: "center",
-    color: theme.colors.foreground,
-    marginBottom: theme.gap(0.5),
   },
   consent: {
     fontFamily: theme.fonts.regular,

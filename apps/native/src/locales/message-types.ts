@@ -565,7 +565,6 @@ export type MessageParams = {
   "onboarding.remindSkip": undefined;
   "onboarding.remindSavedNow": undefined;
   "onboarding.remindFallbackTitle": undefined;
-  "onboarding.remindPledge": undefined;
   "onboarding.remindConsent": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
@@ -616,16 +615,15 @@ export type MessageParams = {
   "home.nextUpCook": undefined;
   "home.nextUpWatch": undefined;
   "home.nextUpOpen": undefined;
-  "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "sharePractice.eyebrow": undefined;
-  "sharePractice.coachTap": undefined;
   "sharePractice.stepShare": undefined;
   "sharePractice.stepShelvr": undefined;
   "sharePractice.title": undefined;
+  "sharePractice.subtitle": undefined;
   "sharePractice.tipIos": undefined;
   "sharePractice.tipAndroid": undefined;
   "sharePractice.savedTitle": undefined;
@@ -634,11 +632,6 @@ export type MessageParams = {
   "promise.titleAccent": undefined;
   "promise.body": undefined;
   "promise.eyebrow": undefined;
-  "promise.share": undefined;
-  "promise.reminderTonight": undefined;
-  "promise.reminderTomorrow": undefined;
-  "promise.reminderWeekend": undefined;
-  "promise.reminderNextWeek": undefined;
   "promise.comeBack": undefined;
   "promise.use": undefined;
   "promise.cta": undefined;

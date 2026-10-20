@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
-import { usePermissions, type PermissionResponse } from "expo-media-library";
+import { usePermissions } from "expo-media-library";
 import { Stack, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState, type FC } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
@@ -29,6 +29,12 @@ import {
 } from "@/lib/tidy/use-albums";
 import { usePhotoBatch, type TidyPhoto } from "@/lib/tidy/use-photo-batch";
 import { useTidyActions } from "@/lib/tidy/use-tidy-actions";
+
+// expo-media-library 58's hook is typed with Expo's base `PermissionResponse`,
+// which drops `accessPrivileges`, although the native module still returns it.
+type PermissionResponse = NonNullable<ReturnType<typeof usePermissions>[0]> & {
+  accessPrivileges?: "all" | "limited" | "none";
+};
 
 export default function TidyScreen() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
@@ -92,7 +98,9 @@ export default function TidyScreen() {
         sources={sources}
         selectedId={source.id}
         selectSource={selectSource}
-        limitedAccess={permission.accessPrivileges === "limited"}
+        limitedAccess={
+          (permission as PermissionResponse).accessPrivileges === "limited"
+        }
         loadNextBatch={loadNextBatch}
         noteDeleted={noteDeleted}
       />

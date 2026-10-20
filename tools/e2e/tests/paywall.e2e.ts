@@ -2,7 +2,7 @@ import { test } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall } from "./paywall-sheet.ts";
+import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
 import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
@@ -12,12 +12,11 @@ startOnSeededHome();
  * close: the launch argument that hides Pro also skips it.
  */
 async function closePaywall(screen: Screen): Promise<void> {
-  // The close control has no label; it is the first button on the sheet.
-  await screen.getByRole("button").first().tap();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeHidden({
+  await screen.getByRole("button", "Close").first().tap();
+  await expect(paywallRestore(screen)).toBeHidden({
     timeout: 30_000,
   });
-  await expect(screen.getByRole("button", "View Pro plans")).toBeVisible();
+  await expect(screen.getByRole("button", "Profile")).toBeVisible();
 }
 
 // The dev user is always Pro, so the app is relaunched with the launch
@@ -89,10 +88,12 @@ test("leaves the exit offer by the app's own close", async ({
 
   await viewPlans.tap();
   await expectPaywall(screen);
-  await screen.getByRole("button").first().tap();
+  await screen.getByRole("button", "Close").first().tap();
 
   const close = screen.getByTestId("exit-offer-close");
   await expect(close).toBeVisible({ timeout: 60_000 });
+  await expect(screen.getByText(/^Your first year/)).toBeVisible();
+  await expect(screen.getByText("No Paywall configured")).toBeHidden();
   await close.tap();
   await expect(close).toBeHidden({ timeout: 30_000 });
   // Home holds the offer open for its window in place of the Pro prompt.
@@ -100,3 +101,39 @@ test("leaves the exit offer by the app's own close", async ({
     timeout: 30_000,
   });
 });
+
+test(
+  "updates billing disclosure when switching monthly and annual plans",
+  { retries: 0 },
+  async ({ device, screen }) => {
+    await device.openApp(BUNDLE_ID, {
+      relaunch: true,
+      launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
+    });
+    const add = screen.getByRole("button", "Add");
+    await expect(add).toBeVisible({ timeout: 180_000 });
+    await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+      timeout: 30_000,
+    });
+    // A previous decline can leave Home's exit-offer card active. Add always
+    // opens the regular paywall, independently of that persisted offer.
+    await add.tap();
+    await expectPaywall(screen);
+
+    await screen.getByRole("button", "View all plans").tap();
+    await screen.getByRole("button", /^Monthly, /).tap();
+    await expect(
+      screen.getByRole("button", "Subscribe monthly").last(),
+    ).toBeVisible();
+    await expect(
+      screen.getByText(/month, billed today\. Cancel anytime\./).last(),
+    ).toBeVisible();
+    await screen.getByRole("button", /^Annual, /).tap();
+    await expect(
+      screen.getByRole("button", "Start 7-day free trial").last(),
+    ).toBeVisible();
+    await screen.getByRole("button", "Close").first().tap();
+    await expectPaywall(screen);
+    await closePaywall(screen);
+  },
+);
