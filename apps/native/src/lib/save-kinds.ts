@@ -1,4 +1,5 @@
 import { INTERESTS } from "@/lib/onboarding-interests";
+import { TRAVEL_VIBES } from "@/lib/travel-vibes";
 
 // The answers to "What do you save?". Each seeds starter spaces: the first
 // preset of every picked kind starts selected, the rest are offered as chips.
@@ -56,6 +57,7 @@ const PRESET_SPACES: ReadonlySet<string> = new Set([
   ...Object.values(SPACE_PRESETS).flat(),
   ...GENERIC_PRESETS,
   ...INTERESTS,
+  ...TRAVEL_VIBES,
 ]);
 
 /** Whether a picked space is a preset identity rather than a typed name. */

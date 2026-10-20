@@ -472,6 +472,12 @@ export type MessageParams = {
   "interests.gaming": undefined;
   "interests.science": undefined;
   "interests.wellness": undefined;
+  "interests.vibesTitle": undefined;
+  "interests.vibeGoodFood": undefined;
+  "interests.vibeCafes": undefined;
+  "interests.vibeDateNights": undefined;
+  "interests.vibeHiddenGems": undefined;
+  "interests.vibeGoingOut": undefined;
   "albums.allPhotos": undefined;
   "appearance.system": undefined;
   "appearance.light": undefined;

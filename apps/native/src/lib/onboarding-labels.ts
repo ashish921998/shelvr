@@ -39,6 +39,11 @@ const LABELS: Record<string, TextMessageKey> = {
   Gaming: "interests.gaming",
   Science: "interests.science",
   Wellness: "interests.wellness",
+  "Good food": "interests.vibeGoodFood",
+  "Aesthetic cafés": "interests.vibeCafes",
+  "Date nights": "interests.vibeDateNights",
+  "Hidden gems": "interests.vibeHiddenGems",
+  "Going out": "interests.vibeGoingOut",
 };
 
 export function onboardingLabel(id: string): string {
