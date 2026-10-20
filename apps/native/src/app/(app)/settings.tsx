@@ -11,12 +11,13 @@ import { restorePurchases, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
+import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -42,6 +43,11 @@ export default function SettingsScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
+  // Typed to what is used here: the native stack's transitionEnd isn't in
+  // expo-router's generic navigation type.
+  const navigation = useNavigation() as ClosingScreen & {
+    getState: () => { routes: { name: string }[] };
+  };
   const { theme } = useUnistyles();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
@@ -66,8 +72,17 @@ export default function SettingsScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/");
+      router.replace("/(app)/(tabs)/(home)");
     }
+  };
+
+  // Closes Settings and the Profile sheet under it. A development reload or
+  // direct link can restore Profile as the stack's root, where dismissAll
+  // stops at Profile, so Home replaces it, as Profile's own close does.
+  const closeAllSheets = () => {
+    const profileIsRoot = navigation.getState().routes[0]?.name === "profile";
+    router.dismissAll();
+    if (profileIsRoot) router.replace("/(app)/(tabs)/(home)");
   };
 
   const openExternal = (url: string) => {
@@ -163,7 +178,9 @@ export default function SettingsScreen() {
                 // Settings sits on the Profile sheet, and Customer Center
                 // presents only once both are gone.
                 onPress: () =>
-                  void manageSubscription(() => router.dismissAll()),
+                  void manageSubscription(() =>
+                    closeScreen(navigation, closeAllSheets),
+                  ),
               },
             ]
           : []),

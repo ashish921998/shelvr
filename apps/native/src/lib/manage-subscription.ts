@@ -11,15 +11,15 @@ import { Alert, Linking, Platform } from "react-native";
  *
  * RevenueCat UI presents from the root view controller, and UIKit refuses to
  * present while a form sheet is up ("already presenting RNSScreen"). So the
- * caller's `dismissSheets` closes every sheet first and this waits for them to
- * settle. When Customer Center is not linked or configured, or identity sync
+ * caller's `dismissSheets` closes every sheet first (resolving once they are
+ * gone, when it can tell) and this waits for them to settle. When Customer Center is not linked or configured, or identity sync
  * timed out, it falls back to the platform's own subscription page rather
  * than leaving the tap with no visible effect.
  */
 export async function manageSubscription(
-  dismissSheets: () => void,
+  dismissSheets: () => void | Promise<void>,
 ): Promise<void> {
-  dismissSheets();
+  await dismissSheets();
   await waitForSheetTransition();
   if (await presentCustomerCenter()) return;
   Alert.alert(t("pro.manage"), t("pro.manageHelp"), [

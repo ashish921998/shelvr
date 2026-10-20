@@ -334,7 +334,6 @@ function SamplePicker({
         >
           {t(titleKind === null ? "demo.title" : TITLES[titleKind])}
         </Text>
-        <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>
 
       {featured === undefined ? null : (

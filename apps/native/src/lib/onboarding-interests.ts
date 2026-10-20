@@ -120,9 +120,9 @@ export const INTEREST_PAGES: Record<
   // preset space, so picking the kind picks the topic and the other way round.
   // Travel offers the same page as the Travel kind's sample.
   Travel: {
-    url: "https://www.lonelyplanet.com/articles/best-things-to-do-in-prague",
-    pageHeading: "Prague: the best things to do",
-    domain: "lonelyplanet.com",
+    url: "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/",
+    pageHeading: "Old Town Square",
+    domain: "prague.eu",
   },
   Fitness: {
     url: "https://www.healthline.com/health/fitness/7-minute-workout",

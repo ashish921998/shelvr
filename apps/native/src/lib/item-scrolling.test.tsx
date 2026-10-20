@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useImperativeHandle, type ReactNode } from "react";
-import type { ScrollView } from "react-native";
+import type { ScrollViewInstance } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ItemScreen from "@/app/(app)/item/[id]";
 import { MediaViewerPage } from "@/components/media-viewer-page";
@@ -245,7 +245,9 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
         pageHeight={700}
         headerInset={60}
         reserveFooter={false}
-        scrollRef={{ current: null } as React.RefObject<ScrollView | null>}
+        scrollRef={
+          { current: null } as React.RefObject<ScrollViewInstance | null>
+        }
         notice={null}
         actions={null}
         details={<div>Details content</div>}
@@ -336,7 +338,9 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
         expect(mock.router.back).toHaveBeenCalledOnce();
         expect(mock.router.replace).not.toHaveBeenCalled();
       } else {
-        expect(mock.router.replace).toHaveBeenCalledWith("/");
+        expect(mock.router.replace).toHaveBeenCalledWith(
+          "/(app)/(tabs)/(home)",
+        );
         expect(mock.router.back).not.toHaveBeenCalled();
       }
     },

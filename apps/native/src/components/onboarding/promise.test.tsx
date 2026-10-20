@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// The promise step: names the reminder only when one was scheduled, and its
-// one button hands over to the paywall.
+// The promise step: two habits that no earlier step already covered, and one
+// button that hands over to the paywall.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -38,31 +38,22 @@ vi.mock("@/lib/use-large-text", () => ({ HEADLINE_MAX_SCALE: 1.5 }));
 vi.mock("@/components/onboarding/parts", () => ({ CtaButton: mock.button }));
 
 describe("PromiseStep", () => {
-  it("names the reminder that was scheduled", () => {
-    render(
-      <PromiseStep reminder="weekend" leaving={false} onCommit={vi.fn()} />,
-    );
-    expect(screen.getByText("promise.reminderWeekend")).toBeTruthy();
-    expect(screen.queryByText("promise.comeBack")).toBeNull();
-    expect(screen.getByText("promise.share")).toBeTruthy();
-    expect(screen.getByText("promise.use")).toBeTruthy();
-  });
-
-  it("promises to come back when no reminder was set", () => {
-    render(<PromiseStep reminder={null} leaving={false} onCommit={vi.fn()} />);
+  it("promises to come back to saves and use them", () => {
+    render(<PromiseStep leaving={false} onCommit={vi.fn()} />);
     expect(screen.getByText("promise.comeBack")).toBeTruthy();
+    expect(screen.getByText("promise.use")).toBeTruthy();
   });
 
   it("commits with one tap", () => {
     const onCommit = vi.fn();
-    render(<PromiseStep reminder={null} leaving={false} onCommit={onCommit} />);
+    render(<PromiseStep leaving={false} onCommit={onCommit} />);
     fireEvent.click(screen.getByText("promise.cta"));
     expect(onCommit).toHaveBeenCalledOnce();
   });
 
   it("takes no taps while the paywall is on its way", () => {
     const onCommit = vi.fn();
-    render(<PromiseStep reminder={null} leaving onCommit={onCommit} />);
+    render(<PromiseStep leaving onCommit={onCommit} />);
     fireEvent.click(screen.getByText("promise.cta"));
     expect(onCommit).not.toHaveBeenCalled();
   });
