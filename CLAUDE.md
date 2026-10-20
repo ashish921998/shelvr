@@ -6,8 +6,8 @@ This file provides guidance when working with code in this repository.
 for a module.
 
 > Expo docs change quickly. Before writing native app code, read the versioned docs
-> for the SDK pinned in `apps/native/package.json` (currently Expo SDK 57):
-> https://docs.expo.dev/versions/v57.0.0/
+> for the SDK pinned in `apps/native/package.json` (currently Expo SDK 58):
+> https://docs.expo.dev/versions/v58.0.0/
 
 ## What this is
 
@@ -302,7 +302,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
-  `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
+  `NativeTabs` from `expo-router/native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
   `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
   `digest/[id]`

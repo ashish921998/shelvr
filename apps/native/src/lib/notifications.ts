@@ -26,6 +26,7 @@ import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
+import { resolveRootHref } from "@/lib/home-href";
 
 const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
@@ -251,7 +252,7 @@ export function useNotificationObserver(): void {
         notification_id:
           notificationField(notification, "notificationId") ?? "",
       });
-      nav.push(url as never);
+      nav.push(resolveRootHref(url) as never);
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this

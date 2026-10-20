@@ -1,8 +1,12 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { AppTabs } from "@/components/ui/app-tab-bar";
-import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/native-tabs";
 import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
+
+// Without an anchor, Expo Router 58 opens the tab with the shortest name (Map).
+// eslint-disable-next-line @typescript-eslint/naming-convention -- Expo Router reads this exact export name.
+export const unstable_settings = { anchor: "(home)" };
 
 export default function TabsLayout() {
   useAppLocale();

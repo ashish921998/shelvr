@@ -5,6 +5,7 @@ import {
   Path,
   Skia,
   type SkPath,
+  type SkPathBuilder,
 } from "@shopify/react-native-skia";
 import { memo, useMemo } from "react";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
@@ -64,7 +65,7 @@ type ThreadCanvasProps = {
 };
 
 /** Turns one glyph stroke into Skia path commands, wobbling as it goes. */
-function addStroke(path: SkPath, stroke: Stroke, seed: number) {
+function addStroke(path: SkPathBuilder, stroke: Stroke, seed: number) {
   switch (stroke.kind) {
     case "polyline":
     case "squiggle": {
@@ -113,26 +114,26 @@ function addStroke(path: SkPath, stroke: Stroke, seed: number) {
  * weights are built once and reused for the life of the splash.
  */
 function buildGlyphPaths(mark: Mark): { pen: SkPath; heavy: SkPath | null } {
-  const pen = Skia.Path.Make();
-  let heavy: SkPath | null = null;
+  const pen = Skia.PathBuilder.Make();
+  let heavy: SkPathBuilder | null = null;
   for (const stroke of glyphStrokes(mark)) {
     if (stroke.kind === "polyline" && stroke.heavy) {
-      heavy = heavy ?? Skia.Path.Make();
+      heavy = heavy ?? Skia.PathBuilder.Make();
       addStroke(heavy, stroke, mark.wobble);
     } else {
       addStroke(pen, stroke, mark.wobble);
     }
   }
-  return { pen, heavy };
+  return { pen: pen.detach(), heavy: heavy?.detach() ?? null };
 }
 
 function buildThreadPath(points: Point[]): SkPath {
-  const path = Skia.Path.Make();
+  const path = Skia.PathBuilder.Make();
   points.forEach(([x, y], index) => {
     if (index === 0) path.moveTo(x, y);
     else path.lineTo(x, y);
   });
-  return path;
+  return path.detach();
 }
 
 /**
@@ -142,9 +143,10 @@ function buildThreadPath(points: Point[]): SkPath {
 let stitchPath: SkPath | null = null;
 function getStitchPath(): SkPath {
   if (!stitchPath) {
-    stitchPath = Skia.Path.Make();
-    stitchPath.moveTo(-STITCH_HALF_WIDTH, 0);
-    stitchPath.lineTo(STITCH_HALF_WIDTH, 0);
+    stitchPath = Skia.PathBuilder.Make()
+      .moveTo(-STITCH_HALF_WIDTH, 0)
+      .lineTo(STITCH_HALF_WIDTH, 0)
+      .detach();
   }
   return stitchPath;
 }
@@ -281,7 +283,7 @@ function Burst({
   const path = useDerivedValue(() => {
     const progress = span(clock.get(), TIMELINE.burstFrom, TIMELINE.burstTo);
     if (progress <= 0 || progress >= 1) return empty;
-    const skPath = Skia.Path.Make();
+    const skPath = Skia.PathBuilder.Make();
     // Radii open outward with the burst, so the ring expands as it dims.
     const inner = BURST_INNER_RADIUS + progress * 24;
     const outer = inner + BURST_TICK_LENGTH + progress * 7;
@@ -296,7 +298,7 @@ function Burst({
         CENTER_Y + Math.sin(angle) * outer,
       );
     }
-    return skPath;
+    return skPath.detach();
   });
 
   const opacity = useDerivedValue(() => {

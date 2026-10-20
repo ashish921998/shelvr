@@ -30,9 +30,30 @@ beforeEach(() => {
 });
 
 it("presents Customer Center only after the sheets are gone", async () => {
-  await manageSubscription(() => mock.order.push("dismissed"));
+  await manageSubscription(() => {
+    mock.order.push("dismissed");
+  });
   expect(mock.order).toEqual(["dismissed", "settled", "customer-center"]);
   expect(mock.alert).not.toHaveBeenCalled();
+});
+
+it("waits for an asynchronous dismissal before settling", async () => {
+  let finish = () => {};
+  const done = manageSubscription(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = () => {
+          mock.order.push("dismissed");
+          resolve();
+        };
+      }),
+  );
+  await Promise.resolve();
+  expect(mock.order).toEqual([]);
+
+  finish();
+  await done;
+  expect(mock.order).toEqual(["dismissed", "settled", "customer-center"]);
 });
 
 it("points to the App Store when Customer Center cannot present", async () => {

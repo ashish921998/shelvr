@@ -242,7 +242,9 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: link.value,
   });
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
 });
 
@@ -278,7 +280,9 @@ it("waits for the first resolution before saving a shared image", async () => {
     ]);
   });
   await waitFor(() => expect(mock.saveImages).toHaveBeenCalledTimes(1));
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
 });
 
 it("gates a retry again when the entitlement lapses after a locked session ran", async () => {
@@ -322,7 +326,9 @@ it("skips a replayed batch that matches the last completed one", async () => {
   mock.entitled = true;
   seedGhostTombstone();
   const view = render(<ShareScreen />);
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   // Resolution settling re-runs the reconcile effect; the skip runs once.
   mock.resolvedSharedPayloads = [resolvedLink];
   view.rerender(<ShareScreen />);
@@ -352,12 +358,16 @@ it("keeps the tombstone when the native clear fails and the user cancels", async
     expect(screen.getByText("share.finishFailed")).toBeDefined(),
   );
   fireEvent.click(screen.getByText("common.cancel"));
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   first.unmount();
 
   vi.mocked(mock.router.replace).mockClear();
   render(<ShareScreen />);
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
 });
 
@@ -365,7 +375,9 @@ it("never records a tombstone on iOS, which does not replay shares", async () =>
   mock.platform = "ios";
   mock.entitled = true;
   render(<ShareScreen />);
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(false);
 });
@@ -384,7 +396,9 @@ it("records the discard when Cancel's native clear throws, so the leftover is no
     expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
   );
   fireEvent.click(screen.getByText("common.cancel"));
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
 
   expect(mock.secure.get(DISCARDED_SHARE_KEY)).toBe(
     fingerprintSharePayloads([link]),
@@ -400,7 +414,9 @@ it("clears the pending flag and the discard record once a share completes", asyn
     fingerprintSharePayloads([{ value: "https://old.test", shareType: "url" }]),
   );
   render(<ShareScreen />);
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
 
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.secure.get(PENDING_SHARE_KEY)).toBe("");
@@ -417,7 +433,9 @@ it("still resumes and saves a different batch after a discard", async () => {
     expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
   );
   fireEvent.click(screen.getByText("common.cancel"));
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   expect(hasResumableSharedPayloads()).toBe(false);
   first.unmount();
 
@@ -433,7 +451,9 @@ it("still resumes and saves a different batch after a discard", async () => {
   mock.entitled = true;
   mock.router.replace.mockClear();
   render(<ShareScreen />);
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await waitFor(() =>
+    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
+  );
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: other.value,
