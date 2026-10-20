@@ -26,19 +26,23 @@ const mock = vi.hoisted(() => ({
   dark: false,
   view: (props: ViewProps) => {
     if (props.onLayout) mock.layout = props.onLayout;
-    const { left, top, shadowColor } = flatten(props.style);
+    const { left, top, backgroundColor } = flatten(props.style);
     return (
       <div
         data-left={left as number | undefined}
         data-top={top as number | undefined}
-        data-shadow={shadowColor as string | undefined}
+        data-background={backgroundColor as string | undefined}
         aria-label={props.accessibilityLabel}
       >
         {props.children}
       </div>
     );
   },
-  text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
+  text: ({ children, style }: { children?: ReactNode; style?: Style }) => (
+    <span data-color={flatten(style).color as string | undefined}>
+      {children}
+    </span>
+  ),
   canvas: ({ children }: { children?: ReactNode }) => (
     <div data-testid="canvas">{children}</div>
   ),
@@ -56,8 +60,16 @@ const mock = vi.hoisted(() => ({
   shape: ({ color }: { color: string }) => (
     <i data-testid="shape" data-color={color} />
   ),
-  path: ({ children, path }: { children?: ReactNode; path: string }) => (
-    <i data-testid="path" data-path={path}>
+  path: ({
+    children,
+    path,
+    color,
+  }: {
+    children?: ReactNode;
+    path: string;
+    color: string;
+  }) => (
+    <i data-testid="path" data-path={path} data-color={color}>
       {children}
     </i>
   ),
@@ -163,11 +175,12 @@ describe("SampleTripMap", () => {
   it("joins each day's stops with a dotted route in that day's color", () => {
     render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
     measure(340);
-    const paths = screen
-      .getAllByTestId("path")
-      .map((path) => path.dataset.path);
-    expect(paths).toContain("M250 76 L232 124 L188 92");
-    expect(paths).toContain("M118 56 L96 122");
+    const route = (path: string) =>
+      screen
+        .getAllByTestId("path")
+        .find((candidate) => candidate.dataset.path === path);
+    expect(route("M250 76 L232 124 L188 92")?.dataset.color).toBe("#amber");
+    expect(route("M118 56 L96 122")?.dataset.color).toBe("#dark");
     expect(screen.getAllByTestId("dash")).toHaveLength(2);
   });
 
@@ -187,18 +200,16 @@ describe("PinBadge", () => {
     expect(screen.getByText("3")).toBeTruthy();
   });
 
-  it("shows no number when veiled", () => {
-    render(<PinBadge number={3} day={0} veiled />);
-    expect(screen.queryByText("3")).toBeNull();
-  });
-
   it.each([
-    [0, "#amber"],
-    [1, "#dark"],
-  ])("glows in its own color when veiled, day %i", (day, color) => {
-    const { container } = render(<PinBadge number={2} day={day} veiled />);
+    [0, "#amber", "#ink"],
+    [1, "#dark", "#paper"],
+  ])("colors day %i's pin %s with %s text", (day, background, text) => {
+    const { container } = render(<PinBadge number={2} day={day} />);
     expect(
-      container.querySelector("[data-shadow]")?.getAttribute("data-shadow"),
-    ).toBe(color);
+      container
+        .querySelector("[data-background]")
+        ?.getAttribute("data-background"),
+    ).toBe(background);
+    expect(screen.getByText("2").dataset.color).toBe(text);
   });
 });

@@ -246,6 +246,16 @@ export function TripLockedStep({
 /** The sample trip, open, after the purchase. */
 export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
   useAppLocale();
+  const [leaving, setLeaving] = useState(false);
+  const leftRef = useRef(false);
+  // Continuing ends onboarding, and the screen takes a moment to go. A second
+  // tap in that moment must not end it twice.
+  const leave = () => {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    setLeaving(true);
+    onContinue();
+  };
   return (
     <View style={styles.wrap}>
       <Animated.View entering={SETTLE_HEAD}>
@@ -258,7 +268,11 @@ export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
         <SampleTripCard locked={false} />
       </Animated.View>
       <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
-        <CtaButton label={t("common.continue")} onPress={onContinue} />
+        <CtaButton
+          label={t("common.continue")}
+          onPress={leave}
+          busy={leaving}
+        />
       </Animated.View>
     </View>
   );

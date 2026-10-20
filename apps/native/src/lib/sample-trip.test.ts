@@ -5,6 +5,7 @@ import {
   SAMPLE_MAP,
   SAMPLE_SLOT_LABELS,
   SAMPLE_TRIP,
+  sampleRows,
   sampleStops,
   showTripTeaser,
 } from "./sample-trip";
@@ -72,5 +73,30 @@ describe("the sample trip", () => {
       ),
     ];
     for (const key of keys) expect(en).toHaveProperty([key]);
+  });
+});
+
+describe("sampleRows", () => {
+  it("lists each day's header, then that day's stops", () => {
+    expect(
+      sampleRows().map((row) =>
+        row.kind === "day" ? `day ${row.day}` : row.entry.stop.name,
+      ),
+    ).toEqual([
+      "day 0",
+      "Old Town Square",
+      "Café Louvre",
+      "Charles Bridge",
+      "day 1",
+      "Prague Castle",
+      "Petřín Lookout Tower",
+    ]);
+  });
+
+  it("carries every stop once, numbered as the map numbers them", () => {
+    const numbers = sampleRows().flatMap((row) =>
+      row.kind === "stop" ? [row.entry.number] : [],
+    );
+    expect(numbers).toEqual([1, 2, 3, 4, 5]);
   });
 });

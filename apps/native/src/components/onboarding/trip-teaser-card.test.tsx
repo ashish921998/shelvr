@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
 // The sample trip card: open it shows every day and stop; locked it shows the
-// first stop and veils the rest, hidden from screen readers, behind a lock.
+// first stop and hands the rest to the blurred stops, hidden from screen
+// readers, behind a lock.
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { SampleRow } from "@/lib/sample-trip";
 import { SampleTripCard } from "./trip-teaser-card";
 
 type ViewProps = {
   children?: ReactNode;
   accessibilityElementsHidden?: boolean;
+  importantForAccessibility?: string;
   accessibilityLabel?: string;
 };
 
@@ -16,10 +19,14 @@ const mock = vi.hoisted(() => ({
   view: ({
     children,
     accessibilityElementsHidden,
+    importantForAccessibility,
     accessibilityLabel,
   }: ViewProps) => (
     <div
       data-hidden={accessibilityElementsHidden ? "true" : undefined}
+      data-android-hidden={
+        importantForAccessibility === "no-hide-descendants" ? "true" : undefined
+      }
       aria-label={accessibilityLabel}
     >
       {children}
@@ -30,18 +37,19 @@ const mock = vi.hoisted(() => ({
   map: ({ crop }: { crop: { top: number } }) => (
     <div data-testid="map" data-top={crop.top} />
   ),
-  pin: ({
-    number,
-    day,
-    veiled,
-  }: {
-    number: number;
-    day: number;
-    veiled?: boolean;
-  }) => (
-    <i data-testid="pin" data-day={day} data-veiled={String(veiled === true)}>
+  pin: ({ number, day }: { number: number; day: number }) => (
+    <i data-testid="pin" data-day={day}>
       {number}
     </i>
+  ),
+  veiled: ({ rows }: { rows: readonly SampleRow[] }) => (
+    <div data-testid="veiled">
+      {rows.map((row, index) => (
+        <span key={index}>
+          {row.kind === "day" ? `day ${row.day}` : row.entry.stop.name}
+        </span>
+      ))}
+    </div>
   ),
 }));
 
@@ -54,6 +62,9 @@ vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.icon }));
 vi.mock("@/components/onboarding/sample-trip-map", () => ({
   SampleTripMap: mock.map,
   PinBadge: mock.pin,
+}));
+vi.mock("@/components/onboarding/veiled-stops", () => ({
+  VeiledStops: mock.veiled,
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string, values?: object) =>
@@ -113,14 +124,14 @@ describe("SampleTripCard open", () => {
       "1",
       "1",
     ]);
-    expect(pins.every((pin) => pin.dataset.veiled === "false")).toBe(true);
   });
 
-  it("says it is a sample, shows the taller map and has no lock", () => {
+  it("says it is a sample, shows the taller map and has no lock or blur", () => {
     render(<SampleTripCard locked={false} />);
     expect(screen.getByText("tripTeaser.sampleBadge")).toBeTruthy();
     expect(screen.getByTestId("map").dataset.top).toBe("10");
     expect(screen.queryByLabelText("tripTeaser.lockedLabel")).toBeNull();
+    expect(screen.queryByTestId("veiled")).toBeNull();
   });
 });
 
@@ -134,28 +145,29 @@ describe("SampleTripCard locked", () => {
     ).toBeNull();
   });
 
-  it("veils every other stop and the second day from screen readers", () => {
+  it("hands every other stop and the second day to the blurred stops", () => {
     render(<SampleTripCard locked />);
-    for (const name of STOPS.slice(1)) {
-      expect(veiledAncestor(screen.getByText(name))).not.toBeNull();
-    }
-    expect(
-      veiledAncestor(screen.getByText('trip.dayTab:{"day":"2"}')),
-    ).not.toBeNull();
-    expect(
-      veiledAncestor(screen.getByText("tripTeaser.dayTwoTitle")),
-    ).not.toBeNull();
+    const rows = Array.from(screen.getByTestId("veiled").children);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "Café Louvre",
+      "Charles Bridge",
+      "day 1",
+      "Prague Castle",
+      "Petřín Lookout Tower",
+    ]);
   });
 
-  it("draws the veiled pins as glows and the clear one as a pin", () => {
+  it("hides the blurred stops from screen readers on both platforms", () => {
     render(<SampleTripCard locked />);
-    const pins = screen.getAllByTestId("pin");
-    expect(pins.map((pin) => pin.dataset.veiled)).toEqual([
-      "false",
-      "true",
-      "true",
-      "true",
-      "true",
+    const hidden = veiledAncestor(screen.getByTestId("veiled"));
+    expect(hidden).not.toBeNull();
+    expect(hidden?.getAttribute("data-android-hidden")).toBe("true");
+  });
+
+  it("draws only the clear stop as a pin, the rest are drawn blurred", () => {
+    render(<SampleTripCard locked />);
+    expect(screen.getAllByTestId("pin").map((pin) => pin.textContent)).toEqual([
+      "1",
     ]);
   });
 

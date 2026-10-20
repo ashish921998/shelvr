@@ -2,14 +2,16 @@ import {
   PinBadge,
   SampleTripMap,
 } from "@/components/onboarding/sample-trip-map";
+import { VeiledStops } from "@/components/onboarding/veiled-stops";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   SAMPLE_CROPS,
   SAMPLE_SLOT_LABELS,
   SAMPLE_TRIP,
-  sampleStops,
+  sampleRows,
   type NumberedStop,
+  type SampleRow,
 } from "@/lib/sample-trip";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -20,40 +22,17 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 /** Rows shown clearly on the locked card: day one's header and first stop. */
 const CLEAR_ROWS = 2;
 
-type Row = { kind: "day"; day: number } | { kind: "stop"; entry: NumberedStop };
-
-/** The card's rows top to bottom: each day's header, then its stops. */
-function cardRows(): Row[] {
-  const stops = sampleStops();
-  return SAMPLE_TRIP.days.flatMap((_, day) => [
-    { kind: "day" as const, day },
-    ...stops
-      .filter((entry) => entry.day === day)
-      .map((entry) => ({ kind: "stop" as const, entry })),
-  ]);
-}
-
-function DayHeader({
-  day,
-  divider,
-  veiled,
-}: {
-  day: number;
-  divider: boolean;
-  veiled: boolean;
-}) {
+function DayHeader({ day, divider }: { day: number; divider: boolean }) {
   const { title, stops } = SAMPLE_TRIP.days[day];
   return (
     <View style={[styles.dayHeader, divider && styles.divider]}>
       <View style={styles.dayText}>
-        <Text style={[styles.dayEyebrow, veiled && styles.veilAccent]}>
+        <Text style={styles.dayEyebrow}>
           {t("trip.dayTab", { day: String(day + 1) })}
         </Text>
-        <Text style={[styles.dayTitle, veiled && styles.veilInk]}>
-          {t(title)}
-        </Text>
+        <Text style={styles.dayTitle}>{t(title)}</Text>
       </View>
-      <Text style={[styles.dayCount, veiled && styles.veilMuted]}>
+      <Text style={styles.dayCount}>
         {t("tripTeaser.placeCount", { count: stops.length })}
       </Text>
     </View>
@@ -63,47 +42,34 @@ function DayHeader({
 function StopRow({
   entry,
   divider,
-  veiled,
 }: {
   entry: NumberedStop;
   divider: boolean;
-  veiled: boolean;
 }) {
   return (
     <View style={[styles.stopRow, divider && styles.divider]}>
-      <Text style={[styles.slot, veiled && styles.veilMuted]} numberOfLines={1}>
+      <Text style={styles.slot} numberOfLines={1}>
         {t(SAMPLE_SLOT_LABELS[entry.stop.slot])}
       </Text>
-      <Text
-        style={[styles.stopName, veiled && styles.veilInk]}
-        numberOfLines={1}
-      >
+      <Text style={styles.stopName} numberOfLines={1}>
         {entry.stop.name}
       </Text>
-      <PinBadge number={entry.number} day={entry.day} veiled={veiled} />
+      <PinBadge number={entry.number} day={entry.day} />
     </View>
   );
 }
 
-function CardRow({
-  row,
-  divider,
-  veiled,
-}: {
-  row: Row;
-  divider: boolean;
-  veiled: boolean;
-}) {
+function CardRow({ row, divider }: { row: SampleRow; divider: boolean }) {
   return row.kind === "day" ? (
-    <DayHeader day={row.day} divider={divider} veiled={veiled} />
+    <DayHeader day={row.day} divider={divider} />
   ) : (
-    <StopRow entry={row.entry} divider={divider} veiled={veiled} />
+    <StopRow entry={row.entry} divider={divider} />
   );
 }
 
 /** Rows behind a lock: the same rows, blurred and hidden from screen readers,
  * with one lock over their middle. */
-function VeiledRows({ rows }: { rows: Row[] }) {
+function VeiledRows({ rows }: { rows: SampleRow[] }) {
   const { theme } = useUnistyles();
   return (
     <View>
@@ -111,9 +77,7 @@ function VeiledRows({ rows }: { rows: Row[] }) {
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        {rows.map((row, index) => (
-          <CardRow key={index} row={row} divider veiled />
-        ))}
+        <VeiledStops rows={rows} />
       </View>
       <View
         style={styles.lock}
@@ -138,7 +102,7 @@ function VeiledRows({ rows }: { rows: Row[] }) {
  */
 export function SampleTripCard({ locked }: { locked: boolean }) {
   useAppLocale();
-  const rows = cardRows();
+  const rows = sampleRows();
   const clear = locked ? rows.slice(0, CLEAR_ROWS) : rows;
   const veiled = locked ? rows.slice(CLEAR_ROWS) : [];
   return (
@@ -152,7 +116,7 @@ export function SampleTripCard({ locked }: { locked: boolean }) {
         </View>
       </View>
       {clear.map((row, index) => (
-        <CardRow key={index} row={row} divider={index > 0} veiled={false} />
+        <CardRow key={index} row={row} divider={index > 0} />
       ))}
       {veiled.length > 0 ? <VeiledRows rows={veiled} /> : null}
     </View>
@@ -241,26 +205,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 16,
     lineHeight: 21,
     color: theme.colors.foreground,
-  },
-  // Blurred text: the glyphs are clear and their shadow is not, so what is
-  // left is a soft smudge in the text's own color.
-  veilInk: {
-    color: "transparent",
-    textShadowColor: theme.colors.foreground,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-  },
-  veilMuted: {
-    color: "transparent",
-    textShadowColor: theme.colors.muted,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-  },
-  veilAccent: {
-    color: "transparent",
-    textShadowColor: theme.colors.primaryText,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
   },
   lock: {
     position: "absolute",

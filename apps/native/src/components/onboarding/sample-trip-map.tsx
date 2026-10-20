@@ -42,7 +42,7 @@ const PARK = { light: "#e3e6cd", dark: "#2c3626" };
 const ROAD_ALPHA = "59";
 
 /** The pin colors for a day: the first day is amber, later days are dark. */
-function usePinColors() {
+export function usePinColors() {
   const { theme } = useUnistyles();
   return (day: number) =>
     day === 0
@@ -50,32 +50,13 @@ function usePinColors() {
       : { background: theme.colors.foreground, text: theme.colors.background };
 }
 
-/**
- * A stop's numbered pin. `veiled` draws it as a soft glow with no number, for
- * the part of the trip that is still locked.
- */
-export function PinBadge({
-  number,
-  day,
-  veiled = false,
-}: {
-  number: number;
-  day: number;
-  veiled?: boolean;
-}) {
+/** A stop's numbered pin. */
+export function PinBadge({ number, day }: { number: number; day: number }) {
   const pinColors = usePinColors();
   const colors = pinColors(day);
   return (
-    <View
-      style={[
-        styles.pin,
-        { backgroundColor: colors.background },
-        veiled && [styles.pinVeiled, { shadowColor: colors.background }],
-      ]}
-    >
-      {veiled ? null : (
-        <Text style={[styles.pinText, { color: colors.text }]}>{number}</Text>
-      )}
+    <View style={[styles.pin, { backgroundColor: colors.background }]}>
+      <Text style={[styles.pinText, { color: colors.text }]}>{number}</Text>
     </View>
   );
 }
@@ -208,13 +189,6 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
-  },
-  // A glow in the pin's own color around a fainter disc.
-  pinVeiled: {
-    opacity: 0.5,
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
   },
   pinText: {
     fontFamily: theme.fonts.bold,

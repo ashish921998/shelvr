@@ -178,4 +178,23 @@ describe("TripRevealStep", () => {
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();
   });
+
+  it("continues once when it is tapped twice before the screen redraws", () => {
+    const onContinue = vi.fn();
+    render(<TripRevealStep onContinue={onContinue} />);
+    const button = screen.getByText("common.continue");
+    act(() => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    expect(onContinue).toHaveBeenCalledOnce();
+  });
+
+  it("takes no more taps once it has continued", () => {
+    const onContinue = vi.fn();
+    render(<TripRevealStep onContinue={onContinue} />);
+    fireEvent.click(screen.getByText("common.continue"));
+    fireEvent.click(screen.getByText("common.continue"));
+    expect(onContinue).toHaveBeenCalledOnce();
+  });
 });

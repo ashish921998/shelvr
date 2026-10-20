@@ -124,3 +124,19 @@ export function sampleStops(): NumberedStop[] {
     )
     .map((entry, index) => ({ ...entry, number: index + 1 }));
 }
+
+/** One line of the trip as the card lists it: a day's header or one stop. */
+export type SampleRow =
+  | { kind: "day"; day: number }
+  | { kind: "stop"; entry: NumberedStop };
+
+/** The trip's rows top to bottom: each day's header, then its stops. */
+export function sampleRows(): SampleRow[] {
+  const stops = sampleStops();
+  return SAMPLE_TRIP.days.flatMap((_, day) => [
+    { kind: "day" as const, day },
+    ...stops
+      .filter((entry) => entry.day === day)
+      .map((entry) => ({ kind: "stop" as const, entry })),
+  ]);
+}
