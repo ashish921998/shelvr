@@ -63,7 +63,14 @@ describe("practice post", () => {
     render(<PracticePost sample={sample} disabled={false} onPress={onPress} />);
     expect(screen.getByText("sharePractice.coachTap")).toBeTruthy();
     expect(screen.getByTestId("pulse")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the sheet from the Tap here bubble too", () => {
+    const onPress = vi.fn();
+    render(<PracticePost sample={sample} disabled={false} onPress={onPress} />);
+    fireEvent.click(screen.getByText("sharePractice.coachTap"));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -71,7 +78,7 @@ describe("practice post", () => {
     const onPress = vi.fn();
     render(<PracticePost sample={sample} disabled onPress={onPress} />);
     expect(screen.queryByTestId("pulse")).toBeNull();
-    fireEvent.click(screen.getByRole("button"));
+    for (const button of screen.getAllByRole("button")) fireEvent.click(button);
     expect(onPress).not.toHaveBeenCalled();
   });
 

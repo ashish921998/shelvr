@@ -129,6 +129,125 @@ describe("share practice", () => {
     expect(screen.getByText("step-1")).toBeTruthy();
   });
 
+  it("asks again when a sheet iOS never showed is still unanswered", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    mock.present
+      .mockReturnValueOnce(new Promise(() => undefined))
+      .mockResolvedValueOnce("shelvr");
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("share-sample"));
+    // A double tap while the sheet slides up asks for nothing more.
+    now.mockReturnValue(2_500);
+    fireEvent.click(screen.getByText("share-sample"));
+    expect(mock.present).toHaveBeenCalledTimes(1);
+    // Later, a tap on the post proves the first sheet never came up.
+    now.mockReturnValue(3_500);
+    await act(async () => {
+      fireEvent.click(screen.getByText("share-sample"));
+    });
+    expect(mock.present).toHaveBeenCalledTimes(2);
+    expect(mock.capture).toHaveBeenCalledWith("onboarding_share_practice", {
+      outcome: "sheet_stuck",
+    });
+    expect(received()).toHaveLength(1);
+    now.mockRestore();
+  });
+
+  it("does not count a tap after a sheet that was up as a stuck one", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    let settle!: () => void;
+    let finish!: (result: string) => void;
+    mock.present.mockImplementationOnce(
+      (_url: string, _arrived: () => boolean, onSettled: () => void) =>
+        new Promise((resolve) => {
+          settle = onSettled;
+          finish = resolve;
+        }),
+    );
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("share-sample"));
+    // The sheet was up for a while, closed, and its result is on its way.
+    now.mockReturnValue(9_000);
+    settle();
+    fireEvent.click(screen.getByText("share-sample"));
+    expect(mock.present).toHaveBeenCalledTimes(1);
+    await act(async () => finish("shelvr"));
+    expect(received()).toHaveLength(1);
+    expect(mock.capture).not.toHaveBeenCalledWith("onboarding_share_practice", {
+      outcome: "sheet_stuck",
+    });
+    now.mockRestore();
+  });
+
+  it("lets the person leave while a sheet is unanswered", () => {
+    mock.present.mockReturnValue(new Promise(() => undefined));
+    const onFinish = vi.fn();
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={onFinish}
+      />,
+    );
+    fireEvent.click(screen.getByText("share-sample"));
+    fireEvent.click(screen.getByText("sharePractice.later"));
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a sheet that answers after the person left", async () => {
+    let answer: (result: string) => void = () => undefined;
+    mock.present.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const onFinish = vi.fn();
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={onFinish}
+      />,
+    );
+    fireEvent.click(screen.getByText("share-sample"));
+    fireEvent.click(screen.getByText("sharePractice.later"));
+    mock.capture.mockClear();
+    await act(async () => {
+      answer("failed");
+    });
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(mock.capture).not.toHaveBeenCalled();
+  });
+
+  it("counts a closed sheet, so a sheet that opened shows in the funnel", async () => {
+    mock.present.mockResolvedValue("dismissed");
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByText("share-sample"));
+    });
+    expect(mock.capture).toHaveBeenCalledWith("onboarding_share_practice", {
+      outcome: "dismissed",
+    });
+  });
+
   it("skips the practice when a share is already held, so it is not replaced", () => {
     mock.payloads = [{ value: "https://mine.test", shareType: "url" }];
     const onFinish = vi.fn();

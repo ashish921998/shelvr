@@ -42,8 +42,9 @@ function Pulse() {
   return <Animated.View pointerEvents="none" style={[styles.pulse, ring]} />;
 }
 
-/** The pretend post. The whole card opens the real share sheet; the coach
- * mark points at its Share button, which is where the tap belongs in any app. */
+/** The pretend post. The whole card and its coach mark open the real share
+ * sheet; the mark points at its Share button, which is where the tap belongs
+ * in any app. */
 export function PracticePost({
   sample,
   disabled,
@@ -102,11 +103,23 @@ export function PracticePost({
           </View>
         </View>
       </Pressable>
-      <View style={styles.coachRow} pointerEvents="none">
-        <View style={styles.coach}>
+      {/* The bubble reads as a button, so a tap on it opens the sheet too
+          instead of landing on nothing. */}
+      <View style={styles.coachRow}>
+        <Pressable
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          disabled={disabled}
+          onPress={onPress}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.coach,
+            pressed && !disabled && { opacity: theme.opacity.pressed },
+          ]}
+        >
           <View style={styles.caret} />
           <Text style={styles.coachText}>{t("sharePractice.coachTap")}</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
