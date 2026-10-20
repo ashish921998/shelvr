@@ -101,9 +101,9 @@ test(
     await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
 
     // The build takes a few seconds and moves on by itself.
-    const unlock = screen.getByRole("button", "Unlock my trip");
+    const unlock = screen.getByRole("button", "Unlock the full trip");
     await expect(unlock).toBeVisible({ timeout: 30_000 });
-    await expect(screen.getByText(/Prague trip/)).toBeVisible();
+    await expect(screen.getByText(/sample Prague trip/)).toBeVisible();
     await unlock.tap();
     await expectPaywall(screen);
 
