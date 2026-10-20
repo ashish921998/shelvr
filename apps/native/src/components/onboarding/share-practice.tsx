@@ -246,6 +246,7 @@ export function SharePracticeStep({
         >
           {t("sharePractice.title")}
         </Text>
+        <Text style={styles.support}>{t("sharePractice.subtitle")}</Text>
       </View>
 
       {/* Above the post, so the sheet never covers it while it is open. */}
@@ -260,15 +261,24 @@ export function SharePracticeStep({
       {wrongApp ? (
         <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
       ) : null}
-      <Text style={styles.tip}>
-        {t(
-          Platform.OS === "ios"
-            ? "sharePractice.tipIos"
-            : "sharePractice.tipAndroid",
-        )}
-      </Text>
 
+      {/* The step's one button, like every other onboarding step: the post
+          alone did not read as the thing to tap. */}
       <View style={styles.foot}>
+        <Text style={[styles.tip, styles.center]}>
+          {t(
+            Platform.OS === "ios"
+              ? "sharePractice.tipIos"
+              : "sharePractice.tipAndroid",
+          )}
+        </Text>
+        {sample === undefined ? null : (
+          <CtaButton
+            label={t("demo.shareThis")}
+            onPress={() => void share()}
+            disabled={leaving}
+          />
+        )}
         <GhostButton
           label={t("sharePractice.later")}
           onPress={skip}

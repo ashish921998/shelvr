@@ -108,6 +108,20 @@ describe("share practice", () => {
     expect(screen.getByText("sharePractice.eyebrow")).toBeTruthy();
   });
 
+  it("opens the sheet from the step's own Share this post button", () => {
+    mock.present.mockReturnValue(new Promise(() => undefined));
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("demo.shareThis"));
+    expect(mock.present).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("step-2")).toBeTruthy();
+  });
+
   it("lights the Shelvr step while the share sheet is open", async () => {
     let finish!: (result: string) => void;
     mock.present.mockReturnValue(
