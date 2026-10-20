@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
+import { showTripTeaser } from "@/lib/sample-trip";
 import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest } from "@/lib/onboarding-interests";
 import {
@@ -46,6 +47,11 @@ import { OpenerStep } from "@/components/onboarding/opener";
 import { PromiseStep } from "@/components/onboarding/promise";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
+import {
+  TripBuildStep,
+  TripLockedStep,
+  TripRevealStep,
+} from "@/components/onboarding/trip-teaser";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
@@ -63,6 +69,9 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   notifications: 0.7,
   share: 0.85,
   promise: 1,
+  tripBuild: 1,
+  tripLocked: 1,
+  tripReveal: 1,
 };
 const READING_PROGRESS = 0.625;
 
@@ -134,6 +143,8 @@ export default function OnboardingScreen() {
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   // A picked topic is a picked space, so the topics need no state of their own.
   const interests = spaces.filter(isInterest);
+  // People who save travel see a sample trip build and lock before the paywall.
+  const teaser = showTripTeaser(kinds, interests);
 
   useEffect(() => {
     setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
@@ -226,7 +237,8 @@ export default function OnboardingScreen() {
     getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
   );
   const paywall = useOnboardingPaywall({
-    onPro: finish,
+    // A purchase opens the sample trip; with no trip, onboarding is done.
+    onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
       dropPracticeShare(practiceSample?.url);
       finish();
@@ -368,8 +380,25 @@ export default function OnboardingScreen() {
           )}
 
           {step === "promise" && (
-            <PromiseStep leaving={paywall.asked} onCommit={paywall.ask} />
+            <PromiseStep
+              leaving={paywall.asked}
+              onCommit={teaser ? advance : paywall.ask}
+            />
           )}
+
+          {step === "tripBuild" && <TripBuildStep onDone={advance} />}
+
+          {step === "tripLocked" && (
+            <TripLockedStep
+              leaving={paywall.asked}
+              onUnlock={() => {
+                recordCurrentStep();
+                paywall.ask();
+              }}
+            />
+          )}
+
+          {step === "tripReveal" && <TripRevealStep onContinue={finish} />}
         </ScrollView>
       )}
     </View>

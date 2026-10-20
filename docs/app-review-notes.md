@@ -6,7 +6,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
-- Reviewer path: onboarding opener → topics → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → share practice → promise → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
+- Reviewer path: onboarding opener → topics → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → share practice → promise → sample trip (only when Travel was picked) → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
 - App Review can use its own Apple account through Sign in with Apple; no developer-issued credentials, one-time code, invitation, or special account state is required.
 - A dedicated Google test account is optional fallback access. If one is supplied, enter the credentials in App Store Connect only, never in this repo or the app binary.
 - Anonymous / "Continue without account" is **dev-only** and disabled in production builds.
@@ -19,11 +19,12 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. A sample first shows a preview of the result with no account, then asks for Sign in with Apple or Google on its own screen; that screen stays up for a few seconds while Shelvr reads, titles, and files the link. **Skip for now** passes the first save, and onboarding then ends at the sign-in screen. If the save fails, for example while offline, the step offers a retry or a way to continue without saving.
 5. **Reminder:** "When should it come back?" offers one reminder for the save just made. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
 6. **Share practice:** "Save this post the way you will in any app." has the user share one sample post to Shelvr through the system share sheet, or skip with **I'll try it later**. A successful share shows "You nailed it." and a **Continue** button.
-7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. The promise itself is not saved; as on every onboarding step, the app only remembers the step on the device and records that it was shown and completed in analytics. **I'm in** is the only action and opens the paywall.
-8. **Paywall:** **I'm in** opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
-9. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
-10. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
-11. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
+7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. The promise itself is not saved; as on every onboarding step, the app only remembers the step on the device and records that it was shown and completed in analytics. **I'm in** is the only action. It opens the sample trip when Travel was picked, and the paywall otherwise.
+8. **Sample trip (only when Travel was picked as a topic or a kind of save):** a short screen builds a fixed sample trip to Prague from three sample saves, then shows it locked: the first stop is clear, the rest is blurred behind a lock. Every screen labels it a sample; it is not made from the user's saves and calls no server. **Unlock my trip** opens the paywall. After a purchase the same sample opens in full with a **Continue** button to Home. Closing the paywall goes to Home, as in the next step. Everyone who did not pick Travel goes from the promise straight to the paywall.
+9. **Paywall:** **I'm in** (or **Unlock my trip** on the sample trip) opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
+10. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
+11. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
+12. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
 
 ## Core save loop
 
@@ -117,7 +118,7 @@ Account access:
 
 Subscription testing:
 
-1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
+1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. (If Travel was picked as a topic or a kind of save, a sample trip builds first and shows locked; tap "Unlock my trip" to open the paywall.) Closing it goes to Home; new saves then ask for Pro.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile > Settings.

@@ -1,0 +1,403 @@
+import { CtaButton } from "@/components/onboarding/parts";
+import { SampleTripCard } from "@/components/onboarding/trip-teaser-card";
+import { AppSymbolIcon } from "@/components/symbol";
+import { StitchRing } from "@/components/ui/stitch-loader";
+import { t, useAppLocale } from "@/lib/i18n";
+import { settleIn } from "@/lib/motion";
+import { SAMPLE_TRIP } from "@/lib/sample-trip";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
+import { Image } from "expo-image";
+import { useEffect, useRef, useState } from "react";
+import { Text, View } from "react-native";
+import Animated from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+// The sample trip steps of onboarding, for people who save travel: the trip
+// builds from three sample saves, shows locked, and opens up after the
+// paywall. Each screen says the trip is a sample.
+
+const PICTURES = {
+  oldTown: require("../../../assets/onboarding/demo-travel.jpg"),
+  rooftops: require("../../../assets/onboarding/prague.jpg"),
+} as const;
+
+// Each build step takes this long, and the finished list holds a beat before
+// the trip shows.
+const BUILD_STEP_COUNT = 4;
+const STEP_MS = 750;
+const HOLD_MS = 500;
+
+const SETTLE_HEAD = settleIn(150);
+const SETTLE_CARD = settleIn(450);
+const SETTLE_FOOT = settleIn(700);
+
+function Head({
+  title,
+  accent,
+  body,
+}: {
+  title: string;
+  accent?: string;
+  body: string;
+}) {
+  return (
+    <View style={styles.head}>
+      <Text style={styles.headline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+        {title}
+        {accent === undefined ? null : (
+          <>
+            {" "}
+            <Text style={styles.headlineAccent}>{accent}</Text>
+          </>
+        )}
+      </Text>
+      <Text style={styles.support}>{body}</Text>
+    </View>
+  );
+}
+
+function SaveRow({
+  save,
+  divider,
+}: {
+  save: (typeof SAMPLE_TRIP.saves)[number];
+  divider: boolean;
+}) {
+  const { theme } = useUnistyles();
+  const source =
+    "host" in save.source ? save.source.host : t(save.source.label);
+  return (
+    <View style={[styles.saveRow, divider && styles.divider]}>
+      <View style={styles.thumb}>
+        {save.picture === "place" ? (
+          <AppSymbolIcon
+            name="fork.knife"
+            size={22}
+            tintColor={theme.colors.primaryText}
+          />
+        ) : (
+          <Image
+            source={PICTURES[save.picture]}
+            contentFit="cover"
+            style={styles.thumbImage}
+          />
+        )}
+      </View>
+      <View style={styles.saveText}>
+        <Text style={styles.saveTitle} numberOfLines={1}>
+          {save.name}
+        </Text>
+        <Text style={styles.saveSource} numberOfLines={1}>
+          {source}
+        </Text>
+      </View>
+      <View style={styles.pill}>
+        <Text style={styles.pillText}>
+          {t("tripTeaser.placeCount", { count: save.places })}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function BuildStepRow({
+  label,
+  state,
+}: {
+  label: string;
+  state: "done" | "active" | "pending";
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.buildRow}>
+      <View style={styles.mark}>
+        {state === "done" ? (
+          <View style={styles.markDone}>
+            <AppSymbolIcon
+              name="checkmark"
+              size={12}
+              weight="bold"
+              tintColor={theme.colors.primaryText}
+            />
+          </View>
+        ) : state === "active" ? (
+          <StitchRing size={22} />
+        ) : (
+          <View style={styles.markPending} />
+        )}
+      </View>
+      <Text
+        style={[
+          styles.buildLabel,
+          state === "active" && styles.buildLabelActive,
+          state === "pending" && styles.buildLabelPending,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * The trip builds from three sample saves, one step at a time, then moves on
+ * by itself. Nothing is made or fetched; the steps show what a real trip does.
+ */
+export function TripBuildStep({ onDone }: { onDone: () => void }) {
+  useAppLocale();
+  const saves = String(SAMPLE_TRIP.saves.length);
+  const steps = [
+    t("tripTeaser.stepRead", { saves }),
+    t("tripTeaser.stepFind"),
+    t("tripTeaser.stepPin"),
+    t("tripTeaser.stepPlan"),
+  ];
+  const [finished, setFinished] = useState(0);
+  const doneRef = useRef(onDone);
+  useEffect(() => {
+    doneRef.current = onDone;
+  });
+
+  useEffect(() => {
+    const building = finished < BUILD_STEP_COUNT;
+    const timer = setTimeout(
+      () => (building ? setFinished(finished + 1) : doneRef.current()),
+      building ? STEP_MS : HOLD_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [finished]);
+
+  return (
+    <View style={styles.wrap}>
+      <Head
+        title={t("tripTeaser.buildTitle")}
+        accent={t("tripTeaser.buildTitleAccent", {
+          city: t("tripTeaser.city"),
+        })}
+        body={t("tripTeaser.buildBody", { saves })}
+      />
+      <View style={styles.card}>
+        {SAMPLE_TRIP.saves.map((save, index) => (
+          <SaveRow key={save.name} save={save} divider={index > 0} />
+        ))}
+      </View>
+      <View style={styles.buildList} accessibilityLiveRegion="polite">
+        {steps.map((label, index) => (
+          <BuildStepRow
+            key={index}
+            label={label}
+            state={
+              index < finished
+                ? "done"
+                : index === finished
+                  ? "active"
+                  : "pending"
+            }
+          />
+        ))}
+      </View>
+      <Text style={[styles.note, styles.noteBottom]}>
+        {t("tripTeaser.buildNote")}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * The finished sample trip, locked: its first stop is clear and the rest is
+ * veiled. One button opens the paywall.
+ */
+export function TripLockedStep({
+  leaving,
+  onUnlock,
+}: {
+  /** `onUnlock` ran and the paywall is on its way. */
+  leaving: boolean;
+  onUnlock: () => void;
+}) {
+  useAppLocale();
+  const city = t("tripTeaser.city");
+  return (
+    <View style={styles.wrap}>
+      <Animated.View entering={SETTLE_HEAD}>
+        <Head
+          title={t("tripTeaser.lockedTitle", { city })}
+          accent={t("tripTeaser.lockedTitleAccent")}
+          body={t("tripTeaser.sampleBody", {
+            saves: String(SAMPLE_TRIP.saves.length),
+          })}
+        />
+      </Animated.View>
+      <Animated.View entering={SETTLE_CARD}>
+        <SampleTripCard locked />
+      </Animated.View>
+      <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
+        <CtaButton
+          label={t("tripTeaser.unlock")}
+          onPress={onUnlock}
+          busy={leaving}
+        />
+        <Text style={styles.note}>{t("tripTeaser.unlockNote")}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
+/** The sample trip, open, after the purchase. */
+export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
+  useAppLocale();
+  return (
+    <View style={styles.wrap}>
+      <Animated.View entering={SETTLE_HEAD}>
+        <Head
+          title={t("tripTeaser.revealTitle")}
+          body={t("tripTeaser.revealBody")}
+        />
+      </Animated.View>
+      <Animated.View entering={SETTLE_CARD}>
+        <SampleTripCard locked={false} />
+      </Animated.View>
+      <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
+        <CtaButton label={t("common.continue")} onPress={onContinue} />
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  wrap: {
+    flex: 1,
+    gap: theme.gap(3),
+  },
+  head: {
+    gap: theme.gap(1),
+  },
+  headline: {
+    fontFamily: theme.fonts.display,
+    fontSize: 28,
+    lineHeight: 34,
+    color: theme.colors.foreground,
+  },
+  headlineAccent: {
+    color: theme.colors.primaryText,
+  },
+  support: {
+    ...theme.type.subhead,
+    lineHeight: 21,
+    color: theme.colors.muted,
+  },
+  card: {
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    overflow: "hidden",
+  },
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  saveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    paddingVertical: theme.gap(1.5),
+    paddingHorizontal: theme.gap(2),
+  },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.sm,
+    borderCurve: "continuous",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primarySoft,
+  },
+  thumbImage: {
+    width: "100%",
+    height: "100%",
+  },
+  saveText: {
+    flex: 1,
+    gap: 2,
+  },
+  saveTitle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 16,
+    lineHeight: 21,
+    color: theme.colors.foreground,
+  },
+  saveSource: {
+    ...theme.type.caption,
+    lineHeight: 18,
+    color: theme.colors.muted,
+  },
+  pill: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  pillText: {
+    ...theme.type.label,
+    lineHeight: 18,
+    color: theme.colors.muted,
+  },
+  buildList: {
+    gap: 14,
+    paddingHorizontal: theme.gap(0.5),
+  },
+  buildRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+  },
+  mark: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markDone: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primarySoft,
+  },
+  markPending: {
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: `${theme.colors.muted}66`,
+  },
+  buildLabel: {
+    flex: 1,
+    ...theme.type.subhead,
+    lineHeight: 20,
+    color: theme.colors.foreground,
+  },
+  buildLabelActive: {
+    fontFamily: theme.fonts.medium,
+  },
+  buildLabelPending: {
+    color: theme.colors.muted,
+  },
+  foot: {
+    marginTop: "auto",
+    gap: theme.gap(1),
+  },
+  note: {
+    ...theme.type.caption,
+    lineHeight: 18,
+    textAlign: "center",
+    color: theme.colors.muted,
+  },
+  noteBottom: {
+    marginTop: "auto",
+  },
+}));

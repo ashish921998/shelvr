@@ -25,11 +25,14 @@ export async function startFreshOnboarding({
 }
 
 /**
- * Walks the opener, interests and setup steps, picking Articles, which seeds
- * and picks a space of its own so Continue enables. Ends on the first-save
- * step.
+ * Walks the opener, interests and setup steps, picking one kind of save
+ * (Articles unless told otherwise), which seeds and picks a space of its own
+ * so Continue enables. Ends on the first-save step.
  */
-export async function walkToFirstSave(screen: Screen): Promise<void> {
+export async function walkToFirstSave(
+  screen: Screen,
+  kind: "Articles" | "Travel" = "Articles",
+): Promise<void> {
   await screen.getByRole("button", "Start yours").tap();
   await expect(screen.getByText("What are you into?")).toBeVisible({
     timeout: 30_000,
@@ -38,7 +41,7 @@ export async function walkToFirstSave(screen: Screen): Promise<void> {
   await expect(screen.getByText("What do you save?")).toBeVisible({
     timeout: 30_000,
   });
-  await screen.getByRole("checkbox", /^Articles/).tap();
+  await screen.getByRole("checkbox", new RegExp(`^${kind}`)).tap();
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();

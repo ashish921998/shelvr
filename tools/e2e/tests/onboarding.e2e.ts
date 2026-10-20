@@ -83,3 +83,34 @@ test(
     await expect(screen.getByRole("button", "Start yours")).toBeHidden();
   },
 );
+
+// Someone who saves travel gets a sample trip between the promise and the
+// paywall: it builds by itself, then shows locked with one way on, which opens
+// the paywall. Closing the paywall is a decline, as for everyone else, and the
+// one sign-in follows. Nobody else sees the trip (the test above picks
+// Articles and goes straight from the promise to the paywall).
+test(
+  "builds a sample trip before the paywall for someone who saves travel",
+  { retries: 0, timeout: 600_000 },
+  async ({ device, screen }) => {
+    await startFreshOnboarding({ device, screen });
+    await walkToFirstSave(screen, "Travel");
+    await queueFirstSave(screen);
+
+    await screen.getByRole("button", SHARE_LATER).tap();
+    await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
+
+    // The build takes a few seconds and moves on by itself.
+    const unlock = screen.getByRole("button", "Unlock my trip");
+    await expect(unlock).toBeVisible({ timeout: 30_000 });
+    await expect(screen.getByText(/Prague trip/)).toBeVisible();
+    await unlock.tap();
+    await expectPaywall(screen);
+
+    await screen.getByRole("button", "Close").first().tap();
+    await expect(paywallRestore(screen)).toBeHidden({
+      timeout: 30_000,
+    });
+    await signInAfterOnboarding(screen);
+  },
+);

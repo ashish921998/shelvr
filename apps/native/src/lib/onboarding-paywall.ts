@@ -12,10 +12,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const ENTITLEMENT_WAIT_MS = 5000;
 
 /**
- * The paywall at the end of onboarding, after the promise step. `ask` waits
+ * The paywall at the end of onboarding, after the promise step (after the
+ * locked sample trip for people who save travel). `ask` waits
  * for the entitlement to load, then lets a Pro account through and shows
  * everyone else the paywall once. Signed out, the purchase is anonymous and
- * the sign-in that follows onboarding attaches it to the new account. A relaunch lands back on the promise step and
+ * the sign-in that follows onboarding attaches it to the new account. A relaunch lands back on the step that asked and
  * asks again. A paywall that could not show (RevenueCat not ready, offline)
  * was never declined: `onUnavailable` finishes without saying so, and the
  * app asks again once Home is up.
