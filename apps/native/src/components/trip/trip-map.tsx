@@ -104,8 +104,17 @@ export function TripMap({
     );
   }, [active, days, width, height, top, rt.insets.bottom]);
 
+  // The `cameraPosition` prop places the first camera. Moving it again goes
+  // through the native view, which is not registered yet on mount and can be
+  // gone by the time a late call lands; either way there is nothing to move.
+  const placed = useRef(false);
   useEffect(() => {
-    if (camera) ref.current?.setCameraPosition(camera);
+    if (!camera) return;
+    if (!placed.current) {
+      placed.current = true;
+      return;
+    }
+    ref.current?.setCameraPosition(camera).catch(() => {});
   }, [camera]);
 
   const pins = days.flatMap((stops, day) =>
