@@ -311,6 +311,16 @@
   "plan.failedTitle": "계획을 세우지 못했어요",
   "plan.shareIntro": "%{space}에서 고른 추천 목록:",
   "plan.shareFooter": "Shelvr로 만듦 %{url}",
+  "plan.ask": "누군가에게 물어보기",
+  "plan.askText": "어디로 갈까? 가고 싶은 곳에 ✓를 눌러줘: %{url}",
+  "plan.askFailedTitle": "투표 링크를 만들지 못했어요",
+  "plan.voterCount": {
+    "other": "%{formattedCount}명이 링크에서 투표했어요."
+  },
+  "plan.daysLeft": {
+    "other": "%{formattedCount}일 남았어요."
+  },
+  "plan.tally": "가고 싶음 %{picks}, 패스 %{passes}",
   "trip.make": "여행 계획하기",
   "trip.pickTitle": "여행",
   "trip.pickBody": "저장한 장소를 하루하루 일정으로",
