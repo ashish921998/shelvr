@@ -36,7 +36,7 @@ const mock = vi.hoisted(() => ({
   logOut: vi.fn(async () => {}),
   isAnonymous: vi.fn(async () => true),
   syncPurchasesForResult: vi.fn(async () => ({})),
-  syncPurchase: vi.fn(async () => null),
+  syncPurchase: vi.fn(async () => true),
 }));
 
 vi.mock("react-native", () => ({
@@ -180,7 +180,7 @@ beforeEach(() => {
   mock.logOut.mockClear();
   mock.isAnonymous.mockReset().mockResolvedValue(true);
   mock.syncPurchasesForResult.mockReset().mockResolvedValue({});
-  mock.syncPurchase.mockReset().mockResolvedValue(null);
+  mock.syncPurchase.mockReset().mockResolvedValue(true);
   push.mockClear();
 });
 
@@ -276,6 +276,36 @@ describe("selling before sign-in", () => {
       expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
     );
   });
+
+  it("keeps the flag while the backend finds no access yet, and clears it once access lands", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    mock.syncPurchasesForResult.mockRejectedValueOnce(new Error("store"));
+    mock.syncPurchase.mockResolvedValueOnce(false);
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "purchase_sync_failed",
+        expect.any(Error),
+      ),
+    );
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledTimes(2), {
+      timeout: 5000,
+    });
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+  });
+
+  it("keeps the flag for the next launch when no read finds access", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    mock.syncPurchase.mockResolvedValue(false);
+    await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledTimes(3), {
+      timeout: 10_000,
+    });
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
+  }, 15_000);
 
   it("still reads the account back when the store sync fails", async () => {
     mock.store.set("shelvr.purchase.beforeSignIn", "1");

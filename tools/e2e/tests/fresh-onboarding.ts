@@ -3,6 +3,7 @@ import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
+import { tapUntilVisible } from "./seeded-home.ts";
 
 /**
  * Starts the app as a first-time user on the onboarding opener. Onboarding
@@ -30,10 +31,14 @@ export async function startFreshOnboarding({
  * step.
  */
 export async function walkToFirstSave(screen: Screen): Promise<void> {
-  await screen.getByRole("button", "Start yours").tap();
-  await expect(screen.getByText("What are you into?")).toBeVisible({
-    timeout: 30_000,
-  });
+  // The opener can drop its first tap while the splash is still fading out
+  // (CI run 39388506914 stayed on the opener), so Start yours is tapped again
+  // only if the interests step has not come up.
+  await tapUntilVisible(
+    screen.getByRole("button", "Start yours"),
+    screen.getByText("What are you into?"),
+    { waitMs: 5_000, timeout: 30_000 },
+  );
   await screen.getByRole("button", "Continue").tap();
   await expect(screen.getByText("What do you save?")).toBeVisible({
     timeout: 30_000,
