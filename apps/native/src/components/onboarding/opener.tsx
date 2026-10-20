@@ -12,7 +12,7 @@ import {
   type SceneProps,
 } from "@/components/onboarding/opener-scenes";
 import { CtaButton } from "@/components/onboarding/parts";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -72,13 +72,17 @@ const COPY_MIN_HEIGHT = 150;
 export function OpenerStep({
   onStart,
   onSignIn,
+  viewedPages,
 }: {
   onStart: () => void;
   onSignIn: () => void;
+  /** Pages already reported in this onboarding mount. The screen owns it,
+   * so a remount (back from interests, a text-size change) reports nothing
+   * new. */
+  viewedPages: Set<number>;
 }) {
   useAppLocale();
-  // At the accessibility sizes the copy can outgrow its page, so each page
-  // scrolls on its own and the sign-in link joins the first page's copy
+  // At the accessibility sizes the sign-in link joins the first page's copy
   // instead of taking footer height from every page.
   const largeText = useLargeText();
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -86,14 +90,13 @@ export function OpenerStep({
   // The furthest page reached. A page's entrance (the share sheet, the
   // toast) plays when the page is first reached, not offscreen on mount.
   const [reached, setReached] = useState(0);
-  const viewedRef = useRef(new Set<number>());
 
   useEffect(() => {
     // Swiping back to a page says nothing new; the funnel counts first views.
-    if (viewedRef.current.has(page)) return;
-    viewedRef.current.add(page);
+    if (viewedPages.has(page)) return;
+    viewedPages.add(page);
     analytics.capture("onboarding_opener_page_viewed", { page_index: page });
-  }, [page]);
+  }, [page, viewedPages]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -147,7 +150,10 @@ export function OpenerStep({
                 key={item.key}
                 style={{ width: size.width, height: size.height }}
                 contentContainerStyle={styles.page}
-                scrollEnabled={largeText}
+                // A page scrolls only when its copy outgrows it: a small
+                // phone, a long translation or a large text size. Copy that
+                // fits neither moves nor bounces.
+                alwaysBounceVertical={false}
                 showsVerticalScrollIndicator={false}
               >
                 <PhoneFrame

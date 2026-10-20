@@ -128,6 +128,8 @@ export default function OnboardingScreen() {
   }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
+  // Mutated in place by the opener; the state only keeps one set per mount.
+  const [viewedOpenerPages] = useState(() => new Set<number>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
@@ -303,6 +305,7 @@ export default function OnboardingScreen() {
             key={fontScale}
             onStart={advance}
             onSignIn={() => setShowSignIn(true)}
+            viewedPages={viewedOpenerPages}
           />
         </View>
       ) : (

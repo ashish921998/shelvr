@@ -85,7 +85,9 @@ vi.mock("react-native", async () => {
     useEffect(() => {
       if (horizontal)
         onLayout?.({
-          nativeEvent: { layout: { x: 0, y: 0, width: PAGE_WIDTH, height: 600 } },
+          nativeEvent: {
+            layout: { x: 0, y: 0, width: PAGE_WIDTH, height: 600 },
+          },
         });
       // Once, as a layout pass would.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,7 +166,13 @@ beforeEach(() => {
 
 describe("OpenerStep", () => {
   it("shows the three pages, each with its headline and body", () => {
-    render(<OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} />);
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={new Set()}
+      />,
+    );
     for (const page of ["Save", "File", "Plan"]) {
       expect(screen.getByText(`onboarding.opener${page}Title`)).toBeTruthy();
       expect(screen.getByText(`onboarding.opener${page}Accent`)).toBeTruthy();
@@ -175,7 +183,13 @@ describe("OpenerStep", () => {
   });
 
   it("lights the dot of the page in view", () => {
-    render(<OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} />);
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={new Set()}
+      />,
+    );
     expect(dot(0)).toContain("dotOn");
     expect(dot(1)).not.toContain("dotOn");
     swipeTo(1);
@@ -196,7 +210,13 @@ describe("OpenerStep", () => {
 
   it("starts from any page", () => {
     const onStart = vi.fn();
-    render(<OpenerStep onStart={onStart} onSignIn={vi.fn()} />);
+    render(
+      <OpenerStep
+        onStart={onStart}
+        onSignIn={vi.fn()}
+        viewedPages={new Set()}
+      />,
+    );
     fireEvent.click(screen.getByText("onboarding.startYours"));
     swipeTo(1);
     fireEvent.click(screen.getByText("onboarding.startYours"));
@@ -207,7 +227,13 @@ describe("OpenerStep", () => {
 
   it("offers sign-in on the first page only", () => {
     const onSignIn = vi.fn();
-    render(<OpenerStep onStart={vi.fn()} onSignIn={onSignIn} />);
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={onSignIn}
+        viewedPages={new Set()}
+      />,
+    );
     expect(screen.getByText("onboarding.haveAccount")).toBeTruthy();
     swipeTo(1);
     expect(screen.queryByText("onboarding.haveAccount")).toBeNull();
@@ -219,7 +245,13 @@ describe("OpenerStep", () => {
   });
 
   it("plays a page's entrance once the page is reached, and keeps it", () => {
-    render(<OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} />);
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={new Set()}
+      />,
+    );
     expect(screen.getByText("share-scene-shown")).toBeTruthy();
     expect(screen.queryByText("filed-toast")).toBeNull();
     swipeTo(1);
@@ -229,7 +261,13 @@ describe("OpenerStep", () => {
   });
 
   it("reports each page the first time it is shown", () => {
-    render(<OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} />);
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={new Set()}
+      />,
+    );
     expect(pageViews()).toEqual([0]);
     swipeTo(1);
     swipeTo(2);
@@ -237,15 +275,43 @@ describe("OpenerStep", () => {
     swipeTo(0);
     swipeTo(2);
     expect(pageViews()).toEqual([0, 1, 2]);
-    expect(mock.capture).toHaveBeenCalledWith(
-      "onboarding_opener_page_viewed",
-      { page_index: 1 },
+    expect(mock.capture).toHaveBeenCalledWith("onboarding_opener_page_viewed", {
+      page_index: 1,
+    });
+  });
+
+  it("reports nothing again when the opener comes back in the same onboarding", () => {
+    const viewedPages = new Set<number>();
+    const first = render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={viewedPages}
+      />,
     );
+    swipeTo(1);
+    first.unmount();
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={viewedPages}
+      />,
+    );
+    swipeTo(1);
+    swipeTo(2);
+    expect(pageViews()).toEqual([0, 1, 2]);
   });
 
   it("keeps sign-in with the first page's copy at the large text sizes", () => {
     mock.largeText = true;
-    render(<OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} />);
+    render(
+      <OpenerStep
+        onStart={vi.fn()}
+        onSignIn={vi.fn()}
+        viewedPages={new Set()}
+      />,
+    );
     expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(1);
     swipeTo(2);
     // It belongs to the first page, which is still mounted, not to the
