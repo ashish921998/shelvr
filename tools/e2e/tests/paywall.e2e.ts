@@ -2,7 +2,7 @@ import { test } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall } from "./paywall-sheet.ts";
+import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
 import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
@@ -14,7 +14,7 @@ startOnSeededHome();
 async function closePaywall(screen: Screen): Promise<void> {
   // The close control has no label; it is the first button on the sheet.
   await screen.getByRole("button").first().tap();
-  await expect(screen.getByRole("button", "Restore Purchases")).toBeHidden({
+  await expect(paywallRestore(screen)).toBeHidden({
     timeout: 30_000,
   });
   await expect(screen.getByRole("button", "View Pro plans")).toBeVisible();
