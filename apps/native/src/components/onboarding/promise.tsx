@@ -1,40 +1,27 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import type { ReminderSlot } from "@/lib/first-save-reminder";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton } from "@/components/onboarding/parts";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-const REMINDER_LINE: Record<ReminderSlot, TextMessageKey> = {
-  tonight: "promise.reminderTonight",
-  tomorrow: "promise.reminderTomorrow",
-  weekend: "promise.reminderWeekend",
-  nextWeek: "promise.reminderNextWeek",
-};
+// Sharing and the reminder each had their own step, so the promise names
+// neither.
+const LINES: TextMessageKey[] = ["promise.comeBack", "promise.use"];
 
 /**
- * The last step before the paywall: three habits the person promises
- * themselves, taken with one tap. The middle one names the reminder they set
- * on the notifications step, and only when it was actually scheduled.
- * Nothing is stored or sent.
+ * The last step before the paywall: two habits the person promises
+ * themselves, taken with one tap. Nothing is stored or sent.
  */
 export function PromiseStep({
-  reminder,
   leaving,
   onCommit,
 }: {
-  reminder: ReminderSlot | null;
   /** `onCommit` ran and the paywall is on its way. */
   leaving: boolean;
   onCommit: () => void;
 }) {
   useAppLocale();
-  const lines: TextMessageKey[] = [
-    "promise.share",
-    reminder === null ? "promise.comeBack" : REMINDER_LINE[reminder],
-    "promise.use",
-  ];
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -50,7 +37,7 @@ export function PromiseStep({
 
       <View style={styles.card}>
         <Text style={styles.eyebrow}>{t("promise.eyebrow")}</Text>
-        {lines.map((line, index) => (
+        {LINES.map((line, index) => (
           <View key={line} style={styles.line}>
             <Text style={styles.number}>{index + 1}</Text>
             <Text style={styles.lineText}>{t(line)}</Text>

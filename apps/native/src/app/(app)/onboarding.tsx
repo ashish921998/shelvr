@@ -46,7 +46,6 @@ import { PromiseStep } from "@/components/onboarding/promise";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import { AppSymbolIcon } from "@/components/symbol";
-import type { ReminderSlot } from "@/lib/first-save-reminder";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
@@ -110,8 +109,6 @@ export default function OnboardingScreen() {
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
   // Restored so a relaunch on the reminder step still offers to remind.
   const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
-  // Not restored: after a relaunch the promise names no reminder.
-  const [reminder, setReminder] = useState<ReminderSlot | null>(null);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -358,13 +355,7 @@ export default function OnboardingScreen() {
           )}
 
           {step === "notifications" && (
-            <NotificationsStep
-              saved={saved}
-              onAdvance={(scheduled) => {
-                setReminder(scheduled ?? null);
-                advance();
-              }}
-            />
+            <NotificationsStep saved={saved} onAdvance={() => advance()} />
           )}
 
           {step === "share" && (
@@ -376,11 +367,7 @@ export default function OnboardingScreen() {
           )}
 
           {step === "promise" && (
-            <PromiseStep
-              reminder={reminder}
-              leaving={paywall.asked}
-              onCommit={paywall.ask}
-            />
+            <PromiseStep leaving={paywall.asked} onCommit={paywall.ask} />
           )}
         </ScrollView>
       )}

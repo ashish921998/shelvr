@@ -1,21 +1,24 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { Image, type ImageSource } from "expo-image";
+import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** A save as the app files it: its picture, title, a line of detail and, when
  * the classifier gave one, a tag. The sign-in prompt and the reminder step
- * both show the first save this way. */
+ * both show the first save this way. `action` sits beside the tag. */
 export function SaveSummary({
   image,
   title,
   meta,
   tag,
+  action,
 }: {
   image: ImageSource | string | number | null | undefined;
   title: string;
   meta: string;
   tag?: string;
+  action?: ReactNode;
 }) {
   const { theme } = useUnistyles();
   return (
@@ -38,9 +41,14 @@ export function SaveSummary({
         <Text style={styles.saveMeta} numberOfLines={1}>
           {meta}
         </Text>
-        {tag ? (
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{tag}</Text>
+        {tag || action ? (
+          <View style={styles.extras}>
+            {tag ? (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ) : null}
+            {action}
           </View>
         ) : null}
       </View>
@@ -89,9 +97,14 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     color: theme.colors.muted,
   },
-  tag: {
-    alignSelf: "flex-start",
+  extras: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.gap(1),
     marginTop: theme.gap(0.5),
+  },
+  tag: {
     paddingHorizontal: theme.gap(1.25),
     paddingVertical: theme.gap(0.5),
     borderRadius: 999,

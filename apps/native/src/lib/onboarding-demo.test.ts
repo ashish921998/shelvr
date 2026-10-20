@@ -10,14 +10,14 @@ describe("orderDemoSamples", () => {
   it("puts the picked kinds' samples first", () => {
     expect(
       orderDemoSamples(["Fitness", "Articles", "Travel"]).map((s) => s.domain),
-    ).toEqual(["fs.blog", "lonelyplanet.com", "bbcgoodfood.com"]);
+    ).toEqual(["fs.blog", "prague.eu", "bbcgoodfood.com"]);
   });
 
   it("offers three samples when no picked kind has one", () => {
     expect(orderDemoSamples(["Fitness"]).map((s) => s.domain)).toEqual([
       "bbcgoodfood.com",
       "apple.com",
-      "lonelyplanet.com",
+      "prague.eu",
     ]);
   });
 });
@@ -43,7 +43,7 @@ describe("samples for picked topics", () => {
       (s) => s.domain,
     );
     expect(domains).toEqual([
-      "lonelyplanet.com",
+      "prague.eu",
       "myanimelist.net",
       "bbcgoodfood.com",
     ]);
@@ -86,13 +86,13 @@ describe("practiceShareSample", () => {
     expect(
       practiceShareSample(["Travel", "Recipes"], "https://fs.blog/reading/")
         ?.domain,
-    ).toBe("lonelyplanet.com");
+    ).toBe("prague.eu");
   });
 });
 
 describe("demoDestination", () => {
   const travelUrl =
-    "https://www.lonelyplanet.com/articles/best-things-to-do-in-prague";
+    "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/";
 
   it("files a sample into its kind's first preset when kept", () => {
     expect(demoDestination(travelUrl, ["Trip ideas", "Travel"])).toBe("Travel");
