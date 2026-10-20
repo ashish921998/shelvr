@@ -68,8 +68,15 @@ test(
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
+    // Declining only suppresses replay for that session. Pending starter
+    // spaces intentionally ask again on the next launch (replay-onboarding).
+    // Wait for that sheet rather than accepting Home underneath it.
+    await expect(paywallRestore(screen)).toBeVisible({ timeout: 180_000 });
+    await expectPaywall(screen);
+    await screen.getByRole("button", "Close").first().tap();
+    await expect(paywallRestore(screen)).toBeHidden({ timeout: 30_000 });
     await expect(screen.getByRole("button", "View Pro plans")).toBeVisible({
-      timeout: 180_000,
+      timeout: 30_000,
     });
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,

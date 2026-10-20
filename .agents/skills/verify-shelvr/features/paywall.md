@@ -31,8 +31,9 @@ Plan switching has its own test: it opens "View all plans", selects Monthly,
 checks the billed-today disclosure, then selects Annual and checks the trial
 CTA. `expectPaywall` only observes the initial paywall, so the entry and
 dismissal tests never need to switch plans. The onboarding test cold-launches
-Home once after completion, waits for both splash layers to disappear, and
-disables whole-test retries so a failed launch cannot become a flaky pass.
+once after completion, verifies and dismisses the intentional replay paywall
+for pending unpaid setup, then checks Home and both splash layers. Whole-test
+retries are disabled so a failed launch cannot become a flaky pass.
 
 ## Proof
 
