@@ -15,6 +15,7 @@ import {
   MAX_PLACE_NAME_CHARS,
   MAX_PLAN_PLACES,
   MAX_WHY_CHARS,
+  placeKey,
 } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
@@ -135,7 +136,9 @@ export const createPlanShare = mutation({
 
 /**
  * The newest open vote link for one of the caller's spaces, with each
- * place's votes so far. Null when the space has none open.
+ * place's votes so far and whether the caller marked it "We went". Places
+ * whose save was deleted are left out. Null when the space has none open,
+ * or none of its places is left.
  */
 export const latestPlanShare = query({
   args: { spaceId: v.id("spaces") },
@@ -152,6 +155,7 @@ export const latestPlanShare = query({
           area: v.optional(v.string()),
           why: v.string(),
           itemId: v.id("items"),
+          been: v.optional(v.boolean()),
           picks: v.number(),
           passes: v.number(),
         }),
@@ -179,20 +183,35 @@ export const latestPlanShare = query({
       .query("planVotes")
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
       .take(MAX_VOTE_ROWS);
-    return {
-      token: share.token,
-      city: share.city,
-      expiresAt: share.expiresAt,
-      voters: votes.filter(hasVote).length,
-      places: share.places.map((place) => ({
+    // Like the public page, a place whose save was deleted is left out.
+    const places = [];
+    for (const place of share.places) {
+      const item = await ctx.db.get(place.itemId);
+      if (item === null || item.userId !== userId) continue;
+      const visit = await ctx.db
+        .query("placeVisits")
+        .withIndex("by_user_and_key", (q) =>
+          q.eq("userId", userId).eq("key", placeKey(place.name)),
+        )
+        .unique();
+      places.push({
         key: place.key,
         name: place.name,
         ...(place.area !== undefined ? { area: place.area } : {}),
         why: place.why,
         itemId: place.itemId,
+        ...(visit !== null ? { been: true } : {}),
         picks: votes.filter((vote) => vote.picks.includes(place.key)).length,
         passes: votes.filter((vote) => vote.passes.includes(place.key)).length,
-      })),
+      });
+    }
+    if (places.length === 0) return null;
+    return {
+      token: share.token,
+      city: share.city,
+      expiresAt: share.expiresAt,
+      voters: votes.filter(hasVote).length,
+      places,
     };
   },
 });

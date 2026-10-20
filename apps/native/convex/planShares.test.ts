@@ -377,11 +377,32 @@ describe("votes", () => {
     expect(
       await backend.query(internal.planShares.getPublicPlanShare, { token }),
     ).toMatchObject({ places: [{ key: "p1" }] });
+    expect(
+      (await t.query(api.planShares.latestPlanShare, { spaceId }))?.places.map(
+        (place) => place.key,
+      ),
+    ).toEqual(["p1"]);
 
     await t.run((ctx) => ctx.db.delete(itemIds[1]));
     expect(
       await backend.query(internal.planShares.getPublicPlanShare, { token }),
     ).toBeNull();
+    expect(
+      await t.query(api.planShares.latestPlanShare, { spaceId }),
+    ).toBeNull();
+  });
+
+  it("tells the owner which shared places they marked We went", async () => {
+    const { t, spaceId, places } = await setup();
+    await t.mutation(api.planShares.createPlanShare, { spaceId, places });
+    await t.mutation(api.placeVisits.setVisited, {
+      name: "Thalassa",
+      itemId: places[0].itemId,
+      visited: true,
+    });
+    const shared = await t.query(api.planShares.latestPlanShare, { spaceId });
+    expect(shared?.places[0]).toMatchObject({ name: "Thalassa", been: true });
+    expect(shared?.places[1]).not.toHaveProperty("been");
   });
 });
 
