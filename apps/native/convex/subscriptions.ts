@@ -68,17 +68,26 @@ export const claimPurchaseSync = internalMutation({
   },
 });
 
+export const entitledNow = internalQuery({
+  args: { userId: v.id("users"), now: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, { userId, now }) =>
+    await hasProEntitlementAt(ctx, userId, now),
+});
+
 /**
  * Re-reads the caller's RevenueCat customer and records any Pro access it
  * holds. A purchase made before sign-in belongs to an anonymous RevenueCat id,
  * so its webhook names no account; signing in aliases it onto this one, and
  * the client calls this once that `logIn` has finished. It only ever adds
- * access: a customer with none leaves the row untouched.
+ * access: a customer with none leaves the row untouched. Returns whether the
+ * caller has Pro afterwards, so the client keeps its pending-purchase marker
+ * until the purchase has actually landed.
  */
 export const syncPurchase = action({
   args: {},
-  returns: v.null(),
-  handler: async (ctx) => {
+  returns: v.boolean(),
+  handler: async (ctx): Promise<boolean> => {
     const userId = await ctx.runMutation(
       internal.subscriptions.claimPurchaseSync,
       {},
@@ -88,7 +97,10 @@ export const syncPurchase = action({
     await reconcileRevenueCatCustomers(ctx, [userId], readAt, {
       grantOnly: true,
     });
-    return null;
+    return await ctx.runQuery(internal.subscriptions.entitledNow, {
+      userId,
+      now: Date.now(),
+    });
   },
 });
 

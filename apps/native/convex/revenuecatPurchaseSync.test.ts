@@ -28,7 +28,7 @@ describe("syncPurchase", () => {
     const fetchMock = stubRevenueCatFetch(
       revenuecatSnapshot({ productId: "annual", periodType: "trial" }),
     );
-    await f.t.action(api.subscriptions.syncPurchase, {});
+    expect(await f.t.action(api.subscriptions.syncPurchase, {})).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain(
       encodeURIComponent(f.userId),
@@ -36,6 +36,13 @@ describe("syncPurchase", () => {
     expect(await f.rows()).toMatchObject([
       { userId: f.userId, status: "trialing", productId: "annual" },
     ]);
+  });
+
+  it("reports no access while RevenueCat has not attached the purchase yet", async () => {
+    const f = await fixture();
+    stubRevenueCatFetch(revenuecatSnapshot());
+    expect(await f.t.action(api.subscriptions.syncPurchase, {})).toBe(false);
+    expect(await f.rows()).toEqual([]);
   });
 
   it("never takes access away when RevenueCat has none", async () => {

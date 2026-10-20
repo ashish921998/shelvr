@@ -305,14 +305,18 @@ export function useEntitlementSync(): void {
  * store receipt is synced onto this account either way. The backend then reads
  * the account back from RevenueCat.
  */
-async function attachPurchaseBeforeSignIn(syncPurchase: () => Promise<null>) {
+async function attachPurchaseBeforeSignIn(
+  syncPurchase: () => Promise<boolean>,
+): Promise<void> {
   try {
     await getPurchases()?.syncPurchasesForResult();
   } catch (error) {
     // logIn's merge may already have attached it; the backend read decides.
     analytics.captureError("revenuecat_purchase_attach_failed", error);
   }
-  await syncPurchase();
+  // Throwing keeps the pending-purchase marker and schedules a retry: the
+  // marker is cleared only once the backend confirms the account has Pro.
+  if (!(await syncPurchase())) throw new Error("purchase_not_attached");
 }
 
 /**
