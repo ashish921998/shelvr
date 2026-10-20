@@ -105,7 +105,10 @@ export function TripMap({
   }, [active, days, width, height, top, rt.insets.bottom]);
 
   useEffect(() => {
-    if (camera) ref.current?.setCameraPosition(camera);
+    // The `cameraPosition` prop already places the map, so a call that finds
+    // no native view (on SDK 58 the first one, before the view mounts, can
+    // reject) has nothing left to do.
+    if (camera) ref.current?.setCameraPosition(camera).catch(() => {});
   }, [camera]);
 
   const pins = days.flatMap((stops, day) =>
