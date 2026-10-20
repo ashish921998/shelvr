@@ -310,6 +310,18 @@
   "plan.failedTitle": "Couldn't make a plan",
   "plan.shareIntro": "Our shortlist from %{space}:",
   "plan.shareFooter": "Made with Shelvr %{url}",
+  "plan.ask": "Ask someone",
+  "plan.askText": "Where should we go? Tap ✓ on the ones you'd go to: %{url}",
+  "plan.askFailedTitle": "Couldn't make a vote link",
+  "plan.voterCount": {
+    "one": "%{formattedCount} person voted on your link.",
+    "other": "%{formattedCount} people voted on your link."
+  },
+  "plan.daysLeft": {
+    "one": "%{formattedCount} day left.",
+    "other": "%{formattedCount} days left."
+  },
+  "plan.tally": "%{picks} would go, %{passes} would pass",
   "trip.make": "Plan my trip",
   "trip.pickTitle": "A trip",
   "trip.pickBody": "Turn your saved places into days",
