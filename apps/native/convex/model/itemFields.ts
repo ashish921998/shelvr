@@ -152,7 +152,8 @@ export function normalizeCities(raw: readonly string[] | undefined): string[] {
     const city = entry
       .replace(/\s+/g, " ")
       .trim()
-      .replace(/[.,;:!?]+$/, "");
+      .replace(/[.,;:!?]+$/, "")
+      .trim();
     const key = city.toLowerCase();
     if (
       city === "" ||

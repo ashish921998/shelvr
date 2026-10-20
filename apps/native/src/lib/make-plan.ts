@@ -6,6 +6,7 @@ import { isAiConsentRequired } from "@convex/model/aiConsent";
 import { placeKey, type PlanPlace } from "@convex/model/plan";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Share } from "react-native";
 
 export type { PlanPlace };
 
@@ -26,14 +27,35 @@ export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
 
 const LOADING: PlanState = { status: "loading" };
 
+/** The space's open vote link, as far as the plan screen needs it. */
+type SharedShortlist = {
+  expiresAt: number;
+  places: { name: string; area?: string; why: string; itemId: Id<"items"> }[];
+};
+
 /**
  * Runs `plans.makePlan` for a space once per space and locale, and again on
  * `retry`. A late answer from an earlier run never overwrites a newer one, and
  * an answer for another space or locale reads as loading, never as ready.
+ *
+ * `shared` is the space's open vote link (undefined while it loads). When one
+ * is open on arrival, the screen shows its shortlist instead of asking the
+ * model again, so the owner comes back to the places people are voting on.
+ * Only `retry` replaces it.
  */
-export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
+export function useMakePlan(
+  spaceId: Id<"spaces">,
+  locale: string,
+  shared: SharedShortlist | null | undefined,
+) {
   const makePlan = useAction(api.plans.makePlan);
   const key = `${spaceId}:${locale}`;
+  // Read once per arrival: a link made from this screen must not reset it.
+  const sharedRef = useRef(shared);
+  useEffect(() => {
+    sharedRef.current = shared;
+  });
+  const linkLoaded = shared !== undefined;
   const [result, setResult] = useState<{
     key: string;
     state: PlanState;
@@ -64,15 +86,31 @@ export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
   );
 
   useEffect(() => {
+    if (!linkLoaded) return;
     const current = ++run.current;
-    void load(current).then((next) => {
-      if (current === run.current) setResult({ key, state: next });
+    const link = sharedRef.current;
+    const next: Promise<PlanState> =
+      link && link.expiresAt > Date.now() && link.places.length > 0
+        ? Promise.resolve({
+            status: "ready",
+            places: link.places.map(({ name, area, why, itemId }) => ({
+              name,
+              ...(area !== undefined ? { area } : {}),
+              why,
+              itemId,
+            })),
+            considered: link.places.length,
+            planId: current,
+          })
+        : load(current);
+    void next.then((state) => {
+      if (current === run.current) setResult({ key, state });
     });
     return () => {
       // Unmounted or regenerating: drop whatever the in-flight run returns.
       run.current += 1;
     };
-  }, [load, key]);
+  }, [load, key, linkLoaded]);
 
   const retry = useCallback(async () => {
     const current = ++run.current;
@@ -318,4 +356,112 @@ export function spinSteps(
     // Ease out: 60 ms per step at the start, about 300 ms at the end.
     holdMs: Math.round(60 + 240 * (step / Math.max(total - 1, 1)) ** 2),
   }));
+}
+
+/** The vote page for a plan link (`apps/web/src/app/p/[token]`). */
+export function planVoteUrl(token: string): string {
+  return `https://shelvr-web.vercel.app/p/${token}`;
+}
+
+/**
+ * "Ask someone": the share sheet with a vote link for the places on screen.
+ * The open link is sent again while it holds this same shortlist, so votes
+ * already in stay on the deck; a new shortlist gets a fresh link. One ask at
+ * a time; a failed link or sheet says so, a cancelled sheet says nothing.
+ */
+export function usePlanAsk(
+  spaceId: Id<"spaces">,
+  places: PlanPlace[],
+  current: { token: string; expiresAt: number } | null,
+) {
+  const createPlanShare = useMutation(api.planShares.createPlanShare);
+  const [asking, setAsking] = useState(false);
+  // A second tap can land before the `asking` render; this one cannot.
+  const busy = useRef(false);
+
+  const ask = useCallback(async () => {
+    if (places.length === 0 || busy.current) return;
+    busy.current = true;
+    setAsking(true);
+    try {
+      const token =
+        (current && current.expiresAt > Date.now() ? current.token : null) ??
+        (await createPlanShare({
+          spaceId,
+          places: places.map((place) => ({
+            name: place.name,
+            area: place.area,
+            why: place.why,
+            itemId: place.itemId,
+          })),
+        }));
+      await sharePlanLink(token, places.length);
+    } catch (error) {
+      analytics.capture("plan_ask_failed", { reason: "link" });
+      analytics.captureError("plan_ask_failed", error);
+      Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
+    } finally {
+      busy.current = false;
+      setAsking(false);
+    }
+  }, [createPlanShare, current, places, spaceId]);
+
+  return { ask, asking };
+}
+
+/** The share sheet for a made link. Its failure is reported, never thrown. */
+async function sharePlanLink(token: string, placeCount: number) {
+  try {
+    const result = await Share.share({
+      message: t("plan.askText", { url: planVoteUrl(token) }),
+    });
+    if (result.action === Share.sharedAction) {
+      analytics.capture("plan_asked", { place_count: placeCount });
+    }
+  } catch (error) {
+    analytics.capture("plan_ask_failed", { reason: "share" });
+    analytics.captureError("plan_ask_failed", error);
+    Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
+  }
+}
+
+/**
+ * The open link, when it holds exactly the places on screen. A regenerated
+ * plan is a new shortlist, so the old link's votes do not belong on it.
+ */
+export function linkForPlan<
+  T extends { expiresAt: number; places: { name: string }[] },
+>(link: T | null | undefined, places: PlanPlace[], now = Date.now()): T | null {
+  // A cached query can outlive the link's week; a closed link has no votes to show.
+  if (!link || places.length === 0 || link.expiresAt <= now) return null;
+  const keys = (names: { name: string }[]) =>
+    names
+      .map((entry) => placeKey(entry.name))
+      .sort()
+      .join("\n");
+  return keys(link.places) === keys(places) ? link : null;
+}
+
+/** The tallies an open vote link holds, by place. */
+type PlanVotes = {
+  voters: number;
+  expiresAt: number;
+  places: { name: string; picks: number; passes: number }[];
+};
+
+/** A place's tally on the link, or null when nobody voted on it. */
+export function votesFor(
+  votes: PlanVotes | null | undefined,
+  place: PlanPlace,
+): { picks: number; passes: number } | null {
+  if (!votes) return null;
+  const key = placeKey(place.name);
+  const tally = votes.places.find((entry) => placeKey(entry.name) === key);
+  if (!tally || tally.picks + tally.passes === 0) return null;
+  return { picks: tally.picks, passes: tally.passes };
+}
+
+/** Whole days the link stays open, at least 1 while it is open. */
+export function daysLeft(expiresAt: number, now = Date.now()): number {
+  return Math.max(1, Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000)));
 }

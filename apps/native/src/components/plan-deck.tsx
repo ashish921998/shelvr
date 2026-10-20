@@ -18,6 +18,8 @@ import Animated, {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { scheduleOnRN } from "react-native-worklets";
 
+type Tally = { picks: number; passes: number };
+
 type Props = {
   places: PlanPlace[];
   /** The card on top. */
@@ -27,6 +29,8 @@ type Props = {
   imageFor: (place: PlanPlace) => string | undefined;
   titleFor: (place: PlanPlace) => string | undefined;
   isVisited: (place: PlanPlace) => boolean;
+  /** The place's ✓/✕ count from the open vote link, or null when nobody voted. */
+  tallyFor: (place: PlanPlace) => Tally | null;
   onFlip: () => void;
   /** The top card was swiped away; it goes to the back of the deck. */
   onNext: () => void;
@@ -51,6 +55,7 @@ export function PlanDeck({
   imageFor,
   titleFor,
   isVisited,
+  tallyFor,
   onFlip,
   onNext,
   onOpenMaps,
@@ -155,6 +160,7 @@ export function PlanDeck({
                 place={place}
                 imageUrl={imageFor(place)}
                 visited={isVisited(place)}
+                tally={tallyFor(place)}
               />
             </View>
           );
@@ -166,7 +172,9 @@ export function PlanDeck({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={
-                  flipped ? backLabel(place, titleFor(place)) : cardLabel(place)
+                  flipped
+                    ? backLabel(place, titleFor(place))
+                    : cardLabel(place, tallyFor(place))
                 }
                 accessibilityHint={t("plan.flipHint")}
                 accessibilityActions={[
@@ -194,6 +202,7 @@ export function PlanDeck({
                     place={place}
                     imageUrl={imageFor(place)}
                     visited={isVisited(place)}
+                    tally={tallyFor(place)}
                   />
                 </Animated.View>
                 <Animated.View
@@ -222,8 +231,13 @@ function backLabel(place: PlanPlace, sourceTitle?: string): string {
   return [place.name, place.why, from].filter(Boolean).join(". ");
 }
 
-function cardLabel(place: PlanPlace): string {
-  return place.area ? `${place.name}, ${place.area}` : place.name;
+function cardLabel(place: PlanPlace, tally: Tally | null): string {
+  const name = place.area ? `${place.name}, ${place.area}` : place.name;
+  if (!tally) return name;
+  return `${name}. ${t("plan.tally", {
+    picks: String(tally.picks),
+    passes: String(tally.passes),
+  })}`;
 }
 
 /** The photo side: the save's image, the place's name, and a stamp once been. */
@@ -231,10 +245,12 @@ function CardFace({
   place,
   imageUrl,
   visited,
+  tally,
 }: {
   place: PlanPlace;
   imageUrl?: string;
   visited: boolean;
+  tally: Tally | null;
 }) {
   return (
     <>
@@ -272,6 +288,13 @@ function CardFace({
         ) : null}
       </View>
       {visited ? <Stamp /> : null}
+      {tally ? (
+        <View style={styles.tally} accessible={false}>
+          <ThemedText variant="labelStrong" style={styles.tallyText}>
+            {`✓ ${tally.picks}  ·  ✕ ${tally.passes}`}
+          </ThemedText>
+        </View>
+      ) : null}
     </>
   );
 }
@@ -444,6 +467,21 @@ const styles = StyleSheet.create((theme) => ({
   stampText: {
     color: theme.colors.danger,
     textAlign: "center",
+  },
+  // The link's ✓/✕ count, top left so a We went stamp still fits top right.
+  tally: {
+    position: "absolute",
+    top: theme.gap(1.5),
+    left: theme.gap(1.5),
+    paddingVertical: theme.gap(0.5),
+    paddingHorizontal: theme.gap(1.25),
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255, 255, 255, 0.35)",
+    backgroundColor: theme.colors.overlay,
+  },
+  tallyText: {
+    color: theme.colors.onOverlay,
   },
   backBody: {
     flex: 1,

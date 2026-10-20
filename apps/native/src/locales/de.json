@@ -310,6 +310,18 @@
   "plan.failedTitle": "Plan konnte nicht erstellt werden",
   "plan.shareIntro": "Unsere Auswahl aus %{space}:",
   "plan.shareFooter": "Erstellt mit Shelvr %{url}",
+  "plan.ask": "Jemanden fragen",
+  "plan.askText": "Wohin sollen wir gehen? Tippe ✓ bei den Orten, zu denen du mitkommen würdest: %{url}",
+  "plan.askFailedTitle": "Abstimmungslink konnte nicht erstellt werden",
+  "plan.voterCount": {
+    "one": "%{formattedCount} Person hat über deinen Link abgestimmt.",
+    "other": "%{formattedCount} Personen haben über deinen Link abgestimmt."
+  },
+  "plan.daysLeft": {
+    "one": "Noch %{formattedCount} Tag.",
+    "other": "Noch %{formattedCount} Tage."
+  },
+  "plan.tally": "%{picks} dafür, %{passes} dagegen",
   "trip.make": "Meine Reise planen",
   "trip.pickTitle": "Eine Reise",
   "trip.pickBody": "Mach aus deinen gespeicherten Orten Tage",

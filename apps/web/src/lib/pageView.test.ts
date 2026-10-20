@@ -49,6 +49,15 @@ describe("page view properties", () => {
     expect(JSON.stringify(properties)).not.toContain("tok_secret123");
   });
 
+  it("never sends a plan vote token", () => {
+    const properties = pageViewProperties(
+      { origin, pathname: "/p/plan_secret456", search: "" },
+      "",
+    );
+    expect(properties.$current_url).toBe(`${origin}/p/[token]`);
+    expect(JSON.stringify(properties)).not.toContain("plan_secret456");
+  });
+
   it("omits the campaign when the visitor brought none", () => {
     expect(
       pageViewProperties({ origin, pathname: "/", search: "" }, ""),

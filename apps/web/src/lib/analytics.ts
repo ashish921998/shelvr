@@ -62,7 +62,7 @@ export function captureWebAnalyticsEvent(
           distinct_id: distinctId,
           ...properties,
           // Capability tokens and user input never belong in telemetry.
-          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/i\/[^/]+/, "/i/[token]")}`,
+          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
         },
       }),
       keepalive: true,

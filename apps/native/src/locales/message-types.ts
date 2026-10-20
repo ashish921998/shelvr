@@ -311,6 +311,12 @@ export type MessageParams = {
   "plan.failedTitle": undefined;
   "plan.shareIntro": { space: string };
   "plan.shareFooter": { url: string };
+  "plan.ask": undefined;
+  "plan.askText": { url: string };
+  "plan.askFailedTitle": undefined;
+  "plan.voterCount": { count: number };
+  "plan.daysLeft": { count: number };
+  "plan.tally": { picks: string; passes: string };
   "trip.make": undefined;
   "trip.pickTitle": undefined;
   "trip.pickBody": undefined;
