@@ -25,7 +25,14 @@ argument, `screen.getByRole("button", "View Pro plans")`,
 then `expectPaywall` (`tests/paywall-sheet.ts`): `getByText("How free trial
 works")`, `/Shelvr Pro/`, the `/^7-day trial, /` plan button, `View all plans`,
 `Start 7-day free trial` and `/^Restore purchases$/i`; the close control is the
-first unlabelled button. No assertion matches a price.
+button named `Close` (provided by the upgraded native SDK). No assertion matches a price.
+
+Plan switching has its own test: it opens "View all plans", selects Monthly,
+checks the billed-today disclosure, then selects Annual and checks the trial
+CTA. `expectPaywall` only observes the initial paywall, so the entry and
+dismissal tests never need to switch plans. The onboarding test cold-launches
+Home once after completion, waits for both splash layers to disappear, and
+disables whole-test retries so a failed launch cannot become a flaky pass.
 
 ## Proof
 
