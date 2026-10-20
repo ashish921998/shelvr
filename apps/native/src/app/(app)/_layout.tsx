@@ -104,7 +104,7 @@ function AppStack() {
           headerTintColor: theme.colors.primary,
         }}
       >
-        <Stack.Protected guard={onboarded}>
+        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="share" options={{ headerShown: false }} />
           <Stack.Screen
@@ -127,7 +127,7 @@ function AppStack() {
                   <HeaderIconButton
                     icon="house.fill"
                     label={t("digest.backHome")}
-                    onPress={() => router.replace("/")}
+                    onPress={() => router.replace("/(app)/(tabs)/(home)")}
                   />
                 ),
             }}
@@ -228,12 +228,13 @@ function AppStack() {
             }}
           />
         </Stack.Protected>
-        <Stack.Protected guard={!onboarded}>
+        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
         {/* Onboarding opens the paywall fallback before onboarding
-            completes. Keep it last: the first available screen is the initial
-            route, so it must be (tabs) or onboarding. */}
+            completes, so it sits outside both guards. Each guard names its
+            redirect: without one, Expo Router falls back to the shortest
+            unguarded route name, which is `paywall`. */}
         <Stack.Screen
           name="paywall"
           options={{

@@ -126,8 +126,12 @@ vi.mock("@shopify/react-native-skia", () => ({
   ),
   // eslint-disable-next-line @typescript-eslint/naming-convention -- SDK export
   Path: () => null,
-  // eslint-disable-next-line @typescript-eslint/naming-convention -- SDK export
-  Skia: { Path: { Make: () => ({ addArc: vi.fn() }) } },
+  Skia: {
+    PathBuilder: {
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- SDK method
+      Make: () => ({ addArc: vi.fn(), detach: () => ({}) }),
+    },
+  },
 }));
 vi.mock("react-native-gesture-handler", () => ({
   // eslint-disable-next-line @typescript-eslint/naming-convention -- SDK export

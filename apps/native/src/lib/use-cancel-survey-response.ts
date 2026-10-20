@@ -13,7 +13,7 @@ import {
  * until its idempotent mutation finishes, including across app restarts. */
 export function useCancelSurveyResponse(
   userId: string | undefined,
-  appState: string,
+  appState: string | null | undefined,
 ) {
   const respond = useMutation(api.cancelSurvey.respond);
   const inFlight = useRef(false);

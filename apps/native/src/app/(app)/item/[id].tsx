@@ -132,15 +132,7 @@ function pagerHeaderColors(
  * while this screen is focused: on blur or unmount expo-status-bar falls back
  * to the root layout's theme-driven bar.
  */
-function PagerHeaderBackdrop({
-  onMedia,
-  browserOpen,
-}: {
-  onMedia: boolean;
-  // The in-app browser is up over a media save: its page is light, so the
-  // bar falls back to the root layout's until it closes.
-  browserOpen: boolean;
-}) {
+function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   const { theme } = useUnistyles();
   // Typed to the events used here: the native stack's transitionStart and
   // gestureCancel aren't in expo-router's generic navigation type.
@@ -190,7 +182,7 @@ function PagerHeaderBackdrop({
   return (
     <>
       <HeaderScrim color={MEDIA_CANVAS} />
-      {focused && !browserOpen ? <StatusBar style="light" /> : null}
+      {focused ? <StatusBar style="light" /> : null}
     </>
   );
 }
@@ -344,7 +336,6 @@ function usePagerPages({
       }),
     [],
   );
-  const [browserOpen, setBrowserOpen] = useState(false);
   const renderItem = useCallback(
     ({ item }: { item: DetailItem }) => (
       // AppEntityView tells Siri which save is on screen ("send this to Sam").
@@ -355,13 +346,12 @@ function usePagerPages({
           pageHeight={pageStyle.height}
           reserveFooter={suggestedIds.has(item._id) || item._id === acceptedId}
           onSheetUnderHeader={onSheetUnderHeader}
-          onSourceBrowser={setBrowserOpen}
         />
       </AppEntityView>
     ),
     [pageStyle, pushedId, suggestedIds, acceptedId, onSheetUnderHeader],
   );
-  return { renderItem, onListLayout, sheetsUnder, browserOpen };
+  return { renderItem, onListLayout, sheetsUnder };
 }
 
 // Takes the save in view out of the space it was opened from, and only that
@@ -426,7 +416,7 @@ function useRemoveFromSpace({
         goTo(neighbor._id);
         writeParams(neighbor._id);
       } else if (router.canGoBack()) router.back();
-      else router.replace("/");
+      else router.replace("/(app)/(tabs)/(home)");
     } catch {
       Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
     } finally {
@@ -578,7 +568,7 @@ function ItemScreenContent() {
     [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
 
-  const { renderItem, onListLayout, sheetsUnder, browserOpen } = usePagerPages({
+  const { renderItem, onListLayout, sheetsUnder } = usePagerPages({
     width,
     windowHeight: height,
     pushedId,
@@ -748,7 +738,7 @@ function ItemScreenContent() {
           animated: !reducedMotion,
         });
       } else if (router.canGoBack()) router.back();
-      else router.replace("/");
+      else router.replace("/(app)/(tabs)/(home)");
     } catch {
       Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
     }
@@ -924,7 +914,7 @@ function ItemScreenContent() {
           blur across the whole band and land the fade where the reader
           layout's content begins — the same gap(1.5) — so nothing at rest is
           hazed. */}
-      <PagerHeaderBackdrop onMedia={media.onMedia} browserOpen={browserOpen} />
+      <PagerHeaderBackdrop onMedia={media.onMedia} />
 
       {activeIsSuggested ? (
         // SlideInDown (not a fade) so the bar never mounts at opacity 0: a
