@@ -101,6 +101,10 @@ const lightTheme = {
     // from #bf8114, which cleared only 3.06:1 on background, 3.25:1 on
     // surface and 2.80:1 on surfaceMuted: now 5.49, 5.82 and 5.03:1.
     tabTint: "#8a5a0b",
+    // The body of a phone drawn in the app (the onboarding opener). A device
+    // is dark in every theme, so this never flips with the foreground; the
+    // dark themes go a step past their background so the edge still reads.
+    bezel: "#2b2418",
   },
 } as const;
 
@@ -128,6 +132,7 @@ const darkTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#e6a23c",
+    bezel: "#0e0b07",
   },
 } as const;
 
@@ -158,6 +163,7 @@ const darkNeutralTheme = {
     onKeep: "#065f46",
     // Matches the previous hard-coded dark tab tint on this theme.
     tabTint: "#e6a23c",
+    bezel: "#07090b",
   },
 } as const;
 
