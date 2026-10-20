@@ -41,7 +41,7 @@ export default function DigestScreen() {
         />
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.replace("/")}
+          onPress={() => router.replace("/(app)/(tabs)/(home)")}
           style={[styles.button, styles.errorButton]}
         >
           <Text style={styles.buttonText}>{t("digest.backHome")}</Text>

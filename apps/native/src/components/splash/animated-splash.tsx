@@ -60,6 +60,14 @@ const FOOTER_RISE = 5;
 const REDUCED_FADE_MS = 240;
 
 /**
+ * How long past the clock's end the splash waits for the UI thread's
+ * completion callback before leaving on its own. The splash covers the whole
+ * screen and takes touches, so a callback that never lands would leave an
+ * invisible layer over the app that swallows every tap.
+ */
+const FINISH_FALLBACK_MS = 300;
+
+/**
  * Reanimated disables `withTiming` outright when the system reduce-motion
  * setting is on, snapping it to its end value. That is right for the
  * choreography and wrong for the two timings below: the clock is the splash's
@@ -81,12 +89,20 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   // The wordmark's natural width sets both how far the lockup slides and how
   // far the unfurl opens, so the composition waits on one measurement pass.
   const [wordmarkWidth, setWordmarkWidth] = useState<number | null>(null);
+  // Touches pass through to the app once the cross-fade starts, so a tap on
+  // the screen showing through is never caught by the fading splash.
+  const [exiting, setExiting] = useState(false);
 
   const clock = useSharedValue(0);
   const reducedProgress = useSharedValue(0);
 
   useEffect(() => {
-    const finish = () => onFinish?.();
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      onFinish?.();
+    };
 
     // Reduced motion drops the drawn layer and the lockup's choreography, not
     // the splash itself: the clock still runs the full duration, so the app
@@ -116,7 +132,19 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
     // Stop it rather than leaving it ticking on the UI thread, and firing
     // `onFinish` a second time, on exactly the path the early dismissal is
     // there to speed up.
-    return () => cancelAnimation(clock);
+    const exitTimer = setTimeout(
+      () => setExiting(true),
+      SPLASH_EXIT_FROM * 1000,
+    );
+    const fallbackTimer = setTimeout(
+      finish,
+      SPLASH_DURATION * 1000 + FINISH_FALLBACK_MS,
+    );
+    return () => {
+      clearTimeout(exitTimer);
+      clearTimeout(fallbackTimer);
+      cancelAnimation(clock);
+    };
     // The animation is started once, on mount; `onFinish` is read through the
     // closure above rather than re-armed when the callback identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,7 +209,10 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   }));
 
   return (
-    <Animated.View style={[styles.screen, screenStyle]}>
+    <Animated.View
+      style={[styles.screen, screenStyle]}
+      pointerEvents={exiting ? "none" : "auto"}
+    >
       {reducedMotion ? null : (
         <View style={styles.canvasLayer} pointerEvents="none">
           <ThreadCanvas
