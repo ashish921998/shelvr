@@ -100,7 +100,7 @@ const Badge: FC<BadgeProps> = ({ direction, label, icon, accentColor }) => {
   }));
 
   const arcPath = useDerivedValue(() => {
-    const skPath = Skia.Path.Make();
+    const skPath = Skia.PathBuilder.Make();
     const sweepDegrees = Math.max(0, progress.get()) * 360;
     skPath.addArc(
       {
@@ -112,7 +112,7 @@ const Badge: FC<BadgeProps> = ({ direction, label, icon, accentColor }) => {
       -90,
       sweepDegrees,
     );
-    return skPath;
+    return skPath.detach();
   });
 
   return (
