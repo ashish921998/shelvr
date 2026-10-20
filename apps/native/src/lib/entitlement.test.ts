@@ -8,6 +8,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PURCHASE_ATTACH_WINDOW_MS } from "./purchase-before-sign-in";
 
 const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
@@ -37,10 +38,22 @@ const mock = vi.hoisted(() => ({
   isAnonymous: vi.fn(async () => true),
   syncPurchasesForResult: vi.fn(async () => ({})),
   syncPurchase: vi.fn(async () => true),
+  appStateListeners: [] as ((state: string) => void)[],
 }));
 
 vi.mock("react-native", () => ({
-  AppState: { addEventListener: () => ({ remove: () => {} }) },
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      mock.appStateListeners.push(listener);
+      return {
+        remove: () => {
+          mock.appStateListeners = mock.appStateListeners.filter(
+            (l) => l !== listener,
+          );
+        },
+      };
+    },
+  },
   NativeModules: { RNPaywalls: {}, RNPurchases: {} },
   Platform: { OS: "ios" },
 }));
@@ -181,6 +194,7 @@ beforeEach(() => {
   mock.isAnonymous.mockReset().mockResolvedValue(true);
   mock.syncPurchasesForResult.mockReset().mockResolvedValue({});
   mock.syncPurchase.mockReset().mockResolvedValue(true);
+  mock.appStateListeners = [];
   push.mockClear();
 });
 
@@ -315,6 +329,77 @@ describe("selling before sign-in", () => {
     expect(mock.captureError).toHaveBeenCalledWith(
       "revenuecat_purchase_attach_failed",
       expect.any(Error),
+    );
+  });
+
+  it("attaches on the next foreground after its retries ran out", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    mock.syncPurchase.mockResolvedValue(false);
+    await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledTimes(3), {
+      timeout: 10_000,
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
+
+    mock.syncPurchase.mockResolvedValue(true);
+    act(() => {
+      for (const listener of mock.appStateListeners) listener("active");
+    });
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+    expect(mock.syncPurchase).toHaveBeenCalledTimes(4);
+  }, 15_000);
+
+  it("attaches on the next launch when the app was closed before access landed", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    mock.syncPurchase.mockResolvedValue(false);
+    const first = await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    first.hook.unmount();
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
+
+    // A relaunch: fresh modules, the same SecureStore.
+    mock.syncPurchase.mockReset().mockResolvedValue(true);
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+  });
+
+  it("lets go of a claimed purchase that never reached the account after the attach window", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "user:user_1");
+    mock.store.set(
+      "shelvr.purchase.beforeSignIn.at",
+      String(Date.now() - PURCHASE_ATTACH_WINDOW_MS - 60_000),
+    );
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "purchase_attach_expired",
+      expect.any(Error),
+    );
+  });
+
+  it("still attaches a purchase whose account signs in long after buying", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    mock.store.set(
+      "shelvr.purchase.beforeSignIn.at",
+      String(Date.now() - PURCHASE_ATTACH_WINDOW_MS - 60_000),
+    );
+    await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+    expect(mock.captureError).not.toHaveBeenCalledWith(
+      "purchase_attach_expired",
+      expect.anything(),
     );
   });
 

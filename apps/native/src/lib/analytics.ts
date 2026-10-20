@@ -312,7 +312,13 @@ export type AnalyticsEventProperties = {
   // "received" is a share that reached Shelvr, saved later by the share
   // screen. "other_app" can repeat; the other outcomes fire once per mount.
   onboarding_share_practice: {
-    outcome: "received" | "other_app" | "skipped" | "sheet_failed";
+    outcome:
+      | "received"
+      | "other_app"
+      | "dismissed"
+      | "sheet_stuck"
+      | "skipped"
+      | "sheet_failed";
   };
   // The onboarding notifications step's answer. `granted` is what the OS
   // reported after the tap; a skipped step (nothing to ask) sends nothing.
