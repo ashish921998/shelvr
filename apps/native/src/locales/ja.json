@@ -355,6 +355,12 @@
   "trip.buildingRead": "保存したものを読んでいます…",
   "trip.buildingFind": "地図で各スポットを探しています…",
   "trip.buildingGroup": "日ごとにまとめています…",
+  "trip.revealSaves": {
+    "other": "保存%{formattedCount}件"
+  },
+  "trip.revealLanding": "%{city}に着陸中",
+  "trip.revealLandingNoCity": "旅行を計画中",
+  "trip.revealSkip": "タップでスキップ",
   "trip.dayTab": "%{day}日目",
   "trip.dayTitleOne": "%{day}日目 · %{area}",
   "trip.dayTitleTwo": "%{day}日目 · %{first}と%{second}",

@@ -344,6 +344,10 @@ export type MessageParams = {
   "trip.buildingRead": undefined;
   "trip.buildingFind": undefined;
   "trip.buildingGroup": undefined;
+  "trip.revealSaves": { count: number };
+  "trip.revealLanding": { city: string };
+  "trip.revealLandingNoCity": undefined;
+  "trip.revealSkip": undefined;
   "trip.dayTab": { day: string };
   "trip.dayTitleOne": { day: string; area: string };
   "trip.dayTitleTwo": { day: string; first: string; second: string };
