@@ -111,6 +111,7 @@
   "spaces.create": "Criar coleção",
   "common.continue": "Continuar",
   "pro.loadFailed": "Não foi possível carregar as opções de assinatura. Verifique sua conexão e tente novamente. Se já comprou o Pro, restaure a compra quando a página de planos carregar ou gerencie a assinatura em Perfil.",
+  "paywall.trialOffer": "Comece por %{zero}, depois %{price}/ano.",
   "common.notNow": "Agora não",
   "legal.termsShort": "Termos",
   "legal.privacyShort": "Privacidade",

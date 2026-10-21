@@ -111,6 +111,7 @@
   "spaces.create": "Sammlung erstellen",
   "common.continue": "Weiter",
   "pro.loadFailed": "Die Abo-Optionen konnten nicht geladen werden. Prüfe deine Verbindung und versuche es erneut. Wenn du Pro bereits gekauft hast, stelle den Kauf nach dem Laden der Abo-Seite wieder her oder verwalte dein Abo im Profil.",
+  "paywall.trialOffer": "Starte für %{zero}, danach %{price}/Jahr.",
   "common.notNow": "Jetzt nicht",
   "legal.termsShort": "Bedingungen",
   "legal.privacyShort": "Datenschutz",

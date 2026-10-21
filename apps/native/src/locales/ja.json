@@ -111,6 +111,7 @@
   "spaces.create": "スペースを作成",
   "common.continue": "続ける",
   "pro.loadFailed": "現在、サブスクリプションの選択肢を読み込めません。接続を確認して再試行してください。Proを購入済みの場合は、購入画面の読み込み後に復元するか、プロフィールでプランを管理してください。",
+  "paywall.trialOffer": "%{zero}で始めて、その後は%{price}/年。",
   "common.notNow": "今はしない",
   "legal.termsShort": "利用規約",
   "legal.privacyShort": "プライバシー",

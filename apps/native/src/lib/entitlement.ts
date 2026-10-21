@@ -393,7 +393,7 @@ async function presentPaywallImpl(
     // offering, and presented from the same snapshot. An unknown trial length
     // dates nothing: the paywall falls back to its undated labels instead of
     // claiming a length the offer may not have.
-    const { offering, trial, yearlyPrice } = await readPaywallOffering();
+    const { offering, trial } = await readPaywallOffering();
     // The events name the offering actually shown, which differs from the
     // current one for someone who has already used their trial.
     const enriched = {
@@ -401,7 +401,12 @@ async function presentPaywallImpl(
       ...(await context),
       ...(offering && { offering_id: offering.identifier }),
     };
-    const customVariables = paywallVariables(Date.now(), trial, yearlyPrice);
+    const customVariables = paywallVariables(
+      Date.now(),
+      trial,
+      offering?.availablePackages.map((pkg) => pkg.product) ?? [],
+      enriched.trial_eligible,
+    );
     const result = await observePaywallPresentation(
       enriched,
       () =>

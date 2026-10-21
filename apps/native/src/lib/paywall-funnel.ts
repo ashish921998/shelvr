@@ -5,6 +5,7 @@ import {
   type TrialEligibility,
 } from "@/lib/analytics";
 import { trialTimelineVariables, type TrialPeriod } from "@/lib/date";
+import { formattingLocale, t } from "@/lib/i18n";
 import { getPurchases } from "@/lib/revenuecat-module";
 import { restoreFoundAccess } from "@/lib/paywall-result";
 
@@ -207,17 +208,15 @@ export async function readPaywallContext(): Promise<PaywallContext> {
  * keeps every trial line on its plans page, where it follows eligibility. */
 export const NO_TRIAL_OFFERING_ID = "weekly_annual_draft";
 
-/** The offering the paywall is about to show, the free trial on it, and the
- * yearly plan's price, so the timeline dates and the price line describe the
- * plan being sold. Call it once RevenueCat identity sync is ready (offerings
- * can be targeted per account) and present the returned offering, so the
- * sheet and its labels come from one snapshot. Empty when the read fails or
- * stalls: the sheet then resolves its own offering and shows its dashboard
- * defaults. */
+/** The offering the paywall is about to show and the free trial on it, so the
+ * timeline dates describe the plan being sold. Call it once RevenueCat
+ * identity sync is ready (offerings can be targeted per account) and present
+ * the returned offering, so the sheet and its labels come from one snapshot.
+ * Empty when the read fails or stalls: the sheet then resolves its own
+ * offering and shows its dashboard defaults. */
 export async function readPaywallOffering(): Promise<{
   offering?: import("react-native-purchases").PurchasesOffering;
   trial?: TrialPeriod;
-  yearlyPrice?: string;
 }> {
   const rc = getPurchases();
   if (!rc) return {};
@@ -250,36 +249,52 @@ export async function readPaywallOffering(): Promise<{
   return {
     offering: current,
     trial: singleTrialPeriod(products),
-    yearlyPrice: yearlyPriceString(current.availablePackages),
   };
-}
-
-/** The yearly plan's localized price ("$39.99"), for the early pages that
- * cannot read product prices themselves. Absent unless exactly one package is
- * yearly. */
-export function yearlyPriceString(
-  packages: { packageType: string; product: { priceString: string } }[],
-): string | undefined {
-  const yearly = packages.filter((pkg) => pkg.packageType === "ANNUAL");
-  return yearly.length === 1 ? yearly[0].product.priceString : undefined;
 }
 
 /** Every `{{ custom.* }}` value the main paywall reads: the trial timeline
- * when the trial length is known, and `yearly_price` for the early pages that
- * cannot show product prices. Undefined when there is nothing to fill, so the
- * sheet keeps its dashboard defaults. */
+ * when the trial length is known, and the opener's `trial_offer` line.
+ * Undefined when there is nothing to fill, so the sheet keeps its dashboard
+ * defaults. */
 export function paywallVariables(
   now: number,
   trial: TrialPeriod | undefined,
-  yearlyPrice: string | undefined,
+  products: TrialOfferProduct[],
+  eligibility: TrialEligibility | undefined,
 ) {
-  if (!trial && !yearlyPrice) return undefined;
-  return {
+  const variables = {
     ...(trial && trialTimelineVariables(now, trial)),
-    ...(yearlyPrice && {
-      yearly_price: { type: "string", value: yearlyPrice } as const,
-    }),
+    ...trialOfferVariables(products, eligibility),
   };
+  return Object.keys(variables).length > 0 ? variables : undefined;
+}
+
+type TrialOfferProduct = {
+  priceString: string;
+  currencyCode: string;
+  subscriptionPeriod: string | null;
+  introPrice: { price: number } | null;
+};
+
+/** The paywall opener's "Start for $0.00, then $39.99/year." line, filled
+ * into `{{ custom.trial_offer }}`. Only for someone the store says can still
+ * take the trial, and only from a yearly plan that has one, so the opener never
+ * offers $0.00 the plan screen won't. Empty otherwise, like the dashboard
+ * default, so a build that passes nothing shows no line. */
+export function trialOfferVariables(
+  products: TrialOfferProduct[],
+  eligibility: TrialEligibility | undefined,
+): Record<string, { type: "string"; value: string }> {
+  const yearly = products.find(
+    (p) => p.subscriptionPeriod === "P1Y" && p.introPrice?.price === 0,
+  );
+  if (eligibility !== "eligible" || !yearly) return {};
+  const zero = new Intl.NumberFormat(formattingLocale(), {
+    style: "currency",
+    currency: yearly.currencyCode,
+  }).format(0);
+  const value = t("paywall.trialOffer", { zero, price: yearly.priceString });
+  return { trial_offer: { type: "string", value } };
 }
 
 /** The free trial the offering's packages share. The paywall has one trial
