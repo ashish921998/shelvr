@@ -324,6 +324,20 @@ describe("notification opens", () => {
     expect(mock.push).toHaveBeenCalledWith("/digest/abc");
   });
 
+  it("holds a cold-launch tap until the plan is known, then opens it", () => {
+    mock.lastResponse = opened({ url: "/add", kind: "trial_reminder" });
+    const { rerender } = renderHook(
+      ({ pending }) => useNotificationObserver(pending),
+      { initialProps: { pending: true } },
+    );
+    expect(mock.push).not.toHaveBeenCalled();
+    rerender({ pending: false });
+    expect(mock.push).toHaveBeenCalledTimes(1);
+    expect(mock.push).toHaveBeenCalledWith("/add");
+    rerender({ pending: false });
+    expect(mock.push).toHaveBeenCalledTimes(1);
+  });
+
   // Installed builds keep receiving payloads from the currently deployed
   // backend until it ships, and those carry a url and nothing else.
   it("still records an open for a payload that predates the kind field", () => {

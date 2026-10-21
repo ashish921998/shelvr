@@ -225,8 +225,22 @@ export function getNotificationUrl(
   return notificationField(notification, "url");
 }
 
-export function useNotificationObserver(): void {
+/**
+ * `planPending`: the signed-in plan is still loading. A tap then waits and
+ * opens once it is known, since the app holds sheets such as Add until then
+ * and would otherwise drop the destination.
+ */
+export function useNotificationObserver(planPending = false): void {
   const nav = useRouter();
+  const pendingRef = useRef(planPending);
+  const queued = useRef<string | null>(null);
+  useEffect(() => {
+    pendingRef.current = planPending;
+    if (planPending || queued.current === null) return;
+    const href = queued.current;
+    queued.current = null;
+    nav.push(href as never);
+  }, [planPending, nav]);
 
   useEffect(() => {
     // Keyed by the notification's own id, not its destination: at launch the
@@ -249,7 +263,9 @@ export function useNotificationObserver(): void {
         notification_id:
           notificationField(notification, "notificationId") ?? "",
       });
-      nav.push(resolveRootHref(url) as never);
+      const href = resolveRootHref(url);
+      if (pendingRef.current) queued.current = href;
+      else nav.push(href as never);
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this

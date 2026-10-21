@@ -1,5 +1,9 @@
 import { OnboardingProvider } from "@/lib/onboarding";
-import { noteAppTouch, useEntitlementSync } from "@/lib/entitlement";
+import {
+  noteAppTouch,
+  useEntitlement,
+  useEntitlementSync,
+} from "@/lib/entitlement";
 import { analytics } from "@/lib/analytics";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { authStorage } from "@/lib/auth-storage";
@@ -40,7 +44,8 @@ function PostHogScreenTracking() {
 }
 
 function NotificationSetup() {
-  useNotificationObserver();
+  // Waits for the plan, so a cold-launch tap on a link to Add is not lost.
+  useNotificationObserver(useEntitlement().loading);
   return null;
 }
 
