@@ -3,7 +3,7 @@ import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
-import { startOnSeededHome } from "./seeded-home.ts";
+import { scrollSettingsTo, startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -45,10 +45,11 @@ test("keeps someone without Pro on the plan gate", async ({
   await expect(screen.getByRole("button", "Add")).toBeHidden();
 
   // Settings, where restore and account deletion live, stays reachable.
+  // Delete account is the last row, below the fold, so it is scrolled to.
   await screen.getByRole("button", "Settings").tap();
-  await expect(screen.getByRole("button", "Delete account")).toBeVisible({
-    timeout: 30_000,
-  });
+  const deleteAccount = screen.getByRole("button", "Delete account");
+  await scrollSettingsTo(screen, deleteAccount);
+  await expect(deleteAccount).toBeVisible();
 });
 
 test(
