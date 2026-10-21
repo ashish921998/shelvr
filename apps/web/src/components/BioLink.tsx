@@ -14,6 +14,7 @@ import {
   bioAction,
   bioAppStoreUrl,
   chromeIntentUrl,
+  isIPadDesktop,
   playStoreUrl,
   type InAppBrowser,
   type Platform,
@@ -27,7 +28,19 @@ type BioLinkProps = {
 };
 
 /** The link in a social bio: out of the in-app browser, then to the store. */
-export default function BioLink({ inApp, platform }: BioLinkProps) {
+export default function BioLink({
+  inApp,
+  platform: serverPlatform,
+}: BioLinkProps) {
+  const [platform, setPlatform] = useState(serverPlatform);
+  useEffect(() => {
+    // iPad Safari asks for desktop sites with a Mac user agent, which only
+    // the browser can tell apart, by its touch screen.
+    if (isIPadDesktop(navigator.userAgent, navigator.maxTouchPoints)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlatform("ios");
+    }
+  }, []);
   const action = bioAction(inApp, platform);
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import {
   bioAppStoreUrl,
   chromeIntentUrl,
   inAppBrowser,
+  isIPadDesktop,
   platform,
   playStoreUrl,
 } from "./bioLink";
@@ -48,6 +49,14 @@ describe("bio link detection", () => {
     expect(platform(UA.iosTikTok)).toBe("ios");
     expect(platform(UA.androidChrome)).toBe("android");
     expect(platform(UA.desktop)).toBe("other");
+  });
+});
+
+describe("iPad in desktop mode", () => {
+  it("is a Mac user agent with a touch screen", () => {
+    expect(isIPadDesktop(UA.desktop, 5)).toBe(true);
+    expect(isIPadDesktop(UA.desktop, 0)).toBe(false);
+    expect(isIPadDesktop(UA.androidChrome, 5)).toBe(false);
   });
 });
 

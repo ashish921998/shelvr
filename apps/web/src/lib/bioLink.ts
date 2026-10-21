@@ -5,7 +5,7 @@ import { appStoreUrl, sanitizeCampaign } from "./appStore";
  * once the travel and food page is live in App Store Connect; until then the
  * bio link opens the default product page.
  */
-export const BIO_PRODUCT_PAGE_ID: string | undefined = undefined;
+const BIO_PRODUCT_PAGE_ID: string | undefined = undefined;
 
 export type InAppBrowser = "tiktok" | "instagram" | "facebook";
 export type Platform = "ios" | "android" | "other";
@@ -26,6 +26,12 @@ export function platform(userAgent: string): Platform {
   if (/iPhone|iPad|iPod/i.test(userAgent)) return "ios";
   if (/Android/i.test(userAgent)) return "android";
   return "other";
+}
+
+/** iPadOS Safari in its default desktop mode reports a Mac user agent; a
+ * touch screen gives it away. */
+export function isIPadDesktop(userAgent: string, maxTouchPoints: number) {
+  return /Macintosh/.test(userAgent) && maxTouchPoints > 1;
 }
 
 /** The App Store link for a bio visit: campaign-tagged, and on the custom
@@ -71,7 +77,7 @@ export function playStoreUrl(campaign: string | undefined): string {
   return `${PLAY_STORE_URL}&${new URLSearchParams({ referrer }).toString()}`;
 }
 
-export type BioAction = "overlay" | "app_store" | "play_store" | "stay";
+type BioAction = "overlay" | "app_store" | "play_store" | "stay";
 
 /** What the bio link does for this visitor on arrival. */
 export function bioAction(
