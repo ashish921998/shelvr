@@ -505,6 +505,29 @@ describe("paywall outcome", () => {
     );
     expect(readPurchaseLanding()).toBeGreaterThan(Date.now());
   });
+
+  it("opens no wait for a purchase that lands after sign-out", async () => {
+    const { openPaywall } = await loadReady();
+    const { endPurchaseLandingSession, readPurchaseLanding } =
+      await import("./purchase-landing");
+    let finish!: (result: string) => void;
+    mock.presentPaywall.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+
+    const first = openPaywall(router, "plan_gate");
+    await vi.waitFor(() => expect(mock.presentPaywall).toHaveBeenCalled());
+    endPurchaseLandingSession();
+    // The next account joins the same sheet before it settles.
+    const joined = openPaywall(router, "plan_gate");
+    finish("PURCHASED");
+
+    await expect(first).resolves.toBe(true);
+    await expect(joined).resolves.toBe(true);
+    expect(readPurchaseLanding()).toBe(0);
+  });
 });
 
 describe("paywall offering", () => {

@@ -545,13 +545,18 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
   });
   // Held before `present` runs, so the presentation can tell it still owns it.
   openSheet = sheet;
-  sheet.paywall = Promise.race([
-    presentPaywallImpl(placement),
-    abandoned,
-  ]).finally(() => {
-    // A stale sheet may already have been replaced; only release our own.
-    releaseSheet(sheet);
-  });
+  // Reserved by the presentation, not its callers, so a caller that joins it
+  // from a later account cannot open the wait with its own reservation.
+  const landing = reservePurchaseLanding();
+  sheet.paywall = Promise.race([presentPaywallImpl(placement), abandoned])
+    .then((outcome) => {
+      if (outcome === "success") landing();
+      return outcome;
+    })
+    .finally(() => {
+      // A stale sheet may already have been replaced; only release our own.
+      releaseSheet(sheet);
+    });
   return { outcome: await sheet.paywall, owned: true };
 }
 
@@ -565,7 +570,6 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
-  const landing = reservePurchaseLanding();
   const { outcome, owned } = await presentPaywall(placement);
   // Only the caller that opened the sheet may route. Joined callers share the
   // same `unavailable`, and a second push stacks a second paywall screen.
@@ -576,7 +580,6 @@ export async function openPaywall(
   // re-taps. Remember the block so the guard that later lets the action
   // through can report the resume, and whether a purchase sits between.
   recordBlockedAction(placement, outcome === "success");
-  if (outcome === "success") landing();
   return outcome === "success";
 }
 
@@ -588,7 +591,6 @@ export async function openPaywallOutcome(
   router: ReturnType<typeof useRouter>,
   placement: string,
 ): Promise<PaywallOutcome> {
-  const landing = reservePurchaseLanding();
   const { outcome, owned } = await presentPaywall(placement);
   // Onboarding finishes whatever the outcome, which swaps the screens under
   // a pushed fallback. The app's own Pro gates offer the paywall again.
@@ -600,7 +602,6 @@ export async function openPaywallOutcome(
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
-  if (outcome === "success") landing();
   return outcome;
 }
 

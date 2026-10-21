@@ -80,6 +80,9 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/home-feed", () => ({
   HomeFeedProvider: vi.fn(({ children }: { children: ReactNode }) => children),
 }));
+vi.mock("@/components/plan-loading-cover", () => ({
+  PlanLoadingCover: vi.fn(() => <div>plan-loading-cover</div>),
+}));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <div>loader</div>),
 }));
@@ -187,11 +190,21 @@ describe("plan gate", () => {
     expect(shows("screen:plan-gate")).toBe(false);
   });
 
-  it("keeps the plan gate up while the plan is still unknown", () => {
+  it("keeps a deep link's screen under a cover while the plan is still unknown", () => {
     mocks.entitlement = { entitled: false, loading: true };
     render(<AppLayout />);
-    expect(shows("screen:plan-gate")).toBe(true);
-    expect(shows("screen:(tabs)")).toBe(false);
+    // No redirect to the gate, so a cold-launch item or digest link keeps
+    // its destination; the cover hides it until the plan is known.
+    expect(shows("screen:item/[id]")).toBe(true);
+    expect(shows("screen:digest/[id]")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+    expect(shows("plan-loading-cover")).toBe(true);
+  });
+
+  it("lifts the cover once the plan is known", () => {
+    mocks.entitlement = { entitled: true, loading: false };
+    render(<AppLayout />);
+    expect(shows("plan-loading-cover")).toBe(false);
   });
 
   it("keeps someone who just paid out of the gate while the purchase lands", () => {
@@ -212,5 +225,13 @@ describe("plan gate", () => {
     render(<AppLayout />);
     expect(shows("screen:onboarding")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
+  });
+
+  it("never covers onboarding while the plan loads", () => {
+    mocks.onboarded = false;
+    mocks.entitlement = { entitled: false, loading: true };
+    render(<AppLayout />);
+    expect(shows("screen:onboarding")).toBe(true);
+    expect(shows("plan-loading-cover")).toBe(false);
   });
 });

@@ -2,10 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notePurchaseLanding } from "./purchase-landing";
-import {
-  notePurchasedDuringOnboarding,
-  useAwaitingOnboardingPurchase,
-} from "./replay-onboarding";
+import { useAwaitingOnboardingPurchase } from "./replay-onboarding";
 
 vi.mock("@convex/_generated/api", () => ({ api: {} }));
 vi.mock("convex/react", () => ({
@@ -27,7 +24,7 @@ describe("useAwaitingOnboardingPurchase", () => {
   });
 
   it("waits for a purchase's entitlement, but not forever", () => {
-    notePurchasedDuringOnboarding();
+    notePurchaseLanding();
     const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
     expect(result.current).toBe(true);
 
@@ -36,7 +33,7 @@ describe("useAwaitingOnboardingPurchase", () => {
   });
 
   it("stops waiting once the entitlement lands, and does not wait again if it lapses", () => {
-    notePurchasedDuringOnboarding();
+    notePurchaseLanding();
     const { result, rerender } = renderHook(
       ({ entitled }) => useAwaitingOnboardingPurchase(entitled),
       { initialProps: { entitled: false } },

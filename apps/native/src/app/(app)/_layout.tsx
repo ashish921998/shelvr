@@ -8,6 +8,7 @@ import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import {
@@ -83,9 +84,9 @@ function AppStack() {
   useEffect(() => {
     if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
   }, [isAuthenticated, isLoading]);
-  // No entry without a plan. Until the plan is known the plan gate shows,
-  // waiting with sign-out in reach, so a stalled entitlement read is no way
-  // in and no dead end.
+  // No entry without a plan. Until the plan is known the requested screen
+  // stays mounted under a cover with sign-out in reach, so a cold-launch deep
+  // link keeps its destination and a stalled read is no way in or dead end.
   const planUnknown =
     isAuthenticated && entitlement.loading && !awaitingPurchase;
   const gated =
@@ -130,7 +131,7 @@ function AppStack() {
         }}
       >
         <Stack.Protected
-          guard={onboarded && !gated && !planUnknown}
+          guard={onboarded && !gated}
           redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -261,7 +262,7 @@ function AppStack() {
           />
         </Stack.Protected>
         <Stack.Protected
-          guard={onboarded && (gated || planUnknown)}
+          guard={onboarded && gated}
           redirectTo="/(app)/(tabs)/(home)"
         >
           <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
@@ -284,6 +285,7 @@ function AppStack() {
           }}
         />
       </Stack>
+      {onboarded && planUnknown ? <PlanLoadingCover /> : null}
     </HomeFeedProvider>
   );
 }

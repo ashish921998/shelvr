@@ -2,20 +2,13 @@ import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
 import { analytics } from "@/lib/analytics";
-import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import { openPaywall } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { useRouter } from "expo-router";
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Pressable,
-  ScrollView,
-  View,
-} from "react-native";
+import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -30,9 +23,6 @@ export default function PlanGateScreen() {
   const router = useRouter();
   const { session, operation } = useNotificationSession();
   const { restoring, restore } = useRestorePurchases();
-  // The gate also covers the wait for the plan, so a stalled read still
-  // leaves sign-out and Settings in reach.
-  const { loading } = useEntitlement();
 
   const signOut = async () => {
     try {
@@ -48,38 +38,30 @@ export default function PlanGateScreen() {
       {/* Scrolls so large accessibility text still reaches every action. */}
       <ScrollView contentContainerStyle={styles.content}>
         <Wordmark size={30} />
-        {loading ? (
-          <View style={styles.middle}>
-            <ActivityIndicator accessibilityLabel={t("loading.app")} />
-          </View>
-        ) : (
-          <>
-            <View style={styles.middle}>
-              <ThemedText variant="largeTitle" style={styles.title}>
-                {t("planGate.title")}
-              </ThemedText>
-              <ThemedText variant="body" style={styles.body}>
-                {t("planGate.body")}
-              </ThemedText>
-            </View>
-            <Button
-              title={t("planGate.seePlans")}
-              onPress={() => void openPaywall(router, "plan_gate")}
-              style={styles.button}
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: restoring, busy: restoring }}
-              disabled={restoring}
-              onPress={() => void restore()}
-              style={styles.restore}
-            >
-              <ThemedText variant="subheadLabel" style={styles.link}>
-                {restoring ? t("pro.restoring") : t("pro.restore")}
-              </ThemedText>
-            </Pressable>
-          </>
-        )}
+        <View style={styles.middle}>
+          <ThemedText variant="largeTitle" style={styles.title}>
+            {t("planGate.title")}
+          </ThemedText>
+          <ThemedText variant="body" style={styles.body}>
+            {t("planGate.body")}
+          </ThemedText>
+        </View>
+        <Button
+          title={t("planGate.seePlans")}
+          onPress={() => void openPaywall(router, "plan_gate")}
+          style={styles.button}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: restoring, busy: restoring }}
+          disabled={restoring}
+          onPress={() => void restore()}
+          style={styles.restore}
+        >
+          <ThemedText variant="subheadLabel" style={styles.link}>
+            {restoring ? t("pro.restoring") : t("pro.restore")}
+          </ThemedText>
+        </Pressable>
         <View style={styles.footer}>
           <FooterLink
             label={

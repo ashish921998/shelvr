@@ -22,7 +22,6 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 import {
-  notePurchaseLanding,
   readPurchaseLanding,
   settlePurchaseLanding,
   subscribePurchaseLanding,
@@ -35,9 +34,9 @@ import {
 // replay paywall waits for the next launch.
 let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
 
+// The purchase wait itself is opened by the paywall presentation.
 export function notePurchasedDuringOnboarding() {
   onboardingPaywall = "purchased";
-  notePurchaseLanding();
 }
 
 /**
