@@ -9,13 +9,15 @@ import {
   type TravelVibe,
 } from "@/lib/travel-vibes";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** "What are you into?": each picked topic becomes a space and leads the
  * first-save picker. Picking none is fine; the step never blocks. Picking
  * Travel asks one thing more, what kind of spots, in a card under the topics;
- * each of those picks is a space too (travel-vibes.ts). */
+ * each of those picks is a space too (travel-vibes.ts). The picks scroll on
+ * their own and Continue stays pinned under them, so the card opening never
+ * pushes it off screen. */
 export function InterestsStep({
   picked,
   vibes,
@@ -32,48 +34,54 @@ export function InterestsStep({
   useAppLocale();
   return (
     <View style={styles.wrap}>
-      <View style={styles.head}>
-        <Text
-          style={styles.headline}
-          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-        >
-          {t("interests.title")}
-        </Text>
-        <Text style={styles.support}>{t("interests.help")}</Text>
-      </View>
-
-      <View style={styles.chips}>
-        {INTERESTS.map((interest) => (
-          <Chip
-            key={interest}
-            label={onboardingLabel(interest)}
-            active={picked.includes(interest)}
-            onPress={() => onToggle(interest)}
-          />
-        ))}
-      </View>
-
-      {picked.includes(VIBES_INTEREST) ? (
-        <View style={styles.card}>
-          <View style={styles.cardHead}>
-            <Text style={styles.eyebrow}>
-              {onboardingLabel(VIBES_INTEREST)}
-            </Text>
-            <Text style={styles.cardTitle}>{t("interests.vibesTitle")}</Text>
-          </View>
-          <View style={styles.chips}>
-            {TRAVEL_VIBES.map((vibe) => (
-              <Chip
-                key={vibe}
-                label={onboardingLabel(vibe)}
-                active={vibes.includes(vibe)}
-                small
-                onPress={() => onToggleVibe(vibe)}
-              />
-            ))}
-          </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.head}>
+          <Text
+            style={styles.headline}
+            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          >
+            {t("interests.title")}
+          </Text>
+          <Text style={styles.support}>{t("interests.help")}</Text>
         </View>
-      ) : null}
+
+        <View style={styles.chips}>
+          {INTERESTS.map((interest) => (
+            <Chip
+              key={interest}
+              label={onboardingLabel(interest)}
+              active={picked.includes(interest)}
+              onPress={() => onToggle(interest)}
+            />
+          ))}
+        </View>
+
+        {picked.includes(VIBES_INTEREST) ? (
+          <View style={styles.card}>
+            <View style={styles.cardHead}>
+              <Text style={styles.eyebrow}>
+                {onboardingLabel(VIBES_INTEREST)}
+              </Text>
+              <Text style={styles.cardTitle}>{t("interests.vibesTitle")}</Text>
+            </View>
+            <View style={styles.chips}>
+              {TRAVEL_VIBES.map((vibe) => (
+                <Chip
+                  key={vibe}
+                  label={onboardingLabel(vibe)}
+                  active={vibes.includes(vibe)}
+                  small
+                  onPress={() => onToggleVibe(vibe)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
 
       <View style={styles.foot}>
         <CtaButton label={t("common.continue")} onPress={onAdvance} />
@@ -131,7 +139,13 @@ function Chip({
 const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
+  body: {
     gap: theme.gap(3),
+    paddingBottom: theme.gap(2),
   },
   head: {
     gap: theme.gap(1),
@@ -211,6 +225,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   foot: {
-    marginTop: "auto",
+    paddingTop: theme.gap(1),
   },
 }));

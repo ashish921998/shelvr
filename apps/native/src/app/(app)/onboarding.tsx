@@ -319,6 +319,24 @@ export default function OnboardingScreen() {
             onSignIn={() => setShowSignIn(true)}
           />
         </View>
+      ) : step === "interests" ? (
+        // Also a static frame: the step scrolls its picks and pins Continue,
+        // so the travel card opening never pushes it off screen.
+        <View
+          style={[
+            styles.content,
+            styles.scroll,
+            { paddingBottom: insets.bottom + theme.gap(3) },
+          ]}
+        >
+          <InterestsStep
+            picked={interests}
+            vibes={vibes}
+            onToggle={toggleInterest}
+            onToggleVibe={toggleSpace}
+            onAdvance={advance}
+          />
+        </View>
       ) : (
         <ScrollView
           style={styles.scroll}
@@ -338,16 +356,6 @@ export default function OnboardingScreen() {
               onToggleKind={toggleKind}
               onToggleSpace={toggleSpace}
               onAddSpace={addSpace}
-              onAdvance={advance}
-            />
-          )}
-
-          {step === "interests" && (
-            <InterestsStep
-              picked={interests}
-              vibes={vibes}
-              onToggle={toggleInterest}
-              onToggleVibe={toggleSpace}
               onAdvance={advance}
             />
           )}

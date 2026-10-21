@@ -23,6 +23,7 @@ type Children = { children?: ReactNode };
 
 const mock = vi.hoisted(() => ({
   view: ({ children }: Children) => <div>{children}</div>,
+  scroll: ({ children }: Children) => <div data-testid="picks">{children}</div>,
   text: ({ children }: Children) => <span>{children}</span>,
   pressable: ({
     children,
@@ -53,6 +54,7 @@ const mock = vi.hoisted(() => ({
 
 vi.mock("react-native", () => ({
   View: mock.view,
+  ScrollView: mock.scroll,
   Text: mock.text,
   Pressable: mock.pressable,
 }));
@@ -113,6 +115,14 @@ describe("InterestsStep", () => {
     fireEvent.click(chip("Good food", false));
     expect(onToggleVibe).toHaveBeenCalledExactlyOnceWith("Good food");
     expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("keeps Continue out of the scrolling picks, so it stays on screen", () => {
+    renderStep(["Travel"]);
+    const picks = screen.getByTestId("picks");
+    expect(picks.contains(chip("Travel"))).toBe(true);
+    expect(picks.contains(chip("Good food"))).toBe(true);
+    expect(picks.contains(screen.getByText("common.continue"))).toBe(false);
   });
 
   it("hands a tapped topic back, Travel included", () => {
