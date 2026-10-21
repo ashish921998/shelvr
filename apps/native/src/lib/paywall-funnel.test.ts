@@ -147,13 +147,34 @@ describe("paywall offering reads", () => {
     current: {
       identifier: "default",
       availablePackages: intros.map((introPrice, index) => ({
-        product: { identifier: `product_${index}`, introPrice },
+        packageType: index === 0 ? "ANNUAL" : "WEEKLY",
+        product: {
+          identifier: `product_${index}`,
+          introPrice,
+          priceString: index === 0 ? "€44.99" : "€14.99",
+        },
       })),
     },
+    all: {},
   });
+  const noTrial = { identifier: "weekly_annual_draft", availablePackages: [] };
+  const withNoTrial = (current: ReturnType<typeof offering>) => ({
+    ...current,
+    all: { weekly_annual_draft: noTrial },
+  });
+  const INTRO_ELIGIBILITY_STATUS = {
+    INTRO_ELIGIBILITY_STATUS_UNKNOWN: 0,
+    INTRO_ELIGIBILITY_STATUS_INELIGIBLE: 1,
+    INTRO_ELIGIBILITY_STATUS_ELIGIBLE: 2,
+    INTRO_ELIGIBILITY_STATUS_NO_INTRO_OFFER_EXISTS: 3,
+  };
+  const answers = (...statuses: number[]) =>
+    Object.fromEntries(
+      statuses.map((status, index) => [`product_${index}`, { status }]),
+    );
   const load = async (rc: object) => {
     vi.doMock("@/lib/revenuecat-module", () => ({
-      getPurchases: () => ({ INTRO_ELIGIBILITY_STATUS: {}, ...rc }),
+      getPurchases: () => ({ INTRO_ELIGIBILITY_STATUS, ...rc }),
     }));
     return await loadFunnel();
   };
@@ -172,12 +193,90 @@ describe("paywall offering reads", () => {
     });
   });
 
-  it("returns the offering with the trial its packages share", async () => {
+  it("returns the offering with its shared trial and yearly price", async () => {
     const current = offering(trial("WEEK", 2), null);
     const funnel = await load({ getOfferings: async () => current });
     await expect(funnel.readPaywallOffering()).resolves.toEqual({
       offering: current.current,
       trial: { unit: "WEEK", count: 2 },
+      yearlyPrice: "€44.99",
+    });
+  });
+
+  it("shows the no-trial offering to someone who used their trial", async () => {
+    const funnel = await load({
+      getOfferings: async () => withNoTrial(offering(trial("DAY", 7), null)),
+      // Yearly's trial is spent and weekly never had one.
+      checkTrialOrIntroductoryPriceEligibility: async () => answers(1, 3),
+    });
+    await expect(funnel.readPaywallOffering()).resolves.toEqual({
+      offering: noTrial,
+    });
+  });
+
+  it("keeps the current offering unless the trial is definitely spent", async () => {
+    for (const statuses of [
+      [2, 3],
+      [0, 3],
+    ]) {
+      const current = withNoTrial(offering(trial("DAY", 7), null));
+      const funnel = await load({
+        getOfferings: async () => current,
+        checkTrialOrIntroductoryPriceEligibility: async () =>
+          answers(...statuses),
+      });
+      await expect(funnel.readPaywallOffering()).resolves.toMatchObject({
+        offering: current.current,
+        trial: { unit: "DAY", count: 7 },
+      });
+    }
+  });
+
+  it("skips the eligibility check when no no-trial offering exists", async () => {
+    const check = vi.fn();
+    const current = offering(trial("DAY", 7), null);
+    const funnel = await load({
+      getOfferings: async () => current,
+      checkTrialOrIntroductoryPriceEligibility: check,
+    });
+    await expect(funnel.readPaywallOffering()).resolves.toMatchObject({
+      offering: current.current,
+    });
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it("finds a yearly price only when exactly one package is yearly", async () => {
+    const funnel = await loadFunnel();
+    const pkg = (packageType: string, priceString: string) => ({
+      packageType,
+      product: { priceString },
+    });
+    expect(
+      funnel.yearlyPriceString([
+        pkg("WEEKLY", "$12.99"),
+        pkg("ANNUAL", "$39.99"),
+      ]),
+    ).toBe("$39.99");
+    expect(funnel.yearlyPriceString([pkg("WEEKLY", "$12.99")])).toBeUndefined();
+    expect(
+      funnel.yearlyPriceString([
+        pkg("ANNUAL", "$39.99"),
+        pkg("ANNUAL", "$24.99"),
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("fills the yearly price with or without a known trial", async () => {
+    const funnel = await loadFunnel();
+    expect(funnel.paywallVariables(0, undefined, undefined)).toBeUndefined();
+    expect(funnel.paywallVariables(0, undefined, "$39.99")).toEqual({
+      yearly_price: { type: "string", value: "$39.99" },
+    });
+    expect(
+      funnel.paywallVariables(0, { unit: "DAY", count: 7 }, "$39.99"),
+    ).toMatchObject({
+      trial_end_day: { type: "string", value: "7" },
+      yearly_price: { type: "string", value: "$39.99" },
     });
   });
 
