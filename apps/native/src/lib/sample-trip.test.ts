@@ -14,8 +14,8 @@ describe("showTripTeaser", () => {
   it.each([
     [["Travel"], [], true],
     [[], ["Travel"], true],
-    [["Recipes", "Travel"], ["AI"], true],
-    [["Articles"], ["Coffee", "Photography"], false],
+    [["Recipes", "Travel"], ["AI & tech"], true],
+    [["Articles"], ["Home & design", "Films, books & music"], false],
     [[], [], false],
   ] as const)(
     "for kinds %j and topics %j shows the trip: %s",

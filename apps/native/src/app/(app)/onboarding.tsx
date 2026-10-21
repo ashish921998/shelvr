@@ -5,7 +5,9 @@ import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import { showTripTeaser } from "@/lib/sample-trip";
 import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
-import { isInterest } from "@/lib/onboarding-interests";
+import { isInterest, type Interest } from "@/lib/onboarding-interests";
+import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
+import { isTravelVibe, spacesAfterInterestToggle } from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -27,7 +29,6 @@ import {
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import {
-  isPresetSpace,
   isSaveKind,
   spacesAfterKindToggle,
   type SaveKind,
@@ -143,6 +144,8 @@ export default function OnboardingScreen() {
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   // A picked topic is a picked space, so the topics need no state of their own.
   const interests = spaces.filter(isInterest);
+  // So are the kinds of spots picked under Travel; they leave with it.
+  const vibes = spaces.filter(isTravelVibe);
   // People who save travel see a sample trip build and lock before the paywall.
   const teaser = showTripTeaser(kinds, interests);
 
@@ -208,6 +211,9 @@ export default function OnboardingScreen() {
         : [...current, name],
     );
 
+  const toggleInterest = (interest: Interest) =>
+    setSpaces((current) => spacesAfterInterestToggle(current, interest));
+
   const addSpace = (name: string) =>
     setSpaces((current) =>
       current.includes(name) ? current : [...current, name],
@@ -217,15 +223,10 @@ export default function OnboardingScreen() {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    analytics.capture("onboarding_completed", {
-      save_pileup: [],
-      save_types: kinds,
-      interests,
-      space_count: spaces.length,
-      space_names: spaces.filter(isPresetSpace),
-      custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
-      $set: { save_pileup: [], save_types: kinds },
-    });
+    analytics.capture(
+      "onboarding_completed",
+      onboardingCompletedProperties(kinds, spaces),
+    );
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
@@ -318,6 +319,24 @@ export default function OnboardingScreen() {
             onSignIn={() => setShowSignIn(true)}
           />
         </View>
+      ) : step === "interests" ? (
+        // Also a static frame: the step scrolls its picks and pins Continue,
+        // so the travel card opening never pushes it off screen.
+        <View
+          style={[
+            styles.content,
+            styles.scroll,
+            { paddingBottom: insets.bottom + theme.gap(3) },
+          ]}
+        >
+          <InterestsStep
+            picked={interests}
+            vibes={vibes}
+            onToggle={toggleInterest}
+            onToggleVibe={toggleSpace}
+            onAdvance={advance}
+          />
+        </View>
       ) : (
         <ScrollView
           style={styles.scroll}
@@ -337,14 +356,6 @@ export default function OnboardingScreen() {
               onToggleKind={toggleKind}
               onToggleSpace={toggleSpace}
               onAddSpace={addSpace}
-              onAdvance={advance}
-            />
-          )}
-
-          {step === "interests" && (
-            <InterestsStep
-              picked={interests}
-              onToggle={toggleSpace}
               onAdvance={advance}
             />
           )}

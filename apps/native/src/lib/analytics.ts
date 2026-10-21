@@ -82,7 +82,7 @@ type SaveKind = "link" | "note" | "image";
 
 type NextUpKind = "read" | "cook" | "watch" | "open";
 
-type AnalyticsEventProperties = {
+export type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
     step_index: number;
@@ -263,6 +263,9 @@ type AnalyticsEventProperties = {
     save_types: string[];
     // The interests step's picked topics. Each is also one of the spaces.
     interests: string[];
+    // The kinds of spots picked under Travel on that step (flow 11 on). Each
+    // is also one of the spaces, and a preset identity, so it is in space_names.
+    travel_vibes: string[];
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];

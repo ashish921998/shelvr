@@ -22,7 +22,10 @@ export const ONBOARDING_STEPS = [
 // 10 added the sample trip steps after the promise step, for people who save
 // travel: the trip builds, shows locked, opens the paywall, and opens up after
 // a purchase. Everyone else still goes from the promise step to the paywall.
-export const ONBOARDING_FLOW_VERSION = 10;
+// 11 asks people who pick Travel on the interests step what kind of spots they
+// like; each pick is a space, listed on onboarding_completed as travel_vibes.
+// The steps are unchanged.
+export const ONBOARDING_FLOW_VERSION = 11;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
