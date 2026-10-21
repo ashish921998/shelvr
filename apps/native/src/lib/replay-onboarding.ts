@@ -21,6 +21,11 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import {
+  notePurchaseLanding,
+  readPurchaseLanding,
+  subscribePurchaseLanding,
+} from "@/lib/purchase-landing";
 
 // Onboarding opens its own paywall at the end. A purchase there can finish
 // onboarding before the webhook marks the user entitled, so replay must wait
@@ -34,31 +39,14 @@ export function notePurchasedDuringOnboarding() {
   notePurchaseLanding();
 }
 
-// Every purchase or restore bumps `landingNonce`; `settledNonce` catches up
-// once its entitlement is seen or the wait runs out.
-let landingNonce = 0;
+// Catches up with the landing counter once a purchase's entitlement is seen
+// or its wait runs out.
 let settledNonce = 0;
-const landingListeners = new Set<() => void>();
-
-function subscribeLanding(listener: () => void) {
-  landingListeners.add(listener);
-  return () => {
-    landingListeners.delete(listener);
-  };
-}
-
-const readLanding = () => landingNonce;
-
-/** A purchase or restore just succeeded outside onboarding (the plan gate). */
-export function notePurchaseLanding() {
-  landingNonce += 1;
-  landingListeners.forEach((listener) => listener());
-}
 
 const PURCHASE_LANDING_MS = 10_000;
 
 /**
- * True while a purchase made in onboarding or on the plan gate is still on its
+ * True while a purchase or restore made anywhere in the app is still on its
  * way to Convex (the webhook lags the store by a moment), so a screen can wait
  * instead of asking for Pro again. The wait is bounded: a webhook that never
  * lands, or a subscription that lapses later in the session, must still reach
@@ -67,9 +55,9 @@ const PURCHASE_LANDING_MS = 10_000;
  */
 export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
   const nonce = useSyncExternalStore(
-    subscribeLanding,
-    readLanding,
-    readLanding,
+    subscribePurchaseLanding,
+    readPurchaseLanding,
+    readPurchaseLanding,
   );
   const [, setWaitedOut] = useState(0);
   const awaiting = !entitled && nonce > settledNonce;

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { notePurchaseLanding } from "./purchase-landing";
 import {
-  notePurchaseLanding,
   notePurchasedDuringOnboarding,
   useAwaitingOnboardingPurchase,
 } from "./replay-onboarding";
@@ -55,7 +55,7 @@ describe("useAwaitingOnboardingPurchase", () => {
     expect(result.current).toBe(false);
   });
 
-  it("waits again for a purchase made later on the plan gate", () => {
+  it("waits again for a purchase made later, anywhere in the app", () => {
     const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
     expect(result.current).toBe(false);
 

@@ -25,11 +25,9 @@ import { StyleSheet } from "react-native-unistyles";
 export function ExitOfferCard({
   endsAt,
   userId,
-  onPurchased,
 }: {
   endsAt: number;
   userId?: string;
-  onPurchased?: () => void;
 }) {
   useAppLocale();
   const router = useRouter();
@@ -51,11 +49,7 @@ export function ExitOfferCard({
       </View>
       <CtaButton
         label={t("exitOffer.cta")}
-        onPress={() =>
-          void openExitOffer(router).then((ok) => {
-            if (ok) onPurchased?.();
-          })
-        }
+        onPress={() => void openExitOffer(router)}
       />
       {userId && optedIn && exitOfferReminderPending(endsAt, now) ? (
         <View style={styles.reminder}>

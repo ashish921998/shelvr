@@ -181,17 +181,19 @@ describe("plan gate", () => {
     expect(shows("screen:paywall")).toBe(true);
   });
 
-  it("opens the app with a plan, and while the plan is still loading", () => {
-    for (const entitlement of [
-      { entitled: true, loading: false },
-      { entitled: false, loading: true },
-    ]) {
-      mocks.entitlement = entitlement;
-      const { unmount } = render(<AppLayout />);
-      expect(shows("screen:(tabs)")).toBe(true);
-      expect(shows("screen:plan-gate")).toBe(false);
-      unmount();
-    }
+  it("opens the app with a plan", () => {
+    mocks.entitlement = { entitled: true, loading: false };
+    render(<AppLayout />);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+  });
+
+  it("opens nothing while the plan is still unknown", () => {
+    mocks.entitlement = { entitled: false, loading: true };
+    render(<AppLayout />);
+    expect(document.body.textContent).toContain("loader");
+    expect(shows("screen:(tabs)")).toBe(false);
+    expect(shows("screen:plan-gate")).toBe(false);
   });
 
   it("keeps someone who just paid out of the gate while the purchase lands", () => {

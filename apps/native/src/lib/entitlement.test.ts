@@ -393,6 +393,19 @@ describe("paywall activation funnel", () => {
 });
 
 describe("restore from the paywall", () => {
+  it("marks a purchase as landing, and a close as nothing", async () => {
+    const { openPaywall } = await loadReady();
+    const { readPurchaseLanding } = await import("./purchase-landing");
+    const before = readPurchaseLanding();
+    mock.presentPaywall.mockResolvedValueOnce("CANCELLED");
+    await openPaywall(router, "share");
+    expect(readPurchaseLanding()).toBe(before);
+
+    mock.presentPaywall.mockResolvedValueOnce("PURCHASED");
+    await openPaywall(router, "plan_gate");
+    expect(readPurchaseLanding()).toBe(before + 1);
+  });
+
   it("treats a restore that found nothing as a close", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("RESTORED");

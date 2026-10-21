@@ -4,9 +4,8 @@ import { useState } from "react";
 import { Alert, Platform } from "react-native";
 
 /** Restore purchases with its result alert, shared by Settings and the plan
- * gate. `restoring` is true while a restore runs; a second tap is ignored.
- * `onRestored` runs once a restore finds an active entitlement. */
-export function useRestorePurchases(onRestored?: () => void) {
+ * gate. `restoring` is true while a restore runs; a second tap is ignored. */
+export function useRestorePurchases() {
   const [restoring, setRestoring] = useState(false);
   const restore = async () => {
     if (restoring) return;
@@ -15,7 +14,6 @@ export function useRestorePurchases(onRestored?: () => void) {
     try {
       const outcome = await restorePurchases();
       if (outcome === "restored") {
-        onRestored?.();
         Alert.alert(
           t("pro.restoredTitle"),
           t("pro.restoredBody", { store: storeName }),

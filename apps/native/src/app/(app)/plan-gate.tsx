@@ -11,7 +11,6 @@ import {
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
-import { notePurchaseLanding } from "@/lib/replay-onboarding";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { useRouter } from "expo-router";
 import { Alert, Linking, Pressable, View } from "react-native";
@@ -28,22 +27,14 @@ export default function PlanGateScreen() {
   useAppLocale();
   const router = useRouter();
   const { session, operation } = useNotificationSession();
-  const { restoring, restore } = useRestorePurchases(notePurchaseLanding);
+  const { restoring, restore } = useRestorePurchases();
   const { data: user } = useCurrentUser();
   // Home is out of reach here, so an open exit offer, and its reminder
   // switch, lives on the gate for its 24 hours.
   const exitOfferEndsAt = useExitOfferEndsAt(user?._id);
 
-  // A purchase lifts the gate before its webhook lands (see the layout guard).
   // While an exit offer is open, its discount opens instead of full price.
-  const seePlans = async () => {
-    const outcome = await openPaywallKeepingExitOffer(
-      router,
-      "plan_gate",
-      true,
-    );
-    if (outcome === "success") notePurchaseLanding();
-  };
+  const seePlans = () => openPaywallKeepingExitOffer(router, "plan_gate", true);
 
   const signOut = async () => {
     try {
@@ -66,11 +57,7 @@ export default function PlanGateScreen() {
         </ThemedText>
         {exitOfferEndsAt !== null ? (
           <View style={styles.offer}>
-            <ExitOfferCard
-              endsAt={exitOfferEndsAt}
-              userId={user?._id}
-              onPurchased={notePurchaseLanding}
-            />
+            <ExitOfferCard endsAt={exitOfferEndsAt} userId={user?._id} />
           </View>
         ) : null}
       </View>

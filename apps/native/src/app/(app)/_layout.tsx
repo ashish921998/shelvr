@@ -78,9 +78,10 @@ function AppStack() {
   // A purchase or restore reaches Convex by webhook a moment later; until it
   // does, someone who just paid is not sent back to the gate.
   const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
-  // No entry without a plan. While the entitlement is still loading the app
-  // shows, so an offline launch never locks anyone out; saves are gated on
-  // the server either way.
+  // No entry without a plan. Until the plan is known the app waits on a
+  // loader rather than opening, so a stalled entitlement read is no way in.
+  const planUnknown =
+    isAuthenticated && entitlement.loading && !awaitingPurchase;
   const gated =
     isAuthenticated &&
     !entitlement.loading &&
@@ -91,7 +92,7 @@ function AppStack() {
   useReplayOnboarding();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume
   // it, once the plan gate is down.
-  useResumePendingShare(gated);
+  useResumePendingShare(gated || planUnknown);
   // Remind trialers two days before the yearly plan starts charging.
   useTrialReminder();
   // Right after Pro starts, Home hands off to one real save.
@@ -106,6 +107,10 @@ function AppStack() {
   // once they've finished onboarding but haven't authenticated yet.
   if (!isAuthenticated && onboarded) {
     return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  if (onboarded && planUnknown) {
+    return <ScreenLoader label={t("loading.app")} />;
   }
 
   return (

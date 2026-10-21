@@ -53,6 +53,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import { notePurchaseLanding } from "@/lib/purchase-landing";
 
 /**
  * Shelvr Pro entitlement.
@@ -835,6 +836,7 @@ export async function openPaywall(
   // re-taps. Remember the block so the guard that later lets the action
   // through can report the resume, and whether a purchase sits between.
   recordBlockedAction(placement, outcome === "success");
+  if (outcome === "success") notePurchaseLanding();
   return outcome === "success";
 }
 
@@ -848,6 +850,7 @@ export async function openExitOffer(
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
+  if (outcome === "success") notePurchaseLanding();
   return outcome === "success";
 }
 
@@ -878,6 +881,7 @@ export async function openPaywallKeepingExitOffer(
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
+  if (outcome === "success") notePurchaseLanding();
   return outcome;
 }
 
@@ -945,6 +949,7 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
     // does, but only while nothing is entitled: restoring an already-visible
     // entitlement made nothing new visible, so it reports nothing.
     if (!hasActiveEntitlement()) recordAccess("restore");
+    notePurchaseLanding();
     return "restored";
   } catch {
     return "unavailable";
