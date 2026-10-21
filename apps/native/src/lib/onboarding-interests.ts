@@ -2,7 +2,9 @@
 // space, and its sample leads the first-save picker, so the first thing a
 // person saves is about something they chose and lands in a space named for it.
 // The ids double as space identities and stay stable; labels are translated.
+// Travel comes first so it sits in the first row of chips.
 export const INTERESTS = [
+  "Travel",
   "AI",
   "Tech",
   "Startups",
@@ -20,7 +22,6 @@ export const INTERESTS = [
   "Books",
   "Science",
   "Coffee",
-  "Travel",
   "Fitness",
   "Wellness",
 ] as const;
