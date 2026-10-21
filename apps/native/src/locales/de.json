@@ -358,6 +358,13 @@
   "trip.buildingRead": "Deine Saves werden gelesen …",
   "trip.buildingFind": "Jeder Ort wird auf der Karte gesucht …",
   "trip.buildingGroup": "Alles wird in Tage aufgeteilt …",
+  "trip.revealSaves": {
+    "one": "%{formattedCount} Save",
+    "other": "%{formattedCount} Saves"
+  },
+  "trip.revealLanding": "Landeanflug auf %{city}",
+  "trip.revealLandingNoCity": "deine Reise entsteht",
+  "trip.revealSkip": "Tippen zum Überspringen",
   "trip.dayTab": "Tag %{day}",
   "trip.dayTitleOne": "Tag %{day} · %{area}",
   "trip.dayTitleTwo": "Tag %{day} · %{first} und %{second}",
