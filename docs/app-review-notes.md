@@ -6,7 +6,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
-- Reviewer path: onboarding opener → topics → setup → save a link in the demo → reminder → share practice → promise → paywall (buy or start the trial in the sandbox) → **Continue with Apple** → Home. Closing the paywall keeps onboarding on the promise step; the account is created only after a purchase or restore. Existing accounts can use **Already have an account? Sign in** on the opener.
+- Reviewer path: onboarding opener → topics → setup → save a link in the demo → reminder → share practice → promise → sample trip (only when Travel was picked) → paywall (buy or start the trial in the sandbox) → **Continue with Apple** → Home. Closing the paywall keeps onboarding on the step that opened it; the account is created only after a purchase or restore. Existing accounts can use **Already have an account? Sign in** on the opener.
 - App Review can use its own Apple account through Sign in with Apple; no developer-issued credentials, one-time code, invitation, or special account state is required.
 - A dedicated Google test account is optional fallback access. If one is supplied, enter the credentials in App Store Connect only, never in this repo or the app binary.
 - Anonymous / "Continue without account" is **dev-only** and disabled in production builds.
@@ -19,11 +19,12 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. No account is needed: a sample shows a preview of the result, then "Read and titled. It goes on your shelf once you're in." with **Continue**; a pasted or typed link shows "Got it." with **Continue**. The link is queued on the device and saved to the account after sign-in. **Skip for now** passes the first save.
 5. **Reminder:** "When should it come back?" offers one reminder for a save already in the account, so a signed-out first run skips this step. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
 6. **Share practice:** "Save your first post." has the user share one sample post to Shelvr through the system share sheet, with the **Share this post** button or the Share icon on the post, or skip with **I'll try it later**. A successful share shows "You nailed it." and a **Continue** button.
-7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. The promise itself is not saved; as on every onboarding step, the app only remembers the step on the device and records that it was shown and completed in analytics. **I'm in** is the only action and opens the paywall.
-8. **Paywall:** **I'm in** opens the RevenueCat paywall. Closing it keeps onboarding on the promise step. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves the queued link.
-9. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
-10. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
-11. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
+7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. The promise itself is not saved; as on every onboarding step, the app only remembers the step on the device and records that it was shown and completed in analytics. **I'm in** is the only action. It opens the sample trip when Travel was picked, and the paywall otherwise.
+8. **Sample trip (only when Travel was picked as a topic or a kind of save):** a short screen builds a fixed sample trip to Prague from three sample saves, then shows it locked: the first stop is clear, the rest is blurred behind a lock. Every screen labels it a sample; it is not made from the user's saves and calls no server. **Unlock the full trip** opens the paywall. After a purchase the same sample opens in full; its **Continue** button leads to sign-in. Closing the paywall keeps the locked trip on screen. Everyone who did not pick Travel goes from the promise straight to the paywall.
+9. **Paywall:** **I'm in** (or **Unlock the full trip** on the sample trip) opens the RevenueCat paywall. Closing it keeps onboarding on the step that opened it. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves the queued link.
+10. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
+11. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
+12. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
 
 ## Core save loop
 
@@ -117,7 +118,7 @@ Account access:
 
 Subscription testing:
 
-1. After the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Buy a plan or start the trial with a sandbox account; closing the paywall returns to that step. Sign-in follows the purchase.
+1. After the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. (If Travel was picked as a topic or a kind of save, a sample trip builds first and shows locked; tap "Unlock the full trip" to open the paywall.) Buy a plan or start the trial with a sandbox account; closing the paywall returns to the step that opened it. Sign-in follows the purchase.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile > Settings.

@@ -6,6 +6,9 @@ export const ONBOARDING_STEPS = [
   "notifications",
   "share",
   "promise",
+  "tripBuild",
+  "tripLocked",
+  "tripReveal",
 ] as const;
 // Sent with every step event. step_index means different steps in different
 // flows, so funnels split by this or filter on step_id. 3 added the source step,
@@ -16,7 +19,10 @@ export const ONBOARDING_STEPS = [
 // 8 added the promise step after the share step; the paywall opens from it.
 // 9 moved sign-in after the paywall: a signed-out first save waits for the
 // account, and the paywall sells before it exists.
-export const ONBOARDING_FLOW_VERSION = 9;
+// 10 added the sample trip steps after the promise step, for people who save
+// travel: the trip builds, shows locked, opens the paywall, and opens up after
+// a purchase. Everyone else still goes from the promise step to the paywall.
+export const ONBOARDING_FLOW_VERSION = 10;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -30,10 +36,14 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   notifications: "notifications",
   share: "share_practice",
   promise: "promise",
+  tripBuild: "trip_build",
+  tripLocked: "trip_locked",
+  tripReveal: "trip_reveal",
 };
 
-// The promise step has no way back: a practice share that reached Shelvr
-// stays held, and a share step that finds one moves straight on again.
+// The promise step and the sample trip steps have no way back: a practice
+// share that reached Shelvr stays held, a share step that finds one moves
+// straight on again, and a purchase cannot be taken back by a step.
 // The demo step is missing on purpose: what back means there depends on
 // which of its screens is up, so the step tells the screen itself.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
