@@ -825,6 +825,51 @@ describe("exit offer after a paywall close", () => {
     });
   });
 
+  it("offers $0.00 from the post-sync trial answer when the early read failed", async () => {
+    const yearly = {
+      identifier: "annual",
+      priceString: "$39.99",
+      currencyCode: "USD",
+      subscriptionPeriod: "P1Y",
+      introPrice: { price: 0, periodUnit: "DAY", periodNumberOfUnits: 7 },
+    };
+    const current = {
+      identifier: "default",
+      availablePackages: [{ product: yearly }],
+    };
+    const noTrial = {
+      identifier: "weekly_annual_draft",
+      availablePackages: [],
+    };
+    mock.getOfferings.mockResolvedValue({
+      current,
+      all: { weekly_annual_draft: noTrial },
+    });
+    // A cold sign-in: the read started before identity sync fails, and the
+    // one made after it answers.
+    mock.checkEligibility
+      .mockRejectedValueOnce(new Error("not configured"))
+      .mockResolvedValueOnce({ annual: { status: 2 } });
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledWith({
+      offering: current,
+      customVariables: expect.objectContaining({
+        trial_offer: {
+          type: "string",
+          value: "Start for $0.00, then $39.99/year.",
+        },
+      }),
+    });
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_requested",
+      expect.anything(),
+    );
+  });
+
   it("does not follow a purchase", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("PURCHASED");
