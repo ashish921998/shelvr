@@ -1,8 +1,13 @@
+import { ExitOfferCard } from "@/components/home/exit-offer-card";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
+import { useCurrentUser } from "@/lib/current-user";
+import {
+  openPaywallKeepingExitOffer,
+  useExitOfferEndsAt,
+} from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
@@ -24,10 +29,20 @@ export default function PlanGateScreen() {
   const router = useRouter();
   const { session, operation } = useNotificationSession();
   const { restoring, restore } = useRestorePurchases(notePurchaseLanding);
+  const { data: user } = useCurrentUser();
+  // Home is out of reach here, so an open exit offer, and its reminder
+  // switch, lives on the gate for its 24 hours.
+  const exitOfferEndsAt = useExitOfferEndsAt(user?._id);
 
   // A purchase lifts the gate before its webhook lands (see the layout guard).
+  // While an exit offer is open, its discount opens instead of full price.
   const seePlans = async () => {
-    if (await openPaywall(router, "plan_gate")) notePurchaseLanding();
+    const outcome = await openPaywallKeepingExitOffer(
+      router,
+      "plan_gate",
+      true,
+    );
+    if (outcome === "success") notePurchaseLanding();
   };
 
   const signOut = async () => {
@@ -49,6 +64,15 @@ export default function PlanGateScreen() {
         <ThemedText variant="body" style={styles.body}>
           {t("planGate.body")}
         </ThemedText>
+        {exitOfferEndsAt !== null ? (
+          <View style={styles.offer}>
+            <ExitOfferCard
+              endsAt={exitOfferEndsAt}
+              userId={user?._id}
+              onPurchased={notePurchaseLanding}
+            />
+          </View>
+        ) : null}
       </View>
       <Button
         title={t("planGate.seePlans")}
@@ -125,6 +149,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: { textAlign: "center" },
   body: { textAlign: "center", color: theme.colors.muted },
+  offer: { alignSelf: "stretch", marginTop: theme.gap(2) },
   button: { alignSelf: "stretch" },
   restore: { paddingVertical: theme.gap(1.5) },
   link: { color: theme.colors.primaryText },
