@@ -1,5 +1,6 @@
 import { CtaButton } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
+import { withAlpha } from "@/lib/color";
 import { t, useAppLocale } from "@/lib/i18n";
 import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -11,6 +12,10 @@ import {
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+// Softens the picks where they pass under Continue, so a cut-off row reads as
+// more to scroll. The picks end this far up, so the last row clears it.
+const FADE_HEIGHT = 32;
 
 /** "What are you into?": each picked topic becomes a space and leads the
  * first-save picker. Picking none is fine; the step never blocks. Picking
@@ -34,54 +39,59 @@ export function InterestsStep({
   useAppLocale();
   return (
     <View style={styles.wrap}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.head}>
-          <Text
-            style={styles.headline}
-            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-          >
-            {t("interests.title")}
-          </Text>
-          <Text style={styles.support}>{t("interests.help")}</Text>
-        </View>
-
-        <View style={styles.chips}>
-          {INTERESTS.map((interest) => (
-            <Chip
-              key={interest}
-              label={onboardingLabel(interest)}
-              active={picked.includes(interest)}
-              onPress={() => onToggle(interest)}
-            />
-          ))}
-        </View>
-
-        {picked.includes(VIBES_INTEREST) ? (
-          <View style={styles.card}>
-            <View style={styles.cardHead}>
-              <Text style={styles.eyebrow}>
-                {onboardingLabel(VIBES_INTEREST)}
-              </Text>
-              <Text style={styles.cardTitle}>{t("interests.vibesTitle")}</Text>
-            </View>
-            <View style={styles.chips}>
-              {TRAVEL_VIBES.map((vibe) => (
-                <Chip
-                  key={vibe}
-                  label={onboardingLabel(vibe)}
-                  active={vibes.includes(vibe)}
-                  small
-                  onPress={() => onToggleVibe(vibe)}
-                />
-              ))}
-            </View>
+      <View style={styles.scroll}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.head}>
+            <Text
+              style={styles.headline}
+              maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+            >
+              {t("interests.title")}
+            </Text>
+            <Text style={styles.support}>{t("interests.help")}</Text>
           </View>
-        ) : null}
-      </ScrollView>
+
+          <View style={styles.chips}>
+            {INTERESTS.map((interest) => (
+              <Chip
+                key={interest}
+                label={onboardingLabel(interest)}
+                active={picked.includes(interest)}
+                onPress={() => onToggle(interest)}
+              />
+            ))}
+          </View>
+
+          {picked.includes(VIBES_INTEREST) ? (
+            <View style={styles.card}>
+              <View style={styles.cardHead}>
+                <Text style={styles.eyebrow}>
+                  {onboardingLabel(VIBES_INTEREST)}
+                </Text>
+                <Text style={styles.cardTitle}>
+                  {t("interests.vibesTitle")}
+                </Text>
+              </View>
+              <View style={styles.chips}>
+                {TRAVEL_VIBES.map((vibe) => (
+                  <Chip
+                    key={vibe}
+                    label={onboardingLabel(vibe)}
+                    active={vibes.includes(vibe)}
+                    small
+                    onPress={() => onToggleVibe(vibe)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
+        <View pointerEvents="none" style={styles.fade} />
+      </View>
 
       <View style={styles.foot}>
         <CtaButton label={t("common.continue")} onPress={onAdvance} />
@@ -145,7 +155,18 @@ const styles = StyleSheet.create((theme) => ({
   },
   body: {
     gap: theme.gap(3),
-    paddingBottom: theme.gap(2),
+    paddingBottom: FADE_HEIGHT,
+  },
+  fade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: FADE_HEIGHT,
+    experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(
+      theme.colors.background,
+      0,
+    )} 0%, ${theme.colors.background} 100%)`,
   },
   head: {
     gap: theme.gap(1),
