@@ -124,7 +124,7 @@ export function FileScene(_props: SceneProps) {
                 tintColor={theme.colors.primaryText}
               />
             </View>
-            <Text style={styles.cardTitle} numberOfLines={1}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
               {t(place.name)}
             </Text>
             <View style={styles.tag}>
@@ -191,7 +191,9 @@ function routeDots(points: Point[], width: number, height: number): Point[] {
   for (let i = 1; i < points.length; i++) {
     const from = { x: points[i - 1].x * width, y: points[i - 1].y * height };
     const to = { x: points[i].x * width, y: points[i].y * height };
-    const steps = Math.floor(Math.hypot(to.x - from.x, to.y - from.y) / DOT_SPACING);
+    const steps = Math.floor(
+      Math.hypot(to.x - from.x, to.y - from.y) / DOT_SPACING,
+    );
     for (let k = 2; k < steps - 1; k++) {
       dots.push({
         x: from.x + ((to.x - from.x) * k) / steps,
@@ -245,7 +247,14 @@ export function PlanScene(_props: SceneProps) {
         <Text style={styles.dayTitle}>{t("onboarding.sceneDayTitle")}</Text>
         {STOPS.map((stop) => (
           <View key={stop.slot} style={styles.stop}>
-            <Text style={styles.stopSlot}>{t(stop.slot)}</Text>
+            <Text
+              style={styles.stopSlot}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {t(stop.slot)}
+            </Text>
             <Text style={styles.stopName} numberOfLines={1}>
               {t(stop.name)}
             </Text>
@@ -372,7 +381,8 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
   },
   cardTile: {
-    aspectRatio: 1.35,
+    // Flatter than the real card, so a two-line name keeps the grid's height.
+    aspectRatio: 1.7,
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
     alignItems: "center",
@@ -381,6 +391,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   cardTitle: {
     ...theme.type.captionStrong,
+    // Two lines held for every card, so a short name keeps its row even.
+    lineHeight: 15,
+    minHeight: 30,
     color: theme.colors.foreground,
   },
   tag: {
@@ -477,7 +490,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   stopSlot: {
     ...theme.type.badge,
-    width: 58,
+    // Wide enough for "Afternoon" in one line; longer translations shrink.
+    width: 72,
     letterSpacing: 0.6,
     textTransform: "uppercase",
     color: theme.colors.primaryText,
