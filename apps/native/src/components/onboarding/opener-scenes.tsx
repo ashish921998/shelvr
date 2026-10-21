@@ -255,7 +255,12 @@ export function PlanScene(_props: SceneProps) {
             >
               {t(stop.slot)}
             </Text>
-            <Text style={styles.stopName} numberOfLines={1}>
+            <Text
+              style={styles.stopName}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
               {t(stop.name)}
             </Text>
           </View>
@@ -497,6 +502,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryText,
   },
   stopName: {
+    // Shrinks a little before it cuts, so "Miradouro da Graça" reads in full.
     ...theme.type.captionLabel,
     flex: 1,
     color: theme.colors.foreground,
