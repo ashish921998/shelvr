@@ -3,6 +3,7 @@
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { FormEvent, useState } from "react";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
+import { arrivalCampaign } from "@/lib/appStore";
 
 const inputId = "android-waitlist-email";
 
@@ -42,11 +43,20 @@ export default function AndroidWaitlist({
   >("idle");
   const [message, setMessage] = useState("");
 
+  // The visit's `?ct=` campaign, so a bio link's signups split by account.
+  function track(event: string) {
+    const campaign = arrivalCampaign(window.location.search);
+    captureWebAnalyticsEvent(event, {
+      source,
+      ...(campaign ? { campaign } : {}),
+    });
+  }
+
   // The form is always visible now, so "opened" means the first focus.
   function open() {
     if (opened) return;
     setOpened(true);
-    captureWebAnalyticsEvent("android_waitlist_opened", { source });
+    track("android_waitlist_opened");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -56,7 +66,7 @@ export default function AndroidWaitlist({
 
     setStatus("loading");
     setMessage("");
-    captureWebAnalyticsEvent("android_waitlist_submitted", { source });
+    track("android_waitlist_submitted");
 
     try {
       const response = await fetch("/api/android-waitlist", {
@@ -83,13 +93,13 @@ export default function AndroidWaitlist({
           : "You’re on the list.",
       );
       setStatus("success");
-      captureWebAnalyticsEvent("android_waitlist_joined", { source });
+      track("android_waitlist_joined");
     } catch (error) {
       setStatus("error");
       setMessage(
         error instanceof Error ? error.message : "Could not join right now.",
       );
-      captureWebAnalyticsEvent("android_waitlist_signup_failed", { source });
+      track("android_waitlist_signup_failed");
     }
   }
 
