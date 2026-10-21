@@ -1,5 +1,5 @@
 import type { Device } from "@e2e-dev/mobile";
-import { expect, type Screen } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
@@ -118,12 +118,14 @@ export const SHARE_LATER = "I'll try it later";
 
 /**
  * Signs in on the sign-in screen that follows a finished onboarding, the
- * only sign-in a new user sees, and waits for Home. The AI disclosure may
+ * only sign-in a new user sees, and waits for `home` (Home by default). The AI disclosure may
  * come up first.
  */
-export async function signInAfterOnboarding(screen: Screen): Promise<void> {
+export async function signInAfterOnboarding(
+  screen: Screen,
+  home: Locator = screen.getByRole("button", "Profile"),
+): Promise<void> {
   await screen.getByTestId("dev-login-button").tap({ timeout: 60_000 });
-  const home = screen.getByRole("button", "Profile");
   const keepAi = screen.getByRole("button", "Keep it on");
   await pollUntil(
     async () => {

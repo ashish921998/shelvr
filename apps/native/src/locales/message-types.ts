@@ -112,6 +112,10 @@ export type MessageParams = {
   "spaces.create": undefined;
   "common.continue": undefined;
   "pro.loadFailed": undefined;
+  "planGate.title": undefined;
+  "planGate.body": undefined;
+  "planGate.seePlans": undefined;
+  "paywall.trialOffer": { zero: string; price: string };
   "common.notNow": undefined;
   "legal.termsShort": undefined;
   "legal.privacyShort": undefined;
@@ -660,17 +664,6 @@ export type MessageParams = {
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
   "aiConsent.signInNote": undefined;
-  "exitOffer.title": undefined;
-  "exitOffer.endsIn": { time: string };
-  "exitOffer.cta": undefined;
-  "exitOffer.sheetEndsIn": { hours: string; minutes: string };
-  "exitOffer.reminderTitle": undefined;
-  "exitOffer.reminderBody": undefined;
-  "exitOffer.remindMe": undefined;
-  "exitOffer.reminderConsent": undefined;
-  "exitOffer.reminderSet": undefined;
-  "exitOffer.reminderCancel": undefined;
-  "exitOffer.reminderDenied": undefined;
   "updates.title": undefined;
   "updates.check": undefined;
   "updates.checking": undefined;

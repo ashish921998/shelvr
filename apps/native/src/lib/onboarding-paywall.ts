@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { notePurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
-import { openPaywallKeepingExitOffer, useEntitlement } from "@/lib/entitlement";
+import { openPaywallOutcome, useEntitlement } from "@/lib/entitlement";
 import {
   noteDeclinedDuringOnboarding,
   notePurchasedDuringOnboarding,
@@ -58,9 +58,7 @@ export function useOnboardingPaywall({
       noteDeclinedDuringOnboarding();
       handlers.current.onDecline();
     };
-    // Skipping the practice reaches this without asking for a paywall, so a
-    // declined exit offer just closes.
-    openPaywallKeepingExitOffer(router, "onboarding", false)
+    openPaywallOutcome(router, "onboarding")
       .then((outcome) => {
         if (outcome === "unavailable") return handlers.current.onUnavailable();
         if (outcome === "cancelled") return decline();

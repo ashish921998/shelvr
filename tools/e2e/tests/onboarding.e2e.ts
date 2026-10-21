@@ -26,9 +26,9 @@ afterEach(async ({ device }) => {
 // the promise, declined the paywall at the end and only then signed in: the
 // paywall comes before the account, and sign-in is asked once. Pro is hidden
 // from the relaunch on (src/lib/e2e-hide-pro.ts), so the dev user, Pro on
-// the server, lands on Home without a second paywall.
+// the server, is treated as having no plan and lands on the plan gate.
 test(
-  "asks for the paywall at the end of onboarding, then sign-in once",
+  "asks for the paywall at the end of onboarding, then sign-in once, then the plan gate",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -51,32 +51,36 @@ test(
     await expectPaywall(screen);
 
     // A close is a decline. Signed out there is no exit offer, and the one
-    // sign-in follows.
+    // sign-in follows. Without a plan it ends on the plan gate.
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallRestore(screen)).toBeHidden({
       timeout: 30_000,
     });
-    await signInAfterOnboarding(screen);
+    const gate = screen.getByRole("button", "See plans");
+    await signInAfterOnboarding(screen, gate);
 
     // No launch helper or whole-test retry may hide a native startup crash.
     // Allow a slow hosted Metro load, then require the splash to leave too.
-    // Pending starter spaces may ask again on the next launch
-    // (replay-onboarding); close that sheet rather than accept Home under it.
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    const home = screen.getByRole("button", "Profile");
+    // Pending starter spaces may ask again on the next launch
+    // (replay-onboarding); close that sheet rather than accept the gate under
+    // it.
     await pollUntil(
       async () => {
         if (await paywallRestore(screen).isVisible()) {
           await screen.getByRole("button", "Close").first().tap();
           return false;
         }
-        return home.isVisible();
+        return gate.isVisible();
       },
       { timeout: 180_000 },
     );
+    await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+      timeout: 30_000,
+    });
     await expect(screen.getByTestId("SplashScreenLogo")).toBeHidden({
       timeout: 30_000,
     });

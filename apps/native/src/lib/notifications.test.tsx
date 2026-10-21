@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { releaseSheetLink, rememberSheetLink } from "./deferred-sheet-link";
 import { ConvexError } from "convex/values";
 import {
   NotificationSessionProvider,
@@ -35,9 +36,6 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
 }));
 vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
-vi.mock("@/lib/exit-offer-reminder", () => ({
-  clearExitOfferReminder: vi.fn(async () => {}),
-}));
 vi.mock("@/lib/first-save-reminder", () => ({
   clearFirstSaveReminder: mock.clearFirstSave,
 }));
@@ -109,6 +107,8 @@ vi.mock("expo-notifications", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The plan is known unless a test says otherwise, so taps open at once.
+  releaseSheetLink(false);
   mock.authenticated = true;
   mock.locale = "en";
   mock.lastResponse = null;
@@ -325,6 +325,24 @@ describe("notification opens", () => {
       notification_id: "abc",
     });
     expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+  });
+
+  it("holds a tap while the plan loads, in the queue deep links share", () => {
+    releaseSheetLink(true);
+    mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
+    renderHook(() => useNotificationObserver());
+    expect(mock.push).not.toHaveBeenCalled();
+    expect(releaseSheetLink(false)).toEqual({ route: "/item/a", sheet: false });
+  });
+
+  it("lets a newer deep link replace a tap that is still waiting", () => {
+    releaseSheetLink(true);
+    mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
+    renderHook(() => useNotificationObserver());
+    // Expo Router opens /item/B itself; the waiting tap must not override it.
+    rememberSheetLink("shelvr://item/b");
+    expect(releaseSheetLink(false)).toBeNull();
+    expect(mock.push).not.toHaveBeenCalled();
   });
 
   // Installed builds keep receiving payloads from the currently deployed

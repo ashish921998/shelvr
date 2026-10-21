@@ -34,8 +34,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
   `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
-  `openPaywall`, `openExitOffer`, `usePaywallGuard` and `restorePurchases`.
-  Around it: `exit-offer*.ts`, `trial-reminder.ts`, `paywall-funnel.ts`,
+  `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
+  Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
   The server side is `convex/subscriptions.ts`.
 - **Home feed:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`);
