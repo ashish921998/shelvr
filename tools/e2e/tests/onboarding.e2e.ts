@@ -25,7 +25,7 @@ afterEach(async ({ device }) => {
 // this user from the relaunch on (src/lib/e2e-hide-pro.ts), as it is for a
 // real new user, so the end-of-onboarding paywall has someone to ask.
 test(
-  "asks for the paywall at the end of onboarding and cold-launches Home",
+  "asks for the paywall at the end of onboarding and cold-launches the plan gate",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -52,13 +52,13 @@ test(
     await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
-    // A close is a decline, and onboarding ends on Home. No exit offer
-    // follows: hiding Pro skips it.
+    // A close is a decline, and onboarding ends on the plan gate: no entry
+    // without a plan.
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallRestore(screen)).toBeHidden({
       timeout: 30_000,
     });
-    await expect(screen.getByRole("button", "Profile")).toBeVisible({
+    await expect(screen.getByRole("button", "See plans")).toBeVisible({
       timeout: 30_000,
     });
 
@@ -70,12 +70,12 @@ test(
     });
     // Declining only suppresses replay for that session. Pending starter
     // spaces intentionally ask again on the next launch (replay-onboarding).
-    // Wait for that sheet rather than accepting Home underneath it.
+    // Wait for that sheet rather than accepting the gate underneath it.
     await expect(paywallRestore(screen)).toBeVisible({ timeout: 180_000 });
     await expectPaywall(screen);
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallRestore(screen)).toBeHidden({ timeout: 30_000 });
-    await expect(screen.getByRole("button", "View Pro plans")).toBeVisible({
+    await expect(screen.getByRole("button", "See plans")).toBeVisible({
       timeout: 30_000,
     });
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({

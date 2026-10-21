@@ -32,10 +32,9 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
   offering before the sheet opens. `trial_eligible` is one of `eligible`,
   `ineligible`, `no_intro`, or `unknown`; missing SDK context is omitted rather
   than guessed.
-- `paywall_purchase_started` records a purchase tap in the mounted exit-offer
-  component. RevenueCat's imperative `presentPaywall` API does not expose the
-  equivalent callback, so the event is intentionally not emitted for the main
-  paywall. Its `package_id` is the SDK package identifier.
+- `paywall_purchase_started` is not emitted: RevenueCat's imperative
+  `presentPaywall` API exposes no purchase-tap callback. Older builds sent it
+  from the exit offer sheet, which has been removed.
 - `entitlement_activated` records the later client observation that the
   Convex entitlement became active after a purchase or restore. It carries
   `source`, the bounded entitlement `status`, and `delay_ms`. A Profile
