@@ -6,7 +6,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
-- Reviewer path: onboarding opener → topics → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → share practice → promise → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
+- Reviewer path: onboarding opener → topics → setup → save a link in the demo → reminder → share practice → promise → paywall (buy or start the trial in the sandbox) → **Continue with Apple** → Home. Closing the paywall keeps onboarding on the promise step; the account is created only after a purchase or restore. Existing accounts can use **Already have an account? Sign in** on the opener.
 - App Review can use its own Apple account through Sign in with Apple; no developer-issued credentials, one-time code, invitation, or special account state is required.
 - A dedicated Google test account is optional fallback access. If one is supplied, enter the credentials in App Store Connect only, never in this repo or the app binary.
 - Anonymous / "Continue without account" is **dev-only** and disabled in production builds.
@@ -112,12 +112,12 @@ Account access:
 1. Launch Shelvr and tap "Start yours". If you already have an account, tap "Already have an account? Sign in" instead.
 2. On "What are you into?", pick any topics or none, and tap Continue.
 3. On "What do you save?", pick at least one kind, keep or edit the suggested spaces, and tap Continue.
-4. Tap the featured link to save it. A short preview plays.
-5. When Shelvr asks you to sign in, choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required. Sign in completes through Apple's system authentication flow.
+4. Tap the featured link to save it. A short preview plays, and the save is kept until the account exists.
+5. After the purchase in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required. Sign in completes through Apple's system authentication flow.
 
 Subscription testing:
 
-1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
+1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Buy a plan or start the trial with a sandbox account; closing the paywall returns to that step. Sign-in follows the purchase.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile > Settings.

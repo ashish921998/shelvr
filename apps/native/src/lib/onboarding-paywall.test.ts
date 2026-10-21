@@ -81,12 +81,35 @@ describe("useOnboardingPaywall", () => {
     expect(onDecline).not.toHaveBeenCalled();
   });
 
-  it("leaves for the app when the paywall is closed", async () => {
+  it("leaves a signed-in account for the app when the paywall is closed", async () => {
     state.open.mockResolvedValue("cancelled");
     const { onPro, onDecline } = await ask({ entitled: false, loading: false });
     await vi.waitFor(() => expect(onDecline).toHaveBeenCalledOnce());
     expect(state.declined).toHaveBeenCalledOnce();
     expect(onPro).not.toHaveBeenCalled();
+  });
+
+  it("keeps a signed-out person on the promise step when the paywall is closed", async () => {
+    state.signedIn = false;
+    state.open.mockResolvedValue("cancelled");
+    const { onPro, onDecline, onUnavailable, hook } = await ask({
+      entitled: false,
+      loading: false,
+    });
+    await vi.waitFor(() => expect(hook.result.current.asked).toBe(false));
+    expect(onDecline).not.toHaveBeenCalled();
+    expect(onPro).not.toHaveBeenCalled();
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(state.declined).not.toHaveBeenCalled();
+
+    state.open.mockResolvedValue("success");
+    await act(async () => {
+      hook.result.current.ask();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    expect(state.open).toHaveBeenCalledTimes(2);
+    expect(state.beforeSignIn).toHaveBeenCalledOnce();
   });
 
   it("does not count a paywall that could not show as a decline", async () => {

@@ -5,13 +5,11 @@ import {
   SHARE_LATER,
   queueFirstSave,
   relaunchWith,
-  signInAfterOnboarding,
   startFreshOnboarding,
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
-import { pollUntil } from "./poll.ts";
 
 // A run that stops partway leaves a signed-in user mid-onboarding, which the
 // seeded flows after this one cannot get past (CI run 39048570372: seven
@@ -23,12 +21,11 @@ afterEach(async ({ device }) => {
 });
 
 // A first-time user who picked one link, relaunched mid-onboarding, took
-// the promise, declined the paywall at the end and only then signed in: the
-// paywall comes before the account, and sign-in is asked once. Pro is hidden
-// from the relaunch on (src/lib/e2e-hide-pro.ts), so the dev user, Pro on
-// the server, is treated as having no plan and lands on the plan gate.
+// the promise and closed the paywall at the end: the paywall comes before the
+// account, and closing it is no way past it. Pro is hidden from the relaunch
+// on (src/lib/e2e-hide-pro.ts).
 test(
-  "asks for the paywall at the end of onboarding, then sign-in once, then the plan gate",
+  "asks for the paywall at the end of onboarding, and a close keeps it there",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -50,40 +47,29 @@ test(
     await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
-    // A close is a decline. Signed out there is no exit offer, and the one
-    // sign-in follows. Without a plan it ends on the plan gate.
+    // Signed out, a close is no way in: the promise step stays, and its
+    // button brings the paywall back. Sign-in comes only after a purchase.
+    const commit = screen.getByRole("button", "I'm in");
     await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallRestore(screen)).toBeHidden({
-      timeout: 30_000,
-    });
-    const gate = screen.getByRole("button", "See plans");
-    await signInAfterOnboarding(screen, gate);
+    await expect(paywallRestore(screen)).toBeHidden({ timeout: 30_000 });
+    await expect(commit).toBeVisible({ timeout: 30_000 });
+    await expect(screen.getByTestId("dev-login-button")).toBeHidden();
+    await commit.tap();
+    await expectPaywall(screen);
+    await screen.getByRole("button", "Close").first().tap();
+    await expect(commit).toBeVisible({ timeout: 30_000 });
 
     // No launch helper or whole-test retry may hide a native startup crash.
     // Allow a slow hosted Metro load, then require the splash to leave too.
+    // A relaunch still lands on the promise step, signed out.
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    // Pending starter spaces may ask again on the next launch
-    // (replay-onboarding); close that sheet rather than accept the gate under
-    // it.
-    await pollUntil(
-      async () => {
-        if (await paywallRestore(screen).isVisible()) {
-          await screen.getByRole("button", "Close").first().tap();
-          return false;
-        }
-        return gate.isVisible();
-      },
-      { timeout: 180_000 },
-    );
-    await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
-      timeout: 30_000,
-    });
+    await expect(commit).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByTestId("SplashScreenLogo")).toBeHidden({
       timeout: 30_000,
     });
-    await expect(screen.getByRole("button", "Start yours")).toBeHidden();
+    await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );
