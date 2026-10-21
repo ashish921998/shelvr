@@ -225,7 +225,10 @@ export type AnalyticsEventProperties = {
   // matches the web share page's `share_page_viewed` and `app_store_clicked`.
   item_shared: { surface: "item_detail" | "feed"; share_ref?: string };
   item_link_copied: Record<string, never>;
-  item_deleted: { item_type: AnalyticsItem["type"] };
+  // Sent by `itemDeleted` once the delete is confirmed. `item_id` and
+  // `saved_at` join it back to the save, so time-to-delete and the deleted
+  // save's kind come from the event itself.
+  item_deleted: ItemProperties & { surface: "item_detail" | "feed" };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
   space_created: { dynamic: boolean; auto_file: boolean };
@@ -488,6 +491,14 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
     capture("item_action", { ...itemProperties(item), action });
 }
 
+function itemDeleted(
+  item: AnalyticsItem,
+  surface: "item_detail" | "feed",
+): void {
+  if (!item.fixtureKey)
+    capture("item_deleted", { ...itemProperties(item), surface });
+}
+
 // The Convex user id is the whole identity PostHog needs. The email stays in
 // Convex: sending it as a person property would copy PII into a third party
 // (and into replay-linked person profiles) for no analytics gain.
@@ -539,4 +550,5 @@ export const analytics = {
   screen,
   itemOpened,
   itemAction,
+  itemDeleted,
 };
