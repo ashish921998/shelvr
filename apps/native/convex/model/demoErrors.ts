@@ -7,6 +7,9 @@ import { ConvexError } from "convex/values";
 // branches on `demoErrorCode(err)` instead. This module has no server-runtime
 // imports so the native app can load it as `@convex/model/demoErrors`.
 
+/** Total retry cap for the demo item, on top of the demoRetry rate limiter's cooldown. */
+export const MAX_DEMO_RETRIES = 5;
+
 const DEMO_ERROR_CODES = [
   // The allowance is spent and its item no longer belongs to the caller.
   "demo_used",
