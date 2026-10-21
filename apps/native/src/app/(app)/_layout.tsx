@@ -10,7 +10,10 @@ import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { useReplayOnboarding } from "@/lib/replay-onboarding";
+import {
+  useAwaitingOnboardingPurchase,
+  useReplayOnboarding,
+} from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
@@ -72,11 +75,17 @@ function AppStack() {
   const reducedMotion = useReducedMotion();
 
   const entitlement = useEntitlement();
+  // A purchase or restore reaches Convex by webhook a moment later; until it
+  // does, someone who just paid is not sent back to the gate.
+  const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
   // No entry without a plan. While the entitlement is still loading the app
   // shows, so an offline launch never locks anyone out; saves are gated on
   // the server either way.
   const gated =
-    isAuthenticated && !entitlement.loading && !entitlement.entitled;
+    isAuthenticated &&
+    !entitlement.loading &&
+    !entitlement.entitled &&
+    !awaitingPurchase;
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();

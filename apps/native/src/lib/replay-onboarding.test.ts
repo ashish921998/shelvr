@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  notePurchaseLanding,
   notePurchasedDuringOnboarding,
   useAwaitingOnboardingPurchase,
 } from "./replay-onboarding";
@@ -51,6 +52,17 @@ describe("useAwaitingOnboardingPurchase", () => {
 
   it("does not wait when nothing was bought in onboarding", () => {
     const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
+    expect(result.current).toBe(false);
+  });
+
+  it("waits again for a purchase made later on the plan gate", () => {
+    const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
+    expect(result.current).toBe(false);
+
+    act(() => notePurchaseLanding());
+    expect(result.current).toBe(true);
+
+    act(() => vi.advanceTimersByTime(10_000));
     expect(result.current).toBe(false);
   });
 });

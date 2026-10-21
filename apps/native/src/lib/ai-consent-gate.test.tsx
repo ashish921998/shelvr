@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
+  awaitingPurchase: false,
 }));
 const nothing = vi.hoisted(() => () => null);
 
@@ -31,6 +32,7 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   useReplayOnboarding: mocks.replay,
+  useAwaitingOnboardingPurchase: () => mocks.awaitingPurchase,
 }));
 vi.mock("@/lib/share/use-resume-pending-share", () => ({
   useResumePendingShare: mocks.resumeShare,
@@ -189,6 +191,18 @@ describe("plan gate", () => {
       expect(shows("screen:(tabs)")).toBe(true);
       expect(shows("screen:plan-gate")).toBe(false);
       unmount();
+    }
+  });
+
+  it("keeps someone who just paid out of the gate while the purchase lands", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    mocks.awaitingPurchase = true;
+    try {
+      render(<AppLayout />);
+      expect(shows("screen:(tabs)")).toBe(true);
+      expect(shows("screen:plan-gate")).toBe(false);
+    } finally {
+      mocks.awaitingPurchase = false;
     }
   });
 

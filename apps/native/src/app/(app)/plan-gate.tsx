@@ -6,6 +6,7 @@ import { openPaywall } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
+import { notePurchaseLanding } from "@/lib/replay-onboarding";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { useRouter } from "expo-router";
 import { Alert, Linking, Pressable, View } from "react-native";
@@ -22,7 +23,12 @@ export default function PlanGateScreen() {
   useAppLocale();
   const router = useRouter();
   const { session, operation } = useNotificationSession();
-  const { restoring, restore } = useRestorePurchases();
+  const { restoring, restore } = useRestorePurchases(notePurchaseLanding);
+
+  // A purchase lifts the gate before its webhook lands (see the layout guard).
+  const seePlans = async () => {
+    if (await openPaywall(router, "plan_gate")) notePurchaseLanding();
+  };
 
   const signOut = async () => {
     try {
@@ -46,11 +52,12 @@ export default function PlanGateScreen() {
       </View>
       <Button
         title={t("planGate.seePlans")}
-        onPress={() => void openPaywall(router, "plan_gate")}
+        onPress={() => void seePlans()}
         style={styles.button}
       />
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled: restoring, busy: restoring }}
         disabled={restoring}
         onPress={() => void restore()}
         style={styles.restore}

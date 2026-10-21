@@ -31,28 +31,60 @@ let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
 
 export function notePurchasedDuringOnboarding() {
   onboardingPaywall = "purchased";
+  notePurchaseLanding();
+}
+
+// Every purchase or restore bumps `landingNonce`; `settledNonce` catches up
+// once its entitlement is seen or the wait runs out.
+let landingNonce = 0;
+let settledNonce = 0;
+const landingListeners = new Set<() => void>();
+
+function subscribeLanding(listener: () => void) {
+  landingListeners.add(listener);
+  return () => {
+    landingListeners.delete(listener);
+  };
+}
+
+const readLanding = () => landingNonce;
+
+/** A purchase or restore just succeeded outside onboarding (the plan gate). */
+export function notePurchaseLanding() {
+  landingNonce += 1;
+  landingListeners.forEach((listener) => listener());
 }
 
 const PURCHASE_LANDING_MS = 10_000;
 
 /**
- * True while a purchase made in onboarding is still on its way to Convex (the
- * webhook lags the store by a moment), so a screen can wait instead of asking
- * for Pro again. The wait is bounded: a webhook that never lands, or a
- * subscription that lapses later in the session, must still reach the Pro
- * gate. Once the entitlement has been seen, the purchase is no longer news.
+ * True while a purchase made in onboarding or on the plan gate is still on its
+ * way to Convex (the webhook lags the store by a moment), so a screen can wait
+ * instead of asking for Pro again. The wait is bounded: a webhook that never
+ * lands, or a subscription that lapses later in the session, must still reach
+ * the Pro gate. Once the entitlement has been seen, the purchase is no longer
+ * news.
  */
 export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
-  const [waitedOut, setWaitedOut] = useState(false);
-  const awaiting = !entitled && onboardingPaywall === "purchased" && !waitedOut;
+  const nonce = useSyncExternalStore(
+    subscribeLanding,
+    readLanding,
+    readLanding,
+  );
+  const [, setWaitedOut] = useState(0);
+  const awaiting = !entitled && nonce > settledNonce;
   useEffect(() => {
-    if (entitled && onboardingPaywall === "purchased") {
-      onboardingPaywall = "unseen";
+    if (entitled) {
+      settledNonce = nonce;
+      if (onboardingPaywall === "purchased") onboardingPaywall = "unseen";
     }
     if (!awaiting) return;
-    const id = setTimeout(() => setWaitedOut(true), PURCHASE_LANDING_MS);
+    const id = setTimeout(() => {
+      settledNonce = Math.max(settledNonce, nonce);
+      setWaitedOut(nonce);
+    }, PURCHASE_LANDING_MS);
     return () => clearTimeout(id);
-  }, [entitled, awaiting]);
+  }, [entitled, awaiting, nonce]);
   return awaiting;
 }
 
