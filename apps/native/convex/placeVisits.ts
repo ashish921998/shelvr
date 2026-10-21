@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
+import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 
@@ -26,12 +27,7 @@ export const setVisited = mutation({
       throw new Error("Place name is empty");
     }
     await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
-    const existing = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_key", (q) =>
-        q.eq("userId", userId).eq("key", key),
-      )
-      .unique();
+    const existing = await findVisit(ctx, userId, args.name);
     if (!args.visited) {
       if (existing !== null) await ctx.db.delete(existing._id);
       return null;
