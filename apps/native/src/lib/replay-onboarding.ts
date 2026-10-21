@@ -120,6 +120,16 @@ export function useReplayOnboarding() {
   const settledWorkRef = useRef<string | null>(null);
   const settledEntitledRef = useRef(entitled);
   const [retryNonce, setRetryNonce] = useState(0);
+  // The account signed in right now; null once signed out or unmounted. A run
+  // that awaits a mutation checks it before its next write, so a run started
+  // for one account never writes into the next one to sign in.
+  const accountRef = useRef<string | null>(null);
+  useEffect(() => {
+    accountRef.current = isAuthenticated ? userId : null;
+    return () => {
+      accountRef.current = null;
+    };
+  }, [isAuthenticated, userId]);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
   // would only notice pending data after an auth/entitlement change.
@@ -181,6 +191,13 @@ export function useReplayOnboarding() {
     // work that arrives while a mutation is in flight is never mistaken for it.
     let remainderKey: string | null = null;
     let lateDemoUrl = false;
+    const runAccount = userId;
+    let accountChanged = false;
+    const sameAccount = () => {
+      if (runAccount !== null && accountRef.current === runAccount) return true;
+      accountChanged = true;
+      return false;
+    };
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -201,6 +218,7 @@ export function useReplayOnboarding() {
 
         awaitingEntitlementRef.current = false;
         onboardingPaywall = "unseen";
+        if (!sameAccount()) return;
 
         // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
@@ -218,6 +236,7 @@ export function useReplayOnboarding() {
         const allSpacesOk = failedSpaces.length === 0;
 
         if (legacyDemoUrl) {
+          if (!sameAccount()) return;
           try {
             // No saveSource: this replays an onboarding demo, but
             // `onboarding_demo` is stamped server-side by createDemoItem and
@@ -228,6 +247,7 @@ export function useReplayOnboarding() {
               legacyDemoSpace === null
                 ? undefined
                 : await createSpace({ name: legacyDemoSpace, dynamic: true });
+            if (!sameAccount()) return;
             await createLinkItem({
               url: legacyDemoUrl,
               spaceId,
@@ -244,6 +264,7 @@ export function useReplayOnboarding() {
 
         // Only mark as done when all required mutations succeed.
         if (!allSpacesOk) return;
+        if (!sameAccount()) return;
 
         // A link handed over while this run was in flight (a queued first
         // save whose account had spent its demo save) is not this run's to
@@ -256,8 +277,10 @@ export function useReplayOnboarding() {
         clearPending();
       } finally {
         // An entitlement change during the run asked for a fresh pass; marking
-        // this work settled would make that pass skip it.
-        const entitlementRerun = rerunRef.current || lateDemoUrl;
+        // this work settled would make that pass skip it. So does a run cut
+        // short by an account change: the account now signed in found it busy.
+        const entitlementRerun =
+          rerunRef.current || lateDemoUrl || accountChanged;
         if (remainderKey !== null && !entitlementRerun) {
           settledWorkRef.current = remainderKey;
         }
