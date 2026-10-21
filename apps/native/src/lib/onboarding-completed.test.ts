@@ -10,7 +10,7 @@ describe("onboardingCompletedProperties", () => {
           "Travel",
           "Good food",
           "Date nights",
-          "Coffee",
+          "AI & tech",
           "Read later",
           "Prague",
         ],
@@ -18,7 +18,7 @@ describe("onboardingCompletedProperties", () => {
     ).toEqual({
       save_pileup: [],
       save_types: ["Travel"],
-      interests: ["Travel", "Coffee"],
+      interests: ["Travel", "AI & tech"],
       travel_vibes: ["Good food", "Date nights"],
       space_count: 6,
       // Vibes are preset identities, so they are named; only "Prague" is typed.
@@ -26,7 +26,7 @@ describe("onboardingCompletedProperties", () => {
         "Travel",
         "Good food",
         "Date nights",
-        "Coffee",
+        "AI & tech",
         "Read later",
       ],
       custom_space_count: 1,

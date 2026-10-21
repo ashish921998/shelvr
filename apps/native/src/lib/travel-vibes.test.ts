@@ -9,18 +9,18 @@ import {
 
 describe("spacesAfterInterestToggle", () => {
   it.each<[string, string[], Interest, string[]]>([
-    ["picks a topic", ["Read later"], "Coffee", ["Read later", "Coffee"]],
-    ["unpicks a topic", ["Coffee", "Travel"], "Coffee", ["Travel"]],
+    ["picks a topic", ["Read later"], "AI & tech", ["Read later", "AI & tech"]],
+    ["unpicks a topic", ["AI & tech", "Travel"], "AI & tech", ["Travel"]],
     [
       "drops the vibes with Travel",
-      ["Coffee", "Travel", "Good food", "Hidden gems"],
+      ["AI & tech", "Travel", "Good food", "Hidden gems"],
       "Travel",
-      ["Coffee"],
+      ["AI & tech"],
     ],
     [
       "keeps the vibes when another topic is unpicked",
-      ["Travel", "Good food", "Coffee"],
-      "Coffee",
+      ["Travel", "Good food", "AI & tech"],
+      "AI & tech",
       ["Travel", "Good food"],
     ],
     [

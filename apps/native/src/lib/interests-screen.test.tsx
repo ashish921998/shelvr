@@ -152,21 +152,21 @@ it("keeps a spot as a space until Travel is unpicked, then forgets it", () => {
   fireEvent.click(chip("Travel"));
   expect(screen.getByText(SPOTS_TITLE)).toBeTruthy();
   fireEvent.click(chip("Good food"));
-  fireEvent.click(chip("Coffee"));
-  expect(savedSpaces()).toEqual(["Travel", "Good food", "Coffee"]);
+  fireEvent.click(chip("AI & tech"));
+  expect(savedSpaces()).toEqual(["Travel", "Good food", "AI & tech"]);
   expect(chip("Good food").getAttribute("aria-checked")).toBe("true");
 
   // Unpicking a spot alone leaves Travel and the card in place.
   fireEvent.click(chip("Good food"));
-  expect(savedSpaces()).toEqual(["Travel", "Coffee"]);
+  expect(savedSpaces()).toEqual(["Travel", "AI & tech"]);
   fireEvent.click(chip("Hidden gems"));
 
   fireEvent.click(chip("Travel"));
   expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
-  expect(savedSpaces()).toEqual(["Coffee"]);
+  expect(savedSpaces()).toEqual(["AI & tech"]);
 
   // Picked again, Travel's card comes back empty.
   fireEvent.click(chip("Travel"));
   expect(chip("Hidden gems").getAttribute("aria-checked")).toBe("false");
-  expect(savedSpaces()).toEqual(["Coffee", "Travel"]);
+  expect(savedSpaces()).toEqual(["AI & tech", "Travel"]);
 });

@@ -136,11 +136,16 @@ export function demoDestination(
   url: string,
   spaces: readonly string[],
 ): string | null {
+  // A topic can share its page with a kind, so the topic's space wins first.
+  const topic = INTEREST_SAMPLES.find(
+    (sample) =>
+      sample.url === url &&
+      sample.interest !== undefined &&
+      spaces.includes(sample.interest),
+  )?.interest;
+  if (topic !== undefined) return topic;
   const sample = findSample(url);
   if (!sample) return null;
-  if (sample.interest !== undefined && spaces.includes(sample.interest)) {
-    return sample.interest;
-  }
   const preset = SPACE_PRESETS[sample.kind][0];
   return spaces.includes(preset) ? preset : null;
 }

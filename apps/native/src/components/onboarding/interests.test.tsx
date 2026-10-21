@@ -84,10 +84,10 @@ function renderStep(picked: Interest[] = [], vibes: TravelVibe[] = []) {
 
 describe("InterestsStep", () => {
   it("asks nothing more while Travel is not picked", () => {
-    renderStep(["Coffee"]);
+    renderStep(["AI & tech"]);
     expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
     expect(screen.getAllByRole("checkbox")).toHaveLength(INTERESTS.length);
-    expect(chip("Coffee", true)).toBeTruthy();
+    expect(chip("AI & tech", true)).toBeTruthy();
   });
 
   it("asks what kind of spots once Travel is picked", () => {

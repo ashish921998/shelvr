@@ -25,35 +25,41 @@ describe("orderDemoSamples", () => {
 describe("samples for picked topics", () => {
   it("follows the first picked kind's sample with the topics' samples", () => {
     expect(
-      orderDemoSamples(["Recipes", "Travel"], ["AI", "Coffee"]).map(
-        (s) => s.domain,
-      ),
-    ).toEqual(["bbcgoodfood.com", "anthropic.com", "jameshoffmann.co.uk"]);
+      orderDemoSamples(
+        ["Recipes", "Travel"],
+        ["AI & tech", "Films, books & music"],
+      ).map((s) => s.domain),
+    ).toEqual(["bbcgoodfood.com", "anthropic.com", "jamesclear.com"]);
   });
 
   it("leads with a topic when no picked kind has a sample", () => {
-    expect(orderDemoSamples(["Fitness"], ["Coffee"])[0]?.domain).toBe(
-      "jameshoffmann.co.uk",
+    expect(orderDemoSamples(["Fitness"], ["AI & tech"])[0]?.domain).toBe(
+      "anthropic.com",
     );
-    expect(featuredDemoKind(["Fitness"], ["Coffee"])).toBe("Articles");
+    expect(featuredDemoKind(["Fitness"], ["AI & tech"])).toBe("Articles");
   });
 
   it("shows a page once when a kind and a topic both offer it", () => {
-    const domains = orderDemoSamples(["Travel"], ["Travel", "Anime"]).map(
-      (s) => s.domain,
-    );
-    expect(domains).toEqual([
-      "prague.eu",
-      "myanimelist.net",
-      "bbcgoodfood.com",
-    ]);
+    const domains = orderDemoSamples(
+      ["Travel"],
+      ["Travel", "Food & recipes"],
+    ).map((s) => s.domain);
+    expect(domains).toEqual(["prague.eu", "bbcgoodfood.com", "apple.com"]);
   });
 
   it("files a topic's sample into that topic's space when it was kept", () => {
-    const url = "https://www.jameshoffmann.co.uk/weird-coffee-science";
-    expect(demoDestination(url, ["Coffee", "Articles"])).toBe("Coffee");
+    const url = "https://www.anthropic.com/research/building-effective-agents";
+    expect(demoDestination(url, ["AI & tech", "Articles"])).toBe("AI & tech");
     expect(demoDestination(url, ["Articles"])).toBe("Articles");
     expect(demoDestination(url, [])).toBeNull();
+  });
+
+  it("files a page a topic shares with a kind into the topic's space", () => {
+    const url = "https://www.bbcgoodfood.com/recipes/classic-lasagne";
+    expect(demoDestination(url, ["Food & recipes", "Recipes"])).toBe(
+      "Food & recipes",
+    );
+    expect(demoDestination(url, ["Recipes"])).toBe("Recipes");
   });
 });
 
