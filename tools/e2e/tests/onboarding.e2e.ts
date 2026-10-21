@@ -9,7 +9,7 @@ import {
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
+import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
 
 // A run that stops partway leaves a signed-in user mid-onboarding, which the
 // seeded flows after this one cannot get past (CI run 39048570372: seven
@@ -51,7 +51,7 @@ test(
     // button brings the paywall back. Sign-in comes only after a purchase.
     const commit = screen.getByRole("button", "I'm in");
     await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallRestore(screen)).toBeHidden({ timeout: 30_000 });
+    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
     await expect(commit).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
     await commit.tap();

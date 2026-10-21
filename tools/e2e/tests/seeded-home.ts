@@ -75,20 +75,7 @@ export function startOnSeededHome(): void {
     });
     await settings.tap();
     const reset = screen.getByTestId("reset-flow-fixtures");
-    // A swipe sent while the Settings sheet is still rising moves nothing,
-    // and the scroll gives up on the first swipe that moves nothing.
-    await expect(screen.getByRole("button", "Sheet Grabber")).toHaveValue(
-      "Expanded",
-      { timeout: 30_000 },
-    );
-    await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-    // Even then a swipe has moved nothing (seen on CI, once in about ten
-    // runs), so the scroll gets one more try after another settle.
-    await screen.scrollUntilVisible(reset).catch(async (error: unknown) => {
-      if (!String(error).includes("moved nothing")) throw error;
-      await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
-      await screen.scrollUntilVisible(reset);
-    });
+    await scrollSettingsTo(screen, reset);
     await reset.tap();
     await screen.getByRole("button", "Reset").tap();
     await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
@@ -147,6 +134,27 @@ async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
     await keepAi.tap();
     await expect(home).toBeVisible({ timeout: 30_000 });
   }
+}
+
+/** Scrolls the open Settings sheet until `target` is on screen. */
+export async function scrollSettingsTo(
+  screen: Screen,
+  target: Locator,
+): Promise<void> {
+  // A swipe sent while the Settings sheet is still rising moves nothing,
+  // and the scroll gives up on the first swipe that moves nothing.
+  await expect(screen.getByRole("button", "Sheet Grabber")).toHaveValue(
+    "Expanded",
+    { timeout: 30_000 },
+  );
+  await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
+  // Even then a swipe has moved nothing (seen on CI, once in about ten
+  // runs), so the scroll gets one more try after another settle.
+  await screen.scrollUntilVisible(target).catch(async (error: unknown) => {
+    if (!String(error).includes("moved nothing")) throw error;
+    await new Promise((resolve) => setTimeout(resolve, SHEET_TRANSITION_MS));
+    await screen.scrollUntilVisible(target);
+  });
 }
 
 /**
