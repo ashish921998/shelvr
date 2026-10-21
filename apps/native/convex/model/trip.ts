@@ -24,8 +24,13 @@ export const STOPS_PER_DAY: Record<TripPace, number> = {
   packed: 7,
 };
 
-/** Places the model may return: a packed trip of the longest length. */
-export const MAX_TRIP_PLACES = STOPS_PER_DAY.packed * MAX_TRIP_DAYS;
+/** Places the model may return for a `days`-day trip: a packed trip of that
+ * length, and never fewer than a packed 5-day trip's, so a short trip keeps a
+ * wishlist. Every place costs a Maps lookup, so a 2-day trip does not ask for
+ * a 15-day trip's worth. */
+export function tripPlaceCap(days: number): number {
+  return STOPS_PER_DAY.packed * Math.max(days, 5);
+}
 
 export const TRIP_SLOTS = [
   "morning",
