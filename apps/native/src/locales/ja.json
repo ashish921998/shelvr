@@ -114,6 +114,7 @@
   "planGate.title": "Shelvrを開くにはプランを選んでください",
   "planGate.body": "保存したものはそのまま残っています。",
   "planGate.seePlans": "プランを見る",
+  "paywall.trialOffer": "%{zero}で始めて、その後は%{price}/年。",
   "common.notNow": "今はしない",
   "legal.termsShort": "利用規約",
   "legal.privacyShort": "プライバシー",

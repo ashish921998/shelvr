@@ -150,10 +150,26 @@ describe("paywall offering reads", () => {
         product: { identifier: `product_${index}`, introPrice },
       })),
     },
+    all: {},
   });
+  const noTrial = { identifier: "weekly_annual_draft", availablePackages: [] };
+  const withNoTrial = (current: ReturnType<typeof offering>) => ({
+    ...current,
+    all: { weekly_annual_draft: noTrial },
+  });
+  const INTRO_ELIGIBILITY_STATUS = {
+    INTRO_ELIGIBILITY_STATUS_UNKNOWN: 0,
+    INTRO_ELIGIBILITY_STATUS_INELIGIBLE: 1,
+    INTRO_ELIGIBILITY_STATUS_ELIGIBLE: 2,
+    INTRO_ELIGIBILITY_STATUS_NO_INTRO_OFFER_EXISTS: 3,
+  };
+  const answers = (...statuses: number[]) =>
+    Object.fromEntries(
+      statuses.map((status, index) => [`product_${index}`, { status }]),
+    );
   const load = async (rc: object) => {
     vi.doMock("@/lib/revenuecat-module", () => ({
-      getPurchases: () => ({ INTRO_ELIGIBILITY_STATUS: {}, ...rc }),
+      getPurchases: () => ({ INTRO_ELIGIBILITY_STATUS, ...rc }),
     }));
     return await loadFunnel();
   };
@@ -178,6 +194,116 @@ describe("paywall offering reads", () => {
     await expect(funnel.readPaywallOffering()).resolves.toEqual({
       offering: current.current,
       trial: { unit: "WEEK", count: 2 },
+    });
+  });
+
+  it("shows the no-trial offering to someone who used their trial", async () => {
+    const funnel = await load({
+      getOfferings: async () => withNoTrial(offering(trial("DAY", 7), null)),
+      // Yearly's trial is spent and weekly never had one.
+      checkTrialOrIntroductoryPriceEligibility: async () => answers(1, 3),
+    });
+    await expect(funnel.readPaywallOffering()).resolves.toEqual({
+      offering: noTrial,
+    });
+  });
+
+  it("keeps the current offering unless the trial is definitely spent", async () => {
+    for (const statuses of [
+      [2, 3],
+      [0, 3],
+    ]) {
+      const current = withNoTrial(offering(trial("DAY", 7), null));
+      const funnel = await load({
+        getOfferings: async () => current,
+        checkTrialOrIntroductoryPriceEligibility: async () =>
+          answers(...statuses),
+      });
+      await expect(funnel.readPaywallOffering()).resolves.toMatchObject({
+        offering: current.current,
+        trial: { unit: "DAY", count: 7 },
+      });
+    }
+  });
+
+  it("keeps the current offering when the eligibility read fails or stalls", async () => {
+    vi.useFakeTimers();
+    for (const check of [
+      async () => {
+        throw new Error("offline");
+      },
+      () => new Promise(() => {}),
+    ]) {
+      const current = withNoTrial(offering(trial("DAY", 7), null));
+      const funnel = await load({
+        getOfferings: async () => current,
+        checkTrialOrIntroductoryPriceEligibility: check,
+      });
+      const read = funnel.readPaywallOffering();
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(read).resolves.toEqual({
+        offering: current.current,
+        trial: { unit: "DAY", count: 7 },
+      });
+    }
+  });
+
+  it("skips the eligibility check when no no-trial offering exists", async () => {
+    const check = vi.fn();
+    const current = offering(trial("DAY", 7), null);
+    const funnel = await load({
+      getOfferings: async () => current,
+      checkTrialOrIntroductoryPriceEligibility: check,
+    });
+    await expect(funnel.readPaywallOffering()).resolves.toMatchObject({
+      offering: current.current,
+    });
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it("offers $0.00 on the opener only from an eligible yearly trial", async () => {
+    const funnel = await loadFunnel();
+    const yearly = {
+      priceString: "$39.99",
+      currencyCode: "USD",
+      subscriptionPeriod: "P1Y",
+      introPrice: trial("DAY", 7),
+    };
+    const weekly = {
+      priceString: "$12.99",
+      currencyCode: "USD",
+      subscriptionPeriod: "P1W",
+      introPrice: null,
+    };
+    expect(funnel.trialOfferVariables([weekly, yearly], "eligible")).toEqual({
+      trial_offer: {
+        type: "string",
+        value: "Start for $0.00, then $39.99/year.",
+      },
+    });
+    expect(funnel.trialOfferVariables([weekly, yearly], "ineligible")).toEqual(
+      {},
+    );
+    expect(funnel.trialOfferVariables([weekly, yearly], undefined)).toEqual({});
+    expect(
+      funnel.trialOfferVariables(
+        [weekly, { ...yearly, introPrice: null }],
+        "eligible",
+      ),
+    ).toEqual({});
+    expect(funnel.paywallVariables(0, undefined, [weekly], "eligible")).toBe(
+      undefined,
+    );
+    expect(
+      funnel.paywallVariables(
+        0,
+        { unit: "DAY", count: 7 },
+        [yearly],
+        "eligible",
+      ),
+    ).toMatchObject({
+      trial_end_day: { type: "string", value: "7" },
+      trial_offer: { type: "string" },
     });
   });
 

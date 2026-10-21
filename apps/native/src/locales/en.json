@@ -114,6 +114,7 @@
   "planGate.title": "Pick a plan to open Shelvr",
   "planGate.body": "Your saves stay right where you left them.",
   "planGate.seePlans": "See plans",
+  "paywall.trialOffer": "Start for %{zero}, then %{price}/year.",
   "common.notNow": "Not now",
   "legal.termsShort": "Terms",
   "legal.privacyShort": "Privacy",

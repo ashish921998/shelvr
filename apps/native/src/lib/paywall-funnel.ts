@@ -4,7 +4,8 @@ import {
   type PaywallContext,
   type TrialEligibility,
 } from "@/lib/analytics";
-import type { TrialPeriod } from "@/lib/date";
+import { trialTimelineVariables, type TrialPeriod } from "@/lib/date";
+import { formattingLocale, t } from "@/lib/i18n";
 import { getPurchases } from "@/lib/revenuecat-module";
 import { restoreFoundAccess } from "@/lib/paywall-result";
 
@@ -200,31 +201,100 @@ export async function readPaywallContext(): Promise<PaywallContext> {
   return { offering_id: offering.identifier, ...eligibility };
 }
 
+/** The offering shown instead of the current one to someone who has already
+ * used their free trial. The current offering's early pages promise the
+ * trial, and RevenueCat can only check trial eligibility on the last page, so
+ * those pages would make that promise to a person who pays today. This one
+ * keeps every trial line on its plans page, where it follows eligibility. */
+export const NO_TRIAL_OFFERING_ID = "weekly_annual_draft";
+
 /** The offering the paywall is about to show and the free trial on it, so the
  * timeline dates describe the plan being sold. Call it once RevenueCat
  * identity sync is ready (offerings can be targeted per account) and present
- * the returned offering, so the sheet and its dates come from one snapshot.
+ * the returned offering, so the sheet and its labels come from one snapshot.
  * Empty when the read fails or stalls: the sheet then resolves its own
- * offering and shows no dates. */
+ * offering and shows its dashboard defaults. */
 export async function readPaywallOffering(): Promise<{
   offering?: import("react-native-purchases").PurchasesOffering;
   trial?: TrialPeriod;
 }> {
   const rc = getPurchases();
   if (!rc) return {};
-  return withTimeout(
-    rc.getOfferings().then(({ current }) =>
-      current
-        ? {
-            offering: current,
-            trial: singleTrialPeriod(
-              current.availablePackages.map((pkg) => pkg.product),
-            ),
-          }
-        : {},
-    ),
+  const startedAt = Date.now();
+  const offerings = await withTimeout(
+    rc.getOfferings(),
     PAYWALL_CONTEXT_TIMEOUT_MS,
   );
+  const current = offerings.current;
+  if (!current) return {};
+  const products = current.availablePackages.map((pkg) => pkg.product);
+  const noTrial = offerings.all[NO_TRIAL_OFFERING_ID];
+  if (noTrial && noTrial.identifier !== current.identifier) {
+    const ids = products.map((product) => product.identifier);
+    // Its own bounded read: a failed or stalled answer counts as unknown, so
+    // the current offering keeps its dates and price instead of losing them.
+    const { eligibility } = await withTimeout(
+      rc.checkTrialOrIntroductoryPriceEligibility(ids).then((answers) => ({
+        eligibility: foldTrialEligibility(
+          ids.map((id) => answers[id]?.status),
+          rc.INTRO_ELIGIBILITY_STATUS,
+        ),
+      })),
+      Math.max(0, PAYWALL_CONTEXT_TIMEOUT_MS - (Date.now() - startedAt)),
+    );
+    // Only a definite "no" switches: an unknown answer keeps the paywall
+    // the dashboard chose.
+    if (eligibility === "ineligible") return { offering: noTrial };
+  }
+  return {
+    offering: current,
+    trial: singleTrialPeriod(products),
+  };
+}
+
+/** Every `{{ custom.* }}` value the main paywall reads: the trial timeline
+ * when the trial length is known, and the opener's `trial_offer` line.
+ * Undefined when there is nothing to fill, so the sheet keeps its dashboard
+ * defaults. */
+export function paywallVariables(
+  now: number,
+  trial: TrialPeriod | undefined,
+  products: TrialOfferProduct[],
+  eligibility: TrialEligibility | undefined,
+) {
+  const variables = {
+    ...(trial && trialTimelineVariables(now, trial)),
+    ...trialOfferVariables(products, eligibility),
+  };
+  return Object.keys(variables).length > 0 ? variables : undefined;
+}
+
+type TrialOfferProduct = {
+  priceString: string;
+  currencyCode: string;
+  subscriptionPeriod: string | null;
+  introPrice: { price: number } | null;
+};
+
+/** The paywall opener's "Start for $0.00, then $39.99/year." line, filled
+ * into `{{ custom.trial_offer }}`. Only for someone the store says can still
+ * take the trial, and only from a yearly plan that has one, so the opener never
+ * offers $0.00 the plan screen won't. Empty otherwise, like the dashboard
+ * default, so a build that passes nothing shows no line. */
+export function trialOfferVariables(
+  products: TrialOfferProduct[],
+  eligibility: TrialEligibility | undefined,
+): Record<string, { type: "string"; value: string }> {
+  const yearly = products.find(
+    (p) => p.subscriptionPeriod === "P1Y" && p.introPrice?.price === 0,
+  );
+  if (eligibility !== "eligible" || !yearly) return {};
+  const zero = new Intl.NumberFormat(formattingLocale(), {
+    style: "currency",
+    currency: yearly.currencyCode,
+  }).format(0);
+  const value = t("paywall.trialOffer", { zero, price: yearly.priceString });
+  return { trial_offer: { type: "string", value } };
 }
 
 /** The free trial the offering's packages share. The paywall has one trial
