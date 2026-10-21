@@ -76,6 +76,17 @@ only loads bundles whose native fingerprint matches. Rebuild with
 
 ## Getting into a specific state
 
+- **Match the served paywall.** Before auditing paywall copy or layout, check
+  that the development RevenueCat project's current offering matches the
+  production current offering. Development's older `default` offering shows
+  the V1 paywall, so QA against it gives misleading results. Test-store prices
+  stay separate from Apple's. The exit offer needs an offering identified as
+  `exit_offer` whose package has an eligible introductory price
+  (`src/lib/exit-offer.ts` returns nothing without one). Its paywall workflow
+  must also be published in the dashboard: publishing only the legacy paywall
+  through the v2 API leaves the workflow a draft, and the SDK then shows
+  "No Paywall configured".
+
 - **First-run onboarding.** Terminate the app, then
   `xcrun simctl keychain <udid> reset`. This clears the auth token, the
   onboarded flag and pending onboarding progress together, so the next launch

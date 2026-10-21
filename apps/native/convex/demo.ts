@@ -5,7 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { beginProcessingRun } from "./items";
 import { requireUserId } from "./model/auth";
-import { demoError } from "./model/demoErrors";
+import { demoError, MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure, MAX_ITEM_TITLE_CHARS } from "./model/itemFields";
 import { insertMembership } from "./model/memberships";
@@ -15,9 +15,6 @@ import { rateLimiter } from "./model/rateLimiter";
 // User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
 // a ConvexError with structured data the client branches on. A plain Error's
 // message is redacted to "Server Error" in production.
-
-/** Total retry cap for the demo item, on top of the demoRetry rate limiter's cooldown. */
-export const MAX_DEMO_RETRIES = 5;
 
 const demoStatusValidator = v.union(
   v.literal("processing"),

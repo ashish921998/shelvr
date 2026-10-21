@@ -1,6 +1,7 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
@@ -909,23 +910,24 @@ function SaveStatusNotice({
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
-          onPress={() =>
-            guard(async () => {
-              setRetrying(true);
-              try {
-                const scheduled = await reprocess({ id: item._id });
-                if (!scheduled) {
-                  // The server still sees this run as live. Usually a device
-                  // clock running ahead of the backend's stale threshold.
-                  Alert.alert(t("item.stillWorking"), t("item.retryLater"));
-                }
-              } catch {
-                Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
-              } finally {
-                setRetrying(false);
+          // Asked of the server first: the onboarding demo save keeps a free
+          // retry without Pro, and only a pro_required answer opens the paywall.
+          onPress={async () => {
+            setRetrying(true);
+            try {
+              const scheduled = await reprocess({ id: item._id });
+              if (!scheduled) {
+                // The server still sees this run as live. Usually a device
+                // clock running ahead of the backend's stale threshold.
+                Alert.alert(t("item.stillWorking"), t("item.retryLater"));
               }
-            })
-          }
+            } catch (error) {
+              if (saveErrorCode(error) === "pro_required") await guard();
+              else Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
+            } finally {
+              setRetrying(false);
+            }
+          }}
           disabled={retrying || entitlementLoading}
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
