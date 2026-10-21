@@ -232,6 +232,29 @@ describe("paywall offering reads", () => {
     }
   });
 
+  it("keeps the current offering when the eligibility read fails or stalls", async () => {
+    vi.useFakeTimers();
+    for (const check of [
+      async () => {
+        throw new Error("offline");
+      },
+      () => new Promise(() => {}),
+    ]) {
+      const current = withNoTrial(offering(trial("DAY", 7), null));
+      const funnel = await load({
+        getOfferings: async () => current,
+        checkTrialOrIntroductoryPriceEligibility: check,
+      });
+      const read = funnel.readPaywallOffering();
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(read).resolves.toEqual({
+        offering: current.current,
+        trial: { unit: "DAY", count: 7 },
+        yearlyPrice: "€44.99",
+      });
+    }
+  });
+
   it("skips the eligibility check when no no-trial offering exists", async () => {
     const check = vi.fn();
     const current = offering(trial("DAY", 7), null);

@@ -221,29 +221,37 @@ export async function readPaywallOffering(): Promise<{
 }> {
   const rc = getPurchases();
   if (!rc) return {};
-  const read = async () => {
-    const { current, all } = await rc.getOfferings();
-    if (!current) return {};
-    const products = current.availablePackages.map((pkg) => pkg.product);
-    const noTrial = all[NO_TRIAL_OFFERING_ID];
-    if (noTrial && noTrial.identifier !== current.identifier) {
-      const ids = products.map((product) => product.identifier);
-      const answers = await rc.checkTrialOrIntroductoryPriceEligibility(ids);
-      const eligibility = foldTrialEligibility(
-        ids.map((id) => answers[id]?.status),
-        rc.INTRO_ELIGIBILITY_STATUS,
-      );
-      // Only a definite "no" switches: an unknown answer keeps the paywall
-      // the dashboard chose.
-      if (eligibility === "ineligible") return { offering: noTrial };
-    }
-    return {
-      offering: current,
-      trial: singleTrialPeriod(products),
-      yearlyPrice: yearlyPriceString(current.availablePackages),
-    };
+  const startedAt = Date.now();
+  const offerings = await withTimeout(
+    rc.getOfferings(),
+    PAYWALL_CONTEXT_TIMEOUT_MS,
+  );
+  const current = offerings.current;
+  if (!current) return {};
+  const products = current.availablePackages.map((pkg) => pkg.product);
+  const noTrial = offerings.all[NO_TRIAL_OFFERING_ID];
+  if (noTrial && noTrial.identifier !== current.identifier) {
+    const ids = products.map((product) => product.identifier);
+    // Its own bounded read: a failed or stalled answer counts as unknown, so
+    // the current offering keeps its dates and price instead of losing them.
+    const { eligibility } = await withTimeout(
+      rc.checkTrialOrIntroductoryPriceEligibility(ids).then((answers) => ({
+        eligibility: foldTrialEligibility(
+          ids.map((id) => answers[id]?.status),
+          rc.INTRO_ELIGIBILITY_STATUS,
+        ),
+      })),
+      Math.max(0, PAYWALL_CONTEXT_TIMEOUT_MS - (Date.now() - startedAt)),
+    );
+    // Only a definite "no" switches: an unknown answer keeps the paywall
+    // the dashboard chose.
+    if (eligibility === "ineligible") return { offering: noTrial };
+  }
+  return {
+    offering: current,
+    trial: singleTrialPeriod(products),
+    yearlyPrice: yearlyPriceString(current.availablePackages),
   };
-  return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
 }
 
 /** The yearly plan's localized price ("$39.99"), for the early pages that
