@@ -70,8 +70,11 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 90
     # The flows split over two runners, each with its own simulator and
-    # backend, balanced on the 2026-10-21 timings: about 8 minutes of flows
+    # backend, balanced on the 2026-10-21 timings: 7 to 10 minutes of flows
     # each once setup is done. One shard failing does not stop the other.
+    # A shard runs its files in name order. Onboarding stays behind
+    # create-space, as on a single runner: as the first flow on a fresh
+    # simulator it lost the driver twice ("Daemon request timed out").
     strategy:
       fail-fast: false
       matrix:
@@ -79,15 +82,15 @@ jobs:
           - name: a
             tests: >-
               tests/create-space.e2e.ts
+              tests/onboarding.e2e.ts
               tests/paywall.e2e.ts
-              tests/search.e2e.ts
           - name: b
             tests: >-
-              tests/onboarding.e2e.ts
-              tests/save-note.e2e.ts
               tests/save-link-fixture.e2e.ts
-              tests/space-suggestions.e2e.ts
+              tests/save-note.e2e.ts
+              tests/search.e2e.ts
               tests/search-no-results.e2e.ts
+              tests/space-suggestions.e2e.ts
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
