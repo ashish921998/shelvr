@@ -21,6 +21,13 @@ describe("deferred sheet link", () => {
     expect(releaseSheetLink(false)).toBeNull();
   });
 
+  it("discards a queued sheet when a newer content link arrives", () => {
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://add");
+    rememberSheetLink("shelvr://item/abc");
+    expect(releaseSheetLink(false)).toBeNull();
+  });
+
   it("ignores a link once the plan is known, since it routes normally", () => {
     releaseSheetLink(false);
     rememberSheetLink("shelvr://add");

@@ -25,6 +25,7 @@ import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
+import { rememberSheetLink, sheetRouteOf } from "@/lib/deferred-sheet-link";
 import { resolveRootHref } from "@/lib/home-href";
 
 const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
@@ -264,8 +265,14 @@ export function useNotificationObserver(planPending = false): void {
           notificationField(notification, "notificationId") ?? "",
       });
       const href = resolveRootHref(url);
-      if (pendingRef.current) queued.current = href;
-      else nav.push(href as never);
+      if (!pendingRef.current) {
+        nav.push(href as never);
+        return;
+      }
+      // One queue for the newest destination: a sheet waits in
+      // deferred-sheet-link (opened only for Pro), anything else replaces it.
+      rememberSheetLink(href);
+      queued.current = sheetRouteOf(href) ? null : href;
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this

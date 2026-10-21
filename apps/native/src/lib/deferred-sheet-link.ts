@@ -23,10 +23,10 @@ export function sheetRouteOf(link: string): string | null {
   }
 }
 
+/** Call for every deep link; a newer non-sheet link discards a queued sheet. */
 export function rememberSheetLink(link: string): void {
   if (!holding) return;
-  const route = sheetRouteOf(link);
-  if (route) pending = route;
+  pending = sheetRouteOf(link);
 }
 
 /** Sets whether the plan is still loading; once known, hands back the link. */

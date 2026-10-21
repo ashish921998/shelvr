@@ -324,8 +324,26 @@ describe("notification opens", () => {
     expect(mock.push).toHaveBeenCalledWith("/digest/abc");
   });
 
-  it("holds a cold-launch tap until the plan is known, then opens it", () => {
+  it("leaves a sheet tap to the deferred sheet queue while the plan loads", async () => {
+    const { releaseSheetLink } = await import("./deferred-sheet-link");
+    releaseSheetLink(true);
     mock.lastResponse = opened({ url: "/add", kind: "trial_reminder" });
+    const { rerender } = renderHook(
+      ({ pending }) => useNotificationObserver(pending),
+      { initialProps: { pending: true } },
+    );
+    rerender({ pending: false });
+    // The layout opens it from the queue, and only for Pro.
+    expect(mock.push).not.toHaveBeenCalled();
+    expect(releaseSheetLink(false)).toBe("/add");
+  });
+
+  it("holds a cold-launch tap until the plan is known, then opens it", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("./deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://add");
+    mock.lastResponse = opened({ url: "/item/abc", kind: "save_reminder" });
     const { rerender } = renderHook(
       ({ pending }) => useNotificationObserver(pending),
       { initialProps: { pending: true } },
@@ -333,9 +351,11 @@ describe("notification opens", () => {
     expect(mock.push).not.toHaveBeenCalled();
     rerender({ pending: false });
     expect(mock.push).toHaveBeenCalledTimes(1);
-    expect(mock.push).toHaveBeenCalledWith("/add");
+    expect(mock.push).toHaveBeenCalledWith("/item/abc");
     rerender({ pending: false });
     expect(mock.push).toHaveBeenCalledTimes(1);
+    // The newer item tap discarded the Add link queued before it.
+    expect(releaseSheetLink(false)).toBeNull();
   });
 
   // Installed builds keep receiving payloads from the currently deployed
