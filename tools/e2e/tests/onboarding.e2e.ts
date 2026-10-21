@@ -9,7 +9,7 @@ import {
   walkToFirstSave,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
+import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
 
 // A run that stops partway leaves a signed-in user mid-onboarding, which the
 // seeded flows after this one cannot get past (CI run 39048570372: seven
@@ -55,7 +55,7 @@ test(
     // A close is a decline, and onboarding ends on the plan gate: no entry
     // without a plan.
     await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallRestore(screen)).toBeHidden({
+    await expect(paywallTitle(screen)).toBeHidden({
       timeout: 30_000,
     });
     await expect(screen.getByRole("button", "See plans")).toBeVisible({
@@ -71,10 +71,10 @@ test(
     // Declining only suppresses replay for that session. Pending starter
     // spaces intentionally ask again on the next launch (replay-onboarding).
     // Wait for that sheet rather than accepting the gate underneath it.
-    await expect(paywallRestore(screen)).toBeVisible({ timeout: 180_000 });
+    await expect(paywallTitle(screen)).toBeVisible({ timeout: 180_000 });
     await expectPaywall(screen);
     await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallRestore(screen)).toBeHidden({ timeout: 30_000 });
+    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
     await expect(screen.getByRole("button", "See plans")).toBeVisible({
       timeout: 30_000,
     });
