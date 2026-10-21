@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { analytics } from "@/lib/analytics";
+import { useCurrentUser } from "@/lib/current-user";
 import { useOnboarding } from "@/lib/onboarding";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
@@ -87,6 +88,11 @@ function pendingWorkKey(): string {
 export function useReplayOnboarding() {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
+  // The paywall's identity gate needs the account: asked before the user doc
+  // lands, RevenueCat has no one to log in yet, so it gives up at once and
+  // the person sees the fallback paywall instead of the real one.
+  const { data: user } = useCurrentUser();
+  const accountLoaded = user != null;
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
@@ -123,6 +129,7 @@ export function useReplayOnboarding() {
       settledWorkRef.current = null;
     }
     if (!isAuthenticated) return;
+    if (!accountLoaded) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
     if (runningRef.current) {
@@ -255,6 +262,7 @@ export function useReplayOnboarding() {
     void run();
   }, [
     isAuthenticated,
+    accountLoaded,
     onboarded,
     createSpace,
     createLinkItem,
