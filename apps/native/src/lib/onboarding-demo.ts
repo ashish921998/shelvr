@@ -55,11 +55,16 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
   },
 ];
 
-const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.map((interest) => ({
-  kind: "Articles",
-  interest,
-  ...INTEREST_PAGES[interest],
-}));
+// A topic's sample is an article, or the very sample of the kind it names,
+// with that kind, so every lookup of a page agrees on what it is.
+const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.flatMap(
+  (interest) => {
+    const page = INTEREST_PAGES[interest];
+    if (!("sampleOf" in page)) return [{ kind: "Articles", interest, ...page }];
+    const shared = DEMO_SAMPLES.find((sample) => sample.kind === page.sampleOf);
+    return shared === undefined ? [] : [{ ...shared, interest }];
+  },
+);
 
 const SAMPLE_COUNT = 3;
 

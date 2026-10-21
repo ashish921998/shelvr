@@ -22,32 +22,21 @@ export function isInterest(value: string): value is Interest {
 
 // Real pages, checked with readPage to return a title and readable text.
 // pageHeading and domain are the page's own text and stay untranslated.
-export const INTEREST_PAGES: Record<
-  Interest,
-  { url: string; pageHeading: string; domain: string }
-> = {
-  // Travel, Food and Style offer the same pages as the Travel, Recipes and
-  // Products kinds' samples; the picker shows a shared page once.
-  Travel: {
-    url: "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/",
-    pageHeading: "Old Town Square",
-    domain: "prague.eu",
-  },
-  "Food & recipes": {
-    url: "https://www.bbcgoodfood.com/recipes/classic-lasagne",
-    pageHeading: "Easy classic lasagne",
-    domain: "bbcgoodfood.com",
-  },
+// A topic whose subject has a setup kind with a sample (Travel, Recipes,
+// Products) names that kind and uses its sample, so the page is defined once.
+type InterestPage =
+  | { url: string; pageHeading: string; domain: string }
+  | { sampleOf: "Travel" | "Recipes" | "Products" };
+
+export const INTEREST_PAGES: Record<Interest, InterestPage> = {
+  Travel: { sampleOf: "Travel" },
+  "Food & recipes": { sampleOf: "Recipes" },
   "Home & design": {
     url: "https://www.architecturaldigest.com/story/small-living-room-ideas",
     pageHeading: "51 Small Living Room Ideas for a Cozy Common Area",
     domain: "architecturaldigest.com",
   },
-  "Style & shopping": {
-    url: "https://www.apple.com/airpods-pro/",
-    pageHeading: "AirPods Pro 3",
-    domain: "apple.com",
-  },
+  "Style & shopping": { sampleOf: "Products" },
   "Fitness & wellness": {
     url: "https://www.healthline.com/health/fitness/7-minute-workout",
     pageHeading: "How Effective is the 7-Minute Workout? We Asked a Trainer",

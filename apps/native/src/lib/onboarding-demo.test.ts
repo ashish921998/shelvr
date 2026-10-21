@@ -39,6 +39,17 @@ describe("samples for picked topics", () => {
     expect(featuredDemoKind(["Fitness"], ["AI & tech"])).toBe("Articles");
   });
 
+  it.each([
+    ["Food & recipes", "bbcgoodfood.com", "Recipes"],
+    ["Style & shopping", "apple.com", "Products"],
+  ] as const)(
+    "names %s's shared sample by its kind when it leads",
+    (interest, domain, kind) => {
+      expect(orderDemoSamples(["Fitness"], [interest])[0]?.domain).toBe(domain);
+      expect(featuredDemoKind(["Fitness"], [interest])).toBe(kind);
+    },
+  );
+
   it("shows a page once when a kind and a topic both offer it", () => {
     const domains = orderDemoSamples(
       ["Travel"],
