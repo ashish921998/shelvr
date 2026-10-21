@@ -10,6 +10,7 @@ import {
   activeProductId,
   forgetPaywallFunnel,
   hasActiveEntitlement,
+  paywallVariables,
   readPaywallContext,
   readPaywallOffering,
   recordAccess,
@@ -20,19 +21,6 @@ import {
 } from "@/lib/paywall-funnel";
 import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
-import {
-  EXIT_OFFERING_ID,
-  EXIT_OFFER_WINDOW_MS,
-  exitOfferDue,
-  exitOfferEndsAt,
-  exitOfferShownKey,
-  findExitOffering,
-  parseShownAt,
-  timeLeft,
-} from "@/lib/exit-offer";
-import { t } from "@/lib/i18n";
-import { trialTimelineVariables } from "@/lib/date";
-import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
@@ -48,11 +36,11 @@ import {
   REVENUECAT_DISABLED_BY_BUILD,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
-import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
-import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import { reservePurchaseLanding } from "@/lib/purchase-landing";
 
 /**
  * Shelvr Pro entitlement.
@@ -389,13 +377,26 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const enriched = { ...properties, ...(await context) };
     // Read after identity sync, so the dates come from this account's
     // offering, and presented from the same snapshot. An unknown trial length
     // dates nothing: the paywall falls back to its undated labels instead of
     // claiming a length the offer may not have.
-    const { offering, trial } = await readPaywallOffering();
-    const customVariables = trial && trialTimelineVariables(Date.now(), trial);
+    const { offering, trial, eligibility } = await readPaywallOffering();
+    // The events name the offering actually shown, which differs from the
+    // current one for someone who has already used their trial, and the trial
+    // answer read with it, which the early read can miss on a cold sign-in.
+    const enriched = {
+      ...properties,
+      ...(await context),
+      ...(offering && { offering_id: offering.identifier }),
+      ...(eligibility && { trial_eligible: eligibility }),
+    };
+    const customVariables = paywallVariables(
+      Date.now(),
+      trial,
+      offering?.availablePackages.map((pkg) => pkg.product) ?? [],
+      enriched.trial_eligible,
+    );
     const result = await observePaywallPresentation(
       enriched,
       () =>
@@ -408,264 +409,16 @@ async function presentPaywallImpl(
       recordAccess(result === "RESTORED" ? "restore" : "purchase");
     }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
-    const outcome = mapPaywallResult(result);
-    // Dropped as never shown, then settled after all: its callers already
-    // had their answer, so no exit offer follows next to a newer sheet.
-    if (outcome !== "cancelled" || (owner && openSheet !== owner)) {
-      return outcome;
-    }
-    return (await presentExitOffer(rcui, placement)) ?? outcome;
+    return mapPaywallResult(result);
   } catch {
     return "unavailable";
   }
 }
 
-/** An empty restore is a close, so the caller is not told the user subscribed
- * and the exit offer still follows. */
+/** An empty restore is a close, so the caller is not told the user subscribed. */
 async function confirmRestore(result: string): Promise<string> {
   if (result !== "RESTORED") return result;
   return (await restoreCameBackEmpty()) ? "CANCELLED" : result;
-}
-
-// Home re-reads the open offer whenever it is claimed or released.
-const exitOfferListeners = new Set<() => void>();
-const notifyExitOffer = () => exitOfferListeners.forEach((read) => read());
-
-function readShownAt(userId: string): number | null {
-  try {
-    return parseShownAt(SecureStore.getItem(exitOfferShownKey(userId)));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The exit offering for an e2e run that asked for the offer, taken as it is.
- * With RevenueCat's Test Store the offering loads but the intro price checks
- * in `findExitOffering` have not passed on CI, and what the run checks is
- * the sheet, not who qualifies for it.
- */
-async function findForcedExitOffering(
-  rc: NonNullable<ReturnType<typeof getPurchases>>,
-) {
-  try {
-    return (await rc.getOfferings()).all[EXIT_OFFERING_ID] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
-  return {
-    getOfferings: () => rc.getOfferings(),
-    checkEligibility: (ids: string[]) =>
-      rc.checkTrialOrIntroductoryPriceEligibility(ids),
-  };
-}
-
-/**
- * After a paywall close, present the discounted exit offering once (see
- * `exit-offer.ts`). Showing it opens the offer's 24-hour window. Runs inside
- * the same sheet latch as the paywall it follows. Returns null when nothing
- * was shown; a failure after the user already closed the paywall stays a
- * cancel, never the fallback screen.
- */
-async function presentExitOffer(
-  rcui: NonNullable<ReturnType<typeof getRCUI>>,
-  sourcePlacement: string,
-): Promise<PaywallOutcome | null> {
-  const userId = _rcSyncedUserId;
-  const rc = getPurchases();
-  if (!userId || !rc) return null;
-  // The paywall e2e flows close the paywall and expect Home, on a simulator
-  // whose offer may or may not be due, unless the run asked for the offer.
-  const forced = isExitOfferForcedForE2E();
-  if (isProHiddenForE2E() && !forced) return null;
-  const key = exitOfferShownKey(userId);
-  const now = Date.now();
-  let lastShownAt: number | null;
-  try {
-    lastShownAt = parseShownAt(SecureStore.getItem(key));
-  } catch {
-    return null;
-  }
-  if (!exitOfferDue(sourcePlacement, forced ? null : lastShownAt, now))
-    return null;
-  const offering = forced
-    ? await findForcedExitOffering(rc)
-    : await findExitOffering(exitOfferDeps(rc));
-  if (!offering) return null;
-  try {
-    // Claim before presenting, so a crash mid-sheet can't repeat it.
-    SecureStore.setItem(key, String(now));
-  } catch {
-    return null;
-  }
-  notifyExitOffer();
-  // UIKit refuses to present while the first paywall is still dismissing.
-  await waitForSheetTransition();
-  // A sheet that never appeared must not open the window.
-  // Awaited before the sheet latch clears, so a later claim can't race it.
-  const release = async () => {
-    try {
-      if (lastShownAt === null) await SecureStore.deleteItemAsync(key);
-      else SecureStore.setItem(key, String(lastShownAt));
-    } catch {
-      // Best-effort; the worst case is one skipped offer.
-    }
-    notifyExitOffer();
-  };
-  const outcome = await showExitOffering(
-    rcui,
-    offering,
-    sourcePlacement,
-    now + EXIT_OFFER_WINDOW_MS,
-    release,
-  );
-  // The user already closed the paywall, so a failed offer stays a cancel.
-  return outcome === "success" ? outcome : "cancelled";
-}
-
-async function showExitOffering(
-  rcui: NonNullable<ReturnType<typeof getRCUI>>,
-  offering: import("react-native-purchases").PurchasesOffering,
-  sourcePlacement: string,
-  endsAt: number,
-  onNotPresented: () => void | Promise<void> = () => {},
-  onDeclined?: () => void,
-): Promise<PaywallOutcome> {
-  const properties = {
-    placement: "exit_offer",
-    source_placement: sourcePlacement,
-    paywall_attempt_id: randomUUID(),
-    // The exit sheet renders a known offering, so its id needs no SDK read.
-    offering_id: offering.identifier,
-  };
-  analytics.capture("paywall_requested", properties);
-  try {
-    const result = await observePaywallPresentation(
-      properties,
-      () =>
-        // Our own sheet, so the offer can close at its deadline.
-        presentExitSheet({
-          Paywall: rcui.Paywall,
-          offering,
-          customVariables: exitOfferVariables(endsAt),
-          endsAt,
-          onDeclined,
-          // The one paywall mounted as a component, so the one place the
-          // purchase tap itself is observable.
-          onPurchaseStarted: (packageId) =>
-            analytics.capture("paywall_purchase_started", {
-              placement: "exit_offer",
-              paywall_attempt_id: properties.paywall_attempt_id,
-              package_id: packageId,
-            }),
-        }),
-      activeProductId,
-    );
-    if (result === "PURCHASED" || result === "RESTORED") {
-      recordAccess(result === "RESTORED" ? "restore" : "purchase");
-    }
-    if (result === "NOT_PRESENTED" || result === "ERROR")
-      await onNotPresented();
-    // Held until the sheet has slid away, so the latch is not released while
-    // UIKit would still refuse the next paywall.
-    else await whenExitSheetDismissed();
-    return mapPaywallResult(result);
-  } catch {
-    await onNotPresented();
-    return "unavailable";
-  }
-}
-
-/**
- * The time left, filled into the paywall's `{{ custom.offer_ends }}` line when
- * the sheet opens. The dashboard default ("Available for a limited time.")
- * covers older builds that pass nothing.
- */
-function exitOfferVariables(endsAt: number) {
-  const { hours, minutes } = timeLeft(endsAt - Date.now());
-  const value = t("exitOffer.sheetEndsIn", {
-    hours: String(hours),
-    minutes: String(minutes),
-  });
-  return { offer_ends: { type: "string", value } as const };
-}
-
-/**
- * Reopen the exit offer while its window is open. If the window closed or the
- * offering vanished, the regular paywall opens at `fallbackPlacement`
- * instead, so the tap never dead-ends.
- */
-async function presentOpenExitOfferImpl(
-  sourcePlacement: string,
-  fallbackPlacement: string,
-  paywallOnDecline = false,
-): Promise<PaywallOutcome> {
-  if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
-  const userId = _rcSyncedUserId;
-  const rc = getPurchases();
-  const rcui = getRCUI();
-  const endsAt = userId
-    ? exitOfferEndsAt(readShownAt(userId), Date.now())
-    : null;
-  if (!rc || !rcui || endsAt === null)
-    return presentPaywallImpl(fallbackPlacement);
-  if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
-  const offering = await findExitOffering(exitOfferDeps(rc));
-  // The lookup can outlast the window; never sell the offer after it closes.
-  if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
-    return presentPaywallImpl(fallbackPlacement);
-  // Only the person's own close counts. A sheet closed by its deadline or by
-  // a torn-down host must not put another paywall in front of them.
-  let declined = false;
-  const outcome = await showExitOffering(
-    rcui,
-    offering,
-    sourcePlacement,
-    endsAt,
-    undefined,
-    paywallOnDecline ? () => void (declined = true) : undefined,
-  );
-  if (!declined || outcome !== "cancelled") return outcome;
-  // The offer carries one plan, so declining it must still leave the trial
-  // and the other plans one step away. Closing that paywall is inside the
-  // cooldown and does not open the offer again.
-  return presentPaywallImpl(fallbackPlacement);
-}
-
-function subscribeExitOffer(onChange: () => void): () => void {
-  exitOfferListeners.add(onChange);
-  const sub = AppState.addEventListener("change", (state) => {
-    if (state === "active") onChange();
-  });
-  return () => {
-    exitOfferListeners.delete(onChange);
-    sub.remove();
-  };
-}
-
-/**
- * The open exit offer's closing time for this account, or null. Updates when
- * the offer is claimed, released, or expires, and on return to the app.
- */
-export function useExitOfferEndsAt(userId: string | undefined): number | null {
-  const shownAt = useSyncExternalStore(subscribeExitOffer, () =>
-    userId ? readShownAt(userId) : null,
-  );
-  // Re-render at the deadline so the card disappears on time.
-  const [now, setNow] = useState(Date.now);
-  const endsAt = exitOfferEndsAt(shownAt, now);
-  useEffect(() => {
-    if (endsAt === null) return;
-    const timer = setTimeout(
-      () => setNow(Date.now()),
-      Math.max(0, endsAt - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [endsAt]);
-  return endsAt;
 }
 
 // A RevenueCat promise that never settles must not hold the latch for the
@@ -775,10 +528,7 @@ export function isPaywallPending(): boolean {
 /** `owned` is false when this call joined a presentation someone else opened. */
 type Presentation = { outcome: PaywallOutcome; owned: boolean };
 
-async function presentPaywall(
-  placement = "pro_gate",
-  present: () => Promise<PaywallOutcome> = () => presentPaywallImpl(placement),
-): Promise<Presentation> {
+async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
   // iOS presents one sheet at a time. A second presentation raced against a
   // live one leaves both RevenueCat promises unsettled, so neither reports an
   // outcome and the user sees at most one paywall. The `share` placement
@@ -797,10 +547,18 @@ async function presentPaywall(
   });
   // Held before `present` runs, so the presentation can tell it still owns it.
   openSheet = sheet;
-  sheet.paywall = Promise.race([present(), abandoned]).finally(() => {
-    // A stale sheet may already have been replaced; only release our own.
-    releaseSheet(sheet);
-  });
+  // Reserved by the presentation, not its callers, so a caller that joins it
+  // from a later account cannot open the wait with its own reservation.
+  const landing = reservePurchaseLanding();
+  sheet.paywall = Promise.race([presentPaywallImpl(placement), abandoned])
+    .then((outcome) => {
+      if (outcome === "success") landing();
+      return outcome;
+    })
+    .finally(() => {
+      // A stale sheet may already have been replaced; only release our own.
+      releaseSheet(sheet);
+    });
   return { outcome: await sheet.paywall, owned: true };
 }
 
@@ -827,36 +585,15 @@ export async function openPaywall(
   return outcome === "success";
 }
 
-/** `openPaywall` for the Home countdown: reopens the open exit offer. */
-export async function openExitOffer(
-  router: ReturnType<typeof useRouter>,
-): Promise<boolean> {
-  const { outcome, owned } = await presentPaywall("home_countdown", () =>
-    presentOpenExitOfferImpl("home_countdown", "home_card"),
-  );
-  if (owned && shouldOpenPaywallFallback(outcome)) {
-    router.push("/(app)/paywall");
-  }
-  return outcome === "success";
-}
-
 /**
- * `openPaywall` that keeps an open exit offer: while its window is open the
- * discounted sheet opens instead of full price, so someone who just closed
- * the offer is not shown the higher price on their next tap. With
- * `paywallOnDecline`, declining it there opens the regular paywall: right for
- * a tap, too much for a sheet nobody asked for. Otherwise it is `openPaywall`,
- * exit offer on close included. Returns the outcome itself, so onboarding can
- * tell a paywall that never showed from one that was closed.
+ * `openPaywall` that returns the outcome itself, so onboarding can tell a
+ * paywall that never showed from one that was closed.
  */
-export async function openPaywallKeepingExitOffer(
+export async function openPaywallOutcome(
   router: ReturnType<typeof useRouter>,
   placement: string,
-  paywallOnDecline: boolean,
 ): Promise<PaywallOutcome> {
-  const { outcome, owned } = await presentPaywall(placement, () =>
-    presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
-  );
+  const { outcome, owned } = await presentPaywall(placement);
   // Onboarding finishes whatever the outcome, which swaps the screens under
   // a pushed fallback. The app's own Pro gates offer the paywall again.
   if (
@@ -922,6 +659,7 @@ type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
  * that Restore is hidden inside the paywall or Customer Center.
  */
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return "unavailable";
 
   const rc = getPurchases();
@@ -934,6 +672,7 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
     // does, but only while nothing is entitled: restoring an already-visible
     // entitlement made nothing new visible, so it reports nothing.
     if (!hasActiveEntitlement()) recordAccess("restore");
+    landing();
     return "restored";
   } catch {
     return "unavailable";

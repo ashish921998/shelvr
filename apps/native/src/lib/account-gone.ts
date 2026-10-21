@@ -3,7 +3,6 @@ import { useConvexAuth } from "convex/react";
 import { useEffect } from "react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
 
@@ -31,7 +30,6 @@ export function useSignOutWhenAccountGone(): void {
     // local tokens, so a failure here is local storage only.
     const signOutGone = async () => {
       await signOut();
-      await clearExitOfferReminder();
       await clearFirstSaveReminder();
       await clearTrialReminder();
     };

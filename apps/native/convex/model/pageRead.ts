@@ -31,6 +31,12 @@ export { fetchXoEmbed, fetchXPost } from "./readers/x";
 export { parseInstagramEmbed, fetchInstagram } from "./readers/instagram";
 export { pinterestPage } from "./readers/pinterest";
 
+/** Largest page preview copied into storage. Some sites serve their hero as a
+ * full-size PNG (a Time Out one was 3.8 MB), and a 3 MB cap left those saves
+ * as text cards although the page had a picture. Still well under the 14 MB a
+ * saved photo may be. */
+const MAX_POSTER_BYTES = 8 * 1024 * 1024;
+
 /**
  * Copy a preview into Convex storage through the connection-bound URL policy.
  * Clients receive only the stored copy. A refused or oversized image leaves
@@ -42,7 +48,7 @@ export async function storePoster(
 ): Promise<Id<"_storage"> | undefined> {
   const result = await safeFetch(imageUrl, {
     timeoutMs: 10000,
-    maxBytes: 3 * 1024 * 1024,
+    maxBytes: MAX_POSTER_BYTES,
     allowContentType: (ct) =>
       ct.startsWith("image/jpeg") ||
       ct.startsWith("image/png") ||

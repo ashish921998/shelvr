@@ -18,7 +18,7 @@ vi.mock("convex/react", () => ({
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => state.entitlement,
-  openPaywallKeepingExitOffer: state.open,
+  openPaywallOutcome: state.open,
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   notePurchasedDuringOnboarding: state.purchased,
