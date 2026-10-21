@@ -6,6 +6,9 @@
 const PURCHASE_LANDING_MS = 10_000;
 
 let landingUntil = 0;
+// Bumped on sign-out, so a store call that started under the old account
+// cannot open a wait for the next one.
+let session = 0;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((listener) => listener());
 
@@ -30,4 +33,21 @@ export function settlePurchaseLanding() {
   if (landingUntil === 0) return;
   landingUntil = 0;
   notify();
+}
+
+/**
+ * Call before a store purchase or restore starts. The returned function opens
+ * the wait, unless the account signed out while the store call ran.
+ */
+export function reservePurchaseLanding() {
+  const at = session;
+  return () => {
+    if (at === session) notePurchaseLanding();
+  };
+}
+
+/** The account signed out: end its wait and void any store call in flight. */
+export function endPurchaseLandingSession() {
+  session += 1;
+  settlePurchaseLanding();
 }

@@ -17,22 +17,36 @@ const keys = (userId: string) => [
 ];
 
 const forgotten = new Set<string>();
+let cancelled = false;
+
+// Async wrappers turn a synchronous throw into a rejection, so one failure
+// never skips the rest.
+const settle = (steps: (() => unknown)[]) =>
+  Promise.allSettled(steps.map(async (step) => step()));
+
+/** The reminder is per device, so it goes even before the account is known. */
+export async function cancelExitOfferReminder(): Promise<void> {
+  if (cancelled) return;
+  cancelled = true;
+  await settle([
+    () => Notifications.cancelScheduledNotificationAsync(REMINDER_ID),
+  ]);
+}
 
 export async function forgetExitOffer(userId: string): Promise<void> {
   if (forgotten.has(userId)) return;
   forgotten.add(userId);
-  const steps = [
-    () => Notifications.cancelScheduledNotificationAsync(REMINDER_ID),
-    ...keys(userId).map((key) => () => SecureStore.deleteItemAsync(key)),
-  ];
-  // Async wrappers turn a synchronous throw into a rejection, so one failure
-  // never skips the rest.
-  await Promise.allSettled(steps.map(async (step) => step()));
+  await settle(
+    keys(userId).map((key) => () => SecureStore.deleteItemAsync(key)),
+  );
 }
 
 export function useForgetExitOffer(): void {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
+  useEffect(() => {
+    void cancelExitOfferReminder();
+  }, []);
   useEffect(() => {
     if (userId) void forgetExitOffer(userId);
   }, [userId]);

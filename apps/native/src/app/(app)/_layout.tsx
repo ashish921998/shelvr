@@ -2,7 +2,7 @@ import { AiConsentCard } from "@/components/ai-consent";
 import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
-import { settlePurchaseLanding } from "@/lib/purchase-landing";
+import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
@@ -81,7 +81,7 @@ function AppStack() {
   const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
   // The wait belongs to the account that paid; signing out ends it.
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) settlePurchaseLanding();
+    if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
   }, [isAuthenticated, isLoading]);
   // No entry without a plan. Until the plan is known the plan gate shows,
   // waiting with sign-out in reach, so a stalled entitlement read is no way

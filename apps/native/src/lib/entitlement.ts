@@ -40,7 +40,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
-import { notePurchaseLanding } from "@/lib/purchase-landing";
+import { reservePurchaseLanding } from "@/lib/purchase-landing";
 
 /**
  * Shelvr Pro entitlement.
@@ -565,6 +565,7 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
+  const landing = reservePurchaseLanding();
   const { outcome, owned } = await presentPaywall(placement);
   // Only the caller that opened the sheet may route. Joined callers share the
   // same `unavailable`, and a second push stacks a second paywall screen.
@@ -575,7 +576,7 @@ export async function openPaywall(
   // re-taps. Remember the block so the guard that later lets the action
   // through can report the resume, and whether a purchase sits between.
   recordBlockedAction(placement, outcome === "success");
-  if (outcome === "success") notePurchaseLanding();
+  if (outcome === "success") landing();
   return outcome === "success";
 }
 
@@ -587,6 +588,7 @@ export async function openPaywallOutcome(
   router: ReturnType<typeof useRouter>,
   placement: string,
 ): Promise<PaywallOutcome> {
+  const landing = reservePurchaseLanding();
   const { outcome, owned } = await presentPaywall(placement);
   // Onboarding finishes whatever the outcome, which swaps the screens under
   // a pushed fallback. The app's own Pro gates offer the paywall again.
@@ -598,7 +600,7 @@ export async function openPaywallOutcome(
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
-  if (outcome === "success") notePurchaseLanding();
+  if (outcome === "success") landing();
   return outcome;
 }
 
@@ -654,6 +656,7 @@ type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
  * that Restore is hidden inside the paywall or Customer Center.
  */
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return "unavailable";
 
   const rc = getPurchases();
@@ -666,7 +669,7 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
     // does, but only while nothing is entitled: restoring an already-visible
     // entitlement made nothing new visible, so it reports nothing.
     if (!hasActiveEntitlement()) recordAccess("restore");
-    notePurchaseLanding();
+    landing();
     return "restored";
   } catch {
     return "unavailable";
