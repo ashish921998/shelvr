@@ -16,6 +16,7 @@ import {
   useAwaitingOnboardingPurchase,
   useReplayOnboarding,
 } from "@/lib/replay-onboarding";
+import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
@@ -108,6 +109,7 @@ function AppStack() {
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
+  useQueuedFirstSave();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume
   // it, once the plan gate is down.
   useResumePendingShare(gated || planUnknown);

@@ -243,8 +243,7 @@ export type MessageParams = {
   "common.paste": undefined;
   "demo.save": undefined;
   "demo.signInTitle": undefined;
-  "demo.signInHelp": undefined;
-  "demo.signInFailed": undefined;
+  "demo.linkQueued": undefined;
   "tidy.completeTitle": undefined;
   "tidy.batchTitle": undefined;
   "tidy.continue": undefined;
@@ -570,7 +569,6 @@ export type MessageParams = {
   "onboarding.remindSavedNow": undefined;
   "onboarding.remindFallbackTitle": undefined;
   "onboarding.remindConsent": undefined;
-  "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
   "demo.stepReading": undefined;
   "demo.stepTitling": undefined;
@@ -579,8 +577,6 @@ export type MessageParams = {
   "demo.eitherWay": undefined;
   "reveal.previewTitle": undefined;
   "reveal.previewSubtitle": undefined;
-  "reveal.saveShelf": undefined;
-  "reveal.saveShelfReason": undefined;
   "reveal.filedIn": { space: string };
   "reveal.keepSaving": undefined;
   "reveal.trialNote": undefined;

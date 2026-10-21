@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
+import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest } from "@/lib/onboarding-interests";
 import {
   featuredDemoKind,
@@ -222,7 +223,7 @@ export default function OnboardingScreen() {
 
   const practiceSample = practiceShareSample(
     kinds,
-    getOnboardingProgress().demo?.url ?? null,
+    getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
   );
   const paywall = useOnboardingPaywall({
     onPro: finish,

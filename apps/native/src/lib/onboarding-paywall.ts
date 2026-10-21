@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { notePurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
 import { openPaywallOutcome, useEntitlement } from "@/lib/entitlement";
 import {
   noteDeclinedDuringOnboarding,
@@ -12,9 +13,12 @@ const ENTITLEMENT_WAIT_MS = 5000;
 
 /**
  * The paywall at the end of onboarding, after the promise step. `ask` waits
- * for the entitlement to load, then lets a Pro or signed-out account through
- * and shows everyone else the paywall once. A relaunch lands back on the promise step and
- * asks again. A paywall that could not show (RevenueCat not ready, offline)
+ * for the entitlement to load, then lets a Pro account through and shows
+ * everyone else the paywall once. Signed out, the purchase is anonymous and
+ * the sign-in that follows onboarding attaches it to the new account, and a
+ * close leaves the person on the promise step: sign-in comes only after a
+ * purchase or restore. A relaunch lands back on the promise step and asks
+ * again. A paywall that could not show (RevenueCat not ready, offline)
  * was never declined: `onUnavailable` finishes without saying so, and the
  * app asks again once Home is up.
  */
@@ -48,9 +52,7 @@ export function useOnboardingPaywall({
   useEffect(() => {
     if (!asked || (loading && !waitedOut) || started.current) return;
     started.current = true;
-    // Skipping the first save skips sign-in too, and a purchase needs an
-    // account. The app asks for both once onboarding is done.
-    if (entitled || !isAuthenticated) {
+    if (entitled) {
       handlers.current.onPro();
       return;
     }
@@ -61,8 +63,17 @@ export function useOnboardingPaywall({
     openPaywallOutcome(router, "onboarding")
       .then((outcome) => {
         if (outcome === "unavailable") return handlers.current.onUnavailable();
-        if (outcome === "cancelled") return decline();
+        if (outcome === "cancelled") {
+          if (isAuthenticated) return decline();
+          // Signed out, closing is not a way in: the account is made only
+          // after a purchase, so the promise step stays and asks again.
+          started.current = false;
+          setWaitedOut(false);
+          setAsked(false);
+          return;
+        }
         notePurchasedDuringOnboarding();
+        if (!isAuthenticated) notePurchaseBeforeSignIn();
         handlers.current.onPro();
       })
       .catch((error: unknown) => {

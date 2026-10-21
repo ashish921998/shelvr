@@ -10,6 +10,7 @@ import {
   setPendingDemo,
   type PendingDemo,
 } from "@/lib/pending-onboarding";
+import { queueFirstSave } from "@/lib/queued-first-save";
 import { extractFirstUrl, isProbablyUrl } from "@/lib/url";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -493,6 +494,24 @@ export function useDemoSave({
     advance();
   };
 
+  // Signed out, the picked link waits for the account, which comes after the
+  // paywall at the end of onboarding; useQueuedFirstSave saves it then.
+  const saveLater = () => {
+    if (advancedRef.current || canSave) return;
+    const request = state.authRequest;
+    if (request === null) return;
+    const { url } = request;
+    analytics.capture("onboarding_demo_deferred", {
+      sample: findSample(url) !== undefined,
+    });
+    queueFirstSave(request);
+    // The queue owns the link now, so a held share of it is let go: the
+    // share screen must not offer it again, and the replay saves it once.
+    releaseSavedShare(url);
+    setPendingDemo(null);
+    advance();
+  };
+
   // Offline or during an outage no save can land, so the step lets the user
   // on with none; the reveal then has no item to show.
   const skip = () => {
@@ -531,6 +550,7 @@ export function useDemoSave({
     canAcceptShare,
     advance,
     skip,
+    saveLater,
     submitUrl,
     submitTyped,
     setError,

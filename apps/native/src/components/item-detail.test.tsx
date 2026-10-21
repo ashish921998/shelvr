@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemDetail, type DetailItem } from "./item-detail";
@@ -8,6 +8,8 @@ import { PostMediaButton } from "@/components/post-media-button";
 import { Link } from "expo-router";
 import { Image } from "expo-image";
 import { AppSymbolIcon } from "@/components/symbol";
+import { saveError } from "@convex/model/saveErrors";
+import { Alert } from "react-native";
 
 vi.mock("@/lib/i18n", () => ({
   t: (key: string, values?: Record<string, unknown>) =>
@@ -68,9 +70,10 @@ const fullRow = vi.hoisted(() => ({ loading: false }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: undefined, isError: !fullRow.loading }),
 }));
-vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
+const retry = vi.hoisted(() => ({ reprocess: vi.fn(), guard: vi.fn() }));
+vi.mock("convex/react", () => ({ useMutation: () => retry.reprocess }));
 vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: vi.fn(), loading: false }),
+  usePaywallGuard: () => ({ guard: retry.guard, loading: false }),
 }));
 vi.mock("@/lib/header-layout", () => ({ useAppHeaderHeight: () => 0 }));
 vi.mock("@/lib/intents", () => ({ runIntent: vi.fn() }));
@@ -247,6 +250,39 @@ describe("a plain link's page", () => {
     expect(
       screen.getByRole("button", { name: "item.viewOnSite:YouTube" }),
     ).toBeTruthy();
+  });
+
+  it("retries without the paywall when the server allows it, as for the free demo save", async () => {
+    retry.reprocess.mockReset().mockResolvedValue(true);
+    retry.guard.mockReset();
+    renderPage({ ...product, status: "failed", failureReason: "error" });
+    fireEvent.click(screen.getByText("common.tryAgain"));
+    await waitFor(() =>
+      expect(retry.reprocess).toHaveBeenCalledWith({ id: "item-1" }),
+    );
+    expect(retry.guard).not.toHaveBeenCalled();
+  });
+
+  it("opens the paywall only when the server asks for Pro", async () => {
+    retry.reprocess.mockReset().mockRejectedValue(saveError("pro_required"));
+    retry.guard.mockReset();
+    renderPage({ ...product, status: "failed", failureReason: "error" });
+    fireEvent.click(screen.getByText("common.tryAgain"));
+    await waitFor(() => expect(retry.guard).toHaveBeenCalledOnce());
+  });
+
+  it("says the retry failed when the server wants Pro this device still shows", async () => {
+    retry.reprocess.mockReset().mockRejectedValue(saveError("pro_required"));
+    retry.guard.mockReset().mockResolvedValue(true);
+    vi.mocked(Alert.alert).mockClear();
+    renderPage({ ...product, status: "failed", failureReason: "error" });
+    fireEvent.click(screen.getByText("common.tryAgain"));
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "errors.retryTitle",
+        "errors.retrySoon",
+      ),
+    );
   });
 
   it("keeps the retry for a page that read only partly", () => {

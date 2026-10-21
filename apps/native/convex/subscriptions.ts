@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { query, internalMutation, internalQuery } from "./_generated/server";
+import {
+  action,
+  query,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -9,6 +14,8 @@ import {
   requireUserId,
 } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
+import { rateLimiter } from "./model/rateLimiter";
+import { reconcileRevenueCatCustomers } from "./model/revenuecatReconcile";
 import { saveError } from "./model/saveErrors";
 
 const subscriptionStatusValidator = v.union(
@@ -47,6 +54,53 @@ export const getEntitlement = query({
       return { status: "none" as const };
     }
     return { status: sub.status, expiresAt: sub.expiresAt };
+  },
+});
+
+/** The caller of `syncPurchase`, charged one token of its rate limit. */
+export const claimPurchaseSync = internalMutation({
+  args: {},
+  returns: v.id("users"),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    await rateLimiter.limit(ctx, "purchaseSync", { key: userId, throws: true });
+    return userId;
+  },
+});
+
+export const entitledNow = internalQuery({
+  args: { userId: v.id("users"), now: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, { userId, now }) =>
+    await hasProEntitlementAt(ctx, userId, now),
+});
+
+/**
+ * Re-reads the caller's RevenueCat customer and records any Pro access it
+ * holds. A purchase made before sign-in belongs to an anonymous RevenueCat id,
+ * so its webhook names no account; signing in aliases it onto this one, and
+ * the client calls this once that `logIn` has finished. It only ever adds
+ * access: a customer with none leaves the row untouched. Returns whether the
+ * caller has Pro afterwards, so the client keeps its pending-purchase marker
+ * until the purchase has actually landed.
+ */
+export const syncPurchase = action({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx): Promise<boolean> => {
+    const userId = await ctx.runMutation(
+      internal.subscriptions.claimPurchaseSync,
+      {},
+    );
+    // Stamped before the read, so a webhook sent after it still applies.
+    const readAt = Date.now();
+    await reconcileRevenueCatCustomers(ctx, [userId], readAt, {
+      grantOnly: true,
+    });
+    return await ctx.runQuery(internal.subscriptions.entitledNow, {
+      userId,
+      now: Date.now(),
+    });
   },
 });
 
@@ -269,6 +323,8 @@ export const liveOwners = internalQuery({
 export const applySnapshots = internalMutation({
   args: {
     eventTimestampMs: v.number(),
+    // Apply a snapshot only where it gives more access than the stored row.
+    grantOnly: v.optional(v.boolean()),
     snapshots: v.array(
       v.object({
         userId: v.id("users"),
@@ -279,9 +335,16 @@ export const applySnapshots = internalMutation({
     ),
   },
   returns: v.null(),
-  handler: async (ctx, { snapshots, eventTimestampMs }) => {
+  handler: async (ctx, { snapshots, eventTimestampMs, grantOnly }) => {
     // Nested writes share this transaction: a failed update rolls back both sides.
     for (const snapshot of snapshots) {
+      if (grantOnly) {
+        const existing = await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", snapshot.userId))
+          .unique();
+        if (!grantsMoreAccess(existing, snapshot)) continue;
+      }
       await ctx.runMutation(internal.subscriptions.upsertSubscription, {
         ...snapshot,
         eventTimestampMs,
@@ -291,6 +354,20 @@ export const applySnapshots = internalMutation({
     return null;
   },
 });
+
+/** Whether a RevenueCat snapshot gives more access than the stored row: no
+ * access never does, a lifetime row is never improved on, and otherwise the
+ * later expiry wins. */
+function grantsMoreAccess(
+  existing: Doc<"subscriptions"> | null,
+  snapshot: { status: SubscriptionStatus; expiresAt: number },
+): boolean {
+  if (snapshot.status === "lapsed") return false;
+  if (existing === null || existing.status === "lapsed") return true;
+  if (existing.status === "lifetime") return false;
+  if (snapshot.status === "lifetime") return true;
+  return snapshot.expiresAt > existing.expiresAt;
+}
 
 export const expireSubscription = internalMutation({
   args: { userId: v.string(), expiresAt: v.number() },

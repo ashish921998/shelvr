@@ -8,8 +8,8 @@ import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
-/** The saved link, as the reading view and the sign-in sheet show it. */
-export function DemoLinkRow({
+/** The saved link, as the reading and preview views show it. */
+function DemoLinkRow({
   title,
   url,
   busy = false,

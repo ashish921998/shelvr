@@ -1,13 +1,17 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearLegacyDemoUrl,
   clearLegacyDemoUrlIfSaved,
   clearPending,
   getOnboardingProgress,
   getOrCreatePendingOperationId,
+  getPendingDemoOwner,
+  getPendingDemoSpace,
   getPendingDemoUrl,
   getPendingSpaces,
   hasPending,
+  queueDemoUrl,
   setOnboardingProgress,
   setPendingDemo,
   setPendingSpaces,
@@ -130,6 +134,41 @@ describe("onboarding recovery", () => {
     expect(getOnboardingProgress().demo).toBeNull();
     expect(getOnboardingProgress().spaces).toEqual(["Recipes"]);
     expect(hasPending()).toBe(true);
+  });
+});
+
+describe("a first save queued before sign-in", () => {
+  it("waits for the replay and survives finishing onboarding", () => {
+    queueDemoUrl("https://example.com/recipe");
+    expect(hasPending()).toBe(true);
+    setPendingSpaces([]);
+    expect(getPendingDemoUrl()).toBe("https://example.com/recipe");
+    expect(hasPending()).toBe(true);
+  });
+
+  it("keeps the space it was picked for until the link is cleared", () => {
+    queueDemoUrl("https://example.com/recipe", "Recipes");
+    setPendingSpaces(["Recipes"]);
+    expect(getPendingDemoSpace()).toBe("Recipes");
+    clearLegacyDemoUrl();
+    expect(getPendingDemoSpace()).toBeNull();
+  });
+
+  it("keeps the account it belongs to until the link is cleared", () => {
+    queueDemoUrl("https://example.com/recipe", "Recipes", "user-1");
+    setPendingSpaces(["Recipes"]);
+    expect(getPendingDemoOwner()).toBe("user-1");
+    clearLegacyDemoUrl();
+    expect(getPendingDemoOwner()).toBeNull();
+  });
+
+  it("keeps the onboarding progress beside it", () => {
+    setOnboardingProgress({ saveKinds: ["recipes"], spaces: ["a"], step: 3 });
+    queueDemoUrl("https://example.com/recipe");
+    expect(getOnboardingProgress()).toMatchObject({
+      saveKinds: ["recipes"],
+      step: 3,
+    });
   });
 });
 

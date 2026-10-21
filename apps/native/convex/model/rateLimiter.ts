@@ -71,6 +71,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // "We went" on a plan: one small row each, no model call. Bounds a loop
   // that would fill the table with names.
   placeVisit: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
+  // Re-reading the caller's RevenueCat customer after a purchase made before
+  // sign-in. One REST call each; a real person needs one or two.
+  purchaseSync: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
   // "Ask someone" on a plan: one share row each, no model call.
   planShare: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   // Votes on the public plan page, per visitor IP and site-wide. A vote is a
