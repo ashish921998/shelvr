@@ -1,22 +1,14 @@
 // @vitest-environment jsdom
 // The interests step: topics as checkboxes and, once Travel is picked, one
 // card more asking what kind of spots. Every pick is handed back to the
-// screen, which keeps topics and spots alike as spaces.
+// screen, which keeps topics and spots alike as spaces; the screen's wiring
+// is tested in src/lib/interests-screen.test.tsx.
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  INTERESTS,
-  isInterest,
-  type Interest,
-} from "@/lib/onboarding-interests";
+import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
-import {
-  TRAVEL_VIBES,
-  isTravelVibe,
-  spacesAfterInterestToggle,
-  type TravelVibe,
-} from "@/lib/travel-vibes";
+import { TRAVEL_VIBES, type TravelVibe } from "@/lib/travel-vibes";
 import { InterestsStep } from "./interests";
 
 type Children = { children?: ReactNode };
@@ -130,60 +122,5 @@ describe("InterestsStep", () => {
     fireEvent.click(chip("Travel", true));
     expect(onToggle).toHaveBeenCalledExactlyOnceWith("Travel");
     expect(onToggleVibe).not.toHaveBeenCalled();
-  });
-});
-
-// The screen's wiring: topics and spots are one list of spaces, topics toggle
-// through spacesAfterInterestToggle and spots toggle on their own.
-function Picker({ onChange }: { onChange: (spaces: string[]) => void }) {
-  const [spaces, setSpaces] = useState<string[]>([]);
-  const update = (next: (current: string[]) => string[]) =>
-    setSpaces((current) => {
-      const result = next(current);
-      onChange(result);
-      return result;
-    });
-  return (
-    <InterestsStep
-      picked={spaces.filter(isInterest)}
-      vibes={spaces.filter(isTravelVibe)}
-      onToggle={(interest) =>
-        update((current) => spacesAfterInterestToggle(current, interest))
-      }
-      onToggleVibe={(vibe) =>
-        update((current) =>
-          current.includes(vibe)
-            ? current.filter((name) => name !== vibe)
-            : [...current, vibe],
-        )
-      }
-      onAdvance={vi.fn()}
-    />
-  );
-}
-
-describe("InterestsStep with the screen's spaces", () => {
-  it("keeps a spot as a space until Travel is unpicked, then forgets it", () => {
-    const onChange = vi.fn();
-    render(<Picker onChange={onChange} />);
-    expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
-
-    fireEvent.click(chip("Travel", false));
-    fireEvent.click(chip("Good food", false));
-    expect(onChange).toHaveBeenLastCalledWith(["Travel", "Good food"]);
-    expect(chip("Good food", true)).toBeTruthy();
-
-    // A second spot, then the first unpicked again: only its own space moves.
-    fireEvent.click(chip("Going out", false));
-    fireEvent.click(chip("Good food", true));
-    expect(onChange).toHaveBeenLastCalledWith(["Travel", "Going out"]);
-
-    fireEvent.click(chip("Travel", true));
-    expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
-    expect(onChange).toHaveBeenLastCalledWith([]);
-
-    // Picked again, Travel starts the card over.
-    fireEvent.click(chip("Travel", false));
-    expect(chip("Going out", false)).toBeTruthy();
   });
 });
