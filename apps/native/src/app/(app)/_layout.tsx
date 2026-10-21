@@ -1,6 +1,7 @@
 import { AiConsentCard } from "@/components/ai-consent";
 import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
+import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
 import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -94,6 +95,15 @@ function AppStack() {
     !entitlement.loading &&
     !entitlement.entitled &&
     !awaitingPurchase;
+
+  // A sheet deep link that arrived before the plan opens once it is known,
+  // only for Pro; without a plan it is dropped and the gate shows.
+  const planLoading = entitlement.loading;
+  const entitled = entitlement.entitled;
+  useEffect(() => {
+    const route = releaseSheetLink(planLoading);
+    if (route && onboarded && entitled) router.push(route as never);
+  }, [planLoading, entitled, onboarded, router]);
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();

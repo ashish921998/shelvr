@@ -1,3 +1,4 @@
+import { rememberSheetLink } from "@/lib/deferred-sheet-link";
 import { readOnboardedFlag } from "@/lib/onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { isDeepLink, markDirectLaunch } from "@/lib/splash/launch-intent";
@@ -25,6 +26,8 @@ export function redirectSystemPath({
   // the app's root URL when there is no real link, so the root is compared
   // against rather than merely checking that the path is an absolute URL.
   if (isDeepLink(path, Linking.createURL("/"))) markDirectLaunch();
+  // A sheet link that beats the plan is redirected away; keep it to replay.
+  rememberSheetLink(path);
 
   try {
     const url = new URL(path);

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   replay: vi.fn(),
   resumeShare: vi.fn(),
   awaitingPurchase: false,
+  push: vi.fn(),
 }));
 const nothing = vi.hoisted(() => () => null);
 
@@ -69,7 +70,7 @@ vi.mock("expo-router", () => {
       Protected: guarded,
     },
   );
-  return { Stack, Redirect: nothing, useRouter: () => ({}) };
+  return { Stack, Redirect: nothing, useRouter: () => ({ push: mocks.push }) };
 });
 vi.mock("@/lib/app-intents", () => ({ AppIntentsBridge: nothing }));
 vi.mock("@/lib/forget-exit-offer", () => ({ useForgetExitOffer: vi.fn() }));
@@ -228,6 +229,36 @@ describe("plan gate", () => {
     render(<AppLayout />);
     expect(shows("screen:onboarding")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
+  });
+
+  it("opens a sheet deep link once the plan is known and Pro", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("@/lib/deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://add?mode=note");
+    mocks.entitlement = { entitled: false, loading: true };
+    const { rerender } = render(<AppLayout />);
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    mocks.entitlement = { entitled: true, loading: false };
+    rerender(<AppLayout />);
+    expect(mocks.push).toHaveBeenCalledWith("/add?mode=note");
+  });
+
+  it("drops a sheet deep link when the plan is known and missing", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("@/lib/deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://camera");
+    mocks.entitlement = { entitled: false, loading: true };
+    const { rerender } = render(<AppLayout />);
+
+    mocks.entitlement = { entitled: false, loading: false };
+    rerender(<AppLayout />);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(shows("screen:plan-gate")).toBe(true);
+    // Dropped, not kept for a later purchase.
+    expect(releaseSheetLink(false)).toBeNull();
   });
 
   it("never covers onboarding while the plan loads", () => {
