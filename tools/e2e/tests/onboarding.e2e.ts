@@ -53,7 +53,7 @@ test(
     await expectPaywall(screen);
 
     // A close is a decline, and onboarding ends on the plan gate: no entry
-    // without a plan. No exit offer follows: hiding Pro skips it.
+    // without a plan.
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallRestore(screen)).toBeHidden({
       timeout: 30_000,

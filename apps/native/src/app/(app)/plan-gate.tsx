@@ -1,19 +1,21 @@
-import { ExitOfferCard } from "@/components/home/exit-offer-card";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
 import { analytics } from "@/lib/analytics";
-import { useCurrentUser } from "@/lib/current-user";
-import {
-  openPaywallKeepingExitOffer,
-  useExitOfferEndsAt,
-} from "@/lib/entitlement";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { useRouter } from "expo-router";
-import { Alert, Linking, Pressable, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -28,13 +30,9 @@ export default function PlanGateScreen() {
   const router = useRouter();
   const { session, operation } = useNotificationSession();
   const { restoring, restore } = useRestorePurchases();
-  const { data: user } = useCurrentUser();
-  // Home is out of reach here, so an open exit offer, and its reminder
-  // switch, lives on the gate for its 24 hours.
-  const exitOfferEndsAt = useExitOfferEndsAt(user?._id);
-
-  // While an exit offer is open, its discount opens instead of full price.
-  const seePlans = () => openPaywallKeepingExitOffer(router, "plan_gate", true);
+  // The gate also covers the wait for the plan, so a stalled read still
+  // leaves sign-out and Settings in reach.
+  const { loading } = useEntitlement();
 
   const signOut = async () => {
     try {
@@ -47,58 +45,64 @@ export default function PlanGateScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Wordmark size={30} />
-      <View style={styles.middle}>
-        <ThemedText variant="largeTitle" style={styles.title}>
-          {t("planGate.title")}
-        </ThemedText>
-        <ThemedText variant="body" style={styles.body}>
-          {t("planGate.body")}
-        </ThemedText>
-        {exitOfferEndsAt !== null ? (
-          <View style={styles.offer}>
-            <ExitOfferCard endsAt={exitOfferEndsAt} userId={user?._id} />
+      {/* Scrolls so large accessibility text still reaches every action. */}
+      <ScrollView contentContainerStyle={styles.content}>
+        <Wordmark size={30} />
+        {loading ? (
+          <View style={styles.middle}>
+            <ActivityIndicator accessibilityLabel={t("loading.app")} />
           </View>
-        ) : null}
-      </View>
-      <Button
-        title={t("planGate.seePlans")}
-        onPress={() => void seePlans()}
-        style={styles.button}
-      />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: restoring, busy: restoring }}
-        disabled={restoring}
-        onPress={() => void restore()}
-        style={styles.restore}
-      >
-        <ThemedText variant="subheadLabel" style={styles.link}>
-          {restoring ? t("pro.restoring") : t("pro.restore")}
-        </ThemedText>
-      </Pressable>
-      <View style={styles.footer}>
-        <FooterLink
-          label={
-            operation === "sign_out"
-              ? t("account.signingOut")
-              : t("account.signOut")
-          }
-          onPress={() => void signOut()}
-        />
-        <FooterLink
-          label={t("profile.settings")}
-          onPress={() => router.push("/(app)/settings")}
-        />
-        <FooterLink
-          label={t("legal.termsShort")}
-          onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
-        />
-        <FooterLink
-          label={t("legal.privacyShort")}
-          onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
-        />
-      </View>
+        ) : (
+          <>
+            <View style={styles.middle}>
+              <ThemedText variant="largeTitle" style={styles.title}>
+                {t("planGate.title")}
+              </ThemedText>
+              <ThemedText variant="body" style={styles.body}>
+                {t("planGate.body")}
+              </ThemedText>
+            </View>
+            <Button
+              title={t("planGate.seePlans")}
+              onPress={() => void openPaywall(router, "plan_gate")}
+              style={styles.button}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: restoring, busy: restoring }}
+              disabled={restoring}
+              onPress={() => void restore()}
+              style={styles.restore}
+            >
+              <ThemedText variant="subheadLabel" style={styles.link}>
+                {restoring ? t("pro.restoring") : t("pro.restore")}
+              </ThemedText>
+            </Pressable>
+          </>
+        )}
+        <View style={styles.footer}>
+          <FooterLink
+            label={
+              operation === "sign_out"
+                ? t("account.signingOut")
+                : t("account.signOut")
+            }
+            onPress={() => void signOut()}
+          />
+          <FooterLink
+            label={t("profile.settings")}
+            onPress={() => router.push("/(app)/settings")}
+          />
+          <FooterLink
+            label={t("legal.termsShort")}
+            onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
+          />
+          <FooterLink
+            label={t("legal.privacyShort")}
+            onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
+          />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -120,9 +124,9 @@ function FooterLink({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  content: {
+    flexGrow: 1,
     alignItems: "center",
     paddingHorizontal: theme.gap(3),
     paddingTop: theme.gap(4),
@@ -136,7 +140,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: { textAlign: "center" },
   body: { textAlign: "center", color: theme.colors.muted },
-  offer: { alignSelf: "stretch", marginTop: theme.gap(2) },
   button: { alignSelf: "stretch" },
   restore: { paddingVertical: theme.gap(1.5) },
   link: { color: theme.colors.primaryText },

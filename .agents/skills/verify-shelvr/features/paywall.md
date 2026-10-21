@@ -15,8 +15,7 @@ instead.
 
 Without Pro, Home > `Add` or "View Pro plans". The dev user is always Pro on
 the server, so the test relaunches with `-E2EHidePro YES`, which makes a
-development build show them as not Pro and skips the exit offer
-(`src/lib/e2e-hide-pro.ts`).
+development build show them as not Pro (`src/lib/e2e-hide-pro.ts`).
 
 ## Driving it with e2e
 

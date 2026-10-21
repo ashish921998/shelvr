@@ -668,17 +668,6 @@ export type MessageParams = {
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
   "aiConsent.signInNote": undefined;
-  "exitOffer.title": undefined;
-  "exitOffer.endsIn": { time: string };
-  "exitOffer.cta": undefined;
-  "exitOffer.sheetEndsIn": { hours: string; minutes: string };
-  "exitOffer.reminderTitle": undefined;
-  "exitOffer.reminderBody": undefined;
-  "exitOffer.remindMe": undefined;
-  "exitOffer.reminderConsent": undefined;
-  "exitOffer.reminderSet": undefined;
-  "exitOffer.reminderCancel": undefined;
-  "exitOffer.reminderDenied": undefined;
   "updates.title": undefined;
   "updates.check": undefined;
   "updates.checking": undefined;

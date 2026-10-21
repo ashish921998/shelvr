@@ -1,8 +1,8 @@
 import { AiConsentCard } from "@/components/ai-consent";
 import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
-import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
-import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
+import { useForgetExitOffer } from "@/lib/forget-exit-offer";
+import { settlePurchaseLanding } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
@@ -21,6 +21,7 @@ import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
+import { useEffect } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -78,8 +79,13 @@ function AppStack() {
   // A purchase or restore reaches Convex by webhook a moment later; until it
   // does, someone who just paid is not sent back to the gate.
   const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
-  // No entry without a plan. Until the plan is known the app waits on a
-  // loader rather than opening, so a stalled entitlement read is no way in.
+  // The wait belongs to the account that paid; signing out ends it.
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) settlePurchaseLanding();
+  }, [isAuthenticated, isLoading]);
+  // No entry without a plan. Until the plan is known the plan gate shows,
+  // waiting with sign-out in reach, so a stalled entitlement read is no way
+  // in and no dead end.
   const planUnknown =
     isAuthenticated && entitlement.loading && !awaitingPurchase;
   const gated =
@@ -97,7 +103,8 @@ function AppStack() {
   useTrialReminder();
   // Right after Pro starts, Home hands off to one real save.
   useWelcomeSaveTracker();
-  useExitOfferReminder();
+  // The exit offer is gone; clears what it left on this device.
+  useForgetExitOffer();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
@@ -109,15 +116,10 @@ function AppStack() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  if (onboarded && planUnknown) {
-    return <ScreenLoader label={t("loading.app")} />;
-  }
-
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
       <AppIntentsBridge />
-      <ExitOfferSheetHost />
       <TrialReminderPrimerSheet />
       <Stack
         screenOptions={{
@@ -128,7 +130,7 @@ function AppStack() {
         }}
       >
         <Stack.Protected
-          guard={onboarded && !gated}
+          guard={onboarded && !gated && !planUnknown}
           redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -259,7 +261,7 @@ function AppStack() {
           />
         </Stack.Protected>
         <Stack.Protected
-          guard={onboarded && gated}
+          guard={onboarded && (gated || planUnknown)}
           redirectTo="/(app)/(tabs)/(home)"
         >
           <Stack.Screen name="plan-gate" options={{ headerShown: false }} />

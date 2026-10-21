@@ -72,8 +72,7 @@ vi.mock("expo-router", () => {
   return { Stack, Redirect: nothing, useRouter: () => ({}) };
 });
 vi.mock("@/lib/app-intents", () => ({ AppIntentsBridge: nothing }));
-vi.mock("@/lib/exit-offer-reminder", () => ({ useExitOfferReminder: vi.fn() }));
-vi.mock("@/lib/exit-offer-sheet", () => ({ ExitOfferSheetHost: nothing }));
+vi.mock("@/lib/forget-exit-offer", () => ({ useForgetExitOffer: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: () => {},
@@ -188,12 +187,11 @@ describe("plan gate", () => {
     expect(shows("screen:plan-gate")).toBe(false);
   });
 
-  it("opens nothing while the plan is still unknown", () => {
+  it("keeps the plan gate up while the plan is still unknown", () => {
     mocks.entitlement = { entitled: false, loading: true };
     render(<AppLayout />);
-    expect(document.body.textContent).toContain("loader");
+    expect(shows("screen:plan-gate")).toBe(true);
     expect(shows("screen:(tabs)")).toBe(false);
-    expect(shows("screen:plan-gate")).toBe(false);
   });
 
   it("keeps someone who just paid out of the gate while the purchase lands", () => {

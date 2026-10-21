@@ -35,9 +35,6 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
 }));
 vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
-vi.mock("@/lib/exit-offer-reminder", () => ({
-  clearExitOfferReminder: vi.fn(async () => {}),
-}));
 vi.mock("@/lib/first-save-reminder", () => ({
   clearFirstSaveReminder: mock.clearFirstSave,
 }));

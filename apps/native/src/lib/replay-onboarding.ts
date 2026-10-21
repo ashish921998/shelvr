@@ -24,6 +24,7 @@ import {
 import {
   notePurchaseLanding,
   readPurchaseLanding,
+  settlePurchaseLanding,
   subscribePurchaseLanding,
 } from "@/lib/purchase-landing";
 
@@ -39,40 +40,30 @@ export function notePurchasedDuringOnboarding() {
   notePurchaseLanding();
 }
 
-// Catches up with the landing counter once a purchase's entitlement is seen
-// or its wait runs out.
-let settledNonce = 0;
-
-const PURCHASE_LANDING_MS = 10_000;
-
 /**
  * True while a purchase or restore made anywhere in the app is still on its
  * way to Convex (the webhook lags the store by a moment), so a screen can wait
- * instead of asking for Pro again. The wait is bounded: a webhook that never
- * lands, or a subscription that lapses later in the session, must still reach
- * the Pro gate. Once the entitlement has been seen, the purchase is no longer
- * news.
+ * instead of asking for Pro again. The wait is bounded (see
+ * `purchase-landing.ts`): a webhook that never lands, or a subscription that
+ * lapses later in the session, must still reach the Pro gate.
  */
 export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
-  const nonce = useSyncExternalStore(
+  const until = useSyncExternalStore(
     subscribePurchaseLanding,
     readPurchaseLanding,
     readPurchaseLanding,
   );
-  const [, setWaitedOut] = useState(0);
-  const awaiting = !entitled && nonce > settledNonce;
+  const [now, setNow] = useState(Date.now);
+  const awaiting = !entitled && now < until;
   useEffect(() => {
     if (entitled) {
-      settledNonce = nonce;
+      settlePurchaseLanding();
       if (onboardingPaywall === "purchased") onboardingPaywall = "unseen";
     }
     if (!awaiting) return;
-    const id = setTimeout(() => {
-      settledNonce = Math.max(settledNonce, nonce);
-      setWaitedOut(nonce);
-    }, PURCHASE_LANDING_MS);
+    const id = setTimeout(() => setNow(Date.now()), until - Date.now());
     return () => clearTimeout(id);
-  }, [entitled, awaiting, nonce]);
+  }, [entitled, awaiting, until]);
   return awaiting;
 }
 

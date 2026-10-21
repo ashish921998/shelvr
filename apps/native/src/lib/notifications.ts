@@ -1,4 +1,3 @@
-import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
@@ -112,13 +111,11 @@ export function NotificationSessionProvider({
           // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
-          await clearExitOfferReminder();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
-          await clearExitOfferReminder();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
