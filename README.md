@@ -193,7 +193,8 @@ flow adds its own photo (`tools/e2e/fixtures/photo.png`) to the simulator's
 library. Each
 test signs in as the anonymous dev user and resets its data through Settings >
 "Reset flow fixtures" (in CI, `E2E_FIXTURE_RESET=backend` resets it from the
-Convex CLI instead), so run it only against a throwaway dev user.
+Convex CLI instead, except create-space, which keeps the Settings reset
+covered), so run it only against a throwaway dev user.
 
 ```sh
 cd tools/e2e
