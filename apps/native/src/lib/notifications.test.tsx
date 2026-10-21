@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { releaseSheetLink, rememberSheetLink } from "./deferred-sheet-link";
 import { ConvexError } from "convex/values";
 import {
   NotificationSessionProvider,
@@ -106,6 +107,8 @@ vi.mock("expo-notifications", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The plan is known unless a test says otherwise, so taps open at once.
+  releaseSheetLink(false);
   mock.authenticated = true;
   mock.locale = "en";
   mock.lastResponse = null;
@@ -324,38 +327,22 @@ describe("notification opens", () => {
     expect(mock.push).toHaveBeenCalledWith("/digest/abc");
   });
 
-  it("leaves a sheet tap to the deferred sheet queue while the plan loads", async () => {
-    const { releaseSheetLink } = await import("./deferred-sheet-link");
+  it("holds a tap while the plan loads, in the queue deep links share", () => {
     releaseSheetLink(true);
-    mock.lastResponse = opened({ url: "/add", kind: "trial_reminder" });
-    const { rerender } = renderHook(
-      ({ pending }) => useNotificationObserver(pending),
-      { initialProps: { pending: true } },
-    );
-    rerender({ pending: false });
-    // The layout opens it from the queue, and only for Pro.
+    mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
+    renderHook(() => useNotificationObserver());
     expect(mock.push).not.toHaveBeenCalled();
-    expect(releaseSheetLink(false)).toBe("/add");
+    expect(releaseSheetLink(false)).toEqual({ route: "/item/a", sheet: false });
   });
 
-  it("holds a cold-launch tap until the plan is known, then opens it", async () => {
-    const { releaseSheetLink, rememberSheetLink } =
-      await import("./deferred-sheet-link");
+  it("lets a newer deep link replace a tap that is still waiting", () => {
     releaseSheetLink(true);
-    rememberSheetLink("shelvr://add");
-    mock.lastResponse = opened({ url: "/item/abc", kind: "save_reminder" });
-    const { rerender } = renderHook(
-      ({ pending }) => useNotificationObserver(pending),
-      { initialProps: { pending: true } },
-    );
-    expect(mock.push).not.toHaveBeenCalled();
-    rerender({ pending: false });
-    expect(mock.push).toHaveBeenCalledTimes(1);
-    expect(mock.push).toHaveBeenCalledWith("/item/abc");
-    rerender({ pending: false });
-    expect(mock.push).toHaveBeenCalledTimes(1);
-    // The newer item tap discarded the Add link queued before it.
+    mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
+    renderHook(() => useNotificationObserver());
+    // Expo Router opens /item/B itself; the waiting tap must not override it.
+    rememberSheetLink("shelvr://item/b");
     expect(releaseSheetLink(false)).toBeNull();
+    expect(mock.push).not.toHaveBeenCalled();
   });
 
   // Installed builds keep receiving payloads from the currently deployed

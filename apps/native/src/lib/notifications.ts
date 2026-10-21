@@ -25,7 +25,7 @@ import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
-import { rememberSheetLink, sheetRouteOf } from "@/lib/deferred-sheet-link";
+import { deferLink } from "@/lib/deferred-sheet-link";
 import { resolveRootHref } from "@/lib/home-href";
 
 const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
@@ -226,22 +226,8 @@ export function getNotificationUrl(
   return notificationField(notification, "url");
 }
 
-/**
- * `planPending`: the signed-in plan is still loading. A tap then waits and
- * opens once it is known, since the app holds sheets such as Add until then
- * and would otherwise drop the destination.
- */
-export function useNotificationObserver(planPending = false): void {
+export function useNotificationObserver(): void {
   const nav = useRouter();
-  const pendingRef = useRef(planPending);
-  const queued = useRef<string | null>(null);
-  useEffect(() => {
-    pendingRef.current = planPending;
-    if (planPending || queued.current === null) return;
-    const href = queued.current;
-    queued.current = null;
-    nav.push(href as never);
-  }, [planPending, nav]);
 
   useEffect(() => {
     // Keyed by the notification's own id, not its destination: at launch the
@@ -265,14 +251,9 @@ export function useNotificationObserver(planPending = false): void {
           notificationField(notification, "notificationId") ?? "",
       });
       const href = resolveRootHref(url);
-      if (!pendingRef.current) {
-        nav.push(href as never);
-        return;
-      }
-      // One queue for the newest destination: a sheet waits in
-      // deferred-sheet-link (opened only for Pro), anything else replaces it.
-      rememberSheetLink(href);
-      queued.current = sheetRouteOf(href) ? null : href;
+      // While the plan loads it waits, sharing one pending destination with
+      // deep links so the newest wins (deferred-sheet-link.ts).
+      if (!deferLink(href)) nav.push(href as never);
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this

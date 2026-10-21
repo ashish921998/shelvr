@@ -96,13 +96,14 @@ function AppStack() {
     !entitlement.entitled &&
     !awaitingPurchase;
 
-  // A sheet deep link that arrived before the plan opens once it is known,
-  // only for Pro; without a plan it is dropped and the gate shows.
+  // A link that arrived before the plan opens once it is known. A sheet
+  // opens only for Pro; without a plan it is dropped and the gate shows.
   const planLoading = entitlement.loading;
   const entitled = entitlement.entitled;
   useEffect(() => {
-    const route = releaseSheetLink(planLoading);
-    if (route && onboarded && entitled) router.push(route as never);
+    const link = releaseSheetLink(planLoading);
+    if (!link || (link.sheet && !(onboarded && entitled))) return;
+    router.push(link.route as never);
   }, [planLoading, entitled, onboarded, router]);
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.

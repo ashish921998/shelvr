@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deferLink,
   releaseSheetLink,
   rememberSheetLink,
   sheetRouteOf,
@@ -17,7 +18,10 @@ describe("deferred sheet link", () => {
   it("keeps a sheet link that arrives before the plan, once", () => {
     rememberSheetLink("shelvr://new-space");
     expect(releaseSheetLink(true)).toBeNull();
-    expect(releaseSheetLink(false)).toBe("/new-space");
+    expect(releaseSheetLink(false)).toEqual({
+      route: "/new-space",
+      sheet: true,
+    });
     expect(releaseSheetLink(false)).toBeNull();
   });
 
@@ -32,5 +36,13 @@ describe("deferred sheet link", () => {
     releaseSheetLink(false);
     rememberSheetLink("shelvr://add");
     expect(releaseSheetLink(false)).toBeNull();
+  });
+
+  it("keeps only the newest of a tap and a deep link", () => {
+    releaseSheetLink(true);
+    expect(deferLink("/item/a")).toBe(true);
+    rememberSheetLink("shelvr://add");
+    expect(releaseSheetLink(false)).toEqual({ route: "/add", sheet: true });
+    expect(deferLink("/item/a")).toBe(false);
   });
 });
