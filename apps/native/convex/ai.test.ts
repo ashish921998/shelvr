@@ -15,6 +15,7 @@ import {
   readPage,
   storePoster,
 } from "./model/pageRead";
+import { fetchImageAspectRatio } from "./model/pageReadCore";
 import { sanitizeRecipe } from "./model/recipeMarkup";
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
@@ -100,6 +101,37 @@ describe("storePoster", () => {
     expect(safeFetch.mock.calls[0][1].maxBytes).toBeGreaterThanOrEqual(
       heroBytes,
     );
+  });
+});
+
+describe("fetchImageAspectRatio", () => {
+  beforeEach(() => {
+    safeFetch.mockReset();
+  });
+
+  it("reads the size from the front of a picture sent whole", async () => {
+    // A 1971x1314 PNG header: signature, IHDR length and type, then size.
+    const header = new Uint8Array(24);
+    header.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    header.set([0x49, 0x48, 0x44, 0x52], 12);
+    const view = new DataView(header.buffer);
+    view.setUint32(16, 1971);
+    view.setUint32(20, 1314);
+    safeFetch.mockResolvedValue({
+      ok: true,
+      finalUrl: "https://media.example.com/images/1/image.jpg",
+      status: 200,
+      contentType: "image/png",
+      bytes: header,
+      truncated: true,
+    });
+
+    const ratio = await fetchImageAspectRatio(
+      "https://media.example.com/images/1/image.jpg",
+    );
+
+    expect(ratio).toBeCloseTo(1971 / 1314);
+    expect(safeFetch.mock.calls[0][1].onOverflow).toBe("truncate");
   });
 });
 
