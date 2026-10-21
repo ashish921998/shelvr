@@ -211,8 +211,20 @@ describe("selling before sign-in", () => {
   it("logs a previous account out before selling, so nothing lands on it", async () => {
     mock.auth = { isAuthenticated: false, isLoading: false };
     mock.isAnonymous.mockResolvedValue(false);
-    await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    const { openPaywallOutcome } = await loadReady();
+    await openPaywallOutcome(router, "onboarding");
     expect(mock.logOut).toHaveBeenCalledOnce();
+  });
+
+  it("leaves a signed-out account's customer alone until the onboarding paywall", async () => {
+    // A renewal posted by an anonymous customer would move the subscription
+    // off the account that owns it.
+    mock.auth = { isAuthenticated: false, isLoading: false };
+    mock.isAnonymous.mockResolvedValue(false);
+    await loadReady();
+    expect(mock.configure).not.toHaveBeenCalled();
+    expect(mock.logOut).not.toHaveBeenCalled();
   });
 
   it("retries a failed anonymous setup, so the onboarding paywall still sells", async () => {
@@ -220,13 +232,13 @@ describe("selling before sign-in", () => {
     mock.isAnonymous.mockRejectedValueOnce(new Error("offline"));
     mock.presentPaywall.mockResolvedValue("PURCHASED");
     const { openPaywallOutcome } = await loadReady();
+    await expect(openPaywallOutcome(router, "onboarding")).resolves.toBe(
+      "unavailable",
+    );
     expect(mock.captureError).toHaveBeenCalledWith(
       "revenuecat_anonymous_sync_failed",
       expect.any(Error),
     );
-    await vi.waitFor(() => expect(mock.isAnonymous).toHaveBeenCalledTimes(2), {
-      timeout: 5000,
-    });
     await expect(openPaywallOutcome(router, "onboarding")).resolves.toBe(
       "success",
     );

@@ -104,6 +104,9 @@ let _rcIdentitySync = Promise.resolve();
 // Signed out, RevenueCat runs as an anonymous customer. Only the onboarding
 // paywall sells there; signing in aliases that purchase onto the account.
 let _rcAnonymousReady = false;
+// Signed out for real, not an account still loading: only then may the
+// onboarding paywall sell anonymously.
+let _rcSignedOut = false;
 const ANONYMOUS_PLACEMENT = "onboarding";
 
 // Maximum time presentPaywall waits for RC identity sync before giving up and
@@ -116,6 +119,12 @@ function setRcTargetUserId(userId: string | null) {
   if (_rcTargetUserId === userId) return;
   _rcTargetUserId = userId;
   _rcSyncedUserId = null;
+  _rcAnonymousReady = false;
+}
+
+function setRcSignedOut(signedOut: boolean) {
+  if (_rcSignedOut === signedOut) return;
+  _rcSignedOut = signedOut;
   _rcAnonymousReady = false;
 }
 
@@ -220,12 +229,14 @@ export function useEntitlementSync(): void {
 
   useEffect(() => {
     setRcTargetUserId(sub);
+    setRcSignedOut(signedOut);
     if (sub === null) {
       // The funnel memory belongs to the account that earned it, so a
       // sign-out or account change drops it (see `forgetPaywallFunnel`).
+      // RevenueCat stays as it is until the onboarding paywall needs an
+      // anonymous customer (see `prepareAnonymousRevenueCat`).
       forgetPaywallFunnel();
-      if (!signedOut || REVENUECAT_DISABLED_BY_BUILD) return;
-      return startAnonymousRevenueCat();
+      return;
     }
     // A build that deliberately has no key would only burn the retry budget
     // and report the absence as a sync failure on every foreground. Readiness
@@ -266,7 +277,7 @@ export function useEntitlementSync(): void {
         if (cancelled || !claimed) return;
         attach = startRevenueCatIdentitySync({
           sync: () =>
-            attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})),
+            attachPurchaseBeforeSignIn(sub, () => syncPurchaseRef.current({})),
           onReady: clearPurchaseBeforeSignIn,
           onError: (error) =>
             analytics.captureError("purchase_sync_failed", error),
@@ -299,59 +310,52 @@ export function useEntitlementSync(): void {
  * webhook named no account. `logIn` merges it into an account with no
  * anonymous history of its own, but only switches to one that has some, so the
  * store receipt is synced onto this account either way. The backend then reads
- * the account back from RevenueCat.
+ * the account back from RevenueCat. The receipt sync waits its turn behind
+ * identity changes, so it never posts to a customer an account switch put in
+ * this one's place.
  */
 async function attachPurchaseBeforeSignIn(
+  sub: string,
   syncPurchase: () => Promise<boolean>,
 ): Promise<void> {
-  try {
-    await getPurchases()?.syncPurchasesForResult();
-  } catch (error) {
-    // logIn's merge may already have attached it; the backend read decides.
-    analytics.captureError("revenuecat_purchase_attach_failed", error);
-  }
+  const receipt = _rcIdentitySync.then(async () => {
+    if (_rcSyncedUserId !== sub) throw new Error("purchase_attach_superseded");
+    try {
+      await getPurchases()?.syncPurchasesForResult();
+    } catch (error) {
+      // logIn's merge may already have attached it; the backend read decides.
+      analytics.captureError("revenuecat_purchase_attach_failed", error);
+    }
+  });
+  _rcIdentitySync = receipt.catch(() => {});
+  await receipt;
   // Throwing keeps the pending-purchase marker and schedules a retry: the
   // marker is cleared only once the backend confirms the account has Pro.
   if (!(await syncPurchase())) throw new Error("purchase_not_attached");
 }
 
 /**
- * Signed out: run RevenueCat as an anonymous customer so the onboarding
+ * Signed out: switch RevenueCat to an anonymous customer so the onboarding
  * paywall can sell before an account exists. A customer still logged in from
  * a previous account is logged out first, so nothing lands on that account.
- * Returns the effect cleanup.
+ * Done only when that paywall is about to show, never on every signed-out
+ * screen: an anonymous customer that posts a renewal or an unfinished
+ * transaction would take the subscription off the account it belongs to.
+ * Each presentation tries again if the last setup failed.
  */
-function startAnonymousRevenueCat(): () => void {
-  let cancelled = false;
-  // Retried like the signed-in sync: a failed setup would otherwise leave
-  // the onboarding paywall unavailable for the whole signed-out session.
-  const observer = startRevenueCatIdentitySync({
-    sync: () => {
-      const attempt = _rcIdentitySync.then(async () => {
-        if (cancelled || _rcTargetUserId !== null) return;
-        await configureRevenueCat(undefined);
-        const rc = getPurchases();
-        if (!rc) throw new Error("revenuecat_module_unavailable");
-        if (!(await rc.isAnonymous())) await rc.logOut();
-      });
-      _rcIdentitySync = attempt.catch(() => {});
-      return attempt;
-    },
-    onReady: () => {
-      if (cancelled || _rcTargetUserId !== null) return;
-      _rcAnonymousReady = true;
-    },
-    onError: (error) =>
-      analytics.captureError("revenuecat_anonymous_sync_failed", error),
+function prepareAnonymousRevenueCat(): void {
+  if (_rcAnonymousReady) return;
+  const attempt = _rcIdentitySync.then(async () => {
+    if (!_rcSignedOut || _rcTargetUserId !== null) return;
+    await configureRevenueCat(undefined);
+    const rc = getPurchases();
+    if (!rc) throw new Error("revenuecat_module_unavailable");
+    if (!(await rc.isAnonymous())) await rc.logOut();
+    if (_rcSignedOut && _rcTargetUserId === null) _rcAnonymousReady = true;
   });
-  const subscription = AppState.addEventListener("change", (state) => {
-    if (state === "active") observer.retry();
-  });
-  return () => {
-    cancelled = true;
-    observer.dispose();
-    subscription.remove();
-  };
+  _rcIdentitySync = attempt.catch((error: unknown) =>
+    analytics.captureError("revenuecat_anonymous_sync_failed", error),
+  );
 }
 
 function reportRevenueCatIdentityError(error: unknown) {
@@ -476,7 +480,10 @@ async function presentPaywallImpl(
   // The one exception is the onboarding paywall signed out: that purchase is
   // anonymous on purpose, and signing in afterwards aliases it.
   const anonymous =
-    placement === ANONYMOUS_PLACEMENT && _rcTargetUserId === null;
+    placement === ANONYMOUS_PLACEMENT &&
+    _rcTargetUserId === null &&
+    _rcSignedOut;
+  if (anonymous && !REVENUECAT_DISABLED_BY_BUILD) prepareAnonymousRevenueCat();
   if (!(await awaitRcSyncReady(anonymous))) {
     failed("identity_not_ready");
     return "unavailable";

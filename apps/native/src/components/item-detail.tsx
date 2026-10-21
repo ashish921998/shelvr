@@ -922,8 +922,12 @@ function SaveStatusNotice({
                 Alert.alert(t("item.stillWorking"), t("item.retryLater"));
               }
             } catch (error) {
-              if (saveErrorCode(error) === "pro_required") await guard();
-              else Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
+              // A guard that lets the action through means this device still
+              // shows Pro while the server does not: say so, not nothing.
+              const paywalled =
+                saveErrorCode(error) === "pro_required" && !(await guard());
+              if (!paywalled)
+                Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
             } finally {
               setRetrying(false);
             }
