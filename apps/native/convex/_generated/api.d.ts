@@ -61,6 +61,7 @@ import type * as model_oracle from "../model/oracle.js";
 import type * as model_pageRead from "../model/pageRead.js";
 import type * as model_pageReadCore from "../model/pageReadCore.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
+import type * as model_placeVisits from "../model/placeVisits.js";
 import type * as model_plan from "../model/plan.js";
 import type * as model_planVote from "../model/planVote.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
@@ -162,6 +163,7 @@ declare const fullApi: ApiFromModules<{
   "model/pageRead": typeof model_pageRead;
   "model/pageReadCore": typeof model_pageReadCore;
   "model/paymentTelemetry": typeof model_paymentTelemetry;
+  "model/placeVisits": typeof model_placeVisits;
   "model/plan": typeof model_plan;
   "model/planVote": typeof model_planVote;
   "model/posthogCapture": typeof model_posthogCapture;

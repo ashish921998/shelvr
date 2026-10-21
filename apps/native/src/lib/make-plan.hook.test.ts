@@ -156,6 +156,8 @@ describe("useMakePlan", () => {
           area: "Baixa",
           why: "Seafood",
           itemId: "item" as Id<"items">,
+          // Marked "We went" earlier, so the deck shows it as visited.
+          been: true,
         },
       ],
     };

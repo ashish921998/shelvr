@@ -1,4 +1,3 @@
-import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
@@ -26,6 +25,7 @@ import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
+import { deferLink } from "@/lib/deferred-sheet-link";
 import { resolveRootHref } from "@/lib/home-href";
 
 const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
@@ -112,13 +112,11 @@ export function NotificationSessionProvider({
           // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
-          await clearExitOfferReminder();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
-          await clearExitOfferReminder();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
@@ -252,7 +250,10 @@ export function useNotificationObserver(): void {
         notification_id:
           notificationField(notification, "notificationId") ?? "",
       });
-      nav.push(resolveRootHref(url) as never);
+      const href = resolveRootHref(url);
+      // While the plan loads it waits, sharing one pending destination with
+      // deep links so the newest wins (deferred-sheet-link.ts).
+      if (!deferLink(href)) nav.push(href as never);
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this

@@ -9,6 +9,7 @@ import { Link } from "expo-router";
 import { Image } from "expo-image";
 import { AppSymbolIcon } from "@/components/symbol";
 import { saveError } from "@convex/model/saveErrors";
+import { Alert } from "react-native";
 
 vi.mock("@/lib/i18n", () => ({
   t: (key: string, values?: Record<string, unknown>) =>
@@ -268,6 +269,20 @@ describe("a plain link's page", () => {
     renderPage({ ...product, status: "failed", failureReason: "error" });
     fireEvent.click(screen.getByText("common.tryAgain"));
     await waitFor(() => expect(retry.guard).toHaveBeenCalledOnce());
+  });
+
+  it("says the retry failed when the server wants Pro this device still shows", async () => {
+    retry.reprocess.mockReset().mockRejectedValue(saveError("pro_required"));
+    retry.guard.mockReset().mockResolvedValue(true);
+    vi.mocked(Alert.alert).mockClear();
+    renderPage({ ...product, status: "failed", failureReason: "error" });
+    fireEvent.click(screen.getByText("common.tryAgain"));
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "errors.retryTitle",
+        "errors.retrySoon",
+      ),
+    );
   });
 
   it("keeps the retry for a page that read only partly", () => {

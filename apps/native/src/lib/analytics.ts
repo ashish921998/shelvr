@@ -172,15 +172,6 @@ export type AnalyticsEventProperties = {
     reason: string;
     duration_ms: number;
   };
-  // The user tapped purchase inside the exit-offer sheet. The imperative
-  // `presentPaywall` API reports no purchase-start callback, so for the main
-  // paywall this signal does not exist; the tap-to-checkout gap is only
-  // measurable where the paywall is a mounted component.
-  paywall_purchase_started: {
-    placement: string;
-    paywall_attempt_id: string;
-    package_id: string;
-  };
   // A purchase or restore made the Convex `subscriptions` row visible to the
   // client: the webhook delivered, the query updated. `delay_ms` measures
   // the purchase-to-entitlement path, not the whole funnel.
@@ -368,9 +359,6 @@ export type AnalyticsEventProperties = {
   // Post-purchase save handoff on Home (lib/welcome-save.ts).
   welcome_save_shown: { trial: boolean };
   welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
-  exit_offer_reminder_opt_in: { granted: boolean };
-  exit_offer_reminder_opt_out: Record<string, never>;
-  exit_offer_expired_open: Record<string, never>;
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation.
   // Only the server-side webhook events (trial_cancelled, …) count as

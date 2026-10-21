@@ -118,22 +118,3 @@ export async function queueFirstSave(screen: Screen): Promise<void> {
 
 /** The share practice's way on without sharing (`sharePractice.later`). */
 export const SHARE_LATER = "I'll try it later";
-
-/**
- * Signs in on the sign-in screen that follows a finished onboarding, the
- * only sign-in a new user sees, and waits for Home. The AI disclosure may
- * come up first.
- */
-export async function signInAfterOnboarding(screen: Screen): Promise<void> {
-  await screen.getByTestId("dev-login-button").tap({ timeout: 60_000 });
-  const home = screen.getByRole("button", "Profile");
-  const keepAi = screen.getByRole("button", "Keep it on");
-  await pollUntil(
-    async () => {
-      if (await home.isVisible()) return true;
-      if (await keepAi.isVisible()) await keepAi.tap();
-      return false;
-    },
-    { timeout: 120_000 },
-  );
-}

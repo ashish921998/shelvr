@@ -9,6 +9,7 @@ import {
   clearLegacyDemoUrl,
   clearPending,
   getPendingDemoSpace,
+  getPendingDemoOwner,
   getPendingDemoUrl,
   getPendingSpaces,
   getPendingOperationId,
@@ -28,6 +29,11 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import {
+  readPurchaseLanding,
+  settlePurchaseLanding,
+  subscribePurchaseLanding,
+} from "@/lib/purchase-landing";
 
 // Onboarding opens its own paywall at the end. A purchase there can finish
 // onboarding before the webhook marks the user entitled, so replay must wait
@@ -36,30 +42,35 @@ import {
 // replay paywall waits for the next launch.
 let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
 
+// The purchase wait itself is opened by the paywall presentation.
 export function notePurchasedDuringOnboarding() {
   onboardingPaywall = "purchased";
 }
 
-const PURCHASE_LANDING_MS = 10_000;
-
 /**
- * True while a purchase made in onboarding is still on its way to Convex (the
- * webhook lags the store by a moment), so a screen can wait instead of asking
- * for Pro again. The wait is bounded: a webhook that never lands, or a
- * subscription that lapses later in the session, must still reach the Pro
- * gate. Once the entitlement has been seen, the purchase is no longer news.
+ * True while a purchase or restore made anywhere in the app is still on its
+ * way to Convex (the webhook lags the store by a moment), so a screen can wait
+ * instead of asking for Pro again. The wait is bounded (see
+ * `purchase-landing.ts`): a webhook that never lands, or a subscription that
+ * lapses later in the session, must still reach the Pro gate.
  */
 export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
-  const [waitedOut, setWaitedOut] = useState(false);
-  const awaiting = !entitled && onboardingPaywall === "purchased" && !waitedOut;
+  const until = useSyncExternalStore(
+    subscribePurchaseLanding,
+    readPurchaseLanding,
+    readPurchaseLanding,
+  );
+  const [now, setNow] = useState(Date.now);
+  const awaiting = !entitled && now < until;
   useEffect(() => {
-    if (entitled && onboardingPaywall === "purchased") {
-      onboardingPaywall = "unseen";
+    if (entitled) {
+      settlePurchaseLanding();
+      if (onboardingPaywall === "purchased") onboardingPaywall = "unseen";
     }
     if (!awaiting) return;
-    const id = setTimeout(() => setWaitedOut(true), PURCHASE_LANDING_MS);
+    const id = setTimeout(() => setNow(Date.now()), until - Date.now());
     return () => clearTimeout(id);
-  }, [entitled, awaiting]);
+  }, [entitled, awaiting, until, now]);
   return awaiting;
 }
 
@@ -93,6 +104,7 @@ export function useReplayOnboarding() {
   // the person sees the fallback paywall instead of the real one.
   const { data: user } = useCurrentUser();
   const accountLoaded = user != null;
+  const userId = user?._id ?? null;
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
@@ -108,6 +120,16 @@ export function useReplayOnboarding() {
   const settledWorkRef = useRef<string | null>(null);
   const settledEntitledRef = useRef(entitled);
   const [retryNonce, setRetryNonce] = useState(0);
+  // The account signed in right now; null once signed out or unmounted. A run
+  // that awaits a mutation checks it before its next write, so a run started
+  // for one account never writes into the next one to sign in.
+  const accountRef = useRef<string | null>(null);
+  useEffect(() => {
+    accountRef.current = isAuthenticated ? userId : null;
+    return () => {
+      accountRef.current = null;
+    };
+  }, [isAuthenticated, userId]);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
   // would only notice pending data after an auth/entitlement change.
@@ -141,6 +163,10 @@ export function useReplayOnboarding() {
       }
       return;
     }
+    // A link handed over for another account (it signed out before the
+    // replay saved it) never lands in this one.
+    const demoOwner = getPendingDemoOwner();
+    if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
     if (!hasPending()) return;
     if (pendingWorkKey() === settledWorkRef.current) return;
     // A purchase made before sign-in is still on its way to the account
@@ -165,6 +191,13 @@ export function useReplayOnboarding() {
     // work that arrives while a mutation is in flight is never mistaken for it.
     let remainderKey: string | null = null;
     let lateDemoUrl = false;
+    const runAccount = userId;
+    let accountChanged = false;
+    const sameAccount = () => {
+      if (runAccount !== null && accountRef.current === runAccount) return true;
+      accountChanged = true;
+      return false;
+    };
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -185,6 +218,7 @@ export function useReplayOnboarding() {
 
         awaitingEntitlementRef.current = false;
         onboardingPaywall = "unseen";
+        if (!sameAccount()) return;
 
         // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
@@ -202,6 +236,7 @@ export function useReplayOnboarding() {
         const allSpacesOk = failedSpaces.length === 0;
 
         if (legacyDemoUrl) {
+          if (!sameAccount()) return;
           try {
             // No saveSource: this replays an onboarding demo, but
             // `onboarding_demo` is stamped server-side by createDemoItem and
@@ -212,6 +247,7 @@ export function useReplayOnboarding() {
               legacyDemoSpace === null
                 ? undefined
                 : await createSpace({ name: legacyDemoSpace, dynamic: true });
+            if (!sameAccount()) return;
             await createLinkItem({
               url: legacyDemoUrl,
               spaceId,
@@ -228,6 +264,7 @@ export function useReplayOnboarding() {
 
         // Only mark as done when all required mutations succeed.
         if (!allSpacesOk) return;
+        if (!sameAccount()) return;
 
         // A link handed over while this run was in flight (a queued first
         // save whose account had spent its demo save) is not this run's to
@@ -240,8 +277,10 @@ export function useReplayOnboarding() {
         clearPending();
       } finally {
         // An entitlement change during the run asked for a fresh pass; marking
-        // this work settled would make that pass skip it.
-        const entitlementRerun = rerunRef.current || lateDemoUrl;
+        // this work settled would make that pass skip it. So does a run cut
+        // short by an account change: the account now signed in found it busy.
+        const entitlementRerun =
+          rerunRef.current || lateDemoUrl || accountChanged;
         if (remainderKey !== null && !entitlementRerun) {
           settledWorkRef.current = remainderKey;
         }
@@ -263,6 +302,7 @@ export function useReplayOnboarding() {
   }, [
     isAuthenticated,
     accountLoaded,
+    userId,
     onboarded,
     createSpace,
     createLinkItem,
