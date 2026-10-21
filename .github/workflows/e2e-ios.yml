@@ -14,8 +14,13 @@ name: e2e ios
 # so space-suggestions sees a seeded save suggested. Two flows are left out because the fake cannot stand in for them:
 # save-link and save-image judge the screen with a real model.
 
+# On a pull request it runs only once the PR carries the `run-e2e` label:
+# adding the label starts a run, and while it stays on, every push re-runs
+# it. Each run takes about 25 minutes of two macOS runners, and running it on
+# every push of every PR left five queued against each other (2026-10-21).
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - "apps/native/**"
       - "tools/e2e/**"
@@ -44,8 +49,10 @@ permissions:
 # every commit keeps its own run, in a group of its own: merges landing close
 # together used to cancel each other (four on 2026-10-15), so main never built
 # the record of clean runs this check needs before it can be required.
+# Adding any other label also starts this workflow (its jobs then skip); that
+# run takes a group of its own, so it never cancels a real run.
 concurrency:
-  group: e2e-ios-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: e2e-ios-${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'run-e2e') && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -55,9 +62,32 @@ env:
 
 jobs:
   ios:
-    name: e2e ios
+    name: e2e ios (${{ matrix.shard.name }})
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'run-e2e') ||
+      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-e2e'))
     runs-on: macos-26
     timeout-minutes: 90
+    # The flows split over two runners, each with its own simulator and
+    # backend, balanced on the 2026-10-21 timings: about 8 minutes of flows
+    # each once setup is done. One shard failing does not stop the other.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: a
+            tests: >-
+              tests/create-space.e2e.ts
+              tests/paywall.e2e.ts
+              tests/search.e2e.ts
+          - name: b
+            tests: >-
+              tests/onboarding.e2e.ts
+              tests/save-note.e2e.ts
+              tests/save-link-fixture.e2e.ts
+              tests/space-suggestions.e2e.ts
+              tests/search-no-results.e2e.ts
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -281,17 +311,7 @@ jobs:
           E2E_FAKE_AI: local-v1
           E2E_FIXTURE_RESET: backend
           CONVEX_AGENT_MODE: anonymous
-        run: >-
-          pnpm exec e2e run
-          tests/search.e2e.ts
-          tests/search-no-results.e2e.ts
-          tests/create-space.e2e.ts
-          tests/paywall.e2e.ts
-          tests/save-note.e2e.ts
-          tests/save-link-fixture.e2e.ts
-          tests/space-suggestions.e2e.ts
-          tests/onboarding.e2e.ts
-          --reporter list,junit
+        run: pnpm exec e2e run ${{ matrix.shard.tests }} --reporter list,junit
 
       # tapUntilVisible taps again when a tap was lost. The run still passes
       # then, so a recovered tap is surfaced here as a warning on the pull
@@ -344,8 +364,20 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-ios
+          name: e2e-ios-${{ matrix.shard.name }}
           path: tools/e2e/.e2e
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
+
+  # One stable check named `e2e ios` over both shards, for when the check
+  # becomes required. It skips with them on a pull request without the label.
+  result:
+    name: e2e ios
+    needs: ios
+    if: ${{ always() && needs.ios.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Both shards passed
+        run: test "${{ needs.ios.result }}" = success
