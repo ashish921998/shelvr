@@ -8,6 +8,7 @@ const mock = vi.hoisted(() => ({
   authenticated: true,
   onboarded: true,
   savesBlocked: false,
+  user: { _id: "user-1" } as { _id: string } | null,
   createDemoItem: vi.fn(),
   queueDemoUrl: vi.fn(),
   recordShareSaved: vi.fn(),
@@ -28,6 +29,9 @@ vi.mock("convex/react", () => ({
 }));
 vi.mock("@/lib/ai-consent", () => ({
   useAiConsent: () => ({ savesBlocked: mock.savesBlocked }),
+}));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: mock.user }),
 }));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: mock.onboarded }),
@@ -79,6 +83,7 @@ beforeEach(() => {
   mock.authenticated = true;
   mock.onboarded = true;
   mock.savesBlocked = false;
+  mock.user = { _id: "user-1" };
   mock.createDemoItem.mockReset().mockResolvedValue(result());
   mock.queueDemoUrl.mockReset();
   mock.recordShareSaved.mockReset();
@@ -126,7 +131,7 @@ describe("a first save queued before sign-in", () => {
     );
     queueFirstSave({ url: SAMPLE, destination: "Recipes", source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, "Recipes");
+    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, "Recipes", "user-1");
     expect(getQueuedFirstSaveUrl()).toBeNull();
   });
 
@@ -140,7 +145,7 @@ describe("a first save queued before sign-in", () => {
     mock.createDemoItem.mockRejectedValue(new ConvexError({ code: "demo" }));
     queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, null);
+    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, null, "user-1");
     expect(getQueuedFirstSaveUrl()).toBeNull();
 
     mock.createDemoItem.mockRejectedValue(new Error("offline"));
@@ -149,6 +154,44 @@ describe("a first save queued before sign-in", () => {
     await mount();
     expect(mock.queueDemoUrl).not.toHaveBeenCalled();
     expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
+  });
+
+  it("never saves another account's queued save into the next account", async () => {
+    mock.createDemoItem.mockRejectedValue(new Error("offline"));
+    queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
+    await mount();
+    expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
+
+    // Account A signed out with its save still queued; account B signs in.
+    mock.createDemoItem.mockReset().mockResolvedValue(result());
+    mock.user = { _id: "user-2" };
+    await mount();
+    expect(mock.createDemoItem).not.toHaveBeenCalled();
+    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(getQueuedFirstSaveUrl()).toBeNull();
+  });
+
+  it("retries its own queued save on the next launch", async () => {
+    mock.createDemoItem.mockRejectedValue(new Error("offline"));
+    queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
+    await mount();
+
+    mock.createDemoItem.mockReset().mockResolvedValue(result());
+    await mount();
+    expect(mock.createDemoItem).toHaveBeenCalledOnce();
+    expect(getQueuedFirstSaveUrl()).toBeNull();
+  });
+
+  it("waits for the account before claiming the save", async () => {
+    queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
+    mock.user = null;
+    const hook = await mount();
+    expect(mock.createDemoItem).not.toHaveBeenCalled();
+
+    mock.user = { _id: "user-1" };
+    hook.rerender();
+    await act(async () => {});
+    expect(mock.createDemoItem).toHaveBeenCalledOnce();
   });
 
   it("keeps the queued save when the server is only rate limiting", async () => {

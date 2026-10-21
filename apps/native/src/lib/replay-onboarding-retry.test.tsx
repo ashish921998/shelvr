@@ -86,6 +86,77 @@ beforeEach(() => {
 });
 
 describe("useReplayOnboarding and the account", () => {
+  it("never saves a link handed over for another account", async () => {
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe", null, "user_other");
+    setPendingSpaces([]);
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(createLinkItem).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBeNull();
+  });
+
+  it("saves a link handed over for this account", async () => {
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe", null, "user_1");
+    setPendingSpaces([]);
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/recipe" }),
+    );
+    expect(hasPending()).toBe(false);
+  });
+
+  it("stops a run when another account signs in while it waits on the server", async () => {
+    let finishSpace: (id: string) => void = () => {};
+    createSpace.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSpace = resolve)),
+    );
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    setPendingSpaces(["Articles"]);
+    queueDemoUrl("https://example.com/recipe", null, "user_1");
+
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(createSpace).toHaveBeenCalledOnce();
+
+    account.user = { _id: "user_2" };
+    hook.rerender();
+    await act(async () => finishSpace("space"));
+    await settle();
+
+    expect(createLinkItem).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBeNull();
+  });
+
+  it("writes nothing more once it unmounts mid-run", async () => {
+    let finishSpace: (id: string) => void = () => {};
+    createSpace.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSpace = resolve)),
+    );
+    createLinkItem.mockResolvedValue("item");
+    setPendingSpaces(["Articles"]);
+    queueDemoUrl("https://example.com/recipe", null, "user_1");
+
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    hook.unmount();
+    await act(async () => finishSpace("space"));
+    await settle();
+
+    expect(createSpace).toHaveBeenCalledOnce();
+    expect(createLinkItem).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBe("https://example.com/recipe");
+  });
+
   it("waits for the account before asking for the paywall", async () => {
     entitlement.entitled = false;
     account.user = undefined;

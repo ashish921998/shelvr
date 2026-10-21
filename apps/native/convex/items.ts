@@ -2222,21 +2222,6 @@ export const findLinks = mutation({
 });
 
 /**
- * User-triggered retry for a save whose page fetch or classification did not
- * fully succeed: a `failed` item, a `ready` one flagged `enrichment: "partial"`
- * (classified from its URL because the page body was unreadable), or a
- * `processing` one whose run is older than PROCESSING_STALE_MS (its action is
- * dead, per the constant's rationale, and the sweeper has not reached it
- * yet). Re-runs the same pipeline, so it is rate-limited like a create.
- *
- * A fresh `processing` item is refused: its action may still finish, and
- * minting a second run would only waste a model call. A stale one gets a new
- * run id, which fences the old run's finalize/fail should it somehow land.
- *
- * Unavailable sources and oversized photos are terminal; retrying would
- * spend classification capacity without changing the result.
- */
-/**
  * The onboarding demo row when this is the caller's demo save, the caller has
  * no Pro, and the demo still has retries left. A first save queued before
  * sign-in can fail after onboarding has ended, and its free save keeps a free
@@ -2257,6 +2242,21 @@ async function freeDemoRetry(
   return demo;
 }
 
+/**
+ * User-triggered retry for a save whose page fetch or classification did not
+ * fully succeed: a `failed` item, a `ready` one flagged `enrichment: "partial"`
+ * (classified from its URL because the page body was unreadable), or a
+ * `processing` one whose run is older than PROCESSING_STALE_MS (its action is
+ * dead, per the constant's rationale, and the sweeper has not reached it
+ * yet). Re-runs the same pipeline, so it is rate-limited like a create.
+ *
+ * A fresh `processing` item is refused: its action may still finish, and
+ * minting a second run would only waste a model call. A stale one gets a new
+ * run id, which fences the old run's finalize/fail should it somehow land.
+ *
+ * Unavailable sources and oversized photos are terminal; retrying would
+ * spend classification capacity without changing the result.
+ */
 export const reprocessItem = mutation({
   args: { id: v.id("items") },
   // True when a new run was scheduled. False means the item is not retryable

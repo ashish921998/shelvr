@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { notePurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
-import { openPaywallKeepingExitOffer, useEntitlement } from "@/lib/entitlement";
+import { openPaywallOutcome, useEntitlement } from "@/lib/entitlement";
 import {
   noteDeclinedDuringOnboarding,
   notePurchasedDuringOnboarding,
@@ -16,8 +16,10 @@ const ENTITLEMENT_WAIT_MS = 5000;
  * locked sample trip for people who save travel). `ask` waits
  * for the entitlement to load, then lets a Pro account through and shows
  * everyone else the paywall once. Signed out, the purchase is anonymous and
- * the sign-in that follows onboarding attaches it to the new account. A relaunch lands back on the step that asked and
- * asks again. A paywall that could not show (RevenueCat not ready, offline)
+ * the sign-in that follows onboarding attaches it to the new account, and a
+ * close leaves the person on the step that asked: sign-in comes only after a
+ * purchase or restore. A relaunch lands back on that step and asks
+ * again. A paywall that could not show (RevenueCat not ready, offline)
  * was never declined: `onUnavailable` finishes without saying so, and the
  * app asks again once Home is up.
  */
@@ -59,12 +61,18 @@ export function useOnboardingPaywall({
       noteDeclinedDuringOnboarding();
       handlers.current.onDecline();
     };
-    // Skipping the practice reaches this without asking for a paywall, so a
-    // declined exit offer just closes.
-    openPaywallKeepingExitOffer(router, "onboarding", false)
+    openPaywallOutcome(router, "onboarding")
       .then((outcome) => {
         if (outcome === "unavailable") return handlers.current.onUnavailable();
-        if (outcome === "cancelled") return decline();
+        if (outcome === "cancelled") {
+          if (isAuthenticated) return decline();
+          // Signed out, closing is not a way in: the account is made only
+          // after a purchase, so the promise step stays and asks again.
+          started.current = false;
+          setWaitedOut(false);
+          setAsked(false);
+          return;
+        }
         notePurchasedDuringOnboarding();
         if (!isAuthenticated) notePurchaseBeforeSignIn();
         handlers.current.onPro();

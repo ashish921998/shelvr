@@ -119,6 +119,9 @@ export async function fetchImageAspectRatio(
     // safe fetcher enforces this cap on actual streamed bytes regardless of
     // what the server sends, so a Range-ignoring server still cannot exhaust us.
     maxBytes: 131072,
+    // A server that ignores Range sends the whole picture; its first 128 KiB
+    // still hold the size, so keep that prefix instead of failing the read.
+    onOverflow: "truncate",
     // Allow only the raster types readImageSize parses (PNG/GIF/WebP/JPEG).
     // SVG is intentionally excluded: it is XML and can carry scripts/XXE, and
     // readImageSize returns undefined for it anyway. ct is already lowercased

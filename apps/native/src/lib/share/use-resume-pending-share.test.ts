@@ -44,6 +44,17 @@ function renderResume() {
 }
 
 describe("useResumePendingShare", () => {
+  it("holds an owed share behind the plan gate and resumes it once a plan lifts the gate", () => {
+    mock.hasPendingShare = true;
+    let blocked = true;
+    const { rerender } = renderHook(() => useResumePendingShare(blocked));
+    expect(mock.replace).not.toHaveBeenCalled();
+
+    blocked = false;
+    rerender();
+    expect(mock.replace).toHaveBeenCalledWith("/share");
+  });
+
   it("recovers a share whose launch URL was lost, once auth restores", () => {
     // The regression: an Android cold start from the share sheet whose
     // `shelvr://expo-sharing` URL lost Expo Router's initial-URL race. The
