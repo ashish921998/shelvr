@@ -8,21 +8,21 @@ import { startOnSeededHome } from "./seeded-home.ts";
 startOnSeededHome();
 
 /**
- * Closes the paywall and waits until Home is back. No exit offer follows the
- * close: the launch argument that hides Pro also skips it.
+ * Closes the paywall and waits until the plan gate is back. No exit offer
+ * follows the close: the launch argument that hides Pro also skips it.
  */
 async function closePaywall(screen: Screen): Promise<void> {
   await screen.getByRole("button", "Close").first().tap();
   await expect(paywallRestore(screen)).toBeHidden({
     timeout: 30_000,
   });
-  await expect(screen.getByRole("button", "Profile")).toBeVisible();
+  await expect(screen.getByRole("button", "See plans")).toBeVisible();
 }
 
 // The dev user is always Pro, so the app is relaunched with the launch
 // argument that makes a development build show them as not Pro
 // (src/lib/e2e-hide-pro.ts). The next test's setup relaunches without it.
-test("shows the paywall instead of Add to someone without Pro", async ({
+test("keeps someone without Pro on the plan gate", async ({
   device,
   screen,
 }) => {
@@ -30,35 +30,28 @@ test("shows the paywall instead of Add to someone without Pro", async ({
     relaunch: true,
     launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
   });
-  const viewPlans = screen.getByRole("button", "View Pro plans");
-  await expect(viewPlans).toBeVisible({ timeout: 180_000 });
-  // The relaunch plays the launch splash again, over a Home that is already
-  // in the tree.
+  const seePlans = screen.getByRole("button", "See plans");
+  await expect(seePlans).toBeVisible({ timeout: 180_000 });
   await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
     timeout: 30_000,
   });
+  await expect(screen.getByText("Pick a plan to open Shelvr")).toBeVisible();
 
-  // Add is a Pro action: it opens the paywall, not the Add sheet.
-  await screen.getByRole("button", "Add").tap();
+  // No entry without a plan: Home, its saves and Add are not reachable.
+  await expect(screen.getByRole("button", "Add")).toBeHidden();
+  await expect(screen.getByTestId("fixture-item-ramen")).toBeHidden();
+
+  // The gate opens the paywall, and closing it comes back to the gate.
+  await seePlans.tap();
   await expectPaywall(screen);
   await closePaywall(screen);
-  await expect(screen.getByTestId("add-option-note")).toBeHidden();
+  await expect(screen.getByRole("button", "Add")).toBeHidden();
 
-  // Home's own prompt opens the same paywall.
-  await viewPlans.tap();
-  await expectPaywall(screen);
-  await closePaywall(screen);
-
-  // Home is as it was: the four seeded saves, and nothing being saved.
-  await expect(screen.getByRole("button", "Still working on it")).toBeHidden();
-  for (const seeded of [
-    "ramen",
-    "belem-tower",
-    "apartment-checklist",
-    "value-of-craft",
-  ]) {
-    await expect(screen.getByTestId(`fixture-item-${seeded}`)).toBeVisible();
-  }
+  // Settings, where restore and account deletion live, stays reachable.
+  await screen.getByRole("button", "Settings").tap();
+  await expect(screen.getByRole("button", "Delete account")).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
 // The exit offer after a paywall close, asked for with a second launch
@@ -80,13 +73,13 @@ test("leaves the exit offer by the app's own close", async ({
       "YES",
     ],
   });
-  const viewPlans = screen.getByRole("button", "View Pro plans");
-  await expect(viewPlans).toBeVisible({ timeout: 180_000 });
+  const seePlans = screen.getByRole("button", "See plans");
+  await expect(seePlans).toBeVisible({ timeout: 180_000 });
   await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
     timeout: 30_000,
   });
 
-  await viewPlans.tap();
+  await seePlans.tap();
   await expectPaywall(screen);
   await screen.getByRole("button", "Close").first().tap();
 
@@ -96,10 +89,8 @@ test("leaves the exit offer by the app's own close", async ({
   await expect(screen.getByText("No Paywall configured")).toBeHidden();
   await close.tap();
   await expect(close).toBeHidden({ timeout: 30_000 });
-  // Home holds the offer open for its window in place of the Pro prompt.
-  await expect(screen.getByRole("button", "See the offer")).toBeVisible({
-    timeout: 30_000,
-  });
+  // Declining the offer leaves the person on the plan gate.
+  await expect(seePlans).toBeVisible({ timeout: 30_000 });
 });
 
 test(
@@ -110,14 +101,12 @@ test(
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    const add = screen.getByRole("button", "Add");
-    await expect(add).toBeVisible({ timeout: 180_000 });
+    const seePlans = screen.getByRole("button", "See plans");
+    await expect(seePlans).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
-    // A previous decline can leave Home's exit-offer card active. Add always
-    // opens the regular paywall, independently of that persisted offer.
-    await add.tap();
+    await seePlans.tap();
     await expectPaywall(screen);
 
     await screen.getByRole("button", "View all plans").tap();

@@ -4,6 +4,7 @@ import { AppIntentsBridge } from "@/lib/app-intents";
 import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -66,6 +67,12 @@ function AppStack() {
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
+  const entitlement = useEntitlement();
+  // No entry without a plan. While the entitlement is still loading the app
+  // shows, so an offline launch never locks anyone out; saves are gated on
+  // the server either way.
+  const gated =
+    isAuthenticated && !entitlement.loading && !entitlement.entitled;
   const { theme } = useUnistyles();
   // Spatial slide transitions are the first thing to cut under Reduce Motion.
   const reducedMotion = useReducedMotion();
@@ -104,7 +111,10 @@ function AppStack() {
           headerTintColor: theme.colors.primary,
         }}
       >
-        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+        <Stack.Protected
+          guard={onboarded && !gated}
+          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="share" options={{ headerShown: false }} />
           <Stack.Screen
@@ -198,6 +208,18 @@ function AppStack() {
             }}
           />
           <Stack.Screen
+            name="camera"
+            options={{
+              presentation: "fullScreenModal",
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+        </Stack.Protected>
+        {/* Profile and Settings stay reachable from the plan gate: sign out,
+            restore and account deletion must never sit behind a purchase. */}
+        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+          <Stack.Screen
             name="profile"
             options={{
               presentation: "formSheet",
@@ -219,14 +241,12 @@ function AppStack() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
-          <Stack.Screen
-            name="camera"
-            options={{
-              presentation: "fullScreenModal",
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
+        </Stack.Protected>
+        <Stack.Protected
+          guard={onboarded && gated}
+          redirectTo="/(app)/(tabs)/(home)"
+        >
+          <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />

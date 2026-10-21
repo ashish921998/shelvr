@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppLayout from "@/app/(app)/_layout";
 
 // The layout is the gate: the stack holds every save screen and every hook
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   onboarded: true,
   status: "unset",
   grantOnItsWay: false,
+  entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
 }));
@@ -40,11 +41,32 @@ vi.mock("convex/react", () => ({
     isAuthenticated: mocks.status !== "signed-out",
   }),
 }));
+vi.mock("@/lib/entitlement", () => ({
+  useEntitlement: () => mocks.entitlement,
+}));
 vi.mock("expo-router", () => {
-  const Stack = Object.assign(() => <div>app-stack</div>, {
-    Screen: nothing,
-    Protected: nothing,
-  });
+  const screen = ({ name }: { name: string }) => (
+    <span>{`screen:${name}`}</span>
+  );
+  const guarded = ({
+    guard,
+    children,
+  }: {
+    guard: boolean;
+    children: ReactNode;
+  }) => (guard ? children : null);
+  const Stack = Object.assign(
+    ({ children }: { children: ReactNode }) => (
+      <div>
+        <span>app-stack</span>
+        {children}
+      </div>
+    ),
+    {
+      Screen: screen,
+      Protected: guarded,
+    },
+  );
   return { Stack, Redirect: nothing, useRouter: () => ({}) };
 });
 vi.mock("@/lib/app-intents", () => ({ AppIntentsBridge: nothing }));
@@ -85,6 +107,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.onboarded = true;
   mocks.status = "unset";
+  mocks.entitlement = { entitled: true, loading: false };
 });
 
 it.each(["unset", "loading"] as const)(
@@ -137,4 +160,43 @@ it("shows no card while the yes given at sign-in is being recorded", () => {
   } finally {
     mocks.grantOnItsWay = false;
   }
+});
+
+describe("plan gate", () => {
+  beforeEach(() => {
+    mocks.status = "granted";
+  });
+
+  it("shows only the plan gate, Profile, Settings and the paywall without a plan", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    render(<AppLayout />);
+    expect(shows("screen:plan-gate")).toBe(true);
+    expect(shows("screen:(tabs)")).toBe(false);
+    expect(shows("screen:add")).toBe(false);
+    expect(shows("screen:item/[id]")).toBe(false);
+    expect(shows("screen:profile")).toBe(true);
+    expect(shows("screen:settings")).toBe(true);
+    expect(shows("screen:paywall")).toBe(true);
+  });
+
+  it("opens the app with a plan, and while the plan is still loading", () => {
+    for (const entitlement of [
+      { entitled: true, loading: false },
+      { entitled: false, loading: true },
+    ]) {
+      mocks.entitlement = entitlement;
+      const { unmount } = render(<AppLayout />);
+      expect(shows("screen:(tabs)")).toBe(true);
+      expect(shows("screen:plan-gate")).toBe(false);
+      unmount();
+    }
+  });
+
+  it("never gates onboarding", () => {
+    mocks.onboarded = false;
+    mocks.entitlement = { entitled: false, loading: false };
+    render(<AppLayout />);
+    expect(shows("screen:onboarding")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+  });
 });

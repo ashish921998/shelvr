@@ -112,6 +112,9 @@ export type MessageParams = {
   "spaces.create": undefined;
   "common.continue": undefined;
   "pro.loadFailed": undefined;
+  "planGate.title": undefined;
+  "planGate.body": undefined;
+  "planGate.seePlans": undefined;
   "common.notNow": undefined;
   "legal.termsShort": undefined;
   "legal.privacyShort": undefined;
