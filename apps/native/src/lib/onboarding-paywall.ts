@@ -17,9 +17,9 @@ const ENTITLEMENT_WAIT_MS = 5000;
  * for the entitlement to load, then lets a Pro account through and shows
  * everyone else the paywall once. Signed out, the purchase is anonymous and
  * the sign-in that follows onboarding attaches it to the new account, and a
- * close leaves the person on the step that asked: sign-in comes only after a
- * purchase or restore. A relaunch lands back on that step and asks
- * again. A paywall that could not show (RevenueCat not ready, offline)
+ * close leaves the person on the step that asked (the promise, or the locked
+ * sample trip): sign-in comes only after a purchase or restore. A relaunch
+ * lands back on that step and asks again. A paywall that could not show (RevenueCat not ready, offline)
  * was never declined: `onUnavailable` finishes without saying so, and the
  * app asks again once Home is up.
  */
