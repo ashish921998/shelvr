@@ -27,7 +27,7 @@ const tones = {
 
 type AndroidWaitlistProps = {
   // The closing panel's events and route still call it "footer".
-  source?: "footer" | "plan";
+  source?: "footer" | "plan" | "bio";
   tone?: keyof typeof tones;
 };
 
