@@ -12,6 +12,7 @@ import {
   formatTripDay,
   toDateKey,
   tripDayDate,
+  tripSaveCount,
   type TripPace,
   type TripRequest,
 } from "@/lib/trip";
@@ -313,7 +314,10 @@ export function TripPlanForm({
         <Days
           days={days}
           onChange={setDays}
-          fill={daysSavesFill(saveCount, pace)}
+          fill={daysSavesFill(
+            tripSaveCount(saveCount, cities, askCity ? city : undefined),
+            pace,
+          )}
         />
         <Segmented
           label={t("trip.pace")}

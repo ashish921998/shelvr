@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   canPlanTrip,
   daysSavesFill,
+  tripSaveCount,
   directionsUrl,
   fitCamera,
   locatedStops,
@@ -41,6 +42,26 @@ describe("canPlanTrip", () => {
       false,
     );
     expect(canPlanTrip([save, save, save])).toBe(true);
+  });
+});
+
+describe("tripSaveCount", () => {
+  const cities = [
+    { city: "Lisbon", count: 6 },
+    { city: "Porto", count: 3 },
+  ];
+
+  it("counts every save when no city is picked", () => {
+    expect(tripSaveCount(10, cities)).toBe(10);
+  });
+
+  it("counts the picked city's saves and the ones naming no city", () => {
+    expect(tripSaveCount(10, cities, "Lisbon")).toBe(7);
+    expect(tripSaveCount(10, cities, "Porto")).toBe(4);
+  });
+
+  it("stops at the saves a trip reads", () => {
+    expect(tripSaveCount(200, [])).toBe(60);
   });
 });
 

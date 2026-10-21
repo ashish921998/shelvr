@@ -331,7 +331,7 @@
     "other": "%{formattedCount} días"
   },
   "trip.daysFill": {
-    "one": "Tus guardados llenan unos %{formattedCount} día a este ritmo.",
+    "one": "Tus guardados llenan alrededor de %{formattedCount} día a este ritmo.",
     "many": "Tus guardados llenan unos %{formattedCount} días a este ritmo.",
     "other": "Tus guardados llenan unos %{formattedCount} días a este ritmo."
   },
