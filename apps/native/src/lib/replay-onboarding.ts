@@ -62,7 +62,7 @@ export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
     if (!awaiting) return;
     const id = setTimeout(() => setNow(Date.now()), until - Date.now());
     return () => clearTimeout(id);
-  }, [entitled, awaiting, until]);
+  }, [entitled, awaiting, until, now]);
   return awaiting;
 }
 

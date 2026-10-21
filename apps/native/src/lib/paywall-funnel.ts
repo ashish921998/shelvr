@@ -217,6 +217,10 @@ export const NO_TRIAL_OFFERING_ID = "weekly_annual_draft";
 export async function readPaywallOffering(): Promise<{
   offering?: import("react-native-purchases").PurchasesOffering;
   trial?: TrialPeriod;
+  /** The trial answer read here, after identity sync, when one was read.
+   * Fresher than the early read that started before sync, which can fail
+   * on a cold sign-in, so the sheet's variables and events prefer it. */
+  eligibility?: TrialEligibility;
 }> {
   const rc = getPurchases();
   if (!rc) return {};
@@ -244,7 +248,12 @@ export async function readPaywallOffering(): Promise<{
     );
     // Only a definite "no" switches: an unknown answer keeps the paywall
     // the dashboard chose.
-    if (eligibility === "ineligible") return { offering: noTrial };
+    if (eligibility === "ineligible") return { offering: noTrial, eligibility };
+    return {
+      offering: current,
+      trial: singleTrialPeriod(products),
+      ...(eligibility && { eligibility }),
+    };
   }
   return {
     offering: current,

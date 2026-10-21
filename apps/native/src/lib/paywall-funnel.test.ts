@@ -205,6 +205,7 @@ describe("paywall offering reads", () => {
     });
     await expect(funnel.readPaywallOffering()).resolves.toEqual({
       offering: noTrial,
+      eligibility: "ineligible",
     });
   });
 
@@ -224,6 +225,18 @@ describe("paywall offering reads", () => {
         trial: { unit: "DAY", count: 7 },
       });
     }
+  });
+
+  it("returns the trial answer it read after identity sync", async () => {
+    const current = withNoTrial(offering(trial("DAY", 7), null));
+    const funnel = await load({
+      getOfferings: async () => current,
+      checkTrialOrIntroductoryPriceEligibility: async () => answers(2, 3),
+    });
+    await expect(funnel.readPaywallOffering()).resolves.toMatchObject({
+      offering: current.current,
+      eligibility: "eligible",
+    });
   });
 
   it("keeps the current offering when the eligibility read fails or stalls", async () => {

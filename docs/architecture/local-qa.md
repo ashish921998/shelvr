@@ -92,10 +92,8 @@ only loads bundles whose native fingerprint matches. Rebuild with
   development build with the `-E2EHidePro YES` argument
   (`src/lib/e2e-hide-pro.ts`), which makes the client show that user as not
   Pro, as the paywall flow in `tools/e2e/tests/paywall.e2e.ts` does. The
-  server still treats them as Pro. Then Home's Add button, or "Paste a link",
-  "Link", reaches the Pro gate. "Paste a link" does nothing unless a
-  URL is on the device clipboard. `pbcopy` reads standard input:
-  `printf '%s' '<url>' | xcrun simctl pbcopy <udid>`.
+  server still treats them as Pro. The app then opens on the plan gate
+  instead of Home, and its See plans button opens the paywall.
 - **Reduced motion.**
   `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true`,
   then relaunch the app. Set it back to `false` when done.
