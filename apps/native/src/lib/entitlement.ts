@@ -44,7 +44,10 @@ import {
   claimPurchaseBeforeSignIn,
   clearPurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
-import { reservePurchaseLanding } from "@/lib/purchase-landing";
+import {
+  notePurchaseLanding,
+  reservePurchaseLanding,
+} from "@/lib/purchase-landing";
 
 /**
  * Shelvr Pro entitlement.
@@ -230,6 +233,17 @@ export function useEntitlementSync(): void {
     if (REVENUECAT_DISABLED_BY_BUILD) return;
 
     let cancelled = false;
+    // A purchase made before sign-in is claimed by the first account in; one
+    // that never reached the account within the attach window is let go (see
+    // purchase-before-sign-in.ts), and reported. Until the attach shows the
+    // entitlement, the plan gate waits as it does after any purchase.
+    const claimed = claimPurchaseBeforeSignIn(sub, () =>
+      analytics.captureError(
+        "purchase_attach_expired",
+        new Error("purchase_attach_expired"),
+      ),
+    );
+    if (claimed) notePurchaseLanding();
     // Attaching a purchase made before sign-in has its own retries: by the
     // time it runs the identity sync is ready, and its retry is a no-op.
     let attach: ReturnType<typeof startRevenueCatIdentitySync> | null = null;
@@ -249,16 +263,7 @@ export function useEntitlementSync(): void {
       },
       onReady: () => {
         markRcUserSynced(sub);
-        if (cancelled) return;
-        // A purchase that never reached the account within the attach
-        // window is let go (see purchase-before-sign-in.ts), and reported.
-        const claimed = claimPurchaseBeforeSignIn(sub, () =>
-          analytics.captureError(
-            "purchase_attach_expired",
-            new Error("purchase_attach_expired"),
-          ),
-        );
-        if (!claimed) return;
+        if (cancelled || !claimed) return;
         attach = startRevenueCatIdentitySync({
           sync: () =>
             attachPurchaseBeforeSignIn(() => syncPurchaseRef.current({})),

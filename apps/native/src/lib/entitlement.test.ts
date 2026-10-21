@@ -391,6 +391,20 @@ describe("selling before sign-in", () => {
     );
   });
 
+  it("holds the plan gate while a purchase made before sign-in attaches", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "1");
+    await loadReady();
+    const { readPurchaseLanding } = await import("./purchase-landing");
+    expect(readPurchaseLanding()).toBeGreaterThan(Date.now());
+  });
+
+  it("does not hold the plan gate for an account that bought nothing here", async () => {
+    mock.store.set("shelvr.purchase.beforeSignIn", "user:someone_else");
+    await loadReady();
+    const { readPurchaseLanding } = await import("./purchase-landing");
+    expect(readPurchaseLanding()).toBe(0);
+  });
+
   it("never attaches a purchase another account already claimed", async () => {
     mock.store.set("shelvr.purchase.beforeSignIn", "user:someone_else");
     await loadReady();
