@@ -341,6 +341,9 @@
   "trip.dayCount": {
     "other": "%{formattedCount}日"
   },
+  "trip.daysFill": {
+    "other": "このペースだと、保存した場所で埋まるのは約%{formattedCount}日です。"
+  },
   "trip.starting": "開始日",
   "trip.addDate": "日付を追加",
   "trip.clearDate": "日付を削除",

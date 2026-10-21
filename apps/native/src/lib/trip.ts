@@ -3,7 +3,12 @@ import { formattingLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isAiConsentRequired } from "@convex/model/aiConsent";
-import type { TripPace, TripSlot } from "@convex/model/trip";
+import { MAX_PLAN_ITEMS } from "@convex/model/plan";
+import {
+  STOPS_PER_DAY,
+  type TripPace,
+  type TripSlot,
+} from "@convex/model/trip";
 import type { FunctionReturnType } from "convex/server";
 import { useAction } from "convex/react";
 import { useCallback, useState } from "react";
@@ -17,6 +22,30 @@ export type Trip = NonNullable<
 >;
 export type TripDayView = Trip["days"][number];
 export type TripStopView = TripDayView["stops"][number];
+
+/** About how many days a space's saves fill at a pace, counting one place a
+ * save; the builder leaves any further day empty. */
+/** About how many saves a trip reads: at most `MAX_PLAN_ITEMS`, and with a
+ * city picked, that city's saves plus the ones that name no city (the trip
+ * leaves out saves that name only other cities). A save naming several
+ * cities is counted once per city, so the no-city share can come out low. */
+export function tripSaveCount(
+  saveCount: number,
+  cities: { city: string; count: number }[],
+  city?: string,
+): number {
+  let count = saveCount;
+  if (city !== undefined) {
+    const named = cities.reduce((sum, c) => sum + c.count, 0);
+    const own = cities.find((c) => c.city === city)?.count ?? 0;
+    count = Math.min(saveCount, own + Math.max(0, saveCount - named));
+  }
+  return Math.min(count, MAX_PLAN_ITEMS);
+}
+
+export function daysSavesFill(saveCount: number, pace: TripPace): number {
+  return Math.max(1, Math.ceil(saveCount / STOPS_PER_DAY[pace]));
+}
 
 // Avoid offering trips for a reading list that merely mentions a place.
 const TRIP_MIN_CITY_SAVES = 3;

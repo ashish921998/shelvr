@@ -343,6 +343,10 @@
     "one": "%{formattedCount} Tag",
     "other": "%{formattedCount} Tage"
   },
+  "trip.daysFill": {
+    "one": "Deine Saves füllen bei diesem Tempo etwa %{formattedCount} Tag.",
+    "other": "Deine Saves füllen bei diesem Tempo etwa %{formattedCount} Tage."
+  },
   "trip.starting": "Ab",
   "trip.addDate": "Datum hinzufügen",
   "trip.clearDate": "Datum entfernen",
