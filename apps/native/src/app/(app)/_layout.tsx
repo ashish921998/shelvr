@@ -67,20 +67,22 @@ function AppStack() {
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
+  const { theme } = useUnistyles();
+  // Spatial slide transitions are the first thing to cut under Reduce Motion.
+  const reducedMotion = useReducedMotion();
+
   const entitlement = useEntitlement();
   // No entry without a plan. While the entitlement is still loading the app
   // shows, so an offline launch never locks anyone out; saves are gated on
   // the server either way.
   const gated =
     isAuthenticated && !entitlement.loading && !entitlement.entitled;
-  const { theme } = useUnistyles();
-  // Spatial slide transitions are the first thing to cut under Reduce Motion.
-  const reducedMotion = useReducedMotion();
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
-  // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
-  useResumePendingShare();
+  // If a Share Sheet intent arrived while signed out / mid-onboarding, resume
+  // it, once the plan gate is down.
+  useResumePendingShare(gated);
   // Remind trialers two days before the yearly plan starts charging.
   useTrialReminder();
   // Right after Pro starts, Home hands off to one real save.
