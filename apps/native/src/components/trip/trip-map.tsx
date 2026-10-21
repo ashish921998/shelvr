@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import {
   fitCamera,
@@ -22,6 +23,12 @@ const pinId = (ref: StopRef) => `${ref.day}:${ref.stop}`;
 function parsePin(id: string | undefined): StopRef | null {
   const [day, stop] = (id ?? "").split(":").map(Number);
   return Number.isInteger(day) && Number.isInteger(stop) ? { day, stop } : null;
+}
+
+/** expo-modules-core's rejection when a call names a native view that is no
+ * longer registered. */
+function isViewGone(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Unable to find the");
 }
 
 /** Hex alpha suffix (about 35%) for other days' gray pins, so the whole trip
@@ -105,8 +112,10 @@ export function TripMap({
   }, [active, days, width, height, top, rt.insets.bottom]);
 
   // The `cameraPosition` prop places the first camera. Moving it again goes
-  // through the native view, which is not registered yet on mount and can be
-  // gone by the time a late call lands; either way there is nothing to move.
+  // through the native view, which is not registered yet on mount, so the
+  // first camera is left to the prop. A later call can still land after the
+  // view is gone (the screen closed mid-flight): there is nothing to move
+  // then. Any other failure is reported.
   const placed = useRef(false);
   useEffect(() => {
     if (!camera) return;
@@ -114,7 +123,10 @@ export function TripMap({
       placed.current = true;
       return;
     }
-    ref.current?.setCameraPosition(camera).catch(() => {});
+    ref.current?.setCameraPosition(camera).catch((error: unknown) => {
+      if (isViewGone(error)) return;
+      analytics.captureError("trip_map_camera_failed", error);
+    });
   }, [camera]);
 
   const pins = days.flatMap((stops, day) =>
