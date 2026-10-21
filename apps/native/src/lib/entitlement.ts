@@ -10,6 +10,7 @@ import {
   activeProductId,
   forgetPaywallFunnel,
   hasActiveEntitlement,
+  paywallVariables,
   readPaywallContext,
   readPaywallOffering,
   recordAccess,
@@ -31,7 +32,6 @@ import {
   timeLeft,
 } from "@/lib/exit-offer";
 import { t } from "@/lib/i18n";
-import { trialTimelineVariables } from "@/lib/date";
 import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
@@ -389,13 +389,24 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const enriched = { ...properties, ...(await context) };
     // Read after identity sync, so the dates come from this account's
     // offering, and presented from the same snapshot. An unknown trial length
     // dates nothing: the paywall falls back to its undated labels instead of
     // claiming a length the offer may not have.
     const { offering, trial } = await readPaywallOffering();
-    const customVariables = trial && trialTimelineVariables(Date.now(), trial);
+    // The events name the offering actually shown, which differs from the
+    // current one for someone who has already used their trial.
+    const enriched = {
+      ...properties,
+      ...(await context),
+      ...(offering && { offering_id: offering.identifier }),
+    };
+    const customVariables = paywallVariables(
+      Date.now(),
+      trial,
+      offering?.availablePackages.map((pkg) => pkg.product) ?? [],
+      enriched.trial_eligible,
+    );
     const result = await observePaywallPresentation(
       enriched,
       () =>

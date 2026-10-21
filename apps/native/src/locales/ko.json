@@ -111,6 +111,7 @@
   "spaces.create": "공간 만들기",
   "common.continue": "계속",
   "pro.loadFailed": "지금 구독 옵션을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요. 이미 Pro를 구매했다면 요금제 화면이 뜬 뒤 복원하거나 프로필에서 요금제를 관리하세요.",
+  "paywall.trialOffer": "%{zero}로 시작하고, 이후 %{price}/년.",
   "common.notNow": "나중에",
   "legal.termsShort": "약관",
   "legal.privacyShort": "개인정보",

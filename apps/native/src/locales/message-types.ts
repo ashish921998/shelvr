@@ -112,6 +112,7 @@ export type MessageParams = {
   "spaces.create": undefined;
   "common.continue": undefined;
   "pro.loadFailed": undefined;
+  "paywall.trialOffer": { zero: string; price: string };
   "common.notNow": undefined;
   "legal.termsShort": undefined;
   "legal.privacyShort": undefined;

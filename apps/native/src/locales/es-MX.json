@@ -111,6 +111,7 @@
   "spaces.create": "Crear colección",
   "common.continue": "Continuar",
   "pro.loadFailed": "No hemos podido cargar los planes de suscripción. Revisa tu conexión y vuelve a intentarlo. Si ya compraste Pro, restaura la compra cuando cargue la página de planes o administra tu suscripción en Perfil.",
+  "paywall.trialOffer": "Empieza por %{zero}, después %{price}/año.",
   "common.notNow": "Ahora no",
   "legal.termsShort": "Condiciones",
   "legal.privacyShort": "Privacidad",

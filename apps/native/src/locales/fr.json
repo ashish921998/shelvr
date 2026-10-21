@@ -111,6 +111,7 @@
   "spaces.create": "Créer une collection",
   "common.continue": "Continuer",
   "pro.loadFailed": "Les offres d'abonnement n'ont pas pu être chargées. Vérifiez votre connexion et réessayez. Si vous avez déjà acheté Pro, restaurez votre achat après le chargement de la page des offres ou gérez votre abonnement dans Profil.",
+  "paywall.trialOffer": "Commencez pour %{zero}, puis %{price}/an.",
   "common.notNow": "Pas maintenant",
   "legal.termsShort": "Conditions",
   "legal.privacyShort": "Confidentialité",
