@@ -2,7 +2,7 @@ import { test } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall, paywallRestore } from "./paywall-sheet.ts";
+import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
 import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
@@ -10,7 +10,7 @@ startOnSeededHome();
 /** Closes the paywall and waits until the plan gate is back. */
 async function closePaywall(screen: Screen): Promise<void> {
   await screen.getByRole("button", "Close").first().tap();
-  await expect(paywallRestore(screen)).toBeHidden({
+  await expect(paywallTitle(screen)).toBeHidden({
     timeout: 30_000,
   });
   await expect(screen.getByRole("button", "See plans")).toBeVisible();
