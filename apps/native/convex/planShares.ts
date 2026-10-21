@@ -15,8 +15,8 @@ import {
   MAX_PLACE_NAME_CHARS,
   MAX_PLAN_PLACES,
   MAX_WHY_CHARS,
-  placeKey,
 } from "./model/plan";
+import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 import { ipKey, ipNetwork } from "./model/clientIp";
@@ -188,12 +188,7 @@ export const latestPlanShare = query({
     for (const place of share.places) {
       const item = await ctx.db.get(place.itemId);
       if (item === null || item.userId !== userId) continue;
-      const visit = await ctx.db
-        .query("placeVisits")
-        .withIndex("by_user_and_key", (q) =>
-          q.eq("userId", userId).eq("key", placeKey(place.name)),
-        )
-        .unique();
+      const visit = await findVisit(ctx, userId, place.name);
       places.push({
         key: place.key,
         name: place.name,

@@ -403,6 +403,17 @@ describe("votes", () => {
     const shared = await t.query(api.planShares.latestPlanShare, { spaceId });
     expect(shared?.places[0]).toMatchObject({ name: "Thalassa", been: true });
     expect(shared?.places[1]).not.toHaveProperty("been");
+
+    // Taking the mark back clears it on the shared shortlist too.
+    await t.mutation(api.placeVisits.setVisited, {
+      name: "Thalassa",
+      itemId: places[0].itemId,
+      visited: false,
+    });
+    const unmarked = await t.query(api.planShares.latestPlanShare, {
+      spaceId,
+    });
+    expect(unmarked?.places[0]).not.toHaveProperty("been");
   });
 });
 
