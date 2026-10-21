@@ -30,13 +30,7 @@ const LOADING: PlanState = { status: "loading" };
 /** The space's open vote link, as far as the plan screen needs it. */
 type SharedShortlist = {
   expiresAt: number;
-  places: {
-    name: string;
-    area?: string;
-    why: string;
-    itemId: Id<"items">;
-    been?: boolean;
-  }[];
+  places: PlanPlace[];
 };
 
 /**
@@ -99,13 +93,7 @@ export function useMakePlan(
       link && link.expiresAt > Date.now() && link.places.length > 0
         ? Promise.resolve({
             status: "ready",
-            places: link.places.map(({ name, area, why, itemId, been }) => ({
-              name,
-              ...(area !== undefined ? { area } : {}),
-              why,
-              itemId,
-              ...(been === true ? { been } : {}),
-            })),
+            places: link.places,
             considered: link.places.length,
             planId: current,
           })
