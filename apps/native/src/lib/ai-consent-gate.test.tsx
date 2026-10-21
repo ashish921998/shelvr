@@ -199,6 +199,9 @@ describe("plan gate", () => {
     expect(shows("screen:digest/[id]")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
     expect(shows("plan-loading-cover")).toBe(true);
+    // Sheets and full-screen modals present above the cover, so they wait.
+    expect(shows("screen:camera")).toBe(false);
+    expect(shows("screen:add")).toBe(false);
   });
 
   it("lifts the cover once the plan is known", () => {

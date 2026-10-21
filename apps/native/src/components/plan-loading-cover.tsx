@@ -26,7 +26,8 @@ export function PlanLoadingCover() {
   };
 
   return (
-    <View style={styles.cover}>
+    // Modal to VoiceOver, so the mounted screen underneath can't be reached.
+    <View style={styles.cover} accessibilityViewIsModal>
       <ScreenLoader label={t("loading.app")} />
       <SafeAreaView edges={["bottom"]} style={styles.footer}>
         <Pressable

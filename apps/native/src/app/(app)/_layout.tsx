@@ -178,6 +178,19 @@ function AppStack() {
             name="trip/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+        </Stack.Protected>
+        {/* Sheets and full-screen modals present natively above the loading
+            cover, so they wait for the plan instead of keeping a deep link. */}
+        <Stack.Protected
+          guard={onboarded && !gated && !planUnknown}
+          redirectTo={
+            !onboarded
+              ? "/onboarding"
+              : gated
+                ? "/plan-gate"
+                : "/(app)/(tabs)/(home)"
+          }
+        >
           <Stack.Screen
             name="add"
             options={
