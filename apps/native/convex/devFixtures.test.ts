@@ -330,3 +330,82 @@ describe("locateTripStops", () => {
     ).rejects.toThrow(/fixtures are disabled/);
   });
 });
+
+describe("resetAnonymousUsersForE2e", () => {
+  function stubE2eBackend() {
+    vi.stubEnv("E2E_FAKE_AI", "local-v1");
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "ci-no-model");
+    vi.stubEnv("CONVEX_CLOUD_URL", "http://127.0.0.1:3210");
+  }
+
+  it("seeds every live anonymous account and leaves others alone", async () => {
+    stubE2eBackend();
+    const { backend, userId } = await anonymousFixtureUser();
+    const { deletingId, oauthId } = await backend.run(async (ctx) => {
+      const deletingId = await ctx.db.insert("users", { deleting: true });
+      await ctx.db.insert("authAccounts", {
+        userId: deletingId,
+        provider: "anonymous",
+        providerAccountId: `anonymous:${deletingId}`,
+      });
+      const oauthId = await ctx.db.insert("users", {
+        email: "oauth@example.com",
+      });
+      await ctx.db.insert("authAccounts", {
+        userId: oauthId,
+        provider: "google",
+        providerAccountId: "google-1",
+      });
+      return { deletingId, oauthId };
+    });
+
+    await expect(
+      backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {}),
+    ).resolves.toBe(1);
+    // A second run replaces the fixtures instead of adding to them.
+    await backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {});
+
+    const counts = await backend.run(async (ctx) => {
+      const itemsOf = async (id: typeof userId) =>
+        (
+          await ctx.db
+            .query("items")
+            .withIndex("by_user", (q) => q.eq("userId", id))
+            .collect()
+        ).length;
+      return {
+        anonymous: await itemsOf(userId),
+        deleting: await itemsOf(deletingId),
+        oauth: await itemsOf(oauthId),
+      };
+    });
+    expect(counts).toEqual({ anonymous: 4, deleting: 0, oauth: 0 });
+  });
+
+  it.each([
+    ["E2E_FAKE_AI", "", /switch_off/],
+    [
+      "CONVEX_CLOUD_URL",
+      "https://amiable-setter-120.convex.cloud",
+      /not_local/,
+    ],
+    ["AUTH_ENABLE_ANONYMOUS", "false", /dev_sign_in_off/],
+    ["GOOGLE_GENERATIVE_AI_API_KEY", "real-key", /real_key/],
+  ])("refuses unless every e2e lock holds (%s)", async (name, value, error) => {
+    stubE2eBackend();
+    vi.stubEnv(name, value);
+    const { backend, userId } = await anonymousFixtureUser();
+
+    await expect(
+      backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {}),
+    ).rejects.toThrow(error);
+    const items = await backend.run(async (ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+    );
+    expect(items).toHaveLength(0);
+  });
+});

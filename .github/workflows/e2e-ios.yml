@@ -155,12 +155,14 @@ jobs:
       # A cold runner build can outlast the budget e2e gives the engine to
       # start (seen: "boot failed: Daemon request timed out"), so it is built
       # here with a budget of its own. The daemon is stopped afterwards so it
-      # does not hold the runner the run's own daemon needs.
+      # does not hold the runner the run's own daemon needs. --json prints
+      # where the time went (timing.additiveParts: build vs connect): this
+      # step takes 1 to 5 minutes even when its cache hits.
       - name: Prepare the XCTest runner
         id: prepare-runner
         run: |
           node node_modules/agent-device/bin/agent-device.mjs prepare ios-runner \
-            --platform ios --udid "$E2E_DEVICE" --timeout 900000
+            --platform ios --udid "$E2E_DEVICE" --timeout 900000 --json
           # stop refuses a daemon whose info file has no start time (run
           # 39049617284) and fails the job though the runner is ready, so it
           # is then stopped by the pid it recorded.
@@ -271,9 +273,14 @@ jobs:
       - name: Run the flows
         working-directory: tools/e2e
         # Tells the flows that need the fake (save-link-fixture,
-        # space-suggestions) that the backend runs it.
+        # space-suggestions) that the backend runs it. E2E_FIXTURE_RESET has
+        # the seeded flows reset their data with `convex run` against this
+        # local backend instead of through Settings (startOnSeededHome), which
+        # cost each flow about 50 seconds of taps and a relaunch.
         env:
           E2E_FAKE_AI: local-v1
+          E2E_FIXTURE_RESET: backend
+          CONVEX_AGENT_MODE: anonymous
         run: >-
           pnpm exec e2e run
           tests/search.e2e.ts
