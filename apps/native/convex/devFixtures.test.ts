@@ -383,6 +383,64 @@ describe("resetAnonymousUsersForE2e", () => {
     expect(counts).toEqual({ anonymous: 4, deleting: 0, oauth: 0 });
   });
 
+  it("seeds each of several anonymous accounts", async () => {
+    stubE2eBackend();
+    const { backend, userId } = await anonymousFixtureUser();
+    const secondId = await backend.run(async (ctx) => {
+      const id = await ctx.db.insert("users", {});
+      await ctx.db.insert("authAccounts", {
+        userId: id,
+        provider: "anonymous",
+        providerAccountId: `anonymous:${id}`,
+      });
+      return id;
+    });
+
+    await expect(
+      backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {}),
+    ).resolves.toBe(2);
+    const counts = await backend.run(async (ctx) =>
+      Promise.all(
+        [userId, secondId].map(
+          async (id) =>
+            (
+              await ctx.db
+                .query("items")
+                .withIndex("by_user", (q) => q.eq("userId", id))
+                .collect()
+            ).length,
+        ),
+      ),
+    );
+    expect(counts).toEqual([4, 4]);
+  });
+
+  it("refuses more than 25 anonymous accounts without seeding any", async () => {
+    stubE2eBackend();
+    const { backend, userId } = await anonymousFixtureUser();
+    await backend.run(async (ctx) => {
+      for (let i = 0; i < 25; i++) {
+        const id = await ctx.db.insert("users", {});
+        await ctx.db.insert("authAccounts", {
+          userId: id,
+          provider: "anonymous",
+          providerAccountId: `anonymous:${id}`,
+        });
+      }
+    });
+
+    await expect(
+      backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {}),
+    ).rejects.toThrow(/more than 25 anonymous accounts/);
+    const items = await backend.run(async (ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+    );
+    expect(items).toHaveLength(0);
+  });
+
   it.each([
     ["E2E_FAKE_AI", "", /switch_off/],
     [

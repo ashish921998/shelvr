@@ -74,12 +74,13 @@ const BACKEND_RESET_ACCOUNTS = 25;
 /**
  * The e2e job's fixture reset, run from the CLI
  * (`convex run devFixtures:resetAnonymousUsersForE2e`) instead of through
- * Settings, which cost each flow about 20 seconds of taps and a relaunch.
+ * Settings, which cost each flow about 50 seconds of taps and a relaunch.
  * The runner does not know which anonymous account the app is signed in as,
- * so every live anonymous account gets the fixtures. Only the e2e job's local
- * backend passes the fake model's locks (loopback URL, dev sign-in, the
- * placeholder key, the switch), so no shared deployment can run it. Returns
- * how many accounts were reset.
+ * so every live anonymous account gets the fixtures. It runs only where the
+ * fake model's locks all hold (a loopback backend URL, dev sign-in, the
+ * placeholder key and the switch): the e2e job's local backend, or a local
+ * one set up the same way, never a shared deployment. Returns how many
+ * accounts were reset.
  */
 export const resetAnonymousUsersForE2e = internalMutation({
   args: {},

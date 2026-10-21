@@ -372,10 +372,12 @@ jobs:
 
   # One stable check named `e2e ios` over both shards, for when the check
   # becomes required. It skips with them on a pull request without the label.
+  # A run that another label started reports under a name of its own, so its
+  # skip never stands in for this commit's real result.
   result:
-    name: e2e ios
+    name: ${{ github.event.action == 'labeled' && github.event.label.name != 'run-e2e' && 'e2e ios (label)' || 'e2e ios' }}
     needs: ios
-    if: ${{ always() && needs.ios.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.ios.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
