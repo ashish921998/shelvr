@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { analytics } from "@/lib/analytics";
+import { useCurrentUser } from "@/lib/current-user";
 import { useOnboarding } from "@/lib/onboarding";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
@@ -7,6 +8,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   clearLegacyDemoUrl,
   clearPending,
+  getPendingDemoSpace,
+  getPendingDemoOwner,
   getPendingDemoUrl,
   getPendingSpaces,
   getPendingOperationId,
@@ -16,6 +19,11 @@ import {
   getPendingOnboardingRevision,
   updatePendingSpaces,
 } from "@/lib/pending-onboarding";
+import {
+  getPurchaseBeforeSignInRevision,
+  hasPurchaseBeforeSignIn,
+  subscribePurchaseBeforeSignIn,
+} from "@/lib/purchase-before-sign-in";
 import {
   openPaywall,
   useEntitlement,
@@ -80,7 +88,8 @@ function pendingWorkKey(): string {
 
 /**
  * After onboarding is finished and the user signs in, replay the deferred
- * onboarding spaces, then present the paywall. Runs once.
+ * onboarding spaces, then present the paywall. Runs again only for work
+ * handed over after it finished (a queued first save's link).
  *
  * Mounted in (app)/_layout.tsx. Gated on `onboarded`: onboarding replay must
  * never fire mid-onboarding (the demo step's inline sign-in authenticates the
@@ -90,11 +99,16 @@ function pendingWorkKey(): string {
 export function useReplayOnboarding() {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
+  // The paywall's identity gate needs the account: asked before the user doc
+  // lands, RevenueCat has no one to log in yet, so it gives up at once and
+  // the person sees the fallback paywall instead of the real one.
+  const { data: user } = useCurrentUser();
+  const accountLoaded = user != null;
+  const userId = user?._id ?? null;
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
-  const ranRef = useRef(false);
   const runningRef = useRef(false);
   const startedEntitledRef = useRef(false);
   const rerunRef = useRef(false);
@@ -106,6 +120,16 @@ export function useReplayOnboarding() {
   const settledWorkRef = useRef<string | null>(null);
   const settledEntitledRef = useRef(entitled);
   const [retryNonce, setRetryNonce] = useState(0);
+  // The account signed in right now; null once signed out or unmounted. A run
+  // that awaits a mutation checks it before its next write, so a run started
+  // for one account never writes into the next one to sign in.
+  const accountRef = useRef<string | null>(null);
+  useEffect(() => {
+    accountRef.current = isAuthenticated ? userId : null;
+    return () => {
+      accountRef.current = null;
+    };
+  }, [isAuthenticated, userId]);
   // SecureStore is synchronous but not reactive. Subscribe so finishing
   // authenticated onboarding immediately wakes this hook; otherwise the hook
   // would only notice pending data after an auth/entitlement change.
@@ -114,13 +138,20 @@ export function useReplayOnboarding() {
     getPendingOnboardingRevision,
     getPendingOnboardingRevision,
   );
+  // Wakes the replay when a purchase made before sign-in stops holding it.
+  const purchaseRevision = useSyncExternalStore(
+    subscribePurchaseBeforeSignIn,
+    getPurchaseBeforeSignInRevision,
+    getPurchaseBeforeSignInRevision,
+  );
 
   useEffect(() => {
     if (entitled !== settledEntitledRef.current) {
       settledEntitledRef.current = entitled;
       settledWorkRef.current = null;
     }
-    if (!isAuthenticated || ranRef.current) return;
+    if (!isAuthenticated) return;
+    if (!accountLoaded) return;
     if (!onboarded) return;
     if (entitlementLoading) return;
     if (runningRef.current) {
@@ -132,17 +163,26 @@ export function useReplayOnboarding() {
       }
       return;
     }
+    // A link handed over for another account (it signed out before the
+    // replay saved it) never lands in this one.
+    const demoOwner = getPendingDemoOwner();
+    if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
     if (!hasPending()) return;
     if (pendingWorkKey() === settledWorkRef.current) return;
+    // A purchase made before sign-in is still on its way to the account
+    // (see purchase-before-sign-in.ts), so it is never sold a second time.
     if (
       !entitled &&
-      (awaitingEntitlementRef.current || onboardingPaywall !== "unseen")
+      (awaitingEntitlementRef.current ||
+        onboardingPaywall !== "unseen" ||
+        hasPurchaseBeforeSignIn())
     )
       return;
 
     const spaces = getPendingSpaces();
 
     const legacyDemoUrl = getPendingDemoUrl();
+    const legacyDemoSpace = getPendingDemoSpace();
 
     runningRef.current = true;
     startedEntitledRef.current = entitled;
@@ -150,6 +190,14 @@ export function useReplayOnboarding() {
     // What this run left unfinished, read straight after its own writes so
     // work that arrives while a mutation is in flight is never mistaken for it.
     let remainderKey: string | null = null;
+    let lateDemoUrl = false;
+    const runAccount = userId;
+    let accountChanged = false;
+    const sameAccount = () => {
+      if (runAccount !== null && accountRef.current === runAccount) return true;
+      accountChanged = true;
+      return false;
+    };
     const run = async () => {
       try {
         // Show the paywall before Pro-gated mutations. createSpace calls
@@ -170,6 +218,7 @@ export function useReplayOnboarding() {
 
         awaitingEntitlementRef.current = false;
         onboardingPaywall = "unseen";
+        if (!sameAccount()) return;
 
         // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
@@ -187,16 +236,26 @@ export function useReplayOnboarding() {
         const allSpacesOk = failedSpaces.length === 0;
 
         if (legacyDemoUrl) {
+          if (!sameAccount()) return;
           try {
             // No saveSource: this replays an onboarding demo, but
             // `onboarding_demo` is stamped server-side by createDemoItem and
             // the client must not claim it. No other literal is truthful here.
+            // The space it was picked for is usually a starter space made
+            // above; createSpace returns that one by name.
+            const spaceId =
+              legacyDemoSpace === null
+                ? undefined
+                : await createSpace({ name: legacyDemoSpace, dynamic: true });
+            if (!sameAccount()) return;
             await createLinkItem({
               url: legacyDemoUrl,
+              spaceId,
               operationId: getOrCreatePendingOperationId(),
               analyticsSessionId: analytics.sessionId(),
             });
-            clearLegacyDemoUrl();
+            // Only the link this run saved: one handed over meanwhile stays.
+            if (getPendingDemoUrl() === legacyDemoUrl) clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
           } catch {
             return;
@@ -205,13 +264,23 @@ export function useReplayOnboarding() {
 
         // Only mark as done when all required mutations succeed.
         if (!allSpacesOk) return;
+        if (!sameAccount()) return;
 
-        ranRef.current = true;
+        // A link handed over while this run was in flight (a queued first
+        // save whose account had spent its demo save) is not this run's to
+        // clear; a fresh pass saves it.
+        if (getPendingDemoUrl() !== null) {
+          lateDemoUrl = true;
+          return;
+        }
+
         clearPending();
       } finally {
         // An entitlement change during the run asked for a fresh pass; marking
-        // this work settled would make that pass skip it.
-        const entitlementRerun = rerunRef.current;
+        // this work settled would make that pass skip it. So does a run cut
+        // short by an account change: the account now signed in found it busy.
+        const entitlementRerun =
+          rerunRef.current || lateDemoUrl || accountChanged;
         if (remainderKey !== null && !entitlementRerun) {
           settledWorkRef.current = remainderKey;
         }
@@ -232,12 +301,15 @@ export function useReplayOnboarding() {
     void run();
   }, [
     isAuthenticated,
+    accountLoaded,
+    userId,
     onboarded,
     createSpace,
     createLinkItem,
     entitled,
     entitlementLoading,
     pendingRevision,
+    purchaseRevision,
     router,
     retryNonce,
   ]);

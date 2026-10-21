@@ -82,7 +82,7 @@ type SaveKind = "link" | "note" | "image";
 
 type NextUpKind = "read" | "cook" | "watch" | "open";
 
-type AnalyticsEventProperties = {
+export type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
     step_index: number;
@@ -266,6 +266,9 @@ type AnalyticsEventProperties = {
     save_types: string[];
     // The interests step's picked topics. Each is also one of the spaces.
     interests: string[];
+    // The kinds of spots picked under Travel on that step (flow 11 on). Each
+    // is also one of the spaces, and a preset identity, so it is in space_names.
+    travel_vibes: string[];
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
@@ -289,6 +292,9 @@ type AnalyticsEventProperties = {
   // space names. Only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
+  // Signed out, a picked link queued for after sign-in (flow 9 onward).
+  // `sample` as in onboarding_demo_picked.
+  onboarding_demo_deferred: { sample: boolean };
   // A first-save pick, before any sign-in. `sample` is a ready-made link
   // (previewed when signed out); otherwise a pasted, typed or shared one.
   onboarding_demo_picked: { sample: boolean; signed_in: boolean };

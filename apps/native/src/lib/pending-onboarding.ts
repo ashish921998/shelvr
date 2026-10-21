@@ -47,6 +47,12 @@ type PendingRecord = {
   operationId: string;
   spaces: string[];
   demoUrl: string | null;
+  /** The space `demoUrl` was picked for; null for the shelf alone, and on
+   * records written before it was kept. */
+  demoSpace: string | null;
+  /** The account `demoUrl` was handed over for, so it never lands in another
+   * one; null on records written before it was kept. */
+  demoOwner: string | null;
   /** Absent on records written by an older flow. */
   progressVersion: number | null;
   saveKinds: string[];
@@ -132,6 +138,14 @@ function readPendingRecord(): PendingRecord | null {
       operationId: record.operationId,
       spaces,
       demoUrl: record.demoUrl === "" ? null : record.demoUrl,
+      demoSpace:
+        typeof record.demoSpace === "string" && record.demoSpace !== ""
+          ? record.demoSpace
+          : null,
+      demoOwner:
+        typeof record.demoOwner === "string" && record.demoOwner !== ""
+          ? record.demoOwner
+          : null,
       progressVersion:
         typeof record.progressVersion === "number"
           ? record.progressVersion
@@ -184,6 +198,8 @@ export function getOrCreatePendingOperationId(): string {
     operationId,
     spaces: [],
     demoUrl: null,
+    demoSpace: null,
+    demoOwner: null,
     progressVersion: null,
     saveKinds: [],
     step: null,
@@ -212,6 +228,8 @@ function writePendingSpaces(
     operationId,
     spaces,
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
+    demoOwner: existing?.demoOwner ?? null,
     progressVersion: existing?.progressVersion ?? null,
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
@@ -249,15 +267,52 @@ export function getPendingOperationId(): string | null {
   return readPendingRecord()?.operationId ?? null;
 }
 
-/** Older builds queued this save until purchase. Preserve that intent. */
+/** A first save queued until sign-in and purchase (older builds queued one
+ * too). */
 export function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
+}
+
+/** The space the queued first save was picked for, if any. */
+export function getPendingDemoSpace(): string | null {
+  return readPendingRecord()?.demoSpace ?? null;
+}
+
+/** The account the queued first save belongs to; null when unknown. */
+export function getPendingDemoOwner(): string | null {
+  return readPendingRecord()?.demoOwner ?? null;
+}
+
+/** A first save the replay makes once the account is Pro, filed into the
+ * space it was picked for: one queued before sign-in whose account had
+ * already spent its free demo save (queued-first-save.ts). `owner` is that
+ * account, so the link never lands in an account that signs in after it. */
+export function queueDemoUrl(
+  url: string,
+  space: string | null = null,
+  owner: string | null = null,
+) {
+  getOrCreatePendingOperationId();
+  const existing = readPendingRecord();
+  if (existing === null) return;
+  writePendingRecord({
+    ...existing,
+    demoUrl: url,
+    demoSpace: space,
+    demoOwner: owner,
+  });
+  notifyChanged();
 }
 
 export function clearLegacyDemoUrl() {
   const existing = readPendingRecord();
   if (existing === null || existing.demoUrl === null) return;
-  writePendingRecord({ ...existing, demoUrl: null });
+  writePendingRecord({
+    ...existing,
+    demoUrl: null,
+    demoSpace: null,
+    demoOwner: null,
+  });
   notifyChanged();
 }
 
@@ -301,6 +356,8 @@ export function setOnboardingProgress(progress: {
     operationId,
     spaces: progress.spaces,
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
+    demoOwner: existing?.demoOwner ?? null,
     progressVersion: PROGRESS_VERSION,
     saveKinds: progress.saveKinds,
     step: progress.step,
@@ -320,6 +377,8 @@ export function setPendingDemo(demo: PendingDemo | null) {
     operationId,
     spaces: existing?.spaces ?? [],
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
+    demoOwner: existing?.demoOwner ?? null,
     progressVersion: existing?.progressVersion ?? null,
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,

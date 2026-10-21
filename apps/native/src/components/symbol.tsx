@@ -80,6 +80,7 @@ const SF_TO_MATERIAL = {
   "arrow.up": "arrow_upward",
   "doc.text": "description",
   "fork.knife": "restaurant",
+  lock: "lock",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
   // The onboarding opener's drawn phone: a video's rail, a share sheet's
   // apps, and the icon tiles of a travel space.
