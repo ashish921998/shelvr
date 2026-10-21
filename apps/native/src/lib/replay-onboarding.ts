@@ -9,6 +9,7 @@ import {
   clearLegacyDemoUrl,
   clearPending,
   getPendingDemoSpace,
+  getPendingDemoOwner,
   getPendingDemoUrl,
   getPendingSpaces,
   getPendingOperationId,
@@ -103,6 +104,7 @@ export function useReplayOnboarding() {
   // the person sees the fallback paywall instead of the real one.
   const { data: user } = useCurrentUser();
   const accountLoaded = user != null;
+  const userId = user?._id ?? null;
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
@@ -151,6 +153,10 @@ export function useReplayOnboarding() {
       }
       return;
     }
+    // A link handed over for another account (it signed out before the
+    // replay saved it) never lands in this one.
+    const demoOwner = getPendingDemoOwner();
+    if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
     if (!hasPending()) return;
     if (pendingWorkKey() === settledWorkRef.current) return;
     // A purchase made before sign-in is still on its way to the account
@@ -273,6 +279,7 @@ export function useReplayOnboarding() {
   }, [
     isAuthenticated,
     accountLoaded,
+    userId,
     onboarded,
     createSpace,
     createLinkItem,

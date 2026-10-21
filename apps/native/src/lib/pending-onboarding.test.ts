@@ -6,6 +6,7 @@ import {
   clearPending,
   getOnboardingProgress,
   getOrCreatePendingOperationId,
+  getPendingDemoOwner,
   getPendingDemoSpace,
   getPendingDemoUrl,
   getPendingSpaces,
@@ -151,6 +152,14 @@ describe("a first save queued before sign-in", () => {
     expect(getPendingDemoSpace()).toBe("Recipes");
     clearLegacyDemoUrl();
     expect(getPendingDemoSpace()).toBeNull();
+  });
+
+  it("keeps the account it belongs to until the link is cleared", () => {
+    queueDemoUrl("https://example.com/recipe", "Recipes", "user-1");
+    setPendingSpaces(["Recipes"]);
+    expect(getPendingDemoOwner()).toBe("user-1");
+    clearLegacyDemoUrl();
+    expect(getPendingDemoOwner()).toBeNull();
   });
 
   it("keeps the onboarding progress beside it", () => {

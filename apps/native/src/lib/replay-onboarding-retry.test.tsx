@@ -86,6 +86,34 @@ beforeEach(() => {
 });
 
 describe("useReplayOnboarding and the account", () => {
+  it("never saves a link handed over for another account", async () => {
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe", null, "user_other");
+    setPendingSpaces([]);
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(createLinkItem).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBeNull();
+  });
+
+  it("saves a link handed over for this account", async () => {
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe", null, "user_1");
+    setPendingSpaces([]);
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/recipe" }),
+    );
+    expect(hasPending()).toBe(false);
+  });
+
   it("waits for the account before asking for the paywall", async () => {
     entitlement.entitled = false;
     account.user = undefined;
