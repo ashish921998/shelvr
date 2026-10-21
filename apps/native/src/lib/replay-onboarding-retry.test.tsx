@@ -19,6 +19,9 @@ const createSpace = vi.hoisted(() => vi.fn());
 const createLinkItem = vi.hoisted(() => vi.fn());
 const entitlement = vi.hoisted(() => ({ entitled: true, loading: false }));
 const openPaywall = vi.hoisted(() => vi.fn());
+const account = vi.hoisted(() => ({
+  user: { _id: "user_1" } as object | undefined,
+}));
 
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => storage.get(key) ?? null,
@@ -36,7 +39,13 @@ vi.mock("convex/react", () => ({
   useMutation: (ref: string) =>
     ref === "createSpace" ? createSpace : createLinkItem,
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
+// Stable, as the real router is: a new object each render would re-run the
+// replay effect on its own.
+const stableRouter = vi.hoisted(() => ({}));
+vi.mock("expo-router", () => ({ useRouter: () => stableRouter }));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: account.user }),
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { sessionId: () => "s" } }));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: true }),
@@ -73,6 +82,29 @@ beforeEach(() => {
   createLinkItem.mockReset();
   openPaywall.mockReset().mockResolvedValue(false);
   entitlement.entitled = true;
+  account.user = { _id: "user_1" };
+});
+
+describe("useReplayOnboarding and the account", () => {
+  it("waits for the account before asking for the paywall", async () => {
+    entitlement.entitled = false;
+    account.user = undefined;
+    setPendingSpaces(["Articles"]);
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+
+    account.user = { _id: "user_1" };
+    hook.rerender();
+    await settle();
+    expect(openPaywall).toHaveBeenCalledOnce();
+
+    // A refresh of the same account does not ask again.
+    account.user = { _id: "user_1" };
+    hook.rerender();
+    await settle();
+    expect(openPaywall).toHaveBeenCalledOnce();
+  });
 });
 
 describe("useReplayOnboarding retries", () => {
