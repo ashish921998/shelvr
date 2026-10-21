@@ -252,6 +252,9 @@ type AnalyticsEventProperties = {
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
   plan_shared: { place_count: number; picked: boolean };
+  /** "Ask someone": a vote link was made and handed to the share sheet. */
+  plan_asked: { place_count: number };
+  plan_ask_failed: { reason: "link" | "share" };
   // "Plan my trip" on a travel space. `made` is false when no save named a
   // place, so no trip was stored.
   trip_made: {

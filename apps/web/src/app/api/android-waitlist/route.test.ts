@@ -137,6 +137,17 @@ describe("POST /api/android-waitlist", () => {
     });
   });
 
+  it("forwards the plan vote page as its own source", async () => {
+    vi.stubEnv("CONVEX_URL", "https://deployment.convex.cloud");
+    vi.stubEnv("WAITLIST_SHARED_SECRET", "test-secret");
+    mocks.fetch.mockResolvedValue(response({ saved: true }));
+
+    await POST(request({ email: "person@example.com", source: "plan" }));
+
+    const [, init] = mocks.fetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ source: "plan" });
+  });
+
   it("derives the Convex site URL and normalizes unknown sources", async () => {
     vi.stubEnv("CONVEX_URL", "https://deployment.convex.cloud");
     vi.stubEnv("WAITLIST_SHARED_SECRET", "test-secret");
