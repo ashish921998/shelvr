@@ -7,12 +7,13 @@ import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 import { analytics } from "@/lib/analytics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
-import { restorePurchases, useEntitlement } from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
 import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
 import { useNotificationSession } from "@/lib/notifications";
+import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -57,7 +58,7 @@ export default function SettingsScreen() {
   // subscriber gets a way to cancel it from the confirmation itself.
   const hasLiveSubscription =
     entitlementStatus === "trialing" || entitlementStatus === "pro";
-  const [restoring, setRestoring] = useState(false);
+  const { restoring, restore } = useRestorePurchases();
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const fixtureResetEnabled = isAnonymousAuthEnabled();
   const { data: canResetFlowFixtures } = useQuery(
@@ -128,33 +129,6 @@ export default function SettingsScreen() {
         error,
       );
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
-    }
-  };
-
-  const handleRestorePurchases = async () => {
-    if (restoring) return;
-    const storeName = Platform.OS === "ios" ? "App Store" : "Google Play";
-    setRestoring(true);
-    try {
-      const outcome = await restorePurchases();
-      if (outcome === "restored") {
-        Alert.alert(
-          t("pro.restoredTitle"),
-          t("pro.restoredBody", { store: storeName }),
-        );
-      } else if (outcome === "none") {
-        Alert.alert(
-          t("pro.notFoundTitle"),
-          t("pro.notFoundBody", { store: storeName }),
-        );
-      } else {
-        Alert.alert(
-          t("pro.restoreFailed"),
-          t("pro.restoreFailedBody", { store: storeName }),
-        );
-      }
-    } finally {
-      setRestoring(false);
     }
   };
 
@@ -308,7 +282,7 @@ export default function SettingsScreen() {
           label={restoring ? t("pro.restoring") : t("pro.restore")}
           icon="arrow.clockwise"
           disabled={restoring}
-          onPress={() => void handleRestorePurchases()}
+          onPress={() => void restore()}
         />
         <SettingsRow
           label={t("support.contact")}

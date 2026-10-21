@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppLayout from "@/app/(app)/_layout";
 
 // The layout is the gate: the stack holds every save screen and every hook
@@ -10,8 +10,11 @@ const mocks = vi.hoisted(() => ({
   onboarded: true,
   status: "unset",
   grantOnItsWay: false,
+  entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
+  awaitingPurchase: false,
+  push: vi.fn(),
 }));
 const nothing = vi.hoisted(() => () => null);
 
@@ -30,6 +33,7 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   useReplayOnboarding: mocks.replay,
+  useAwaitingOnboardingPurchase: () => mocks.awaitingPurchase,
 }));
 vi.mock("@/lib/share/use-resume-pending-share", () => ({
   useResumePendingShare: mocks.resumeShare,
@@ -40,22 +44,45 @@ vi.mock("convex/react", () => ({
     isAuthenticated: mocks.status !== "signed-out",
   }),
 }));
+vi.mock("@/lib/entitlement", () => ({
+  useEntitlement: () => mocks.entitlement,
+}));
 vi.mock("expo-router", () => {
-  const Stack = Object.assign(() => <div>app-stack</div>, {
-    Screen: nothing,
-    Protected: nothing,
-  });
-  return { Stack, Redirect: nothing, useRouter: () => ({}) };
+  const screen = ({ name }: { name: string }) => (
+    <span>{`screen:${name}`}</span>
+  );
+  const guarded = ({
+    guard,
+    children,
+  }: {
+    guard: boolean;
+    children: ReactNode;
+  }) => (guard ? children : null);
+  const Stack = Object.assign(
+    ({ children }: { children: ReactNode }) => (
+      <div>
+        <span>app-stack</span>
+        {children}
+      </div>
+    ),
+    {
+      Screen: screen,
+      Protected: guarded,
+    },
+  );
+  return { Stack, Redirect: nothing, useRouter: () => ({ push: mocks.push }) };
 });
 vi.mock("@/lib/app-intents", () => ({ AppIntentsBridge: nothing }));
-vi.mock("@/lib/exit-offer-reminder", () => ({ useExitOfferReminder: vi.fn() }));
-vi.mock("@/lib/exit-offer-sheet", () => ({ ExitOfferSheetHost: nothing }));
+vi.mock("@/lib/forget-exit-offer", () => ({ useForgetExitOffer: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: () => {},
 }));
 vi.mock("@/lib/home-feed", () => ({
   HomeFeedProvider: vi.fn(({ children }: { children: ReactNode }) => children),
+}));
+vi.mock("@/components/plan-loading-cover", () => ({
+  PlanLoadingCover: vi.fn(() => <div>plan-loading-cover</div>),
 }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <div>loader</div>),
@@ -85,6 +112,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.onboarded = true;
   mocks.status = "unset";
+  mocks.entitlement = { entitled: true, loading: false };
 });
 
 it.each(["unset", "loading"] as const)(
@@ -137,4 +165,107 @@ it("shows no card while the yes given at sign-in is being recorded", () => {
   } finally {
     mocks.grantOnItsWay = false;
   }
+});
+
+describe("plan gate", () => {
+  beforeEach(() => {
+    mocks.status = "granted";
+  });
+
+  it("shows only the plan gate, Profile, Settings and the paywall without a plan", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    render(<AppLayout />);
+    expect(shows("screen:plan-gate")).toBe(true);
+    expect(shows("screen:(tabs)")).toBe(false);
+    expect(shows("screen:add")).toBe(false);
+    expect(shows("screen:item/[id]")).toBe(false);
+    expect(shows("screen:profile")).toBe(true);
+    expect(shows("screen:settings")).toBe(true);
+    expect(shows("screen:paywall")).toBe(true);
+  });
+
+  it("opens the app with a plan", () => {
+    mocks.entitlement = { entitled: true, loading: false };
+    render(<AppLayout />);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+  });
+
+  it("keeps a deep link's screen under a cover while the plan is still unknown", () => {
+    mocks.entitlement = { entitled: false, loading: true };
+    render(<AppLayout />);
+    // No redirect to the gate, so a cold-launch item or digest link keeps
+    // its destination; the cover hides it until the plan is known.
+    expect(shows("screen:item/[id]")).toBe(true);
+    expect(shows("screen:digest/[id]")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+    expect(shows("plan-loading-cover")).toBe(true);
+    // Sheets and full-screen modals present above the cover, so they wait.
+    expect(shows("screen:camera")).toBe(false);
+    expect(shows("screen:add")).toBe(false);
+  });
+
+  it("lifts the cover once the plan is known", () => {
+    mocks.entitlement = { entitled: true, loading: false };
+    render(<AppLayout />);
+    expect(shows("plan-loading-cover")).toBe(false);
+  });
+
+  it("keeps someone who just paid out of the gate while the purchase lands", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    mocks.awaitingPurchase = true;
+    try {
+      render(<AppLayout />);
+      expect(shows("screen:(tabs)")).toBe(true);
+      expect(shows("screen:plan-gate")).toBe(false);
+    } finally {
+      mocks.awaitingPurchase = false;
+    }
+  });
+
+  it("never gates onboarding", () => {
+    mocks.onboarded = false;
+    mocks.entitlement = { entitled: false, loading: false };
+    render(<AppLayout />);
+    expect(shows("screen:onboarding")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+  });
+
+  it("opens a sheet deep link once the plan is known and Pro", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("@/lib/deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://add?mode=note");
+    mocks.entitlement = { entitled: false, loading: true };
+    const { rerender } = render(<AppLayout />);
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    mocks.entitlement = { entitled: true, loading: false };
+    rerender(<AppLayout />);
+    expect(mocks.push).toHaveBeenCalledWith("/add?mode=note");
+  });
+
+  it("drops a sheet deep link when the plan is known and missing", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("@/lib/deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://camera");
+    mocks.entitlement = { entitled: false, loading: true };
+    const { rerender } = render(<AppLayout />);
+
+    mocks.entitlement = { entitled: false, loading: false };
+    rerender(<AppLayout />);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(shows("screen:plan-gate")).toBe(true);
+    // Dropped, not kept for a later purchase.
+    expect(releaseSheetLink(false)).toBeNull();
+  });
+
+  it("never covers onboarding while the plan loads", () => {
+    mocks.onboarded = false;
+    mocks.entitlement = { entitled: false, loading: true };
+    render(<AppLayout />);
+    expect(shows("screen:onboarding")).toBe(true);
+    expect(shows("plan-loading-cover")).toBe(false);
+  });
 });

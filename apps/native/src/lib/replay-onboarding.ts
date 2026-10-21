@@ -21,6 +21,11 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import {
+  readPurchaseLanding,
+  settlePurchaseLanding,
+  subscribePurchaseLanding,
+} from "@/lib/purchase-landing";
 
 // Onboarding opens its own paywall at the end. A purchase there can finish
 // onboarding before the webhook marks the user entitled, so replay must wait
@@ -29,30 +34,35 @@ import {
 // replay paywall waits for the next launch.
 let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
 
+// The purchase wait itself is opened by the paywall presentation.
 export function notePurchasedDuringOnboarding() {
   onboardingPaywall = "purchased";
 }
 
-const PURCHASE_LANDING_MS = 10_000;
-
 /**
- * True while a purchase made in onboarding is still on its way to Convex (the
- * webhook lags the store by a moment), so a screen can wait instead of asking
- * for Pro again. The wait is bounded: a webhook that never lands, or a
- * subscription that lapses later in the session, must still reach the Pro
- * gate. Once the entitlement has been seen, the purchase is no longer news.
+ * True while a purchase or restore made anywhere in the app is still on its
+ * way to Convex (the webhook lags the store by a moment), so a screen can wait
+ * instead of asking for Pro again. The wait is bounded (see
+ * `purchase-landing.ts`): a webhook that never lands, or a subscription that
+ * lapses later in the session, must still reach the Pro gate.
  */
 export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
-  const [waitedOut, setWaitedOut] = useState(false);
-  const awaiting = !entitled && onboardingPaywall === "purchased" && !waitedOut;
+  const until = useSyncExternalStore(
+    subscribePurchaseLanding,
+    readPurchaseLanding,
+    readPurchaseLanding,
+  );
+  const [now, setNow] = useState(Date.now);
+  const awaiting = !entitled && now < until;
   useEffect(() => {
-    if (entitled && onboardingPaywall === "purchased") {
-      onboardingPaywall = "unseen";
+    if (entitled) {
+      settlePurchaseLanding();
+      if (onboardingPaywall === "purchased") onboardingPaywall = "unseen";
     }
     if (!awaiting) return;
-    const id = setTimeout(() => setWaitedOut(true), PURCHASE_LANDING_MS);
+    const id = setTimeout(() => setNow(Date.now()), until - Date.now());
     return () => clearTimeout(id);
-  }, [entitled, awaiting]);
+  }, [entitled, awaiting, until, now]);
   return awaiting;
 }
 

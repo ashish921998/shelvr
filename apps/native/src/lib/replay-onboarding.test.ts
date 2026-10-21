@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  notePurchasedDuringOnboarding,
-  useAwaitingOnboardingPurchase,
-} from "./replay-onboarding";
+import { notePurchaseLanding } from "./purchase-landing";
+import { useAwaitingOnboardingPurchase } from "./replay-onboarding";
 
 vi.mock("@convex/_generated/api", () => ({ api: {} }));
 vi.mock("convex/react", () => ({
@@ -26,7 +24,7 @@ describe("useAwaitingOnboardingPurchase", () => {
   });
 
   it("waits for a purchase's entitlement, but not forever", () => {
-    notePurchasedDuringOnboarding();
+    notePurchaseLanding();
     const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
     expect(result.current).toBe(true);
 
@@ -35,7 +33,7 @@ describe("useAwaitingOnboardingPurchase", () => {
   });
 
   it("stops waiting once the entitlement lands, and does not wait again if it lapses", () => {
-    notePurchasedDuringOnboarding();
+    notePurchaseLanding();
     const { result, rerender } = renderHook(
       ({ entitled }) => useAwaitingOnboardingPurchase(entitled),
       { initialProps: { entitled: false } },
@@ -51,6 +49,17 @@ describe("useAwaitingOnboardingPurchase", () => {
 
   it("does not wait when nothing was bought in onboarding", () => {
     const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
+    expect(result.current).toBe(false);
+  });
+
+  it("waits again for a purchase made later, anywhere in the app", () => {
+    const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
+    expect(result.current).toBe(false);
+
+    act(() => notePurchaseLanding());
+    expect(result.current).toBe(true);
+
+    act(() => vi.advanceTimersByTime(10_000));
     expect(result.current).toBe(false);
   });
 });
