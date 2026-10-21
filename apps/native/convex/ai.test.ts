@@ -2,6 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { finalRecipe } from "./ai";
 import {
   extractBodyText,
@@ -74,6 +75,31 @@ describe("storePoster", () => {
     );
 
     expect(stored).toBeUndefined();
+  });
+
+  it("keeps a full-size PNG hero of a few megabytes as the cover", async () => {
+    // Time Out serves some heroes as ~3.8 MB PNGs; a 3 MB cap left those
+    // saves as text cards although the page had a picture.
+    const heroBytes = 3_787_207;
+    safeFetch.mockResolvedValue({
+      ok: true,
+      finalUrl: "https://media.example.com/images/1/image.jpg",
+      status: 200,
+      contentType: "image/png",
+      bytes: new Uint8Array([1, 2, 3]),
+    });
+    const store = vi.fn(async () => "kg2storedposter" as Id<"_storage">);
+
+    const stored = await storePoster(
+      { storage: { store } },
+      "https://media.example.com/images/1/image.jpg",
+    );
+
+    expect(stored).toBe("kg2storedposter");
+    expect(store).toHaveBeenCalledOnce();
+    expect(safeFetch.mock.calls[0][1].maxBytes).toBeGreaterThanOrEqual(
+      heroBytes,
+    );
   });
 });
 
