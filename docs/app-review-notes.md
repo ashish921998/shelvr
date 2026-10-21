@@ -16,11 +16,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 1. **Opener:** a **Start yours** button and an **Already have an account? Sign in** link.
 2. **Topics:** "What are you into?" offers topics to pick. Each picked topic becomes a space. Nothing has to be picked.
 3. **Setup:** "What do you save?" picks save kinds and the spaces to start with.
-4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. A sample first shows a preview of the result with no account, then asks for Sign in with Apple or Google on its own screen; that screen stays up for a few seconds while Shelvr reads, titles, and files the link. **Skip for now** passes the first save, and onboarding then ends at the sign-in screen. If the save fails, for example while offline, the step offers a retry or a way to continue without saving.
-5. **Reminder:** "When should it come back?" offers one reminder for the save just made. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
+4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. No account is needed: a sample shows a preview of the result, then "Read and titled. It goes on your shelf once you're in." with **Continue**; a pasted or typed link shows "Got it." with **Continue**. The link is queued on the device and saved to the account after sign-in. **Skip for now** passes the first save.
+5. **Reminder:** "When should it come back?" offers one reminder for a save already in the account, so a signed-out first run skips this step. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
 6. **Share practice:** "Save your first post." has the user share one sample post to Shelvr through the system share sheet, with the **Share this post** button or the Share icon on the post, or skip with **I'll try it later**. A successful share shows "You nailed it." and a **Continue** button.
 7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. The promise itself is not saved; as on every onboarding step, the app only remembers the step on the device and records that it was shown and completed in analytics. **I'm in** is the only action and opens the paywall.
-8. **Paywall:** **I'm in** opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
+8. **Paywall:** **I'm in** opens the RevenueCat paywall. Closing it keeps onboarding on the promise step. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves the queued link.
 9. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
 10. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
 11. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
@@ -30,7 +30,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - **Link:** tap Add, paste a URL, and save. The item enters processing, then ready with title/description/tags when AI completes.
 - **Note:** tap Add, type a note, and save. The content remains if AI classification fails.
 - **Image:** Camera capture or library import. Upload progress and retry are shown on failure.
-- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, the demo consumes the shared link itself and asks for sign-in inline before saving it. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
+- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, the demo consumes the shared link itself and queues it until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
@@ -117,7 +117,7 @@ Account access:
 
 Subscription testing:
 
-1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Buy a plan or start the trial with a sandbox account; closing the paywall returns to that step. Sign-in follows the purchase.
+1. After the share practice (tap "Continue", or "I'll try it later" to skip it), tap "I'm in" on "Last thing. Make it count." to open the RevenueCat paywall in Apple's sandbox environment. Buy a plan or start the trial with a sandbox account; closing the paywall returns to that step. Sign-in follows the purchase.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile > Settings.
