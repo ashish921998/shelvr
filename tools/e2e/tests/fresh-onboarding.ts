@@ -36,11 +36,13 @@ export async function walkToFirstSave(
 ): Promise<void> {
   // The opener can drop its first tap while the splash is still fading out
   // (CI run 39388506914 stayed on the opener), so Start yours is tapped again
-  // only if the interests step has not come up.
+  // only if the interests step has not come up. Right after a cold relaunch a
+  // slow runner can spend most of 30 s on one tap (CI run 39601672631), so
+  // the wait leaves room for a second one.
   await tapUntilVisible(
     screen.getByRole("button", "Start yours"),
     screen.getByText("What are you into?"),
-    { waitMs: 5_000, timeout: 30_000 },
+    { waitMs: 5_000, timeout: 60_000 },
   );
   await screen.getByRole("button", "Continue").tap();
   await expect(screen.getByText("What do you save?")).toBeVisible({
