@@ -25,12 +25,6 @@ function parsePin(id: string | undefined): StopRef | null {
   return Number.isInteger(day) && Number.isInteger(stop) ? { day, stop } : null;
 }
 
-/** expo-modules-core's rejection when a call names a native view that is no
- * longer registered. */
-function isViewGone(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("Unable to find the");
-}
-
 /** Hex alpha suffix (about 35%) for other days' gray pins, so the whole trip
  * stays visible behind the open day's amber. */
 const FADED_ALPHA = "59";
@@ -111,23 +105,20 @@ export function TripMap({
     );
   }, [active, days, width, height, top, rt.insets.bottom]);
 
-  // The `cameraPosition` prop places the first camera. Moving it again goes
-  // through the native view, which is not registered yet on mount, so the
-  // first camera is left to the prop. A later call can still land after the
-  // view is gone (the screen closed mid-flight): there is nothing to move
-  // then. Any other failure is reported.
-  const placed = useRef(false);
+  // On iOS the effect moves the camera, so day switches fly: the prop holds
+  // the first camera only (expo-maps also applies every prop change, without
+  // animation). Moving it imperatively goes through the native view, which is
+  // not registered yet on mount, so the first camera is left to the prop.
+  const [firstCamera, setFirstCamera] = useState(camera);
+  if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
   useEffect(() => {
-    if (!camera) return;
-    if (!placed.current) {
-      placed.current = true;
-      return;
-    }
-    ref.current?.setCameraPosition(camera).catch((error: unknown) => {
-      if (isViewGone(error)) return;
-      analytics.captureError("trip_map_camera_failed", error);
-    });
-  }, [camera]);
+    if (!camera || camera === firstCamera) return;
+    ref.current
+      ?.setCameraPosition(camera)
+      .catch((error: unknown) =>
+        analytics.captureError("trip_map_camera_failed", error),
+      );
+  }, [camera, firstCamera]);
 
   const pins = days.flatMap((stops, day) =>
     stops
@@ -160,7 +151,7 @@ export function TripMap({
       <AppleMaps.View
         ref={ref}
         style={styles.map}
-        cameraPosition={camera}
+        cameraPosition={firstCamera}
         colorScheme={
           isDarkThemeName(rt.themeName)
             ? AppleMaps.MapColorScheme.DARK
