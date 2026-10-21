@@ -1,15 +1,22 @@
 import { AiConsentCard } from "@/components/ai-consent";
 import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
-import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
-import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
+import { releaseSheetLink } from "@/lib/deferred-sheet-link";
+import { useForgetExitOffer } from "@/lib/forget-exit-offer";
+import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { useReplayOnboarding } from "@/lib/replay-onboarding";
+import {
+  useAwaitingOnboardingPurchase,
+  useReplayOnboarding,
+} from "@/lib/replay-onboarding";
+import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
@@ -17,6 +24,7 @@ import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
+import { useEffect } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -70,15 +78,47 @@ function AppStack() {
   // Spatial slide transitions are the first thing to cut under Reduce Motion.
   const reducedMotion = useReducedMotion();
 
+  const entitlement = useEntitlement();
+  // A purchase or restore reaches Convex by webhook a moment later; until it
+  // does, someone who just paid is not sent back to the gate.
+  const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
+  // The wait belongs to the account that paid; signing out ends it.
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
+  }, [isAuthenticated, isLoading]);
+  // No entry without a plan. Until the plan is known the requested screen
+  // stays mounted under a cover with sign-out in reach, so a cold-launch deep
+  // link keeps its destination and a stalled read is no way in or dead end.
+  const planUnknown =
+    isAuthenticated && entitlement.loading && !awaitingPurchase;
+  const gated =
+    isAuthenticated &&
+    !entitlement.loading &&
+    !entitlement.entitled &&
+    !awaitingPurchase;
+
+  // A link that arrived before the plan opens once it is known. A sheet
+  // opens only for Pro; without a plan it is dropped and the gate shows.
+  const planLoading = entitlement.loading;
+  const entitled = entitlement.entitled;
+  useEffect(() => {
+    const link = releaseSheetLink(planLoading);
+    if (!link || (link.sheet && !(onboarded && entitled))) return;
+    router.push(link.route as never);
+  }, [planLoading, entitled, onboarded, router]);
+
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
-  // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
-  useResumePendingShare();
+  useQueuedFirstSave();
+  // If a Share Sheet intent arrived while signed out / mid-onboarding, resume
+  // it, once the plan gate is down.
+  useResumePendingShare(gated || planUnknown);
   // Remind trialers two days before the yearly plan starts charging.
   useTrialReminder();
   // Right after Pro starts, Home hands off to one real save.
   useWelcomeSaveTracker();
-  useExitOfferReminder();
+  // The exit offer is gone; clears what it left on this device.
+  useForgetExitOffer();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
@@ -94,7 +134,6 @@ function AppStack() {
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
       <AppIntentsBridge />
-      <ExitOfferSheetHost />
       <TrialReminderPrimerSheet />
       <Stack
         screenOptions={{
@@ -104,7 +143,10 @@ function AppStack() {
           headerTintColor: theme.colors.primary,
         }}
       >
-        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+        <Stack.Protected
+          guard={onboarded && !gated}
+          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="share" options={{ headerShown: false }} />
           <Stack.Screen
@@ -149,6 +191,19 @@ function AppStack() {
             name="trip/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+        </Stack.Protected>
+        {/* Sheets and full-screen modals present natively above the loading
+            cover, so they wait for the plan instead of keeping a deep link. */}
+        <Stack.Protected
+          guard={onboarded && !gated && !planUnknown}
+          redirectTo={
+            !onboarded
+              ? "/onboarding"
+              : gated
+                ? "/plan-gate"
+                : "/(app)/(tabs)/(home)"
+          }
+        >
           <Stack.Screen
             name="add"
             options={
@@ -198,6 +253,18 @@ function AppStack() {
             }}
           />
           <Stack.Screen
+            name="camera"
+            options={{
+              presentation: "fullScreenModal",
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+        </Stack.Protected>
+        {/* Profile and Settings stay reachable from the plan gate: sign out,
+            restore and account deletion must never sit behind a purchase. */}
+        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+          <Stack.Screen
             name="profile"
             options={{
               presentation: "formSheet",
@@ -219,14 +286,12 @@ function AppStack() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
-          <Stack.Screen
-            name="camera"
-            options={{
-              presentation: "fullScreenModal",
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
+        </Stack.Protected>
+        <Stack.Protected
+          guard={onboarded && gated}
+          redirectTo="/(app)/(tabs)/(home)"
+        >
+          <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -246,6 +311,7 @@ function AppStack() {
           }}
         />
       </Stack>
+      {onboarded && planUnknown ? <PlanLoadingCover /> : null}
     </HomeFeedProvider>
   );
 }

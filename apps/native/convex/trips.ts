@@ -27,46 +27,47 @@ import {
   buildTrip,
   keepNearby,
   MAX_TRIP_DAYS,
-  MAX_TRIP_PLACES,
   MIN_TRIP_DAYS,
   tripPaceValidator,
+  tripPlaceCap,
   type TripCandidate,
 } from "./model/trip";
 
-// Up to 60 saves in, up to 35 places out. The user is watching a spinner.
+// Up to 60 saves in, up to 105 places out. The user is watching a spinner.
 const TRIP_TIMEOUT_MS = 30_000;
 
-const tripSchema = z.object({
-  places: z
-    .array(
-      z.object({
-        saveNumber: z
-          .number()
-          .describe("The number of the save that names this place."),
-        name: z
-          .string()
-          .describe(
-            "Just the place's name as the save writes it, e.g. 'Café de Flore'. No added words like 'restaurant' unless they are part of the name, and no street address.",
-          ),
-        area: z
-          .string()
-          .describe(
-            "Neighbourhood if the save says it or it is well known, e.g. 'Saint-Germain'. Empty string if unsure.",
-          ),
-        why: z
-          .string()
-          .describe(
-            "One short line, under 90 characters, on why it's worth going, built from what the save says (a dish, the view, the vibe). No hype words.",
-          ),
-        slot: z
-          .enum(["morning", "lunch", "afternoon", "dinner", "evening", "any"])
-          .describe(
-            "When in the day it fits: a café or bakery 'morning', a restaurant 'lunch' or 'dinner', a bar 'evening', a sight or shop 'any'.",
-          ),
-      }),
-    )
-    .describe(`At most ${MAX_TRIP_PLACES} places, best first.`),
-});
+const tripSchema = (cap: number) =>
+  z.object({
+    places: z
+      .array(
+        z.object({
+          saveNumber: z
+            .number()
+            .describe("The number of the save that names this place."),
+          name: z
+            .string()
+            .describe(
+              "Just the place's name as the save writes it, e.g. 'Café de Flore'. No added words like 'restaurant' unless they are part of the name, and no street address.",
+            ),
+          area: z
+            .string()
+            .describe(
+              "Neighbourhood if the save says it or it is well known, e.g. 'Saint-Germain'. Empty string if unsure.",
+            ),
+          why: z
+            .string()
+            .describe(
+              "One short line, under 90 characters, on why it's worth going, built from what the save says (a dish, the view, the vibe). No hype words.",
+            ),
+          slot: z
+            .enum(["morning", "lunch", "afternoon", "dinner", "evening", "any"])
+            .describe(
+              "When in the day it fits: a café or bakery 'morning', a restaurant 'lunch' or 'dinner', a bar 'evening', a sight or shop 'any'.",
+            ),
+        }),
+      )
+      .describe(`At most ${cap} places, best first.`),
+  });
 
 function lookupQuery(
   candidate: TripCandidate,
@@ -162,7 +163,7 @@ export const makeTrip = action({
       const { object } = await generateObject({
         model: MODEL,
         ...modelCallOptions(TRIP_TIMEOUT_MS),
-        schema: tripSchema,
+        schema: tripSchema(tripPlaceCap(days)),
         prompt: [
           "You help someone plan a trip from what they saved in a save-it-for-later app. Many saves are restaurant, café, bar and sight reels.",
           `The saves below come from their space "${spaceName}". They are spending ${days} ${days === 1 ? "day" : "days"}${city ? ` in ${city}` : ""}. List every place the saves name (restaurants, cafés, bakeries, bars, sights, shops, viewpoints), best first, and say when in the day each fits.`,
@@ -180,7 +181,7 @@ export const makeTrip = action({
         object.places,
         sources,
         new Set(been.map(placeKey)),
-        MAX_TRIP_PLACES,
+        tripPlaceCap(days),
       ).map(({ pick, place }) => ({ ...place, slot: pick.slot }));
     } catch (error) {
       // Sanitized: a category, never the raw error.

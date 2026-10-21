@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   open: vi.fn<() => Promise<"success" | "cancelled" | "unavailable">>(),
   purchased: vi.fn(),
   declined: vi.fn(),
+  beforeSignIn: vi.fn(),
 }));
 
 vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
@@ -18,7 +19,10 @@ vi.mock("convex/react", () => ({
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => state.entitlement,
-  openPaywallKeepingExitOffer: state.open,
+  openPaywallOutcome: state.open,
+}));
+vi.mock("@/lib/purchase-before-sign-in", () => ({
+  notePurchaseBeforeSignIn: state.beforeSignIn,
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   notePurchasedDuringOnboarding: state.purchased,
@@ -46,11 +50,20 @@ describe("useOnboardingPaywall", () => {
     state.signedIn = true;
   });
 
-  it("lets a signed-out account through without a paywall", async () => {
+  it("sells to a signed-out account and remembers the purchase for sign-in", async () => {
     state.signedIn = false;
+    state.open.mockResolvedValue("success");
     const { onPro } = await ask({ entitled: false, loading: false });
-    expect(onPro).toHaveBeenCalledOnce();
-    expect(state.open).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    expect(state.open).toHaveBeenCalledOnce();
+    expect(state.beforeSignIn).toHaveBeenCalledOnce();
+  });
+
+  it("does not flag a signed-in purchase as made before sign-in", async () => {
+    state.open.mockResolvedValue("success");
+    const { onPro } = await ask({ entitled: false, loading: false });
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    expect(state.beforeSignIn).not.toHaveBeenCalled();
   });
 
   it("sends a Pro account on without a paywall", async () => {
@@ -68,12 +81,35 @@ describe("useOnboardingPaywall", () => {
     expect(onDecline).not.toHaveBeenCalled();
   });
 
-  it("leaves for the app when the paywall is closed", async () => {
+  it("leaves a signed-in account for the app when the paywall is closed", async () => {
     state.open.mockResolvedValue("cancelled");
     const { onPro, onDecline } = await ask({ entitled: false, loading: false });
     await vi.waitFor(() => expect(onDecline).toHaveBeenCalledOnce());
     expect(state.declined).toHaveBeenCalledOnce();
     expect(onPro).not.toHaveBeenCalled();
+  });
+
+  it("keeps a signed-out person on the promise step when the paywall is closed", async () => {
+    state.signedIn = false;
+    state.open.mockResolvedValue("cancelled");
+    const { onPro, onDecline, onUnavailable, hook } = await ask({
+      entitled: false,
+      loading: false,
+    });
+    await vi.waitFor(() => expect(hook.result.current.asked).toBe(false));
+    expect(onDecline).not.toHaveBeenCalled();
+    expect(onPro).not.toHaveBeenCalled();
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(state.declined).not.toHaveBeenCalled();
+
+    state.open.mockResolvedValue("success");
+    await act(async () => {
+      hook.result.current.ask();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
+    expect(state.open).toHaveBeenCalledTimes(2);
+    expect(state.beforeSignIn).toHaveBeenCalledOnce();
   });
 
   it("does not count a paywall that could not show as a decline", async () => {

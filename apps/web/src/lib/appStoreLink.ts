@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { appStoreUrl, arrivalCampaign } from "@/lib/appStore";
+import { bioAppStoreUrl } from "@/lib/bioLink";
 import { sharePageUrl, shareRef } from "@/lib/shareRef";
 
-type AppStoreLinkSource = "header" | "hero" | "footer" | "share" | "oracle";
+type AppStoreLinkSource =
+  | "header"
+  | "hero"
+  | "footer"
+  | "share"
+  | "oracle"
+  | "plan"
+  | "bio";
 
 /**
  * The App Store link for one button, tagged with the campaign the visitor
@@ -50,5 +58,8 @@ export function useAppStoreLink(
     );
   };
 
-  return { href: appStoreUrl(campaign), onClick };
+  return {
+    href: source === "bio" ? bioAppStoreUrl(campaign) : appStoreUrl(campaign),
+    onClick,
+  };
 }

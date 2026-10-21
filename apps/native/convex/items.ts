@@ -12,8 +12,9 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, requireUserId, senderFirstName } from "./model/auth";
 import {
+  hasProEntitlement,
   hasProEntitlementAt,
   hasProEntitlementStatus,
   requireProEntitlement,
@@ -64,6 +65,7 @@ import {
   MAX_PHOTOS_PER_ACCOUNT,
 } from "./model/imagePolicy";
 import { saveError } from "./model/saveErrors";
+import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import {
@@ -2220,6 +2222,27 @@ export const findLinks = mutation({
 });
 
 /**
+ * The onboarding demo row when this is the caller's demo save, the caller has
+ * no Pro, and the demo still has retries left. A first save queued before
+ * sign-in can fail after onboarding has ended, and its free save keeps a free
+ * retry from the item page; past the demo's cap it takes Pro like any save.
+ */
+async function freeDemoRetry(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  itemId: Id<"items">,
+): Promise<Doc<"onboardingDemos"> | null> {
+  const demo = await ctx.db
+    .query("onboardingDemos")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (demo === null || demo.itemId !== itemId) return null;
+  if ((demo.retryCount ?? 0) >= MAX_DEMO_RETRIES) return null;
+  if (await hasProEntitlement(ctx, userId)) return null;
+  return demo;
+}
+
+/**
  * User-triggered retry for a save whose page fetch or classification did not
  * fully succeed: a `failed` item, a `ready` one flagged `enrichment: "partial"`
  * (classified from its URL because the page body was unreadable), or a
@@ -2243,7 +2266,8 @@ export const reprocessItem = mutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    const freeDemo = await freeDemoRetry(ctx, userId, args.id);
+    if (freeDemo === null) await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -2255,10 +2279,18 @@ export const reprocessItem = mutation({
     if (!retryable) {
       return false;
     }
-    await rateLimiter.limit(ctx, "reprocessItem", {
-      key: userId,
-      throws: true,
-    });
+    if (freeDemo !== null) {
+      // The same budget as the onboarding step's retryDemoItem.
+      await rateLimiter.limit(ctx, "demoRetry", { key: userId, throws: true });
+      await ctx.db.patch(freeDemo._id, {
+        retryCount: (freeDemo.retryCount ?? 0) + 1,
+      });
+    } else {
+      await rateLimiter.limit(ctx, "reprocessItem", {
+        key: userId,
+        throws: true,
+      });
+    }
     const run = beginProcessingRun();
     await ctx.db.patch(args.id, {
       ...run,
@@ -2472,26 +2504,6 @@ export const getSharePreview = internalQuery({
 });
 
 /** Longest first name a share page shows. Past this it is not a first name. */
-const MAX_SENDER_NAME_CHARS = 40;
-
-/**
- * The first word of the sharer's account name: enough for "Ashish wanted you
- * to see this" and nothing more (no surname, email or photo). Undefined when
- * the account has no usable name, e.g. Apple sign-in with the name withheld,
- * which leaves the email in its place.
- */
-async function senderFirstName(
-  ctx: QueryCtx,
-  userId: string,
-): Promise<string | undefined> {
-  const id = ctx.db.normalizeId("users", userId);
-  const user = id === null ? null : await ctx.db.get(id);
-  const first = user?.name?.trim().split(/\s+/)[0];
-  if (!first || first.length > MAX_SENDER_NAME_CHARS || first.includes("@")) {
-    return undefined;
-  }
-  return first;
-}
 
 export const listReadyItemsInternal = internalQuery({
   args: { userId: v.string(), limit: v.number() },

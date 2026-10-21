@@ -58,6 +58,14 @@ crons.interval(
   {},
 );
 
+// Delete plan vote links a week after they closed, with their votes.
+crons.interval(
+  "purge expired plan vote links",
+  { hours: 24 },
+  internal.planShares.purgeExpiredPlanShares,
+  {},
+);
+
 // Prepare and deliver eligible weekly shelves. The worker is bounded and
 // schedules one small transaction per due user.
 crons.interval(

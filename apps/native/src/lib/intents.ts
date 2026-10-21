@@ -5,7 +5,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { Platform } from "react-native";
-import { openInAppBrowser } from "@/lib/in-app-browser";
+import { openLink } from "@/lib/open-link";
 import type { IntentKind } from "@convex/model/itemFields";
 
 // The closed set of action kinds the AI can attach to an item, derived from
@@ -15,9 +15,9 @@ export type { IntentKind };
 
 /**
  * Execute an intent. Each kind maps to a guaranteed-installed Expo primitive.
- * `open_url` uses Linking (not WebBrowser) so an https URL can hand off to the
- * matching native app via universal links, e.g. an x.com URL opens the X app
- * if installed, falling back to the in-app browser only if nothing handles it.
+ * Links go through Linking, so an https URL hands off to the matching native
+ * app via universal links (an x.com URL opens the X app if installed) and
+ * otherwise opens in the system browser.
  */
 export async function runIntent(
   kind: IntentKind,
@@ -25,14 +25,14 @@ export async function runIntent(
 ): Promise<void> {
   switch (kind) {
     case "open_url":
-      await Linking.openURL(value).catch(() => openInAppBrowser(value));
+      await openLink(value);
       break;
     case "copy":
       await Clipboard.setStringAsync(value);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       break;
     case "web_search":
-      await openInAppBrowser(
+      await openLink(
         `https://www.google.com/search?q=${encodeURIComponent(value)}`,
       );
       break;

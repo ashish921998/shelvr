@@ -26,11 +26,14 @@ import { useEffect, useRef } from "react";
  * discarded (whose native clear failed) is not resumable: the predicate
  * consults the discard record, so Cancel's leftover never routes back.
  *
+ * `blocked` holds the resume while the plan gate is up: `/share` would only
+ * redirect back to the gate, so the share waits until a plan lifts it.
+ *
  * No splash handling is needed here: the gate's one-shot initializer reads
  * the same resumable predicate before this effect can run, so a launch
  * carrying an owed share never starts the animation in the first place.
  */
-export function useResumePendingShare(): void {
+export function useResumePendingShare(blocked = false): void {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const router = useRouter();
@@ -40,7 +43,7 @@ export function useResumePendingShare(): void {
   const navigatedRef = useRef(false);
 
   useEffect(() => {
-    if (isLoading || !onboarded || !isAuthenticated) {
+    if (isLoading || !onboarded || !isAuthenticated || blocked) {
       navigatedRef.current = false;
       return;
     }
@@ -57,5 +60,5 @@ export function useResumePendingShare(): void {
 
     navigatedRef.current = true;
     router.replace("/share");
-  }, [isAuthenticated, isLoading, onboarded, pathname, router]);
+  }, [blocked, isAuthenticated, isLoading, onboarded, pathname, router]);
 }

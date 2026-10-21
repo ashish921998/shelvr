@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import {
   fitCamera,
@@ -104,12 +105,20 @@ export function TripMap({
     );
   }, [active, days, width, height, top, rt.insets.bottom]);
 
+  // On iOS the effect moves the camera, so day switches fly: the prop holds
+  // the first camera only (expo-maps also applies every prop change, without
+  // animation). Moving it imperatively goes through the native view, which is
+  // not registered yet on mount, so the first camera is left to the prop.
+  const [firstCamera, setFirstCamera] = useState(camera);
+  if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
   useEffect(() => {
-    // The `cameraPosition` prop already places the map, so a call that finds
-    // no native view (on SDK 58 the first one, before the view mounts, can
-    // reject) has nothing left to do.
-    if (camera) ref.current?.setCameraPosition(camera).catch(() => {});
-  }, [camera]);
+    if (!camera || camera === firstCamera) return;
+    ref.current
+      ?.setCameraPosition(camera)
+      .catch((error: unknown) =>
+        analytics.captureError("trip_map_camera_failed", error),
+      );
+  }, [camera, firstCamera]);
 
   const pins = days.flatMap((stops, day) =>
     stops
@@ -142,7 +151,7 @@ export function TripMap({
       <AppleMaps.View
         ref={ref}
         style={styles.map}
-        cameraPosition={camera}
+        cameraPosition={firstCamera}
         colorScheme={
           isDarkThemeName(rt.themeName)
             ? AppleMaps.MapColorScheme.DARK

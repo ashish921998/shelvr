@@ -59,6 +59,7 @@ describe("isPresetSpace", () => {
     ["Watch later", true],
     ["Read later", true],
     ["Home & decor", true],
+    ["Date nights", true],
     ["Products", false],
     ["Book club", false],
     ["recipes", false],

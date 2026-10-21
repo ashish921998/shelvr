@@ -80,6 +80,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemReads`: per-user read state, kept out of the item row
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
+  - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
+    so someone without the app can vote on its places at `/p/<token>`
+  - `planVotes`: one visitor's ✓/✕ picks on a `planShares` link, keyed by a browser id,
+    at most 20 voters per link
   - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
     user's saves; a new trip replaces the old one
   - `shareLinks`: one random public token per shared item, the capability behind the
@@ -195,8 +199,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
-  recovery, hourly feedback inbox delivery retry, embedding sweep, and daily payment-receipt
-  retention purge.
+  recovery, hourly feedback inbox delivery retry, embedding sweep, daily payment-receipt
+  retention purge, and the daily expired plan vote link purge.
 - **`auth.ts`**: `convexAuth()` setup with Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
   `image: null` Apple's provider emits, which the users schema rejects.
@@ -249,6 +253,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   claims Pro, AI consent and the `makePlan` rate limit first; the pure prompt and sanitizing
   half (which drops a place no save names) is `model/plan.ts`. Places marked "We went"
   (`placeVisits.ts`, `setVisited`) go into the prompt and come back last, tagged `been`.
+- **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
+  link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
+  `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
+  web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
+  daily cron deletes them a week after they close.
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
   travel space's saves (one city's, when they span several), makes one model call that lists
   the places they name with a time of day each, looks each up in the Apple Maps Server API
@@ -303,9 +312,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `(auth)` / `(app)` route groups
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/native-tabs`; other platforms fall back to `AppTabs`
-- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
+- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `plan-gate`, `profile`,
   `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
   `digest/[id]`
+- `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
+  entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides

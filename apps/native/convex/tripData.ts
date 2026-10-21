@@ -9,10 +9,10 @@ import {
   MAX_BEEN_PLACES,
   MAX_PLAN_ITEMS,
   PLAN_CONTENT_CHARS,
-  placeKey,
   planSourceValidator,
   type PlanSource,
 } from "./model/plan";
+import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   dayOf,
@@ -355,12 +355,7 @@ export const getSpaceTrip = query({
     const view = async (stop: TripStop) => {
       const item = await liveSave(ctx, stop, userId, args.spaceId);
       if (item === null) return null;
-      const visit = await ctx.db
-        .query("placeVisits")
-        .withIndex("by_user_and_key", (q) =>
-          q.eq("userId", userId).eq("key", placeKey(stop.name)),
-        )
-        .unique();
+      const visit = await findVisit(ctx, userId, stop.name);
       // An image save's stored file, else a link's page image.
       const cover = item.storageId
         ? await ctx.storage.getUrl(item.storageId)
