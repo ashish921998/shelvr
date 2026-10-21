@@ -1,4 +1,5 @@
 import { motion } from "@/lib/motion";
+import { SKIA_FONTS } from "@/lib/skia-fonts";
 import { needsNativeText } from "@/lib/text-shaping";
 import {
   advanceMorphTransition,
@@ -46,13 +47,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // fade), staggered left to right. The scene is bounded by the slot width and
 // MAX_MORPH_GLYPHS, interruption-aware, and pruned in one batch, so a long
 // note or rapid paging cannot flood it with worklet nodes.
-
-const FONTS: Record<string, number> = {
-  "CrimsonProRoman-Regular": require("../../assets/fonts/CrimsonProRoman-Regular.ttf"),
-  "Satoshi-Regular": require("../../assets/fonts/Satoshi-Regular.otf"),
-  "Satoshi-Medium": require("../../assets/fonts/Satoshi-Medium.otf"),
-  "Satoshi-Bold": require("../../assets/fonts/Satoshi-Bold.otf"),
-};
 
 const morph = motion.textMorph;
 const CANVAS_HEIGHT = 56;
@@ -238,7 +232,8 @@ export function AnimatedText({
   const reducedMotion = useReducedMotion();
   const { fontScale } = useWindowDimensions();
   const font = useFont(
-    FONTS[flat.fontFamily ?? theme.fonts.display] ?? FONTS[theme.fonts.display],
+    SKIA_FONTS[flat.fontFamily ?? theme.fonts.display] ??
+      SKIA_FONTS[theme.fonts.display],
     fontSize,
   );
 

@@ -13,6 +13,7 @@ vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
 vi.mock("@/lib/analytics", () => ({ analytics: {} }));
 vi.mock("@/lib/onboarding", () => ({ useOnboarding: () => ({}) }));
 vi.mock("@/lib/pending-onboarding", () => ({}));
+vi.mock("@/lib/purchase-before-sign-in", () => ({}));
 vi.mock("@/lib/entitlement", () => ({}));
 
 describe("useAwaitingOnboardingPurchase", () => {
