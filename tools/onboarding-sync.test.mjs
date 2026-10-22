@@ -48,22 +48,22 @@ const PAYWALL = [
 const straighten = (text) => text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
 const normalize = (text) => straighten(text).replace(/\s+/g, " ").trim();
 
+// Screens that render two catalog strings one after the other. A quote may join
+// exactly these pairs, and only while both parts are still in the catalog.
+const COMPOSED = [
+  ["Already have an account?", "Sign in"],
+  ["Read and titled.", "It goes on your shelf once you're in."],
+  ["Last thing.", "Make it count."],
+];
+
 function showing(strings) {
   const shown = new Set(strings.map(normalize));
-  return (text) => {
-    const words = text.split(" ");
-    const reachable = new Array(words.length + 1).fill(false);
-    reachable[words.length] = true;
-    for (let start = words.length - 1; start >= 0; start--) {
-      for (let end = start + 1; end <= words.length; end++) {
-        if (reachable[end] && shown.has(words.slice(start, end).join(" "))) {
-          reachable[start] = true;
-          break;
-        }
-      }
+  for (const parts of COMPOSED) {
+    if (parts.every((part) => shown.has(normalize(part)))) {
+      shown.add(normalize(parts.join(" ")));
     }
-    return reachable[0];
-  };
+  }
+  return (text) => shown.has(normalize(text));
 }
 
 const BLOCK_START = /^(#{1,6} |[-*] |\d+\. |\|)/;
@@ -119,6 +119,13 @@ function* swiftStrings(directory) {
     }
   }
 }
+
+test("unrelated strings are not joined", () => {
+  const isShown = showing(["Already have an account?", "Sign in", "Continue"]);
+  assert.ok(isShown("Already have an account? Sign in"));
+  assert.ok(!isShown("Already have an account? Continue"));
+  assert.ok(!showing(["Sign in"])("Already have an account? Sign in"));
+});
 
 test("the matcher takes a title and its accent, and not a retired title", () => {
   const isShown = showing([
