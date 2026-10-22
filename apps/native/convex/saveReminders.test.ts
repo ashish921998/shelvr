@@ -755,6 +755,27 @@ describe("delivering a save reminder", () => {
     expect(await sendJobs(t)).toBe(before);
   });
 
+  it("settles a reminder already in flight when deletion begins, with no send event", async () => {
+    const { t, userId, reminder } = await queued();
+    const claimed = await t.mutation(
+      internal.notificationDelivery.claimReminder,
+      {
+        reminderId: reminder._id,
+      },
+    );
+    await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    const before = await sendJobs(t);
+    await t.mutation(internal.notificationDelivery.finishReminder, {
+      reminderId: reminder._id,
+      attempt: claimed!.attempt,
+      recipients: [{ token: "token-a", state: "delivered" }],
+    });
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "complete",
+    });
+    expect(await sendJobs(t)).toBe(before);
+  });
+
   it("drops a reminder that could not go out the same day", async () => {
     const { t, reminder } = await queued();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));

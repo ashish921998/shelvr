@@ -536,4 +536,19 @@ describe("durable digest delivery", () => {
     expect((await digest())?.deliveryNextAttemptAt).toBeUndefined();
     expect(await sendJobs(t)).toBe(0);
   });
+
+  it("settles a send already in flight when deletion begins, with no send event", async () => {
+    const { t, userId, digestId, digest } = await seed();
+    const claimed = await t.mutation(internal.notificationDelivery.claim, {
+      digestId,
+    });
+    await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    await t.mutation(internal.notificationDelivery.finish, {
+      digestId,
+      attempt: claimed!.attempt,
+      recipients: [{ token: "token-a", state: "delivered" }],
+    });
+    expect(await digest()).toMatchObject({ deliveryStatus: "complete" });
+    expect(await sendJobs(t)).toBe(0);
+  });
 });

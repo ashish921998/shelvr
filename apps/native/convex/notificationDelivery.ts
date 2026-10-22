@@ -350,7 +350,7 @@ export const finish = internalMutation({
       ...fields,
       ...(sentAt !== undefined && { deliverySentAt: sentAt }),
     });
-    if (status !== "pending")
+    if (status !== "pending" && (await liveOwner(ctx, digest.userId)) !== null)
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: digest.userId,
         notificationId: digest._id,
@@ -638,7 +638,10 @@ export const finishReminder = internalMutation({
       ...fields,
       ...(sentAt !== undefined && { deliverySentAt: sentAt }),
     });
-    if (status !== "pending")
+    if (
+      status !== "pending" &&
+      (await liveOwner(ctx, reminder.userId)) !== null
+    )
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: reminder.userId,
         notificationId: reminder._id,
