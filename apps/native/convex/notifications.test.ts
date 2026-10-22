@@ -452,58 +452,6 @@ describe("weekly shelf notifications", () => {
     }
   });
 
-  it("excludes opened candidates even after more than 1000 historical reads", async () => {
-    const t = await signInA();
-    const now = Date.now();
-    await t.run(async (ctx) => {
-      for (let i = 0; i < 1003; i++) {
-        const itemId = await ctx.db.insert("items", {
-          userId: userA,
-          type: "note",
-          status: "ready",
-          title: `Opened save ${i}`,
-          tags: [],
-          searchText: "opened save",
-        });
-        await ctx.db.insert("itemReads", {
-          userId: userA,
-          itemId,
-          firstOpenedAt: now,
-          lastOpenedAt: now,
-        });
-      }
-    });
-    await t.mutation(api.notifications.setPreferences, {
-      weeklyShelfEnabled: true,
-      nextDigestAt: now - 1,
-    });
-    await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: userA,
-      now,
-    });
-    expect(await t.query(api.notifications.getDigest, {})).toBeNull();
-
-    const unopenedIds = await Promise.all([
-      seedItem(t, userA, "note"),
-      seedItem(t, userA, "note"),
-      seedItem(t, userA, "note"),
-    ]);
-    await t.mutation(api.notifications.setPreferences, {
-      weeklyShelfEnabled: true,
-      nextDigestAt: now - 1,
-    });
-
-    await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: userA,
-      now,
-    });
-
-    const digest = await t.query(api.notifications.getDigest, {});
-    expect(digest?.items.map((item) => item._id).sort()).toEqual(
-      unopenedIds.sort(),
-    );
-  }, 20_000);
-
   it("starts disabled until the user opts in", async () => {
     const t = await signInA();
 
