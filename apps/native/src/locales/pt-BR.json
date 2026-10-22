@@ -484,7 +484,7 @@
   "search.placeholder": "Busque seus conteúdos",
   "search.emptyTitle": "Encontre qualquer coisa",
   "search.emptyBody": "A busca percorre suas notas e os títulos,\netiquetas e descrições escritos pelo Shelvr.",
-  "search.noResultsTitle": "Ainda nada",
+  "search.noResultsTitle": "Nada encontrado",
   "navigation.spacesHeader": "coleções",
   "spaces.addFirst": "Adicionar primeiro conteúdo",
   "spaces.waitingTitle": "Ainda vazias",

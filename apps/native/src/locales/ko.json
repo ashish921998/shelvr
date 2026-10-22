@@ -468,7 +468,7 @@
   "search.placeholder": "저장한 항목 검색",
   "search.emptyTitle": "무엇이든 찾아보세요",
   "search.emptyBody": "메모 내용과 Shelvr가 작성한 제목,\n태그, 설명을 검색해요.",
-  "search.noResultsTitle": "아직 없어요",
+  "search.noResultsTitle": "찾은 항목이 없어요",
   "navigation.spacesHeader": "공간",
   "spaces.addFirst": "첫 항목 추가",
   "spaces.waitingTitle": "아직 비어 있어요",
