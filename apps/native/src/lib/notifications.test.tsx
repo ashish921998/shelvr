@@ -12,6 +12,7 @@ import {
 const mock = vi.hoisted(() => ({
   authenticated: true,
   locale: "en",
+  timezone: "Asia/Kolkata",
   token: vi.fn(),
   register: vi.fn(),
   otherMutation: vi.fn(),
@@ -31,6 +32,9 @@ const mock = vi.hoisted(() => ({
 vi.mock("@/lib/i18n", () => ({
   currentLocale: () => mock.locale,
   useAppLocale: () => mock.locale,
+}));
+vi.mock("expo-localization", () => ({
+  getCalendars: () => [{ timeZone: mock.timezone }],
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
@@ -110,6 +114,7 @@ beforeEach(() => {
   releaseSheetLink(false);
   mock.authenticated = true;
   mock.locale = "en";
+  mock.timezone = "Asia/Kolkata";
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
@@ -239,6 +244,27 @@ describe("notification session lifecycle", () => {
     expect(mock.register).toHaveBeenLastCalledWith(
       expect.objectContaining({ locale: "ja" }),
     );
+  });
+
+  it("updates the timezone once on foreground after the device changes zones", async () => {
+    renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Asia/Kolkata" }),
+    );
+    mock.timezone = "Europe/Paris";
+    act(() => mock.appState?.("active"));
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(2));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Europe/Paris" }),
+    );
+    await act(async () => {
+      mock.appState?.("active");
+      mock.appState?.("active");
+    });
+    expect(mock.token).toHaveBeenCalledTimes(2);
+    expect(mock.token).not.toHaveBeenCalledWith(true);
+    expect(mock.register).toHaveBeenCalledTimes(2);
   });
 
   it("reports a startup failure once and retries on foreground", async () => {
