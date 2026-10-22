@@ -5,7 +5,7 @@ import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 import { tapUntilVisible } from "./seeded-home.ts";
 
-// onboarding-flow-version: 11 (the flow these helpers and onboarding.e2e.ts walk)
+// onboarding-flow-version: 11
 
 /**
  * Starts the app as a first-time user on the onboarding opener. Onboarding

@@ -36,11 +36,6 @@ type Save = [
   fields: Partial<Doc<"items">> & Pick<Doc<"items">, "type">,
 ];
 
-/**
- * Seeds the user's saves, then their preferences and device at NOW. Saves go
- * in oldest first: the test database never lets a document's creation time
- * run backwards, so a save back-dated after a newer insert would land at NOW.
- */
 async function setup({
   device = true,
   preferences = {},
@@ -54,8 +49,6 @@ async function setup({
   const order = saves
     .map((save, index) => ({ save, index }))
     .sort((a, b) => b.save[0] - a.save[0]);
-  // The account row must predate the oldest back-dated save, for the same
-  // creation-time reason.
   vi.setSystemTime(NOW - ((order[0]?.save[0] ?? 0) + 1) * DAY);
   const { t: user, userId } = await signedInUser(t);
   const ids: Id<"items">[] = [];
@@ -100,7 +93,6 @@ async function setup({
       userId,
       now,
     });
-  /** Makes the user due again at `now`, as the next day's cron tick would. */
   const due = (now: number) =>
     t.run(async (ctx) => {
       const row = await ctx.db
@@ -208,7 +200,6 @@ describe("choosing a save reminder", () => {
     );
     await prepare();
     expect(await reminders()).toEqual([]);
-    // Still booked for tomorrow: the budget skips a day, not the user.
     expect((await preferencesRow())?.nextReminderAt).toBe(NOW + DAY);
   });
 
@@ -347,7 +338,6 @@ describe("reminder preferences", () => {
     expect((await read()).remindersEnabled).toBe(true);
     const row = () =>
       t.run((ctx) => ctx.db.query("notificationPreferences").unique());
-    // 18:00 in Kolkata is 12:30 UTC, already past at NOW, so tomorrow's.
     expect((await row())?.nextReminderAt).toBe(
       Date.parse("2026-09-26T12:30:00Z"),
     );
@@ -355,7 +345,6 @@ describe("reminder preferences", () => {
     await user.mutation(api.notifications.setSaveReminders, { enabled: false });
     expect((await read()).remindersEnabled).toBe(false);
     expect((await row())?.nextReminderAt).toBeUndefined();
-    // Turning the weekly shelf on leaves reminders as the user set them.
     await user.mutation(api.notifications.setPreferences, {
       weeklyShelfEnabled: true,
     });
@@ -385,7 +374,6 @@ describe("reminder preferences", () => {
     );
     expect(row).toMatchObject({
       timezone: "Asia/Kolkata",
-      // 18:00 and Sunday 09:00 in Kolkata, no longer in UTC.
       nextReminderAt: Date.parse("2026-09-26T12:30:00Z"),
       nextDigestAt: Date.parse("2026-09-27T03:30:00Z"),
     });
@@ -404,7 +392,6 @@ describe("reminder preferences", () => {
       t.run((ctx) => ctx.db.query("notificationPreferences").unique());
     await register("UTC");
     const home = await row();
-    // An older client that sends no zone changes nothing.
     await register();
     expect(await row()).toMatchObject({
       timezone: "UTC",
@@ -518,7 +505,6 @@ describe("the server switch", () => {
       await t.mutation(internal.notifications.prepareDueSaveReminders, {});
       await prepare();
       expect(await reminders()).toEqual([]);
-      // Left armed, so turning the switch on picks the user up again.
       expect((await preferencesRow())?.nextReminderAt).toBe(NOW);
       const jobs = await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),
@@ -545,7 +531,6 @@ describe("the server switch", () => {
   });
 
   it("books the next slot instead of sending off-hours after a backlog", async () => {
-    // Armed long before the switch turned on: due, but hours past its slot.
     const { prepare, reminders, preferencesRow } = await setup({
       saves: [[2, article]],
       preferences: { nextReminderAt: NOW - 3 * 60 * 60 * 1000 },
@@ -680,7 +665,6 @@ describe("delivering a save reminder", () => {
     const row = await t.run((ctx) => ctx.db.get(reminder._id));
     vi.setSystemTime(row!.deliveryNextAttemptAt!);
     await send();
-    // The push most likely reached the phone, so it keeps its budget slot.
     expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
       deliveryStatus: "complete",
       deliveryError: "notifications_disabled",
@@ -775,7 +759,6 @@ describe("delivering a save reminder", () => {
             { status: "ok", id: "ticket-b" },
           ]),
         )
-        // Device b's receipt never arrives.
         .mockResolvedValue(json({ "ticket-a": { status: "ok" } })),
     );
     const send = () =>
@@ -786,7 +769,6 @@ describe("delivering a save reminder", () => {
     const row = await t.run((ctx) => ctx.db.get(reminder._id));
     vi.setSystemTime(row!.deliveryNextAttemptAt!);
     await send();
-    // Out of time before device b answers.
     vi.setSystemTime(NOW + 6 * 60 * 60 * 1000);
     await send();
     const final = await t.run((ctx) => ctx.db.get(reminder._id));

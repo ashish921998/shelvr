@@ -16,7 +16,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// The accent color matches theme.colors.primary (identical in both themes).
 const ACCENT = "#e6a23c";
 
 // Apple Maps stretches an annotation icon into a fixed 50x50pt frame, so
@@ -66,9 +65,6 @@ type Located = {
   imageUrl: string | null;
 };
 
-/** Frames every marker: bounding-box midpoint, zoomed so the widest span
- * fits. `log2(360 / span)` is the standard web-mercator zoom for a span in
- * degrees; the -0.5 leaves breathing room at the edges. */
 function fitCamera(items: Located[]) {
   const lats = items.map((i) => i.latitude);
   const lons = items.map((i) => i.longitude);
@@ -92,8 +88,6 @@ export default function MapScreen() {
   const locale = useAppLocale();
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
-  // Only photos with coordinates, already filtered server-side, so the map
-  // never subscribes to the feed.
   const { data: items } = useQuery(
     convexQuery(
       api.items.listLocatedItems,
@@ -130,10 +124,7 @@ export default function MapScreen() {
         .then((ref) => {
           if (ref) setThumbs((prev) => ({ ...prev, [item.id]: ref }));
         })
-        .catch(() => {
-          // Keep the id in requested so a broken URL doesn't re-fetch on
-          // every Convex push (the effect re-runs when `located` changes).
-        });
+        .catch(() => {});
     }
   }, [located]);
 
@@ -146,10 +137,6 @@ export default function MapScreen() {
     return <ScreenLoader label={t("loading.map")} />;
   }
 
-  // Map is a Pro feature: a lapsed user who deep-links here is bounced to the
-  // paywall instead of seeing the map. ProGate's CTA presents the paywall
-  // under this screen's own placement, so its attempts stay separable from
-  // Tidy's in the paywall funnel.
   if (!entitled) {
     return (
       <ProGateView
@@ -174,9 +161,6 @@ export default function MapScreen() {
 
   const openItem = (id: string | undefined) => {
     if (!id) return;
-    // `from: "map"` attributes the open to the map instead of `direct`, and
-    // the item screen falls back to the home feed for pager siblings exactly
-    // as it did when the param was absent.
     router.push({ pathname: "/item/[id]", params: { id, from: "map" } });
   };
 

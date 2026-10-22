@@ -21,22 +21,10 @@ import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 import { ipKey, ipNetwork } from "./model/clientIp";
 
-// "Ask someone" on a plan: the owner sends the shortlist as a link, and the
-// person who opens it votes on each place without an account or the app. The
-// share is a snapshot of the plan, so the public page never calls the model,
-// and it expires after a week.
-
-/** How long a vote link stays open. */
 export const PLAN_SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-/** Most people whose votes one link keeps. Past this a new voter is refused. */
 export const MAX_PLAN_VOTERS = 20;
-/**
- * Most vote rows one link keeps. Beyond the voters, a visitor who picked and
- * then took it all back keeps an empty row holding their ballot order.
- */
 const MAX_VOTE_ROWS = MAX_PLAN_VOTERS * 2;
 const MAX_CITY_CHARS = 60;
-/** Shares a space or account deletion removes per transaction. */
 const DELETE_BATCH = 50;
 
 const sharedPlaceValidator = v.object({
@@ -62,7 +50,6 @@ function newToken(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The share behind a token while its owner, space and week are all live. */
 async function liveShare(
   ctx: QueryCtx,
   token: string,
@@ -78,11 +65,6 @@ async function liveShare(
   return share;
 }
 
-/**
- * Turns a plan the owner is looking at into a vote link and returns its
- * token. The places are the plan's own (at most five), each tied to a save
- * the caller owns; the text is clipped to the plan's limits.
- */
 export const createPlanShare = mutation({
   args: {
     spaceId: v.id("spaces"),
@@ -134,12 +116,6 @@ export const createPlanShare = mutation({
   },
 });
 
-/**
- * The newest open vote link for one of the caller's spaces, with each
- * place's votes so far and whether the caller marked it "We went". Places
- * whose save was deleted are left out. Null when the space has none open,
- * or none of its places is left.
- */
 export const latestPlanShare = query({
   args: { spaceId: v.id("spaces") },
   returns: v.union(
@@ -183,7 +159,6 @@ export const latestPlanShare = query({
       .query("planVotes")
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
       .take(MAX_VOTE_ROWS);
-    // Like the public page, a place whose save was deleted is left out.
     const places = [];
     for (const place of share.places) {
       const item = await ctx.db.get(place.itemId);
@@ -211,12 +186,6 @@ export const latestPlanShare = query({
   },
 });
 
-/**
- * What the public vote page shows for a token: the sender's first name, the
- * city, and each place with its reason and its save's picture. Places whose
- * save was deleted since are left out. Null for an unknown, expired or
- * orphaned link.
- */
 export const getPublicPlanShare = internalQuery({
   args: { token: v.string() },
   returns: v.union(
@@ -265,14 +234,6 @@ export const getPublicPlanShare = internalQuery({
   },
 });
 
-/**
- * Stores one visitor's votes on a link, replacing what they sent before.
- * Keys not on the link are dropped, and a key in both lists counts as a
- * pick. A ballot with a revision older than the stored one is a late
- * arrival and leaves the newer vote alone. Rate limited per visitor IP and
- * site-wide; a link keeps at most MAX_PLAN_VOTERS voters, and one network
- * can add only a few of them.
- */
 export const recordPlanVote = internalMutation({
   args: {
     token: v.string(),
@@ -312,7 +273,6 @@ export const recordPlanVote = internalMutation({
       ) {
         return "recorded";
       }
-      // An empty row holds no voter, so turning it into a vote needs a slot.
       if (
         !empty &&
         !hasVote(existing) &&
@@ -328,10 +288,6 @@ export const recordPlanVote = internalMutation({
       });
       return "recorded";
     }
-    // An empty ballot from someone new holds no vote. With a revision it is
-    // still kept, so an earlier ballot of theirs that lands after it can't
-    // bring back a withdrawn pick. It takes no voter slot, and past the row
-    // cap it is dropped as before.
     if (empty && args.revision === undefined) return "recorded";
     const rows = await ctx.db
       .query("planVotes")
@@ -383,8 +339,6 @@ async function deleteShare(ctx: MutationCtx, share: Doc<"planShares">) {
   await ctx.db.delete(share._id);
 }
 
-/** Deletes up to one batch of a space's vote links and their votes. Returns
- * true when none remain. */
 export async function deletePlanSharesForSpace(
   ctx: MutationCtx,
   spaceId: Id<"spaces">,
@@ -399,8 +353,6 @@ export async function deletePlanSharesForSpace(
   return shares.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch of a user's vote links and their votes. Returns
- * true when none remain. */
 export async function deletePlanSharesForUser(
   ctx: MutationCtx,
   userKey: string,
@@ -415,10 +367,6 @@ export async function deletePlanSharesForUser(
   return shares.length !== DELETE_BATCH;
 }
 
-/**
- * Daily cleanup: deletes vote links a week past their expiry, with their
- * votes, one batch per transaction. A full batch schedules the next.
- */
 export const purgeExpiredPlanShares = internalMutation({
   args: {},
   returns: v.null(),

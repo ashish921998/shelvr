@@ -6,18 +6,10 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { createMMKV } from "react-native-mmkv";
 
-// Remembers that this install has an answer on record, so a launch does not
-// wait on the network (or hang offline) to show the app to someone who
-// already chose. The server still decides what happens to each save.
 const store = createMMKV({ id: "ai-consent" });
 const ANSWERED_KEY = "answered";
-// Set when a sign-in starts from a screen that carries the AI disclosure
-// (every sign-in surface does). Signing in there is the user's yes, so the
-// separate card is only for people who were already signed in.
 const DISCLOSED_KEY = "disclosed-at-sign-in";
 
-// Every screen that asks reads the flag through these, so a change made by
-// one (a grant that failed and fell back to the card) reaches all of them.
 const disclosedListeners = new Set<() => void>();
 function subscribeDisclosed(listener: () => void): () => void {
   disclosedListeners.add(listener);
@@ -44,13 +36,6 @@ type AiConsentStatus =
   | "granted"
   | "declined";
 
-/**
- * The one rule for third-party AI consent: a signed-in user must answer
- * before any save is created. A save sends its content to Google's Gemini,
- * so nothing may be saved while the answer is not given (`unset`) or, on an
- * install that has never recorded one, still unknown (`loading`, which
- * includes a failed read). Signed out there is no save to hold back.
- */
 function savesBlocked(
   status: AiConsentStatus,
   answeredBefore: boolean,
@@ -58,13 +43,10 @@ function savesBlocked(
   return status === "unset" || (status === "loading" && !answeredBefore);
 }
 
-// The sign-in yes is written once, whichever screen's hook sees it first.
 let grantInFlight = false;
 
 export function useAiConsent() {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  // The React Query adapter, not convex/react: a read that fails during a
-  // token refresh must not throw into the layout that renders this.
   const { data } = useQuery(
     convexQuery(api.aiConsent.getStatus, isAuthenticated ? {} : "skip"),
   );
@@ -76,7 +58,6 @@ export function useAiConsent() {
   const answered = status === "granted" || status === "declined";
   useEffect(() => {
     if (answered) store.set(ANSWERED_KEY, true);
-    // Auth still restoring reads as signed out; that must not forget the answer.
     else if (status === "unset" || (status === "signed-out" && !isLoading))
       store.remove(ANSWERED_KEY);
   }, [answered, status, isLoading]);
@@ -96,13 +77,10 @@ export function useAiConsent() {
             granted: true,
             surface: "sign_in",
           }),
-        // Not recorded: fall back to asking with the card, on whichever
-        // screen draws it, not only the one whose hook made the attempt.
         () => setDisclosed(false),
       );
   }, [answered, status, disclosed, setConsent]);
 
-  /** Rejects when the answer was not recorded; the caller shows that. */
   const answer = useCallback(
     async (granted: boolean, surface: "card" | "settings") => {
       await setConsent({ granted });
@@ -113,7 +91,6 @@ export function useAiConsent() {
 
   return {
     status,
-    /** True when the card should be shown: no answer, and none on its way. */
     asking: status === "unset" && !disclosed,
     savesBlocked: savesBlocked(status, store.getBoolean(ANSWERED_KEY) === true),
     answer,

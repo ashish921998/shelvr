@@ -19,7 +19,6 @@ vi.mock("expo-crypto", () => ({
 
 describe("shareRefOf", () => {
   it("matches the web share page's hash of the token", async () => {
-    // Same vector as apps/web/src/lib/shareRef.test.ts.
     expect(await shareRefOf("https://shelvr-web.vercel.app/i/abc")).toBe(
       "ba7816bf8f01cfea",
     );

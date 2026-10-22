@@ -209,15 +209,12 @@ describe("capturing Apple's refresh token at sign-in", () => {
     const [retained] = await tokenRows(t);
     await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
 
-    // A web sign-in lands on the same (deleting) user: the secret is still
-    // cleared from the users row, but the retained token is not replaced.
     await signIn(t, "web-during-deletion");
     const users = await t.run((ctx) => ctx.db.query("users").collect());
     expect(users).toHaveLength(1);
     expect(users[0]).not.toHaveProperty("appleRefreshToken");
     expect(await tokenRows(t)).toEqual([retained]);
 
-    // With the retained row gone, nothing is inserted either.
     await t.run((ctx) => ctx.db.delete(retained._id));
     await signIn(t, "web-after-forget");
     expect(await tokenRows(t)).toEqual([]);
@@ -230,16 +227,11 @@ describe("capturing Apple's refresh token at sign-in", () => {
     const [retained] = await tokenRows(t);
     await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
 
-    // The sign-in lands while the owner row is deleting: the token is still
-    // moved off the users row, but storing it is refused, and it must not
-    // be dropped unrevoked.
     await signIn(t, "web-during-deletion");
     expect(await tokenRows(t)).toEqual([retained]);
     const users = await t.run((ctx) => ctx.db.query("users").collect());
     expect(users[0]).not.toHaveProperty("appleRefreshToken");
 
-    // Run the revoke job alone: draining every timer would also fire the
-    // hour-later fallback forget before the action has read the row.
     const job = (
       await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),
@@ -254,7 +246,6 @@ describe("capturing Apple's refresh token at sign-in", () => {
     expect(await detachedRows(t)).toEqual([]);
     expect(body.get("client_id")).toBe("app.shelvr.signin");
     expect(body.get("token_type_hint")).toBe("refresh_token");
-    // The retained row belongs to the deletion's own revoke job; untouched.
     expect(await tokenRows(t)).toEqual([retained]);
   });
 
@@ -325,7 +316,6 @@ describe("capturing Apple's refresh token at sign-in", () => {
       attempt: 3,
     });
     expect(await detachedRows(t)).toEqual([]);
-    // A job that runs after the row is gone does nothing.
     await t.action(internal.appleRevoke.revokeDetachedToken, { tokenId });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -373,7 +363,6 @@ describe("deleting an account that signed in with Apple", () => {
     expect(jobs[0].args).toEqual([{ tokenId }]);
     expect(JSON.stringify(jobs[0].args)).not.toContain("r.token");
 
-    // Even if the revoke job never runs, the token does not outlive the hour.
     const fallback = (
       await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),
@@ -403,8 +392,6 @@ describe("deleting an account that signed in with Apple", () => {
     await as(t, userId).mutation(api.users.deleteCurrentUserAccount, {});
     expect(await t.run((ctx) => ctx.db.get(userId))).toBeNull();
 
-    // The live-owner fence must not reach the revocation lookup: the row is
-    // deliberately the one thing deletion leaves behind.
     await expect(
       t.query(internal.users.appleTokenForRevoke, { tokenId }),
     ).resolves.toEqual({ refreshToken: "r.token", clientId: undefined });
@@ -415,7 +402,6 @@ describe("deleting an account that signed in with Apple", () => {
     await expect(
       t.query(internal.users.appleTokenForRevoke, { tokenId }),
     ).resolves.toBeNull();
-    // Forgetting an already forgotten row is harmless.
     await t.mutation(internal.users.forgetAppleToken, { tokenId });
   });
 });

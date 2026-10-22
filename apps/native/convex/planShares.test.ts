@@ -144,7 +144,6 @@ describe("votes", () => {
     expect(await vote(backend, token, "a", ["p0", "zz"], ["p1"])).toBe(
       "recorded",
     );
-    // A changed mind replaces the earlier answer; a key in both lists is a pick.
     expect(await vote(backend, token, "a", ["p1"], ["p0", "p1"])).toBe(
       "recorded",
     );
@@ -183,10 +182,8 @@ describe("votes", () => {
       );
 
     expect(await ballot(["p0"], 2)).toBe("recorded");
-    // A request that left the browser earlier but arrived later changes nothing.
     expect(await ballot(["p1"], 1)).toBe("recorded");
     expect(await tally()).toEqual([1, 0]);
-    // A newer one, or one from a page with no revisions, still replaces it.
     expect(await ballot(["p1"], 3)).toBe("recorded");
     expect(await tally()).toEqual([0, 1]);
     expect(await vote(backend, token, "a", ["p0"])).toBe("recorded");
@@ -205,7 +202,6 @@ describe("votes", () => {
     expect(await vote(backend, token, "late", ["p0"], [], "198.51.100.1")).toBe(
       "full",
     );
-    // Someone already on the link can still change their answer.
     expect(await vote(backend, token, "v0", ["p1"], [], "198.51.100.1")).toBe(
       "recorded",
     );
@@ -221,7 +217,6 @@ describe("votes", () => {
       expect(await vote(backend, token, `v${i}`, ["p0"])).toBe("recorded");
     }
     await expect(vote(backend, token, "late", ["p0"])).rejects.toThrow();
-    // Voters already on the link can still change their answer.
     expect(await vote(backend, token, "v0", ["p1"])).toBe("recorded");
     expect(await vote(backend, token, "late", ["p0"], [], "198.51.100.9")).toBe(
       "recorded",
@@ -275,7 +270,6 @@ describe("votes", () => {
         revision,
         ip: "203.0.113.7",
       });
-    // Picked then unpicked: the page-close ballot overtakes the first one.
     expect(await ballot([], 2)).toBe("recorded");
     expect(await ballot(["p0"], 1)).toBe("recorded");
     expect(
@@ -307,7 +301,6 @@ describe("votes", () => {
     for (let i = 0; i < MAX_PLAN_VOTERS; i++) {
       expect(await ballot(`v${i}`, ["p0"], `198.51.100.${i}`)).toBe("recorded");
     }
-    // Twenty voters are in, so a take-back can't become a twenty-first vote.
     expect(
       await backend.mutation(internal.planShares.recordPlanVote, {
         token,
@@ -404,7 +397,6 @@ describe("votes", () => {
     expect(shared?.places[0]).toMatchObject({ name: "Thalassa", been: true });
     expect(shared?.places[1]).not.toHaveProperty("been");
 
-    // Taking the mark back clears it on the shared shortlist too.
     await t.mutation(api.placeVisits.setVisited, {
       name: "Thalassa",
       itemId: places[0].itemId,

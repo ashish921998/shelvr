@@ -11,15 +11,12 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type RecallItem = FunctionReturnType<typeof api.items.similarItems>[number];
 
-/** The glyph a thumbnail shows when the save has no picture. */
 const TYPE_SYMBOLS = {
   link: "link",
   image: "photo.stack",
   note: "doc.text",
 } as const satisfies Record<RecallItem["type"], AppSymbolName>;
 
-/** Where each thumbnail of the fanned stack sits, back to front, by how many
- * the card shows. The last entry is the front thumbnail: the top match. */
 const STACK_LAYOUTS: Record<number, StackSlot[]> = {
   1: [{ left: 18, top: 9, rotate: 0 }],
   2: [
@@ -35,12 +32,6 @@ const STACK_LAYOUTS: Record<number, StackSlot[]> = {
 
 type StackSlot = { left: number; top: number; rotate: number };
 
-/**
- * The save recall card on Home: older saves that go with the one just added,
- * as one tappable row with their thumbnails fanned into a stack. Tapping it
- * opens the top match. Purely presentational; the hook in
- * lib/use-save-recall.ts owns when it shows and its analytics.
- */
 export function SaveRecallCard({
   savedTitle,
   matches,
@@ -55,8 +46,6 @@ export function SaveRecallCard({
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  // The count names only the saves the stack shows, so it never promises
-  // more than the card delivers.
   const shown = matches.slice(0, RECALL_MAX_SHOWN);
   const top = shown[0];
   if (top === undefined) return null;
@@ -70,7 +59,6 @@ export function SaveRecallCard({
       ? t("home.recallSavedOn", { date })
       : t("home.recallOldest", { date });
   const slots = STACK_LAYOUTS[shown.length] ?? [];
-  // Back to front, so the top match paints last and sits on top.
   const stack = shown.slice().reverse();
   return (
     <View style={styles.wrap} testID="save-recall-card">
@@ -176,12 +164,6 @@ function StackThumb({
   );
 }
 
-/**
- * The card's title sentence, with the save's title shortened so the whole
- * sentence fits the card's three lines. The room left for the title is what
- * the locale's own words leave over, so the count still shows in languages
- * that put it after the title (ja, ko).
- */
 function stackTitle(count: number, savedTitle: string): string {
   const frame = textWidth(t("home.recallStackTitle", { count, title: "" }));
   const room = Math.max(TITLE_MIN_WIDTH, TITLE_LINES_WIDTH - frame);
@@ -191,7 +173,6 @@ function stackTitle(count: number, savedTitle: string): string {
   });
 }
 
-/** CJK and other full-width characters take about two Latin letters' room. */
 const WIDE_CHAR =
   /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/u;
 
@@ -208,7 +189,6 @@ function clipToWidth(text: string, room: number): string {
   let kept = "";
   let width = 0;
   for (const char of text) {
-    // One unit stays free for the ellipsis.
     if (width + charWidth(char) > room - 1) break;
     kept += char;
     width += charWidth(char);
@@ -216,8 +196,6 @@ function clipToWidth(text: string, room: number): string {
   return `${kept.trimEnd()}…`;
 }
 
-/** About how many Latin letters the title's three lines hold at its size on
- * a phone-width card, and the least room a title ever gets. */
 const TITLE_LINES_WIDTH = 60;
 const TITLE_MIN_WIDTH = 8;
 const FRONT_THUMB = 58;
@@ -234,7 +212,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.gap(2),
     padding: theme.gap(1.75),
-    // Room for the dismiss button in the top corner.
     paddingRight: theme.gap(5.5),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
@@ -249,15 +226,12 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 2,
-    // A paper edge, so overlapping thumbnails read as separate cards in both
-    // themes; the card's own tint vanished against itself in dark mode.
     borderColor: theme.colors.surface,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.colors.surface,
   },
-  // Recedes the cards behind the top match so the front one leads.
   backThumb: {
     opacity: 0.8,
   },
@@ -284,7 +258,6 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.caption,
     color: theme.colors.muted,
   },
-  // A full-size tap target around the small visible circle.
   dismiss: {
     position: "absolute",
     top: 0,

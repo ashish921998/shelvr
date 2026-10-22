@@ -51,7 +51,6 @@ describe("youtubeVideoId", () => {
   });
 });
 
-/** Assert the policy code thrown by normalizeExternalUrl for a given input. */
 function expectCode(raw: string, code: string): void {
   expect(() => normalizeExternalUrl(raw)).toThrow();
   try {
@@ -84,15 +83,11 @@ describe("normalizeExternalUrl - scheme handling", () => {
     expectCode("data:text/html,<x>", "unsupported_scheme");
     expectCode("javascript:alert(1)", "unsupported_scheme");
     expectCode("ftp://example.com", "unsupported_scheme");
-    // WHATWG URL parses "example.com:8080" with scheme "example.com:"; the
-    // scheme-aware detector rejects it as unsupported rather than treating it
-    // as a bare host with a port.
     expectCode("example.com:8080", "unsupported_scheme");
     expectCode("localhost:3000", "unsupported_scheme");
   });
 
   it("does not treat a scheme-like substring mid-string as a scheme", () => {
-    // No leading scheme -> https:// is prepended; the inner "://" is just path.
     expect(normalizeExternalUrl("example.com/http://evil.com")).toBe(
       "https://example.com/http://evil.com",
     );
@@ -111,8 +106,6 @@ describe("normalizeExternalUrl - credentials", () => {
 
 describe("normalizeExternalUrl - host", () => {
   it("rejects a missing host", () => {
-    // "https://" declares an http(s) scheme but has no host, reported as
-    // invalid_host, distinct from genuinely unparseable input.
     expectCode("https://", "invalid_host");
   });
   it("accepts fragments and query strings", () => {
@@ -140,21 +133,17 @@ describe("normalizeExternalUrl - ports", () => {
 
 describe("normalizeExternalUrl - IPv4 canonicalization", () => {
   it("canonicalizes decimal IPv4", () => {
-    // 167903424 decimal -> 10.2.0.192 per the WHATWG host parser.
     expect(normalizeExternalUrl("https://167903424")).toBe(
       "https://10.2.0.192/",
     );
   });
   it("canonicalizes hex IPv4", () => {
-    // 0x0a.0x02.0x03.0x04 == 10.2.3.4
     expect(normalizeExternalUrl("https://0x0a020304")).toBe(
       "https://10.2.3.4/",
     );
   });
   it("canonicalizes short/legacy IPv4 forms", () => {
-    // 10 -> 0.0.0.10
     expect(normalizeExternalUrl("https://10")).toBe("https://0.0.0.10/");
-    // 10.2 -> 10.0.0.2
     expect(normalizeExternalUrl("https://10.2")).toBe("https://10.0.0.2/");
   });
 });
@@ -170,7 +159,6 @@ describe("normalizeExternalUrl - IPv6", () => {
 
 describe("normalizeExternalUrl - length boundary", () => {
   it("rejects URLs longer than the cap", () => {
-    // Build a URL whose canonical form is exactly MAX+1 code units.
     const host = "example.com";
     const base = `https://${host}/`;
     const pad = MAX_URL_LENGTH - base.length + 1;
@@ -194,10 +182,7 @@ describe("normalizeExternalUrl - empty / invalid", () => {
     expectCode("   ", "empty");
   });
   it("rejects malformed input", () => {
-    // An http(s)-schemed input that fails to parse is reported as invalid_host
-    // (the scheme was recognized but the URL is incomplete).
     expectCode("https://exa mple.com", "invalid_host");
-    // Genuinely unparseable schemeless garbage is invalid_url.
     expectCode("exa mple", "invalid_url");
   });
 });

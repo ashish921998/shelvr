@@ -3,9 +3,6 @@ type AnalyticsProperties = Record<
   boolean | number | string | unknown[]
 >;
 
-// Error messages can interpolate user input (a waitlist email, a query
-// param), so the grouped exception value keeps only fixed shapes: mail and
-// URL substrings are replaced before anything reaches PostHog.
 function safeExceptionValue(message: string): string {
   return message
     .replace(/\b[\w.+-]+@[\w.-]+\.\w+\b/g, "[email]")
@@ -37,9 +34,6 @@ export function captureWebAnalyticsEvent(
   event: string,
   properties: AnalyticsProperties = {},
 ) {
-  // Analytics must never break the UI: localStorage and crypto access can
-  // throw in restrictive privacy modes, and CTA handlers should remain usable
-  // even when telemetry is unavailable.
   try {
     const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
@@ -61,7 +55,6 @@ export function captureWebAnalyticsEvent(
         properties: {
           distinct_id: distinctId,
           ...properties,
-          // Capability tokens and user input never belong in telemetry.
           $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
         },
       }),

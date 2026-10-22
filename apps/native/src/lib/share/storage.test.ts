@@ -1,6 +1,3 @@
-// Tests for the incoming-share session store. The reconciliation rules are the
-// load-bearing correctness logic for plan 004, so every remount window is
-// exercised with an in-memory adapter: no MMKV, no React Native runtime.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,8 +19,6 @@ import {
   type RawSharePayload,
 } from "./storage";
 
-/** A minimal in-memory MMKV-shaped adapter backed by a Map. `contains` is
- * modeled because the module never calls it, but the interface requires it. */
 function memoryStore(): SessionStoreAdapter {
   const map = new Map<string, string>();
   return {
@@ -38,8 +33,6 @@ function memoryStore(): SessionStoreAdapter {
   };
 }
 
-// The authenticated user the session is scoped to. Different USER values model
-// different accounts on the same device.
 const USER = "user-a";
 const OTHER_USER = "user-b";
 
@@ -49,20 +42,17 @@ const payload = (value: string, shareType = "text"): RawSharePayload => ({
   shareType,
 });
 const BATCH_A = [payload("https://a.example", "url")];
-const BATCH_A_DUP = [payload("https://a.example", "url")]; // identical content
-const BATCH_B = [payload("https://b.example", "url")]; // different content
+const BATCH_A_DUP = [payload("https://a.example", "url")];
+const BATCH_B = [payload("https://b.example", "url")];
 
 describe("fingerprintSharePayloads", () => {
   it("encodes order and duplicates so identical-content distinct batches stay distinct", () => {
-    // Two identical entries in one batch must NOT collapse with one entry.
     expect(fingerprintSharePayloads([payload("x"), payload("x")])).not.toBe(
       fingerprintSharePayloads([payload("x")]),
     );
-    // Order matters: a re-ordering is a different batch.
     expect(fingerprintSharePayloads([payload("a"), payload("b")])).not.toBe(
       fingerprintSharePayloads([payload("b"), payload("a")]),
     );
-    // Same batch, same fingerprint (deterministic).
     expect(fingerprintSharePayloads([payload("a"), payload("b")])).toBe(
       fingerprintSharePayloads([payload("a"), payload("b")]),
     );
@@ -88,7 +78,6 @@ describe("fingerprintSharePayloads", () => {
   });
 
   it("never collides via delimiter concatenation", () => {
-    // The classic delimiter pitfall: ["a|b"] vs ["a","b"].
     expect(fingerprintSharePayloads([payload("a|b")])).not.toBe(
       fingerprintSharePayloads([payload("a"), payload("b")]),
     );
@@ -113,7 +102,6 @@ describe("reconcileSession", () => {
     expect(result.session.entries).toHaveLength(1);
     expect(result.session.entries[0].operationId).toBe("share:sess-1:0");
     expect(result.session.entries[0].status).toBe("pending");
-    // Persisted.
     expect(loadSession(store)?.fingerprint).toBe(
       fingerprintSharePayloads(BATCH_A),
     );
@@ -123,7 +111,6 @@ describe("reconcileSession", () => {
     const store = memoryStore();
     const first = reconcileSession(store, USER, BATCH_A, id);
     if (first.kind !== "new") throw new Error("expected new");
-    // Simulate a saved entry before the remount.
     updateEntry(store, 0, { status: "saved", itemId: "items-1", kind: "link" });
 
     const result = reconcileSession(store, USER, BATCH_A, id);
@@ -134,11 +121,6 @@ describe("reconcileSession", () => {
   });
 
   it("directs a clear for a matching completed session but KEEPS the record until clear succeeds", () => {
-    // The throwing-clear invariant: reconcileSession must NOT delete the
-    // completed session. If it did, a throwing native clear on remount would
-    // leave native payloads with no session, and the next remount would treat
-    // the batch as new and re-save everything (duplicates). The caller owns the
-    // delete, only after a non-throwing clear.
     const store = memoryStore();
     reconcileSession(store, USER, BATCH_A, id);
     updateEntry(store, 0, { status: "saved", itemId: "items-1", kind: "link" });
@@ -146,27 +128,22 @@ describe("reconcileSession", () => {
 
     const result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
-    // Record is intentionally retained: a failed clear must be retryable.
     expect(loadSession(store)).not.toBeNull();
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // The caller deletes only after the native clear succeeds.
     deleteSession(store);
     expect(loadSession(store)).toBeNull();
   });
 
   it("starts a fresh session when a later re-share matches a stale completed record", () => {
-    // Completed state is single-use: after the caller cleared and deleted, an
-    // identical-content re-share must start a NEW session, not be dropped.
     const store = memoryStore();
     reconcileSession(store, USER, BATCH_A, id);
     updateEntry(store, 0, { status: "saved", itemId: "items-1", kind: "link" });
     markComplete(store);
-    reconcileSession(store, USER, BATCH_A, id); // directs a clear (record retained)
-    deleteSession(store); // caller deletes after a successful clear
+    reconcileSession(store, USER, BATCH_A, id);
+    deleteSession(store);
     expect(loadSession(store)).toBeNull();
 
-    // A deliberate later re-share of identical content is a fresh session.
     const result = reconcileSession(store, USER, BATCH_A_DUP, id);
     expect(result.kind).toBe("new");
     if (result.kind !== "new") return;
@@ -174,26 +151,19 @@ describe("reconcileSession", () => {
   });
 
   it("keeps directing a clear on repeated remounts until the caller deletes (throwing-clear safety)", () => {
-    // The throwing-clear invariant in full: if the native clear keeps failing,
-    // reconcileSession must keep returning 'clear' with the completed record
-    // intact, so every remount retries the clear rather than starting a new
-    // session that would re-save everything (duplicates).
     const store = memoryStore();
     reconcileSession(store, USER, BATCH_A, id);
     updateEntry(store, 0, { status: "saved", itemId: "items-1", kind: "link" });
     markComplete(store);
 
-    // First remount: clear fails (caller does NOT delete).
     let result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // Second remount: clear still failing; still 'clear', record still there.
     result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     expect(loadSession(store)?.phase).toBe("complete");
 
-    // Third remount: clear finally succeeds, caller deletes; record is gone.
     result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("clear");
     deleteSession(store);
@@ -223,7 +193,6 @@ describe("reconcileSession", () => {
   });
 
   it("assigns distinct stable operation ids to duplicate entries in one batch", () => {
-    // Two identical entries must each get their own id by raw index.
     const store = memoryStore();
     const result = reconcileSession(
       store,
@@ -260,14 +229,10 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   }
 
   it("flags a record-less identical, fully settled batch as a ghost", () => {
-    // The reported duplicate: the save completed (record deleted), Android
-    // replayed the task's share intent, and a fresh session minted a fresh
-    // operationId the ledger could not dedupe. It must be skipped instead.
     const store = memoryStore();
     completedBatchA(store);
     const result = reconcileSession(store, USER, BATCH_A, id);
     expect(result).toEqual({ kind: "ghost" });
-    // No session was started for the replay.
     expect(loadSession(store)).toBeNull();
   });
 
@@ -286,17 +251,13 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   });
 
   it("treats an identical batch as new when nothing completed before it", () => {
-    // First-ever share must never prompt.
     const store = memoryStore();
     expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
   });
 
   it("does not ghost-check an active or completed session match", () => {
-    // A matching existing session follows the resume/clear rules regardless of
-    // any tombstone: those paths reuse stable operation ids.
     const store = memoryStore();
     completedBatchA(store);
-    // Directly start the active session (bypasses the ghost branch).
     startNewSession(
       store,
       USER,
@@ -305,7 +266,6 @@ describe("ghost redelivery (Android task-restore replay)", () => {
       id,
     );
     recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, []);
-    // Active session for the same batch → resume, not ghost.
     expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("resume");
   });
 
@@ -316,16 +276,12 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   });
 
   it("never matches a tombstone left by a different user", () => {
-    // Account switch: user A completed this batch, user B shares identical
-    // content. The ghost check is user-scoped: B's share is genuine.
     const store = memoryStore();
     completedBatchA(store);
     expect(reconcileSession(store, OTHER_USER, BATCH_A, id).kind).toBe("new");
   });
 
   it("retries a replayed batch that failed, instead of skipping it", () => {
-    // A failed save still completes (Cancel / Continue) and tombstones the
-    // batch. Sharing it again must save it, not return Home empty-handed.
     const store = memoryStore();
     recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, []);
     const result = reconcileSession(store, USER, BATCH_A, () => "sess-9");
@@ -336,8 +292,6 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   });
 
   it("carries settled entries into a partly saved batch's replay", () => {
-    // Only the entries that did not save are attempted again; the saved one
-    // keeps its item id, so it is never saved twice.
     const store = memoryStore();
     const batch = [...BATCH_A, ...BATCH_B];
     recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
@@ -351,8 +305,6 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   });
 
   it("does not skip a replay when settled entries miss an index", () => {
-    // Matching counts are not enough: a duplicate index must not hide an
-    // entry that never saved.
     const store = memoryStore();
     const batch = [...BATCH_A, ...BATCH_B];
     recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
@@ -363,8 +315,6 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   });
 
   it("saves a replay whose tombstone predates settled entries", () => {
-    // Older tombstones were written for failed batches too, so they cannot
-    // prove the batch saved: treat the match as a new share.
     const store = memoryStore();
     completedBatchA(store);
     const legacy = JSON.parse(store.getString(LAST_COMPLETED_SHARE_KEY)!) as {
@@ -376,8 +326,6 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   });
 
   it("saves an identical re-share after its item was deleted", () => {
-    // Save a link, delete the item, share the same link again: content alone
-    // cannot tell this from a replay, so the delete must unmark the entry.
     const store = memoryStore();
     completedBatchA(store);
     forgetDeletedShareItem(store, "items-1");
@@ -430,7 +378,6 @@ describe("loadSession", () => {
     const store = memoryStore();
     store.set(SESSION_KEY, JSON.stringify({ version: 999 }));
     expect(loadSession(store)).toBeNull();
-    // The corrupt record was removed so the next reconcile starts clean.
     expect(store.contains(SESSION_KEY)).toBe(false);
   });
 
@@ -495,7 +442,6 @@ describe("entriesToProcess", () => {
     );
     updateEntry(store, 0, { status: "saved" });
     updateEntry(store, 1, { status: "failed" });
-    // index 2 still pending
     const session = loadSession(store)!;
     const toProcess = entriesToProcess(session);
     expect(toProcess.map((e) => e.index)).toEqual([1, 2]);
@@ -521,18 +467,14 @@ describe("deleteSession", () => {
   });
 
   it("is a no-op against a different session id (scoped delete)", () => {
-    // An in-flight run finishing after a newer session replaced its record must
-    // not delete the newer session.
     const store = memoryStore();
     const first = reconcileSession(store, USER, BATCH_A, id);
     if (first.kind !== "new") throw new Error("expected new");
     const firstSessionId = first.session.sessionId;
 
-    // A different batch replaces the record with a new session.
     const second = reconcileSession(store, USER, BATCH_B, () => "sess-2");
     if (second.kind !== "new") throw new Error("expected new");
 
-    // The old session tries to delete by its (now-stale) id, which must be a no-op.
     deleteSession(store, firstSessionId);
     expect(loadSession(store)?.sessionId).toBe("sess-2");
   });
@@ -540,15 +482,12 @@ describe("deleteSession", () => {
 
 describe("user-scoped sessions (account switching)", () => {
   it("starts a fresh session when a different user reconciles an identical batch", () => {
-    // user-a completes a batch; user-b (same device) sharing the SAME content
-    // must NOT match user-a's stale record; otherwise the new share is dropped.
     const store = memoryStore();
     const a = reconcileSession(store, USER, BATCH_A, id);
     if (a.kind !== "new") throw new Error("expected new");
     updateEntry(store, 0, { status: "saved", itemId: "items-a", kind: "link" });
     markComplete(store);
 
-    // user-b reconciles identical content: must be a NEW session, not a clear.
     const result = reconcileSession(
       store,
       "user-b",
@@ -567,12 +506,9 @@ describe("user-scoped sessions (account switching)", () => {
     updateEntry(store, 0, { status: "saved", itemId: "items-a", kind: "link" });
     markComplete(store);
 
-    // user-b: identical content. The completed record belongs to user-a, so it
-    // is replaced (newSession overwrites). The return is 'new', never 'clear'.
     const result = reconcileSession(store, "user-b", BATCH_A, () => "sess-b");
     expect(result.kind).not.toBe("clear");
     expect(result.kind).toBe("new");
-    // The record now belongs to user-b.
     expect(loadSession(store)?.userId).toBe("user-b");
   });
 });
@@ -685,18 +621,14 @@ describe("entry validation in loadSession", () => {
 
 describe("session-scoped mutations (new-share-during-in-flight-run safety)", () => {
   it("updateEntry is a no-op when sessionId does not match", () => {
-    // The in-flight run's persistEntry must not touch a newer session's entry.
     const store = memoryStore();
     const first = reconcileSession(store, USER, BATCH_A, id);
     if (first.kind !== "new") throw new Error("expected new");
     const firstSessionId = first.session.sessionId;
 
-    // A new batch replaces the record.
     reconcileSession(store, USER, BATCH_B, () => "sess-2");
 
-    // The old run tries to update entry index 0 by its stale session id.
     updateEntry(store, 0, { status: "saved", kind: "link" }, firstSessionId);
-    // The new session's entry 0 is untouched.
     const live = loadSession(store);
     expect(live?.sessionId).toBe("sess-2");
     expect(live?.entries[0].status).toBe("pending");
@@ -710,7 +642,6 @@ describe("session-scoped mutations (new-share-during-in-flight-run safety)", () 
 
     reconcileSession(store, USER, BATCH_B, () => "sess-2");
     markComplete(store, firstSessionId);
-    // The newer session stays active (not completed).
     expect(loadSession(store)?.phase).toBe("active");
   });
 });

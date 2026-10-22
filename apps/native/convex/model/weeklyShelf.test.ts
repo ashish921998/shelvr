@@ -93,7 +93,6 @@ describe("shelf composition", () => {
   const recent = ["r1", "r2", "r3"];
   const archive = ["a1", "a2", "a3"];
 
-  // Each row: recent saves found, unopened older saves available, shelf.
   it.each([
     { found: 3, older: 3, shelf: ["r1", "r2", "a1"] },
     { found: 2, older: 3, shelf: ["r1", "r2", "a1"] },

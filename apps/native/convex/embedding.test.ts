@@ -75,8 +75,6 @@ describe("normalizeEmbedding", () => {
   });
 
   it("is a no-op on an already-unit vector", () => {
-    // The model is documented to normalize its own truncated output, so this
-    // is the case that runs in production: it must not perturb the vector.
     const unit = [0, 1, 0];
     expect(normalizeEmbedding(unit)).toEqual(unit);
   });
@@ -107,16 +105,12 @@ describe("isValidEmbedding", () => {
   });
 
   it("rejects an all-zero vector", () => {
-    // It survives normalization untouched and passes every other check, but
-    // cosine similarity against it is 0/0.
     expect(
       isValidEmbedding(Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0)),
     ).toBe(false);
   });
 
   it("rejects what normalizeEmbedding produces from a zero vector", () => {
-    // The two helpers are always composed in production, so the composition is
-    // what has to be safe: neither one alone catches this.
     const zero = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0);
     expect(isValidEmbedding(normalizeEmbedding(zero))).toBe(false);
   });
@@ -143,8 +137,6 @@ describe("sweep constants", () => {
   });
 
   it("starts the generation above the absent-field sentinel", () => {
-    // setEmbeddingsInternal compares `embeddingVersion ?? -1`, and the sweep
-    // range is `lt(CURRENT)`, so an unstamped row must sort strictly below.
     expect(CURRENT_EMBEDDING_VERSION).toBeGreaterThan(0);
   });
 });

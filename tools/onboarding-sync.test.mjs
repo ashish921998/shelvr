@@ -15,8 +15,6 @@ const FLOWS = "tools/e2e/tests/fresh-onboarding.ts";
 const flowVersion = (source) =>
   Number(/ONBOARDING_FLOW_VERSION = (\d+)/.exec(source)?.[1]);
 
-// Both are written out by hand, so the app's version number is what tells
-// them the onboarding moved.
 for (const path of [NOTES, FLOWS]) {
   test(`${path} was walked against the current onboarding`, () => {
     const stamp = /onboarding-flow-version: (\d+)/.exec(read(path));
@@ -33,10 +31,6 @@ for (const path of [NOTES, FLOWS]) {
 const straighten = (text) => text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
 const normalize = (text) => straighten(text).replace(/\s+/g, " ").trim();
 
-/**
- * A matcher for text a screen shows: as written, or as whole strings one after
- * another, because a title and its accent are two strings on one line.
- */
 function showing(strings) {
   const shown = new Set(strings.map(normalize));
   return (text) => {
@@ -55,7 +49,6 @@ function showing(strings) {
   };
 }
 
-/** Double-quoted text anywhere, and bold text in the onboarding steps. */
 function quotedCopy(markdown) {
   const quotes = [];
   let inOnboarding = false;

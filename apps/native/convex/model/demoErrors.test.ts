@@ -20,7 +20,6 @@ describe("demo error classification", () => {
   });
 
   it("returns null for anything that is not a demo ConvexError", () => {
-    // What production hands the client for a plain server Error.
     expect(demoErrorCode(new Error("Server Error"))).toBeNull();
     expect(demoErrorCode(new ConvexError("Photo limit reached"))).toBeNull();
     expect(

@@ -25,72 +25,30 @@ import {
   TIMELINE,
 } from "./timeline";
 
-// Shelvr's launch animation. A thread draws down the screen and hand-sketched
-// saves (notes, recipes, articles, photos, products) gather onto a shelf at
-// the centre, where they settle into stitches; the S pops in over the row, the
-// wordmark unfurls beside it as the lockup slides into place, and the strapline
-// arrives last.
-//
-// The drawn layer lives in `thread-canvas.tsx` (Skia) and the lockup here
-// (Reanimated views over real text). Both read one clock, defined in
-// `timeline.ts`.
-
 const WORDMARK_SIZE = 50;
-/**
- * Crimson Pro's ascender height (the top of the h and l), as a share of the
- * font size: 694 units of 1024. The S is drawn exactly this tall and stood on
- * the wordmark's baseline, so it reads as a letter of the same line rather
- * than a badge floating beside it.
- */
 const ASCENDER = 694 / 1024;
-// The wordmark opts out of system font scaling (see `allowFontScaling` below):
-// the S is a fixed size, so a scaled wordmark would outgrow it. It is a logo,
-// not reading text.
 const MARK_SIZE = Math.round(WORDMARK_SIZE * ASCENDER);
 const LOCKUP_GAP = 11;
-/** Slack past the measured wordmark, so the last glyph is never clipped. */
 const UNFURL_OVERSHOOT = 4;
 
-/** Easing the lockup's slide and unfurl share. */
 const LOCKUP_EASE = [0.16, 0.84, 0.24, 1] as const;
 const FOOTER_EASE = [0.2, 0.8, 0.25, 1] as const;
 const FOOTER_RISE = 5;
 
-/** With reduced motion the lockup simply fades up, in place. */
 const REDUCED_FADE_MS = 240;
 
-/**
- * How long past the clock's end the splash waits for the UI thread's
- * completion callback before leaving on its own. The splash covers the whole
- * screen and takes touches, so a callback that never lands would leave an
- * invisible layer over the app that swallows every tap.
- */
 const FINISH_FALLBACK_MS = 300;
 
-/**
- * Reanimated disables `withTiming` outright when the system reduce-motion
- * setting is on, snapping it to its end value. That is right for the
- * choreography and wrong for the two timings below: the clock is the splash's
- * duration, not an effect, and letting it complete on the first frame hands
- * off to an app that has not hydrated. Motion is skipped in the style
- * branches instead, where it is legible.
- */
 const KEEP_TIMING = { reduceMotion: ReduceMotion.Never } as const;
 
 export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   useAppLocale();
   const { width, height } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
-  // The drawn layer takes its colours as props, so they are resolved here
-  // rather than in the stylesheet, from the same theme name the sheet reads.
   const { rt } = useUnistyles();
   const splash = splashTheme(isDarkThemeName(rt.themeName));
 
-  // The wordmark's natural width sets both how far the lockup slides and how
-  // far the unfurl opens, so the composition waits on one measurement pass.
   const [wordmarkWidth, setWordmarkWidth] = useState<number | null>(null);
-  // Touches pass through to the app once the cross-fade starts, so a tap on
-  // the screen showing through is never caught by the fading splash.
   const [exiting, setExiting] = useState(false);
 
   const clock = useSharedValue(0);
@@ -104,10 +62,6 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
       onFinish?.();
     };
 
-    // Reduced motion drops the drawn layer and the lockup's choreography, not
-    // the splash itself: the clock still runs the full duration, so the app
-    // gets the same window to hydrate behind it and leaves by the same
-    // cross-fade. Ending early here would hand off to a half-built screen.
     if (reducedMotion) {
       reducedProgress.set(
         withTiming(1, { duration: REDUCED_FADE_MS, ...KEEP_TIMING }),
@@ -128,10 +82,6 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         },
       ),
     );
-    // A late deep link can dismiss the splash before the clock runs out.
-    // Stop it rather than leaving it ticking on the UI thread, and firing
-    // `onFinish` a second time, on exactly the path the early dismissal is
-    // there to speed up.
     const exitTimer = setTimeout(
       () => setExiting(true),
       SPLASH_EXIT_FROM * 1000,
@@ -145,23 +95,14 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
       clearTimeout(fallbackTimer);
       cancelAnimation(clock);
     };
-    // The animation is started once, on mount; `onFinish` is read through the
-    // closure above rather than re-armed when the callback identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reducedMotion]);
 
-  // The lockup needs no horizontal offset of its own. The row is centred by
-  // its parent and the clip below is a flex child, so opening the clip widens
-  // the row and slides the mark left on its own: the mark starts centred and
-  // ends beside the wordmark. (The web prototype used `clip-path`, which does
-  // not affect layout, so there it took an explicit counter-translation.)
   const rowStyle = useAnimatedStyle(() => ({
     opacity: reducedMotion ? reducedProgress.get() : 1,
   }));
 
   const wordmarkStyle = useAnimatedStyle(() => {
-    // The gap lives inside the clip, so an unopened clip takes no width at all
-    // and the mark sits dead centre until the wordmark starts to unfurl.
     const full = LOCKUP_GAP + (wordmarkWidth ?? 0) + UNFURL_OVERSHOOT;
     if (reducedMotion) return { width: full };
     const progress = cubicBezierEase(
@@ -202,8 +143,6 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
     };
   });
 
-  // The app is already mounted behind the splash, so the last beat is a
-  // cross-fade rather than a cut.
   const screenStyle = useAnimatedStyle(() => ({
     opacity: 1 - span(clock.get(), SPLASH_EXIT_FROM, SPLASH_DURATION),
   }));
@@ -224,8 +163,6 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         </View>
       )}
 
-      {/* Measured off-screen: an unconstrained copy reports the wordmark's
-          natural width, which the clipped copy below can then be given. */}
       <Text
         style={[styles.wordmark, styles.measure]}
         allowFontScaling={false}
@@ -236,10 +173,6 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         shelvr
       </Text>
 
-      {/* Held invisible until the wordmark is measured: the row's baseline
-          comes from the wordmark, so the S only takes its final place once
-          the wordmark is mounted. Revealing it earlier could show the S jump,
-          visible with reduced motion, where it is drawn from frame one. */}
       <View
         style={[
           styles.lockupLayer,
@@ -286,9 +219,6 @@ const styles = StyleSheet.create((theme, rt) => {
   return {
     screen: {
       ...StyleSheet.absoluteFillObject,
-      // Pinned literals, not theme tokens, but chosen between two grounds: a
-      // warm paper launch in front of a dark app reads as a flash on the
-      // hand-off.
       backgroundColor: splash.ground,
     },
     canvasLayer: {
@@ -300,25 +230,17 @@ const styles = StyleSheet.create((theme, rt) => {
       right: 0,
       top: `${SPLASH_ANCHOR_Y * 100}%`,
       alignItems: "center",
-      // Centre the lockup on the anchor rather than hanging it below the line.
       transform: [{ translateY: -WORDMARK_SIZE / 2 }],
     },
     lockup: {
       flexDirection: "row",
-      // The S's bottom edge meets the wordmark's baseline. Centring the two
-      // boxes instead left the mark floating above the letters, because a
-      // text box carries its descender space below the baseline.
       alignItems: "baseline",
     },
     wordmarkClip: {
       overflow: "hidden",
-      // The clip opens from the left, so the wordmark writes itself out from
-      // behind the mark instead of sliding in as a block.
       alignItems: "flex-start",
       justifyContent: "center",
     },
-    // Inside the clip, so a closed clip contributes no width and the mark stays
-    // centred until the unfurl begins.
     wordmarkInset: {
       paddingLeft: LOCKUP_GAP,
     },

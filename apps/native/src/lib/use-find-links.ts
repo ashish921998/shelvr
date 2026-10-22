@@ -8,8 +8,6 @@ import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { usePaywallGuard } from "./entitlement";
 
-// `productsStatus` is optional: a card row has not loaded it yet, and the
-// server refuses a duplicate search anyway.
 type SearchableItem = Pick<DetailItem, "_id" | "status" | "productsStatus">;
 
 export function useFindLinks(item: SearchableItem | undefined) {
@@ -35,7 +33,6 @@ export function useFindLinks(item: SearchableItem | undefined) {
       if (await guard()) await search({ id: item._id });
     } catch (error) {
       if (isAiConsentRequired(error)) {
-        // Find links is an AI feature the user turned off; point at the switch.
         Alert.alert(t("products.findLinks"), t("aiConsent.findLinksOff"), [
           { text: t("common.cancel"), style: "cancel" },
           {

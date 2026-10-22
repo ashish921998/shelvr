@@ -77,9 +77,7 @@ describe("weekly nudge timing", () => {
 
   it("treats the launch that first sees an account as its first session", () => {
     expect(isFirstSession("user_a")).toBe(true);
-    // Same launch, asked again.
     expect(isFirstSession("user_a")).toBe(true);
-    // A later launch stored a different id first.
     store.set("shelvr.firstLaunch.user_b", "an-earlier-launch");
     expect(isFirstSession("user_b")).toBe(false);
   });

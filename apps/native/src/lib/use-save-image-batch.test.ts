@@ -1,16 +1,8 @@
-// Tests for the pure runImageBatch protocol. The React adapter
-// (useSaveImageBatch) and the React Native / expo-router modules it binds are
-// not exercised here: only the dependency-injected protocol, which is where
-// the operation-id-reusing retry and the paywall precedence live. Runs in the
-// Node default env.
 import { describe, expect, it, vi } from "vitest";
 import { runImageBatch, type ImageBatchDeps } from "./use-save-image-batch";
 import type { ImageSaveRequest, ImageSaveResult } from "./use-save-image";
 import { IMAGE_TOO_LARGE_MESSAGE } from "@convex/model/imagePolicy";
 
-// Stubbed at the module boundary so the module under test loads under Node
-// without a React Native runtime. `reportSaveFailures` has its own analytics
-// coverage in use-save-image.test.ts; here it only needs to be observable.
 const reportSaveFailures = vi.fn();
 vi.mock("./use-save-image", () => ({
   reportSaveFailures: (results: ImageSaveResult[]) =>
@@ -47,9 +39,6 @@ const failure = (
   ...overrides,
 });
 
-/** Builds deps plus the recorders a test asserts on. `batches` is the queue of
- * results `saveImages` returns, one entry per call, so a test can script a
- * first run that partly fails and a retry that succeeds. */
 function harness(batches: ImageSaveResult[][]) {
   const calls: ImageSaveRequest[][] = [];
   const alerts: AlertCall[] = [];
@@ -101,7 +90,6 @@ describe("runImageBatch", () => {
     ]);
     await runImageBatch(["a", "b", "c"].map(request), h.deps);
 
-    // The partial outcome is alerted, not swallowed.
     expect(h.alerts).toHaveLength(1);
     const retry = h.alerts[0].buttons[0];
     expect(retry.text).toBe("Retry failed");
@@ -109,9 +97,6 @@ describe("runImageBatch", () => {
     retry.onPress?.();
     await vi.waitFor(() => expect(h.calls).toHaveLength(2));
 
-    // The retry resubmits ONLY the two failures, each carrying the exact
-    // operation id its failed result reported. A fresh id here would start a
-    // second server operation per image instead of resuming the first.
     expect(h.calls[1]).toEqual([
       { image: { uri: "b" }, operationId: "image:op-b" },
       { image: { uri: "c" }, operationId: "image:op-c" },
@@ -120,11 +105,7 @@ describe("runImageBatch", () => {
       "image:op-b",
       "image:op-c",
     ]);
-    // The successful sibling is never resubmitted.
     expect(h.calls[1].some((r) => r.image.uri === "a")).toBe(false);
-    // The retry saving everything is what finally reports an all-saved batch,
-    // and it reports the whole batch: the sibling saved on the first attempt
-    // is not forgotten just because the retry never resubmitted it.
     expect(h.allSaved).toHaveLength(1);
     expect(h.allSaved[0].map((r) => r.operationId)).toEqual([
       "image:op-a",
@@ -149,7 +130,6 @@ describe("runImageBatch", () => {
 
     h.alerts[0].buttons[0].onPress?.();
     await vi.waitFor(() => expect(h.alerts).toHaveLength(2));
-    // Not "1 of 2": the second alert still speaks of the three images picked.
     expect(h.alerts[1].message).toContain("2 of 3 saved.");
     expect(h.calls[2 - 1]).toHaveLength(2);
 
@@ -170,8 +150,6 @@ describe("runImageBatch", () => {
     expect(h.alerts).toEqual([]);
     expect(h.onDismiss).not.toHaveBeenCalled();
     expect(h.openPaywall).not.toHaveBeenCalled();
-    // Busy stays set on the way out: the host screen closes rather than
-    // returning to an idle state.
     expect(h.busy).toEqual([true]);
   });
 
@@ -189,10 +167,7 @@ describe("runImageBatch", () => {
     await runImageBatch(["a", "b"].map(request), h.deps);
 
     expect(h.openPaywall).toHaveBeenCalledTimes(1);
-    // Presenting can wait on identity sync; the host must stay busy until it
-    // resolves so a second capture cannot start underneath the paywall.
     expect(busyWhilePresenting).toBe(true);
-    // Precedence: the partial-failure alert must not also appear.
     expect(h.alerts).toEqual([]);
     expect(h.allSaved).toEqual([]);
     expect(h.busy).toEqual([true, false]);
@@ -212,8 +187,6 @@ describe("runImageBatch", () => {
 
     expect(h.openPaywall).toHaveBeenCalledTimes(1);
     expect(h.alerts).toHaveLength(1);
-    // The alert is worded from the failure the user can act on here, and its
-    // retry carries both operation ids so a purchase resumes the refused one.
     expect(h.alerts[0].message).toContain("too large");
     h.alerts[0].buttons[0].onPress?.();
     await vi.waitFor(() => expect(h.calls).toHaveLength(2));
@@ -235,7 +208,6 @@ describe("runImageBatch", () => {
     expect(reportSaveFailures).toHaveBeenCalledTimes(1);
     expect(h.alerts[0].title).toBe("Could not save all images");
     expect(h.alerts[0].message).toContain("0 of 1 saved.");
-    // The dismissal button is the host's, not a retry.
     h.alerts[0].buttons[1].onPress?.();
     expect(h.onDismiss).toHaveBeenCalledTimes(1);
     expect(h.busy).toEqual([true, false]);

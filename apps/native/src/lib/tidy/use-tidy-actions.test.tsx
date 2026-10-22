@@ -49,8 +49,6 @@ beforeEach(() => {
 });
 
 describe("undo after a committed delete", () => {
-  // The deck re-inserts `currentIndex + 1` on every undo, so the hook may
-  // only hand back the card right above the top one, or nothing.
   it("offers nothing to undo when the kept card sits above a committed delete", async () => {
     const { result } = setup();
     act(() => result.current.onDecision(23, "keep"));
@@ -105,7 +103,6 @@ describe("undo after a committed delete", () => {
     act(() => {
       commit = result.current.commitDeletes();
     });
-    // The system dialog is open; the user swipes one more card away.
     act(() => result.current.onDecision(22, "delete"));
     expect(result.current.pendingDeleteCount).toBe(1);
     await act(async () => {
@@ -139,13 +136,11 @@ describe("undo after a committed delete", () => {
     act(() => {
       commit = result.current.commitDeletes();
     });
-    // The dialog is open and the queued delete gets undone underneath it.
     act(() => result.current.undo());
     await act(async () => {
       finishDelete();
       await commit;
     });
-    // Card 22 is gone either way, so the keep above it is not undoable.
     expect(result.current.canUndo).toBe(false);
     expect(result.current.undo()).toBeNull();
   });

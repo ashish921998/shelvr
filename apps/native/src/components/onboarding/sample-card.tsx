@@ -6,9 +6,6 @@ import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The ready-made sample cards onboarding shows: the first-save picker and the
-// share-sheet practice.
-
 const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Articles: require("../../../assets/onboarding/demo-article.jpg"),
   Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
@@ -35,8 +32,6 @@ export function sampleImage(sample: DemoSample): number {
     : INTEREST_IMAGES[sample.interest];
 }
 
-/** A large sample card. "save" saves it in one tap; "share" opens the real
- * share sheet over it, so the save goes through the Shelvr tile. */
 export function SampleCard({
   sample,
   action,

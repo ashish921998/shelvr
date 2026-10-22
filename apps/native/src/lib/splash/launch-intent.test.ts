@@ -13,7 +13,6 @@ beforeEach(() => {
 });
 
 describe("isDeepLink", () => {
-  // What `Linking.createURL("/")` returns for a production install.
   const ROOT = "shelvr:///";
 
   it.each([
@@ -47,7 +46,6 @@ describe("isDeepLink", () => {
   });
 
   it("does not confuse two installs' roots", () => {
-    // A dev build's root is not the production root, but neither is a link.
     expect(isDeepLink("app.shelvr.save.dev:///", "shelvr:///")).toBe(true);
   });
 

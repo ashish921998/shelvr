@@ -7,9 +7,6 @@ import { convexTest } from "convex-test";
 import schema from "../schema";
 import { effectiveStatus, type MembershipStatus } from "./memberships";
 
-// A minimal, typed spaceItems row. Built through a helper instead of `as any`
-// so the compiler keeps the fixture honest as the schema evolves. The required
-// fields mirror convex/schema.ts; only what effectiveStatus reads is needed.
 function row(status?: MembershipStatus) {
   return {
     _id: "ks_spaceItems_abc" as never,
@@ -33,10 +30,6 @@ describe("effectiveStatus", () => {
   });
 });
 
-// Convex smoke test: loads the schema and module map and performs a database
-// operation through the mocked backend with no live Convex deployment or
-// credentials required. Verifies the test harness, schema, and module map can
-// all resolve under @edge-runtime/vm.
 const modules = import.meta.glob("../**/*.ts");
 
 describe("convex-test harness", () => {

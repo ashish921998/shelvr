@@ -1,11 +1,5 @@
 import type { OracleMode } from "@/lib/oracle";
 
-/**
- * What a shared verdict carries: the mode, persona, tagline, spaces and
- * Someday score (absent from links made before it existed). The
- * per-item guesses stay out, because they describe what the sharer saved.
- * The share link holds this in `?c=`, so nothing is stored server side.
- */
 export type SharedVerdict = {
   mode: OracleMode;
   persona: string;
@@ -53,7 +47,6 @@ function fromBase64Url(code: string): string {
   return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
-/** Clips each field to its limit, so any model output fits in a link. */
 export function encodeSharedVerdict(verdict: SharedVerdict): string {
   const wire: Wire = {
     m: verdict.mode,
@@ -117,13 +110,10 @@ export function decodeSharedVerdict(code: string): SharedVerdict | undefined {
   };
 }
 
-/** The share page for one verdict, relative to the site origin. */
 export function sharedVerdictPath(verdict: SharedVerdict): string {
   return `/oracle/s?c=${encodeSharedVerdict(verdict)}`;
 }
 
-/** The verdict's card image. `story` is the 9:16 cut for saving and posting;
- * the default is the 1200×630 link preview. */
 export function sharedVerdictImagePath(code: string, format?: "story"): string {
   return `/oracle/og?c=${code}${format ? `&format=${format}` : ""}`;
 }

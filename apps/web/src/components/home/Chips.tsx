@@ -6,8 +6,6 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ReactNode } from "react";
 
-// Web recreations of the app's chips (apps/native/src/components).
-
 export function TagChip({
   label,
   emphasized = false,

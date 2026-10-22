@@ -56,7 +56,6 @@ const session = (
   ],
 });
 
-/** Runs events in order, collecting every effect. */
 function run(
   events: ShareEvent[],
   context: ShareContext = ctx(),
@@ -103,7 +102,6 @@ describe("incoming share owner", () => {
   });
 
   it("never completes a session a newer share has replaced", () => {
-    // s1 is saving when a newer share replaces the record with s2.
     const { state, effects } = run(
       [
         { type: "reconciled", result: { kind: "new", session: session("s1") } },
@@ -119,7 +117,6 @@ describe("incoming share owner", () => {
       ctx({ storedSessionId: "s2" }),
     );
     expect(types(effects[1])).toEqual(["save"]);
-    // s1's progress is persisted against s1 only and never drawn over s2.
     expect(effects[2]).toEqual([
       {
         type: "persistEntry",
@@ -127,10 +124,7 @@ describe("incoming share owner", () => {
         entry: session("s1", "saved").entries[0],
       },
     ]);
-    // s1's result touches only its own (already replaced) record: no native
-    // clear of s2's payloads, no navigation, no phase change.
     expect(effects[3]).toEqual([{ type: "markComplete", sessionId: "s1" }]);
-    // s2 still owns the record, so its completion tombstones the batch.
     expect(types(effects[4])).toEqual([
       "markComplete",
       "tombstone",
@@ -153,9 +147,7 @@ describe("incoming share owner", () => {
       ],
       ctx({ storedSessionId: "s1" }),
     );
-    // A second press while completing is a no-op.
     expect(effects[2]).toEqual([]);
-    // A throwing clear keeps the session and offers Try again.
     expect(effects[3]).toEqual([]);
     expect(types(effects[4])).toEqual([
       "markComplete",
@@ -327,10 +319,6 @@ describe("incoming share owner", () => {
   });
 
   it("skips the tombstone when the store already holds a newer record", () => {
-    // s2's record is written synchronously in the reconcile effect, but its
-    // result reaches the owner a microtask later. s1 completing in between
-    // (Continue on its partial screen) still matches recordId, so only the
-    // store check can catch it.
     const stale = run(
       [
         { type: "reconciled", result: { kind: "new", session: session("s1") } },

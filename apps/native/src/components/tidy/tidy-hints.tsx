@@ -16,22 +16,12 @@ import { motion } from "@/lib/motion";
 import { useCardAnimation } from "@/lib/tidy/card-animation";
 import { swipeProgress } from "@/lib/tidy/swipe-decision";
 
-// Direction hint overlay, adapted from the Slack Catch Up recreation's
-// color-background + mark-view: a solid tint per swipe direction plus a badge
-// whose circular arc fills as the drag approaches the commit threshold.
-
 const BADGE_SIZE = 60;
 const STROKE_WIDTH = 3;
 const ICON_SIZE = 24;
 
 type Direction = "keep" | "delete" | "save";
 
-/**
- * Fraction of the commit threshold the dominant axis has covered toward this
- * direction, 0 at rest, 1 at commit. A direction's cue fills only when that
- * direction is the one the release would act on: a diagonal lights one
- * badge instead of two, and a downward-dominant drag lights none.
- */
 function useDirectionProgress(direction: Direction) {
   const { panX, panY, panDistanceX, panDistanceY } = useCardAnimation();
 
@@ -82,7 +72,6 @@ const Badge: FC<BadgeProps> = ({ direction, label, icon, accentColor }) => {
     opacity: interpolate(progress.get(), [0, 1], [0, 1], Extrapolation.CLAMP),
   }));
 
-  // Small buffer so the fill flips as the arc looks visually complete.
   const buffer = STROKE_WIDTH / 2 / BADGE_SIZE;
 
   const rCircleStyle = useAnimatedStyle(() => ({
@@ -188,7 +177,6 @@ const styles = StyleSheet.create((theme) => ({
     ...StyleSheet.absoluteFillObject,
   },
   topRow: {
-    // The swipe recognizer uses physical X coordinates in both layout directions.
     direction: "ltr",
     position: "absolute",
     top: theme.gap(3),

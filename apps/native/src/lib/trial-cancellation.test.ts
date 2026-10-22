@@ -5,7 +5,6 @@ import {
   readFreshTrialCancellation,
 } from "./trial-cancellation";
 
-/** EntitlementInfo slices shaped like a RevenueCat CustomerInfo response. */
 const entitlement = (
   overrides: Partial<{ periodType: string; willRenew: boolean }> = {},
 ) => ({
@@ -69,7 +68,6 @@ describe("classifyTrialCancellation", () => {
   });
 
   it("ignores non-trial entitlements when a trial is also present", () => {
-    // Multiple active entitlements are possible; the trial decides.
     expect(
       classifyTrialCancellation([
         entitlement({ periodType: "NORMAL", willRenew: false }),

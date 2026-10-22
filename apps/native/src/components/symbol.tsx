@@ -6,16 +6,7 @@ import {
 } from "expo-symbols";
 import { I18nManager, Platform } from "react-native";
 
-/**
- * Maps SF Symbol names used throughout the app to their Material Symbols
- * equivalents. On Android, expo-symbols renders Material Symbols via a
- * font, and requires the name to be passed as { android: 'name' }.
- *
- * Any SF Symbol not in this map will fall back to 'circle' on Android
- * (a neutral placeholder) rather than rendering nothing.
- */
 const SF_TO_MATERIAL = {
-  // Generic UI
   xmark: "close",
   checkmark: "check",
   plus: "add",
@@ -25,12 +16,10 @@ const SF_TO_MATERIAL = {
   "exclamationmark.triangle.fill": "warning",
   "exclamationmark.circle": "error",
   "info.circle": "info",
-  // People / communication
   "person.fill": "person",
   envelope: "mail",
   message: "chat",
   phone: "call",
-  // Content / media
   camera: "photo_camera",
   "photo.on.rectangle": "add_photo_alternate",
   "photo.on.rectangle.angled": "add_photo_alternate",
@@ -51,22 +40,18 @@ const SF_TO_MATERIAL = {
   "arrow.left.arrow.right": "swap_horiz",
   minus: "remove",
   magnifyingglass: "search",
-  // Commerce
   bag: "shopping_bag",
   "square.and.arrow.up": "ios_share",
-  // Creation
   "square.and.pencil": "edit_note",
   sparkles: "auto_awesome",
   trash: "delete",
   "doc.on.doc": "content_copy",
   calendar: "calendar_month",
   "arrow.up.right.square": "open_in_new",
-  // Navigation
   "chevron.left": "arrow_back",
   "chevron.right": "arrow_forward",
   "chevron.up": "expand_less",
   "arrow.uturn.backward": "undo",
-  // Tabs / system
   "house.fill": "home",
   gearshape: "settings",
   "gearshape.fill": "settings",
@@ -96,14 +81,7 @@ const SF_TO_MATERIAL = {
 
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;
 
-/**
- * Resolves an SF Symbol name to the cross-platform format that
- * expo-symbols SymbolView expects.
- *
- * On iOS, the original SF Symbol name is used.
- * On Android and web, the mapped Material Symbols name (or 'circle' fallback).
- * expo-symbols reads the `web` key in browsers, so omitting it renders nothing.
- */
+// expo-symbols reads the `web` key in browsers, so omitting it renders nothing.
 function resolveSymbolName(sfName: AppSymbolName): SymbolViewProps["name"] {
   if (Platform.OS === "ios") {
     return sfName;
@@ -112,10 +90,6 @@ function resolveSymbolName(sfName: AppSymbolName): SymbolViewProps["name"] {
   return { android: material, web: material } as const;
 }
 
-/**
- * A drop-in replacement for SymbolView that works on both platforms.
- * Pass any supported SF Symbol name; on Android it renders the Material equivalent.
- */
 export function AppSymbolIcon({
   name,
   size = 24,

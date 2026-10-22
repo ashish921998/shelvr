@@ -1,8 +1,6 @@
 type NoteDraft = { title: string; text: string };
 export type NoteEdit = Partial<NoteDraft>;
 
-/** Serializes edits and retains failed fields until another flush. A newer
- * field value always wins over the value in a failed request. */
 export function createNoteSaveQueue(
   write: (edit: NoteEdit) => Promise<void>,
   onError: (error: unknown) => Promise<void>,

@@ -110,8 +110,6 @@ describe("onboarding recovery", () => {
       source: "direct",
     });
     setOnboardingProgress({ saveKinds: [], spaces: [], step: 3 });
-    // finish(): nothing for the replay hook to do, and no stale save left in
-    // SecureStore that a later mount could replay.
     setPendingSpaces([]);
     expect(getOnboardingProgress().demo).toBeNull();
     expect(hasPending()).toBe(false);

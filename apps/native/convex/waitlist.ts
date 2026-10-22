@@ -51,11 +51,7 @@ const resendStatusValidator = v.union(
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_RETRY_SCAN = 100;
-/** Provider-side requests identify this surface so Resend metrics can split
- * waitlist syncs from feedback sends. */
 const RESEND_USER_AGENT = "Shelvr-Waitlist/1.0";
-// A row that fails this many Resend syncs stays `failed` for manual
-// inspection instead of occupying the retry cron window forever.
 export const RESEND_MAX_ATTEMPTS = 10;
 
 function normalizeEmail(value: string): string {
@@ -96,8 +92,6 @@ export const upsertSignup = internalMutation({
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "waitlistJoinGlobal", { throws: true });
     await rateLimiter.limit(ctx, "waitlistJoinIp", {
-      // Normalized here as well as at the HTTP edge, so a caller that hands
-      // in a raw header value cannot mint a bucket per malformed string.
       key: ipKey(args.ip),
       throws: true,
     });
@@ -115,8 +109,6 @@ export const upsertSignup = internalMutation({
       .unique();
 
     if (existing) {
-      // Keep the original consent trail. A later submit may update the last
-      // seen source, but it must not rewrite what the person first agreed to.
       await ctx.db.patch(existing._id, {
         source: args.source,
         lastSubmittedAt: now,
@@ -172,14 +164,10 @@ export const updateResendStatus = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       resendStatus: args.status,
-      // A missing contactId must not erase one captured earlier (create can
-      // succeed and a later segment/topic call still fail).
       ...(args.contactId === undefined
         ? {}
         : { resendContactId: args.contactId }),
       ...(args.attempts === undefined ? {} : { resendAttempts: args.attempts }),
-      // Same for the error: the unconfigured path has nothing new to record
-      // and must keep the last real failure visible.
       ...(args.preserveError
         ? {}
         : {
@@ -212,8 +200,6 @@ export const listSignupsNeedingResendSync = internalQuery({
       resendAttempts: number;
     }[] = [];
     for (const status of statuses) {
-      // The compound index drops attempt-capped rows outright so they cannot
-      // fill the retry window and starve newer, still-retryable rows.
       const page = await ctx.db
         .query("waitlistSignups")
         .withIndex("by_confirmed_and_resendStatus_and_resendAttempts", (q) =>
@@ -325,9 +311,6 @@ async function persistResendSync(
   const missingAndroidSegment =
     product === "shelvr-android" && !env.RESEND_ANDROID_SEGMENT_ID;
   if (!apiKey || missingAndroidSegment) {
-    // Missing provider configuration is an operator condition, not a row
-    // failure: keep the last real error and do not spend an attempt. Android
-    // rows must not be marked synced until they are in their launch segment.
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id,
       status: "unconfigured",
@@ -345,8 +328,6 @@ async function persistResendSync(
     });
     return true;
   } catch (error) {
-    // Log and persist only the shape of the failure. The provider message (and
-    // the email it can echo) stays out of both the database and the logs.
     const { category, status } = classifyResendError(
       error,
       "invalid_recipient",
@@ -369,10 +350,6 @@ async function persistResendSync(
   }
 }
 
-/**
- * Thrown by `joinWaitlist` for caller mistakes (bad email) so the HTTP layer
- * can answer 400 instead of 5xx.
- */
 export class WaitlistInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -393,13 +370,6 @@ type JoinWaitlistResult = {
   emailProviderSynced: boolean;
 };
 
-/**
- * Persist a waitlist signup and project it to Resend. This is deliberately a
- * plain helper, not a public `action`: the only legitimate caller is the
- * `/waitlist/join` HTTP action in `http.ts`, which authenticates the web
- * server with a shared secret and supplies the real client IP. A public action
- * would let anyone omit or forge `ip` and skip the per-IP limiter.
- */
 export async function joinWaitlist(
   ctx: ActionCtx,
   args: JoinWaitlistArgs,
@@ -424,7 +394,6 @@ export async function joinWaitlist(
     id: signup.id,
   });
   if (row?.confirmedAt !== undefined || signup.resendStatus === "synced") {
-    // Public resubmits never change existing provider preferences.
     return {
       saved: true,
       emailProviderSynced: signup.resendStatus === "synced",

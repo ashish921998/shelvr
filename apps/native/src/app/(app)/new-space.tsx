@@ -42,16 +42,11 @@ const SUBMIT_CONTENT_EXIT = FadeOut.duration(motion.duration.exit).easing(
   motion.easing.out,
 );
 
-// One form, two jobs: `/new-space` creates, `/new-space?id=…` edits. The form
-// is keyed by the loaded space so its `useState` initializers seed once from
-// the server value and a cached query refresh never overwrites in-flight edits.
 export default function NewSpaceScreen() {
   useAppLocale();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = id !== undefined;
 
-  // 'skip' (not `enabled`) keeps create mode from subscribing with an empty
-  // id. See item/[id].tsx for why `enabled` is not enough here.
   const {
     data: space,
     isLoading,
@@ -63,15 +58,10 @@ export default function NewSpaceScreen() {
     ),
   );
 
-  // Edit mode waits for the space to arrive; create mode renders immediately.
   if (editing && isLoading) {
     return <ScreenLoader label={t("loading.space")} />;
   }
 
-  // The space is gone, inaccessible, or the link is stale. This guard is the
-  // invariant the form below relies on: `mode: 'edit'` may only mount with a
-  // real space, so it can never fall through to `createSpace`. Without it, a
-  // settled null/error query would render the create form on the edit route.
   if (editing && (isError || space === null)) {
     return (
       <View style={styles.loading}>
@@ -88,9 +78,6 @@ export default function NewSpaceScreen() {
 
 type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic" | "autoFile">;
 
-// A discriminated union makes the two modes impossible to confuse: in edit
-// mode `space` is guaranteed present, so `save` switches on `mode` and the
-// create branch is structurally unreachable from edit mode.
 type SpaceFormProps = { mode: "create" } | { mode: "edit"; space: Space };
 
 function SpaceForm(props: SpaceFormProps) {
@@ -101,23 +88,14 @@ function SpaceForm(props: SpaceFormProps) {
   const reducedMotion = useReducedMotion();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
-  // Creating a space and enabling dynamic are Pro: route to the paywall if
-  // not entitled. Editing a name or turning dynamic off stays open to lapsed
-  // users (managing existing data).
   const { guard } = usePaywallGuard("new_space");
 
-  // Seeded once per (keyed) mount: a fresh create starts dynamic on; an edit
-  // starts from the loaded space. A query refresh remounts via key only if the
-  // id changes, so user typing is never overwritten.
   const [name, setName] = useState(
     props.mode === "edit" ? props.space.name : "",
   );
-  // Dynamic is the marquee behavior: on by default for a new space; an edit
-  // mirrors the server, treating a legacy status-less space as off.
   const [dynamic, setDynamic] = useState(
     props.mode === "edit" ? (props.space.dynamic ?? false) : true,
   );
-  // Auto-file only matters while dynamic is on; off by default.
   const [autoFile, setAutoFile] = useState(
     props.mode === "edit" ? (props.space.autoFile ?? false) : false,
   );
@@ -126,8 +104,6 @@ function SpaceForm(props: SpaceFormProps) {
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed || saving) return;
-    // Creating any space is Pro; editing is Pro only when turning dynamic or
-    // auto-file on.
     const needsPro =
       props.mode === "create" ||
       (props.mode === "edit" &&

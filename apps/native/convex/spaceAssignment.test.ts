@@ -8,19 +8,10 @@ import type { DataModel, Id } from "./_generated/dataModel";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-// Mirrors spaces.test.ts's helper: an authenticated, Pro-entitled test user.
 async function entitledUser(): Promise<TestCtx> {
   return (await signedInUser(newConvexTest(), { pro: true })).t;
 }
 
-/**
- * Regression: explicit space assignment must survive the async classification
- * pipeline ("upload completed but was not assigned to selected space"). The
- * create transaction writes a `saved` row; the pipeline may only add
- * `suggested` rows into DYNAMIC spaces. The client half of the original bug
- * (onboarding replay creating spaces without `dynamic: true`) lives in
- * lib/replay-onboarding.ts; the last test pins the server default it relies on.
- */
 describe("explicit space assignment vs classification", () => {
   it("keeps the user's saved assignment when classification suggests other spaces", async () => {
     const t = await entitledUser();
@@ -33,7 +24,6 @@ describe("explicit space assignment vs classification", () => {
       spaceId: dynamicSpace,
     });
 
-    // Classification suggests a different dynamic space entirely.
     const otherSpace = await t.mutation(api.spaces.createSpace, {
       name: "Travel",
       dynamic: true,
@@ -49,9 +39,7 @@ describe("explicit space assignment vs classification", () => {
         .withIndex("by_item", (q) => q.eq("itemId", itemId))
         .collect();
       const bySpace = new Map(joins.map((j) => [j.spaceId, j.status]));
-      // The explicit assignment is untouched, never downgraded to suggested.
       expect(bySpace.get(dynamicSpace)).toBe("saved");
-      // The AI's pick landed as a suggestion only.
       expect(bySpace.get(otherSpace)).toBe("suggested");
     });
   });
@@ -67,7 +55,6 @@ describe("explicit space assignment vs classification", () => {
       spaceId: space,
     });
 
-    // The classifier names the same space the user already filed it into.
     await t.mutation(internal.items.setSpacesForItem, {
       itemId,
       spaceIds: [space],
@@ -85,7 +72,6 @@ describe("explicit space assignment vs classification", () => {
 
   it("only suggests into dynamic spaces — quiet spaces never hear from the pipeline", async () => {
     const t = await entitledUser();
-    // No `dynamic` → server default false (the onboarding-replay trap).
     const quietSpace = await t.mutation(api.spaces.createSpace, {
       name: "Quiet shelf",
     });
@@ -125,12 +111,6 @@ describe("explicit space assignment vs classification", () => {
   });
 });
 
-/**
- * Auto-file: the one opt-in under which the pipeline writes `saved`. The
- * space owner's standing choice stands in for the per-item accept, so the
- * user-owned invariants still hold: only dynamic spaces, never over a
- * dismissal, and never for a lapsed account turning it on.
- */
 describe("auto-file spaces", () => {
   async function joinStatuses(t: TestCtx, itemId: Id<"items">) {
     const joins = await t.run(
@@ -208,7 +188,6 @@ describe("auto-file spaces", () => {
       spaceId: space,
     });
 
-    // A retry or refresh classifies it into the same space again.
     await t.mutation(internal.items.setSpacesForItem, {
       itemId,
       spaceIds: [space],
@@ -218,7 +197,6 @@ describe("auto-file spaces", () => {
   });
 
   it("leaves saves made before auto-file was turned on as suggestions", async () => {
-    // Pin the clock so the older save is strictly older than the switch.
     vi.useFakeTimers({ now: 1_000_000 });
     const t = await entitledUser();
     const space = await t.mutation(api.spaces.createSpace, {
@@ -235,7 +213,6 @@ describe("auto-file spaces", () => {
       url: "https://example.com/new-recipe",
     });
 
-    // A retry of the older save classifies it after the switch.
     for (const itemId of [olderItem, newerItem]) {
       await t.mutation(internal.items.setSpacesForItem, {
         itemId,
@@ -256,7 +233,6 @@ describe("auto-file spaces", () => {
       autoFile: true,
     });
 
-    // An older build only knows `dynamic`.
     await t.mutation(api.spaces.updateSpace, { id: space, dynamic: false });
     await t.mutation(api.spaces.updateSpace, { id: space, dynamic: true });
 

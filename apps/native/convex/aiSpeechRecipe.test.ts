@@ -26,8 +26,6 @@ const SPOKEN = {
 
 const fetchMock = vi.fn();
 
-/** A TikTok whose oEmbed caption names the dish and nothing more. Every other
- * page fetch fails. */
 function serveTikTok() {
   safeFetch.mockImplementation(async (url: string) =>
     url.startsWith("https://www.tiktok.com/oembed?")
@@ -48,7 +46,6 @@ function serveTikTok() {
   );
 }
 
-/** The classification, then (if asked) the recipe read from speech. */
 function model(cookingVideo: boolean, spoken: typeof SPOKEN | null = SPOKEN) {
   generateObject.mockImplementation(async (call: { prompt?: string }) =>
     call.prompt?.startsWith("This is a short cooking video")

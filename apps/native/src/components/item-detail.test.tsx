@@ -64,8 +64,6 @@ vi.mock("@convex/_generated/api", () => ({
 vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (query: string, args: unknown) => ({ queryKey: [query, args] }),
 }));
-// By default getItem has failed, so the page paints the row it was handed at
-// once; `loading` holds it in flight instead.
 const fullRow = vi.hoisted(() => ({ loading: false }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: undefined, isError: !fullRow.loading }),
@@ -136,7 +134,6 @@ const video = {
   title: "Never Gonna Give You Up",
   url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   siteName: "YouTube",
-  // The client only gets Shelvr's stored copy of YouTube's 4:3 thumbnail.
   imageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
   heroImageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
   aspectRatio: 4 / 3,
@@ -174,7 +171,6 @@ describe("a plain link's page", () => {
     renderPage(product, true);
     expect(screen.getByText("I")).toBeTruthy();
     expect(screen.getByText("ikea.com")).toBeTruthy();
-    // The card's zoom lands on the panel, as it would on a photo.
     expect(Link.AppleZoomTarget).toHaveBeenCalled();
   });
 
@@ -218,7 +214,6 @@ describe("a plain link's page", () => {
     expect(
       screen.getByRole("button", { name: "item.watchOnSite:YouTube" }),
     ).toBeTruthy();
-    // The photo is the hero, so there is no letter panel.
     expect(screen.queryByText("Y")).toBeNull();
   });
 

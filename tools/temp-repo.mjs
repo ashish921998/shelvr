@@ -9,16 +9,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-/**
- * A throwaway repository for a test.
- *
- * Git exports GIT_DIR and its siblings to every hook, and they outrank
- * `git -C`. A test run from a hook would then init, configure and commit in the
- * real repository: one such run left core.bare=true and a fake identity in the
- * config every worktree shares. They are cleared from this process, not just
- * from the helper's own calls, because the code under test runs git with the
- * ambient environment too.
- */
+// Hooks export GIT_DIR and its siblings, which outrank `git -C`: cleared from
+// process.env so neither this helper nor the code under test reaches the real repo.
 export function createRepo(prefix) {
   const hookVariables = execFileSync("git", ["rev-parse", "--local-env-vars"], {
     encoding: "utf8",

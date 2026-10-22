@@ -11,8 +11,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const victim = createRepo("temp-repo-victim-");
 after(() => victim.remove());
 
-// What a hook does to its children. The victim stands in for the real
-// repository, so the failure this guards against hits a scratch directory.
 test("GIT_DIR from a hook cannot redirect the temp repository", () => {
   const helper = new URL("./temp-repo.mjs", import.meta.url).href;
   const script = `

@@ -8,21 +8,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { analytics } from "@/lib/analytics";
 
-// The "Open this next" card on Home: one save worth going back to, picked on
-// the server (the newest save of any kind not opened yet, or a recipe not
-// looked at lately). It stays until the person opens it or says not now.
-
 const HOUR_MS = 60 * 60 * 1000;
 
-/** The clock sent to the query, floored to the hour so the query's cache and
- * subscription hold between renders. The rules count in days. */
 export function hourFloor(now: number): number {
   return now - (now % HOUR_MS);
 }
 
-// Keyed per account, like the other Home prompts.
 const dismissedKey = (userId: string) => `shelvr.nextUpDismissed.${userId}`;
-const DISMISSED_LIMIT = 50; // NEXT_UP_SKIP_MAX on the server
+const DISMISSED_LIMIT = 50;
 
 function readDismissedNextUp(userId: string): Id<"items">[] {
   const raw = SecureStore.getItem(dismissedKey(userId));
@@ -46,7 +39,6 @@ function writeDismissedNextUp(userId: string, itemId: Id<"items">): void {
       JSON.stringify(dismissed.slice(-DISMISSED_LIMIT)),
     );
   } catch (error) {
-    // useNextUp still skips it while Home is mounted.
     analytics.captureError("next_up_dismiss_store_failed", error);
   }
 }
@@ -59,8 +51,6 @@ function writeDismissedNextUp(userId: string, itemId: Id<"items">): void {
 export function useNextUp(userId: string | undefined, enabled: boolean) {
   const [now, setNow] = useState(() => hourFloor(Date.now()));
   const refreshNow = useCallback(() => setNow(hourFloor(Date.now())), []);
-  // Home gaining focus, and the app returning to the foreground: Home can sit
-  // in the background overnight without ever losing focus.
   useFocusEffect(refreshNow);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -68,8 +58,6 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
     });
     return () => subscription.remove();
   }, [refreshNow]);
-  // Dismissed while Home is mounted, kept here too in case the store write
-  // failed.
   const [dismissedNow, setDismissedNow] = useState<{
     userId: string;
     ids: Id<"items">[];
@@ -82,8 +70,6 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
     const added = session.filter((id) => !stored.includes(id));
     return [...stored, ...added].slice(-DISMISSED_LIMIT);
   }, [userId, dismissedNow]);
-  // gcTime ends an old subscription soon after the hour or the skip list
-  // moves on, instead of keeping each one alive for the default day.
   const { data } = useQuery({
     ...convexQuery(
       api.items.nextUp,
@@ -91,12 +77,8 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
     ),
     gcTime: 30_000,
   });
-  // The previous answer can still name the save just dismissed until the
-  // new one arrives.
   const next = data && userId && !skip.includes(data.item._id) ? data : null;
 
-  // Reported by the card as it renders, not here: another Home card can hold
-  // the slot while this save is picked. Once per save per Home mount.
   const shownRef = useRef<string | null>(null);
   const nextId = next?.item._id;
   const kind = next?.kind;

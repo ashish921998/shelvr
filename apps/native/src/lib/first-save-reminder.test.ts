@@ -25,7 +25,6 @@ vi.mock("@/lib/i18n", () => ({
 
 beforeEach(() => vi.clearAllMocks());
 
-// 2026-10-05 is a Monday; months are zero-based.
 const at = (day: number, hour: number, minute = 0) =>
   new Date(2026, 9, day, hour, minute);
 
@@ -82,7 +81,6 @@ describe("reminderOptions", () => {
         const weekend = reminderOptions(at(day, hour)).find(
           (o) => o.slot === "weekend",
         );
-        // Never a Saturday or Sunday more than six days out.
         if (weekend)
           expect(weekend.at.getTime() - at(day, hour).getTime()).toBeLessThan(
             6 * 24 * 60 * 60 * 1000,
@@ -143,7 +141,6 @@ describe("first-save reminder ticket", () => {
     await remind(ticket);
     await clearing;
     expect(notifications.schedule).toHaveBeenCalledTimes(1);
-    // The clear waits for the schedule in flight, then cancels after it.
     expect(notifications.cancel).toHaveBeenCalledTimes(2);
     expect(notifications.cancel.mock.invocationCallOrder[1]).toBeGreaterThan(
       notifications.schedule.mock.invocationCallOrder[0],
@@ -176,8 +173,6 @@ describe("first-save reminder ticket", () => {
     await vi.waitFor(() => expect(notifications.schedule).toHaveBeenCalled());
     releaseFirst();
     await Promise.all([first, clearing, second]);
-    // A, then the clear's cancel, then B's replace-cancel and B: nothing
-    // cancels after B, so the newer reminder stays scheduled.
     expect(events.at(-1)).toBe("B");
     expect(events.indexOf("A")).toBeLessThan(events.indexOf("B"));
   });

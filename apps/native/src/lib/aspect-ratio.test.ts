@@ -20,7 +20,6 @@ describe("clampRatio", () => {
 
 describe("letterboxedVideoRatio", () => {
   const video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-  // oEmbed's hqdefault is 480×360.
   const stock = 480 / 360;
 
   it("crops a YouTube video's 4:3 stock thumbnail to the video's 16:9", () => {

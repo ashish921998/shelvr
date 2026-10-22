@@ -74,8 +74,6 @@ test("narrowing an argument validator is a change", () => {
   assert.equal(isBreaking(diff), true);
 });
 
-// The reason this tool exists. listItems' own text is untouched; the shape it
-// promises moved in another file, and reading the diff would not say so.
 test("a validator that moved in another file changes every caller's contract", () => {
   const head = tree({
     items,
@@ -173,8 +171,6 @@ test("an unchanged tree says so", () => {
   );
 });
 
-// A module may hand a validator on without declaring it. The walk has to keep
-// going or the contract it describes is invisible.
 test("a validator reached through a re-export is part of the contract", () => {
   const leaf = (extra) => `
 import { v } from "convex/values";
@@ -202,7 +198,6 @@ export const listTags = query({
   assert.equal(isBreaking(diff), true);
 });
 
-// Unexporting is how a function leaves the API without its body being touched.
 test("withdrawing an export is a removal", () => {
   const head = tree({
     "model/items": shared,
@@ -233,8 +228,6 @@ export { pinItem };
   assert.deepEqual(diff.removed, []);
 });
 
-// An installed app calls a query over one transport and a mutation over
-// another, so the kind is as much a contract as the validators are.
 test("changing a query to a mutation is a change", () => {
   const head = tree({
     "model/items": shared,
@@ -290,8 +283,6 @@ export { pinItem as favouriteItem };
   assert.deepEqual(diff.added, ["items:favouriteItem"]);
 });
 
-// Whitespace between tokens is formatting. Whitespace inside a string is the
-// value, and the two must not be collapsed together.
 test("whitespace inside a literal is part of the contract", () => {
   const withStatus = (status) => `
 import { v } from "convex/values";
@@ -310,8 +301,6 @@ export const listStates = query({
   assert.deepEqual(diff.changed, ["api:listStates"]);
 });
 
-// Convex Auth hands back its endpoints from a factory call, so no registrar
-// names them and nothing above sees them.
 const authModule = (names) => `
 import { convexAuth } from "@convex-dev/auth/server";
 
@@ -343,7 +332,6 @@ const { signIn } = convexAuth({ providers: [] });
   assert.deepEqual([...signatures(tree({ auth: source })).keys()], []);
 });
 
-// The word at the call site is a local binding, not the registrar.
 const registrarModule = (importLine, callee) => `
 import { v } from "convex/values";
 import { ${importLine} } from "./_generated/server";
@@ -386,8 +374,6 @@ export const listTags = query({ ...contract, handler: async () => null });
   assert.deepEqual(diff.changed, ["api:listTags"]);
 });
 
-// Which commits get compared is decided by git, so these run the script
-// against a real repository where main has moved on without the branches.
 const checkScript = fileURLToPath(
   new URL("./verify-convex-api.mjs", import.meta.url),
 );

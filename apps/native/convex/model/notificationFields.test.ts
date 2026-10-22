@@ -65,8 +65,6 @@ describe("digest copy", () => {
     );
   });
 
-  // A title is user content. String replacement would expand `$&` and its
-  // siblings into the surrounding copy.
   it("inserts a title containing replacement patterns literally", () => {
     expect(digestCopy("en", 1, "$& and $` and $'").body).toBe(
       "“$& and $` and $'”, saved this week",

@@ -18,9 +18,6 @@ const WIDGET_URL =
   "https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=643944446743403202";
 const SOURCE_URL = "https://neutraleating.com/chicken-recipes/";
 
-// The fields a probe of this pin's widget answer returned on 2026-09-28. It is
-// a video pin: the probe found a V_HLSV4 video (1000x1500) in its video list
-// while is_video read false, as it did on every video pin probed.
 const videoPin = {
   id: "643944446743403202",
   description:
@@ -73,11 +70,9 @@ function html(url: string, body: string) {
 const PIN_PAGE =
   '<html><head><meta property="og:title" content="Chicken | recipes"><meta property="og:image" content="https://i.pinimg.com/736x/7a/11/ce/x.jpg"><meta property="og:image:width" content="736"><meta property="og:image:height" content="1104"></head><body></body></html>';
 
-/** A pin page with no image or text. */
 const EMPTY_PIN_PAGE =
   '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>';
 
-/** Serves `routes` by exact URL; every other fetch fails. */
 function serve(routes: Record<string, unknown>) {
   safeFetch.mockImplementation(
     async (url: string) =>
@@ -477,8 +472,6 @@ describe("readPage for Pinterest pins", () => {
     });
     const read = await readPage(shortUrl);
     expect(read.status === "ok" && read.page.siteName).toBe("Pinterest");
-    // The page cap, not a smaller one: draining a pin page past a 64 KiB cap
-    // stalled to the deadline on live Pinterest.
     expect(safeFetch).toHaveBeenCalledWith(
       shortUrl,
       expect.objectContaining({ maxRedirects: 5, maxBytes: 1024 * 1024 }),
@@ -502,7 +495,6 @@ describe("readPage for Pinterest pins", () => {
   it("marks the page read incomplete when the widget fails transiently", async () => {
     serve({
       [WIDGET_URL]: { ok: false, code: "http_error", status: 503 },
-      // Even an empty page is kept: the widget may answer on a retry.
       [PIN_URL]: html(PIN_URL, EMPTY_PIN_PAGE),
     });
     const read = await readPage(PIN_URL);
@@ -579,12 +571,9 @@ describe("readPage for Pinterest pins", () => {
   });
 });
 
-/** Instagram's crawler login shell: no card for any post. */
 const INSTAGRAM_SHELL =
   '<html><head><title>Instagram</title><meta property="og:title" content="Instagram" /></head><body></body></html>';
 
-// Probed 2026-10-02: a removed or made-up post's captioned embed answers 200
-// with this box in place of the media and caption.
 const BROKEN_EMBED =
   '<div class="_aa4c"><div class="EmbedBrokenMedia"><p>This post may be broken, or the post may have been removed.</p></div></div>';
 
@@ -614,7 +603,6 @@ describe("readPage for Instagram posts", () => {
       const result = await readPage(url);
       expect(result).toMatchObject({ status: "ok", askForRecipe: eligible });
       if (result.status === "ok") {
-        // An empty caption leaves no content to mark as a caption.
         expect(result.page.caption).toBe(caption === "" ? undefined : true);
         expect(result.page.recipe).toBeUndefined();
       }
@@ -644,7 +632,6 @@ describe("readPage for Instagram posts", () => {
   it.each([
     ["the page", true, false, BROKEN_EMBED],
     ["the embed", false, true, BROKEN_EMBED],
-    // A cut embed can end before its broken-media box ever arrives.
     ["the embed, before its broken-media box,", false, true, "<html><body>"],
   ])(
     "keeps a post retryable, not gone, when %s was cut short",
@@ -661,7 +648,6 @@ describe("readPage for Instagram posts", () => {
         status: "ok",
         page: { truncated: true, incomplete: true },
       });
-      // Incomplete, so the save offers a retry instead of a blank ready item.
       expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
         "partial",
       );
@@ -753,7 +739,6 @@ describe("readPage for YouTube videos", () => {
         heroAspectRatio: 480 / 360,
       },
     });
-    // The bot-gated watch page is never loaded.
     expect(safeFetch).toHaveBeenCalledTimes(1);
   });
 

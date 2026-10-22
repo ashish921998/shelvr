@@ -3,9 +3,6 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The app owns the kind → icon mapping so the model can never emit an invalid
-// SF Symbol. `sparkles` is a forward-compat fallback for a kind a newer backend
-// might add before this build knows about it.
 const ICONS: Record<IntentKind, AppSymbolName> = {
   open_url: "arrow.up.right.square",
   copy: "doc.on.doc",
@@ -33,7 +30,6 @@ export function IntentChip({
       accessibilityRole="button"
       style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
       onPress={onPress}
-      // The pill stays compact; the slop brings the touch target to 48.
       hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
     >
       <AppSymbolIcon
@@ -62,7 +58,6 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.7,
   },
   label: {
-    // Lets the label truncate when its container is narrower than the chip.
     flexShrink: 1,
     minWidth: 0,
     fontFamily: theme.fonts.medium,

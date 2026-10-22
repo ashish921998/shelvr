@@ -7,10 +7,6 @@ import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// A static two-column masonry for the similar-items strip. The parent page
-// already scrolls, so a nested virtualized list would be invalid. Keeping this
-// component outside item-detail also prevents a runtime import cycle with the
-// article-reader render path.
 export function SimilarGrid({ items }: { items: DetailItem[] }) {
   const columns: [DetailItem[], DetailItem[]] = [[], []];
   const heights = [0, 0];
@@ -35,9 +31,6 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
   );
 }
 
-/** A card's picture shape, bounded so one extreme picture can't take over
- * its column. A letterboxed video thumbnail takes its video's shape, so the
- * cover fit crops the black bars away. */
 function similarRatio(item: DetailItem): number {
   return (
     letterboxedVideoRatio(item.url, item.aspectRatio) ??
@@ -56,8 +49,6 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
     (item.url ? displayHost(item.url) : t("item.untitledItem"));
 
   return (
-    // No `Link asChild`: its Slot drops a Pressable style function, which
-    // cost this card its clipping and press feedback (see save-recall-card).
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={title}

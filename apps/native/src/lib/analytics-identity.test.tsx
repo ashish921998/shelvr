@@ -188,13 +188,11 @@ describe("useAnalyticsIdentity", () => {
   it("clears the Home Screen widget and records the boundary when signed out", async () => {
     renderHook(() => useAnalyticsIdentity());
     expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
-    // The capture waits for the async clear to resolve.
     await act(async () => {});
     expect(mock.capture).toHaveBeenCalledWith("widget_cleared");
   });
 
   it("does not record the boundary when there is no widget to clear", async () => {
-    // A non-iOS or old client clears nothing, so the boundary is not recorded.
     mock.clearRecentSavesWidget.mockResolvedValueOnce(false);
     renderHook(() => useAnalyticsIdentity());
     await act(async () => {});
@@ -227,10 +225,6 @@ describe("useAnalyticsIdentity", () => {
   });
 
   it("resets through the conditional path when signing out before the user query resolved", () => {
-    // The one case where the retired unconditional reset diverged: nothing
-    // was ever identified, so there is no link to break and the anonymous
-    // id (and the onboarding funnel on it) must survive. Only the
-    // conditional reset may run, and it must not be paired with an identify.
     mock.isAuthenticated = true;
     mock.isFetching = true;
     mock.user = undefined;
@@ -247,9 +241,6 @@ describe("useAnalyticsIdentity", () => {
   });
 
   it("resets when the session expires without a user action", async () => {
-    // Convex reports an expired session as the same unauthenticated edge as
-    // an explicit sign-out. The retired device-session reset never covered
-    // this path; the auth edge does.
     mock.isAuthenticated = true;
     mock.user = { _id: "user_1" };
     const hook = renderHook(() => useAnalyticsIdentity());
@@ -264,8 +255,6 @@ describe("useAnalyticsIdentity", () => {
   });
 
   it("re-identifies a different account after the reset", async () => {
-    // Account switch on one device: reset on the edge, then a fresh identify
-    // for the new user id once its record is fetched.
     mock.isAuthenticated = true;
     mock.user = { _id: "user_1" };
     const hook = renderHook(() => useAnalyticsIdentity());
@@ -314,8 +303,6 @@ describe("useAnalyticsIdentity", () => {
     mock.user = { _id: "user_1" };
     hook.rerender();
     await act(async () => {});
-    // The reset is still pending: identifying now would let its deferred
-    // continuation wipe the new identity.
     expect(mock.identify).not.toHaveBeenCalled();
     release();
     await act(async () => {});

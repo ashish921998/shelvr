@@ -19,8 +19,6 @@ export const paymentTelemetryValidator = v.object({
   payment_kind: v.string(),
   revenue_usd: v.optional(v.number()),
   country_code: v.optional(v.string()),
-  // Cancellation events only. `cancel_reason` is the verbatim RevenueCat
-  // enum; `cancel_category` is the derived classification used by dashboards.
   cancel_reason: v.optional(v.string()),
   cancel_category: v.optional(
     v.union(
@@ -33,11 +31,6 @@ export const paymentTelemetryValidator = v.object({
   ),
 });
 
-// RevenueCat webhook payloads are untyped JSON, so every field passes through
-// the shared guards from model/revenuecat.ts before it reaches the telemetry
-// row. Keeping one copy of the guards prevents the two parsers from
-// drifting apart.
-
 function parseEnvironment(
   value: unknown,
 ): "production" | "sandbox" | undefined {
@@ -46,8 +39,6 @@ function parseEnvironment(
   return undefined;
 }
 
-// Event types that represent revenue; every other webhook type is lifecycle
-// noise the telemetry must not count.
 const PAID_EVENT_TYPES = [
   "INITIAL_PURCHASE",
   "RENEWAL",
@@ -60,8 +51,6 @@ type PaymentClassification = {
   revenue_usd?: number;
 };
 
-/** Classify an event as a trial start or a paid purchase. Returns undefined
- * for lifecycle events, trial-priced renewals, and price-less purchases. */
 function classifyPayment(
   data: Record<string, unknown>,
 ): PaymentClassification | undefined {
@@ -102,14 +91,7 @@ type CancelCategory =
   | "developer"
   | "unknown";
 
-/**
- * Classification of RevenueCat `cancel_reason` values (docs:
- * webhooks → "Cancellation and Expiration Reasons").
- * - `CUSTOMER_SUPPORT` means a support refund: auto-renew may still be ON,
- *   so a refund "cancellation" can be followed by continued payments. It is
- *   its own category, never folded into voluntary.
- * - `UNKNOWN` (Apple didn't say) and absent reasons fall back to `unknown`.
- */
+// CUSTOMER_SUPPORT is a refund: auto-renew may stay on, so it is never voluntary.
 const CANCEL_CATEGORIES: Record<string, CancelCategory> = {
   UNSUBSCRIBE: "voluntary",
   PRICE_INCREASE: "voluntary",
@@ -119,10 +101,6 @@ const CANCEL_CATEGORIES: Record<string, CancelCategory> = {
 };
 
 function cancelCategory(reason: unknown): CancelCategory {
-  // Object.hasOwn, not `in`: a crafted `cancel_reason` like "constructor"
-  // would pass `in` (inherited property) and leak the inherited value as
-  // the category, which the enqueue validator would then reject, dropping
-  // the entire webhook event. Own-property check falls back to `unknown`.
   return typeof reason === "string" && Object.hasOwn(CANCEL_CATEGORIES, reason)
     ? CANCEL_CATEGORIES[reason]
     : "unknown";
@@ -134,12 +112,6 @@ type LifecycleEvent =
   | "trial_expired"
   | "subscription_uncancelled";
 
-/** Map RevenueCat lifecycle webhook types to their telemetry event and
- * payment_kind together. They are one decision. `EXPIRATION` only counts
- * for trials (a lapsed unconverted trial); paid expirations are not part of
- * the trial funnel. `UNCANCELLATION` fires for paid subscriptions too, so it
- * keeps a general name and `payment_kind` carries the trial/subscription
- * split. */
 function lifecyclePayment(
   type: unknown,
   periodType: unknown,
@@ -176,8 +148,6 @@ export function parsePaymentTelemetry(body: unknown) {
 
   const lifecycle = lifecyclePayment(data.type, data.period_type);
 
-  // Lifecycle events timestamp the lifecycle moment (`event_timestamp_ms`);
-  // purchases keep `purchased_at_ms` per the existing contract.
   const timestamp = readPositiveNumber(
     lifecycle ? data.event_timestamp_ms : data.purchased_at_ms,
   );

@@ -11,8 +11,6 @@ import {
 
 import { FieldHint, SubmitButton, fieldClass } from "./OracleFields";
 
-// Larger exports can freeze a phone while they are parsed, and 40 sampled
-// saves read the same from a smaller slice of history.
 const MAX_EXPORT_BYTES = 5 * 1024 * 1024;
 
 export default function LibraryInput({ busy, onSubmit }: OracleInputProps) {

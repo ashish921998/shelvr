@@ -27,11 +27,6 @@ import {
 
 export type { FeedItem } from "@/components/item-card-face";
 
-// Describes which list a card belongs to, so the detail screen can rebuild the
-// same ordered sibling set for horizontal swipe-paging. `digest` and `map` open
-// onto the home feed's pager (anything not `space`/`search` does), but the
-// `from` value still reaches `item_opened` so the open is attributed to the
-// screen it came from instead of collapsing into `direct`.
 export type ItemSource =
   | { from: "home" }
   | { from: "space"; spaceId: string }
@@ -57,8 +52,6 @@ function cardMenuActions({
   dismiss: () => void;
   share: () => void;
   changeSpaces: () => void;
-  // Set only on a card inside a space: it takes the save out of that space
-  // alone, so Delete there has to say it reaches every space.
   removeFromSpace?: () => void;
   confirmDelete: () => void;
 }): ActionMenuItem[] {
@@ -103,7 +96,6 @@ function ItemCardView({
 }: {
   item: FeedItem;
   source?: ItemSource;
-  /** Where a withAppleZoom link that pushed this screen zooms in to. */
   zoomTarget?: boolean;
 }) {
   useAppLocale();
@@ -149,25 +141,16 @@ function ItemCardView({
           "share",
         );
       }
-    } catch {
-      // A dismissed or failed share is not a completed action.
-    }
+    } catch {}
     if (link !== undefined) settleShareLink(item._id, shared);
   };
 
-  // What a screen reader reads instead of the card's contents. The classifier
-  // can hand back a title that is empty or only spaces, and an accessibilityLabel
-  // replaces the child text rather than falling back to it, so a blank one
-  // would leave the card announcing nothing at all. Take the first title with
-  // visible characters, then describe the item's state.
   const accessibilityLabel =
     cardTitles(item).find((title) => title?.trim()) ??
     (item.status === "processing"
       ? t("item.stillWorking")
       : t("item.untitledItem"));
 
-  // The primary accept gesture: tap the sparkle, the item is in. The badge's
-  // exit animation is the confirmation: no navigation, no dialog.
   const accept = () => {
     if (spaceId === undefined) return;
     if (process.env.EXPO_OS === "ios") {
@@ -219,10 +202,6 @@ function ItemCardView({
     ]);
   };
 
-  // A place on Home shows its Maps action on the card, as on the onboarding
-  // reminder step, so the save's payoff is one tap from the shelf. Only the
-  // save's own intents count: a space's steered ones belong to that space's
-  // page, and a suggestion isn't the user's save yet.
   const maps =
     source?.from === "home" && item.suggested !== true
       ? item.intents?.find((intent) => intent.kind === "open_maps")
@@ -257,10 +236,6 @@ function ItemCardView({
   });
 
   const a11yOnCell = process.env.EXPO_OS === "ios";
-  // On iOS the cell is one element to VoiceOver, which hides the Maps chip
-  // under the card, so it is reached as one of the cell's actions. Android
-  // keeps the card's accessibility on the Pressable, so the chip stays its
-  // own button there.
   const a11yActions =
     openMaps && a11yOnCell
       ? [...menuActions, { label: t("plan.openMaps"), onPress: openMaps }]
@@ -272,8 +247,6 @@ function ItemCardView({
   // under a zero-size container, so a label on the Pressable never reaches
   // VoiceOver or XCTest. The cell above them has a real frame, so iOS reads
   // the card there. Android has no such wrappers, so the Pressable keeps it.
-  // The long-press menu's actions ride along as accessibility actions, since
-  // the ellipsis button inside is folded into the card on both platforms.
   const cardA11y = {
     accessible: true,
     // `role`, not `accessibilityRole`: Link spreads its own role="link"
@@ -295,9 +268,6 @@ function ItemCardView({
         .find(({ label }) => label === nativeEvent.actionName)
         ?.onPress();
     },
-    // VoiceOver's double-tap. Without it iOS falls back to a synthetic touch
-    // at the cell's centre, which only opens the card while the centre lands
-    // on the Pressable. Opening here is a plain push, without the zoom.
     onAccessibilityTap: () => router.push(href),
     testID: item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined,
   };
@@ -392,9 +362,6 @@ function ItemCardView({
       ) : (
         link
       )}
-      {/* Outside the Link, so a tap opens Maps and never the card's zoom or
-          preview, which a native gesture would start before any JS
-          stopPropagation could. */}
       {openMaps ? (
         <View style={styles.mapsChip}>
           <IntentChip
@@ -408,10 +375,6 @@ function ItemCardView({
   );
 }
 
-// Feeds pass `source` as a fresh literal on every render, so two sources are
-// the same when they name the same list, not when they are the same object.
-// Spelling out every variant makes a new one fail to compile here until it
-// says what identifies its list.
 function sourceKey(source: ItemSource | undefined): string | undefined {
   switch (source?.from) {
     case undefined:
@@ -429,9 +392,6 @@ function sourceKey(source: ItemSource | undefined): string | undefined {
   }
 }
 
-// Memoized: feed rows are the highest-churn surface in the app (every live-query
-// tick and parent re-render touches the list), so skip re-renders when a row's
-// `item` ref and `source` value are unchanged.
 export const ItemCard = memo(
   ItemCardView,
   (prev, next) =>
@@ -446,10 +406,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   mapsChip: {
     alignSelf: "flex-start",
-    // Large text in a narrow column truncates the label instead of
-    // pushing the chip into the next column.
     maxWidth: "100%",
-    // Clears the chip's hitSlop, so a tap just above it opens the card.
     marginTop: theme.gap(1),
     marginHorizontal: theme.gap(0.5),
   },

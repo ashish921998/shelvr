@@ -8,8 +8,6 @@ import { serverLog } from "./serverLog";
 
 export class BodyTooLargeError extends Error {}
 
-/** Web and native deploy independently. Keep this transport reader in the
- * web bundle rather than importing files excluded by Vercel's app root. */
 export async function readBoundedText(
   request: Request,
   maxBytes: number,
@@ -51,7 +49,6 @@ export async function authorizeRequestBody(
 ): Promise<Response | undefined> {
   const site = convexSiteUrl();
   const secret = process.env.WAITLIST_SHARED_SECRET;
-  // The route's existing unconfigured response remains responsible for this.
   if (!site || !secret)
     return route === "oracle-image"
       ? Response.json({ message: "Please try again later." }, { status: 503 })

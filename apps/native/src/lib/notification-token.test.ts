@@ -98,7 +98,6 @@ describe("notification token registration", () => {
   });
 
   it("uses the EAS project fallback and rejects missing project configuration", async () => {
-    // Match a manifest without an extra.eas.projectId field.
     Reflect.deleteProperty(mock.constants.expoConfig.extra.eas, "projectId");
     await getExpoPushToken(false);
     expect(mock.token).toHaveBeenCalledWith(

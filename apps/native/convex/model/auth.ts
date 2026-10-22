@@ -4,13 +4,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 
 const NOT_AUTHENTICATED = "Not authenticated";
 
-/**
- * The live owner row behind `userId`, or null when the id is not a users id,
- * the row is gone, or deletion has begun: a row may still own data only while
- * it exists and account deletion has not started on it. The one definition
- * every fence in the backend shares. Takes the raw string form because
- * webhook app user ids and the string `userId` columns are not typed ids.
- */
+/** Live owner row for a raw string id (webhook ids are untyped), or null if not a users id, gone, or deleting. */
 export async function liveOwner(
   ctx: QueryCtx | MutationCtx,
   userId: string,
@@ -21,27 +15,7 @@ export async function liveOwner(
   return user !== null && user.deleting !== true ? user : null;
 }
 
-/**
- * Returns the authenticated user's stable users-table id, or throws. Every
- * public function derives its userId from this, never from an argument.
- *
- * Convex Auth puts both the user id and session id in the JWT `sub` claim
- * (`userId|sessionId`). `getAuthUserId` removes the session suffix; using the
- * raw `identity.subject` would make ownership session-scoped and would not
- * match RevenueCat's user id or `getCurrentUser`.
- *
- * A valid JWT is not enough on its own: the owner row must still be live.
- * Account deletion marks the row in its first transaction, so a retained
- * token on another device stops authorizing the moment deletion starts, not
- * only once the batched cleanup reaches the auth tables. The rejection is the
- * same unauthenticated error either way.
- *
- * This stays provider-agnostic: it works identically whether the user signed in
- * via OAuth or Anonymous. Query and mutation contexts only: an action derives
- * the caller through the internal mutation or query it runs (Convex forwards
- * the caller's identity to it), so the authorization and the write stay in one
- * transaction.
- */
+/** Stable users-table id (JWT `sub` is `userId|sessionId`, so not `identity.subject`), or throws. */
 export async function requireUserId(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Id<"users">> {
@@ -71,12 +45,6 @@ export async function isDevelopmentAnonymousUser(
 
 const MAX_SENDER_NAME_CHARS = 40;
 
-/**
- * The first word of the sharer's account name: enough for "Ashish wanted you
- * to see this" and nothing more (no surname, email or photo). Undefined when
- * the account has no usable name, e.g. Apple sign-in with the name withheld,
- * which leaves the email in its place.
- */
 export async function senderFirstName(
   ctx: QueryCtx,
   userId: string,

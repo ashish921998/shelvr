@@ -4,8 +4,6 @@ import { after, test } from "node:test";
 import { trailerValues } from "./git-trailer.mjs";
 import { createRepo } from "./temp-repo.mjs";
 
-// Reading a trailer is git's job, so the test gives git real commits rather
-// than a string that only looks like one.
 const { dir: repo, git, commit, remove } = createRepo("git-trailer-");
 
 commit("root");

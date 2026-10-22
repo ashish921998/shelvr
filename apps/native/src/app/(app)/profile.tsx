@@ -28,8 +28,6 @@ export default function ProfileScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
-  // Typed to the one event used here: the native stack's transitionEnd isn't
-  // in expo-router's generic navigation type.
   const navigation = useNavigation() as ClosingScreen;
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
@@ -43,8 +41,6 @@ export default function ProfileScreen() {
       router.back();
       return;
     }
-    // A development reload or direct link can restore Profile as the root
-    // route. In that state there is no history entry for Android Back to pop.
     router.replace("/(app)/(tabs)/(home)");
   };
 
@@ -61,17 +57,9 @@ export default function ProfileScreen() {
               ? "…"
               : t("pro.viewPlans");
 
-  // Customer Center is only relevant to users who have (or had) a subscription:
-  // any non-`none` status. A `none` user has nothing to manage and should see
-  // the "View Pro plans" paywall row instead.
   const hasSubscription = status !== "none" && !loading;
-  // A lapsed trial or subscription has nothing left to manage: the way back is
-  // a new purchase, so that row opens the paywall rather than Customer Center.
   const opensPaywall = status === "none" || status === "lapsed";
 
-  // An active subscriber goes to Customer Center, which can only present
-  // once this profile sheet is gone; a `none` or lapsed user to the paywall,
-  // after the same dismissal.
   const openSubscription = async () => {
     if (loading) return;
     const dismissProfile = () => closeScreen(navigation, closeProfile);

@@ -9,8 +9,7 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-    // Node 26 defines a global localStorage that reads as undefined without
-    // --localstorage-file, and Vitest does not replace a global that exists.
+    // Node 26's own localStorage global shadows jsdom's.
     execArgv: ["--no-experimental-webstorage"],
     environmentOptions: {
       jsdom: {

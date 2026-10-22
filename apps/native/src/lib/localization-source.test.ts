@@ -60,8 +60,6 @@ function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
       checkKey(node.whenTrue);
       checkKey(node.whenFalse);
     }
-    // Non-literal keys are constrained by t()'s generated MessageKey type.
-    // This also checks arrays/maps and required interpolation parameters in tsc.
   };
   const checkAlertButtons = (node: ts.Node) => {
     if (

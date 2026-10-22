@@ -69,7 +69,6 @@ const PANCAKES = {
 
 it("opens on the ingredients tab with servings above the switch", () => {
   const { container, getByRole } = render(<RecipeSection recipe={PANCAKES} />);
-  // `name` is intentionally not rendered: the item title already carries it.
   expect(renderedText(container)).toEqual([
     "4 servings",
     "2 cups flour",

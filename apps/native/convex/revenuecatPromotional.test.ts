@@ -22,7 +22,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-/** RevenueCat's view of a customer granted Pro with no end date. */
 const lifetimeGrant = {
   request_date_ms: Date.now(),
   subscriber: {
@@ -52,8 +51,6 @@ async function fixture(previous?: { expiresAt: number }) {
     }
     return id;
   });
-  // A dashboard grant arrives as a promotional non-renewing purchase. A
-  // lifetime grant has no expiry on the event.
   const grant = (fields: Record<string, unknown> = {}) =>
     t.fetch("/webhooks/revenuecat", {
       method: "POST",
@@ -113,8 +110,6 @@ describe("promotional grant webhook", () => {
     expect((await f.grant()).status).toBe(200);
     await expect(f.save()).resolves.toBeDefined();
 
-    // Revoking the grant in the dashboard expires it. RevenueCat no longer
-    // lists the entitlement.
     stubRevenueCatFetch(revenuecatSnapshot());
     expect(
       (
@@ -136,8 +131,6 @@ describe("promotional grant webhook", () => {
     expect((await f.grant()).status).toBe(200);
     await expect(f.save()).resolves.toBeDefined();
 
-    // A revoke can also arrive as a promotional cancellation, whatever its
-    // reason. RevenueCat no longer lists the entitlement.
     stubRevenueCatFetch(revenuecatSnapshot());
     expect(
       (

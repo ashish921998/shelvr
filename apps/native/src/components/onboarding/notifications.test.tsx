@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-// The onboarding reminder step: skipped when there is nothing to remind about
-// or no way to notify, otherwise the OS prompt comes only from the tap.
 import {
   act,
   fireEvent,
@@ -99,7 +97,6 @@ const saved = { itemId: "item-1", savedSpaceNames: [] } as unknown as DemoSaved;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
-  // A Wednesday afternoon, so the first option is tonight.
   vi.setSystemTime(new Date(2026, 9, 7, 14, 0));
   mock.state.mockResolvedValue("ask");
   mock.request.mockResolvedValue(true);
@@ -241,7 +238,6 @@ describe("NotificationsStep", () => {
     const onAdvance = renderStep();
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
     await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
-    // Nothing was scheduled, so the promise step names no reminder.
     expect(onAdvance).toHaveBeenCalledWith(undefined);
     expect(mock.weekly).not.toHaveBeenCalled();
   });
@@ -261,7 +257,6 @@ describe("NotificationsStep", () => {
   });
 
   it("moves on without waiting for the Weekly shelf while offline", async () => {
-    // An offline Convex mutation neither resolves nor rejects.
     mock.weekly.mockReturnValue(new Promise(() => {}));
     const onAdvance = renderStep();
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
@@ -304,7 +299,6 @@ describe("NotificationsStep", () => {
 
   it("shows fresh times instead of scheduling one that has passed", async () => {
     const onAdvance = renderStep();
-    // Left open until after 8 pm, so "tonight" has gone.
     vi.setSystemTime(new Date(2026, 9, 7, 21, 0));
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
     expect(mock.request).not.toHaveBeenCalled();
@@ -322,7 +316,6 @@ describe("NotificationsStep", () => {
       new Promise<boolean>((resolve) => (answer = resolve)),
     );
     const onAdvance = renderStep();
-    // Tap at 7:59 pm, answer the prompt at 8:01 pm.
     vi.setSystemTime(new Date(2026, 9, 7, 19, 59));
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
     vi.setSystemTime(new Date(2026, 9, 7, 20, 1));
