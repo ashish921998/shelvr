@@ -83,6 +83,8 @@
   "permissions.allowCamera": "Permitir cámara",
   "capture.photoMode": "FOTO",
   "capture.stickerMode": "PEGATINA",
+  "capture.flipCamera": "Cambiar cámara",
+  "capture.takePhoto": "Tomar foto",
   "spaces.changeFailed": "No se ha podido cambiar la colección",
   "spaces.changeFailedBody": "Tu elección anterior sigue guardada. Vuelve a intentarlo.",
   "navigation.spaces": "Colecciones",

@@ -83,6 +83,8 @@
   "permissions.allowCamera": "Autoriser l'appareil photo",
   "capture.photoMode": "PHOTO",
   "capture.stickerMode": "AUTOCOLLANT",
+  "capture.flipCamera": "Changer de caméra",
+  "capture.takePhoto": "Prendre une photo",
   "spaces.changeFailed": "Impossible de changer de collection",
   "spaces.changeFailedBody": "Votre choix précédent est toujours enregistré. Réessayez.",
   "navigation.spaces": "Collections",

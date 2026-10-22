@@ -83,6 +83,8 @@
   "permissions.allowCamera": "카메라 허용",
   "capture.photoMode": "사진",
   "capture.stickerMode": "스티커",
+  "capture.flipCamera": "카메라 전환",
+  "capture.takePhoto": "사진 찍기",
   "spaces.changeFailed": "공간을 변경하지 못했어요",
   "spaces.changeFailedBody": "이전 선택은 그대로 저장되어 있어요. 다시 시도해 주세요.",
   "navigation.spaces": "공간",

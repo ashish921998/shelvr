@@ -248,7 +248,12 @@ export default function CameraScreen() {
       </GestureDetector>
 
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
-        <Pressable style={styles.roundButton} onPress={() => router.back()}>
+        <Pressable
+          style={styles.roundButton}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.close")}
+        >
           <AppSymbolIcon
             name="xmark"
             size={17}
@@ -262,6 +267,8 @@ export default function CameraScreen() {
             onPress={() =>
               setPosition((p) => (p === "back" ? "front" : "back"))
             }
+            accessibilityRole="button"
+            accessibilityLabel={t("capture.flipCamera")}
           >
             <AppSymbolIcon
               name="arrow.triangle.2.circlepath.camera"
@@ -296,6 +303,9 @@ export default function CameraScreen() {
               style={styles.libraryButton}
               onPress={pickFromLibrary}
               disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={t("capture.photos")}
+              accessibilityState={{ disabled: busy }}
             >
               <AppSymbolIcon
                 name="photo.on.rectangle"
@@ -303,7 +313,14 @@ export default function CameraScreen() {
                 tintColor="#fff"
               />
             </Pressable>
-            <Pressable style={styles.shutter} onPress={capture} disabled={busy}>
+            <Pressable
+              style={styles.shutter}
+              onPress={capture}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={t("capture.takePhoto")}
+              accessibilityState={{ disabled: busy, busy }}
+            >
               {busy ? (
                 <StitchRing size={22} color="#1a1712" />
               ) : (
