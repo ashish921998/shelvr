@@ -1,4 +1,4 @@
-import { v, type Infer, type ObjectType } from "convex/values";
+import { v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import {
   buildEmbeddingText,
@@ -51,63 +51,11 @@ export type Settlement = {
   classification?: Classification;
 };
 
-const oldCallerFields = {
-  ...readingValidator.fields,
-  tags: v.optional(v.array(v.string())),
-  intents: v.optional(v.array(intentValidator)),
-  cities: v.optional(v.array(v.string())),
-  embedding: v.optional(v.array(v.float64())),
-  classified: v.optional(v.boolean()),
-  status: v.optional(v.literal("ready")),
-};
-
 export const runFields = {
   keepTitle: v.optional(v.boolean()),
-  reading: v.optional(readingValidator),
+  reading: readingValidator,
   classification: v.optional(classificationValidator),
-  ...oldCallerFields,
 };
-
-export function runOf(args: ObjectType<typeof runFields>): Settlement {
-  const { keepTitle, reading, classification } = args;
-  if (reading !== undefined) {
-    return { keepTitle, reading, classification };
-  }
-  const shared: Reading = {
-    content: args.content,
-    siteName: args.siteName,
-    author: args.author,
-    heroImageUrl: args.heroImageUrl,
-    media: args.media,
-    articleMedia: args.articleMedia,
-    storageId: args.storageId,
-    aspectRatio: args.aspectRatio,
-    enrichment: args.enrichment,
-  };
-  if (args.classified === true) {
-    return {
-      keepTitle,
-      reading: shared,
-      classification: {
-        title: args.title,
-        description: args.description ?? "",
-        tags: args.tags ?? [],
-        intents: args.intents,
-        cities: args.cities,
-        recipe: args.recipe,
-      },
-    };
-  }
-  return {
-    keepTitle,
-    reading: {
-      ...shared,
-      title: args.title,
-      description: args.description,
-      recipe: args.recipe,
-    },
-  };
-}
 
 export type ItemPatch = Partial<Omit<Doc<"items">, "_id" | "_creationTime">>;
 
