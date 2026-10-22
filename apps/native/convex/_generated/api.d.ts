@@ -55,6 +55,7 @@ import type * as model_legalConsent from "../model/legalConsent.js";
 import type * as model_localization from "../model/localization.js";
 import type * as model_log from "../model/log.js";
 import type * as model_memberships from "../model/memberships.js";
+import type * as model_nextUp from "../model/nextUp.js";
 import type * as model_notificationFields from "../model/notificationFields.js";
 import type * as model_notificationSchedule from "../model/notificationSchedule.js";
 import type * as model_oracle from "../model/oracle.js";
@@ -161,6 +162,7 @@ declare const fullApi: ApiFromModules<{
   "model/localization": typeof model_localization;
   "model/log": typeof model_log;
   "model/memberships": typeof model_memberships;
+  "model/nextUp": typeof model_nextUp;
   "model/notificationFields": typeof model_notificationFields;
   "model/notificationSchedule": typeof model_notificationSchedule;
   "model/oracle": typeof model_oracle;

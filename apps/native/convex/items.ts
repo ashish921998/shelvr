@@ -29,12 +29,7 @@ import {
   getMembership,
   insertMembership,
 } from "./model/memberships";
-import {
-  isYouTubeUrl,
-  linkSource,
-  normalizeExternalUrl,
-  shortFormSource,
-} from "./model/externalUrl";
+import { normalizeExternalUrl } from "./model/externalUrl";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -68,14 +63,8 @@ import { saveError } from "./model/saveErrors";
 import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
-import {
-  COOK_MIN_AGE_MS,
-  openedTooRecently,
-  READ_MAX_AGE_MS,
-  READ_MIN_AGE_MS,
-  reminderKind,
-  reminderSubject,
-} from "./model/saveReminders";
+import { nextUpKind } from "./model/nextUp";
+import { openedTooRecently, reminderSubject } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { buildSearchText } from "./model/searchText";
 import {
@@ -98,23 +87,6 @@ export const RECENT_ITEMS_MAX = 20;
 const NEXT_UP_SCAN_ROWS = 100;
 const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
 export const NEXT_UP_SKIP_MAX = 50;
-
-type NextUpKind = "read" | "cook" | "watch" | "open";
-
-function nextUpKind(item: Doc<"items">, now: number): NextUpKind | undefined {
-  const age = now - item._creationTime;
-  const reminder = reminderKind(item);
-  if (reminder === "cook") return age >= COOK_MIN_AGE_MS ? "cook" : undefined;
-  if (age < READ_MIN_AGE_MS || age > READ_MAX_AGE_MS) return undefined;
-  if (
-    isYouTubeUrl(item.url) ||
-    shortFormSource(item.url)?.video ||
-    item.media?.some((media) => media.kind === "video")
-  )
-    return "watch";
-  if (reminder === "read" && linkSource(item.url) === undefined) return "read";
-  return "open";
-}
 
 const itemTypeValidator = v.union(
   v.literal("image"),
