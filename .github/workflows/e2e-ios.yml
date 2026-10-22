@@ -321,7 +321,7 @@ jobs:
           # earlier attempt.
           node -e '
             const run = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8")).run;
-            const wedged = /Daemon request timed out|test tool stopped answering|overran its watchdog|runner is wedged/;
+            const wedged = /Daemon request timed out|test tool stopped answering|overran its watchdog|runner is wedged|ENGINE_FAILURE|LAUNCH_TIMEOUT|xcrun timed out/;
             const failed = run.results
               .filter((r) => ["failed", "timed-out", "interrupted"].includes(r.status))
               .map((r) => r.attempts?.at(-1)?.error ?? r.error);
