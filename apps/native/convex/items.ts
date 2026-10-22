@@ -1369,7 +1369,10 @@ async function createLinkOrNote(
     ...(kind === "link" && "url" in payload ? { url: payload.url } : {}),
     ...(kind === "note" && "note" in payload ? { note: payload.note } : {}),
     tags: [],
-    searchText: "",
+    searchText:
+      kind === "note" && "note" in payload
+        ? buildSearchText({ tags: [], note: payload.note })
+        : "",
   });
   if (options.spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, options.spaceId);
