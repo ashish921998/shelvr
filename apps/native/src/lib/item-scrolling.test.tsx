@@ -166,7 +166,7 @@ vi.mock("@/lib/share/share-store", () => ({
   forgetDeletedSharedItem: mock.forget,
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: vi.fn(), itemAction: vi.fn() },
+  analytics: { capture: vi.fn(), itemAction: vi.fn(), itemDeleted: vi.fn() },
 }));
 vi.mock("@/components/item-detail", () => ({ ItemDetail: vi.fn(() => null) }));
 vi.mock("@/components/item-header", () => ({

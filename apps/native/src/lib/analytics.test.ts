@@ -83,9 +83,23 @@ describe("item analytics", () => {
     );
   });
 
+  it("links a deletion to its save", () => {
+    analytics.itemDeleted(item, "feed");
+    expect(mock.capture).toHaveBeenCalledWith("item_deleted", {
+      item_id: "item-1",
+      item_type: "note",
+      saved_at: 1000,
+      item_age_ms: expect.any(Number),
+      surface: "feed",
+      environment: "development",
+      analytics_version: 1,
+    });
+  });
+
   it("excludes development fixtures", () => {
     analytics.itemOpened({ ...item, fixtureKey: "qa" }, "direct");
     analytics.itemAction({ ...item, fixtureKey: "qa" }, "copy");
+    analytics.itemDeleted({ ...item, fixtureKey: "qa" }, "item_detail");
     expect(mock.capture).not.toHaveBeenCalled();
   });
 

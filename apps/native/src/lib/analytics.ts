@@ -167,7 +167,7 @@ export type AnalyticsEventProperties = {
   };
   item_shared: { surface: "item_detail" | "feed"; share_ref?: string };
   item_link_copied: Record<string, never>;
-  item_deleted: { item_type: AnalyticsItem["type"] };
+  item_deleted: ItemProperties & { surface: "item_detail" | "feed" };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
   space_created: { dynamic: boolean; auto_file: boolean };
@@ -373,6 +373,14 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
     capture("item_action", { ...itemProperties(item), action });
 }
 
+function itemDeleted(
+  item: AnalyticsItem,
+  surface: "item_detail" | "feed",
+): void {
+  if (!item.fixtureKey)
+    capture("item_deleted", { ...itemProperties(item), surface });
+}
+
 function identify(userId: string): void {
   if (!posthog) return;
 
@@ -408,4 +416,5 @@ export const analytics = {
   screen,
   itemOpened,
   itemAction,
+  itemDeleted,
 };

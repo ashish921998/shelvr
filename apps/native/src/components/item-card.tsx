@@ -197,9 +197,14 @@ function ItemCardView({
         text: t("common.delete"),
         style: "destructive",
         onPress: () =>
-          deleteItem({ id: item._id }).then(() =>
-            forgetDeletedSharedItem(item._id),
-          ),
+          deleteItem({ id: item._id }).then(() => {
+            forgetDeletedSharedItem(item._id);
+            if (item._creationTime !== undefined)
+              analytics.itemDeleted(
+                { ...item, _creationTime: item._creationTime },
+                "feed",
+              );
+          }),
       },
     ]);
   };

@@ -613,7 +613,7 @@ function ItemScreenContent() {
     try {
       await deleteItem({ id: activeItem._id });
       forgetDeletedSharedItem(activeItem._id);
-      analytics.capture("item_deleted", { item_type: activeItem.type });
+      analytics.itemDeleted(activeItem, "item_detail");
       if (neighbor) {
         goTo(neighbor._id);
         writeParams(neighbor._id);

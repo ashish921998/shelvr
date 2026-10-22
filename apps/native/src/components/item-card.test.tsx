@@ -145,7 +145,12 @@ vi.mock("@/lib/share/share-store", () => ({
   forgetDeletedSharedItem: vi.fn(),
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: vi.fn(), captureError: vi.fn(), itemAction: vi.fn() },
+  analytics: {
+    capture: vi.fn(),
+    captureError: vi.fn(),
+    itemAction: vi.fn(),
+    itemDeleted: vi.fn(),
+  },
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/lib/intents", () => ({ runIntent: vi.fn(async () => undefined) }));
@@ -421,6 +426,26 @@ it("runs a menu action picked from the screen reader's actions", () => {
     "Delete this save?",
     expect.any(String),
     expect.any(Array),
+  );
+});
+
+it("reports a confirmed delete from the feed", async () => {
+  vi.mocked(Alert.alert).mockClear();
+  render(
+    <ItemCard
+      item={{ ...base, _creationTime: 1000, title: "Miso soup recipe" }}
+    />,
+  );
+  labelledProps(Pressable, "Miso soup recipe").onAccessibilityAction?.({
+    nativeEvent: { actionName: "Delete" },
+  } as never);
+  const buttons = vi.mocked(Alert.alert).mock.calls[0]?.[2] ?? [];
+  buttons.find((button) => button.style === "destructive")?.onPress?.();
+  await waitFor(() =>
+    expect(analytics.itemDeleted).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: "item-1", _creationTime: 1000 }),
+      "feed",
+    ),
   );
 });
 
