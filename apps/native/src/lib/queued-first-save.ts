@@ -42,11 +42,6 @@ function clearQueued() {
   );
 }
 
-export function queueFirstSave(save: PendingDemo) {
-  const queued: QueuedSave = { ...save, owner: null };
-  SecureStore.setItem(KEY, JSON.stringify(queued));
-}
-
 function claimQueued(save: QueuedSave, owner: string): boolean {
   try {
     SecureStore.setItem(KEY, JSON.stringify({ ...save, owner }));

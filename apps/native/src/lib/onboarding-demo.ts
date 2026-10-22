@@ -4,7 +4,7 @@ import {
   type Interest,
 } from "@/lib/onboarding-interests";
 import type { SampleCityId } from "@/lib/sample-cities";
-import { SPACE_PRESETS, type SaveKind } from "@/lib/save-kinds";
+import type { SaveKind } from "@/lib/save-kinds";
 
 export type DemoKind = Extract<
   SaveKind,
@@ -15,6 +15,7 @@ export type DemoSample = {
   kind: DemoKind;
   interest?: Interest;
   city?: SampleCityId;
+  picture?: "food" | "view";
   url: string;
   pageHeading: string;
   domain: string;
@@ -108,6 +109,76 @@ const CITY_PAGES: Record<
     pageHeading: "CN Tower",
     domain: "cntower.ca",
   },
+  amsterdam: {
+    url: "https://maps.apple.com/?q=Rijksmuseum&ll=52.36%2C4.8852",
+    pageHeading: "Rijksmuseum",
+    domain: "maps.apple.com",
+  },
+  austin: {
+    url: "https://maps.apple.com/?q=Blanton%20Museum%20of%20Art&ll=30.2808%2C-97.7377",
+    pageHeading: "Blanton Museum of Art",
+    domain: "maps.apple.com",
+  },
+  berlin: {
+    url: "https://maps.apple.com/?q=German%20Spy%20Museum&ll=52.5089%2C13.3793",
+    pageHeading: "German Spy Museum",
+    domain: "maps.apple.com",
+  },
+  chicago: {
+    url: "https://maps.apple.com/?q=Chicago%20Architecture%20Center&ll=41.888%2C-87.6235",
+    pageHeading: "Chicago Architecture Center",
+    domain: "maps.apple.com",
+  },
+  copenhagen: {
+    url: "https://maps.apple.com/?q=Nikolaj%20Art%20Gallery&ll=55.6786%2C12.5816",
+    pageHeading: "Nikolaj Art Gallery",
+    domain: "maps.apple.com",
+  },
+  dallas: {
+    url: "https://maps.apple.com/?q=The%20Sixth%20Floor%20Museum%20at%20Dealey%20Plaza&ll=32.7798%2C-96.8085",
+    pageHeading: "The Sixth Floor Museum at Dealey Plaza",
+    domain: "maps.apple.com",
+  },
+  florence: {
+    url: "https://maps.apple.com/?q=Basilica%20of%20Santa%20Maria%20Novella&ll=43.7746%2C11.2494",
+    pageHeading: "Basilica of Santa Maria Novella",
+    domain: "maps.apple.com",
+  },
+  "las-vegas": {
+    url: "https://maps.apple.com/?q=Meow%20Wolf%20Las%20Vegas%27%20Omega%20Mart&ll=36.1325%2C-115.1819",
+    pageHeading: "Meow Wolf Las Vegas' Omega Mart",
+    domain: "maps.apple.com",
+  },
+  madrid: {
+    url: "https://maps.apple.com/?q=Museo%20Nacional%20Centro%20de%20Arte%20Reina%20Sof%C3%ADa&ll=40.4079%2C-3.6946",
+    pageHeading: "Museo Nacional Centro de Arte Reina Sofía",
+    domain: "maps.apple.com",
+  },
+  milan: {
+    url: "https://maps.apple.com/?q=Basilica%20of%20Sant%27Ambrogio&ll=45.4623%2C9.1755",
+    pageHeading: "Basilica of Sant'Ambrogio",
+    domain: "maps.apple.com",
+  },
+  montreal: {
+    url: "https://maps.apple.com/?q=Saint%20Joseph%27s%20Oratory%20of%20Mount%20Royal&ll=45.4921%2C-73.6191",
+    pageHeading: "Saint Joseph's Oratory of Mount Royal",
+    domain: "maps.apple.com",
+  },
+  rome: {
+    url: "https://maps.apple.com/?q=Capitoline%20Museums&ll=41.8929%2C12.4826",
+    pageHeading: "Capitoline Museums",
+    domain: "maps.apple.com",
+  },
+  seattle: {
+    url: "https://maps.apple.com/?q=Cal%20Anderson%20Park&ll=47.617%2C-122.3191",
+    pageHeading: "Cal Anderson Park",
+    domain: "maps.apple.com",
+  },
+  vancouver: {
+    url: "https://maps.apple.com/?q=Museum%20of%20Vancouver&ll=49.2763%2C-123.1444",
+    pageHeading: "Museum of Vancouver",
+    domain: "maps.apple.com",
+  },
 };
 
 const CITY_SAMPLES: readonly DemoSample[] = Object.entries(CITY_PAGES).map(
@@ -135,79 +206,19 @@ const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.flatMap(
   },
 );
 
-const SAMPLE_COUNT = 3;
-
-export function orderDemoSamples(
-  kinds: readonly SaveKind[],
-  interests: readonly Interest[] = [],
-  city: SampleCityId | null = null,
-): DemoSample[] {
-  const rank = (sample: DemoSample) => {
-    const index = kinds.indexOf(sample.kind);
-    return index === -1 ? kinds.length : index;
-  };
-  const byKind = [...DEMO_SAMPLES].sort((a, b) => rank(a) - rank(b));
-  const lead = byKind.filter((sample) => kinds.includes(sample.kind));
-  const topical = interests.flatMap((interest) =>
-    INTEREST_SAMPLES.filter((sample) => sample.interest === interest),
-  );
-  const ordered = [
-    ...lead.slice(0, 1),
-    ...topical,
-    ...lead.slice(1),
-    ...byKind.filter((sample) => !kinds.includes(sample.kind)),
-  ].map((sample) => inCity(sample, city));
-  return ordered
-    .filter(
-      (sample, index) =>
-        ordered.findIndex((other) => other.url === sample.url) === index,
-    )
-    .slice(0, SAMPLE_COUNT);
-}
-
-export function featuredDemoKind(
-  kinds: readonly SaveKind[],
-  interests: readonly Interest[] = [],
-): DemoKind | null {
-  const featured = orderDemoSamples(kinds, interests)[0];
-  if (featured === undefined) return null;
-  return featured.interest !== undefined || kinds.includes(featured.kind)
-    ? featured.kind
-    : null;
-}
-
+/** The post share practice offers: the first picked topic's page, in the picked city, or the article sample. */
 export function practiceShareSample(
-  kinds: readonly SaveKind[],
-  savedUrl: string | null,
+  interests: readonly Interest[],
   city: SampleCityId | null = null,
 ): DemoSample | undefined {
-  const featured = DEMO_SAMPLES.find((sample) => sample.kind === "Articles");
-  return [
-    ...(featured === undefined ? [] : [featured]),
-    ...orderDemoSamples(kinds, [], city),
-  ].find((sample) => sample.url !== savedUrl);
+  const sample =
+    INTEREST_SAMPLES.find((other) => other.interest === interests[0]) ??
+    DEMO_SAMPLES.find((other) => other.kind === "Articles");
+  return sample === undefined ? undefined : inCity(sample, city);
 }
 
 export function findSample(url: string): DemoSample | undefined {
   return [...DEMO_SAMPLES, ...INTEREST_SAMPLES, ...CITY_SAMPLES].find(
     (sample) => sample.url === url,
   );
-}
-
-/** The space a ready-made sample files into, or null to leave the link to the classifier. */
-export function demoDestination(
-  url: string,
-  spaces: readonly string[],
-): string | null {
-  const topic = INTEREST_SAMPLES.find(
-    (sample) =>
-      sample.url === url &&
-      sample.interest !== undefined &&
-      spaces.includes(sample.interest),
-  )?.interest;
-  if (topic !== undefined) return topic;
-  const sample = findSample(url);
-  if (!sample) return null;
-  const preset = SPACE_PRESETS[sample.kind][0];
-  return spaces.includes(preset) ? preset : null;
 }

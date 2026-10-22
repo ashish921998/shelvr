@@ -9,26 +9,40 @@ import {
   SAMPLE_SLOT_LABELS,
   sampleRows,
   sampleStops,
+  samplePlan,
   sampleTrip,
-  showTripTeaser,
   WATER_CLEARANCE,
 } from "./sample-trip";
+import { planAsCity, planCities } from "./sample-plans";
 
 const ROUNDING_SLACK = 0.5;
 
-describe("showTripTeaser", () => {
+describe("samplePlan", () => {
   it.each([
-    [["Travel"], [], true],
-    [[], ["Travel"], true],
-    [["Recipes", "Travel"], ["AI & tech"], true],
-    [["Articles"], ["Home & design", "Films, books & music"], false],
-    [[], [], false],
+    ["date", "paris", "paris"],
+    ["date", "las-vegas", "prague"],
+    ["date", null, "prague"],
+    ["weekend", "new-york", "new-york"],
+    ["weekend", "las-vegas", "prague"],
   ] as const)(
-    "for kinds %j and topics %j shows the trip: %s",
-    (kinds, interests, expected) => {
-      expect(showTripTeaser(kinds, interests)).toBe(expected);
+    "draws a %s picked in %s in %s, Prague when the city has none",
+    (kind, picked, expected) => {
+      expect(samplePlan(kind, picked).city).toBe(expected);
+      expect(samplePlan(kind, picked).kind).toBe(kind);
     },
   );
+
+  it("offers only cities with a written plan, Prague among them", () => {
+    for (const kind of ["date", "weekend"] as const) {
+      expect(planCities(kind)).toContain("prague");
+      for (const city of planCities(kind)) {
+        expect(samplePlan(kind, city).city).toBe(city);
+      }
+    }
+    expect(planCities("trip")).toEqual(
+      SAMPLE_CITY_IDS.filter((id) => id !== "seattle"),
+    );
+  });
 });
 
 describe("sampleTrip", () => {
@@ -52,7 +66,7 @@ describe("sampleTrip", () => {
   });
 });
 
-describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
+describe.each(planCities("trip"))("the %s sample trip", (city) => {
   const trip = sampleTrip(city);
   const stops = sampleStops(trip);
 
@@ -72,6 +86,18 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
     expect(stops.map(({ number }) => number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(stops.map(({ day }) => day)).toEqual([0, 0, 0, 0, 1, 1, 1, 1]);
   });
+});
+
+const PLANS = [
+  ...planCities("trip").map((city) => ["trip", city] as const),
+  ...planCities("date").map((city) => ["date", city] as const),
+  ...planCities("weekend").map((city) => ["weekend", city] as const),
+];
+
+describe.each(PLANS)("the %s sample in %s", (kind, city) => {
+  const trip = samplePlan(kind, city);
+  const stops = sampleStops(trip);
+  const source = kind === "trip" ? SAMPLE_CITIES[city] : planAsCity(kind, city);
 
   it("names as many places in its saves as it has stops", () => {
     const named = trip.saves.reduce((sum, save) => sum + save.places, 0);
@@ -109,7 +135,6 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
   });
 
   it("keeps the pins of places on land off the drawn water", () => {
-    const trip = sampleTrip(city);
     const lines = trip.water.map((path) =>
       [...path.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map(([, x, y]) => ({
         x: Number(x),
@@ -117,7 +142,7 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
       })),
     );
     const onWater = new Set<string>(
-      SAMPLE_CITIES[city].days.flatMap((day) =>
+      source.days.flatMap((day) =>
         day.stops
           .filter((stop) => "onWater" in stop && stop.onWater)
           .map((stop) => stop.name),

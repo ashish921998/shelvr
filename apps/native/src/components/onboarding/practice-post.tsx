@@ -2,12 +2,17 @@ import { t, useAppLocale } from "@/lib/i18n";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { AppSymbolIcon } from "@/components/symbol";
 import { sampleImage } from "@/components/onboarding/sample-card";
+import {
+  PlatformMark,
+  platformOf,
+} from "@/components/onboarding/platform-mark";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const APP_ICON = require("../../../assets/icon.png");
 const SHARE_SIZE = 40;
+const HANDLES = { instagram: "city.notes", tiktok: "weekend.eats" } as const;
 
 export function PracticePost({
   sample,
@@ -20,6 +25,7 @@ export function PracticePost({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const platform = platformOf(sample);
   return (
     <Pressable
       accessibilityRole="button"
@@ -40,8 +46,9 @@ export function PracticePost({
           style={styles.avatar}
         />
         <Text style={styles.author} numberOfLines={1}>
-          {sample.domain}
+          {HANDLES[platform]}
         </Text>
+        <PlatformMark platform={platform} size={24} />
       </View>
       <Image
         source={sampleImage(sample)}
@@ -111,7 +118,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   image: {
     width: "100%",
-    aspectRatio: 2,
+    aspectRatio: 1.4,
     backgroundColor: theme.colors.primarySoft,
   },
   footer: {

@@ -60,8 +60,20 @@ vi.mock("@/lib/analytics", () => ({
   },
 }));
 
-const { getQueuedFirstSaveUrl, queueFirstSave, useQueuedFirstSave } =
+const { getQueuedFirstSaveUrl, useQueuedFirstSave } =
   await import("./queued-first-save");
+
+/** Only an older build's onboarding queues a first save, so seed the keychain the way it left it. */
+function queueFirstSave(save: {
+  url: string;
+  destination: string | null;
+  source: "direct" | "share";
+}) {
+  mock.store.set(
+    "shelvr.onboarding.queuedSave",
+    JSON.stringify({ ...save, owner: null }),
+  );
+}
 
 const SAMPLE = "https://sample.test/ready-made";
 const result = (overrides: object = {}) => ({

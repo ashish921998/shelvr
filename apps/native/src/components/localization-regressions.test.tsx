@@ -1,14 +1,11 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
 import { Button } from "./ui/button";
 import { Pressable } from "react-native";
 import { TidyDone } from "./tidy/tidy-done";
-import { SetupStep } from "@/components/onboarding/setup";
-import { onboardingLabel } from "@/lib/onboarding-labels";
-import { getSpacePresets } from "@/lib/save-kinds";
 
 const device = vi.hoisted(() => ({
   tag: "en-US",
@@ -246,48 +243,6 @@ it("translates the singular deleted-photo summary on a mounted screen", () => {
   changeLanguage("ja-JP");
   expect(screen.queryByText(/1 photo deleted/)).toBeNull();
   expect(screen.queryByText(/1 deleted/)).toBeNull();
-});
-
-it("preserves selected preset identities and focused setup chips across languages", () => {
-  let selected: string[] = [];
-  const toggleKind = vi.fn();
-  function Setup() {
-    const [spaces, setSpaces] = useState(getSpacePresets(["Recipes"]));
-    selected = spaces;
-    return (
-      <SetupStep
-        kinds={["Recipes"]}
-        spaces={spaces}
-        onToggleKind={toggleKind}
-        onToggleSpace={(name) =>
-          setSpaces((prev) => prev.filter((item) => item !== name))
-        }
-        onAddSpace={() => {}}
-        onAdvance={() => {}}
-      />
-    );
-  }
-  render(<Setup />);
-  const chip = screen.getByRole("button", {
-    name: onboardingLabel("Restaurants to try"),
-  });
-  chip.focus();
-  changeLanguage("de-DE");
-  expect(document.activeElement).toBe(chip);
-  expect(chip.textContent).toBe(onboardingLabel("Restaurants to try"));
-  expect(chip.textContent).not.toBe("Restaurants to try");
-  fireEvent.click(chip);
-  expect(selected).not.toContain("Restaurants to try");
-  expect(selected).toContain("Recipes");
-
-  const kindTile = screen.getByRole("button", {
-    name: onboardingLabel("Fitness"),
-  });
-  kindTile.focus();
-  changeLanguage("ja-JP");
-  expect(document.activeElement).toBe(kindTile);
-  fireEvent.click(kindTile);
-  expect(toggleKind).toHaveBeenCalledWith("Fitness");
 });
 
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));

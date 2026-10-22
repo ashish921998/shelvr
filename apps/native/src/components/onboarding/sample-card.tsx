@@ -1,4 +1,3 @@
-import { t } from "@/lib/i18n";
 import type { DemoKind, DemoSample } from "@/lib/onboarding-demo";
 import type { Interest } from "@/lib/onboarding-interests";
 import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
@@ -27,60 +26,12 @@ const INTEREST_IMAGES: Record<Interest, number> = {
 };
 
 export function sampleImage(sample: DemoSample): number {
-  if (sample.city !== undefined) return CITY_PICTURES[sample.city].view;
+  if (sample.city !== undefined) {
+    return CITY_PICTURES[sample.city][sample.picture ?? "view"];
+  }
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
     : INTEREST_IMAGES[sample.interest];
-}
-
-export function SampleCard({
-  sample,
-  action,
-  disabled,
-  onPress,
-}: {
-  sample: DemoSample;
-  action: "save" | "share";
-  disabled: boolean;
-  onPress?: () => void;
-}) {
-  const { theme } = useUnistyles();
-  const share = action === "share";
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.post,
-        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
-      ]}
-    >
-      <Image
-        source={sampleImage(sample)}
-        contentFit="cover"
-        style={styles.postImage}
-      />
-      <View style={styles.postBody}>
-        <View style={styles.linkText}>
-          <Text style={styles.postTitle} numberOfLines={2}>
-            {sample.pageHeading}
-          </Text>
-          <Text style={styles.linkUrl} numberOfLines={1}>
-            {sample.domain}
-          </Text>
-        </View>
-        <View style={styles.hintShare}>
-          <AppSymbolIcon
-            name={share ? "square.and.arrow.up" : "plus"}
-            size={18}
-            tintColor={theme.colors.primaryForeground}
-          />
-        </View>
-      </View>
-    </Pressable>
-  );
 }
 
 export function SampleRow({
@@ -125,39 +76,6 @@ export function SampleRow({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  hintShare: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  post: {
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    overflow: "hidden",
-  },
-  postImage: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  postBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(1.5),
-  },
-  postTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    lineHeight: 22,
-    color: theme.colors.foreground,
-  },
   linkText: {
     flex: 1,
     gap: 2,

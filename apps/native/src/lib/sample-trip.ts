@@ -1,5 +1,3 @@
-import type { Interest } from "@/lib/onboarding-interests";
-import type { SaveKind } from "@/lib/save-kinds";
 import {
   SAMPLE_CITIES,
   isSampleCity,
@@ -9,16 +7,10 @@ import {
   type SampleSave,
   type SampleSlot,
 } from "@/lib/sample-cities";
+import { planAsCity, planCity, type PlanKind } from "@/lib/sample-plans";
 import type { TextMessageKey } from "@/locales/message-types";
 
 export { isSampleCity };
-
-export function showTripTeaser(
-  kinds: readonly SaveKind[],
-  interests: readonly Interest[],
-): boolean {
-  return kinds.includes("Travel") || interests.includes("Travel");
-}
 
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
@@ -27,13 +19,17 @@ export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
   lunch: "trip.slotLunch",
   afternoon: "trip.slotAfternoon",
   dinner: "trip.slotDinner",
+  drinks: "trip.slotDrinks",
+  dessert: "trip.slotDessert",
+  walk: "trip.slotWalk",
+  brunch: "trip.slotBrunch",
+  coffee: "trip.slotCoffee",
 };
 
 export const SAMPLE_MAP = { width: 340, height: 168 } as const;
 
 export type SampleCrop = { top: number; height: number };
 export const SAMPLE_CROPS = {
-  locked: { top: 28, height: 120 },
   reveal: { top: 10, height: 150 },
 } as const satisfies Record<string, SampleCrop>;
 
@@ -43,6 +39,7 @@ export type SampleStop = {
   name: string;
   slot: SampleSlot;
   pin: Point;
+  at: LatLng;
 };
 
 type SampleDay = {
@@ -51,6 +48,7 @@ type SampleDay = {
 };
 
 export type SampleTrip = {
+  kind: PlanKind;
   city: SampleCityId;
   name: TextMessageKey;
   saves: readonly SampleSave[];
@@ -183,8 +181,11 @@ function spreadPins(
   }));
 }
 
-function buildTrip(id: SampleCityId): SampleTrip {
-  const city: SampleCity = SAMPLE_CITIES[id];
+function buildTrip(
+  kind: PlanKind,
+  id: SampleCityId,
+  city: SampleCity,
+): SampleTrip {
   const stops = city.days.flatMap((day) => day.stops);
   const place = projection(stops.map((stop) => stop.at));
   const water: Water = {
@@ -198,6 +199,7 @@ function buildTrip(id: SampleCityId): SampleTrip {
   );
   let next = 0;
   return {
+    kind,
     city: id,
     name: city.name,
     saves: city.saves,
@@ -206,7 +208,7 @@ function buildTrip(id: SampleCityId): SampleTrip {
       stops: day.stops.map((stop) => {
         const pin = pins[next];
         next += 1;
-        return { name: stop.name, slot: stop.slot, pin };
+        return { name: stop.name, slot: stop.slot, pin, at: stop.at };
       }),
     })),
     water: water.lines.map((line) =>
@@ -221,16 +223,32 @@ function buildTrip(id: SampleCityId): SampleTrip {
   };
 }
 
-const TRIPS = new Map<SampleCityId, SampleTrip>();
+const TRIPS = new Map<string, SampleTrip>();
 
-export function sampleTrip(city?: string | null): SampleTrip {
-  const id = isSampleCity(city) ? city : DEFAULT_SAMPLE_CITY;
-  let trip = TRIPS.get(id);
+/** The sample a goal shows: a trip in the picked city, or a date night or weekend there, in Prague when that city has none. */
+export function samplePlan(kind: PlanKind, city?: string | null): SampleTrip {
+  const picked = isSampleCity(city) ? city : null;
+  const tripCity =
+    picked !== null && SAMPLE_CITIES[picked].days.length > 0 ? picked : null;
+  const id =
+    kind === "trip"
+      ? (tripCity ?? DEFAULT_SAMPLE_CITY)
+      : planCity(kind, picked);
+  const key = `${kind}:${id}`;
+  let trip = TRIPS.get(key);
   if (trip === undefined) {
-    trip = buildTrip(id);
-    TRIPS.set(id, trip);
+    trip = buildTrip(
+      kind,
+      id,
+      kind === "trip" ? SAMPLE_CITIES[id] : planAsCity(kind, id),
+    );
+    TRIPS.set(key, trip);
   }
   return trip;
+}
+
+export function sampleTrip(city?: string | null): SampleTrip {
+  return samplePlan("trip", city);
 }
 
 export type NumberedStop = {
@@ -259,4 +277,24 @@ export function sampleRows(trip: SampleTrip): SampleRow[] {
       .filter((entry) => entry.day === day)
       .map((entry) => ({ kind: "stop" as const, entry })),
   ]);
+}
+
+export const EVENING_AFTER = ["walk", "drinks", "dessert"] as const;
+export type EveningAfter = (typeof EVENING_AFTER)[number];
+
+export const isEveningAfter = (value: unknown): value is EveningAfter =>
+  EVENING_AFTER.some((after) => after === value);
+
+/** A date night cut to dinner and the one stop picked for after it; other plans pass through. */
+export function eveningWith(trip: SampleTrip, after: EveningAfter): SampleTrip {
+  if (trip.kind !== "date") return trip;
+  return {
+    ...trip,
+    days: trip.days.map((day) => ({
+      ...day,
+      stops: day.stops.filter(
+        (stop) => stop.slot === "dinner" || stop.slot === after,
+      ),
+    })),
+  };
 }

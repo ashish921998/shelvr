@@ -30,7 +30,7 @@ const BLOCKS = [
 const DOTS = [0.1, 6];
 const WATER = { light: "#cfdcd7", dark: "#2f4147" };
 
-export function usePinColors() {
+function usePinColors() {
   const { theme } = useUnistyles();
   return (day: number) =>
     day === 0
