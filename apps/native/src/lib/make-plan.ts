@@ -211,6 +211,8 @@ export function usePlanPicker(
       timers.current.forEach(clearTimeout);
       timers.current = [];
       spinningPlan.current = null;
+      // A failed shuffle brings the same plan back; a spin cut short must not come back with it.
+      setPick((shown) => (shown?.spinning ? null : shown));
     },
     [planId],
   );

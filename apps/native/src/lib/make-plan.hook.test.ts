@@ -304,6 +304,32 @@ describe("usePlanPicker", () => {
     expect(onPicked).toHaveBeenCalledWith(result.current.picked);
   });
 
+  it("can pick again when a failed shuffle brings back the plan it was spinning", () => {
+    vi.useFakeTimers();
+    const onPicked = vi.fn();
+    const places = [place("Alpha"), place("Beta"), place("Gamma")];
+    const { result, rerender } = renderHook(
+      ({ planId }: { planId: number | null }) =>
+        usePlanPicker(places, planId, { reducedMotion: false, onPicked }),
+      { initialProps: { planId: 1 as number | null } },
+    );
+    act(() => result.current.pickForMe());
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current.isSpinning).toBe(true);
+
+    rerender({ planId: null });
+    rerender({ planId: 1 });
+    expect(result.current.isSpinning).toBe(false);
+    expect(result.current.highlight).toBeNull();
+
+    act(() => result.current.pickForMe());
+    spinToEnd();
+    expect(onPicked).toHaveBeenCalledTimes(1);
+    expect(result.current.isSpinning).toBe(false);
+  });
+
   it("clears its timers on unmount", () => {
     vi.useFakeTimers();
     const onPicked = vi.fn();
