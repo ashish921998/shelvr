@@ -91,7 +91,9 @@ export function textFaceCopy(
       : item.description) || undefined;
   if (title && words) return { body: words, captionTitle: title };
   const name = item.type === "note" ? item.note || title : (title ?? words);
-  return { body: name ?? failedLabel ?? displayHost(item.url) };
+  const unread =
+    item.status === "processing" ? t("item.reading") : displayHost(item.url);
+  return { body: name ?? failedLabel ?? unread };
 }
 
 const NOTE_TITLE_CUT = 80;
@@ -274,7 +276,10 @@ function CardCaption({
         label={t("item.actions")}
         title={t("item.actions")}
         actions={menuActions}
-        style={[styles.menuButton, !hostRow && styles.menuOnTitle]}
+        style={[
+          styles.menuButton,
+          !(hostRow && captionTitle !== undefined) && styles.menuOnTitle,
+        ]}
       >
         <AppSymbolIcon
           name="ellipsis"

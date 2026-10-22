@@ -580,6 +580,16 @@ describe("textFaceCopy", () => {
     });
   });
 
+  it("says Shelvr is reading a link instead of naming its site twice", () => {
+    expect(
+      textFaceCopy({
+        ...base,
+        status: "processing",
+        url: "https://www.theverge.com/a",
+      }),
+    ).toEqual({ body: "Shelvr is reading this…" });
+  });
+
   it("leaves a note's own heading to the caption instead of printing it twice", () => {
     const note = { ...base, type: "note" as const, title: "Mum's Gift Ideas" };
     expect(
