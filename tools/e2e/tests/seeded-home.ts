@@ -1,3 +1,7 @@
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
 import { beforeEach } from "@e2e-dev/mobile";
 import { type App, expect, type Locator, type Screen } from "e2e";
 
@@ -29,9 +33,18 @@ const PROFILE_WAIT_MS = 15_000;
  * Starts every test on Home as the anonymous dev user with the fixture data:
  * 4 saves, 3 spaces and a Pro entitlement. Needs AUTH_ENABLE_ANONYMOUS on the
  * dev Convex deployment; the reset button does not exist otherwise.
+ *
+ * With E2E_FIXTURE_RESET=backend (the e2e workflow) the data is reset from
+ * the CLI before the app opens, so a signed-in app needs one launch and no
+ * trip through Settings. Everywhere else, and in a flow that asks for
+ * `reset: "settings"` (create-space keeps that path covered in CI), it is
+ * reset through Settings as a person would.
  */
-export function startOnSeededHome(): void {
+export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
+  const fromBackend =
+    options.reset !== "settings" && process.env.E2E_FIXTURE_RESET === "backend";
   beforeEach(async ({ app, screen }) => {
+    if (fromBackend) await resetFixturesFromBackend();
     // Three ways the app can open: already signed in (Profile), on the
     // sign-in screen (dev login), or, on a fresh install, on the onboarding
     // opener, whose "Sign in" link leads to the same dev login.
@@ -61,33 +74,64 @@ export function startOnSeededHome(): void {
         waitMs: 10_000,
         timeout: 60_000,
       });
-    if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
+    const wasSignedIn = await profile.isVisible();
+    if (!wasSignedIn) await devLogin.tap({ timeout: 30_000 });
     await answerAiConsent(screen, profile);
+    // The account the backend reset seeded is the one on screen.
+    if (fromBackend && wasSignedIn) return;
 
-    // A Profile tap has been lost with nothing on screen to say why: the
-    // engine reported the tap, Profile never opened, and Home looked ready
-    // (seen 2026-10-14, once in three runs; tapping the moment the splash
-    // leaves did not reproduce it in 13 tries).
-    const settings = screen.getByRole("button", "Settings");
-    await tapUntilVisible(profile, settings, {
-      waitMs: PROFILE_WAIT_MS,
-      timeout: BUNDLE_TIMEOUT,
-    });
-    await settings.tap();
-    const reset = screen.getByTestId("reset-flow-fixtures");
-    await scrollSettingsTo(screen, reset);
-    await reset.tap();
-    await screen.getByRole("button", "Reset").tap();
-    await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
-      timeout: 30_000,
-    });
-    await screen.getByRole("button", "OK").tap();
+    // A dev login makes a new anonymous account, so it is seeded now, and
+    // the app is opened again so no screen keeps the old data.
+    if (fromBackend) await resetFixturesFromBackend();
+    else await resetThroughSettings(screen, profile);
 
     await openApp(app, screen, () => profile.isVisible());
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
   });
+}
+
+const NATIVE_APP_DIR = fileURLToPath(
+  new URL("../../../apps/native/", import.meta.url),
+);
+
+/**
+ * Seeds every anonymous account on the e2e job's local backend
+ * (`devFixtures:resetAnonymousUsersForE2e`, which refuses any other
+ * deployment). The CLI reads the deployment from apps/native/.env.local.
+ */
+async function resetFixturesFromBackend(): Promise<void> {
+  await promisify(execFile)(
+    "npx",
+    ["convex", "run", "devFixtures:resetAnonymousUsersForE2e"],
+    { cwd: NATIVE_APP_DIR, timeout: 60_000 },
+  );
+}
+
+/** Resets the fixtures from Settings' development section. */
+async function resetThroughSettings(
+  screen: Screen,
+  profile: Locator,
+): Promise<void> {
+  // A Profile tap has been lost with nothing on screen to say why: the
+  // engine reported the tap, Profile never opened, and Home looked ready
+  // (seen 2026-10-14, once in three runs; tapping the moment the splash
+  // leaves did not reproduce it in 13 tries).
+  const settings = screen.getByRole("button", "Settings");
+  await tapUntilVisible(profile, settings, {
+    waitMs: PROFILE_WAIT_MS,
+    timeout: BUNDLE_TIMEOUT,
+  });
+  await settings.tap();
+  const reset = screen.getByTestId("reset-flow-fixtures");
+  await scrollSettingsTo(screen, reset);
+  await reset.tap();
+  await screen.getByRole("button", "Reset").tap();
+  await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
+    timeout: 30_000,
+  });
+  await screen.getByRole("button", "OK").tap();
 }
 
 /**

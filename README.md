@@ -182,7 +182,7 @@ plus a smoke test (`tests/smoke.e2e.ts`) that only opens the seeded Home.
 Search, save-a-note, create-a-space and the paywall use plain locators and make
 no model call from the test; save-a-note still needs the backend's model, which
 makes the note searchable. The paywall flow relaunches the app with `-E2EHidePro YES`, which makes
-a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check`. The `e2e ios` workflow runs search, search-no-results, create-space, the paywall, save-a-note and save-link-fixture on pull requests that touch the app, against a local Convex backend and with no real model, as a check that is not required yet. That backend classifies the note, and serves and classifies a fixture page for save-link-fixture, with the deterministic fake in `apps/native/convex/model/fakeAi.ts`, which only a local backend with the e2e switch, dev sign-in and the placeholder key turns on. Every flow launches with `-E2EHideLogBox YES`, which keeps the
+a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check`. The `e2e ios` workflow runs search, search-no-results, create-space, onboarding, the paywall, save-a-note, save-link-fixture and space-suggestions on main and on pull requests that touch the app and carry the `run-e2e` label (split over two runners), against a local Convex backend and with no real model, as a check that is not required yet. That backend classifies the note, and serves and classifies a fixture page for save-link-fixture, with the deterministic fake in `apps/native/convex/model/fakeAi.ts`, which only a local backend with the e2e switch, dev sign-in and the placeholder key turns on. Every flow launches with `-E2EHideLogBox YES`, which keeps the
 development error banner from covering the controls the flows tap.
 
 It needs a booted iOS simulator with the development build
@@ -192,7 +192,9 @@ app runs in English whatever the simulator's language, and the save-a-photo
 flow adds its own photo (`tools/e2e/fixtures/photo.png`) to the simulator's
 library. Each
 test signs in as the anonymous dev user and resets its data through Settings >
-"Reset flow fixtures", so run it only against a throwaway dev user.
+"Reset flow fixtures" (in CI, `E2E_FIXTURE_RESET=backend` resets it from the
+Convex CLI instead, except create-space, which keeps the Settings reset
+covered), so run it only against a throwaway dev user.
 
 ```sh
 cd tools/e2e

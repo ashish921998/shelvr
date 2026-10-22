@@ -36,10 +36,12 @@ test("saves a note and finds it by its own words", async ({ screen }) => {
   // The model titles the note, so the result's label is not known ahead of
   // time. Once the search has answered, the result is the only button on the
   // screen that is not a search or keyboard control. Waiting for exactly one
-  // means a stray button fails the flow here instead of being tapped.
+  // means a stray button fails the flow here instead of being tapped. The
+  // software keyboard, when the simulator shows it, adds its own "shift" and
+  // "search" buttons (CI run 39600098062).
   const result = screen.getByRole(
     "button",
-    /^(?!(Clear text|Close|Emoji|Dictate)$).+/,
+    /^(?!(Clear text|Close|Emoji|Dictate|shift|search)$).+/,
   );
   await expect(result).toHaveCount(1, { timeout: 60_000 });
   await result.tap();
