@@ -212,6 +212,12 @@ function SpaceCard({
   const router = useRouter();
   const href = `/space/${space._id}` as const;
   const cover = (space.previews ?? [])[0];
+  const countLabel =
+    space.itemCount > 0
+      ? t("spaces.saveCount", { count: space.itemCount })
+      : space.suggestionCount > 0
+        ? t("spaces.suggestionCount", { count: space.suggestionCount })
+        : undefined;
   // As in item-card: on iOS expo-router hosts the trigger inside zero-size
   // native views, and iOS drops every accessibility element under them, so
   // the card is read from the cell instead. Android keeps it on the
@@ -220,14 +226,7 @@ function SpaceCard({
     accessible: true,
     role: "button" as const,
     accessibilityLabel: space.name,
-    accessibilityValue: {
-      text:
-        space.itemCount > 0
-          ? t("spaces.saveCount", { count: space.itemCount })
-          : space.suggestionCount > 0
-            ? t("spaces.suggestionCount", { count: space.suggestionCount })
-            : undefined,
-    },
+    accessibilityValue: { text: countLabel },
     accessibilityActions: [{ name: "delete", label: t("common.delete") }],
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
       if (event.nativeEvent.actionName === "delete") {
@@ -256,9 +255,18 @@ function SpaceCard({
                   suggestionCount={space.suggestionCount}
                 />
                 <View style={styles.caption}>
-                  <Text style={styles.title} numberOfLines={1}>
-                    {space.name}
-                  </Text>
+                  <View style={styles.captionText}>
+                    <Text style={styles.title} numberOfLines={1}>
+                      {space.name}
+                    </Text>
+                    {/* A space without a cover already shows its count on
+                        the empty card. */}
+                    {cover && countLabel ? (
+                      <Text style={styles.count} numberOfLines={1}>
+                        {countLabel}
+                      </Text>
+                    ) : null}
+                  </View>
                   <ActionMenu
                     label={t("spaces.actions")}
                     title={t("spaces.actions")}
@@ -456,12 +464,19 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(0.5),
     paddingTop: theme.gap(1),
   },
-  title: {
+  captionText: {
     flex: 1,
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    gap: 2,
+  },
+  title: {
+    ...theme.type.subheadStrong,
+    lineHeight: 20,
     color: theme.colors.foreground,
+  },
+  count: {
+    ...theme.type.caption,
+    lineHeight: 17,
+    color: theme.colors.muted,
   },
   emptySection: {
     gap: theme.gap(1),
