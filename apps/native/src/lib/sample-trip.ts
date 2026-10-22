@@ -2,6 +2,7 @@ import type { Interest } from "@/lib/onboarding-interests";
 import type { SaveKind } from "@/lib/save-kinds";
 import {
   SAMPLE_CITIES,
+  isSampleCity,
   type LatLng,
   type SampleCity,
   type SampleCityId,
@@ -9,6 +10,8 @@ import {
   type SampleSlot,
 } from "@/lib/sample-cities";
 import type { TextMessageKey } from "@/locales/message-types";
+
+export { isSampleCity };
 
 // The sample trip onboarding builds before the paywall, for people who said
 // they save travel. It is in the city they said they are going to next, the
@@ -84,6 +87,13 @@ const WATER_WIDTH = 16;
 // How far a pin's centre stays from the water's edge, so a place on land
 // never reads as in the river. A pin is 22 across, so most of it is on land.
 const WATER_CLEARANCE = 8;
+// A pin this many clearances from a line, on the wrong side, has crossed the
+// water while spreading and goes back to its own bank.
+const CROSSING_REACH = 3;
+// How many spreading passes may run before the pins are left where they are.
+const SPREAD_ROUNDS = 80;
+// Pins on the same spot part along this fixed slant (a unit vector).
+const SAME_SPOT_SLANT = [0.8, 0.6] as const;
 
 /** Places the trip's real coordinates on the drawing: one scale for both
  * axes (a degree of longitude shrinks away from the equator), centred in the
@@ -156,7 +166,8 @@ function keepOffWater(pin: Point, home: Point, water: Water): boolean {
   for (const line of water.lines) {
     const bank = nearestOnLine(home, line);
     const now = nearestOnLine(pin, line);
-    const crossed = now.side !== bank.side && now.distance < room * 3;
+    const crossed =
+      now.side !== bank.side && now.distance < room * CROSSING_REACH;
     if (now.distance >= room && !crossed) continue;
     // Off the line, square to it, on the place's own bank.
     const sign = now.side === bank.side ? 1 : -1;
@@ -177,7 +188,7 @@ function spreadPins(
 ): Point[] {
   const spread = pins.map((pin) => ({ ...pin }));
   const homes = pins.map((pin) => ({ ...pin }));
-  for (let round = 0; round < 80; round += 1) {
+  for (let round = 0; round < SPREAD_ROUNDS; round += 1) {
     let moved = false;
     for (let a = 0; a < spread.length; a += 1) {
       for (let b = a + 1; b < spread.length; b += 1) {
@@ -186,9 +197,8 @@ function spreadPins(
         const distance = Math.hypot(dx, dy);
         if (distance >= PIN_GAP) continue;
         moved = true;
-        // Pins on the same spot part along a fixed slant.
         const [ux, uy] =
-          distance === 0 ? [0.8, 0.6] : [dx / distance, dy / distance];
+          distance === 0 ? SAME_SPOT_SLANT : [dx / distance, dy / distance];
         const push = (PIN_GAP - distance) / 2;
         spread[a].x -= ux * push;
         spread[a].y -= uy * push;
@@ -250,14 +260,6 @@ function buildTrip(id: SampleCityId): SampleTrip {
 }
 
 const TRIPS = new Map<SampleCityId, SampleTrip>();
-
-/** Whether `value` names a city there is a sample trip for. */
-export function isSampleCity(value: unknown): value is SampleCityId {
-  return (
-    typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(SAMPLE_CITIES, value)
-  );
-}
 
 /** The sample trip in `city`, or in the default city when there is none. */
 export function sampleTrip(city?: string | null): SampleTrip {
