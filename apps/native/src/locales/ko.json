@@ -255,6 +255,7 @@
   "spaces.addAll": "모두 추가",
   "spaces.emptyTitle": "아직 아무것도 없어요",
   "spaces.emptyBody": "Shelvr가 이 공간에 어울리는 항목을 찾고 있어요.\n위의 +로 직접 추가할 수도 있어요.",
+  "spaces.emptyBodyManual": "위의 +로 이 공간에 항목을 추가할 수 있어요.",
   "plan.make": "계획 세우기",
   "plan.button": "계획",
   "plan.pickerTitle": "무엇을 계획하나요?",

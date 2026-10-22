@@ -295,7 +295,11 @@ export default function SpaceScreen() {
           ListEmptyComponent={
             <EmptyState
               title={t("spaces.emptyTitle")}
-              message={t("spaces.emptyBody")}
+              message={
+                space.dynamic === true
+                  ? t("spaces.emptyBody")
+                  : t("spaces.emptyBodyManual")
+              }
             />
           }
         />
