@@ -25,7 +25,10 @@ export const ONBOARDING_STEPS = [
 // 11 asks people who pick Travel on the interests step what kind of spots they
 // like; each pick is a space, listed on onboarding_completed as travel_vibes.
 // The steps are unchanged.
-export const ONBOARDING_FLOW_VERSION = 11;
+// 12 asks people who pick Travel where they are going next; the sample trip is
+// in that city (Prague for "Not sure yet"), sent on onboarding_completed as
+// sample_city. The steps are unchanged.
+export const ONBOARDING_FLOW_VERSION = 12;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 

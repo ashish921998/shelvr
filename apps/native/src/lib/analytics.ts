@@ -269,6 +269,9 @@ export type AnalyticsEventProperties = {
     // The kinds of spots picked under Travel on that step (flow 11 on). Each
     // is also one of the spaces, and a preset identity, so it is in space_names.
     travel_vibes: string[];
+    // The city picked for the sample trip under Travel (flow 12 on), one of
+    // the fixed sample cities; null for "Not sure yet" or no Travel.
+    sample_city: string | null;
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
