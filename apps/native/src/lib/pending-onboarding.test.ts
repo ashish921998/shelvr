@@ -96,6 +96,7 @@ describe("onboarding recovery", () => {
         source: "share",
       },
       saved: null,
+      travelCity: null,
     });
     setPendingDemo(null);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -134,6 +135,28 @@ describe("onboarding recovery", () => {
     expect(getOnboardingProgress().demo).toBeNull();
     expect(getOnboardingProgress().spaces).toEqual(["Recipes"]);
     expect(hasPending()).toBe(true);
+  });
+});
+
+describe("the sample trip's city", () => {
+  it("is kept with the progress through a relaunch and a demo update", () => {
+    setOnboardingProgress({
+      saveKinds: [],
+      spaces: ["Travel"],
+      step: 2,
+      travelCity: "tokyo",
+    });
+    setPendingDemo({
+      url: "https://example.com/trip",
+      destination: null,
+      source: "direct",
+    });
+    expect(getOnboardingProgress().travelCity).toBe("tokyo");
+  });
+
+  it("reads back as none when the record holds no city", () => {
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 1 });
+    expect(getOnboardingProgress().travelCity).toBeNull();
   });
 });
 
@@ -225,6 +248,7 @@ describe("progress written by an older onboarding flow", () => {
     step: null,
     demo: null,
     saved: null,
+    travelCity: null,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -293,6 +317,7 @@ describe("progress written by an older onboarding flow", () => {
         source: "direct",
       },
       saved: null,
+      travelCity: null,
     });
   });
 
@@ -314,6 +339,7 @@ describe("progress written by an older onboarding flow", () => {
       step: 0,
       demo: null,
       saved: null,
+      travelCity: null,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

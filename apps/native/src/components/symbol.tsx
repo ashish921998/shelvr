@@ -65,6 +65,7 @@ const SF_TO_MATERIAL = {
   "chevron.left": "arrow_back",
   "chevron.right": "arrow_forward",
   "chevron.up": "expand_less",
+  "chevron.up.chevron.down": "unfold_more",
   "arrow.uturn.backward": "undo",
   // Tabs / system
   "house.fill": "home",

@@ -3,7 +3,6 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { SKIA_FONTS } from "@/lib/skia-fonts";
 import {
   SAMPLE_SLOT_LABELS,
-  SAMPLE_TRIP,
   type NumberedStop,
   type SampleRow,
 } from "@/lib/sample-trip";
@@ -186,17 +185,16 @@ function DrawnStop({
 function DrawnDay({
   top,
   width,
-  day,
+  row: { day, title, places },
   fonts,
 }: {
   top: number;
   width: number;
-  day: number;
+  row: Extract<SampleRow, { kind: "day" }>;
   fonts: Fonts;
 }) {
   const { theme } = useUnistyles();
-  const { title, stops } = SAMPLE_TRIP.days[day];
-  const count = t("tripTeaser.placeCount", { count: stops.length });
+  const count = t("tripTeaser.placeCount", { count: places });
   const eyebrowTop = top + DIVIDER + DAY_PAD_TOP;
   const titleTop = eyebrowTop + EYEBROW_LINE + DAY_TEXT_GAP;
   return (
@@ -259,7 +257,7 @@ export function VeiledStops({ rows }: { rows: readonly SampleRow[] }) {
                   key={index}
                   top={top}
                   width={width}
-                  day={row.day}
+                  row={row}
                   fonts={fonts}
                 />
               ) : (

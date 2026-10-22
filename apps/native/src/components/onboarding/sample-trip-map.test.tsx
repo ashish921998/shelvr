@@ -5,8 +5,18 @@
 import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SAMPLE_CROPS } from "@/lib/sample-trip";
+import { SAMPLE_CROPS, sampleTrip } from "@/lib/sample-trip";
+
 import { PinBadge, SampleTripMap } from "./sample-trip-map";
+
+const TRIP = sampleTrip("prague");
+const PINS = TRIP.days.flatMap((day) => day.stops.map((stop) => stop.pin));
+const FIRST = PINS[0]!;
+const LAST = PINS[PINS.length - 1]!;
+const route = (day: number) =>
+  TRIP.days[day]!.stops.map(
+    ({ pin }, index) => `${index === 0 ? "M" : "L"}${pin.x} ${pin.y}`,
+  ).join(" ");
 
 type Style = Record<string, unknown> | Style[] | false | null | undefined;
 type ViewProps = {
@@ -119,23 +129,23 @@ const measure = (width: number) =>
   act(() => mock.layout?.({ nativeEvent: { layout: { width } } }));
 
 describe("SampleTripMap", () => {
-  it("is described as a map of the sample city and its five stops", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
+  it("is described as a map of the sample city and its eight stops", () => {
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
     expect(
       screen.getByLabelText(
-        'tripTeaser.mapLabel:{"city":"tripTeaser.city","places":"5"}',
+        'tripTeaser.mapLabel:{"city":"tripTeaser.cityPrague","places":"8"}',
       ),
     ).toBeTruthy();
   });
 
   it("draws nothing until the card is measured", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
     expect(screen.queryByTestId("canvas")).toBeNull();
-    expect(screen.queryAllByText(/^[1-5]$/)).toHaveLength(0);
+    expect(screen.queryAllByText(/^[1-8]$/)).toHaveLength(0);
   });
 
   it("places each pin at the drawing's point, cut to the crop", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
     measure(340);
     const left = (n: number) =>
       screen
@@ -147,45 +157,52 @@ describe("SampleTripMap", () => {
         .getByText(String(n))
         .closest("[data-left]")
         ?.getAttribute("data-top");
-    // Pin 1 sits at (250, 76) on the drawing; the locked crop starts at y 28
-    // and a pin is 22 across, so its corner is 11 short of its center.
-    expect([left(1), top(1)]).toEqual(["239", "37"]);
-    // Pin 5 sits at (96, 122).
-    expect([left(5), top(5)]).toEqual(["85", "83"]);
+    // The locked crop starts at y 28 and a pin is 22 across, so its corner is
+    // 11 short of its center.
+    expect([left(1), top(1)]).toEqual([
+      String(FIRST.x - 11),
+      String(FIRST.y - 28 - 11),
+    ]);
+    expect([left(8), top(8)]).toEqual([
+      String(LAST.x - 11),
+      String(LAST.y - 28 - 11),
+    ]);
   });
 
   it("scales the pins' places and the drawing with the card's width", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
     measure(680);
     const place = screen.getByText("1").closest("[data-left]");
-    expect(place?.getAttribute("data-left")).toBe(String(250 * 2 - 11));
-    expect(place?.getAttribute("data-top")).toBe(String((76 - 28) * 2 - 11));
+    expect(place?.getAttribute("data-left")).toBe(String(FIRST.x * 2 - 11));
+    expect(place?.getAttribute("data-top")).toBe(
+      String((FIRST.y - 28) * 2 - 11),
+    );
     expect(screen.getByTestId("group").dataset.transform).toBe(
       JSON.stringify([{ scale: 2 }, { translateY: -28 }]),
     );
   });
 
   it("starts the open card's crop higher", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.reveal} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.reveal} />);
     measure(340);
     const place = screen.getByText("1").closest("[data-left]");
-    expect(place?.getAttribute("data-top")).toBe(String(76 - 10 - 11));
+    expect(place?.getAttribute("data-top")).toBe(String(FIRST.y - 10 - 11));
   });
 
   it("joins each day's stops with a dotted route in that day's color", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
     measure(340);
-    const route = (path: string) =>
+    const drawn = (path: string) =>
       screen
         .getAllByTestId("path")
         .find((candidate) => candidate.dataset.path === path);
-    expect(route("M250 76 L232 124 L188 92")?.dataset.color).toBe("#amber");
-    expect(route("M118 56 L96 122")?.dataset.color).toBe("#dark");
+    expect(drawn(route(0))?.dataset.color).toBe("#amber");
+    expect(drawn(route(1))?.dataset.color).toBe("#dark");
     expect(screen.getAllByTestId("dash")).toHaveLength(2);
   });
 
   it("re-draws when the card is measured again", () => {
-    render(<SampleTripMap crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
     measure(340);
     measure(300);
     expect(screen.getByTestId("group").dataset.transform).toBe(

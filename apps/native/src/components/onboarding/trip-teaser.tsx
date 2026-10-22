@@ -4,7 +4,8 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { StitchRing } from "@/components/ui/stitch-loader";
 import { t, useAppLocale } from "@/lib/i18n";
 import { settleIn } from "@/lib/motion";
-import { SAMPLE_TRIP } from "@/lib/sample-trip";
+import type { SampleCityId, SampleSave } from "@/lib/sample-cities";
+import type { SampleTrip } from "@/lib/sample-trip";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
@@ -16,10 +17,54 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // builds from three sample saves, shows locked, and opens up after the
 // paywall. Each screen says the trip is a sample.
 
-const PICTURES = {
-  oldTown: require("../../../assets/onboarding/demo-travel.jpg"),
-  rooftops: require("../../../assets/onboarding/prague.jpg"),
-} as const;
+// Each city's covers: a dish for the reel, a view for the article. Unsplash,
+// under its free licence; credits are kept with the onboarding notes.
+const PICTURES: Record<SampleCityId, Record<"food" | "view", number>> = {
+  barcelona: {
+    food: require("../../../assets/onboarding/city-barcelona-food.jpg"),
+    view: require("../../../assets/onboarding/city-barcelona-view.jpg"),
+  },
+  lisbon: {
+    food: require("../../../assets/onboarding/city-lisbon-food.jpg"),
+    view: require("../../../assets/onboarding/city-lisbon-view.jpg"),
+  },
+  london: {
+    food: require("../../../assets/onboarding/city-london-food.jpg"),
+    view: require("../../../assets/onboarding/city-london-view.jpg"),
+  },
+  "los-angeles": {
+    food: require("../../../assets/onboarding/city-los-angeles-food.jpg"),
+    view: require("../../../assets/onboarding/city-los-angeles-view.jpg"),
+  },
+  "new-york": {
+    food: require("../../../assets/onboarding/city-new-york-food.jpg"),
+    view: require("../../../assets/onboarding/city-new-york-view.jpg"),
+  },
+  paris: {
+    food: require("../../../assets/onboarding/city-paris-food.jpg"),
+    view: require("../../../assets/onboarding/city-paris-view.jpg"),
+  },
+  prague: {
+    food: require("../../../assets/onboarding/city-prague-food.jpg"),
+    view: require("../../../assets/onboarding/prague.jpg"),
+  },
+  "san-francisco": {
+    food: require("../../../assets/onboarding/city-san-francisco-food.jpg"),
+    view: require("../../../assets/onboarding/city-san-francisco-view.jpg"),
+  },
+  seoul: {
+    food: require("../../../assets/onboarding/city-seoul-food.jpg"),
+    view: require("../../../assets/onboarding/city-seoul-view.jpg"),
+  },
+  tokyo: {
+    food: require("../../../assets/onboarding/city-tokyo-food.jpg"),
+    view: require("../../../assets/onboarding/city-tokyo-view.jpg"),
+  },
+  toronto: {
+    food: require("../../../assets/onboarding/city-toronto-food.jpg"),
+    view: require("../../../assets/onboarding/city-toronto-view.jpg"),
+  },
+};
 
 // Each build step takes this long, and the finished list holds a beat before
 // the trip shows.
@@ -57,10 +102,12 @@ function Head({
 }
 
 function SaveRow({
+  city,
   save,
   divider,
 }: {
-  save: (typeof SAMPLE_TRIP.saves)[number];
+  city: SampleCityId;
+  save: SampleSave;
   divider: boolean;
 }) {
   const { theme } = useUnistyles();
@@ -77,7 +124,7 @@ function SaveRow({
           />
         ) : (
           <Image
-            source={PICTURES[save.picture]}
+            source={PICTURES[city][save.picture]}
             contentFit="cover"
             style={styles.thumbImage}
           />
@@ -143,9 +190,15 @@ function BuildStepRow({
  * The trip builds from three sample saves, one step at a time, then moves on
  * by itself. Nothing is made or fetched; the steps show what a real trip does.
  */
-export function TripBuildStep({ onDone }: { onDone: () => void }) {
+export function TripBuildStep({
+  trip,
+  onDone,
+}: {
+  trip: SampleTrip;
+  onDone: () => void;
+}) {
   useAppLocale();
-  const saves = String(SAMPLE_TRIP.saves.length);
+  const saves = String(trip.saves.length);
   const steps = [
     t("tripTeaser.stepRead", { saves }),
     t("tripTeaser.stepFind"),
@@ -171,14 +224,17 @@ export function TripBuildStep({ onDone }: { onDone: () => void }) {
     <View style={styles.wrap}>
       <Head
         title={t("tripTeaser.buildTitle")}
-        accent={t("tripTeaser.buildTitleAccent", {
-          city: t("tripTeaser.city"),
-        })}
+        accent={t("tripTeaser.buildTitleAccent", { city: t(trip.name) })}
         body={t("tripTeaser.buildBody", { saves })}
       />
       <View style={styles.card}>
-        {SAMPLE_TRIP.saves.map((save, index) => (
-          <SaveRow key={save.name} save={save} divider={index > 0} />
+        {trip.saves.map((save, index) => (
+          <SaveRow
+            key={save.name}
+            city={trip.city}
+            save={save}
+            divider={index > 0}
+          />
         ))}
       </View>
       <View style={styles.buildList} accessibilityLiveRegion="polite">
@@ -208,15 +264,17 @@ export function TripBuildStep({ onDone }: { onDone: () => void }) {
  * veiled. One button opens the paywall.
  */
 export function TripLockedStep({
+  trip,
   leaving,
   onUnlock,
 }: {
+  trip: SampleTrip;
   /** `onUnlock` ran and the paywall is on its way. */
   leaving: boolean;
   onUnlock: () => void;
 }) {
   useAppLocale();
-  const city = t("tripTeaser.city");
+  const city = t(trip.name);
   return (
     <View style={styles.wrap}>
       <Animated.View entering={SETTLE_HEAD}>
@@ -224,12 +282,12 @@ export function TripLockedStep({
           title={t("tripTeaser.lockedTitle", { city })}
           accent={t("tripTeaser.lockedTitleAccent")}
           body={t("tripTeaser.sampleBody", {
-            saves: String(SAMPLE_TRIP.saves.length),
+            saves: String(trip.saves.length),
           })}
         />
       </Animated.View>
       <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard locked />
+        <SampleTripCard trip={trip} locked />
       </Animated.View>
       <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
         <CtaButton
@@ -244,7 +302,13 @@ export function TripLockedStep({
 }
 
 /** The sample trip, open, after the purchase. */
-export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
+export function TripRevealStep({
+  trip,
+  onContinue,
+}: {
+  trip: SampleTrip;
+  onContinue: () => void;
+}) {
   useAppLocale();
   const [leaving, setLeaving] = useState(false);
   const leftRef = useRef(false);
@@ -265,7 +329,7 @@ export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
         />
       </Animated.View>
       <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard locked={false} />
+        <SampleTripCard trip={trip} locked={false} />
       </Animated.View>
       <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
         <CtaButton

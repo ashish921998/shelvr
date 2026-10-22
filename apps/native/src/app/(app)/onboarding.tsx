@@ -3,11 +3,16 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
-import { showTripTeaser } from "@/lib/sample-trip";
+import type { SampleCityId } from "@/lib/sample-cities";
+import { isSampleCity, sampleTrip, showTripTeaser } from "@/lib/sample-trip";
 import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
-import { isTravelVibe, spacesAfterInterestToggle } from "@/lib/travel-vibes";
+import {
+  isTravelVibe,
+  spacesAfterInterestToggle,
+  VIBES_INTEREST,
+} from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -118,6 +123,12 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
+  // Where they are going next, asked with Travel; the sample trip is there.
+  const [travelCity, setTravelCity] = useState<SampleCityId | null>(() =>
+    isSampleCity(initialProgress.travelCity)
+      ? initialProgress.travelCity
+      : null,
+  );
   // Restored so a relaunch on the reminder step still offers to remind.
   const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
   const [reading, setReading] = useState(false);
@@ -150,10 +161,17 @@ export default function OnboardingScreen() {
   const vibes = spaces.filter(isTravelVibe);
   // People who save travel see a sample trip build and lock before the paywall.
   const teaser = showTripTeaser(kinds, interests);
+  const trip = sampleTrip(travelCity);
 
   useEffect(() => {
-    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
-  }, [kinds, spaces, stepIndex, saved]);
+    setOnboardingProgress({
+      saveKinds: kinds,
+      spaces,
+      travelCity,
+      step: stepIndex,
+      saved,
+    });
+  }, [kinds, spaces, travelCity, stepIndex, saved]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -213,8 +231,13 @@ export default function OnboardingScreen() {
         : [...current, name],
     );
 
-  const toggleInterest = (interest: Interest) =>
+  const toggleInterest = (interest: Interest) => {
+    // The city leaves with Travel, as its kinds of spots do.
+    if (interest === VIBES_INTEREST && interests.includes(interest)) {
+      setTravelCity(null);
+    }
     setSpaces((current) => spacesAfterInterestToggle(current, interest));
+  };
 
   const addSpace = (name: string) =>
     setSpaces((current) =>
@@ -227,7 +250,7 @@ export default function OnboardingScreen() {
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(kinds, spaces),
+      onboardingCompletedProperties(kinds, spaces, travelCity),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -335,8 +358,10 @@ export default function OnboardingScreen() {
           <InterestsStep
             picked={interests}
             vibes={vibes}
+            city={travelCity}
             onToggle={toggleInterest}
             onToggleVibe={toggleSpace}
+            onPickCity={setTravelCity}
             onAdvance={advance}
           />
         </View>
@@ -400,10 +425,13 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripBuild" && <TripBuildStep onDone={advance} />}
+          {step === "tripBuild" && (
+            <TripBuildStep trip={trip} onDone={advance} />
+          )}
 
           {step === "tripLocked" && (
             <TripLockedStep
+              trip={trip}
               leaving={paywall.asked}
               onUnlock={() => {
                 recordCurrentStep();
@@ -412,7 +440,9 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripReveal" && <TripRevealStep onContinue={finish} />}
+          {step === "tripReveal" && (
+            <TripRevealStep trip={trip} onContinue={finish} />
+          )}
         </ScrollView>
       )}
     </View>
