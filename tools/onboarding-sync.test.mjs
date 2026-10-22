@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -11,19 +11,24 @@ const CATALOG = "apps/native/src/locales/en.json";
 const STEPS = "apps/native/src/lib/onboarding-steps.ts";
 const NOTES = "docs/app-review-notes.md";
 const FLOWS = "tools/e2e/tests/fresh-onboarding.ts";
+const WALKS = "tools/onboarding-walks.json";
 
 const flowVersion = (source) =>
   Number(/ONBOARDING_FLOW_VERSION = (\d+)/.exec(source)?.[1]);
 
 for (const path of [NOTES, FLOWS]) {
   test(`${path} was walked against the current onboarding`, () => {
-    const stamp = /onboarding-flow-version: (\d+)/.exec(read(path));
-    assert.ok(stamp, `${path} has no "onboarding-flow-version: N" line.`);
+    assert.ok(
+      existsSync(join(root, path)),
+      `${path} is gone. Point NOTES and FLOWS in this test, and ${WALKS}, at its new path.`,
+    );
+    const walked = JSON.parse(read(WALKS))[path];
+    assert.ok(Number.isInteger(walked), `${WALKS} has no number for ${path}.`);
     const current = flowVersion(read(STEPS));
     assert.equal(
-      Number(stamp[1]),
+      walked,
       current,
-      `${path} was last walked against onboarding flow version ${stamp[1]}; ${STEPS} is at ${current}. Walk it against the new flow (steps, their order, button labels), fix what moved, then set its onboarding-flow-version line to ${current}.`,
+      `${path} was last walked against onboarding flow version ${walked}; ${STEPS} is at ${current}. Walk it against the new flow (steps, their order, button labels), fix what moved, then set its number in ${WALKS} to ${current}.`,
     );
   });
 }

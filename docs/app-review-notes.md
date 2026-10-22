@@ -13,8 +13,6 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Onboarding
 
-<!-- onboarding-flow-version: 12 -->
-
 1. **Opener:** a **Start yours** button and an **Already have an account? Sign in** link.
 2. **Topics:** "What are you into?" offers topics to pick. Each picked topic becomes a space. Nothing has to be picked. Picking Travel opens a card under the topics with "What kind of spots?", where each pick is a space too, and "Where are you going next?", a menu of eleven cities or "Not sure yet" (Prague), which is the city of the sample trip. None of it is required.
 3. **Setup:** "What do you save?" picks save kinds and the spaces to start with.

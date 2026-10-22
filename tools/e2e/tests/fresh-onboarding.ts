@@ -5,8 +5,6 @@ import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 import { tapUntilVisible } from "./seeded-home.ts";
 
-// onboarding-flow-version: 12
-
 /**
  * Starts the app as a first-time user on the onboarding opener. Onboarding
  * is gated by a keychain flag and the dev sign-in token lives in the
