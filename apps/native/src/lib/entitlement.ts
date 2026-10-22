@@ -6,6 +6,7 @@ import { useAction, useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
+import { getOnboardingProgress } from "@/lib/pending-onboarding";
 import {
   activeProductId,
   forgetPaywallFunnel,
@@ -354,6 +355,7 @@ async function presentPaywallImpl(
       trial,
       offering?.availablePackages.map((pkg) => pkg.product) ?? [],
       enriched.trial_eligible,
+      getOnboardingProgress(),
     );
     const result = await observePaywallPresentation(
       enriched,
