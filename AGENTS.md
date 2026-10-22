@@ -76,6 +76,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   paywall.
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
+- **Proving account deletion:** `.agents/skills/account-deletion` runs
+  `convex/accountDeletion.test.ts` and says how to read a failure. Use it before
+  changing the deletion drain in `convex/users.ts`, a table with a user key, an
+  owner check, or a function that writes rows for a user.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
