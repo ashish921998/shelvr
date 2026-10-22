@@ -44,7 +44,11 @@ export async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const caption = str("title");
   return {
     ...postField(tikTokPostUrl(handle, str("embed_product_id"))),
-    title: caption,
+    // Like Instagram's: the caption's first line, not its hashtags and paragraphs.
+    title:
+      Array.from(caption?.split("\n")[0] ?? "")
+        .slice(0, 100)
+        .join("") || undefined,
     siteName: "TikTok",
     author: handle ? `@${handle}` : str("author_name"),
     heroImageUrl: str("thumbnail_url"),
