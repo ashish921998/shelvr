@@ -68,7 +68,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/items.ts` is its adapter. `convex/finalizeItem.grid.test.ts` pins the
   rules with the recorded rows in `convex/testdata/settlement/rows.json`.
   `failurePatch` in the same module is the rule for a failed run;
-  `convex/failItem.grid.test.ts` pins it against `failure-rows.json`.
+  `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
 - **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
