@@ -22,23 +22,13 @@ import { useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The locked part of the sample trip: the rows the open card lists, drawn with
-// Skia and blurred for real, because React Native cannot blur text. They use
-// the open rows' fonts, colors and spacing, so unlocking reads as the blur
-// lifting. Heights and offsets follow `stopRow` and `dayHeader` in
-// trip-teaser-card.tsx.
-
 const PAD = 16;
 const DIVIDER = 1;
 const STOP_HEIGHT = 44;
 const SLOT_WIDTH = 84;
 const COLUMN_GAP = 12;
 const BADGE = 22;
-// The open row's pin has a ring in the card's color inside its 22 points, so
-// the colored disc is that much smaller.
 const BADGE_RING = 2;
-// A day header: the divider, 14 of padding, an eyebrow line, 2 between, a
-// title line, and 8 of padding.
 const DAY_PAD_TOP = 14;
 const EYEBROW_LINE = 15;
 const DAY_TEXT_GAP = 2;
@@ -55,9 +45,7 @@ const DAY_HEIGHT =
 const NAME_SIZE = 16;
 const BADGE_TEXT_SIZE = 12;
 const EYEBROW_SIZE = 11;
-// How blurred the rows are, in points: the approved mock's `blur(5px)`.
 const BLUR = 5;
-// A glyph's middle sits about this far above its baseline, in font sizes.
 const MIDDLE_ABOVE_BASELINE = 0.34;
 
 type Fonts = Record<
@@ -69,7 +57,6 @@ function rowHeight(row: SampleRow): number {
   return row.kind === "day" ? DAY_HEIGHT : STOP_HEIGHT;
 }
 
-/** Each row with the top edge it starts at, and the height of all of them. */
 function placeRows(rows: readonly SampleRow[]) {
   let height = 0;
   const placed = rows.map((row) => {
@@ -80,7 +67,6 @@ function placeRows(rows: readonly SampleRow[]) {
   return { placed, height };
 }
 
-/** The fonts the rows use, once every one of them has loaded. */
 function useRowFonts(): Fonts | null {
   const { theme } = useUnistyles();
   const { label, header, caption } = theme.type;
@@ -95,7 +81,6 @@ function useRowFonts(): Fonts | null {
     : null;
 }
 
-/** One line of text, set so its middle sits at `middle`. */
 function Words({
   text,
   font,
@@ -227,10 +212,7 @@ function DrawnDay({
   );
 }
 
-/**
- * `rows` drawn and blurred, as tall as the open rows would be. It draws
- * nothing until it has a width and its fonts, so it never shows half a row.
- */
+// React Native cannot blur text, so the rows are drawn in Skia and blurred there.
 export function VeiledStops({ rows }: { rows: readonly SampleRow[] }) {
   useAppLocale();
   const [width, setWidth] = useState(0);

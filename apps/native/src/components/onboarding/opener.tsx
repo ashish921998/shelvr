@@ -25,17 +25,12 @@ import {
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// The opener: three pages to swipe through, each a phone showing one thing
-// Shelvr does, with "Start yours" under all of them. The pain first (losing
-// the places you save), then the filing, then the trip.
-
 type Page = {
   key: "save" | "file" | "plan";
   title: TextMessageKey;
   accent: TextMessageKey;
   body: TextMessageKey;
   Scene: ComponentType<SceneProps>;
-  /** Drawn over the phone's edge, outside its screen. */
   Overlay?: ComponentType;
 };
 
@@ -64,9 +59,6 @@ const PAGES: Page[] = [
   },
 ];
 
-// Two headline lines and three body lines. Every page's copy gets at least
-// this, so the headline sits at the same height on each page and the phone
-// above it does not change size as the pages go by.
 const COPY_MIN_HEIGHT = 150;
 
 export function OpenerStep({
@@ -76,23 +68,15 @@ export function OpenerStep({
 }: {
   onStart: () => void;
   onSignIn: () => void;
-  /** Pages already reported in this onboarding mount. The screen owns it,
-   * so a remount (back from interests, a text-size change) reports nothing
-   * new. */
   viewedPages: Set<number>;
 }) {
   useAppLocale();
-  // At the accessibility sizes the sign-in link joins the first page's copy
-  // instead of taking footer height from every page.
   const largeText = useLargeText();
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [page, setPage] = useState(0);
-  // The furthest page reached. A page's entrance (the share sheet, the
-  // toast) plays when the page is first reached, not offscreen on mount.
   const [reached, setReached] = useState(0);
 
   useEffect(() => {
-    // Swiping back to a page says nothing new; the funnel counts first views.
     if (viewedPages.has(page)) return;
     viewedPages.add(page);
     analytics.capture("onboarding_opener_page_viewed", { page_index: page });
@@ -131,10 +115,6 @@ export function OpenerStep({
 
   return (
     <View style={styles.wrap}>
-      {/* The pager runs edge to edge, past the onboarding screen's gutter,
-          so a page slides across the whole screen; its content keeps the
-          gutter. The pages wait for the pager's size, since each page is
-          exactly one pager wide. */}
       <ScrollView
         horizontal
         pagingEnabled
@@ -150,9 +130,6 @@ export function OpenerStep({
                 key={item.key}
                 style={{ width: size.width, height: size.height }}
                 contentContainerStyle={styles.page}
-                // A page scrolls only when its copy outgrows it: a small
-                // phone, a long translation or a large text size. Copy that
-                // fits neither moves nor bounces.
                 alwaysBounceVertical={false}
                 showsVerticalScrollIndicator={false}
               >
@@ -191,7 +168,6 @@ export function OpenerStep({
             style={[
               styles.dot,
               index === page && styles.dotOn,
-              // The dots change in place, so they take the state budget.
               {
                 transitionProperty: ["width", "backgroundColor"],
                 transitionDuration: motion.duration.state,
@@ -204,8 +180,6 @@ export function OpenerStep({
 
       <View style={styles.foot}>
         <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-        {/* The slot keeps the link's height on every page, so the button
-            above it never moves when the link goes. */}
         {largeText ? null : (
           <View style={styles.signInSlot}>
             {page === 0 ? (
@@ -227,7 +201,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   pager: {
     flex: 1,
-    // The onboarding screen's horizontal gutter, given back here.
     marginHorizontal: -theme.gap(3),
   },
   page: {

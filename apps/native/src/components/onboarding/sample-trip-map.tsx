@@ -18,10 +18,6 @@ import { useState } from "react";
 import { Text, View, type LayoutChangeEvent } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The sample trip's map: a drawing of Prague's river and blocks with the
-// trip's pins on it, dotted routes joining each day's stops. It is drawn, not
-// fetched, so it is there at once, works offline and never shows a blank tile.
-
 const PIN_SIZE = 22;
 const BLOCKS = [
   [226, 52, 34, 16],
@@ -35,13 +31,10 @@ const RIVER = "M196 176 C192 140 176 118 184 92 S214 52 262 36 S330 14 346 10";
 const BRIDGE = "M164 88 L214 96";
 // A zero-length dash with a round cap is a dot.
 const DOTS = [0.1, 6];
-// Water and park have no theme role, so each theme names its own.
 const WATER = { light: "#cfdcd7", dark: "#2f4147" };
 const PARK = { light: "#e3e6cd", dark: "#2c3626" };
-// The road is the muted text color at about 35%.
 const ROAD_ALPHA = "59";
 
-/** The pin colors for a day: the first day is amber, later days are dark. */
 export function usePinColors() {
   const { theme } = useUnistyles();
   return (day: number) =>
@@ -50,7 +43,6 @@ export function usePinColors() {
       : { background: theme.colors.foreground, text: theme.colors.background };
 }
 
-/** A stop's numbered pin. */
 export function PinBadge({ number, day }: { number: number; day: number }) {
   const pinColors = usePinColors();
   const colors = pinColors(day);
@@ -71,7 +63,6 @@ function routePath(day: number): string {
     .join(" ");
 }
 
-/** The sample map, cut to `crop`. It lays itself out at the card's width. */
 export function SampleTripMap({ crop }: { crop: SampleCrop }) {
   useAppLocale();
   const { theme, rt } = useUnistyles();

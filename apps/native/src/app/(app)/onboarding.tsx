@@ -130,15 +130,12 @@ export default function OnboardingScreen() {
   }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
-  // Mutated in place by the opener; the state only keeps one set per mount.
   const [viewedOpenerPages] = useState(() => new Set<number>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const interests = spaces.filter(isInterest);
-  // So are the kinds of spots picked under Travel; they leave with it.
   const vibes = spaces.filter(isTravelVibe);
-  // People who save travel see a sample trip build and lock before the paywall.
   const teaser = showTripTeaser(kinds, interests);
 
   useEffect(() => {
@@ -227,7 +224,6 @@ export default function OnboardingScreen() {
     getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
   );
   const paywall = useOnboardingPaywall({
-    // A purchase opens the sample trip; with no trip, onboarding is done.
     onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
       dropPracticeShare(practiceSample?.url);
@@ -294,10 +290,7 @@ export default function OnboardingScreen() {
           ]}
         >
           <OpenerStep
-            // On iOS, a live text-size change can leave native text
-            // measurements stale (react-native#57512), so the expected
-            // onLayout updates never arrive. Remounting forces fresh
-            // measurement.
+            // iOS: a live text-size change leaves native text measurements stale (react-native#57512); remounting re-measures.
             key={fontScale}
             onStart={advance}
             onSignIn={() => setShowSignIn(true)}
@@ -305,8 +298,6 @@ export default function OnboardingScreen() {
           />
         </View>
       ) : step === "interests" ? (
-        // Also a static frame: the step scrolls its picks and pins Continue,
-        // so the travel card opening never pushes it off screen.
         <View
           style={[
             styles.content,

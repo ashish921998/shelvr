@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// The opener's three pages: their copy, the dots that follow a swipe, "Start
-// yours" under every page, sign-in on the first page only, and one analytics
-// event per page.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +14,6 @@ type ScrollEvent = {
 const PAGE_WIDTH = 390;
 
 const mock = vi.hoisted(() => {
-  // The mocked StyleSheet names each style, and the mocked View lists the
-  // names it was given, so a test can see which dot is lit.
   const styleNames = (style: unknown): string =>
     (Array.isArray(style) ? style.flat(Infinity) : [style])
       .map((entry) =>
@@ -69,8 +64,6 @@ const mock = vi.hoisted(() => {
 
 vi.mock("react-native", async () => {
   const { useEffect } = await import("react");
-  // The pager reports its size once, like a laid-out ScrollView, and hands
-  // its scroll handler to the test so a swipe can be played.
   const ScrollView = ({
     children,
     horizontal,
@@ -195,7 +188,6 @@ describe("OpenerStep", () => {
     swipeTo(1);
     expect(dot(0)).not.toContain("dotOn");
     expect(dot(1)).toContain("dotOn");
-    // A swipe that settles a little short of the page still counts as it.
     act(() => {
       mock.pager?.({
         nativeEvent: {
@@ -314,8 +306,6 @@ describe("OpenerStep", () => {
     );
     expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(1);
     swipeTo(2);
-    // It belongs to the first page, which is still mounted, not to the
-    // footer under every page.
     expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(1);
     expect(screen.getByText("onboarding.startYours")).toBeTruthy();
   });

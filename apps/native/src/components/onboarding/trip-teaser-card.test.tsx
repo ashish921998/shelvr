@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// The sample trip card: open it shows every day and stop; locked it shows the
-// first stop and hands the rest to the blurred stops, hidden from screen
-// readers, behind a lock.
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";

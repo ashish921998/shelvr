@@ -13,7 +13,6 @@ const STEPS: TextMessageKey[] = [
   "trip.buildingGroup",
 ];
 
-/** The build step to show: advances on a timer and holds on the last one. */
 export function useBuildStep(): TextMessageKey {
   const [step, setStep] = useState(0);
 
@@ -28,8 +27,6 @@ export function useBuildStep(): TextMessageKey {
   return STEPS[step];
 }
 
-/** What the trip screen shows while the trip is being made: the app's loader
- * over the build step. */
 export function TripBuilding() {
   useAppLocale();
   const step = useBuildStep();

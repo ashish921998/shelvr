@@ -13,8 +13,7 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
   Videos: require("../../../assets/onboarding/topic-talk.jpg"),
 };
-// Each topic's picture. The topic photos are from Unsplash, under its free
-// licence.
+// The topic photos are from Unsplash, under its free licence.
 const INTEREST_IMAGES: Record<Interest, number> = {
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
   "Food & recipes": require("../../../assets/onboarding/demo-recipe.jpg"),

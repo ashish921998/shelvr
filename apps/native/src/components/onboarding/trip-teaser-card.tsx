@@ -16,10 +16,6 @@ import {
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The sample trip as a card: the map, then each day's stops. Locked, the card
-// shows the first stop clearly and veils the rest behind a lock.
-
-/** Rows shown clearly on the locked card: day one's header and first stop. */
 const CLEAR_ROWS = 2;
 
 function DayHeader({ day, divider }: { day: number; divider: boolean }) {
@@ -67,8 +63,6 @@ function CardRow({ row, divider }: { row: SampleRow; divider: boolean }) {
   );
 }
 
-/** Rows behind a lock: the same rows, blurred and hidden from screen readers,
- * with one lock over their middle. */
 function VeiledRows({ rows }: { rows: SampleRow[] }) {
   const { theme } = useUnistyles();
   return (
@@ -96,10 +90,6 @@ function VeiledRows({ rows }: { rows: SampleRow[] }) {
   );
 }
 
-/**
- * The sample trip. With `locked`, only the first stop is clear; the rest is
- * veiled behind a lock.
- */
 export function SampleTripCard({ locked }: { locked: boolean }) {
   useAppLocale();
   const rows = sampleRows();
