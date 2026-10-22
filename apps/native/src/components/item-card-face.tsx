@@ -138,6 +138,20 @@ function afterOwnHeading(
   return same ? rest.join("\n").trim() || undefined : note;
 }
 
+/**
+ * A text face with nothing to caption carries its menu in its top corner, so
+ * the card does not end in a row holding only the ellipsis.
+ */
+export function menuSitsOnFace(item: FeedItem, suggested?: boolean): boolean {
+  return (
+    !(item.imageUrl ?? item.heroImageUrl) &&
+    textFaceCopy(item, failureLabel(item)).captionTitle === undefined &&
+    !(item.type === "link" && item.url) &&
+    !suggested &&
+    item.status === "ready"
+  );
+}
+
 const FACE_SYMBOL = {
   image: "photo.stack",
   link: "link",
@@ -351,14 +365,7 @@ export function ItemCardFace({
   const captionTitle = hasMedia
     ? cardTitles(item).find((title) => title !== undefined)
     : textFaceCopy(item, failedLabel).captionTitle;
-  // A text face with nothing to caption carries its menu in its top corner,
-  // so the card does not end in a row holding only the ellipsis.
-  const menuOnFace =
-    !hasMedia &&
-    captionTitle === undefined &&
-    !(item.type === "link" && item.url) &&
-    !suggested &&
-    item.status === "ready";
+  const menuOnFace = menuSitsOnFace(item, suggested);
   return (
     <View
       style={[

@@ -8,7 +8,7 @@ import { Image } from "expo-image";
 import { analytics } from "@/lib/analytics";
 import { runIntent } from "@/lib/intents";
 import { ItemCard, type FeedItem } from "./item-card";
-import { textFaceCopy } from "./item-card-face";
+import { menuSitsOnFace, textFaceCopy } from "./item-card-face";
 
 type A11yProps = {
   children?: ReactNode;
@@ -359,6 +359,38 @@ it("keeps the save-actions control on a note with nothing to caption", () => {
   expect(
     screen.getAllByRole("button", { name: "Save actions", hidden: true }),
   ).toHaveLength(1);
+});
+
+describe("menuSitsOnFace", () => {
+  const note = { ...base, type: "note" as const };
+  it("moves the menu onto a note that has nothing to caption", () => {
+    expect(menuSitsOnFace({ ...note, note: "Call the landlord" })).toBe(true);
+    expect(
+      menuSitsOnFace({
+        ...note,
+        title: "Call the landlord",
+        note: "Call the landlord",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps the menu in the caption whenever there is a caption or a badge", () => {
+    expect(
+      menuSitsOnFace({ ...note, title: "Gifts", note: "Gifts\nA planter" }),
+    ).toBe(false);
+    expect(menuSitsOnFace({ ...base, url: "https://example.com" })).toBe(false);
+    expect(menuSitsOnFace({ ...note, note: "Hi", status: "processing" })).toBe(
+      false,
+    );
+    expect(menuSitsOnFace({ ...note, note: "Hi" }, true)).toBe(false);
+    expect(
+      menuSitsOnFace({
+        ...base,
+        type: "image",
+        imageUrl: "https://example.convex.cloud/api/storage/1",
+      }),
+    ).toBe(false);
+  });
 });
 
 it("offers Dismiss in the suggested save's long-press menu", () => {
