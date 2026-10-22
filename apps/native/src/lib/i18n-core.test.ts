@@ -23,6 +23,13 @@ describe("translate", () => {
     );
   });
 
+  it("uses the plural rule of the catalog a regional locale falls back to", () => {
+    // French puts 0 in "one"; English would pick "other".
+    expect(translate("fr-BE", "spaces.saveCount", { count: 0 })).toBe(
+      translate("fr", "spaces.saveCount", { count: 0 }),
+    );
+  });
+
   it("picks the plural category for the locale and formats the count", () => {
     expect(translate("fr", "spaces.saveCount", { count: 1.5 })).toContain(
       "1,5",

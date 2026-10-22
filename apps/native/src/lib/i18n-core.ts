@@ -25,12 +25,15 @@ function fallbackChain(locale: string): string[] {
   return chain;
 }
 
-function lookup(locale: string, key: MessageKey): Message | undefined {
-  for (const candidate of fallbackChain(locale)) {
-    const message = isSupportedLocale(candidate)
-      ? (catalogs[candidate][key] as Message | undefined)
+function lookup(
+  locale: string,
+  key: MessageKey,
+): { message: Message; catalog: string } | undefined {
+  for (const catalog of fallbackChain(locale)) {
+    const message = isSupportedLocale(catalog)
+      ? (catalogs[catalog][key] as Message | undefined)
       : undefined;
-    if (message !== undefined && message !== null) return message;
+    if (message !== undefined && message !== null) return { message, catalog };
   }
   return undefined;
 }
@@ -111,14 +114,18 @@ export function translate(
     formatted.formattedCount = formatNumber(numberLocale, values.count);
   }
   const found = lookup(locale, key);
-  if (typeof found === "string") {
-    return interpolate(found, { ...formatted, locale });
+  if (typeof found?.message === "string") {
+    return interpolate(found.message, { ...formatted, locale });
   }
   if (found === undefined || typeof values.count !== "number") {
     return missing(locale, key);
   }
-  const category = (pluralRules[locale] ?? pluralRules.en)(values.count);
-  const variant = found[category] as string | undefined;
-  if (variant === undefined) return missing(locale, `${key}.${category}`);
+  // The rule of the catalog the message came from, so a regional fallback
+  // (fr-BE reading fr) picks French plural forms.
+  const rule = pluralRules[found.catalog] ?? pluralRules.en;
+  const variant = found.message[rule(values.count)] as string | undefined;
+  if (variant === undefined) {
+    return missing(locale, `${key}.${rule(values.count)}`);
+  }
   return interpolate(variant, { ...formatted, count: values.count, locale });
 }
