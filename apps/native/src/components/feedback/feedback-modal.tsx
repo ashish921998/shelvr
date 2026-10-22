@@ -322,12 +322,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   buttonRow: {
     flexDirection: "row",
-    justifyContent: "flex-end",
     gap: theme.gap(1),
     marginTop: theme.gap(1),
   },
   primaryButton: {
-    minHeight: 44,
+    flex: 1,
+    minHeight: 48,
     paddingHorizontal: theme.gap(3),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
@@ -341,7 +341,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryForeground,
   },
   secondaryButton: {
-    minHeight: 44,
+    flex: 1,
+    minHeight: 48,
     paddingHorizontal: theme.gap(3),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
