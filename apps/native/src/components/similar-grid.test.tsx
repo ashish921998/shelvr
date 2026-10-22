@@ -72,3 +72,10 @@ it("shows a note's text once", () => {
   );
   expect(screen.getAllByText("Call the landlord")).toHaveLength(1);
 });
+
+it("draws no caption when the site is the only name a link has", () => {
+  render(
+    <SimilarGrid items={[save({ url: "https://example.com/article" })]} />,
+  );
+  expect(screen.getAllByText("example.com")).toHaveLength(1);
+});
