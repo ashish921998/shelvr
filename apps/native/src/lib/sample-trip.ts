@@ -1,11 +1,20 @@
 import type { Interest } from "@/lib/onboarding-interests";
 import type { SaveKind } from "@/lib/save-kinds";
+import {
+  SAMPLE_CITIES,
+  type LatLng,
+  type SampleCity,
+  type SampleCityId,
+  type SampleSave,
+  type SampleSlot,
+} from "@/lib/sample-cities";
 import type { TextMessageKey } from "@/locales/message-types";
 
 // The sample trip onboarding builds before the paywall, for people who said
-// they save travel. It is the same on every run and is never made by the
-// model: it shows what a trip looks like, and the label on every screen says
-// it is a sample. Place names are the places' own and stay untranslated.
+// they save travel. It is in the city they said they are going to next, the
+// same on every run, and never made by the model: it shows what a trip looks
+// like, and the label on every screen says it is a sample. Place names are
+// the places' own and stay untranslated.
 
 /** Whether onboarding shows the sample trip: travel was picked as a kind of
  * save or as a topic. Everyone else goes from the promise to the paywall. */
@@ -16,13 +25,16 @@ export function showTripTeaser(
   return kinds.includes("Travel") || interests.includes("Travel");
 }
 
-type SampleSlot = "morning" | "afternoon" | "evening";
+/** The city a sample trip is in when nobody picked one ("Not sure yet",
+ * travel picked only as a kind of save, or an older stored pick). */
+export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
 /** The trip screen's slot labels, so the sample reads like the real trip. */
 export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
   morning: "trip.slotMorning",
+  lunch: "trip.slotLunch",
   afternoon: "trip.slotAfternoon",
-  evening: "trip.slotEvening",
+  dinner: "trip.slotDinner",
 };
 
 /** The drawing the sample map is made on, in points before it scales to the
@@ -37,10 +49,12 @@ export const SAMPLE_CROPS = {
   reveal: { top: 10, height: 150 },
 } as const satisfies Record<string, SampleCrop>;
 
+type Point = { x: number; y: number };
+
 export type SampleStop = {
   name: string;
   slot: SampleSlot;
-  pin: { x: number; y: number };
+  pin: Point;
 };
 
 type SampleDay = {
@@ -48,65 +62,213 @@ type SampleDay = {
   stops: readonly SampleStop[];
 };
 
-type SampleSave = {
-  name: string;
-  /** The page's own host, or a label that says what kind of save it is. */
-  source: { host: string } | { label: TextMessageKey };
-  /** How many of the trip's places this save names. */
-  places: number;
-  picture: "oldTown" | "rooftops" | "place";
-};
-
-export const SAMPLE_TRIP = {
-  saves: [
-    {
-      name: "Old Town Square",
-      source: { host: "prague.eu" },
-      places: 1,
-      picture: "oldTown",
-    },
-    {
-      name: "Three days in Prague",
-      source: { label: "tripTeaser.sourceArticle" },
-      places: 3,
-      picture: "rooftops",
-    },
-    {
-      name: "Café Louvre",
-      source: { label: "tripTeaser.sourcePlace" },
-      places: 1,
-      picture: "place",
-    },
-  ],
-  days: [
-    {
-      title: "tripTeaser.dayOneTitle",
-      stops: [
-        {
-          name: "Old Town Square",
-          slot: "morning",
-          pin: { x: 250, y: 76 },
-        },
-        { name: "Café Louvre", slot: "afternoon", pin: { x: 232, y: 124 } },
-        { name: "Charles Bridge", slot: "evening", pin: { x: 188, y: 92 } },
-      ],
-    },
-    {
-      title: "tripTeaser.dayTwoTitle",
-      stops: [
-        { name: "Prague Castle", slot: "morning", pin: { x: 118, y: 56 } },
-        {
-          name: "Petřín Lookout Tower",
-          slot: "afternoon",
-          pin: { x: 96, y: 122 },
-        },
-      ],
-    },
-  ],
-} as const satisfies {
+/** A city's sample trip, with every stop pinned on the drawing. */
+export type SampleTrip = {
+  city: SampleCityId;
+  /** The city's name. */
+  name: TextMessageKey;
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
+  /** The city's water as drawing paths, on the same scale as the pins. */
+  water: readonly string[];
+  /** How wide the water is drawn. */
+  waterWidth: number;
 };
+
+// Where pins may sit: a pin's centre stays this far inside both crops.
+const PIN_BOX = { left: 26, right: 314, top: 50, bottom: 136 };
+// Two pins closer than this would overlap, so they are pushed apart.
+const PIN_GAP = 24;
+// How wide a river is drawn, unless its city says otherwise.
+const WATER_WIDTH = 16;
+// How far a pin's centre stays from the water's edge, so a place on land
+// never reads as in the river. A pin is 22 across, so most of it is on land.
+const WATER_CLEARANCE = 8;
+
+/** Places the trip's real coordinates on the drawing: one scale for both
+ * axes (a degree of longitude shrinks away from the equator), centred in the
+ * pin box. */
+function projection(points: readonly LatLng[]): (at: LatLng) => Point {
+  const lats = points.map((point) => point.lat);
+  const lngs = points.map((point) => point.lng);
+  const [south, north] = [Math.min(...lats), Math.max(...lats)];
+  const [west, east] = [Math.min(...lngs), Math.max(...lngs)];
+  const shrink = Math.cos((((north + south) / 2) * Math.PI) / 180);
+  const spanX = Math.max((east - west) * shrink, 1e-6);
+  const spanY = Math.max(north - south, 1e-6);
+  const boxWidth = PIN_BOX.right - PIN_BOX.left;
+  const boxHeight = PIN_BOX.bottom - PIN_BOX.top;
+  const scale = Math.min(boxWidth / spanX, boxHeight / spanY);
+  const left = PIN_BOX.left + (boxWidth - spanX * scale) / 2;
+  const top = PIN_BOX.top + (boxHeight - spanY * scale) / 2;
+  return (at) => ({
+    x: left + (at.lng - west) * shrink * scale,
+    y: top + (north - at.lat) * scale,
+  });
+}
+
+const clamp = (value: number, low: number, high: number) =>
+  Math.min(high, Math.max(low, value));
+
+type Water = { lines: readonly (readonly Point[])[]; width: number };
+
+type Nearest = { near: Point; distance: number; side: number; normal: Point };
+
+/** Where `line` passes closest to `pin`: the point, how far it is, which side
+ * of the line the pin is on (1 or -1), and the unit normal on that side. */
+function nearestOnLine(pin: Point, line: readonly Point[]): Nearest {
+  let best: Nearest = {
+    near: line[0],
+    distance: Infinity,
+    side: 1,
+    normal: { x: 0, y: -1 },
+  };
+  for (let index = 1; index < line.length; index += 1) {
+    const a = line[index - 1];
+    const b = line[index];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const along = clamp(
+      ((pin.x - a.x) * dx + (pin.y - a.y) * dy) / (length * length),
+      0,
+      1,
+    );
+    const near = { x: a.x + along * dx, y: a.y + along * dy };
+    const distance = Math.hypot(pin.x - near.x, pin.y - near.y);
+    if (distance >= best.distance) continue;
+    const side = dx * (pin.y - a.y) - dy * (pin.x - a.x) < 0 ? -1 : 1;
+    best = {
+      near,
+      distance,
+      side,
+      normal: { x: (-dy / length) * side, y: (dx / length) * side },
+    };
+  }
+  return best;
+}
+
+/** Keeps a pin out of the drawn water and on the bank its place is on, the
+ * side of each line its real position (`home`) falls. Says whether it moved. */
+function keepOffWater(pin: Point, home: Point, water: Water): boolean {
+  const room = water.width / 2 + WATER_CLEARANCE;
+  let moved = false;
+  for (const line of water.lines) {
+    const bank = nearestOnLine(home, line);
+    const now = nearestOnLine(pin, line);
+    const crossed = now.side !== bank.side && now.distance < room * 3;
+    if (now.distance >= room && !crossed) continue;
+    // Off the line, square to it, on the place's own bank.
+    const sign = now.side === bank.side ? 1 : -1;
+    pin.x = now.near.x + now.normal.x * sign * room;
+    pin.y = now.near.y + now.normal.y * sign * room;
+    moved = true;
+  }
+  return moved;
+}
+
+/** Moves pins that would overlap apart until each has room, and pins of
+ * places on land off the water, keeping them in the pin box. Neighbours a
+ * street apart still read as two pins. */
+function spreadPins(
+  pins: Point[],
+  onWater: readonly boolean[],
+  water: Water,
+): Point[] {
+  const spread = pins.map((pin) => ({ ...pin }));
+  const homes = pins.map((pin) => ({ ...pin }));
+  for (let round = 0; round < 80; round += 1) {
+    let moved = false;
+    for (let a = 0; a < spread.length; a += 1) {
+      for (let b = a + 1; b < spread.length; b += 1) {
+        const dx = spread[b].x - spread[a].x;
+        const dy = spread[b].y - spread[a].y;
+        const distance = Math.hypot(dx, dy);
+        if (distance >= PIN_GAP) continue;
+        moved = true;
+        // Pins on the same spot part along a fixed slant.
+        const [ux, uy] =
+          distance === 0 ? [0.8, 0.6] : [dx / distance, dy / distance];
+        const push = (PIN_GAP - distance) / 2;
+        spread[a].x -= ux * push;
+        spread[a].y -= uy * push;
+        spread[b].x += ux * push;
+        spread[b].y += uy * push;
+      }
+    }
+    spread.forEach((pin, index) => {
+      if (!onWater[index] && keepOffWater(pin, homes[index], water)) {
+        moved = true;
+      }
+      pin.x = clamp(pin.x, PIN_BOX.left, PIN_BOX.right);
+      pin.y = clamp(pin.y, PIN_BOX.top, PIN_BOX.bottom);
+    });
+    if (!moved) break;
+  }
+  return spread.map((pin) => ({
+    x: Math.round(pin.x * 10) / 10,
+    y: Math.round(pin.y * 10) / 10,
+  }));
+}
+
+function buildTrip(id: SampleCityId): SampleTrip {
+  const city: SampleCity = SAMPLE_CITIES[id];
+  const stops = city.days.flatMap((day) => day.stops);
+  const place = projection(stops.map((stop) => stop.at));
+  const water: Water = {
+    lines: city.water.map((line) => line.map(place)),
+    width: city.waterWidth ?? WATER_WIDTH,
+  };
+  const pins = spreadPins(
+    stops.map((stop) => place(stop.at)),
+    stops.map((stop) => stop.onWater === true),
+    water,
+  );
+  let next = 0;
+  return {
+    city: id,
+    name: city.name,
+    saves: city.saves,
+    days: city.days.map((day) => ({
+      title: day.title,
+      stops: day.stops.map((stop) => {
+        const pin = pins[next];
+        next += 1;
+        return { name: stop.name, slot: stop.slot, pin };
+      }),
+    })),
+    water: water.lines.map((line) =>
+      line
+        .map(
+          ({ x, y }, index) =>
+            `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`,
+        )
+        .join(" "),
+    ),
+    waterWidth: water.width,
+  };
+}
+
+const TRIPS = new Map<SampleCityId, SampleTrip>();
+
+/** Whether `value` names a city there is a sample trip for. */
+export function isSampleCity(value: unknown): value is SampleCityId {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(SAMPLE_CITIES, value)
+  );
+}
+
+/** The sample trip in `city`, or in the default city when there is none. */
+export function sampleTrip(city?: string | null): SampleTrip {
+  const id = isSampleCity(city) ? city : DEFAULT_SAMPLE_CITY;
+  let trip = TRIPS.get(id);
+  if (trip === undefined) {
+    trip = buildTrip(id);
+    TRIPS.set(id, trip);
+  }
+  return trip;
+}
 
 export type NumberedStop = {
   stop: SampleStop;
@@ -117,8 +279,8 @@ export type NumberedStop = {
 };
 
 /** Every stop in trip order, numbered as the map numbers its pins. */
-export function sampleStops(): NumberedStop[] {
-  return SAMPLE_TRIP.days
+export function sampleStops(trip: SampleTrip): NumberedStop[] {
+  return trip.days
     .flatMap((day, dayIndex) =>
       day.stops.map((stop) => ({ stop, day: dayIndex })),
     )
@@ -127,14 +289,14 @@ export function sampleStops(): NumberedStop[] {
 
 /** One line of the trip as the card lists it: a day's header or one stop. */
 export type SampleRow =
-  | { kind: "day"; day: number }
+  | { kind: "day"; day: number; title: TextMessageKey; places: number }
   | { kind: "stop"; entry: NumberedStop };
 
 /** The trip's rows top to bottom: each day's header, then its stops. */
-export function sampleRows(): SampleRow[] {
-  const stops = sampleStops();
-  return SAMPLE_TRIP.days.flatMap((_, day) => [
-    { kind: "day" as const, day },
+export function sampleRows(trip: SampleTrip): SampleRow[] {
+  const stops = sampleStops(trip);
+  return trip.days.flatMap(({ title, stops: places }, day) => [
+    { kind: "day" as const, day, title, places: places.length },
     ...stops
       .filter((entry) => entry.day === day)
       .map((entry) => ({ kind: "stop" as const, entry })),

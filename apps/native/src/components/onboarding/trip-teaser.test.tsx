@@ -5,7 +5,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sampleTrip } from "@/lib/sample-trip";
 import { TripBuildStep, TripLockedStep, TripRevealStep } from "./trip-teaser";
+
+const TRIP = sampleTrip("prague");
 
 type Children = { children?: ReactNode };
 
@@ -72,29 +75,32 @@ const advance = (ms: number, step = 50) => {
 
 describe("TripBuildStep", () => {
   it("shows the three sample saves and the four steps, the first under way", () => {
-    render(<TripBuildStep onDone={vi.fn()} />);
+    render(<TripBuildStep trip={TRIP} onDone={vi.fn()} />);
     expect(screen.getAllByTestId("image")).toHaveLength(2);
     expect(screen.getByText("Old Town Square")).toBeTruthy();
     expect(screen.getByText("Three days in Prague")).toBeTruthy();
-    expect(screen.getByText("Café Louvre")).toBeTruthy();
+    expect(screen.getByText("Where to eat in Prague")).toBeTruthy();
     expect(screen.getByText('tripTeaser.stepRead:{"saves":"3"}')).toBeTruthy();
     expect(screen.getByText("tripTeaser.stepFind")).toBeTruthy();
     expect(screen.getByText("tripTeaser.stepPin")).toBeTruthy();
     expect(screen.getByText("tripTeaser.stepPlan")).toBeTruthy();
     expect(screen.getAllByTestId("ring")).toHaveLength(1);
     expect(screen.queryAllByTestId("icon-checkmark")).toHaveLength(0);
+    // The saved place is a landmark, so it shows a pin, not a dining icon.
+    expect(screen.getAllByTestId("icon-mappin")).toHaveLength(1);
   });
 
   it("says each sample save names its places", () => {
-    render(<TripBuildStep onDone={vi.fn()} />);
-    expect(
-      screen.getAllByText('tripTeaser.placeCount:{"count":1}'),
-    ).toHaveLength(2);
-    expect(screen.getByText('tripTeaser.placeCount:{"count":3}')).toBeTruthy();
+    render(<TripBuildStep trip={TRIP} onDone={vi.fn()} />);
+    for (const count of [1, 3, 4]) {
+      expect(
+        screen.getByText(`tripTeaser.placeCount:{"count":${count}}`),
+      ).toBeTruthy();
+    }
   });
 
   it("ticks one step off at a time", () => {
-    render(<TripBuildStep onDone={vi.fn()} />);
+    render(<TripBuildStep trip={TRIP} onDone={vi.fn()} />);
     advance(750);
     expect(screen.getAllByTestId("icon-checkmark")).toHaveLength(1);
     advance(750);
@@ -106,7 +112,7 @@ describe("TripBuildStep", () => {
 
   it("moves on by itself once every step is ticked, and not before", () => {
     const onDone = vi.fn();
-    render(<TripBuildStep onDone={onDone} />);
+    render(<TripBuildStep trip={TRIP} onDone={onDone} />);
     advance(4 * 750);
     expect(onDone).not.toHaveBeenCalled();
     advance(499, 1);
@@ -120,9 +126,9 @@ describe("TripBuildStep", () => {
   it("calls the newest onDone when the parent re-renders mid-build", () => {
     const first = vi.fn();
     const second = vi.fn();
-    const { rerender } = render(<TripBuildStep onDone={first} />);
+    const { rerender } = render(<TripBuildStep trip={TRIP} onDone={first} />);
     advance(1000);
-    rerender(<TripBuildStep onDone={second} />);
+    rerender(<TripBuildStep trip={TRIP} onDone={second} />);
     advance(10_000);
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledOnce();
@@ -130,7 +136,7 @@ describe("TripBuildStep", () => {
 
   it("does nothing once it is gone", () => {
     const onDone = vi.fn();
-    const { unmount } = render(<TripBuildStep onDone={onDone} />);
+    const { unmount } = render(<TripBuildStep trip={TRIP} onDone={onDone} />);
     advance(1000);
     unmount();
     advance(10_000);
@@ -140,7 +146,7 @@ describe("TripBuildStep", () => {
 
 describe("TripLockedStep", () => {
   it("shows the locked sample trip and says what the button leads to", () => {
-    render(<TripLockedStep leaving={false} onUnlock={vi.fn()} />);
+    render(<TripLockedStep trip={TRIP} leaving={false} onUnlock={vi.fn()} />);
     expect(screen.getByTestId("card").dataset.locked).toBe("true");
     expect(screen.getByText("tripTeaser.lockedTitleAccent")).toBeTruthy();
     expect(
@@ -151,14 +157,14 @@ describe("TripLockedStep", () => {
 
   it("opens the paywall with one tap", () => {
     const onUnlock = vi.fn();
-    render(<TripLockedStep leaving={false} onUnlock={onUnlock} />);
+    render(<TripLockedStep trip={TRIP} leaving={false} onUnlock={onUnlock} />);
     fireEvent.click(screen.getByText("tripTeaser.unlock"));
     expect(onUnlock).toHaveBeenCalledOnce();
   });
 
   it("takes no taps while the paywall is on its way", () => {
     const onUnlock = vi.fn();
-    render(<TripLockedStep leaving onUnlock={onUnlock} />);
+    render(<TripLockedStep trip={TRIP} leaving onUnlock={onUnlock} />);
     fireEvent.click(screen.getByText("tripTeaser.unlock"));
     expect(onUnlock).not.toHaveBeenCalled();
   });
@@ -166,7 +172,7 @@ describe("TripLockedStep", () => {
 
 describe("TripRevealStep", () => {
   it("shows the open sample trip and says it is a sample", () => {
-    render(<TripRevealStep onContinue={vi.fn()} />);
+    render(<TripRevealStep trip={TRIP} onContinue={vi.fn()} />);
     expect(screen.getByTestId("card").dataset.locked).toBe("false");
     expect(screen.getByText("tripTeaser.revealTitle")).toBeTruthy();
     expect(screen.getByText("tripTeaser.revealBody")).toBeTruthy();
@@ -174,14 +180,14 @@ describe("TripRevealStep", () => {
 
   it("continues with one tap", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep onContinue={onContinue} />);
+    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
   it("continues once when it is tapped twice before the screen redraws", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep onContinue={onContinue} />);
+    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
     const button = screen.getByText("common.continue");
     act(() => {
       fireEvent.click(button);
@@ -192,7 +198,7 @@ describe("TripRevealStep", () => {
 
   it("takes no more taps once it has continued", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep onContinue={onContinue} />);
+    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
     fireEvent.click(screen.getByText("common.continue"));
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();
