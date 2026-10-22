@@ -116,10 +116,12 @@ export function reminderBlocked(
   if (sentAt.filter((at) => now - at < WEEK_MS).length + kept >= WEEKLY_LIMIT)
     return "weekly_limit";
   const streak = recentReminders.slice(0, IGNORED_STREAK);
+  const [latest] = streak;
   if (
+    latest !== undefined &&
     streak.length === IGNORED_STREAK &&
     streak.every((reminder) => !reminder.opened) &&
-    now - streak[0].createdAt < IGNORED_PAUSE_MS
+    now - latest.createdAt < IGNORED_PAUSE_MS
   )
     return "ignored";
   return undefined;

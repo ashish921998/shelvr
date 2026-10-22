@@ -52,8 +52,9 @@ async function embedBatch(
     });
     embeddings.forEach((raw, position) => {
       const vector = normalizeEmbedding(raw);
-      if (isValidEmbedding(vector)) {
-        vectors[sendable[position].index] = vector;
+      const entry = sendable[position];
+      if (entry !== undefined && isValidEmbedding(vector)) {
+        vectors[entry.index] = vector;
       }
     });
   } catch (error) {
@@ -95,16 +96,12 @@ export const sweepItemEmbeddings = internalAction({
         entries: pending.map(({ itemId, userId }) => ({ itemId, userId })),
       },
     );
-    const eligible = pending.flatMap((entry, index) =>
-      dispositions[index].disposition === "gone"
+    const eligible = pending.flatMap((entry, index) => {
+      const disposition = dispositions[index]?.disposition ?? "gone";
+      return disposition === "gone"
         ? []
-        : [
-            {
-              ...entry,
-              aiDeclined: dispositions[index].disposition === "declined",
-            },
-          ],
-    );
+        : [{ ...entry, aiDeclined: disposition === "declined" }];
+    });
     const { vectors, callFailed } = await embedTexts(
       eligible.map((entry) => (entry.aiDeclined ? "" : entry.text)),
     );

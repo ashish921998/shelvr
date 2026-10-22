@@ -95,7 +95,8 @@ export function weeklyShuffle<T>(items: readonly T[], seed: string): T[] {
   const shuffled = [...items];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    // Both indexes are in range: 0 <= j <= i < shuffled.length.
+    [shuffled[i], shuffled[j]] = [shuffled[j] as T, shuffled[i] as T];
   }
   return shuffled;
 }

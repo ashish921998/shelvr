@@ -255,9 +255,9 @@ export const createSpace = mutation({
       .withIndex("by_user_and_name", (q) =>
         q.eq("userId", userId).eq("name", name),
       )
-      .take(1);
-    if (existing.length > 0) {
-      return existing[0]._id;
+      .first();
+    if (existing !== null) {
+      return existing._id;
     }
     validateSpaceName(name);
     const description = validateSpaceDescription(args.description);

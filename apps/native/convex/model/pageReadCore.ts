@@ -92,9 +92,9 @@ export function extractMetaContent(
     ),
   ];
   for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match && match[1].trim() !== "") {
-      return decodeEntities(match[1].trim());
+    const content = html.match(pattern)?.[1]?.trim();
+    if (content) {
+      return decodeEntities(content);
     }
   }
   return undefined;
@@ -136,9 +136,9 @@ function extractTitle(html: string): string | undefined {
   if (ogTitle) {
     return ogTitle;
   }
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (match) {
-    const title = decodeEntities(match[1]).replace(/\s+/g, " ").trim();
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  if (match !== undefined) {
+    const title = decodeEntities(match).replace(/\s+/g, " ").trim();
     if (title !== "") {
       return title;
     }

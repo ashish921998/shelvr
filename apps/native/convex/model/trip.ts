@@ -96,9 +96,11 @@ function centroid(points: LatLng[]): LatLng {
 }
 
 function seeds(points: LatLng[], k: number): LatLng[] {
-  const chosen = [points[0]];
+  const [first] = points;
+  if (first === undefined) return [];
+  const chosen = [first];
   while (chosen.length < k) {
-    let best = points[0];
+    let best = first;
     let bestDistance = -1;
     for (const point of points) {
       const nearest = Math.min(...chosen.map((c) => distanceKm(c, point)));
@@ -131,9 +133,10 @@ export function clusterPlaces(
     const next: number[] = new Array<number>(points.length).fill(-1);
     const load: number[] = new Array<number>(centres.length).fill(0);
     for (const { point, day } of pairs) {
-      if (next[point] !== -1 || load[day] >= capacity) continue;
+      const dayLoad = load[day] ?? 0;
+      if (next[point] !== -1 || dayLoad >= capacity) continue;
       next[point] = day;
-      load[day]++;
+      load[day] = dayLoad + 1;
     }
     const stable = next.every((day, i) => day === assignment[i]);
     assignment = next;
@@ -146,8 +149,13 @@ export function clusterPlaces(
   return assignment;
 }
 
+/** The neighbourhood part of an area such as "Shibuya, Tokyo". */
+function areaLabel(area: string | undefined): string {
+  return (area ?? "").split(",", 1)[0]?.trim() ?? "";
+}
+
 function areaKey(area: string | undefined): string {
-  return (area ?? "").split(",")[0].trim().toLowerCase();
+  return areaLabel(area).toLowerCase();
 }
 
 function dayAreas(stops: { area?: string }[]): string[] {
@@ -155,7 +163,7 @@ function dayAreas(stops: { area?: string }[]): string[] {
   for (const stop of stops) {
     const key = areaKey(stop.area);
     if (key === "") continue;
-    const label = (stop.area ?? "").split(",")[0].trim();
+    const label = areaLabel(stop.area);
     const entry = counts.get(key) ?? { label, count: 0 };
     entry.count++;
     counts.set(key, entry);
@@ -184,7 +192,7 @@ function orderDay(stops: TripCandidate[]): TripCandidate[] {
           }
         });
       }
-      ordered.push(group.splice(pick, 1)[0]);
+      ordered.push(...group.splice(pick, 1));
     }
   }
   return ordered;
@@ -226,7 +234,12 @@ export function buildTrip(
     options.days,
     perDay,
   );
-  located.forEach((candidate, i) => groups[assignment[i]].push(candidate));
+  located.forEach((candidate, i) => {
+    const day = assignment[i];
+    const group = day === undefined ? undefined : groups[day];
+    if (group === undefined) wishlist.push(candidate);
+    else group.push(candidate);
+  });
 
   for (const candidate of chosen.filter((c) => c.location === undefined)) {
     const key = areaKey(candidate.area);
@@ -266,7 +279,7 @@ export function keepNearby(
   if (points.length === 0) return found;
   const median = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
-    return sorted[Math.floor(sorted.length / 2)];
+    return sorted[Math.floor(sorted.length / 2)] ?? 0;
   };
   const anchor = centre ?? {
     lat: median(points.map((p) => p.lat)),
@@ -284,13 +297,13 @@ export function swapStop(
 ): { days: TripDay[]; wishlist: TripStop[]; replacement: TripStop } | null {
   const day = trip.days[dayIndex];
   const stop = day?.stops[stopIndex];
-  if (stop === undefined || trip.wishlist.length === 0) return null;
+  if (day === undefined || stop === undefined) return null;
   const at = (s: TripStop): LatLng | null =>
     s.lat !== undefined && s.lng !== undefined
       ? { lat: s.lat, lng: s.lng }
       : null;
   const from = at(stop);
-  const score = (s: TripStop, rank: number) => {
+  const score = (s: TripStop, rank: number): [number, number, number] => {
     const point = at(s);
     const distance =
       from !== null && point !== null ? distanceKm(from, point) : 1_000;
@@ -302,8 +315,9 @@ export function swapStop(
       (a, b) =>
         a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2],
     );
-  const best = ranked[0].rank;
-  const replacement = trip.wishlist[best];
+  const best = ranked[0]?.rank;
+  const replacement = best === undefined ? undefined : trip.wishlist[best];
+  if (replacement === undefined) return null;
   const stops = day.stops
     .map((s, i) => (i === stopIndex ? replacement : s))
     .sort((a, b) => TRIP_SLOTS.indexOf(a.slot) - TRIP_SLOTS.indexOf(b.slot));

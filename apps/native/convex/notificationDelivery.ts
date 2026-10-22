@@ -443,6 +443,7 @@ async function exchange(
       recipients = recipients.map((recipient): Recipient => {
         if (recipient.state !== "pending") return recipient;
         const result = response.data[index++];
+        if (result === undefined) throw new Error("expo_ticket_count_mismatch");
         if (result.status === "ok" && result.id) {
           return {
             token: recipient.token,
