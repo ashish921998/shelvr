@@ -42,6 +42,7 @@ import Animated, {
   FadeOut,
   LinearTransition,
   SlideInDown,
+  SlideInLeft,
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
@@ -59,9 +60,9 @@ function rise() {
   };
 }
 
-const PANEL_IN = SlideInDown.duration(300).easing(
-  Easing.bezier(0.32, 0.72, 0, 1),
-);
+const PANEL_EASING = Easing.bezier(0.32, 0.72, 0, 1);
+const PANEL_IN = SlideInDown.duration(300).easing(PANEL_EASING);
+const SIDE_PANEL_IN = SlideInLeft.duration(300).easing(PANEL_EASING);
 const PANEL_RESIZE = LinearTransition.duration(motion.duration.enter).easing(
   motion.easing.inOut,
 );
@@ -369,7 +370,7 @@ function TripSheet({
   const side = useTripSidePanel() && overMap;
   return (
     <Animated.View
-      entering={PANEL_IN}
+      entering={side ? SIDE_PANEL_IN : PANEL_IN}
       layout={PANEL_RESIZE}
       style={
         side
