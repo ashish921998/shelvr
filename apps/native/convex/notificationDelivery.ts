@@ -6,6 +6,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { liveOwner } from "./model/auth";
 import {
   awaitingOutcome,
   recipientValidator,
@@ -180,6 +181,15 @@ type Closed = {
   deliverySentAt?: number;
 };
 
+const OWNER_UNAVAILABLE: Pick<
+  Closed,
+  "deliveryStatus" | "deliveryNextAttemptAt" | "deliveryError"
+> = {
+  deliveryStatus: "failed",
+  deliveryNextAttemptAt: undefined,
+  deliveryError: "owner_unavailable",
+};
+
 function firstSendAt(
   recorded: number | undefined,
   recipients: Recipient[],
@@ -245,6 +255,10 @@ export const claim = internalMutation({
       (digest.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
+    if ((await liveOwner(ctx, digest.userId)) === null) {
+      await ctx.db.patch(digestId, OWNER_UNAVAILABLE);
+      return null;
+    }
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", digest.userId))
@@ -336,7 +350,7 @@ export const finish = internalMutation({
       ...fields,
       ...(sentAt !== undefined && { deliverySentAt: sentAt }),
     });
-    if (status !== "pending")
+    if (status !== "pending" && (await liveOwner(ctx, digest.userId)) !== null)
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: digest.userId,
         notificationId: digest._id,
@@ -506,6 +520,10 @@ export const claimReminder = internalMutation({
       (reminder.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
+    if ((await liveOwner(ctx, reminder.userId)) === null) {
+      await ctx.db.patch(reminderId, OWNER_UNAVAILABLE);
+      return null;
+    }
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", reminder.userId))
@@ -620,7 +638,10 @@ export const finishReminder = internalMutation({
       ...fields,
       ...(sentAt !== undefined && { deliverySentAt: sentAt }),
     });
-    if (status !== "pending")
+    if (
+      status !== "pending" &&
+      (await liveOwner(ctx, reminder.userId)) !== null
+    )
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: reminder.userId,
         notificationId: reminder._id,

@@ -12,23 +12,24 @@ afterEach(() => {
 
 async function seed(tokens = ["token-a"]) {
   const t = newConvexTest();
+  const userId = await t.run((ctx) => ctx.db.insert("users", {}));
   const digestId = await t.run(async (ctx) => {
     await ctx.db.insert("notificationPreferences", {
-      userId: "user-a",
+      userId,
       weeklyShelfEnabled: true,
       nextDigestAt: Date.now() + 7 * 86400000,
       updatedAt: Date.now(),
     });
     for (const token of tokens)
       await ctx.db.insert("notificationDevices", {
-        userId: "user-a",
+        userId,
         token,
         enabled: true,
         platform: "ios",
         lastSeenAt: Date.now(),
       });
     const itemId = await ctx.db.insert("items", {
-      userId: "user-a",
+      userId,
       type: "note",
       status: "ready",
       title: "A note",
@@ -36,7 +37,7 @@ async function seed(tokens = ["token-a"]) {
       searchText: "note",
     });
     return ctx.db.insert("weeklyDigests", {
-      userId: "user-a",
+      userId,
       weekStart: Date.now(),
       createdAt: Date.now(),
       itemIds: [itemId],
@@ -49,11 +50,18 @@ async function seed(tokens = ["token-a"]) {
     const row = await digest();
     if (row?.deliveryNextAttemptAt) vi.setSystemTime(row.deliveryNextAttemptAt);
   };
-  return { t, digestId, digest, advance };
+  return { t, userId, digestId, digest, advance };
 }
 
 const json = (data: unknown) =>
   new Response(JSON.stringify({ data }), { status: 200 });
+
+const sendJobs = async (t: Awaited<ReturnType<typeof seed>>["t"]) =>
+  (
+    await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())
+  ).filter((job) =>
+    /notificationDelivery:send|captureNotification/.test(job.name),
+  ).length;
 
 describe("durable digest delivery", () => {
   it("sends each device its own language and preserves the legacy fallback", async () => {
@@ -215,18 +223,18 @@ describe("durable digest delivery", () => {
   });
 
   it("targets enabled devices when many disabled rows precede them", async () => {
-    const { t, digestId } = await seed([]);
+    const { t, userId, digestId } = await seed([]);
     await t.run(async (ctx) => {
       for (let i = 0; i < 30; i++)
         await ctx.db.insert("notificationDevices", {
-          userId: "user-a",
+          userId,
           token: `stale-${i}`,
           enabled: false,
           platform: "ios",
           lastSeenAt: Date.now(),
         });
       await ctx.db.insert("notificationDevices", {
-        userId: "user-a",
+        userId,
         token: "live-a",
         enabled: true,
         platform: "ios",
@@ -346,7 +354,7 @@ describe("durable digest delivery", () => {
   });
 
   it("recovers legacy unsent digests without resending completed ones", async () => {
-    const { t, digestId, digest } = await seed();
+    const { t, userId, digestId, digest } = await seed();
     const completedId = await t.run(async (ctx) => {
       const original = await ctx.db.get(digestId);
       await ctx.db.patch(digestId, {
@@ -354,7 +362,7 @@ describe("durable digest delivery", () => {
         deliveryNextAttemptAt: undefined,
       });
       return ctx.db.insert("weeklyDigests", {
-        userId: "user-a",
+        userId,
         weekStart: Date.now() - 7 * 86400000,
         createdAt: Date.now() - 7 * 86400000,
         itemIds: original!.itemIds,
@@ -375,11 +383,11 @@ describe("durable digest delivery", () => {
   });
 
   it("names a fully enriched save ahead of one guessed from its URL", async () => {
-    const { t, digestId } = await seed();
+    const { t, userId, digestId } = await seed();
     await t.run(async (ctx) => {
       const digest = (await ctx.db.get(digestId))!;
       const guessed = await ctx.db.insert("items", {
-        userId: "user-a",
+        userId,
         type: "link",
         status: "ready",
         title: "Guessed from the URL",
@@ -408,7 +416,7 @@ describe("durable digest delivery", () => {
 
   it("records one send event when delivery reaches a terminal state", async () => {
     vi.setSystemTime(new Date("2026-10-01T10:00:00Z"));
-    const { t, digestId, advance } = await seed();
+    const { t, userId, digestId, advance } = await seed();
     const firstSendAt = Date.now();
     const fetchMock = vi
       .fn()
@@ -429,7 +437,7 @@ describe("durable digest delivery", () => {
     const jobs = await telemetry();
     expect(jobs).toHaveLength(1);
     expect(jobs[0].args[0]).toMatchObject({
-      userId: "user-a",
+      userId,
       notificationId: digestId,
       kind: "weekly_shelf",
       itemCount: 1,
@@ -487,5 +495,60 @@ describe("durable digest delivery", () => {
       ],
     });
     expect((await digest())?.deliveredAt).toBeUndefined();
+  });
+
+  it("closes a digest whose owner is gone instead of queueing it again", async () => {
+    const { t, userId, digestId, digest } = await seed();
+    await t.run((ctx) => ctx.db.delete(userId));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    await t.mutation(internal.notificationDelivery.recover, {});
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect((await digest())?.deliveryNextAttemptAt).toBeUndefined();
+    expect(await sendJobs(t)).toBe(0);
+  });
+
+  it("closes a digest already sent once when its owner is gone, with no send event", async () => {
+    const { t, userId, digestId, digest, advance } = await seed();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json([{ status: "ok", id: "ticket-a" }])),
+    );
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect((await digest())?.deliveryRecipients).toMatchObject([
+      { state: "receipt" },
+    ]);
+    await t.run((ctx) => ctx.db.delete(userId));
+    await advance();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect((await digest())?.deliveryNextAttemptAt).toBeUndefined();
+    expect(await sendJobs(t)).toBe(0);
+  });
+
+  it("settles a send already in flight when deletion begins, with no send event", async () => {
+    const { t, userId, digestId, digest } = await seed();
+    const claimed = await t.mutation(internal.notificationDelivery.claim, {
+      digestId,
+    });
+    await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    await t.mutation(internal.notificationDelivery.finish, {
+      digestId,
+      attempt: claimed!.attempt,
+      recipients: [{ token: "token-a", state: "delivered" }],
+    });
+    expect(await digest()).toMatchObject({ deliveryStatus: "complete" });
+    expect(await sendJobs(t)).toBe(0);
   });
 });
