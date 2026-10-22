@@ -27,17 +27,23 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   tripReveal: "trip_reveal",
 };
 
-const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
+const PREVIOUS_STEP: Record<OnboardingStep, OnboardingStep | null> = {
+  opener: null,
   interests: "opener",
   setup: "interests",
+  demo: null,
   notifications: "demo",
   share: "notifications",
+  promise: null,
+  tripBuild: null,
+  tripLocked: null,
+  tripReveal: null,
 };
 
 export function previousOnboardingStep(
   step: OnboardingStep,
 ): OnboardingStep | null {
-  return PREVIOUS_STEP[step] ?? null;
+  return PREVIOUS_STEP[step];
 }
 
 /** `step` must be an index written by this flow version; getOnboardingProgress drops older flows' records. */
