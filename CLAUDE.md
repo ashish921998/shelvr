@@ -280,6 +280,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
+- **`model/settlement.ts`**: `completionPatch(item, args, aiAllowed)`, the pure rule for what a
+  finished processing run writes to a save. When the owner declines AI after the run last asked, it
+  drops the run's title, description, tags, intents, cities and recipe and keeps the row's own. A
+  typed or refreshed title wins, and a vector lands only while AI is allowed (consent not declined).
+  `finalizeItem` is its adapter (run fence, consent read, poster cleanup, telemetry).
+  `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
+  `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
+  Re-record that file only for a change you intend, and review its diff.
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
 (auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var, an AI Studio API key).
@@ -449,7 +457,8 @@ needed at runtime by the features that use them:
 ## Working conventions
 
 - Do not reintroduce the old notes-app domain (`notes` table, OpenAI summary action, `/notes`
-  routes). The product domain is **items + spaces**.
+  routes). The product domain is **items + spaces**. `GLOSSARY.md` names the domain's terms: say
+  "save" in copy and docs while tables and code keep `items`.
 - Never pass `userId` from the client into Convex public functions.
 - Keep `returns:` validators accurate. Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
