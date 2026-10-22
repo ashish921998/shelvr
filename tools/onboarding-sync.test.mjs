@@ -33,6 +33,18 @@ for (const path of [NOTES, FLOWS]) {
   });
 }
 
+// The paywall is built in RevenueCat, so its text is in no file here. Edit this list when the paywall copy changes.
+const PAYWALL = [
+  "Save the link. Shelvr does the filing.",
+  "Get a heads-up before you pay",
+  "Pick a plan",
+  "Yearly",
+  "Weekly",
+  "Try for $0.00, then <price>/year",
+  "Subscribe for <price>/week",
+  "Restore",
+];
+
 const straighten = (text) => text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
 const normalize = (text) => straighten(text).replace(/\s+/g, " ").trim();
 
@@ -141,6 +153,7 @@ test("the App Review notes quote only text the app shows", () => {
   const isShown = showing([
     ...catalogStrings(JSON.parse(read(CATALOG))),
     ...swiftStrings("apps/native/app-intents"),
+    ...PAYWALL,
   ]);
   const stale = quotedCopy(read(NOTES))
     .filter(({ text }) => !isShown(text))
