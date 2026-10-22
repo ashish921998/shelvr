@@ -396,4 +396,20 @@ describe("OpenerStep", () => {
     wait(20000);
     expect(dot(0)).toContain("dotOn");
   });
+
+  it("keeps a Reduce Motion change that lands before the mount query answers", async () => {
+    vi.useFakeTimers();
+    let answer: (enabled: boolean) => void = () => {};
+    const query = new Promise<boolean>((resolve) => (answer = resolve));
+    const { AccessibilityInfo } = await import("react-native");
+    const spy = vi
+      .spyOn(AccessibilityInfo, "isReduceMotionEnabled")
+      .mockReturnValue(query);
+    renderOpener();
+    act(() => mock.reduceMotionChanged?.(true));
+    await act(async () => answer(false));
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
+    spy.mockRestore();
+  });
 });

@@ -68,13 +68,17 @@ function useLiveReducedMotion() {
   const [reduced, setReduced] = useState(useReducedMotion());
   useEffect(() => {
     let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) setReduced(enabled);
-    });
+    let changed = false;
     const subscription = AccessibilityInfo.addEventListener(
       "reduceMotionChanged",
-      setReduced,
+      (enabled) => {
+        changed = true;
+        setReduced(enabled);
+      },
     );
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted && !changed) setReduced(enabled);
+    });
     return () => {
       mounted = false;
       subscription.remove();
