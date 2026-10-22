@@ -141,7 +141,9 @@ function ItemCardView({
           "share",
         );
       }
-    } catch {}
+    } catch (error) {
+      analytics.captureError("feed_item_share_failed", error);
+    }
     if (link !== undefined) settleShareLink(item._id, shared);
   };
 

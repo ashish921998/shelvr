@@ -1,3 +1,4 @@
+import { bestEffort } from "@/lib/best-effort";
 import * as SecureStore from "expo-secure-store";
 
 const KEY = "shelvr.purchase.beforeSignIn";
@@ -30,9 +31,7 @@ export function getPurchaseBeforeSignInRevision(): number {
 }
 
 export function notePurchaseBeforeSignIn() {
-  try {
-    write(UNCLAIMED);
-  } catch {}
+  bestEffort("note_purchase_before_sign_in_failed", () => write(UNCLAIMED));
 }
 
 function read(): string | null {
@@ -79,17 +78,17 @@ export function claimPurchaseBeforeSignIn(
     clearPurchaseBeforeSignIn();
     return false;
   }
-  try {
+  bestEffort("claim_purchase_before_sign_in_failed", () => {
     SecureStore.setItem(AT_KEY, String(Date.now()));
     write(owner);
-  } catch {}
+  });
   return true;
 }
 
 // SecureStore's delete is async-only, so clearing writes "".
 export function clearPurchaseBeforeSignIn() {
-  try {
+  bestEffort("clear_purchase_before_sign_in_failed", () => {
     SecureStore.setItem(AT_KEY, "");
     write("");
-  } catch {}
+  });
 }

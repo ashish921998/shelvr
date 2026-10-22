@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import { isRateLimitedError } from "@convex/model/demoErrors";
 import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
+import { bestEffort } from "@/lib/best-effort";
 import { useCurrentUser } from "@/lib/current-user";
 import { recordShareSaved } from "@/lib/first-share";
 import { useOnboarding } from "@/lib/onboarding";
@@ -36,9 +37,9 @@ function readQueued(): QueuedSave | null {
 
 // SecureStore's delete is async-only, so clearing writes "".
 function clearQueued() {
-  try {
-    SecureStore.setItem(KEY, "");
-  } catch {}
+  bestEffort("clear_queued_first_save_failed", () =>
+    SecureStore.setItem(KEY, ""),
+  );
 }
 
 export function queueFirstSave(save: PendingDemo) {
