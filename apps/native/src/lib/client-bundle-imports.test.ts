@@ -31,15 +31,30 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+// `import { type A, type B } from "x"` names only types, so it is erased too.
+function onlyInlineTypes(clause: string): boolean {
+  const named = /^\s*\{([^}]*)\}\s*$/.exec(clause);
+  if (named === null) return false;
+  const names = named[1]
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return names.length > 0 && names.every((name) => name.startsWith("type "));
+}
+
 /** Specifiers of imports that survive compilation (`import type` is erased). */
 function runtimeImports(file: string): string[] {
   const text = readFileSync(file, "utf8");
   const specifiers: string[] = [];
-  const pattern =
-    /(?:^|\n)\s*(import|export)\s+(type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']/g;
-  for (const match of text.matchAll(pattern)) {
-    if (match[2] === undefined) specifiers.push(match[3]);
+  const declaration =
+    /(?:^|\n)\s*(?:import|export)\s+(type\s+)?(?:([^"';]*?)\sfrom\s+)?["']([^"']+)["']/g;
+  for (const [, typeOnly, clause, specifier] of text.matchAll(declaration)) {
+    if (typeOnly === undefined && !onlyInlineTypes(clause ?? "")) {
+      specifiers.push(specifier);
+    }
   }
+  const call = /\b(?:import|require)\(\s*["']([^"']+)["']\s*\)/g;
+  for (const [, specifier] of text.matchAll(call)) specifiers.push(specifier);
   return specifiers;
 }
 
