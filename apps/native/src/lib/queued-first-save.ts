@@ -36,7 +36,7 @@ function readQueued(): QueuedSave | null {
 }
 
 // SecureStore's delete is async-only, so clearing writes "".
-function clearQueued() {
+export function clearQueued() {
   bestEffort("clear_queued_first_save_failed", () =>
     SecureStore.setItem(KEY, ""),
   );

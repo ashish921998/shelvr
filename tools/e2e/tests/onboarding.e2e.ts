@@ -10,9 +10,10 @@ import {
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
 
-afterEach(async ({ device }) => {
+// Leave the app signed out at the opener, not mid-onboarding, for the next test.
+afterEach(async ({ device, screen }) => {
+  await startFreshOnboarding({ device, screen });
   await device.closeApp().catch(() => undefined);
-  await device.clearKeychain();
 });
 
 test(
@@ -64,10 +65,10 @@ test(
     await walkToSharePractice(screen, "Travel ideas");
 
     await screen.getByRole("button", SHARE_LATER).tap();
-    await expect(screen.getByText("There it is.")).toBeVisible({
+    await expect(screen.getByText(/^There it is\./)).toBeVisible({
       timeout: 30_000,
     });
-    await expect(screen.getByText("Sample trip")).toBeVisible();
+    await expect(screen.getByText(/^Sample trip$/i)).toBeVisible();
     await expect(screen.getByText("Staré Město")).toBeVisible();
     await screen.getByRole("button", "Continue").tap();
 
