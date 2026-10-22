@@ -31,8 +31,8 @@ For any change a person can see, screenshots or a recording go here, naming the 
 commit they were taken at. Drag images into this box.
 CI requires one when the pull request touches UI files (screens, styles, motion, copy, assets,
 native view modules, app intents, app config, push copy, apps/web UI). If those files changed but
-nothing on screen did, say why here; only the owner waives the screenshot, with the "no-ui-change"
-label (a rule, not a check: CI cannot tell who added the label, so agents never add it).
+nothing on screen did, say why here and add the "no-ui-change" label when you open the pull
+request (`gh pr create --label no-ui-change`). Any visible change still needs a screenshot.
 Paywall changes live in RevenueCat, so CI cannot see them: they still need screenshots.
 -->
 
