@@ -713,6 +713,38 @@ describe("readPage for Instagram posts", () => {
       page: { caption: true },
     });
   });
+  it("finds the recipe behind a later caption link when a sponsor's comes first", async () => {
+    const postUrl = "https://www.instagram.com/p/ABC124/";
+    const embedUrl = "https://www.instagram.com/p/ABC124/embed/captioned/";
+    const sponsorUrl = "https://shop.example.com/pans";
+    const recipeUrl = "https://example.com/lemon-pasta/";
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Lemon pasta",
+      recipeIngredient: ["200 g spaghetti", "1 lemon"],
+      recipeInstructions: ["Boil the pasta.", "Toss with lemon."],
+    };
+    serve({
+      [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+      [embedUrl]: html(
+        embedUrl,
+        `<div class="Caption"><a class="CaptionUsername">cook</a>Lemon pasta. My pan: ${sponsorUrl} Recipe: ${recipeUrl}<div class="CaptionComments"></div></div>`,
+      ),
+      [sponsorUrl]: html(
+        sponsorUrl,
+        "<html><head></head><body>Pans</body></html>",
+      ),
+      [recipeUrl]: html(
+        recipeUrl,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      ),
+    });
+    const read = await readPage(postUrl);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+  });
 });
 
 describe("readPage for YouTube videos", () => {
