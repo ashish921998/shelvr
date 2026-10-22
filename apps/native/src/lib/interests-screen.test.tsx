@@ -46,6 +46,9 @@ const mocks = vi.hoisted(() => ({
     </button>
   ),
   sharePractice: vi.fn((_props: { sample?: { domain: string } }) => null),
+  payloads: [] as { value: string; shareType: string }[],
+  clearSharedPayloads: vi.fn(),
+  paywall: { onDecline: () => {} },
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -59,9 +62,18 @@ vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ completeOnboarding: vi.fn() }),
 }));
 vi.mock("@/lib/onboarding-paywall", () => ({
-  useOnboardingPaywall: () => ({ asked: false, ask: vi.fn() }),
+  useOnboardingPaywall: (options: { onDecline: () => void }) => {
+    mocks.paywall = options;
+    return { asked: false, ask: vi.fn() };
+  },
 }));
-vi.mock("@/lib/use-incoming-share-url", () => ({ holdsOnlyLink: () => false }));
+vi.mock("@/lib/use-incoming-share-url", () => ({
+  holdsOnlyLink: (payloads: { value: string }[], url: string) =>
+    payloads.length === 1 && payloads[0].value === url,
+}));
+vi.mock("@/lib/share/process-share", () => ({
+  firstSharedUrl: (payloads: { value: string }[]) => payloads[0]?.value ?? null,
+}));
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
   getOnboardingProgress: () => ({
@@ -122,8 +134,8 @@ vi.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success" },
 }));
 vi.mock("expo-sharing", () => ({
-  clearSharedPayloads: vi.fn(),
-  getSharedPayloads: () => [],
+  clearSharedPayloads: mocks.clearSharedPayloads,
+  getSharedPayloads: () => mocks.payloads,
 }));
 vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -151,6 +163,8 @@ const savedSpaces = () =>
 beforeEach(() => {
   mocks.setOnboardingProgress.mockClear();
   mocks.sharePractice.mockClear();
+  mocks.clearSharedPayloads.mockClear();
+  mocks.payloads = [];
 });
 afterEach(cleanup);
 
@@ -199,4 +213,24 @@ it("moves on to share practice only once a topic is picked, with that topic's po
   expect(mocks.sharePractice.mock.lastCall?.[0].sample?.domain).toBe(
     "anthropic.com",
   );
+});
+
+it("drops a declined practice share even after the topics changed", () => {
+  render(<OnboardingScreen />);
+  fireEvent.click(chip("Food & recipes"));
+  mocks.payloads = [
+    {
+      value: "https://www.anthropic.com/research/building-effective-agents",
+      shareType: "url",
+    },
+  ];
+  mocks.paywall.onDecline();
+  expect(mocks.clearSharedPayloads).toHaveBeenCalledTimes(1);
+});
+
+it("keeps a link the person shared on their own when the paywall is declined", () => {
+  render(<OnboardingScreen />);
+  mocks.payloads = [{ value: "https://example.com/my-own", shareType: "url" }];
+  mocks.paywall.onDecline();
+  expect(mocks.clearSharedPayloads).not.toHaveBeenCalled();
 });

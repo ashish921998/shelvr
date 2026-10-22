@@ -12,7 +12,8 @@ import {
   spacesAfterInterestToggle,
   TRAVEL_INTEREST,
 } from "@/lib/travel-vibes";
-import { practiceShareSample } from "@/lib/onboarding-demo";
+import { findSample, practiceShareSample } from "@/lib/onboarding-demo";
+import { firstSharedUrl } from "@/lib/share/process-share";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
@@ -69,10 +70,13 @@ function holdIncomingShare() {
   }
 }
 
-function dropPracticeShare(practiceUrl: string | undefined) {
+/** Drops a held practice share by what was shared, since the topics, and so the offered post, can change after it. */
+function dropPracticeShare() {
   try {
-    if (practiceUrl === undefined) return;
-    if (!holdsOnlyLink(getSharedPayloads(), practiceUrl)) return;
+    const payloads = getSharedPayloads();
+    const url = firstSharedUrl(payloads);
+    if (url === null || findSample(url) === undefined) return;
+    if (!holdsOnlyLink(payloads, url)) return;
     clearSharedPayloads();
     clearPendingShareOnDevice();
   } catch (err) {
@@ -192,7 +196,7 @@ export default function OnboardingScreen() {
   const paywall = useOnboardingPaywall({
     onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
-      dropPracticeShare(practiceSample?.url);
+      dropPracticeShare();
       finish();
     },
     onUnavailable: finish,
