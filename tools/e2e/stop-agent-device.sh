@@ -9,7 +9,7 @@ echo "::warning::agent-device would not stop its daemon; stopping it by pid"
 for info in $(find "$HOME/.agent-device" -name daemon.json 2>/dev/null); do
   pid=$(node -p "require('$info').pid") || continue
   # Signal it only if that pid is still an agent-device process.
-  if ps -p "$pid" -o command= 2>/dev/null | grep -q agent-device; then
+  if [ "$pid" != "$$" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q agent-device; then
     kill "$pid" 2>/dev/null || true
     # Wait for it to exit, so the runner cache saved next does not catch its
     # state files mid-shutdown.
