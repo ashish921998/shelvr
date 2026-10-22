@@ -203,3 +203,34 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 - Keep secrets and user content out of source, logs, tests, and reports.
 - Do not reintroduce the retired notes-app domain or edit generated Convex files
   unless the Convex workflow explicitly requires regeneration.
+
+## Rules and what enforces them
+
+The rules here and in `CLAUDE.md`, and what fails when one is broken. When you
+are corrected for a rule already listed, fix the mistake and move the rule up
+in the same change: remove the way to get it wrong, then types, then a lint or
+CI check whose message names the fix, then a test. Docs come last. A row that
+fails "nowhere" is a repeat waiting to happen. Drop a row once its mistake
+cannot happen.
+
+| Rule                                                       | Enforced by                                                           | Fails in                             |
+| ---------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------ |
+| File and identifier naming                                 | ESLint `check-file`, `naming-convention`                              | `lint`                               |
+| Complexity limits, zero lint warnings                      | ESLint `complexity`, `max-*`, `--max-warnings 0`                      | `lint`                               |
+| No `console.*` outside the loggers                         | ESLint `no-console`                                                   | `lint`                               |
+| One gate, run before a push and in CI                      | `check:code` via `.husky/pre-push`, the CI `Gate` step, `check`       | pre-push, CI                         |
+| Generated Convex files are current                         | `tools/verify-convex-codegen.mjs`                                     | `check:code`                         |
+| Copy lives in `en.json`; generated catalogs untouched      | `localization-source.test.ts`, `localization-catalogs.test.ts`        | `check:code`                         |
+| `CLAUDE.md` names every table, module and route            | `tools/verify-agent-docs.mjs`                                         | `check:code`                         |
+| No dead code; one version per dependency                   | Knip, Syncpack                                                        | `check:code`                         |
+| Tests that run git use `createRepo()`                      | `tools/temp-repo.test.mjs`                                            | `check:code`                         |
+| Onboarding notes and e2e helpers follow the flow           | `tools/onboarding-sync.test.mjs`                                      | `check:code`                         |
+| Public Convex `args` and `returns` stay compatible         | `tools/verify-convex-api.mjs`, from the fork point                    | CI `convex api contract`             |
+| Native fingerprint moves are acknowledged                  | `tools/verify-native-fingerprint.mjs`, `verify-ota-compatibility.mjs` | CI `native-fingerprint`, OTA publish |
+| A PR shows how it was verified; UI shows a screenshot      | `tools/verify-pr-evidence.mjs`                                        | CI `PR evidence`                     |
+| No high or critical advisories                             | `pnpm run audit`                                                      | `check`, CI on dependency PRs, daily |
+| `requireUserId`, no client `userId`, `liveOwner`           | Review against `REVIEW.md`                                            | nowhere                              |
+| `requireProEntitlement`; `aiAllowed` before content leaves | Review against `REVIEW.md`                                            | nowhere                              |
+| AI passes touch only `suggested` memberships               | Review against `REVIEW.md`                                            | nowhere                              |
+| Indexes over `.filter()`; `logEvent` scalars; `safeFetch`  | Review against `REVIEW.md`                                            | nowhere                              |
+| `newConvexTest()`; `captureError`; no test in `src/app`    | Review against `REVIEW.md`                                            | nowhere                              |
