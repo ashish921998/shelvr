@@ -39,8 +39,7 @@ vi.mock("convex/react", () => ({
   useMutation: (ref: string) =>
     ref === "createSpace" ? createSpace : createLinkItem,
 }));
-// Stable, as the real router is: a new object each render would re-run the
-// replay effect on its own.
+// Stable like the real router: a new object each render would re-run the replay effect.
 const stableRouter = vi.hoisted(() => ({}));
 vi.mock("expo-router", () => ({ useRouter: () => stableRouter }));
 vi.mock("@/lib/current-user", () => ({
@@ -56,9 +55,6 @@ vi.mock("@/lib/entitlement", () => ({
   waitForSheetTransition: () => Promise.resolve(),
 }));
 
-// Lets every pending mutation promise, store notification and re-render
-// settle. A self-retrying replay keeps scheduling new attempts, so the call
-// count below would keep growing instead of holding still.
 async function settle() {
   for (let i = 0; i < 10; i++) {
     await act(async () => {
@@ -67,8 +63,6 @@ async function settle() {
   }
 }
 
-// Rejects like a server error, but succeeds once the call count shows a retry
-// loop, so a regression fails its assertion instead of exhausting the heap.
 function failingServer() {
   return () =>
     createSpace.mock.calls.length > 20
@@ -170,7 +164,6 @@ describe("useReplayOnboarding and the account", () => {
     await settle();
     expect(openPaywall).toHaveBeenCalledOnce();
 
-    // A refresh of the same account does not ask again.
     account.user = { _id: "user_1" };
     hook.rerender();
     await settle();
@@ -272,7 +265,6 @@ describe("useReplayOnboarding retries", () => {
   });
 
   it("runs work that arrives while a pass is in flight", async () => {
-    // An older build's queued link keeps the replay busy after the spaces.
     storage.set(
       "shelvr.pending.onboarding",
       JSON.stringify({
@@ -358,7 +350,6 @@ describe("a purchase made before sign-in", () => {
     setPendingSpaces(["Recipes"]);
     notePurchaseBeforeSignIn();
 
-    // The app is closed before the purchase reaches the account.
     const first = renderHook(() => useReplayOnboarding());
     await settle();
     first.unmount();
@@ -367,8 +358,6 @@ describe("a purchase made before sign-in", () => {
     expect(openPaywall).not.toHaveBeenCalled();
     expect(createSpace).not.toHaveBeenCalled();
 
-    // Access lands (the webhook, or the attach on this launch) while the
-    // flag is still set: the replay does not wait for the flag too.
     entitlement.entitled = true;
     relaunched.rerender();
     await settle();

@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// Tests for the onboarding gate. SecureStore is stubbed with an in-memory map,
-// so the persistence contract is observable: the provider starts from the
-// stored flag and completeOnboarding persists before flipping state.
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,7 +16,6 @@ vi.mock("expo-secure-store", () => ({
 
 type Onboarding = ReturnType<typeof useOnboarding>;
 
-// Renders nothing; hands the context value it sees to the test.
 function Probe({ sink }: { sink: Onboarding[] }) {
   sink.push(useOnboarding());
   return null;
@@ -58,7 +54,6 @@ describe("OnboardingProvider", () => {
       sink[0].completeOnboarding();
     });
     expect(store.map.get("shelvr.onboarded")).toBe("true");
-    // The state flip produces a new context value on the re-render.
     expect(sink.at(-1)?.onboarded).toBe(true);
   });
 

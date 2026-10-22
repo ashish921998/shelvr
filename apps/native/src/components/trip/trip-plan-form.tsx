@@ -59,7 +59,6 @@ type Props = {
   onCancel?: () => void;
 };
 
-/** One row of the form: a label on the left, its control on the right. */
 function Row({
   label,
   children,
@@ -75,8 +74,6 @@ function Row({
   );
 }
 
-/** A label over a full-width native segmented control. The label comes
- * first so VoiceOver reads it before the segments. */
 function Segmented({
   label,
   values,
@@ -103,9 +100,6 @@ function Segmented({
   );
 }
 
-/** How many days: the native menu of 1 to 15 days on iOS, the scrolling day
- * pills on Android. Below it, when the saves cannot fill that many days at
- * this pace, about how many they do fill. */
 function Days({
   days,
   onChange,
@@ -170,8 +164,6 @@ function Days({
   );
 }
 
-/** The start date: "Add a date" until one is picked, then the native
- * compact picker (iOS) or the date with a tap to change it (Android). */
 function StartDate({
   value,
   onChange,
@@ -255,10 +247,6 @@ function StartDate({
   );
 }
 
-/**
- * "Plan my trip": how many days, when, how full, and (for a space whose
- * saves span cities) which city. The form never names a place itself.
- */
 export function TripPlanForm({
   saveCount,
   cities,
@@ -275,8 +263,6 @@ export function TripPlanForm({
       ? date
       : null;
   });
-  // Kept by name: the list reorders as saves finish, so an index could
-  // drift to another city while the sheet is open.
   const [picked, setPicked] = useState(initial?.city);
   const cityIndex = Math.max(
     0,
@@ -407,8 +393,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "flex-end",
     gap: theme.gap(1),
   },
-  // The compact picker sizes to its date; without a floor it is laid out
-  // narrower than the text and clips the year.
+  // The compact date picker is laid out narrower than its text and clips the year without a floor.
   compactPicker: {
     minWidth: 132,
   },

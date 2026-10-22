@@ -1,20 +1,14 @@
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import type { LocalImage } from '@/lib/use-save-image';
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import type { LocalImage } from "@/lib/use-save-image";
 
-/** Long edge of the stored copy. Plenty for the feed and detail views, and
- * Gemini bills by 768px tiles rather than bytes, so a camera original buys
- * nothing but 5-10x the storage and feed bandwidth. */
 export const MAX_IMAGE_EDGE = 1600;
 const JPEG_QUALITY = 0.8;
 
-/** PNG when the source says so, by MIME or by extension when the picker or
- * share sheet gives no MIME. No alpha scan: an opaque PNG screenshot costs a
- * few hundred KB more than JPEG would; sniff alpha if that ever dominates. */
 function keepPng(image: LocalImage): boolean {
   return (
     image.isSticker === true ||
-    image.mimeType?.toLowerCase() === 'image/png' ||
-    /\.png$/i.test(image.uri.split('?')[0])
+    image.mimeType?.toLowerCase() === "image/png" ||
+    /\.png$/i.test(image.uri.split("?")[0])
   );
 }
 
@@ -31,7 +25,6 @@ export async function normalizeImage(image: LocalImage): Promise<LocalImage> {
   const context = ImageManipulator.manipulate(image.uri);
   let rendered = await context.renderAsync();
   if (Math.max(rendered.width, rendered.height) > MAX_IMAGE_EDGE) {
-    // Axis from the oriented dimensions; a rotated 4000x3000 is 3000x4000 here.
     context.resize(
       rendered.width >= rendered.height
         ? { width: MAX_IMAGE_EDGE }

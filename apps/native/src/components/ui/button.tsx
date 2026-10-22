@@ -16,13 +16,6 @@ type Props = Omit<PressableProps, "children" | "style"> & {
   style?: React.ComponentProps<typeof AnimatedPressable>["style"];
 };
 
-/**
- * Shelvr's capsule action for a screen's main step. Where iOS supports Liquid
- * Glass it is interactive glass and the system owns the press response;
- * elsewhere it is a solid capsule that dims and scales in. Loading dims the
- * button instead of swapping in a spinner, so the label stays put and nothing
- * around it reflows. Ported from Amber (#13).
- */
 export function Button({
   title,
   loading = false,
@@ -37,7 +30,6 @@ export function Button({
   const reducedMotion = useReducedMotion();
   const [pressed, setPressed] = useState(false);
   const inactive = !!disabled || loading;
-  // Glass animates its own press natively, so only the solid capsule tracks it.
   const visual: Visual = loading
     ? "loading"
     : inactive

@@ -27,20 +27,16 @@ function ballot(
   });
 }
 
-function store(key: string, value: unknown) {
+function storeQuietly(key: string, value: unknown) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // A private window keeps the vote for this visit only.
-  }
+  } catch {}
 }
 
-function forget(key: string) {
+function forgetQuietly(key: string) {
   try {
     window.localStorage.removeItem(key);
-  } catch {
-    // Nothing was kept, so there is nothing to drop.
-  }
+  } catch {}
 }
 
 function load(key: string): unknown {
@@ -56,15 +52,7 @@ function isChoices(value: unknown): value is Choices {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** The last ballot the server took, with its revision. */
 const savedKey = (token: string) => `shelvr.planVote.${token}`;
-/**
- * The newest ballot sent, kept from the moment it goes out until the server
- * is seen taking it. A tab closed before the answer arrives (the request
- * itself outlives it) leaves it here, so the next visit shows it and sends
- * it again. That replaces nothing newer: the server keeps the later
- * revision.
- */
 const pendingKey = (token: string) => `shelvr.planVotePending.${token}`;
 
 type Ballot = { choices: Choices; revision: number };
@@ -76,30 +64,20 @@ function storedBallot(key: string): Ballot | undefined {
   if (isChoices(choices) && typeof revision === "number") {
     return { choices, revision };
   }
-  // A page from before revisions kept the bare choices.
   return { choices: value, revision: 0 };
 }
 
-/**
- * Keeps `ballot` under `key` unless a newer one is already there, so a
- * slower answer from one tab never replaces what another tab sent later.
- */
 function storeIfNewer(key: string, ballot: Ballot) {
   const current = storedBallot(key);
   if (current && current.revision > ballot.revision) return;
-  store(key, ballot);
+  storeQuietly(key, ballot);
 }
 
-/**
- * The number for the next ballot: the clock, or one above the last ballot
- * when two land in the same millisecond, so each one sent is above the last.
- */
 function nextRevision(last: { current: number }): number {
   last.current = Math.max(Date.now(), last.current + 1);
   return last.current;
 }
 
-/** One id per browser, so a changed mind replaces the earlier vote. */
 function voterId(): string {
   try {
     const existing = window.localStorage.getItem(VOTER_KEY);
@@ -125,23 +103,12 @@ export default function PlanVote({
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>();
   const voter = useRef<string | undefined>(undefined);
-  // Votes go out one at a time, so a slow request never lands after a newer one.
   const queue = useRef<Promise<void>>(Promise.resolve());
-  // Each ballot carries a number above the last, so the server can tell a
-  // late one from a new one however the requests arrive.
   const lastRevision = useRef(0);
 
-  // Taps settle for a moment before they go out, so toggling five places is
-  // one request, not ten.
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // The ballot still waiting on that pause. Leaving the page sends it at once,
-  // with keepalive so the request outlives the tab.
   const pending = useRef<Ballot | undefined>(undefined);
-  // The newest ballot handed to the queue whose request hasn't started yet,
-  // because an earlier one is still out. Leaving the page sends it too.
   const queued = useRef<Ballot | undefined>(undefined);
-  // The newest revision leaving the page already sent, so the queue skips it
-  // and anything older rather than sending it twice.
   const sentOnLeave = useRef(0);
 
   const send = (next: Choices, revision: number) => {
@@ -160,14 +127,10 @@ export default function PlanVote({
           keepalive: true,
         });
         if (response.ok) {
-          // Remembered only once saved, so a reload never shows a vote the
-          // server didn't take.
           storeIfNewer(savedKey(token), { choices: next, revision });
           if ((storedBallot(pendingKey(token))?.revision ?? 0) <= revision) {
-            forget(pendingKey(token));
+            forgetQuietly(pendingKey(token));
           }
-          // A newer ballot still settling or queued keeps the page on
-          // "saving", so an earlier answer never reads as the latest tap saved.
           if (revision === lastRevision.current) {
             setStatus("saved");
             setMessage(undefined);
@@ -193,11 +156,6 @@ export default function PlanVote({
   });
 
   useEffect(() => {
-    // localStorage only exists in the browser, after hydration. A ballot that
-    // left with the last visit is shown and sent again, since its answer was
-    // never seen.
-    // The next ballot is numbered above both, so a clock that went back since
-    // never sends one the server would treat as late.
     const saved = storedBallot(savedKey(token));
     const left = storedBallot(pendingKey(token));
     const resend =
@@ -218,7 +176,6 @@ export default function PlanVote({
   useEffect(() => {
     const leave = () => {
       clearTimeout(timer.current);
-      // The ballot still settling is newer than any in the queue.
       const next = pending.current ?? queued.current;
       pending.current = undefined;
       queued.current = undefined;

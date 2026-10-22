@@ -5,13 +5,6 @@ import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/**
- * Root render-crash boundary. Reports the exception to error tracking and
- * offers a retry (which remounts the route tree) instead of Expo's bare
- * default screen. Nested routes without their own boundary land here.
- * Re-exported as `ErrorBoundary` from `src/app/_layout.tsx`, where Expo
- * Router picks it up.
- */
 export function RootErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   useAppLocale();
   useEffect(() => {

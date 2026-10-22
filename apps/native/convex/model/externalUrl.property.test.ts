@@ -7,7 +7,6 @@ import {
   normalizeExternalUrl,
 } from "./externalUrl";
 
-/** Real-looking links, schemeless input, and arbitrary junk, mixed. */
 const input = fc.oneof(
   fc.webUrl({ withQueryParameters: true, withFragments: true }),
   fc.domain(),
@@ -34,8 +33,6 @@ function normalized(raw: string): string | null {
   try {
     return normalizeExternalUrl(raw);
   } catch (e) {
-    // Rejection must always be a policy error with a stable code, never a
-    // stray TypeError the caller does not expect.
     expect(isUrlPolicyError(e)).toBe(true);
     return null;
   }

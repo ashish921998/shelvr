@@ -79,8 +79,6 @@ describe("storePoster", () => {
   });
 
   it("keeps a full-size PNG hero of a few megabytes as the cover", async () => {
-    // Time Out serves some heroes as ~3.8 MB PNGs; a 3 MB cap left those
-    // saves as text cards although the page had a picture.
     const heroBytes = 3_787_207;
     safeFetch.mockResolvedValue({
       ok: true,
@@ -110,7 +108,6 @@ describe("fetchImageAspectRatio", () => {
   });
 
   it("reads the size from the front of a picture sent whole", async () => {
-    // A 1971x1314 PNG header: signature, IHDR length and type, then size.
     const header = new Uint8Array(24);
     header.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     header.set([0x49, 0x48, 0x44, 0x52], 12);
@@ -308,8 +305,6 @@ describe("fetchXPost", () => {
       heroImageUrl:
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
-      // X cut the preview itself, so no length check can tell it from a
-      // complete short post.
       truncated: true,
     });
   });
@@ -617,8 +612,6 @@ describe("processItem for X posts", () => {
     );
   });
 
-  /** Answer as the provider does: the model can only fill fields the chosen
-   * schema declares, and zod strips the rest. */
   function offerRecipe() {
     generateObject.mockImplementation(
       async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
@@ -641,8 +634,6 @@ describe("processItem for X posts", () => {
   }
 
   it("does not lift a recipe out of a long post X served cut short", async () => {
-    // `note_tweet` means the 280 characters on hand are a cut copy of the post,
-    // which no length check can tell from a post that is simply short.
     offerRecipe();
     serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
 
@@ -787,9 +778,6 @@ describe("linkEnrichment", () => {
     },
   );
   it("does not turn a skip link into the article body", () => {
-    // The symptom this guards: a bot-hostile page yields only its skip link,
-    // the classifier describes that, and the reader shows "Skip to main
-    // content" as both the description and the whole body.
     const content = extractBodyText(
       '<html><head><title>Ultimate chocolate cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><a href="#content">Skip to content</a><div id="main"></div></body></html>',
       "https://example.com/recipes/cake",
@@ -866,10 +854,6 @@ describe("linkEnrichment", () => {
     expect(content).not.toContain("Copyright");
     expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
   });
-  // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
-  // failed (retryable, classified from the URL alone), the page read but had
-  // no article body (terminal, e.g. an oEmbed-only TikTok read), a fully
-  // read article, and no page at all (images/notes never fetch).
   it("flags an unreadable page as partial so the client offers a retry", () => {
     expect(linkEnrichment({ status: "unreadable" })).toBe("partial");
   });
@@ -946,8 +930,6 @@ function html(body: string) {
 
 type EmbedFailure = { ok: false; code: string; status?: number };
 
-/** Route mocked fetches the way Instagram answers a link preview: the post page,
- * its captioned embed (or how its fetch failed), and the poster image. */
 function instagramAnswers(
   page: string,
   embed: string | EmbedFailure | "throws",
@@ -1079,7 +1061,6 @@ describe("fetchInstagram", () => {
       heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
       heroAspectRatio: 1,
       content: undefined,
-      // The card calls this /p/ link a reel.
       video: true,
     });
   });
@@ -1415,8 +1396,6 @@ describe("sanitizeRecipe", () => {
   });
 
   it("keeps a long instruction whole rather than cutting it short", () => {
-    // The card replaces the article body, so a step cut mid-sentence loses its
-    // temperature or its timing with nothing left on screen to recover it.
     const step = `Braise until fork-tender, ${"about three hours, ".repeat(30)}then glaze.`;
     const recipe = sanitizeRecipe({
       ingredients: ["3 lb short ribs"],
@@ -1426,8 +1405,6 @@ describe("sanitizeRecipe", () => {
   });
 
   it("keeps a quantity that two components both call for", () => {
-    // `recipeIngredient` is one flat list, so a cake and its frosting each
-    // wanting a cup of sugar reads as a repeat. Dropping it changes the recipe.
     expect(
       sanitizeRecipe({
         ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
@@ -1440,8 +1417,6 @@ describe("sanitizeRecipe", () => {
   });
 
   it("refuses a recipe too long to store instead of trimming it", () => {
-    // Refusing leaves the article body in place, which is readable; a recipe
-    // missing its last ten steps is not, and looks complete.
     const steps = Array.from({ length: 40 }, () => "x".repeat(600));
     expect(sanitizeRecipe({ ingredients: ["Salt"], steps })).toBeUndefined();
     expect(
@@ -1459,7 +1434,6 @@ describe("sanitizeRecipe", () => {
       ingredients: ["Salt"],
       steps: ["Add salt."],
     });
-    // Strict: the keys must be absent, not present with an undefined value.
     expect(recipe).toStrictEqual({
       ingredients: ["Salt"],
       steps: ["Add salt."],
@@ -1500,9 +1474,6 @@ describe("processItem for a recipe page the fetch cap cut short", () => {
     "Carve and serve with the pan juices spooned over.",
   ];
 
-  /** Microdata rather than JSON-LD on purpose: a cut JSON-LD block is rejected
-   * by `JSON.parse`, so microdata is the shape that survives a cut and needs
-   * the guard. */
   function microdataHtml(): string {
     return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title></head><body>
 <div itemscope itemtype="https://schema.org/Recipe">
@@ -1563,9 +1534,6 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     return await t.run((ctx) => ctx.db.get(itemId));
   }
 
-  /** The document as the fetch cap would hand it over: everything before
-   * `marker`. What makes the read truncated is the flag `save` sets, so the cut
-   * only has to land at a known point in the markup. */
   function cutAt(html: string, marker: string): string {
     return html.slice(0, html.indexOf(marker));
   }
@@ -1577,12 +1545,8 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
   });
 
   it("refuses a recipe whose method the cap cut off after one step", async () => {
-    // The worst shape, because nothing about it looks wrong: a complete
-    // ingredient list and a method that simply stops. A reader would believe
-    // heating the oven is the whole recipe.
     const item = await save(cutAt(microdataHtml(), STEPS[1]), true);
     expect(item?.recipe).toBeUndefined();
-    // The article body still stands in for it, so the save is not wasted.
     expect(item?.status).toBe("ready");
   });
 
@@ -1609,8 +1573,6 @@ describe("readPage recipe eligibility", () => {
     decodeWithContentType.mockImplementation(actual.decodeWithContentType);
   });
 
-  /** A TikTok whose oEmbed caption is `caption`; `recipeHtml`, when given, is
-   * the page the caption links to. Every other fetch fails. */
   function serveTikTok(caption: string, recipeHtml?: string) {
     safeFetch.mockImplementation(async (url: string) => {
       if (url.startsWith("https://www.tiktok.com/oembed?")) {
@@ -1691,7 +1653,6 @@ describe("readPage recipe eligibility", () => {
   });
 
   it("does not ask for a recipe when only the Instagram card was read", async () => {
-    // The card's og:description is a cut summary, not the caption.
     instagramAnswers(REEL_PAGE_WITH_DESCRIPTION, SHELL_PAGE);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({ status: "ok", askForRecipe: false });

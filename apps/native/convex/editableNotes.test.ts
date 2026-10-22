@@ -13,8 +13,6 @@ import { MAX_ITEM_TITLE_CHARS, MAX_NOTE_TEXT_CHARS } from "./model/itemFields";
 type TestCtx = TestConvexForDataModel<DataModel>;
 type ItemFields = Partial<Omit<Doc<"items">, "_id" | "_creationTime">>;
 
-// Scheduled refreshes stay queued rather than calling the model during
-// teardown; their `_scheduled_functions` rows are still assertable.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
@@ -23,7 +21,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** A real user on `base` with an active Pro subscription. */
 async function proUser(
   base: ReturnType<typeof newConvexTest>,
 ): Promise<{ t: TestCtx; userId: string }> {

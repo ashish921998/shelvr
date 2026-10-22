@@ -1,0 +1,64 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { readdirSync, readFileSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { createRepo } from "./temp-repo.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const victim = createRepo("temp-repo-victim-");
+let worktree;
+after(() => {
+  victim.remove();
+  if (worktree) rmSync(worktree, { recursive: true, force: true });
+});
+
+victim.commit("root");
+worktree = `${victim.dir}-worktree`;
+victim.git("worktree", "add", "--quiet", "-b", "other", worktree);
+
+test("GIT_DIR from a hook cannot redirect the temp repository", () => {
+  const helper = new URL("./temp-repo.mjs", import.meta.url).href;
+  const script = `
+    import { createRepo } from ${JSON.stringify(helper)};
+    const inner = createRepo("temp-repo-inner-");
+    try {
+      inner.commit("inside");
+      console.log(inner.dir);
+    } finally {
+      inner.remove();
+    }
+  `;
+  const result = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_DIR: join(victim.dir, ".git", "worktrees", basename(worktree)),
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+
+  assert.equal(victim.git("rev-list", "--all", "--count").trim(), "1");
+  assert.equal(victim.git("config", "--get", "core.bare").trim(), "false");
+});
+
+test("tools tests get their repository from createRepo", () => {
+  const spawnsGit =
+    /\b(?:execFileSync|execFile|execSync|spawnSync|spawn)\(\s*["'`]git\b/;
+  const offenders = readdirSync(here).filter(
+    (name) =>
+      name.endsWith(".test.mjs") &&
+      spawnsGit.test(readFileSync(join(here, name), "utf8")),
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    "These tests run git themselves. Use createRepo() from tools/temp-repo.mjs: it clears the GIT_* variables a hook exports, which otherwise point git at the real repository.",
+  );
+});

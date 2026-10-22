@@ -10,12 +10,6 @@ import {
   whenTrialPrimerDone,
 } from "./trial-reminder";
 
-/**
- * The hook under a DOM, for what the primer adds between a trial starting and
- * the OS prompt: a declined primer never prompts, an accepted one does, and a
- * trial that ends while the primer is open closes it without prompting.
- */
-
 const mock = vi.hoisted(() => ({
   permission: vi.fn(),
   request: vi.fn(),
@@ -74,7 +68,6 @@ function entitled(status: "none" | "trialing"): Entitlement {
   } as Entitlement;
 }
 
-/** Renders the hook for a signed-in account, then starts a trial. */
 function startTrial() {
   vi.mocked(useCurrentUser).mockReturnValue({
     data: { _id: "user-a" as Id<"users">, email: undefined },

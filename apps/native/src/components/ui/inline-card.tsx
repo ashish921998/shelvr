@@ -2,11 +2,6 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/**
- * Shared shell for the dismissible inline cards on Home (feedback
- * invitation, cancel survey): card frame, header, body. Purely
- * presentational: callers own their buttons/options and all state.
- */
 export function InlineCard({
   title,
   body,

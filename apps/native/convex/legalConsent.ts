@@ -43,7 +43,6 @@ export const get = query({
   },
 });
 
-/** Only an explicit terms-review decision can establish consent. */
 export const review = mutation({
   args: { version: v.literal(TERMS_VERSION), accepted: v.boolean() },
   returns: v.null(),
@@ -123,7 +122,6 @@ export async function revoke(
   await queueSync(ctx, row._id);
 }
 
-/** Recover pending delivery and workers that exceeded the action runtime. */
 export const retry = internalMutation({
   args: {},
   returns: v.null(),
@@ -137,13 +135,7 @@ export const retry = internalMutation({
         )
         .take(50);
       for (const row of rows) {
-        // A syncing row past its lease means the action died before finish
-        // could spend the attempt. Spend it here so crash-recovery loops
-        // cannot retry for free forever (mirrors feedback delivery).
         const attempts = state === "syncing" ? row.attempts + 1 : row.attempts;
-        // Recovery must not outlive the cap either: a grant that keeps
-        // crashing before `finish` would otherwise burn attempts via this
-        // path and stay retryable indefinitely.
         if (
           state === "syncing" &&
           deliversGrant(row) &&

@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // Node 26's own localStorage global shadows jsdom's.
+    execArgv: ["--no-experimental-webstorage"],
     environmentOptions: {
       jsdom: {
         url: "https://shelvr.test",

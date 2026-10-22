@@ -1,14 +1,7 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Longest IANA zone name is about 32 characters; this bounds untrusted input. */
 const MAX_TIMEZONE_LENGTH = 64;
 
-/**
- * True when `Intl` accepts `timezone` as a `timeZone` option. This is the only
- * check that matches what the scheduler does at run time: `Intl.supportedValuesOf`
- * returns a canonical-only list that omits `"UTC"`, aliases, and `Etc/GMT±N`, so it
- * would reject zones the formatter accepts.
- */
 export function isValidTimezone(timezone: string): boolean {
   if (timezone.length === 0 || timezone.length > MAX_TIMEZONE_LENGTH) {
     return false;
@@ -21,11 +14,6 @@ export function isValidTimezone(timezone: string): boolean {
   }
 }
 
-/**
- * Boundary check for a client-supplied zone. Returns the trimmed zone, or
- * `undefined` when none was supplied, and throws on anything `Intl` rejects so a
- * bad value is never persisted.
- */
 export function parseTimezoneInput(
   timezone: string | undefined,
 ): string | undefined {
@@ -37,11 +25,6 @@ export function parseTimezoneInput(
   return trimmed;
 }
 
-/**
- * Resolves a stored zone to one `Intl` accepts. Stored rows may predate input
- * validation, so any invalid value falls back to UTC instead of throwing; a
- * digest must never fail forever because of one bad preference row.
- */
 export function resolveTimezone(timezone: string | undefined): string {
   return timezone !== undefined && isValidTimezone(timezone) ? timezone : "UTC";
 }
@@ -56,13 +39,6 @@ const WALL_CLOCK_FORMAT: Intl.DateTimeFormatOptions = {
   hourCycle: "h23",
 };
 
-/**
- * The wall-clock formatter for a stored zone. Building the formatter is itself
- * the validity check, so a bad zone costs one failed construction instead of a
- * probe formatter plus the real one. Stored rows may predate input validation
- * and must never make a digest fail forever, so an invalid zone falls back to
- * UTC in the same way `resolveTimezone` does.
- */
 function wallClockFormatter(timezone: string | undefined): Intl.DateTimeFormat {
   if (timezone !== undefined && timezone.length <= MAX_TIMEZONE_LENGTH) {
     try {
@@ -80,7 +56,6 @@ function wallClockFormatter(timezone: string | undefined): Intl.DateTimeFormat {
   });
 }
 
-/** The instant's wall-clock reading in the formatter's zone, as a UTC timestamp. */
 function localTimestamp(formatter: Intl.DateTimeFormat, instant: number) {
   const parts = formatter.formatToParts(instant);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
@@ -95,8 +70,6 @@ function localTimestamp(formatter: Intl.DateTimeFormat, instant: number) {
   );
 }
 
-/** The instant at which the zone's clock reads `wallTime`. A few fixed-point
- * passes settle the offset across a DST change. */
 function instantAt(formatter: Intl.DateTimeFormat, wallTime: number) {
   let instant = wallTime;
   for (let pass = 0; pass < 4; pass++) {
@@ -117,14 +90,12 @@ export function nextWeeklyDigestAt(now: number, timezone = "UTC"): number {
   throw new Error("Could not calculate weekly notification time");
 }
 
-/** The hour (0-23) the zone's clock shows at `instant`. */
 export function localHour(instant: number, timezone?: string): number {
   return new Date(
     localTimestamp(wallClockFormatter(timezone), instant),
   ).getUTCHours();
 }
 
-/** The next instant after `now` at which the zone's clock reads `hour`:00. */
 export function nextLocalHourAt(
   now: number,
   timezone: string | undefined,
@@ -140,14 +111,6 @@ export function nextLocalHourAt(
   throw new Error("Could not calculate daily notification time");
 }
 
-/**
- * The fields a change of zone rebooks, or undefined when the zone is the one
- * already stored. Every launch, the shelf settings and the reminder switch all
- * report the device's zone, and a traveller would otherwise keep the weekly
- * shelf and reminders booked at home hours, which can be the middle of their
- * night. `reminderHour` is the hour to book the reminder slot at, or null to
- * leave the slot alone: the caller knows whether reminders are on.
- */
 export function rebookedSchedule(
   existing: { timezone?: string },
   timezone: string,

@@ -1,13 +1,10 @@
 // @vitest-environment jsdom
-// The interests step: topics as checkboxes and, once Travel is picked, one
-// card more asking what kind of spots. Every pick is handed back to the
-// screen, which keeps topics and spots alike as spaces; the screen's wiring
-// is tested in src/lib/interests-screen.test.tsx.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import type { SampleCityId } from "@/lib/sample-cities";
 import { TRAVEL_VIBES, type TravelVibe } from "@/lib/travel-vibes";
 import { InterestsStep } from "./interests";
 
@@ -42,6 +39,36 @@ const mock = vi.hoisted(() => ({
     </button>
   ),
   empty: () => null,
+  menu: ({
+    label,
+    actions,
+    children,
+  }: Children & {
+    label: string;
+    actions: {
+      id: string;
+      label: string;
+      selected?: boolean;
+      onPress: () => void;
+    }[];
+  }) => (
+    <div aria-label={label}>
+      {children}
+      <ul data-testid="city-menu">
+        {actions.map((action) => (
+          <li key={action.id}>
+            <button
+              type="button"
+              data-selected={String(Boolean(action.selected))}
+              onClick={action.onPress}
+            >
+              {action.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ),
 }));
 
 vi.mock("react-native", () => ({
@@ -55,6 +82,7 @@ vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: { colors: { primary: "#000" } } }),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.empty }));
+vi.mock("@/components/ui/action-menu", () => ({ ActionMenu: mock.menu }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: () => "en",
@@ -62,24 +90,30 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/use-large-text", () => ({ HEADLINE_MAX_SCALE: 1.5 }));
 vi.mock("@/components/onboarding/parts", () => ({ CtaButton: mock.button }));
 
-// With t() returning its key, every label is its catalog key.
 const SPOTS_TITLE = "interests.vibesTitle";
 const chip = (id: string, checked?: boolean) =>
   screen.getByRole("checkbox", { name: onboardingLabel(id), checked });
 
-function renderStep(picked: Interest[] = [], vibes: TravelVibe[] = []) {
+function renderStep(
+  picked: Interest[] = [],
+  vibes: TravelVibe[] = [],
+  city: SampleCityId | null = null,
+) {
   const onToggle = vi.fn();
   const onToggleVibe = vi.fn();
+  const onPickCity = vi.fn();
   render(
     <InterestsStep
       picked={picked}
       vibes={vibes}
       onToggle={onToggle}
       onToggleVibe={onToggleVibe}
+      city={city}
+      onPickCity={onPickCity}
       onAdvance={vi.fn()}
     />,
   );
-  return { onToggle, onToggleVibe };
+  return { onToggle, onToggleVibe, onPickCity };
 }
 
 describe("InterestsStep", () => {
@@ -97,7 +131,6 @@ describe("InterestsStep", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(
       INTERESTS.length + TRAVEL_VIBES.length,
     );
-    // The card's eyebrow names the topic it follows, under the Travel chip.
     expect(screen.getAllByText(onboardingLabel("Travel"))).toHaveLength(2);
   });
 
@@ -122,5 +155,42 @@ describe("InterestsStep", () => {
     fireEvent.click(chip("Travel", true));
     expect(onToggle).toHaveBeenCalledExactlyOnceWith("Travel");
     expect(onToggleVibe).not.toHaveBeenCalled();
+  });
+
+  it("asks where you are going next only once Travel is picked", () => {
+    renderStep(["AI & tech"]);
+    expect(screen.queryByText("interests.cityTitle")).toBeNull();
+    renderStep(["Travel"]);
+    expect(screen.getByText("interests.cityTitle")).toBeTruthy();
+  });
+
+  it("offers not sure first, then every city, and shows not sure while none is picked", () => {
+    renderStep(["Travel"]);
+    const options = Array.from(
+      screen.getByTestId("city-menu").querySelectorAll("button"),
+    );
+    expect(options).toHaveLength(12);
+    expect(options[0]?.textContent).toBe("interests.cityNotSure");
+    expect(options[0]?.dataset.selected).toBe("true");
+    expect(
+      screen.getByLabelText("interests.cityTitle interests.cityNotSure"),
+    ).toBeTruthy();
+  });
+
+  it("hands a picked city back and checks the current one", () => {
+    const { onPickCity } = renderStep(["Travel"], [], "tokyo");
+    expect(
+      screen.getByLabelText("interests.cityTitle tripTeaser.cityTokyo"),
+    ).toBeTruthy();
+    const menu = screen.getByTestId("city-menu");
+    const option = (name: string) =>
+      Array.from(menu.querySelectorAll("button")).find(
+        (button) => button.textContent === name,
+      );
+    expect(option("tripTeaser.cityTokyo")?.dataset.selected).toBe("true");
+    option("tripTeaser.cityLisbon")?.click();
+    expect(onPickCity).toHaveBeenCalledExactlyOnceWith("lisbon");
+    option("interests.cityNotSure")?.click();
+    expect(onPickCity).toHaveBeenLastCalledWith(null);
   });
 });

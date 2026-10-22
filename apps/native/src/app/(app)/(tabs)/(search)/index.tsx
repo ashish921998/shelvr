@@ -25,10 +25,6 @@ export default function SearchScreen() {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
   const searchBarRef = useRef<ComponentRef<typeof Stack.SearchBar>>(null);
-  // iOS types into the native header search bar. Everywhere else the floating
-  // tab bar owns the field and shares its text through the tab search store.
-  // Siri's "search Shelvr for ..." opens this tab with `q`; `t` marks each new
-  // request so asking for the same words twice still fills the bar again.
   const { q, t: requestedAt } = useLocalSearchParams<{
     q?: string;
     t?: string;
@@ -78,7 +74,6 @@ export default function SearchScreen() {
           onCancelButtonPress={() => setIosSearch("")}
         />
       ) : (
-        // The header is transparent, so results start below it.
         <View style={{ height: headerHeight }} />
       )}
       {emptyCopy ? (

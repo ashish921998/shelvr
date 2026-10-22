@@ -29,7 +29,6 @@ describe("mapPaywallResult", () => {
           result === "PURCHASED" || result === "RESTORED",
         );
         expect(outcome === "cancelled").toBe(result === "CANCELLED");
-        // Closing the paywall goes back; only a failure opens the fallback.
         expect(shouldOpenPaywallFallback(outcome)).toBe(
           outcome === "unavailable",
         );

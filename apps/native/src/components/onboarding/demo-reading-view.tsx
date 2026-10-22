@@ -8,7 +8,6 @@ import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
-/** The saved link, as the reading and preview views show it. */
 function DemoLinkRow({
   title,
   url,
@@ -37,7 +36,6 @@ function DemoLinkRow({
   );
 }
 
-/** The demo save after it reached the server: still reading, or failed. */
 export function DemoReadingView({
   failed,
   terminal,
@@ -52,7 +50,6 @@ export function DemoReadingView({
   onContinueWaiting,
 }: {
   failed: boolean;
-  /** The failure cannot change on retry. */
   terminal: boolean;
   host: string;
   url: string;
@@ -133,15 +130,9 @@ const READING_STEPS: TextMessageKey[] = [
   "demo.stepFiling",
 ];
 
-// Nothing is saved before sign-in, so the preview leaves out "Saved".
 const PREVIEW_STEPS: TextMessageKey[] = READING_STEPS.slice(1);
 const PREVIEW_STEP_MS = 700;
 
-/**
- * A signed-out sample before sign-in: the same steps a real save shows,
- * played on a short timer, then on to the reveal. Nothing reaches the
- * server until the reveal's sign-in.
- */
 export function DemoPreviewView({
   title,
   url,
@@ -184,7 +175,6 @@ function ReadingSteps({
   active = 1,
 }: {
   steps?: TextMessageKey[];
-  /** Steps before it are done, steps after it are still to come. */
   active?: number;
 }) {
   const { theme } = useUnistyles();

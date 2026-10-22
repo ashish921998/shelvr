@@ -88,7 +88,6 @@ describe("REVENUECAT_API_KEY", () => {
     expect(preview.REVENUECAT_API_KEY).toBeUndefined();
     expect(preview.REVENUECAT_DISABLED_BY_BUILD).toBe(true);
 
-    // A production build with no key is a misconfiguration, not a choice.
     setVariant("production");
     const production = await loadModule("ios");
     expect(production.REVENUECAT_API_KEY).toBeUndefined();

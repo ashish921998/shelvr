@@ -211,8 +211,6 @@ function Probe() {
 }
 
 function uiFrame() {
-  // Snapshot the subscriptions: worklets can enqueue RN updates but cannot
-  // synchronously mount React children during this UI-thread frame.
   for (const observer of [...runtime.observers]) evaluate(observer);
 }
 
@@ -285,7 +283,6 @@ describe.each([false, true])(
         deck.currentIndex.set(22);
         uiFrame();
       });
-      // Before RN catches up the old overlays must still be mounted.
       expect(view.indices()).toEqual([20, 21, 22, 23]);
       expect(runtime.queued.length).toBeGreaterThan(0);
       flushRN();
@@ -331,8 +328,6 @@ describe.each([false, true])(
         act(() => {
           deck.undoIndex.set(index);
           uiFrame();
-          // A second UI frame propagates the currentIndex written by Undo to
-          // every card, including cards evaluated earlier in the first frame.
           uiFrame();
         });
         expect(deck.currentIndex.get()).toBe(index);

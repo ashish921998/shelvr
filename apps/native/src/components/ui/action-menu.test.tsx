@@ -10,9 +10,6 @@ const touchAt = (event: { clientX: number; clientY: number }): TouchAt => ({
   nativeEvent: { pageX: event.clientX, pageY: event.clientY },
 });
 
-// Models React Native's responder bubbling: a touch goes to the deepest view
-// whose `onStartShouldSetResponder` returns true, and ancestors never see it.
-// That view also receives the release.
 vi.mock("react-native", () => ({
   AppState: { addEventListener: vi.fn() },
   Platform: { OS: "ios" },
@@ -48,8 +45,6 @@ vi.mock("react-native", () => ({
     ),
   ),
 }));
-// The native menu handles its own taps outside the JS responder system; the
-// "Pick" button stands in for choosing an item from the open menu.
 vi.mock("@expo/ui/community/menu", () => ({
   MenuView: vi.fn(
     ({
@@ -76,7 +71,6 @@ beforeEach(() => {
   dropMenuDismissTouch();
 });
 
-// The app root drops a touch in the capture phase, before any child sees it.
 function renderCard(cardPress: () => void, onShare = () => {}) {
   return render(
     <div
@@ -162,8 +156,6 @@ it("lets the next tap through when an open menu unmounts", () => {
   expect(cardPress).toHaveBeenCalledTimes(1);
 });
 
-// Pressing the trigger and sliding off before lifting opens no menu, so there
-// is no dismissing tap to drop.
 it("lets the next tap through when the finger slides off the trigger", () => {
   const cardPress = vi.fn();
   renderCard(cardPress);

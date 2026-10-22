@@ -23,7 +23,6 @@ async function loadFunnel() {
 
 type Status = "trialing" | "pro" | "lifetime" | null;
 
-/** Mounts the activation observer the way `useEntitlementSync` does. */
 function observer(funnel: Awaited<ReturnType<typeof loadFunnel>>) {
   return renderHook(
     (status: Status) => funnel.useEntitlementActivation(status),
@@ -43,8 +42,6 @@ describe("entitlement activation", () => {
   it("fires immediately when the entitlement row already became visible", async () => {
     const funnel = await loadFunnel();
     const { rerender } = observer(funnel);
-    // The webhook and the query won the race with the native purchase
-    // promise: the row is visible before recordAccess runs.
     rerender("pro");
     funnel.recordAccess("purchase");
     expect(mock.capture).toHaveBeenCalledWith("entitlement_activated", {
@@ -67,7 +64,6 @@ describe("entitlement activation", () => {
       source: "restore",
       delay_ms: expect.any(Number),
     });
-    // One event per recorded access, not one per later status change.
     rerender("pro");
     expect(mock.capture).toHaveBeenCalledTimes(1);
   });
@@ -78,7 +74,6 @@ describe("entitlement activation", () => {
     funnel.recordAccess("purchase");
     funnel.forgetPaywallFunnel();
     expect(funnel.hasActiveEntitlement()).toBe(false);
-    // The next account's entitled status never completes the armed purchase.
     rerender("pro");
     expect(mock.capture).not.toHaveBeenCalled();
   });
@@ -97,7 +92,6 @@ describe("blocked action resume", () => {
         purchased_since_block: true,
       },
     );
-    // The memory is one action deep: a second pass reports nothing new.
     funnel.resumeBlockedAction("add");
     expect(mock.capture).toHaveBeenCalledTimes(1);
   });
@@ -200,7 +194,6 @@ describe("paywall offering reads", () => {
   it("shows the no-trial offering to someone who used their trial", async () => {
     const funnel = await load({
       getOfferings: async () => withNoTrial(offering(trial("DAY", 7), null)),
-      // Yearly's trial is spent and weekly never had one.
       checkTrialOrIntroductoryPriceEligibility: async () => answers(1, 3),
     });
     await expect(funnel.readPaywallOffering()).resolves.toEqual({

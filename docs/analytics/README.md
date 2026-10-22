@@ -53,7 +53,7 @@ Removing a saved membership now retains a `dismissed` record. Both AI classifica
 
 ## Verification
 
-Run `pnpm --filter native-app check` for lint, TypeScript, and unit/backend tests. Regression tests cover persistent removal, explicit restoration, authorization, canonical save timestamps, idempotent retries, telemetry UUID reuse, unavailable analytics, and content-free item event properties.
+Run `pnpm run check` for lint, TypeScript, and unit/backend tests. Regression tests cover persistent removal, explicit restoration, authorization, canonical save timestamps, idempotent retries, telemetry UUID reuse, unavailable analytics, and content-free item event properties.
 
 `validate-useful-returns.sql` runs synthetic rows directly through PostHog's SQL engine without inserting events. Expected: `valid` reopens and acts; `same_session` and `too_late` do neither; `unknown_session` is unmeasurable; `immature` is absent; `action_before_open` and `different_session` reopen but do not count as useful returns.
 

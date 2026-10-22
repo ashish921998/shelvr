@@ -1,13 +1,7 @@
 // @vitest-environment edge-runtime
-// Runs under edge-runtime so `crypto.subtle` behaves like the default Convex
-// V8 runtime that http.ts executes in.
 import { describe, expect, it } from "vitest";
 
 import { APPLE_ROOT_CA_G3 } from "./appleJws";
-// A throwaway chain shaped like Apple's: P-384 root and intermediate, P-256
-// leaf, Apple's marker extensions, 100-year validity from 2026-10-03.
-// `unmarkedLeaf` is signed by a leaf without the marker; `otherApp` carries a
-// different appAppleId.
 import fixtures from "./appleJws.fixtures.json";
 import {
   answerRetentionRequest,
@@ -87,7 +81,6 @@ describe("answerRetentionRequest", () => {
       Buffer.from(headerSegment, "base64url").toString(),
     );
     const leaf = Buffer.from(header.x5c[0], "base64");
-    // The last byte of the certificate is the end of the issuer's signature.
     leaf[leaf.length - 1] ^= 1;
     header.x5c[0] = leaf.toString("base64");
     const forged = Buffer.from(JSON.stringify(header)).toString("base64url");
@@ -159,7 +152,6 @@ describe("promotional offers", () => {
       signingKey: {
         keyId: "KEY123",
         issuerId: "issuer-uuid",
-        // Pasted on one line, as the dashboard keeps it.
         privateKey: `-----BEGIN PRIVATE KEY-----\\n${body}\\n-----END PRIVATE KEY-----`,
       },
     };
@@ -212,7 +204,6 @@ describe("promotional offers", () => {
       offerIdentifier: "annual_half_off",
       transactionId: "2000000000000001",
     });
-    // Apple rejects a signature that carries an expiry.
     expect(claims).not.toHaveProperty("exp");
   });
 
@@ -222,7 +213,6 @@ describe("promotional offers", () => {
       status: 200,
       body: { message: { messageIdentifier: messageId } },
     });
-    // The fixture's product id resolves only through the prototype here.
     const inherited = Object.create(offers) as typeof offers;
     expect(await answerWith({ signingKey, offers: inherited })).toEqual({
       status: 200,

@@ -43,8 +43,6 @@ export type FeedItem = {
   enrichment?: Infer<typeof enrichmentValidator>;
   intents?: Infer<typeof intentValidator>[];
   tags: string[];
-  // Suggested this item into the current space; it isn't a member
-  // until the user accepts. Only ever set by the space screen.
   suggested?: boolean;
 };
 
@@ -73,9 +71,6 @@ function failureLabel(item: FeedItem): string | undefined {
   if (item.status !== "failed") return;
   return t(FAILURE_LABELS[item.failureReason ?? "error"][item.type]);
 }
-// Everything that can name a card, best first. A failed save has no AI title,
-// so without its failure label the card is blank forever and indistinguishable
-// from one still processing.
 export function cardTitles(item: FeedItem): (string | undefined)[] {
   return [
     item.title,
@@ -85,33 +80,22 @@ export function cardTitles(item: FeedItem): (string | undefined)[] {
   ];
 }
 
-/**
- * What a card without a picture prints on its face. A link shows its summary
- * and a note its own words, in the display face, with the title in the
- * caption under it like a photo card. Until both exist (still reading, or the
- * save failed) the face carries whichever names the save best and the
- * caption leaves the title out, so it never prints twice.
- */
 export function textFaceCopy(
   item: FeedItem,
   failedLabel?: string,
 ): { body: string; captionTitle?: string } {
-  // An empty title or summary names nothing, so it counts as missing.
   const title = item.title || undefined;
   const words =
     (item.type === "note"
       ? afterOwnHeading(item.note, title)
       : item.description) || undefined;
   if (title && words) return { body: words, captionTitle: title };
-  // A note that is only its heading still shows the words its owner wrote.
   const name = item.type === "note" ? item.note || title : (title ?? words);
   return { body: name ?? failedLabel ?? displayHost(item.url) };
 }
 
-// Where convex/ai.ts cuts a note's first line when it titles the note itself.
 const NOTE_TITLE_CUT = 80;
 
-// Words that change nothing about what a heading names.
 const FILLER_WORDS = new Set([
   "a",
   "an",
@@ -130,16 +114,6 @@ function headingWords(text: string): Set<string> {
   );
 }
 
-/**
- * A note's text after its first line when that line is the note's own heading
- * for `title`: the same words in any order, so "Gift ideas for Mum" heads a
- * note titled "Mum's Gift Ideas". The caption already prints the title, and
- * the face would otherwise open with it again. Undefined when the note is only
- * its heading, or when the title is a note saved without AI's first line cut
- * at 80 characters, which the one-line caption would cut shorter still; the
- * face then keeps the whole note and the caption gives way. The note itself
- * otherwise.
- */
 function afterOwnHeading(
   note: string | undefined,
   title: string | undefined,
@@ -164,15 +138,12 @@ function afterOwnHeading(
   return same ? rest.join("\n").trim() || undefined : note;
 }
 
-// The mark on a text face when there is no site letter to show.
 const FACE_SYMBOL = {
   image: "photo.stack",
   link: "link",
   note: "square.and.pencil",
 } as const satisfies Record<FeedItem["type"], AppSymbolName>;
 
-// Standard OpenGraph image shape (1200×630), the default when a link's real
-// hero dimensions weren't captured.
 const OG_RATIO = 1.91;
 
 type UnistylesTheme = ReturnType<typeof useUnistyles>["theme"];
@@ -201,8 +172,6 @@ function CardMedia({
           style={[
             item.isSticker ? styles.sticker : styles.image,
             {
-              // A letterboxed video thumbnail shows at its video's shape, so
-              // the cover fit crops the black bars away.
               aspectRatio:
                 letterboxedVideoRatio(item.url, item.aspectRatio) ??
                 clampRatio(
@@ -241,8 +210,6 @@ function CardMedia({
       </View>
     );
   }
-  // No picture: the site's letter (or a note's pencil) over the save's own
-  // words, so the tile reads as designed rather than still loading.
   const monogram = item.type === "link" ? siteMonogram(item.url) : undefined;
   return (
     <View style={[styles.textFace, item.type === "note" && styles.noteFace]}>
@@ -345,11 +312,6 @@ function CardStatusCorner({
     </Animated.View>
   );
 }
-/**
- * The visual body of a feed card: media, caption, suggested badge and status
- * corner. Plain props only, so it renders anywhere; `ItemCard` wraps it with
- * navigation and the save's actions.
- */
 export function ItemCardFace({
   item,
   menuActions,
@@ -367,8 +329,6 @@ export function ItemCardFace({
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const failedLabel = failureLabel(item);
-  // Under a picture the caption names the save; under a text face it names it
-  // only when the face shows other words (see textFaceCopy).
   const hasMedia = Boolean(item.imageUrl ?? item.heroImageUrl);
   const captionTitle = hasMedia
     ? cardTitles(item).find((title) => title !== undefined)
@@ -390,8 +350,6 @@ export function ItemCardFace({
       />
 
       {suggested && (
-        // The badge pops off with a spring when the suggestion resolves
-        // (accepted here or anywhere else: the prop flip unmounts it).
         <Animated.View
           exiting={
             reducedMotion
@@ -417,8 +375,6 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: "continuous",
     overflow: "hidden",
   },
-  // Stickers are transparent die-cut PNGs. Let the drop shadow spill past the
-  // tile bounds instead of being clipped by the card's overflow.
   cardSticker: {
     overflow: "visible",
   },
@@ -465,9 +421,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 12,
     color: "white",
   },
-  // No fill / border / rounding: the white die-cut edge is baked into the PNG.
-  // The iOS layer shadow is cast from the image's opaque pixels, so it hugs the
-  // silhouette rather than a rectangle.
   sticker: {
     width: "100%",
     shadowColor: "#000",
@@ -475,8 +428,6 @@ const styles = StyleSheet.create((theme) => ({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
-  // The mark heads the face and the words settle at its foot, so a short
-  // summary leaves its space in the middle rather than under the text.
   textFace: {
     padding: theme.gap(1.5),
     minHeight: 112,
@@ -536,8 +487,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 14,
     color: theme.colors.muted,
   },
-  // 44pt touch target; the negative margin keeps the caption's footprint at 40
-  // so the grid rhythm does not change.
   menuButton: {
     width: 44,
     height: 44,
@@ -546,11 +495,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     borderRadius: 22,
   },
-  // With no site line, the "…" centres on the title's line (13.5 from the
-  // caption's top) instead of hanging a line below it. The icon moves, not the
-  // button: a margin on it would not move the native menu's host, and would
-  // push the 44pt hit area up into the picture. A save whose title hasn't
-  // landed yet sits the same way, so its card keeps its height when it does.
   menuOnTitle: {
     paddingBottom: 25,
   },

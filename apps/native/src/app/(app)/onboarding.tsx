@@ -3,11 +3,16 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
-import { showTripTeaser } from "@/lib/sample-trip";
+import type { SampleCityId } from "@/lib/sample-cities";
+import { isSampleCity, sampleTrip, showTripTeaser } from "@/lib/sample-trip";
 import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
-import { isTravelVibe, spacesAfterInterestToggle } from "@/lib/travel-vibes";
+import {
+  isTravelVibe,
+  spacesAfterInterestToggle,
+  TRAVEL_INTEREST,
+} from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -76,8 +81,6 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
 };
 const READING_PROGRESS = 0.625;
 
-// A share that arrived mid-onboarding and was not the demo save is still held
-// by expo-sharing. Flagging it lets the share screen pick it up in the app.
 function holdIncomingShare() {
   try {
     if (getSharedPayloads().length > 0) markPendingShareOnDevice();
@@ -86,10 +89,6 @@ function holdIncomingShare() {
   }
 }
 
-// Saving is Pro, so the practice link of someone who closed the paywall is
-// let go. Left held, the share screen would ask for Pro again in the app.
-// expo-sharing clears every held share at once, so the held batch is read
-// here and cleared only when it is the practice link and nothing else.
 function dropPracticeShare(practiceUrl: string | undefined) {
   try {
     if (practiceUrl === undefined) return;
@@ -118,7 +117,11 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
-  // Restored so a relaunch on the reminder step still offers to remind.
+  const [travelCity, setTravelCity] = useState<SampleCityId | null>(() =>
+    isSampleCity(initialProgress.travelCity)
+      ? initialProgress.travelCity
+      : null,
+  );
   const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
@@ -128,8 +131,6 @@ export default function OnboardingScreen() {
     (back: (() => void) | null) => setDemoBack(() => back),
     [],
   );
-  // The save a relaunch left unfinished is resumed once. Leaving the demo
-  // step either way drops it, so coming back starts from the picker.
   const [resumeDemo, setResumeDemo] = useState(() =>
     initialStep === "demo" ? initialProgress.demo : null,
   );
@@ -139,25 +140,30 @@ export default function OnboardingScreen() {
   }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
+  const [viewedOpenerPages] = useState(() => new Set<number>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
-  // A picked topic is a picked space, so the topics need no state of their own.
   const interests = spaces.filter(isInterest);
-  // So are the kinds of spots picked under Travel; they leave with it.
   const vibes = spaces.filter(isTravelVibe);
-  // People who save travel see a sample trip build and lock before the paywall.
   const teaser = showTripTeaser(kinds, interests);
+  const pickedCity = interests.includes(TRAVEL_INTEREST) ? travelCity : null;
+  const trip = sampleTrip(pickedCity);
 
   useEffect(() => {
-    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
-  }, [kinds, spaces, stepIndex, saved]);
+    setOnboardingProgress({
+      saveKinds: kinds,
+      spaces,
+      travelCity,
+      step: stepIndex,
+      saved,
+    });
+  }, [kinds, spaces, travelCity, stepIndex, saved]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
     viewedStep.current = step;
     stepEnteredAt.current = Date.now();
-    // Going back re-enters a step; the funnel counts the first entry only.
     if (viewedStepsRef.current.has(step)) return;
     viewedStepsRef.current.add(step);
     analytics.capture("onboarding_step_viewed", {
@@ -186,8 +192,6 @@ export default function OnboardingScreen() {
     );
   }, [recordCurrentStep]);
 
-  // A returning account already has its spaces, so the setup answers are
-  // dropped instead of replayed onto it.
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
     holdIncomingShare();
@@ -211,8 +215,12 @@ export default function OnboardingScreen() {
         : [...current, name],
     );
 
-  const toggleInterest = (interest: Interest) =>
+  const toggleInterest = (interest: Interest) => {
+    if (interest === TRAVEL_INTEREST && interests.includes(interest)) {
+      setTravelCity(null);
+    }
     setSpaces((current) => spacesAfterInterestToggle(current, interest));
+  };
 
   const addSpace = (name: string) =>
     setSpaces((current) =>
@@ -225,7 +233,7 @@ export default function OnboardingScreen() {
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(kinds, spaces),
+      onboardingCompletedProperties(kinds, spaces, pickedCity),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -236,15 +244,14 @@ export default function OnboardingScreen() {
   const practiceSample = practiceShareSample(
     kinds,
     getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
+    pickedCity,
   );
   const paywall = useOnboardingPaywall({
-    // A purchase opens the sample trip; with no trip, onboarding is done.
     onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
       dropPracticeShare(practiceSample?.url);
       finish();
     },
-    // Not a decline: the practice share stays held for the share screen.
     onUnavailable: finish,
   });
 
@@ -259,8 +266,6 @@ export default function OnboardingScreen() {
 
   const progress =
     step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
-  // With no first save the reminder step passes itself by, so going back
-  // from the share step has to clear it too.
   const previous =
     step === "share" && saved === null ? "demo" : previousOnboardingStep(step);
   const goBack = paywall.asked
@@ -300,8 +305,6 @@ export default function OnboardingScreen() {
       </View>
 
       {step === "opener" ? (
-        // A static frame, not the shared ScrollView: the opener lays out its
-        // own scrolling wall and pinned buttons.
         <View
           style={[
             styles.content,
@@ -310,18 +313,14 @@ export default function OnboardingScreen() {
           ]}
         >
           <OpenerStep
-            // On iOS, a live text-size change can leave native text
-            // measurements stale (react-native#57512), so the expected
-            // onLayout updates never arrive. Remounting forces fresh
-            // measurement.
+            // iOS: a live text-size change leaves native text measurements stale (react-native#57512); remounting re-measures.
             key={fontScale}
             onStart={advance}
             onSignIn={() => setShowSignIn(true)}
+            viewedPages={viewedOpenerPages}
           />
         </View>
       ) : step === "interests" ? (
-        // Also a static frame: the step scrolls its picks and pins Continue,
-        // so the travel card opening never pushes it off screen.
         <View
           style={[
             styles.content,
@@ -332,8 +331,10 @@ export default function OnboardingScreen() {
           <InterestsStep
             picked={interests}
             vibes={vibes}
+            city={travelCity}
             onToggle={toggleInterest}
             onToggleVibe={toggleSpace}
+            onPickCity={setTravelCity}
             onAdvance={advance}
           />
         </View>
@@ -362,7 +363,7 @@ export default function OnboardingScreen() {
 
           {step === "demo" && (
             <LiveDemoStep
-              samples={orderDemoSamples(kinds, interests)}
+              samples={orderDemoSamples(kinds, interests, pickedCity)}
               titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
               resume={resumeDemo}
@@ -397,10 +398,13 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripBuild" && <TripBuildStep onDone={advance} />}
+          {step === "tripBuild" && (
+            <TripBuildStep trip={trip} onDone={advance} />
+          )}
 
           {step === "tripLocked" && (
             <TripLockedStep
+              trip={trip}
               leaving={paywall.asked}
               onUnlock={() => {
                 recordCurrentStep();
@@ -409,7 +413,9 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripReveal" && <TripRevealStep onContinue={finish} />}
+          {step === "tripReveal" && (
+            <TripRevealStep trip={trip} onContinue={finish} />
+          )}
         </ScrollView>
       )}
     </View>
@@ -422,14 +428,10 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
   },
-  // Tall enough to hold the back button and take its taps. The negative
-  // margins give back all but the bar's own 3pt, so no step's content moves.
   header: {
     height: 28,
     marginTop: -12,
     marginBottom: -13,
-    // The step below overlaps this row by that margin. Stay on top of it, or
-    // the lower half of the back button stops taking taps.
     zIndex: 1,
     flexDirection: "row",
     alignItems: "center",

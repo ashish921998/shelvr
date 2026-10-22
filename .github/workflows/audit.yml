@@ -1,0 +1,36 @@
+name: Dependency audit
+
+# New advisories land in the registry, not in a diff, so the required `check`
+# audits a pull request only when it changes dependencies. This run covers the
+# rest: a failed run here is the alert that main now carries a high or critical
+# advisory. Baseline one with no compatible fix in pnpm.auditConfig.ignoreGhsas.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Security audit
+        run: pnpm run audit

@@ -1,6 +1,3 @@
-// Tests for the share screen's pure derivations. No React renderer and no
-// native share module: these are plain functions of a session (or of the
-// resolution outputs), which is the point of keeping them out of the screen.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,7 +19,6 @@ import {
 
 const SESSION_ID = "sess-1";
 
-/** Builds a session whose entries carry the given statuses, in order. */
 function makeSession(statuses: ShareEntryStatus[]): ShareSession {
   const entries: ShareEntry[] = statuses.map((status, index) => ({
     index,
@@ -56,8 +52,6 @@ const resolved = (
   contentMimeType: null,
 });
 
-/** A natively resolved image. Its contentUri is something the raw fallback can
- * never derive, so any assertion on it proves the resolved branch was taken. */
 const RESOLVED_IMAGE = resolved(
   "file:///tmp/a.jpg",
   "image",
@@ -71,8 +65,6 @@ describe("hasRetryableEntries", () => {
   });
 
   it("is false once every entry is saved or unsupported", () => {
-    // Unsupported entries have nothing to retry, saved ones are never re-saved,
-    // so the partial screen must not offer "Retry failed" here.
     expect(hasRetryableEntries(makeSession(["saved", "unsupported"]))).toBe(
       false,
     );
@@ -168,8 +160,6 @@ describe("countProgress / countPartial", () => {
   });
 
   it("reports zero failures when the batch only stalled", () => {
-    // The orchestration-error path lands on the partial screen with entries
-    // still pending, so the screen must be able to word itself from failed===0.
     expect(
       countPartial(
         makeSession(["saved", "pending"]),
@@ -192,7 +182,6 @@ describe("withEntry", () => {
 
     expect(next.entries.map((e) => e.status)).toEqual(["pending", "saved"]);
     expect(next.entries[0]).toBe(session.entries[0]);
-    // The caller renders from the returned copy; the input must not mutate.
     expect(session.entries[1].status).toBe("pending");
   });
 });
@@ -205,8 +194,6 @@ describe("selectProcessorPayloads", () => {
       raw: [raw("file:///tmp/a.jpg", "image")],
     });
 
-    // The fallback would leave contentUri null, so this fails if the resolved
-    // branch is ever dropped in favour of always re-deriving from raw.
     expect(payloads).toEqual([
       {
         contentType: "image",
@@ -218,8 +205,6 @@ describe("selectProcessorPayloads", () => {
   });
 
   it("falls back to the raw payloads when resolution failed", () => {
-    // A bot-hostile host can fail the whole resolution; a url share still has
-    // everything the save needs in its raw value.
     const payloads = selectProcessorPayloads({
       resolutionError: new Error("resolve failed"),
       resolved: [],
@@ -244,14 +229,10 @@ describe("selectProcessorPayloads", () => {
     });
 
     expect(payloads.map((p) => p.contentType)).toEqual(["image", "text"]);
-    // Every payload came from raw: the resolved contentUri was discarded, not
-    // spliced in front of the fallback.
     expect(payloads[0].contentUri).toBeNull();
   });
 
   it("leaves fallback images without a contentUri so they fail explicitly", () => {
-    // The raw fallback cannot reach the image bytes; classification turns this
-    // into a reported failed entry rather than killing the whole share.
     const payloads = selectProcessorPayloads({
       resolutionError: new Error("resolve failed"),
       resolved: [],

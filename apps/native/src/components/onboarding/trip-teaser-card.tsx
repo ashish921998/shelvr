@@ -8,22 +8,23 @@ import { t, useAppLocale } from "@/lib/i18n";
 import {
   SAMPLE_CROPS,
   SAMPLE_SLOT_LABELS,
-  SAMPLE_TRIP,
   sampleRows,
   type NumberedStop,
   type SampleRow,
+  type SampleTrip,
 } from "@/lib/sample-trip";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The sample trip as a card: the map, then each day's stops. Locked, the card
-// shows the first stop clearly and veils the rest behind a lock.
-
-/** Rows shown clearly on the locked card: day one's header and first stop. */
 const CLEAR_ROWS = 2;
 
-function DayHeader({ day, divider }: { day: number; divider: boolean }) {
-  const { title, stops } = SAMPLE_TRIP.days[day];
+function DayHeader({
+  row: { day, title, places },
+  divider,
+}: {
+  row: Extract<SampleRow, { kind: "day" }>;
+  divider: boolean;
+}) {
   return (
     <View style={[styles.dayHeader, divider && styles.divider]}>
       <View style={styles.dayText}>
@@ -33,7 +34,7 @@ function DayHeader({ day, divider }: { day: number; divider: boolean }) {
         <Text style={styles.dayTitle}>{t(title)}</Text>
       </View>
       <Text style={styles.dayCount}>
-        {t("tripTeaser.placeCount", { count: stops.length })}
+        {t("tripTeaser.placeCount", { count: places })}
       </Text>
     </View>
   );
@@ -61,14 +62,12 @@ function StopRow({
 
 function CardRow({ row, divider }: { row: SampleRow; divider: boolean }) {
   return row.kind === "day" ? (
-    <DayHeader day={row.day} divider={divider} />
+    <DayHeader row={row} divider={divider} />
   ) : (
     <StopRow entry={row.entry} divider={divider} />
   );
 }
 
-/** Rows behind a lock: the same rows, blurred and hidden from screen readers,
- * with one lock over their middle. */
 function VeiledRows({ rows }: { rows: SampleRow[] }) {
   const { theme } = useUnistyles();
   return (
@@ -96,19 +95,22 @@ function VeiledRows({ rows }: { rows: SampleRow[] }) {
   );
 }
 
-/**
- * The sample trip. With `locked`, only the first stop is clear; the rest is
- * veiled behind a lock.
- */
-export function SampleTripCard({ locked }: { locked: boolean }) {
+export function SampleTripCard({
+  trip,
+  locked,
+}: {
+  trip: SampleTrip;
+  locked: boolean;
+}) {
   useAppLocale();
-  const rows = sampleRows();
+  const rows = sampleRows(trip);
   const clear = locked ? rows.slice(0, CLEAR_ROWS) : rows;
   const veiled = locked ? rows.slice(CLEAR_ROWS) : [];
   return (
     <View style={styles.card}>
       <View>
         <SampleTripMap
+          trip={trip}
           crop={locked ? SAMPLE_CROPS.locked : SAMPLE_CROPS.reveal}
         />
         <View style={styles.badge} pointerEvents="none">

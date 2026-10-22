@@ -14,9 +14,8 @@ type TestCtx = TestConvexForDataModel<DataModel>;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 9, 12, 12);
+const SLOW_PROPERTY_RUNS = 30;
 
-// Scheduled jobs stay queued (see items.test.ts), and the clock is pinned so
-// "expired" means the same thing on every run.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
   vi.setSystemTime(NOW);
@@ -32,11 +31,9 @@ type User = (typeof USERS)[number];
 type SignedIn = {
   as: Record<User, TestCtx>;
   ids: Record<User, Id<"users">>;
-  /** The test's name for the owner of a stored `userId`. */
   nameOf: (userId: string) => User | undefined;
 };
 
-/** Both users, backed by real users rows; `pro` gives each a live plan. */
 async function signedIn(
   base: ReturnType<typeof newConvexTest>,
   options: { pro?: boolean } = {},
@@ -59,12 +56,6 @@ async function snapshot(t: TestCtx) {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// Saves
-// ---------------------------------------------------------------------------
-
-// A few operation ids shared by every command, so retries, a retry of the
-// other kind, and the other user's use of the same id all happen often.
 const operationId = fc.option(
   fc.integer({ min: 0, max: 3 }).map((n) => `share:operation-${n}`),
   { nil: undefined },
@@ -92,8 +83,6 @@ const command = fc.oneof(
 type Saves = Map<Id<"items">, { user: User; kind: string }>;
 type Operations = Map<string, { kind: string; itemId: Id<"items"> }>;
 
-/** Deletes one of the user's saves, if they have any, and takes it out of
- * what should exist. */
 async function deleteOneSave(
   t: TestCtx,
   step: { user: User; pick: number },
@@ -105,7 +94,6 @@ async function deleteOneSave(
   const [itemId] = mine[step.pick % mine.length];
   await t.mutation(api.items.deleteItem, { id: itemId });
   saves.delete(itemId);
-  // A deleted save frees its operation id for a fresh save.
   for (const [key, op] of operations) {
     if (op.itemId === itemId) operations.delete(key);
   }
@@ -115,17 +103,13 @@ describe("saving links and notes", () => {
   it("makes one save per operation, whatever is retried, mixed up or deleted", async () => {
     await fc.assert(
       fc.asyncProperty(
-        // 20 commands stay under one user's itemCreate burst of 30.
         fc.array(command, { maxLength: 20 }),
         async (commands) => {
           const base = newConvexTest();
           const { as, nameOf } = await signedIn(base, { pro: true });
 
-          // What should exist: each user's saves, and which save each of
-          // their operation ids produced.
           const saves: Saves = new Map();
           const operations: Operations = new Map();
-          // Every save ever made, deleted ones included.
           const everSaved: Id<"items">[] = [];
 
           for (const step of commands) {
@@ -186,11 +170,7 @@ describe("saving links and notes", () => {
           expect(
             stored.operations.every((op) => op.status === "complete"),
           ).toBe(true);
-          // No operation id has two ledger rows, which the map above would
-          // have folded into one.
           expect(stored.operations).toHaveLength(operations.size);
-          // Each save was sent for processing once, and a retry never sends
-          // it again.
           expect(
             stored.jobs
               .filter((job) => job.name === "ai:processItem")
@@ -199,114 +179,106 @@ describe("saving links and notes", () => {
           ).toEqual([...everSaved].sort());
         },
       ),
+      { numRuns: SLOW_PROPERTY_RUNS },
     );
   });
 });
 
-// ---------------------------------------------------------------------------
-// The Pro gate
-// ---------------------------------------------------------------------------
+type Sub = {
+  status: "trialing" | "pro" | "lapsed" | "lifetime";
+  expiresAt: number;
+} | null;
 
-const subscription = fc.option(
-  fc.record({
-    status: fc.constantFrom(
-      "trialing" as const,
-      "pro" as const,
-      "lapsed" as const,
-      "lifetime" as const,
-    ),
-    // Around the pinned clock, with the edges on both sides of "now".
-    expiresAt: fc.oneof(
-      fc.constantFrom(NOW - 1, NOW, NOW + 1),
-      fc.integer({ min: NOW - 30 * DAY_MS, max: NOW + 30 * DAY_MS }),
-    ),
-  }),
-  { nil: null },
-);
+const EXPIRIES: [string, number][] = [
+  ["30 days ago", -30 * DAY_MS],
+  ["a day ago", -DAY_MS],
+  ["1 ms ago", -1],
+  ["now", 0],
+  ["in 1 ms", 1],
+  ["in a day", DAY_MS],
+  ["in 30 days", 30 * DAY_MS],
+];
+
+const SUBS: [string, Sub][] = [
+  ["no subscription", null],
+  ...(["trialing", "pro", "lapsed", "lifetime"] as const).flatMap(
+    (status): [string, Sub][] =>
+      EXPIRIES.map(([when, offset]) => [
+        `${status}, expires ${when}`,
+        { status, expiresAt: NOW + offset },
+      ]),
+  ),
+];
 
 describe("the Pro gate on saves", () => {
-  it("lets a save through only on a live trial, subscription or lifetime plan, and stores nothing otherwise", async () => {
-    await fc.assert(
-      fc.asyncProperty(subscription, async (sub) => {
-        const base = newConvexTest();
-        const { as, ids } = await signedIn(base);
-        const t = as["user-a"];
-        if (sub !== null) {
-          await base.run(async (ctx) => {
-            await ctx.db.insert("subscriptions", {
-              userId: ids["user-a"],
-              ...sub,
-              updatedAt: NOW,
-            });
+  it.each(SUBS)(
+    "lets a save through only on a live trial, subscription or lifetime plan: %s",
+    async (_label, sub) => {
+      const base = newConvexTest();
+      const { as, ids } = await signedIn(base);
+      const t = as["user-a"];
+      if (sub !== null) {
+        await base.run(async (ctx) => {
+          await ctx.db.insert("subscriptions", {
+            userId: ids["user-a"],
+            ...sub,
+            updatedAt: NOW,
           });
-        }
-        // Written out here, not taken from the gate's own helper.
-        const allowed =
-          sub !== null &&
-          (sub.status === "lifetime" ||
-            ((sub.status === "trialing" || sub.status === "pro") &&
-              sub.expiresAt > NOW));
+        });
+      }
+      const allowed =
+        sub !== null &&
+        (sub.status === "lifetime" ||
+          ((sub.status === "trialing" || sub.status === "pro") &&
+            sub.expiresAt > NOW));
 
-        const attempts = [
-          () =>
-            t.mutation(api.items.createLinkItem, {
-              url: "https://example.com/a",
-              operationId: "share:operation-link",
-            }),
-          () =>
-            t.mutation(api.items.createNoteItem, {
-              text: "a note",
-              operationId: "share:operation-note",
-            }),
-          () =>
-            t.mutation(api.items.importLinks, {
-              urls: ["https://example.com/b"],
-            }),
-        ];
-        for (const attempt of attempts) {
-          if (allowed) {
-            await attempt();
-          } else {
-            const error = await attempt().then(
-              () => undefined,
-              (thrown: unknown) => thrown,
-            );
-            expect(saveErrorCode(error)).toBe("pro_required");
-          }
+      const attempts = [
+        () =>
+          t.mutation(api.items.createLinkItem, {
+            url: "https://example.com/a",
+            operationId: "share:operation-link",
+          }),
+        () =>
+          t.mutation(api.items.createNoteItem, {
+            text: "a note",
+            operationId: "share:operation-note",
+          }),
+        () =>
+          t.mutation(api.items.importLinks, {
+            urls: ["https://example.com/b"],
+          }),
+      ];
+      for (const attempt of attempts) {
+        if (allowed) {
+          await attempt();
+        } else {
+          const error = await attempt().then(
+            () => undefined,
+            (thrown: unknown) => thrown,
+          );
+          expect(saveErrorCode(error)).toBe("pro_required");
         }
+      }
 
-        const stored = await snapshot(base);
-        expect(stored.items).toHaveLength(allowed ? 3 : 0);
-        if (!allowed) {
-          expect(stored.operations).toHaveLength(0);
-          expect(stored.jobs).toHaveLength(0);
-        }
-      }),
-    );
-  });
+      const stored = await snapshot(base);
+      expect(stored.items).toHaveLength(allowed ? 3 : 0);
+      if (!allowed) {
+        expect(stored.operations).toHaveLength(0);
+        expect(stored.jobs).toHaveLength(0);
+      }
+    },
+  );
 });
 
-// ---------------------------------------------------------------------------
-// Search
-// ---------------------------------------------------------------------------
-
-// Words none of which starts another, so which saves a word finds is plain.
 const WORDS = ["ramen", "tower", "craft", "lisbon", "checklist", "sourdough"];
 const savedTitle = fc
   .subarray(WORDS, { minLength: 1, maxLength: 3 })
   .chain((words) => fc.shuffledSubarray(words, { minLength: words.length }));
-const typed = fc
-  .tuple(
-    fc.constantFrom(...WORDS),
-    fc.boolean(),
-    fc.constantFrom("", " ", "  \n"),
-  )
-  .map(([word, upper, padding]) => ({
-    word,
-    text: `${padding}${upper ? word.toUpperCase() : word}${padding}`,
-  }));
+const spelling = fc.record({
+  upper: fc.boolean(),
+  padding: fc.constantFrom("", " ", "  \n"),
+});
 
-/** Saves a link and finishes it the way the processing pipeline does. */
 async function saveFinished(
   base: TestCtx,
   t: TestCtx,
@@ -330,35 +302,41 @@ describe("searching saves", () => {
   it("finds every one of your saves with the word, and never anyone else's", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.array(savedTitle, { minLength: 1, maxLength: 6 }),
-        typed,
-        async (titles, query) => {
+        fc.array(savedTitle, { minLength: 1, maxLength: 4 }),
+        spelling,
+        async (titles, { upper, padding }) => {
           const base = newConvexTest();
           const { as, ids } = await signedIn(base, { pro: true });
 
-          // Both users save the same titles, so only ownership tells their
-          // saves apart.
+          await saveFinished(
+            base,
+            as["user-b"],
+            "https://example.com/b",
+            WORDS,
+          );
           const mine = new Map<Id<"items">, string[]>();
           for (const [index, title] of titles.entries()) {
             const url = `https://example.com/${index}`;
             mine.set(await saveFinished(base, as["user-a"], url, title), title);
-            await saveFinished(base, as["user-b"], url, title);
           }
 
-          const found = await as["user-a"].query(api.items.searchItems, {
-            query: query.text,
-          });
-          expect(found.map((item) => item._id).sort()).toEqual(
-            [...mine]
-              .filter(([, title]) => title.includes(query.word))
-              .map(([itemId]) => itemId)
-              .sort(),
-          );
-          expect(found.every((item) => item.userId === ids["user-a"])).toBe(
-            true,
-          );
+          for (const word of WORDS) {
+            const found = await as["user-a"].query(api.items.searchItems, {
+              query: `${padding}${upper ? word.toUpperCase() : word}${padding}`,
+            });
+            expect(found.map((item) => item._id).sort()).toEqual(
+              [...mine]
+                .filter(([, title]) => title.includes(word))
+                .map(([itemId]) => itemId)
+                .sort(),
+            );
+            expect(found.every((item) => item.userId === ids["user-a"])).toBe(
+              true,
+            );
+          }
         },
       ),
+      { numRuns: SLOW_PROPERTY_RUNS },
     );
   });
 

@@ -99,7 +99,6 @@ describe("scheduleTrialReminder", () => {
   it("asks once when a trial has just started", async () => {
     mock.permission.mockResolvedValue(undetermined);
     mock.request.mockResolvedValue(granted);
-    // Local noon, so the trial ends at the same hour in every timezone.
     const noon = new Date(2027, 0, 4, 12, 0).getTime();
     expect(await scheduleTrialReminder(noon + 7 * DAY, noon, true)).toBe(true);
     expect(mock.request).toHaveBeenCalledTimes(1);
@@ -157,7 +156,6 @@ describe("scheduleTrialReminder", () => {
 });
 
 describe("trial nudges", () => {
-  // Local noon, so the nudges keep the trial's hour.
   const noon = new Date(2027, 0, 4, 12, 0, 0, 0).getTime();
   const nudgeIds = TRIAL_NUDGES.map((nudge) => nudge.id);
 
@@ -178,8 +176,6 @@ describe("trial nudges", () => {
   });
 
   it("keeps the local date across a DST change", () => {
-    // A late-evening trial start in a zone that springs forward that week
-    // still lands on the calendar day after.
     const start = new Date(2027, 2, 13, 18, 30).getTime();
     const at = new Date(trialNudgeAt(start + 7 * DAY, 1, start)!);
     expect([at.getMonth(), at.getDate(), at.getHours()]).toEqual([2, 14, 18]);
@@ -190,7 +186,6 @@ describe("trial nudges", () => {
   });
 
   it("needs Save reminders on, and a missing preferences row means no", () => {
-    // `getPreferences` reports reminders off for a user with no row.
     expect(trialNudgesAllowed({ remindersEnabled: false })).toBe(false);
     expect(trialNudgesAllowed({ remindersEnabled: true })).toBe(true);
   });
@@ -220,7 +215,6 @@ describe("trial nudges", () => {
 
   it("clears the nudges when they are switched off", async () => {
     await scheduleTrialReminder(noon + 7 * DAY, noon, false);
-    // The two reminders about the charge stay.
     const ids = mock.schedule.mock.calls.map(
       (call) => (call[0] as { identifier: string }).identifier,
     );
@@ -264,7 +258,6 @@ describe("last-day reminder", () => {
 
   it("skips a trial ending in the morning rather than send at night", () => {
     expect(at(new Date(2027, 0, 11, 8, 0))).toBeNull();
-    // Just past midnight, the window opens two calendar days earlier.
     expect(at(new Date(2027, 0, 11, 0, 30))).toBeNull();
   });
 

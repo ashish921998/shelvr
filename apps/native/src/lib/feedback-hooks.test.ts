@@ -1,6 +1,3 @@
-// Tests for the two Home hooks that decide when to ask for feedback. They are
-// effect-only hooks, so the shared slot-indexed React stand-in (see
-// src/test/react-stand-in.ts) drives them without a renderer.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   isNativeReviewAttemptInFlight,
@@ -84,8 +81,6 @@ vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.secure.get(key) ?? null,
   setItem: (key: string, value: string) => void mock.secure.set(key, value),
 }));
-// Keep the real gate and persistence; only the session mark is observed so
-// one test cannot leak a 90s cooldown into the next.
 vi.mock("@/lib/feedback", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./feedback")>()),
   markNativeReviewPrompted: mock.markNativeReviewPrompted,
@@ -146,13 +141,10 @@ describe("useFeedbackInvitation", () => {
     expect(result.invitationVisible).toBe(true);
     expect(readInvitationState("user-1").shownCount).toBe(1);
 
-    // A save starts: the invitation goes away.
     items = [...items, item({ status: "processing" })];
     result = react.rerender<Result>();
     expect(result.invitationVisible).toBe(false);
 
-    // The save settles. The 14-day gap blocks a second show, so the ended
-    // invitation must not simply reappear.
     items = [...threeReady(), item()];
     result = react.rerender<Result>();
     vi.advanceTimersByTime(2000);
@@ -184,8 +176,6 @@ describe("useFeedbackInvitation", () => {
 
   it("waits out a pending native review check so both prompts cannot appear together", () => {
     const items = threeReady();
-    // useReviewPrompt has claimed the moment but hasAction() has not resolved,
-    // so no timestamp is marked yet. The invitation must not slip in.
     setNativeReviewAttemptInFlight(true);
     react.mount(() => useFeedbackInvitation(items));
 
@@ -193,10 +183,6 @@ describe("useFeedbackInvitation", () => {
     expect(react.rerender<Result>().invitationVisible).toBe(false);
     expect(readInvitationState("user-1").shownCount).toBe(0);
 
-    // The check resolved without a prompt (no review action): the window is
-    // over and the invitation proceeds on its next tick. Had the prompt fired,
-    // the mark it leaves is honored by the same attempt, as the cooldown
-    // tests cover.
     setNativeReviewAttemptInFlight(false);
     vi.advanceTimersByTime(2000);
     expect(react.rerender<Result>().invitationVisible).toBe(true);
@@ -207,7 +193,6 @@ describe("useFeedbackInvitation", () => {
     const items = threeReady();
     react.mount(() => useFeedbackInvitation(items, { defer: true }));
 
-    // Long past the settle delay: no claim, no shown event, no gate burn.
     vi.advanceTimersByTime(2000);
     vi.advanceTimersByTime(2000);
     expect(react.rerender<Result>().invitationVisible).toBe(false);
@@ -230,12 +215,9 @@ describe("useFeedbackInvitation", () => {
 });
 
 describe("useReviewPrompt", () => {
-  // Home must hold still for the settle window before the sheet may appear.
   const flush = () => vi.advanceTimersByTimeAsync(REVIEW_PROMPT_SETTLE_MS);
 
   type Feed = ReturnType<typeof threeReady>;
-  /** Mounts the hook across a win: the first render is on an opened save,
-   * and every later render is back on Home. */
   const mountFiled = (getItems: () => Feed, run: (feed: Feed) => void) => {
     mock.segments = ["(app)", "item", "[id]"];
     react.mount(() => run(getItems()));
@@ -256,7 +238,6 @@ describe("useReviewPrompt", () => {
       () => items,
       (feed) => useReviewPrompt(feed),
     );
-    // Home has not settled yet: nothing may be claimed.
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
 
@@ -274,7 +255,6 @@ describe("useReviewPrompt", () => {
 
   it("records nothing when a guard fails after hasAction() resolves, and retries on the next return from a save", async () => {
     let items = threeReady();
-    // A paywall opens while hasAction() is in flight.
     mock.hasAction.mockImplementationOnce(async () => {
       mock.paywallPending = true;
       return true;
@@ -288,8 +268,6 @@ describe("useReviewPrompt", () => {
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
 
-    // The paywall closes and another save lands while Home stays up. That is
-    // no longer the moment of the save, so nothing is asked.
     mock.paywallPending = false;
     items = [...items, item()];
     react.rerender();
@@ -297,7 +275,6 @@ describe("useReviewPrompt", () => {
     expect(mock.hasAction).toHaveBeenCalledOnce();
     expect(mock.requestReview).not.toHaveBeenCalled();
 
-    // The next return from a save is a fresh moment: the attempt runs again.
     mock.segments = ["(app)", "item", "[id]"];
     react.rerender();
     mock.segments = ["(app)", "(tabs)", "(home)"];
@@ -356,7 +333,6 @@ describe("useReviewPrompt", () => {
 
   it("waits for the keyboard to go away, then for Home to settle", async () => {
     const items = threeReady();
-    // Add was just closed with its keyboard still sliding away.
     setKeyboard(true);
     mountFiled(
       () => items,
@@ -372,7 +348,6 @@ describe("useReviewPrompt", () => {
     expect(mock.requestReview).toHaveBeenCalledOnce();
   });
 
-  /** Holds hasAction() open until the test resolves it. */
   const pendingHasAction = () => {
     let resolve!: (value: boolean) => void;
     mock.hasAction.mockImplementationOnce(
@@ -391,7 +366,6 @@ describe("useReviewPrompt", () => {
     await flush();
     expect(mock.hasAction).toHaveBeenCalledOnce();
 
-    // The keyboard shows and hides again before hasAction() answers.
     setKeyboard(true);
     setKeyboard(false);
     resolveHasAction();
@@ -399,7 +373,6 @@ describe("useReviewPrompt", () => {
     expect(mock.requestReview).not.toHaveBeenCalled();
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
 
-    // A fresh attempt waits out a full settle window of its own.
     await flush();
     expect(mock.requestReview).toHaveBeenCalledOnce();
   });
@@ -414,7 +387,6 @@ describe("useReviewPrompt", () => {
     );
     await flush();
 
-    // The feedback form opens during the check.
     defer = true;
     react.rerender();
     resolveHasAction();
@@ -438,14 +410,12 @@ describe("useReviewPrompt", () => {
 
     mock.segments = ["(app)", "item", "[id]"];
     react.rerender();
-    // The cancelled check gave the invitation its moment back.
     expect(isNativeReviewAttemptInFlight()).toBe(false);
     mock.segments = ["(app)", "(tabs)", "(home)"];
     react.rerender();
     resolveHasAction();
     await vi.advanceTimersByTimeAsync(0);
     expect(mock.requestReview).not.toHaveBeenCalled();
-    // The superseded check must not release the fresh attempt's hold.
     expect(isNativeReviewAttemptInFlight()).toBe(true);
 
     await flush();
@@ -470,8 +440,6 @@ describe("useReviewPrompt", () => {
 
   it("records nothing when hasAction() resolves before the keyboard's render commits", async () => {
     const items = threeReady();
-    // The keyboard is already up by the live read, though no show event has
-    // reached the hook yet: only the re-check after the await stops it.
     mock.hasAction.mockImplementationOnce(async () => {
       mock.keyboard.visible = true;
       return true;

@@ -16,7 +16,6 @@ import {
   authorizeRequestBody,
 } from "@/lib/requestBody";
 
-// A screenshot verdict may take the full 45 s upstream deadline.
 export const maxDuration = 60;
 
 const MAX_BODY_CHARS = 6 * 1024 * 1024;
@@ -38,7 +37,6 @@ function requestKind(text: string): string | undefined {
   }
 }
 
-/** Forwards the visitor's oracle input to Convex, which validates it. */
 export async function POST(request: Request) {
   const refused = await authorizeRequestBody(request, "oracle");
   if (refused) return refused;

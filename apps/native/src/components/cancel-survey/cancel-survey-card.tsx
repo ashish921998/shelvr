@@ -8,14 +8,6 @@ import {
   type CancelSurveyReason,
 } from "@/lib/cancel-survey";
 
-/**
- * The one-time cancel-survey card shown on Home after a trial cancellation is
- * detected (auto-renew off, trial still active). Presentational apart from
- * one signal: `onPresented` fires on mount, because the ask is consumed only
- * when the card actually renders, never when cancellation is merely
- * detected. State and analytics live in useCancelSurvey. Tapping a reason
- * submits it: no separate send step, no free text anywhere.
- */
 export function CancelSurveyCard({
   onSubmit,
   onDismiss,

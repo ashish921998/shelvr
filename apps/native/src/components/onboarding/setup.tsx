@@ -38,8 +38,6 @@ export function SetupStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  // At the accessibility sizes two cards no longer fit a label across, so the
-  // grid drops to one column instead of breaking words.
   const oneColumn = useLargeText();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");

@@ -8,20 +8,10 @@ type Props = {
   title: string;
   message: string;
   ctaLabel?: string;
-  /** Which Pro-gated surface this card sits on, so its paywall attempts land
-   * in the funnel under the screen that earned them instead of collapsing
-   * into `pro_gate`. Defaults to `pro_gate` for unattributed call sites. */
   placement?: string;
-  /** Override the CTA action. Defaults to presenting the paywall / fallback. */
   onPress?: () => void;
 };
 
-/**
- * The Pro upsell card shared by Tidy, Map, and the paywall fallback screen.
- * One layout + stylesheet replaces the three near-identical copies that lived
- * in each screen. The CTA defaults to `openPaywall` so each call site avoids
- * repeating the presentPaywall → router.push('/(app)/paywall') fallback.
- */
 export function ProGate({
   title,
   message,

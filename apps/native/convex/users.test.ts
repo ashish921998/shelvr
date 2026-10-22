@@ -12,7 +12,6 @@ import { DELETE_BATCH } from "./users";
 type TestCtx = TestConvexForDataModel<DataModel>;
 type Backend = ReturnType<typeof newConvexTest>;
 
-/** A signed-in Pro user backed by a real users row. */
 async function as(
   backend: Backend,
 ): Promise<{ t: TestCtx; userId: Id<"users"> }> {
@@ -27,7 +26,6 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
   });
 }
 
-/** Seeds note + image, space + membership, pending op with storage. */
 async function seedOwnedData(t: TestCtx, userId: string) {
   const storageId = await storeBlob(t);
   const pendingStorageId = await storeBlob(t);
@@ -111,8 +109,6 @@ describe("deleteCurrentUserAccount", () => {
       ).not.toBeNull();
     });
 
-    // The one-time cancel-survey ask row is user-owned state; it must drain
-    // with the account too.
     await t.run(async (ctx) => {
       await ctx.db.insert("cancelSurveys", {
         userId,
@@ -121,8 +117,6 @@ describe("deleteCurrentUserAccount", () => {
         reason: "too_expensive",
         respondedAt: 1700000000001,
       });
-      // Feedback submissions hold the user's authored messages; they drain
-      // with the account as well.
       await ctx.db.insert("feedbackSubmissions", {
         userId,
         message: "Loved the app, sad to go",
@@ -130,7 +124,6 @@ describe("deleteCurrentUserAccount", () => {
         status: "delivered",
         attempts: 1,
       });
-      // "We went" places say where the user has been.
       await ctx.db.insert("placeVisits", {
         userId,
         key: "tigre",
@@ -138,7 +131,6 @@ describe("deleteCurrentUserAccount", () => {
         itemId: seeded.noteId,
         visitedAt: 1700000000002,
       });
-      // A trip lists the places the user plans to go.
       await ctx.db.insert("trips", {
         userId,
         spaceId: seeded.spaceId,
@@ -207,9 +199,6 @@ describe("deleteCurrentUserAccount", () => {
   });
 
   it("ends a pass on bytes read, so a batch of long articles stays under the read limit", async () => {
-    // Convex refuses a transaction that reads more than 16 MiB. A link save
-    // keeps up to 100k characters of article plus its search copy, so a
-    // full row-count batch of them can cross that and fail every retry.
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
@@ -241,8 +230,6 @@ describe("deleteCurrentUserAccount", () => {
         );
 
       await t.mutation(api.users.deleteCurrentUserAccount, {});
-      // 60 rows of ~200 KB each is ~12 MB: under the row cap, over the
-      // byte budget, so the first pass leaves some for the continuation.
       expect(await remaining()).toBeGreaterThan(0);
       expect(await remaining()).toBeLessThan(count);
 
@@ -255,8 +242,6 @@ describe("deleteCurrentUserAccount", () => {
   });
 
   it("drains accounts larger than one batch via scheduled continuations", async () => {
-    // The continuation mutation validates `userId: v.id("users")`, so this
-    // test needs a real users row (a synthetic string subject won't do).
     vi.useFakeTimers();
     try {
       const backend = newConvexTest();
@@ -321,7 +306,6 @@ describe("deleteCurrentUserAccount", () => {
       expect(sub).not.toBeNull();
     });
 
-    // B's identity still works; A's is gone with the account.
     await expect(tb.query(api.spaces.listSpaces, {})).resolves.toHaveLength(1);
     await expect(ta.query(api.spaces.listSpaces, {})).rejects.toThrow(
       /Not authenticated/,
@@ -386,10 +370,6 @@ describe("deleteCurrentUserAccount", () => {
     });
   });
 
-  // Feedback rows hold authored messages, so a chatty account must be able
-  // to exceed one deletion batch and still drain completely (via the same
-  // scheduled continuations as every other table) before the auth identity
-  // is removed.
   it("drains more than one batch of feedback rows via scheduled continuations", async () => {
     vi.useFakeTimers();
     try {
@@ -421,8 +401,6 @@ describe("deleteCurrentUserAccount", () => {
             .withIndex("by_user", (q) => q.eq("userId", userId as string))
             .collect(),
         ).toHaveLength(0);
-        // The auth identity is only removed by the final batch, so its
-        // absence proves the continuations ran to completion.
         expect(await ctx.db.get(userId)).toBeNull();
       });
     } finally {
@@ -430,8 +408,6 @@ describe("deleteCurrentUserAccount", () => {
     }
   });
 
-  // Regression: the onboarding demo table must drain with the account: no
-  // orphan allowance row (or dangling item reference) may survive deletion.
   it("removes the onboarding demo allowance with the account", async () => {
     const backend = newConvexTest();
     const { userId, t } = await signedInUser(backend, {
@@ -468,9 +444,6 @@ describe("deleteCurrentUserAccount", () => {
   });
 });
 
-/** A real signed-in Pro user with `itemCount` notes. More than `DELETE_BATCH`
- * leaves the account mid-deletion after the first mutation, so the owner row
- * is still there to carry the marker. */
 async function fencedUser(backend: Backend, itemCount: number) {
   const { userId, t } = await signedInUser(backend, {
     email: "fence@example.com",
@@ -493,8 +466,6 @@ async function remainingItems(backend: TestCtx, userId: Id<"users">) {
   );
 }
 
-/** The same authenticated identity, driven through a query, a mutation, a
- * demo save and the capture-token action. Every one must refuse. */
 async function expectRetainedIdentityRejected(t: TestCtx) {
   await expect(t.query(api.spaces.listSpaces, {})).rejects.toThrow(
     /Not authenticated/,
@@ -519,8 +490,6 @@ describe("account deletion fence", () => {
 
       await t.mutation(api.users.deleteCurrentUserAccount, {});
 
-      // Mid-deletion: rows remain, the owner row is still there, and it is
-      // marked.
       expect(await remainingItems(backend, userId)).toBe(1);
       expect(await backend.run((ctx) => ctx.db.get(userId))).toMatchObject({
         deleting: true,
@@ -549,8 +518,6 @@ describe("account deletion fence", () => {
 
       await t.mutation(api.users.deleteCurrentUserAccount, {});
       expect(await remainingItems(backend, userId)).toBe(1);
-      // The retry during cleanup must not fail because the owner is already
-      // deleting; it resumes the drain.
       await expect(
         t.mutation(api.users.deleteCurrentUserAccount, {}),
       ).resolves.toBeNull();
@@ -589,7 +556,6 @@ describe("account deletion fence", () => {
       const backend = newConvexTest();
       const { userId, t } = await fencedUser(backend, DELETE_BATCH + 1);
 
-      // Live: the identity works everywhere.
       await expect(t.query(api.spaces.listSpaces, {})).resolves.toEqual([]);
       await expect(
         t.action(api.appIntents.issueCaptureToken, {}),

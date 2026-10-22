@@ -13,8 +13,6 @@ import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-// Keep scheduled jobs queued (see items.test.ts): the rows stay assertable
-// without the AI action firing during teardown.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
@@ -164,8 +162,6 @@ describe("bounded upload endpoint", () => {
   });
 });
 
-/** A signed-in user with a freshly issued capture token, Pro unless `pro` is
- * false. */
 async function setup(options: { pro?: boolean } = {}) {
   const base = newConvexTest();
   const { userId, t } = await signedInUser(base, {
@@ -275,7 +271,6 @@ describe("POST /app-intents/capture", () => {
     expect(first.status).toBe(200);
     const { itemId } = (await first.json()) as { itemId: Id<"items"> };
 
-    // Siri retried after a timeout: the same operation returns the same save.
     const retry = await post(t, "/app-intents/capture", body, token);
     expect(await retry.json()).toEqual({ itemId });
 
@@ -428,7 +423,6 @@ describe("image capture", () => {
       captureContext: "Siri: save this\n\nText in the image:\nMiso ramen",
     });
 
-    // A retried begin after the save returns the finished item.
     const again = await post(
       t,
       "/app-intents/image/begin",
@@ -496,8 +490,6 @@ describe("account deletion", () => {
     expect(response.status).toBe(401);
   });
 
-  /** Enough notes that the first deletion pass leaves the owner row behind,
-   * marked, so the mid-deletion state can be observed. */
   async function leaveMidDeletion(t: TestCtx, userId: Id<"users">) {
     await seedNotes(t, userId, DELETE_BATCH + 1);
     await t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -507,9 +499,6 @@ describe("account deletion", () => {
   }
 
   it("rejects issuing a token once the account is gone", async () => {
-    // Authorization and the write are one transaction inside
-    // storeCaptureToken, so there is no window to race: deleting first, then
-    // issuing, fails the same check every public function uses.
     const { t } = await setup();
     await t.mutation(api.users.deleteCurrentUserAccount, {});
     await expect(
@@ -543,12 +532,10 @@ describe("account deletion", () => {
 
   it("rejects a residual token for a deleting or missing owner before marking it used", async () => {
     const { base, t, userId, token } = await setup();
-    // Fresh token, never used, so a lastUsedAt write would be visible.
     const rowId = await base.run(
       async (ctx) => (await ctx.db.query("captureTokens").first())!._id,
     );
     await base.run((ctx) => ctx.db.patch(userId, { deleting: true }));
-    // A token that outlived the drain (deletion is batched) must be useless.
     const body = { operationId: OP, kind: "note", text: "hi" };
     expect((await post(t, "/app-intents/capture", body, token)).status).toBe(
       401,

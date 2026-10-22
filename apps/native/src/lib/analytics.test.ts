@@ -32,8 +32,6 @@ vi.mock("expo-updates", () => ({
   isEmbeddedLaunch: true,
 }));
 vi.mock("@/lib/posthog", async (importOriginal) => {
-  // Spread the real module so captureError exercises the production
-  // allowlist instead of a drift-prone hard-coded copy; swap only the client.
   const actual = await importOriginal<typeof import("@/lib/posthog")>();
   return { ...actual, posthog: mock };
 });
@@ -109,8 +107,6 @@ describe("item analytics", () => {
     analytics.identify("user-1");
     expect(mock.identify).toHaveBeenCalledTimes(1);
     expect(mock.identify).toHaveBeenCalledWith("user-1");
-    // Nothing shaped like a person-property payload (`$set`) or an address
-    // may reach PostHog.
     expect(JSON.stringify(mock.identify.mock.calls)).not.toMatch(
       /\$set|email|@/,
     );
@@ -141,7 +137,6 @@ describe("captureError", () => {
   it("reports the class and stack but never a content-carrying message", () => {
     const error = new TypeError("Value: https://private.example/note text");
     analytics.captureError("share_save_failed", error, { entry_count: 2 });
-    // Console diagnostics retain a known type, never the raw error.
     expect(console.error).toHaveBeenCalledWith("share_save_failed", {
       error_type: "TypeError",
     });
@@ -150,7 +145,6 @@ describe("captureError", () => {
     const [reported, properties] = mock.captureException.mock.calls[0];
     expect(reported).toBeInstanceOf(Error);
     expect((reported as Error).name).toBe("TypeError");
-    // The stack ships for symbolication; the message may not echo user data.
     expect((reported as Error).stack).toBe(error.stack);
     expect(JSON.stringify(mock.captureException.mock.calls)).not.toContain(
       "private.example",
@@ -201,9 +195,6 @@ describe("captureError", () => {
 
 describe("resetIfIdentified", () => {
   it("is the only reset the facade exposes", () => {
-    // Sign-out flows used to call an unconditional reset alongside the auth
-    // edge's conditional one. The auth edge (useAnalyticsIdentity) is the
-    // single owner now; an unconditional entry point must not come back.
     expect("reset" in analytics).toBe(false);
     expect(typeof analytics.resetIfIdentified).toBe("function");
   });

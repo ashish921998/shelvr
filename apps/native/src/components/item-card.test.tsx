@@ -10,13 +10,6 @@ import { runIntent } from "@/lib/intents";
 import { ItemCard, type FeedItem } from "./item-card";
 import { textFaceCopy } from "./item-card-face";
 
-// Every query below goes through the accessibility tree, so the mocks resolve
-// role and name the way the platform does rather than echoing whichever prop
-// was set: React Native reads `role` ahead of `accessibilityRole`
-// (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt) and an
-// accessibilityLabel replaces the child text instead of falling back to it.
-// An element marked `accessible` is one leaf to the screen reader, so its
-// children are hidden from these queries the way iOS hides them.
 type A11yProps = {
   children?: ReactNode;
   accessible?: boolean;
@@ -42,7 +35,6 @@ vi.mock("react-native", () => {
   );
   return {
     View: vi.fn(a11yElement),
-    // The card's look lives in render-prop children (see item-card.tsx).
     Pressable: vi.fn(
       ({
         children,
@@ -69,10 +61,6 @@ vi.mock("react-native", () => {
   };
 });
 
-// Link spreads its own role="link" onto the element it wraps (expo-router's
-// Slot, via @radix-ui/react-slot: `{...slotProps, ...childProps}`), so the card
-// has to win that merge to read as a button. Mirroring the spread here is what
-// makes the role assertions mean anything.
 const routerPush = vi.hoisted(() => vi.fn());
 const motionPreference = vi.hoisted(() => ({ reduced: true }));
 const linkProps = vi.hoisted(() => vi.fn());
@@ -93,8 +81,6 @@ vi.mock("expo-router", () => {
   Link.Preview = function LinkPreview() {
     return null;
   };
-  // A zero-size native view on iOS, which hides everything under it from the
-  // screen reader; aria-hidden does the same to these queries.
   Link.AppleZoomTarget = function LinkAppleZoomTarget({
     children,
   }: {
@@ -180,8 +166,6 @@ vi.mock("@/components/glass", () => ({
     <div>{children}</div>
   )),
 }));
-// ActionMenu itself stays real, so the ellipsis control keeps its own label
-// here; only the native menu host is stubbed.
 vi.mock("@expo/ui/community/menu", () => ({
   MenuView: vi.fn(({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
@@ -194,7 +178,6 @@ const base: FeedItem = {
   status: "ready",
   tags: [],
 };
-/** The props of the one native element the screen reader sees as the card. */
 function labelledProps(owner: typeof View | typeof Pressable, name: string) {
   const call = vi
     .mocked(owner)
@@ -280,7 +263,6 @@ describe.each([false, true])("with reduced motion %s", (reduced) => {
     },
   );
 });
-/** Finds the card the way a screen reader would: a button with this name. */
 function card(item: Partial<FeedItem>, name: string) {
   render(<ItemCard item={{ ...base, ...item }} />);
   return screen.getByRole("button", { name });
@@ -348,10 +330,6 @@ it("stays a button even though Link marks the trigger a link", () => {
   expect(screen.queryByRole("link")).toBeNull();
 });
 
-// Reachability is a separate question from rendering: the card is one
-// accessibility element, so this control is folded into it (its actions reach
-// the screen reader as the card's accessibility actions, tested below). This
-// asserts only that labelling the card did not drop either set of actions.
 it("still renders the save-actions control and the long-press menu", () => {
   render(
     <ItemCard
@@ -378,8 +356,6 @@ it("offers Dismiss in the suggested save's long-press menu", () => {
 });
 
 describe("on iOS", () => {
-  // expo-router wraps the trigger in zero-size native views there, which hide
-  // anything below them from VoiceOver and XCTest, so the cell carries the card.
   const os = process.env.EXPO_OS;
   afterEach(() => {
     process.env.EXPO_OS = os;
@@ -418,8 +394,6 @@ describe("on iOS", () => {
     render(
       <ItemCard item={{ ...base, title: "Miso soup recipe" }} zoomTarget />,
     );
-    // The target measures its direct native child, so that child has to be
-    // a real view with the card's frame, not the Link's zero-size host.
     const [target] = zoomTargets.mock.lastCall ?? [];
     expect(isValidElement(target) && target.type).toBe(View);
     expect(
@@ -577,7 +551,6 @@ it("crops the black bars off a YouTube video's 4:3 thumbnail", () => {
         ...base,
         title: "Never Gonna Give You Up",
         url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        // The client only gets Shelvr's stored copy, never YouTube's address.
         imageUrl: "https://happy-otter-123.convex.cloud/api/storage/0b1c2d3e",
         aspectRatio: 4 / 3,
       }}
@@ -618,11 +591,9 @@ describe("textFaceCopy", () => {
       body: "Linen apron and a good bread knife.",
       captionTitle: "Mum's Gift Ideas",
     });
-    // Only the heading: the owner's words, with the caption left empty.
     expect(textFaceCopy({ ...note, note: "Gift ideas for Mum" })).toEqual({
       body: "Gift ideas for Mum",
     });
-    // A first line that says more than the title is the note itself.
     expect(
       textFaceCopy({
         ...note,
@@ -651,7 +622,6 @@ describe("textFaceCopy", () => {
         note: "Pottery class for Mum\nSaturday 10am",
       }),
     ).toEqual({ body: "Saturday 10am", captionTitle: "Pottery class for Mum" });
-    // A title that only starts the first line is a summary, not a cut.
     expect(
       textFaceCopy({
         ...base,
@@ -677,7 +647,6 @@ describe("textFaceCopy", () => {
         note,
       }),
     ).toEqual({ body: note });
-    // A cut that ends on a space is stored with it.
     const spaced =
       "Things to pack for the Lisbon trip next month: passport, adapters, sunscreen, a hat and a book";
     expect(spaced[79]).toBe(" ");

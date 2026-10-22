@@ -28,10 +28,6 @@ describe("parseRevenueCatEvent", () => {
   });
 
   it("returns other event types without an expiration timestamp (handler decides)", () => {
-    // The parser returns any readable event; the HTTP handler decides whether
-    // to act on it or acknowledge it. A RENEWAL with null expiration is still
-    // parsed: the handler will pass expiresAt: 0 to upsert, which preserves
-    // the existing row's expiry.
     expect(
       parseRevenueCatEvent({
         event: {
@@ -216,8 +212,6 @@ describe("RevenueCat project entitlement isolation", () => {
   });
 });
 
-// A mutation-testing pass (Stryker) showed these rules could be
-// removed without any test failing.
 describe("RevenueCat parsing edge cases", () => {
   const now = Date.parse("2026-09-08T12:00:00Z");
   function customer(entitlement: unknown, extra: Record<string, unknown> = {}) {

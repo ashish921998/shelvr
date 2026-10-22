@@ -7,23 +7,16 @@ import {
 } from "react";
 import { useSharedValue, type SharedValue } from "react-native-reanimated";
 
-// Deck-level animation coordination, adapted from the Slack Catch Up
-// recreation (rn-makeitanimated). The stack is indexed top-card-last:
-// currentIndex starts at total-1 and counts DOWN to -1 as cards are
-// dismissed. animatedIndex is the fractional twin of currentIndex so cards
-// behind the top one can interpolate scale/parallax mid-drag.
 type DeckAnimationValue = {
   isDragging: SharedValue<boolean>;
   animatedIndex: SharedValue<number>;
   currentIndex: SharedValue<number>;
-  // Set to a card index to run the undo re-insertion animation on that card.
   undoIndex: SharedValue<number | null>;
 };
 
 const DeckAnimationContext = createContext<DeckAnimationValue | null>(null);
 
 type Props = PropsWithChildren<{
-  /** Index of the top card (batch length - 1). */
   lastIndex: number;
 }>;
 
@@ -35,8 +28,7 @@ export const DeckAnimationProvider: FC<Props> = ({ lastIndex, children }) => {
 
   const value = useMemo(
     () => ({ isDragging, animatedIndex, currentIndex, undoIndex }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [isDragging, animatedIndex, currentIndex, undoIndex],
   );
 
   return (

@@ -37,7 +37,6 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         });
         shared = result.action !== Share.dismissedAction;
       } else if (activeItem.type === "link") {
-        // No link for an unfinished save, or offline: share the source.
         branded = await shareLink(activeItem._id);
         const url = branded ?? activeItem.url;
         if (!url) return;
@@ -60,8 +59,8 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         shared = true;
         shareSheetOnly = true;
       }
-    } catch {
-      // Dismissed or failed share is not a completed action.
+    } catch (error) {
+      analytics.captureError("item_share_failed", error);
     }
 
     if (branded !== undefined) settleShareLink(activeItem._id, shared);

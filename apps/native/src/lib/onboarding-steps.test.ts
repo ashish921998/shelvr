@@ -30,8 +30,6 @@ describe("restoreOnboardingStep", () => {
   );
 
   it("keeps every index a v9 record could hold on the same step", () => {
-    // The sample trip steps were added after the promise step, so a record
-    // written before them still points where it did.
     expect(ONBOARDING_STEPS.slice(0, 7)).toEqual([
       "opener",
       "interests",

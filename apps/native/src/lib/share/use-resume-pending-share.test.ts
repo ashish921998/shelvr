@@ -56,15 +56,10 @@ describe("useResumePendingShare", () => {
   });
 
   it("recovers a share whose launch URL was lost, once auth restores", () => {
-    // The regression: an Android cold start from the share sheet whose
-    // `shelvr://expo-sharing` URL lost Expo Router's initial-URL race. The
-    // launch landed on Home, no deferred flag was set, and the payloads are
-    // the only record that a share is owed.
     mock.auth = { isAuthenticated: false, isLoading: true };
     mock.hasResumablePayloads = true;
     const { rerender } = renderResume();
 
-    // Auth still restoring: nothing routes yet.
     expect(mock.replace).not.toHaveBeenCalled();
 
     mock.auth = { isAuthenticated: true, isLoading: false };
@@ -97,11 +92,6 @@ describe("useResumePendingShare", () => {
   });
 
   it("stays home over the leftover of an explicitly discarded share", () => {
-    // The P2 review case: Cancel tolerated a throwing native clear and left
-    // the payload behind. The batch is unread but not resumable: the
-    // predicate (see resumable-payloads.test.ts) reports it as such, so the
-    // hook must not route back to /share and re-save it. Routing stays off
-    // until a genuinely new share flips the predicate.
     const { rerender } = renderResume();
     expect(mock.replace).not.toHaveBeenCalled();
 
@@ -114,9 +104,6 @@ describe("useResumePendingShare", () => {
     const { rerender } = renderResume();
     expect(mock.replace).not.toHaveBeenCalled();
 
-    // A share arrives later in the same session (the warm onNewIntent path
-    // routed it; this hook stays out of the way). Nothing left owed, the
-    // guard resets, so the NEXT recovered share still routes.
     mock.hasResumablePayloads = true;
     rerender();
     expect(mock.replace).toHaveBeenCalledWith("/share");
@@ -127,7 +114,6 @@ describe("useResumePendingShare", () => {
     const { rerender } = renderResume();
     expect(mock.replace).toHaveBeenCalledTimes(1);
 
-    // Re-renders before the pathname lands on /share must not re-navigate.
     rerender();
     expect(mock.replace).toHaveBeenCalledTimes(1);
 

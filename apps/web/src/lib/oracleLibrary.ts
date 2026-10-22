@@ -24,8 +24,6 @@ function httpUrl(value: unknown): string | undefined {
   }
 }
 
-// The oracle accepts saves dated 1990 to 2100; a date outside that is a
-// malformed export, so it is dropped rather than sent.
 const MIN_SAVED_AT = Date.UTC(1990, 0, 1);
 const MAX_SAVED_AT = Date.UTC(2100, 0, 1);
 
@@ -43,6 +41,19 @@ function decodeEntities(text: string): string {
     .replace(/&amp;/g, "&");
 }
 
+function stripTags(html: string): string {
+  let text = "";
+  let from = 0;
+  for (;;) {
+    const open = html.indexOf("<", from);
+    if (open === -1) return text + html.slice(from);
+    text += html.slice(from, open);
+    const close = html.indexOf(">", open + 1);
+    if (close === -1) return text + html.slice(open);
+    from = close + 1;
+  }
+}
+
 function entry(url: string, title?: string, savedAt?: number): LibraryEntry {
   return {
     url,
@@ -57,7 +68,7 @@ function parseNetscape(blob: string): LibraryEntry[] {
       const href = /href="([^"]*)"/i.exec(attributes)?.[1];
       const url = href && httpUrl(decodeEntities(href));
       if (!url) return [];
-      const title = decodeEntities(inner.replace(/<[^>]*>/g, "")).trim();
+      const title = decodeEntities(stripTags(inner)).trim();
       const addDate = /add_date="(\d+)"/i.exec(attributes)?.[1];
       return [entry(url, title, epochSecondsToMs(addDate))];
     },
@@ -108,8 +119,6 @@ function detectFormat(blob: string): LibraryFormat {
   return "lines";
 }
 
-/** Bookmarks HTML (Chrome, Safari, Firefox), Instagram's saved_posts.json,
- * or one URL per line. savedAt is epoch milliseconds. */
 export function parseLibraryExport(blob: string): LibraryEntry[] {
   return parsers[detectFormat(blob)](blob);
 }
@@ -139,8 +148,6 @@ export function libraryStats(rows: LibraryEntry[]): LibraryStats {
   };
 }
 
-/** An evenly spaced sample, so the oracle sees the whole span of the pile
- * rather than only its newest or oldest end. */
 export function oracleRows(rows: LibraryEntry[], max = 40): LibraryRow[] {
   const step = Math.max(1, rows.length / max);
   return Array.from({ length: Math.min(max, rows.length) }, (_, i) => {

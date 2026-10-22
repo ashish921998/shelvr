@@ -10,8 +10,6 @@ test("finds a save by a word in its title", async ({ screen }) => {
   await tapTab(screen, "Search", search);
   await fillField(search, "ramen");
 
-  // The query is debounced and runs on the backend, so the toBeVisible wait
-  // covers the round trip. Then none of the other seeded saves may show.
   await expect(screen.getByTestId("fixture-item-ramen")).toBeVisible({
     timeout: 30_000,
   });

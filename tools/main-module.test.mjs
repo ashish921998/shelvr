@@ -19,10 +19,6 @@ const HELPER = pathToFileURL(
   join(dirname(fileURLToPath(import.meta.url)), "main-module.mjs"),
 ).href;
 
-// A Linux tmpdir is a real path and a macOS one is not, so make the symlink
-// here instead of depending on the platform for the case under test. Scripts
-// are written under `real` and run through `linked`, which is how argv[1] and
-// import.meta.url come to name one file by two paths.
 const work = realpathSync(mkdtempSync(join(tmpdir(), "main-module-")));
 const real = join(work, "real");
 const linked = join(work, "link");
@@ -36,8 +32,6 @@ function script(name, lines) {
   return path;
 }
 
-// Prints the helper's answer and, beside it, the answer the string comparison
-// this helper replaces would have given for the same file.
 const subject = script("subject.mjs", [
   `import { isMainModule } from ${JSON.stringify(HELPER)};`,
   'import { pathToFileURL } from "node:url";',
@@ -76,11 +70,9 @@ test("the same file, imported, is not the program", () => {
 });
 
 test("a module reached by import is not the program", () => {
-  // This file imported the helper, so node was asked for this file, not it.
   assert.equal(isMainModule(HELPER), false);
 });
 
-// Replacing argv[1] is the only way to reach these from inside a test run.
 function withEntry(entry, body) {
   const original = process.argv[1];
   process.argv[1] = entry;

@@ -5,9 +5,6 @@ import { useRouter } from "expo-router";
 import { Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Where a save is filed. Tapping it opens the same space picker as the ⋯
-// menu's "Add to space". A save in no space shows nothing here; the menu
-// still offers it.
 export function ItemSpaces({
   itemId,
   spaces,
@@ -32,8 +29,6 @@ export function ItemSpaces({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={t("spaces.membershipHelp")}
-      // The row is one line of small text; the slop brings the target up to
-      // the control minimum without spacing out the page.
       hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
       pressRetentionOffset={theme.control.pressRetentionOffset}
       onPress={() =>

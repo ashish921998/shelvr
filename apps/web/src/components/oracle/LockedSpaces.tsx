@@ -1,6 +1,3 @@
-/** The extra spaces the oracle named, held back until the visitor shares the
- * verdict. While locked, the names are not rendered: each shows as a blurred
- * placeholder of the same length. */
 export default function LockedSpaces({
   names,
   unlocked,

@@ -25,19 +25,12 @@ import {
 } from "./model/imagePolicy";
 import { saveErrorCode, type SaveErrorCode } from "./model/saveErrors";
 
-// The accessor returned by withIdentity (no further withIdentity/registerComponent).
-// Used as the shared param type for helpers that drive either a base or
-// identity-scoped test backend.
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-// A representative operation id (UUID-shaped, within the 8–200 char bound).
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
 const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 
-// convex-test runs `runAfter(0, ...)` jobs via a real `setTimeout`, so the AI
-// action would fire during worker teardown (`EnvironmentTeardownError`). Fake
-// timers keep the jobs queued: `_scheduled_functions` rows are still written
-// and assertable, but nothing executes. Leave Date and other clocks real.
+// convex-test runs runAfter(0) via real setTimeout; fake timers keep scheduled jobs queued.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
@@ -46,9 +39,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Seeds `count` ready link items for `userId`, oldest first, each carrying an
- * article body so a leak into the card shape is detectable. Returns ids in
- * insertion order (convex-test gives strictly increasing creation times). */
 async function seedFeed(
   t: TestCtx,
   userId: string,
@@ -100,7 +90,6 @@ describe("listItems (installed builds)", () => {
 
     const items = await t.query(api.items.listItems, {});
     expect(items.map((item) => item._id)).toEqual([...ids].reverse());
-    // The pre-pagination detail screen read the article body off this row.
     expect(items[0].content).toContain("Article body 2");
     expect(items[0]).toHaveProperty("imageUrl");
   });
@@ -122,8 +111,6 @@ describe("listItems (installed builds)", () => {
 
     const results = await t.query(api.items.searchItems, { query: "save" });
     expect(results.map((item) => item._id)).toEqual([id]);
-    // The pre-pagination detail screen renders `content` straight off this
-    // row; without it, search → open shows a link with no article.
     expect(results[0].content).toContain("Article body 0");
     expect(results[0]).toHaveProperty("imageUrl");
   });
@@ -197,7 +184,6 @@ describe("listItemsPage", () => {
     ]) {
       expect(row).not.toHaveProperty(dropped);
     }
-    // What the card and the detail pager's first paint still need.
     expect(row).toMatchObject({
       type: "link",
       status: "ready",
@@ -208,7 +194,6 @@ describe("listItemsPage", () => {
     });
     expect(typeof row._creationTime).toBe("number");
 
-    // The full document is still one getItem away.
     const full = await t.query(api.items.getItem, { id });
     expect(full?.content).toContain("Article body 0");
     expect(full?.products).toHaveLength(1);
@@ -245,8 +230,6 @@ describe("listItemsPage", () => {
   });
 
   it("only returns the caller's items", async () => {
-    // One shared backend, so the userId scope, not database isolation, is
-    // what keeps the two feeds apart.
     const backend = newConvexTest();
     const { t: ta, userId: aId } = await signedInUser(backend);
     const { t: tb, userId: bId } = await signedInUser(backend);
@@ -283,7 +266,6 @@ describe("listRecentItems", () => {
     await expect(
       t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
     ).resolves.toEqual([]);
-    // The legacy no-clock path gates the same way.
     await expect(
       t.query(api.items.listRecentItems, { limit: 5 }),
     ).resolves.toEqual([]);
@@ -310,16 +292,11 @@ describe("listRecentItems", () => {
     const { t, userId } = await as();
     const ids = await seedFeed(t, userId, 2);
 
-    // Rollout contract: installed builds predate the `now` argument, so the
-    // stored status gates them until the update reaches them.
     const recent = await t.query(api.items.listRecentItems, { limit: 5 });
     expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
   });
 
   it("does not extend access through the expiry webhook window", async () => {
-    // A period that ended before its webhook landed still says "pro", so
-    // the status-only fallback keeps the installed build's widget fed
-    // while a build that sends its clock is already cut off.
     const { t, userId } = await signedInUser(newConvexTest());
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
@@ -377,8 +354,6 @@ describe("listRecentItems", () => {
   it("finds older ready items behind a burst of newer processing ones", async () => {
     const { t, userId } = await as();
     const ready = await seedFeed(t, userId, 3);
-    // A bulk photo import: far more fresh processing rows than any fixed
-    // window would cover. The widget must still show the older ready saves.
     await seedFeed(t, userId, 30, { status: "processing" });
 
     const recent = await t.query(api.items.listRecentItems, {
@@ -416,7 +391,6 @@ describe("listRecentItems", () => {
     expect(capped).toHaveLength(RECENT_ITEMS_MAX);
     expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
 
-    // A non-positive or fractional limit still yields at least one item.
     expect(
       await t.query(api.items.listRecentItems, {
         limit: 0,
@@ -428,8 +402,6 @@ describe("listRecentItems", () => {
 
 describe("nextUp", () => {
   const DAY = 24 * 60 * 60 * 1000;
-  // Seeded saves are made "now", so the clock the client sends is moved
-  // forward: an article has to be a day old before Home suggests it.
   const later = (days: number) => Date.now() + days * DAY;
 
   async function markOpened(
@@ -456,7 +428,6 @@ describe("nextUp", () => {
     const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
     expect(next?.kind).toBe("read");
     expect(next?.item._id).toBe(ids[1]);
-    // Card shape only: the article body never rides along.
     expect(next?.item).not.toHaveProperty("content");
   });
 
@@ -729,7 +700,6 @@ describe("similarItems", () => {
       title: "Walnut floor lamp",
       tags: ["lighting", "furniture"],
     });
-    // Enough unrelated saves to push the old one out of the recent read.
     await seedFeed(t, userId, 320);
     const fresh = await insertItem(t, userId, {
       title: "Brass reading lamp",
@@ -738,7 +708,6 @@ describe("similarItems", () => {
 
     const similar = await t.query(api.items.similarItems, { id: fresh });
     expect(similar.map((item) => item._id)).toEqual([old]);
-    // Card shape only: the index copy never reaches the client.
     expect(similar[0]).not.toHaveProperty("searchText");
   });
 
@@ -818,8 +787,6 @@ describe("similarItems", () => {
   });
 
   describe("reserves old matches ahead of the score cut", () => {
-    // _creationTime is stamped from Date.now(), so backdating the old save
-    // needs the same faked-Date pattern as the "stale processing runs" tests.
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
@@ -827,13 +794,8 @@ describe("similarItems", () => {
 
     it("keeps a strong old match out of a burst of higher-scoring newer saves", async () => {
       const start = Date.now();
-      const oldAgeMs = 8 * 24 * 60 * 60 * 1000; // past the 7-day reserve threshold
+      const oldAgeMs = 8 * 24 * 60 * 60 * 1000;
 
-      // convex-test's virtual clock anchors to the real Date.now() at the
-      // first write on a test context, then ticks forward from there, so
-      // the backdated write has to be the very first thing this context
-      // does. `as()` seeds a Pro row first, which similarItems doesn't need,
-      // so build the identity directly instead.
       vi.setSystemTime(start - oldAgeMs);
       const { t, userId } = await signedInUser(newConvexTest());
       const old = await insertItem(t, userId, {
@@ -842,8 +804,6 @@ describe("similarItems", () => {
       });
 
       vi.setSystemTime(start);
-      // More than SIMILAR_LIMIT newer saves that fully match the fresh
-      // save's tags, so a plain top-score cut would push the old match out.
       for (let i = 0; i < 12; i++) {
         await insertItem(t, userId, {
           title: `Recent lamp ${i}`,
@@ -925,7 +885,6 @@ describe("canonical save telemetry", () => {
     expect(telemetry.map((job) => job.args[0])).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ itemId: linkId, itemType: "link" }),
-        // The 4-byte blob from storeBlob; photo_count is the account total after this save.
         expect.objectContaining({
           itemId: imageId,
           itemType: "image",
@@ -938,8 +897,6 @@ describe("canonical save telemetry", () => {
     const linkJob = telemetry.find((job) => job.args[0].itemType === "link")
       ?.args[0];
     expect(linkJob).not.toHaveProperty("photoCount");
-    // An installed build that predates save_source sends no source, and the
-    // property must then be absent rather than present and empty.
     expect(linkJob).not.toHaveProperty("saveSource");
   });
 
@@ -972,25 +929,14 @@ describe("canonical save telemetry", () => {
     );
     expect(sourceById.get(linkId)).toBe("manual_link");
     expect(sourceById.get(imageId)).toBe("camera");
-    // A note shared through the extension counts as extension use. If someone
-    // turns the server-side `note` default into an override, this is what fails.
     expect(sourceById.get(noteId)).toBe("share_extension");
   });
 });
 
-// Each test gets its own authenticated user: a real users row, signed in as
-// `${userId}|session`, so different rows model different users. Every save and
-// Pro mutation is gated behind an active subscription, so `as` seeds an active
-// Pro row for the user. The existing tests model the entitled (paying) path.
-// The lapsed/not-entitled path is covered by the gating tests further down.
 async function as(): Promise<{ t: TestCtx; userId: string }> {
   return await signedInUser(newConvexTest(), { pro: true });
 }
 
-/** Insert an active Pro subscription for `userId` so gated mutations succeed.
- * Idempotent: if a row already exists it is patched, otherwise a new one is
- * inserted, so calling `seedPro` twice (e.g. in a shared helper) doesn't
- * violate the `by_user` unique index. */
 async function seedPro(t: TestCtx, userId: string): Promise<void> {
   await t.run(async (ctx) => {
     const existing = await ctx.db
@@ -1010,8 +956,6 @@ async function seedPro(t: TestCtx, userId: string): Promise<void> {
   });
 }
 
-/** Uploads a blob to mock storage and returns its id, the way a real client
- * would after POSTing to the upload URL begin returns. */
 async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
   return await t.run(async (ctx) => {
     return await ctx.storage.store(
@@ -1106,11 +1050,6 @@ describe("upload abuse controls", () => {
   });
 });
 
-/** Asserts a refusal carries BOTH halves of the save-error contract: the code
- * the current client routes on, and the sentence an already-installed bundle
- * still matches in `localizeError`'s `ERROR_MESSAGES` table. A copy edit would
- * silently downgrade old clients to the generic fallback, so the message is
- * pinned here as well as in `model/saveErrors.test.ts`. */
 async function expectSaveRefusal(
   call: Promise<unknown>,
   code: SaveErrorCode,
@@ -1129,7 +1068,6 @@ async function expectSaveRefusal(
 describe("photo quota", () => {
   it("refuses a new photo at the cap, reports usage, and frees the slot on delete", async () => {
     const { t, userId } = await as();
-    // Fill the account to one under the cap, then take the last slot for real.
     await t.run(async (ctx) => {
       for (let i = 0; i < MAX_PHOTOS_PER_ACCOUNT - 1; i++) {
         await ctx.db.insert("items", {
@@ -1140,7 +1078,6 @@ describe("photo quota", () => {
           searchText: "",
         });
       }
-      // Links and notes never count.
       await ctx.db.insert("items", {
         userId,
         type: "link",
@@ -1167,7 +1104,6 @@ describe("photo quota", () => {
       "photo_limit",
       PHOTO_LIMIT_MESSAGE,
     );
-    // A completed operation still returns its item to a full account.
     expect(
       await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
     ).toBe(lastId);
@@ -1201,7 +1137,6 @@ describe("image import lifecycle", () => {
     });
     expect(typeof itemId).toBe("string");
 
-    // The scheduled AI job is queued; verify the item landed as processing.
     const op = await t.query(api.items.getImportOperation, {
       operationId: OP_ID,
     });
@@ -1227,20 +1162,16 @@ describe("image import lifecycle", () => {
       operationId: OP_ID,
     });
 
-    // A retry that begins the same completed operation should get the item back
-    // without needing to re-upload.
     const began = await t.mutation(api.items.beginImageImport, {
       operationId: OP_ID,
     });
     expect(began).toEqual({ kind: "complete", itemId: firstId });
 
-    // Finalizing again returns the same id, never a second item.
     const secondId = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
     });
     expect(secondId).toBe(firstId);
 
-    // Exactly one image item exists for this user.
     const items = await t.run(async (ctx) => {
       return await ctx.db
         .query("items")
@@ -1251,13 +1182,10 @@ describe("image import lifecycle", () => {
   });
 
   it("keeps the same operation id independent across users", async () => {
-    // Both users must operate against ONE shared backend so the (userId,
-    // operationId) pair, not database isolation, is what distinguishes them.
     const backend = newConvexTest();
     const { t: ta } = await signedInUser(backend, { pro: true });
     const { t: tb } = await signedInUser(backend, { pro: true });
 
-    // user-a finalizes the operation.
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const sa = await storeBlob(ta);
     await ta.mutation(api.items.attachImageUpload, {
@@ -1268,8 +1196,6 @@ describe("image import lifecycle", () => {
       operationId: OP_ID,
     });
 
-    // user-b using the same operation id is a separate operation and a separate
-    // item: the (userId, operationId) pair is the unique key.
     await tb.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const sb = await storeBlob(tb);
     await tb.mutation(api.items.attachImageUpload, {
@@ -1292,8 +1218,6 @@ describe("image import lifecycle", () => {
   });
 
   it("returns the completed itemId to a lapsed user without checking Pro", async () => {
-    // A user who saved an image while Pro, then lapsed, must still retrieve
-    // the completed itemId: the idempotent read path is not gated on Pro.
     const { t, userId } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
@@ -1305,7 +1229,6 @@ describe("image import lifecycle", () => {
       operationId: OP_ID,
     });
 
-    // Lapse the subscription.
     await t.run(async (ctx) => {
       const sub = await ctx.db
         .query("subscriptions")
@@ -1319,13 +1242,11 @@ describe("image import lifecycle", () => {
       }
     });
 
-    // begin returns the completed itemId without throwing Pro required.
     const began = await t.mutation(api.items.beginImageImport, {
       operationId: OP_ID,
     });
     expect(began).toEqual({ kind: "complete", itemId });
 
-    // finalize also returns the same id without throwing.
     const again = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
     });
@@ -1333,7 +1254,6 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects reusing an operation id with a different kind", async () => {
-    // Seed a completed image operation directly.
     const { t, userId } = await as();
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -1345,11 +1265,6 @@ describe("image import lifecycle", () => {
       });
     });
 
-    // beginImageImport loads with kind "image" by default; a future link/note
-    // flow (plan 004) would load with a different kind and must be rejected.
-    // Simulate that by checking the helper's contract through the image path:
-    // a second image operation with the same id is fine, but we assert a kind
-    // mismatch throws when an op exists as a different kind.
     await t.run(async (ctx) => {
       const op = await ctx.db
         .query("itemOperations")
@@ -1377,15 +1292,12 @@ describe("image import lifecycle", () => {
     });
     expect(r1).toEqual({ storageId: first });
 
-    // A racing retry attaches a different storage id; first attachment wins and
-    // the redundant blob is deleted.
     const r2 = await t.mutation(api.items.attachImageUpload, {
       operationId: OP_ID,
       storageId: second,
     });
     expect(r2).toEqual({ storageId: first });
 
-    // The redundant blob is gone; the canonical one survives.
     const secondGone = await t.run(async (ctx) =>
       ctx.db.system.get("_storage", second),
     );
@@ -1395,7 +1307,6 @@ describe("image import lifecycle", () => {
     );
     expect(firstAlive).not.toBeNull();
 
-    // Finalize uses the canonical storage id.
     const itemId = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
     });
@@ -1412,7 +1323,6 @@ describe("image import lifecycle", () => {
       storageId,
     });
 
-    // An impossible aspect ratio must throw and must NOT complete the operation.
     await expect(
       t.mutation(api.items.finalizeImageImport, {
         operationId: OP_ID,
@@ -1425,7 +1335,6 @@ describe("image import lifecycle", () => {
     });
     expect(op?.status).toBe("pending");
 
-    // A corrected retry can still succeed.
     const itemId = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
       aspectRatio: 1.5,
@@ -1451,14 +1360,11 @@ describe("image import lifecycle", () => {
 
     await t.mutation(api.items.deleteItem, { id: itemId });
 
-    // The operation row is gone, so the durable id can be re-performed.
     const op = await t.query(api.items.getImportOperation, {
       operationId: OP_ID,
     });
     expect(op).toBeNull();
 
-    // begin now treats it as a fresh operation (pending + new upload), not the
-    // deleted item.
     const began = await t.mutation(api.items.beginImageImport, {
       operationId: OP_ID,
     });
@@ -1468,8 +1374,6 @@ describe("image import lifecycle", () => {
   it("deletes only eligible unreferenced stale pending uploads", async () => {
     const { t, userId } = await as();
 
-    // A stale pending operation with an attached upload (process died between
-    // upload and finalize). Its storage should be swept.
     const staleStorageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -1478,12 +1382,10 @@ describe("image import lifecycle", () => {
         kind: "image",
         status: "pending",
         storageId: staleStorageId,
-        // One hour past the staleness cutoff.
         updatedAt: Date.now() - STALE_IMPORT_CUTOFF_MS - 60 * 60 * 1000,
       });
     });
 
-    // A fresh pending operation (well within the 24h window) must survive.
     const freshStorageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -1498,7 +1400,6 @@ describe("image import lifecycle", () => {
 
     await t.mutation(internal.items.cleanupStaleImageImports, {});
 
-    // Stale op + its blob are gone.
     const staleOp = await t.query(api.items.getImportOperation, {
       operationId: OP_ID,
     });
@@ -1508,7 +1409,6 @@ describe("image import lifecycle", () => {
     );
     expect(staleBlob).toBeNull();
 
-    // Fresh op + its blob survive.
     const freshOp = await t.query(api.items.getImportOperation, {
       operationId: OP_ID_2,
     });
@@ -1520,7 +1420,6 @@ describe("image import lifecycle", () => {
   });
 
   it("refuses to adopt or delete a storage id referenced by a completed item", async () => {
-    // A completed image for user-a with its own storage object.
     const { t: ta } = await as();
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const victimStorageId = await storeBlob(ta);
@@ -1530,10 +1429,6 @@ describe("image import lifecycle", () => {
     });
     await ta.mutation(api.items.finalizeImageImport, { operationId: OP_ID });
 
-    // A malicious/buggy second operation tries to attach victimStorageId (which
-    // is already referenced by user-a's completed item). attach must REJECT it
-    // rather than adopt it. Otherwise finalize/deleteItem could delete the
-    // victim's storage. Defense: only unreferenced storage is adoptable.
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID_2 });
     await expect(
       ta.mutation(api.items.attachImageUpload, {
@@ -1542,7 +1437,6 @@ describe("image import lifecycle", () => {
       }),
     ).rejects.toThrow(/already in use/i);
 
-    // The victim blob is intact (not deleted by the rejected attach).
     const victimAlive = await ta.run(async (ctx) =>
       ctx.db.system.get("_storage", victimStorageId),
     );
@@ -1562,8 +1456,6 @@ describe("image import lifecycle", () => {
       aspectRatio: 1.5,
     });
 
-    // A retry that resends an impossible aspectRatio must still return the
-    // existing item: the idempotent read path is not gated on re-validation.
     const retriedId = await t.mutation(api.items.finalizeImageImport, {
       operationId: OP_ID,
       aspectRatio: -1,
@@ -1572,10 +1464,6 @@ describe("image import lifecycle", () => {
   });
 
   it("deletes the redundant re-upload when attach lands on an already-complete op", async () => {
-    // The headline retry race: the original attempt finalizes while a retry's
-    // re-upload is in flight. The retry's attach must return the canonical id
-    // AND delete its own redundant blob: nothing else references it, so the
-    // pending-only cleanup cron would otherwise never reclaim it.
     const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const canonical = await storeBlob(t);
@@ -1603,9 +1491,6 @@ describe("image import lifecycle", () => {
   });
 
   it("refuses to adopt a storage id another pending operation holds", async () => {
-    // Double-adopt defense: without the itemOperations check, one blob could
-    // back two operations, finalize into two items sharing it, and be deleted
-    // out from under the survivor when either item is deleted.
     const { t } = await as();
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
@@ -1622,7 +1507,6 @@ describe("image import lifecycle", () => {
       }),
     ).rejects.toThrow(/already in use/i);
 
-    // The first operation's pending upload is intact.
     const blobAlive = await t.run(async (ctx) =>
       ctx.db.system.get("_storage", storageId),
     );
@@ -1630,7 +1514,6 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects attaching a storage id that does not exist", async () => {
-    // A swept blob's id must not become an item with a permanently dead image.
     const { t } = await as();
     const storageId = await storeBlob(t);
     await t.run(async (ctx) => {
@@ -1646,9 +1529,6 @@ describe("image import lifecycle", () => {
   });
 
   it("never deletes a blob a live item references, even from a stale pending row", async () => {
-    // Inconsistent-but-possible state: a stale pending row holds a storageId
-    // that a live item also references. The sweep must drop only the ledger
-    // row and leave the blob alone.
     const { t, userId } = await as();
     const storageId = await storeBlob(t);
     await t.run(async (ctx) => {
@@ -1683,8 +1563,6 @@ describe("image import lifecycle", () => {
   });
 
   it("sweeps stale image rows even when stale non-image rows exist", async () => {
-    // The kind-first index means link/note rows (plans 004/005) can never fill
-    // the sweep page and starve image cleanup.
     const { t, userId } = await as();
     const staleAt = Date.now() - STALE_IMPORT_CUTOFF_MS - 60 * 60 * 1000;
     const imageBlob = await storeBlob(t);
@@ -1708,7 +1586,6 @@ describe("image import lifecycle", () => {
 
     await t.mutation(internal.items.cleanupStaleImageImports, {});
 
-    // The image row and its blob are swept; the link row is left to its owner.
     const imageOp = await t.query(api.items.getImportOperation, {
       operationId: OP_ID,
     });
@@ -1724,9 +1601,6 @@ describe("image import lifecycle", () => {
   });
 
   it("recycles a complete op whose item is gone and releases its orphaned blob", async () => {
-    // Seed the inconsistent state directly (an item deleted NOT via deleteItem,
-    // which would have released the row): begin must reset the row to pending,
-    // delete the orphaned blob, and hand back a fresh upload URL.
     const { t, userId } = await as();
     const storageId = await storeBlob(t);
     const deadItemId = await t.run(async (ctx) => {
@@ -1770,9 +1644,6 @@ describe("image import lifecycle", () => {
   });
 
   it("recycles an inconsistent complete op (no itemId) and clears its stale storageId", async () => {
-    // Defensive branch: a complete row with no itemId. Recycling must clear
-    // the stale storageId. Left in place, attach would treat it as canonical
-    // and delete the fresh re-upload as "redundant".
     const { t, userId } = await as();
     const staleBlob = await storeBlob(t);
     await t.run(async (ctx) => {
@@ -1796,7 +1667,6 @@ describe("image import lifecycle", () => {
     expect(op?.status).toBe("pending");
     expect(op?.storageId).toBeUndefined();
 
-    // A fresh upload then attaches and finalizes normally.
     const freshBlob = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
       operationId: OP_ID,
@@ -1823,13 +1693,10 @@ describe("image import lifecycle", () => {
 
   it("rejects finalize when the operation was never begun or never attached", async () => {
     const { t } = await as();
-    // Never begun.
     await expect(
       t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
     ).rejects.toThrow(/no attached upload/i);
 
-    // Begun but never attached (process died between upload and attach). The
-    // op must stay pending so a later attach + finalize can still succeed.
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 });
     await expect(
       t.mutation(api.items.finalizeImageImport, { operationId: OP_ID_2 }),
@@ -1863,10 +1730,6 @@ describe("image import lifecycle", () => {
   });
 });
 
-// Plan 004: shared links and notes use the same operation ledger as images so
-// a share retry never duplicates a saved link/note and never resubmits one.
-// These IDs are deliberately distinct from the image OP_* ids above so a cross-
-// kind mismatch test can reuse the (userId, operationId) namespace cleanly.
 const LINK_OP = "link:33333333-3333-4333-8333-333333333333";
 const NOTE_OP = "note:44444444-4444-4444-8444-444444444444";
 
@@ -1883,7 +1746,6 @@ describe("shared link/note operation idempotency", () => {
     });
     expect(secondId).toBe(firstId);
 
-    // Exactly one link item exists for this user.
     const items = await t.run(async (ctx) => {
       return await ctx.db
         .query("items")
@@ -1929,8 +1791,6 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects reusing an image operation id for a link", async () => {
-    // Seed a completed image operation directly, then attempt a link create with
-    // the same operation id: the kind guard must reject it.
     const { t, userId } = await as();
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -1964,7 +1824,6 @@ describe("shared link/note operation idempotency", () => {
     });
     expect(bId).not.toBe(aId);
 
-    // Each user has their own link item.
     const aItems = await ta.run(async (ctx) =>
       ctx.db
         .query("items")
@@ -1982,8 +1841,6 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("creates two intentional items for identical content under distinct operations", async () => {
-    // Idempotency is per-operation, never per-content: the same URL shared twice
-    // (different share sessions) is two deliberate saves, not a deduplicated one.
     const { t, userId } = await as();
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/dup",
@@ -2014,7 +1871,6 @@ describe("shared link/note operation idempotency", () => {
     });
     expect(secondId).not.toBe(firstId);
 
-    // No ledger rows are written on the non-idempotent path.
     const ops = await t.run(async (ctx) =>
       ctx.db.query("itemOperations").collect(),
     );
@@ -2022,19 +1878,12 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("schedules processItem exactly once per link/note create, on both paths", async () => {
-    // Regression: the operation-guarded path used to call insertLinkOrNote
-    // (which schedules processItem) AND then schedule processItem again itself,
-    // running the AI pipeline twice and racing two concurrent classifications.
-    // Both the guarded (operationId) and ordinary paths must schedule exactly
-    // one processItem job for the created item, no more.
     const { t } = await as();
 
-    // Guarded path (share flow).
     const guardedId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/guarded",
       operationId: LINK_OP,
     });
-    // Ordinary path (Add UI).
     const plainId = await t.mutation(api.items.createNoteItem, {
       text: "plain note",
     });
@@ -2043,17 +1892,13 @@ describe("shared link/note operation idempotency", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     const processJobs = scheduled.filter((j) => j.name === "ai:processItem");
-    // Exactly two jobs total: one per create, and each targets its own item.
     expect(processJobs).toHaveLength(2);
     const targeted = processJobs.flatMap((j) =>
-      // args is stored as a single-element array wrapping the mutation args.
       (j.args as unknown as { itemId: Id<"items"> }[]).map((a) => a.itemId),
     );
     expect(targeted).toContain(guardedId);
     expect(targeted).toContain(plainId);
 
-    // A repeat create on the completed guarded operation (idempotent hit) must
-    // NOT schedule processItem again: the item already exists and was processed.
     await t.mutation(api.items.createLinkItem, {
       url: "example.com/guarded",
       operationId: LINK_OP,
@@ -2074,7 +1919,6 @@ describe("shared link/note operation idempotency", () => {
     });
     await t.mutation(api.items.deleteItem, { id: itemId });
 
-    // The operation row is gone, so a new share with the same id performs fresh.
     const op = await t.query(api.items.getImportOperation, {
       operationId: LINK_OP,
     });
@@ -2111,7 +1955,6 @@ describe("shared link/note operation idempotency", () => {
         operationId: NOTE_OP,
       }),
     ).rejects.toThrow(/empty/i);
-    // No item, no operation row was created.
     const op = await t.query(api.items.getImportOperation, {
       operationId: NOTE_OP,
     });
@@ -2120,9 +1963,6 @@ describe("shared link/note operation idempotency", () => {
 
   it("rejects an invalid url on the idempotent path without completing the op", async () => {
     const { t } = await as();
-    // The centralized URL policy rejects empty/whitespace URLs before any
-    // operation row is created. The error category is "empty"; the important
-    // contract is that the op is not recorded, so a corrected retry is clean.
     await expect(
       t.mutation(api.items.createLinkItem, {
         url: "  ",
@@ -2136,19 +1976,10 @@ describe("shared link/note operation idempotency", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Pro entitlement gate
-// ---------------------------------------------------------------------------
-
 describe("Pro entitlement gate", () => {
-  // A user with no subscription row at all (the brand-new-user case). Every
-  // save and Pro mutation must throw `Pro required` so the client can route
-  // to the paywall; reads (listItems, getItem, searchItems) stay open.
   it("blocks saves for a user with no subscription", async () => {
     const { t } = await signedInUser(newConvexTest());
 
-    // Both halves of the contract: the code the client routes to the paywall
-    // on, and the unchanged sentence an already-installed bundle still sees.
     await expectSaveRefusal(
       t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
       "pro_required",
@@ -2167,11 +1998,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("blocks a lapsed user from retrying a pending image import", async () => {
-    // A user who began an import while Pro, then lapsed, must NOT be able to
-    // retry the pending operation: begin would otherwise hand back a fresh
-    // upload URL and refresh updatedAt, pinning the row alive past the cron.
     const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
-    // Begin while Pro (creates the pending row), then lapse the subscription.
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     await t.run(async (ctx) => {
       const sub = await ctx.db
@@ -2185,7 +2012,6 @@ describe("Pro entitlement gate", () => {
         });
       }
     });
-    // Retrying begin on the existing pending op must now throw Pro required.
     await expect(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
     ).rejects.toThrow(/Pro required/);
@@ -2193,7 +2019,6 @@ describe("Pro entitlement gate", () => {
 
   it("blocks Find links for a lapsed user", async () => {
     const { t, userId } = await signedInUser(newConvexTest());
-    // Seed a subscription whose trial already expired.
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
         userId,
@@ -2202,8 +2027,6 @@ describe("Pro entitlement gate", () => {
         updatedAt: Date.now(),
       });
     });
-    // The lapsed user still owns a ready item (created here directly so the
-    // gate isn't exercised on the insert).
     const itemId = await t.run(async (ctx) => {
       return await ctx.db.insert("items", {
         userId,
@@ -2257,10 +2080,6 @@ describe("Pro entitlement gate", () => {
     expect(ent.expiresAt).toBeUndefined();
   });
 
-  /** upsertSubscription ignores events for users whose row no longer exists
-   * (post-account-deletion webhooks), so webhook-ordering tests need a real
-   * users row. The identity subject is that row's id, matching what
-   * requireUserId derives for `getEntitlement`. */
   async function asWebhookUser(): Promise<{ t: TestCtx; userId: string }> {
     const backend = newConvexTest();
     const userId = await backend.run(async (ctx) => {
@@ -2281,8 +2100,6 @@ describe("Pro entitlement gate", () => {
       expiresAt: farFuture,
       eventTimestampMs: 2000,
     });
-    // A stale EXPIRATION event with an earlier event timestamp must not
-    // regress the row, even though its expiry is earlier.
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId,
       status: "lapsed",
@@ -2343,7 +2160,6 @@ describe("Pro entitlement gate", () => {
       expiresAt: farFuture,
       eventTimestampMs: 1000,
     });
-    // A newer EXPIRATION event shortens the period (e.g. a refund).
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId,
       status: "lapsed",
@@ -2386,7 +2202,6 @@ describe("Pro entitlement gate", () => {
       productId: "prod-1",
     };
     await t.mutation(internal.subscriptions.upsertSubscription, event);
-    // Replaying the exact same event (same timestamp) is a no-op.
     await t.mutation(internal.subscriptions.upsertSubscription, event);
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent.status).toBe("pro");
@@ -2402,8 +2217,6 @@ describe("Pro entitlement gate", () => {
       expiresAt: farFuture,
       eventTimestampMs: 1000,
     });
-    // A CANCELLATION event (status omitted) preserves `trialing` but
-    // refreshes expiresAt from the event.
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId,
       expiresAt: farFuture + 1000,
@@ -2423,7 +2236,6 @@ describe("Pro entitlement gate", () => {
       expiresAt: farFuture,
       eventTimestampMs: 1000,
     });
-    // An event with expiresAt=0 preserves the existing expiresAt.
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId,
       expiresAt: 0,
@@ -2610,8 +2422,6 @@ describe("poster storage compensation", () => {
 });
 
 describe("failed saves and retry", () => {
-  /** Insert a link item for `userId` in the given end state, the way the
-   * pipeline would leave it. */
   async function seedLink(
     t: TestCtx,
     userId: string,
@@ -2667,8 +2477,6 @@ describe("failed saves and retry", () => {
   });
 
   it("does not retry a no-article link (the URL itself is the save)", async () => {
-    // A no-article page read fine: a retry cannot change the outcome, so the
-    // backend must refuse the retry the way it refuses a 404.
     const { t, userId } = await as();
     const itemId = await seedLink(t, userId, {
       status: "ready",
@@ -2718,7 +2526,6 @@ describe("failed saves and retry", () => {
           ctx.db.system.query("_scheduled_functions").collect(),
         ),
       ).toHaveLength(0);
-      // A legitimate retry still succeeds after the terminal attempts.
       await t.run((ctx) => ctx.db.patch(id, { failureReason: "error" }));
       await t.mutation(api.items.reprocessItem, { id });
       expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
@@ -2771,9 +2578,6 @@ describe("failed saves and retry", () => {
 
 describe("rate limiting", () => {
   it("blocks item creation past the per-user burst capacity", async () => {
-    // itemCreate bucket capacity is 30; the 31st create in a tight loop (no
-    // meaningful refill) must be rejected so a leaked/shared Pro account can't
-    // loop and burn LLM spend. Notes avoid any network fetch.
     const { t } = await as();
     for (let i = 0; i < 30; i++) {
       await t.mutation(api.items.createNoteItem, { text: `note ${i}` });
@@ -2837,7 +2641,7 @@ describe("importLinks", () => {
 
   it("skips a link saved long before the latest 1,000 through the URL index", async () => {
     const { t, userId } = await as();
-    await seedFeed(t, userId, 1); // https://example.com/0, the oldest save
+    await seedFeed(t, userId, 1);
     await t.run(async (ctx) => {
       for (let i = 1; i <= 5; i++) {
         await ctx.db.insert("items", {
@@ -2852,10 +2656,10 @@ describe("importLinks", () => {
     });
     const res = await t.mutation(api.items.importLinks, {
       urls: [
-        "https://EXAMPLE.com/0", // the old save; hosts compare case-insensitively
+        "https://EXAMPLE.com/0",
         "https://example.com/Fresh",
-        "https://example.com/Fresh", // repeated within the batch
-        "https://example.com/fresh", // path case differs: a distinct link
+        "https://example.com/Fresh",
+        "https://example.com/fresh",
         "ftp://example.com/nope",
       ],
     });
@@ -2898,7 +2702,6 @@ describe("importLinks", () => {
       (_, i) => `https://example.com/${i}`,
     );
     await t.mutation(api.items.importLinks, { urls: batch });
-    // Drain the 600-token bucket down to 5 without inserting 600 rows.
     await t.run(async (ctx) => {
       const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
         key: userId,
@@ -3053,7 +2856,6 @@ describe("photo rejection before classification", () => {
       }),
     );
     await t.mutation(api.items.findLinks, { id });
-    // The search action is killed (a deploy, a timeout) before it writes.
     await t.run(async (ctx) => {
       for (const job of await ctx.db.system
         .query("_scheduled_functions")
@@ -3127,12 +2929,6 @@ describe("stale processing runs", () => {
   const STALE_AGE = PROCESSING_STALE_MS + 60 * 1000;
   const FRESH_AGE = 60 * 1000;
 
-  /** Insert a `processing` link for `userId` whose run started `ageMs` ago.
-   * `legacy` rows omit the run fields the way pre-fencing rows do, so their
-   * age has to come from `_creationTime`, which convex-test stamps from
-   * Date.now(), hence the faked clock below. convex-test also keeps
-   * `_creationTime` monotonic per instance, so legacy rows must be inserted
-   * before newer rows, oldest first. */
   async function processingLink(
     t: TestCtx,
     userId: string,
@@ -3173,7 +2969,6 @@ describe("stale processing runs", () => {
   }
 
   beforeEach(() => {
-    // Date joins the faked clocks so legacy rows can be created "in the past".
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
   });
@@ -3189,14 +2984,12 @@ describe("stale processing runs", () => {
       processingStartedAt: Date.now(),
     });
     expect(typeof note?.processingRunId).toBe("string");
-    // The scheduled action carries the same run id it must finalize under.
     const [job] = await scheduledJobs(t, "ai:processItem");
     expect(job.args[0]).toEqual({
       itemId: noteId,
       runId: note?.processingRunId,
     });
 
-    // A retry mints a NEW run so the old action is fenced out.
     await t.run((ctx) =>
       ctx.db.patch(noteId, { status: "failed", failureReason: "error" }),
     );
@@ -3226,8 +3019,6 @@ describe("stale processing runs", () => {
       internal.items.failStaleProcessingItems,
       {},
     );
-    // Both legacy rows sort into the range (undefined precedes every number);
-    // only the stale one is failed, so scanned counts 3 and failed counts 2.
     expect(result).toEqual({ failed: 2, scanned: 3 });
 
     const byId = async (id: Id<"items">) =>
@@ -3242,10 +3033,7 @@ describe("stale processing runs", () => {
     });
     expect(await byId(fresh)).toMatchObject({ status: "processing" });
     expect(await byId(legacyFresh)).toMatchObject({ status: "processing" });
-    // The stale row keeps its run id: if the presumed-dead action does finish,
-    // its finalize still owns the row and may repair the item.
     expect((await byId(stale))?.processingRunId).toBeDefined();
-    // A partial page does not chain.
     expect(
       await scheduledJobs(t, "items:failStaleProcessingItems"),
     ).toHaveLength(0);
@@ -3264,8 +3052,6 @@ describe("stale processing runs", () => {
       await scheduledJobs(t, "items:failStaleProcessingItems"),
     ).toHaveLength(1);
 
-    // The chained run (executed directly here; the scheduler is frozen) picks
-    // up the remainder and, with a partial page, stops.
     const second = await t.mutation(
       internal.items.failStaleProcessingItems,
       {},
@@ -3280,9 +3066,6 @@ describe("stale processing runs", () => {
   });
 
   it("does not loop on a full page of legacy rows that are not yet stale", async () => {
-    // Only possible in the first threshold window after deploy: rows created
-    // by the previous code have no start time and sit at the front of the
-    // range. They must age out on a later tick, not spin the scheduler now.
     const t = newConvexTest();
     for (let i = 0; i < 100; i++) {
       await processingLink(t, "sweep-legacy", FRESH_AGE, { legacy: true });
@@ -3302,7 +3085,6 @@ describe("stale processing runs", () => {
     const itemId = await processingLink(t, "fence", FRESH_AGE);
     const current = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
 
-    // The old run's result arrives after a retry replaced it.
     const stale = await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId: "run-superseded",
@@ -3328,7 +3110,6 @@ describe("stale processing runs", () => {
       status: "processing",
     });
 
-    // The owning run still lands.
     const applied = await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId: current,
@@ -3464,9 +3245,6 @@ describe("stale processing runs", () => {
   });
 
   it("keeps the recipe off the feed card", async () => {
-    // `itemCardValidator` omits `recipe`, and Convex enforces the returns
-    // validator at runtime, so a card still carrying it fails the whole feed
-    // query rather than just shipping an extra field.
     const { t, userId } = await as();
     const itemId = await processingLink(t, userId, FRESH_AGE);
     const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
@@ -3493,9 +3271,6 @@ describe("stale processing runs", () => {
   });
 
   it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
-    // The account is created before the legacy row, back-dated past it, so the
-    // row's `_creationTime` can still land STALE_AGE ago: creation times never
-    // run backwards. The Pro row is inserted afterwards at "now".
     const now = Date.now();
     vi.setSystemTime(now - STALE_AGE - 60_000);
     const { t, userId } = await signedInUser(newConvexTest());
@@ -3531,9 +3306,6 @@ describe("stale processing runs", () => {
     expect(legacyRetried?.processingRunId).toBeDefined();
     expect(legacyRetried?.processingStartedAt).toBe(Date.now());
 
-    // Fresh: its action may still finish, so nothing changes and no job queues.
-    // The false return is what lets a client with a fast clock tell the user
-    // instead of going quiet.
     expect(await t.mutation(api.items.reprocessItem, { id: fresh })).toBe(
       false,
     );
@@ -3548,8 +3320,6 @@ describe("stale processing runs", () => {
   it("listReadyItemsInternal returns `limit` ready items despite many failed ones", async () => {
     const t = newConvexTest();
     await t.run(async (ctx) => {
-      // Failed rows are newer than every ready row, so the old by_user read
-      // (2x limit, newest first) would have returned mostly failures.
       for (let i = 0; i < 5; i++) {
         await ctx.db.insert("items", {
           userId: "ready-list",
@@ -3646,7 +3416,6 @@ describe("share links", () => {
       }),
     );
     const unnamed = await base.run((ctx) => ctx.db.insert("users", {}));
-    // Apple sign-in with the name withheld: the email stands in as the name.
     const emailOnly = await base.run((ctx) =>
       ctx.db.insert("users", {
         name: "private@privaterelay.appleid.com",
@@ -3715,7 +3484,6 @@ describe("share links", () => {
       await t.query(internal.items.getSharePreview, { token: token! }),
     ).toBeNull();
 
-    // Settling with no link left is a no-op, and a later share mints anew.
     await t.mutation(api.items.settleShareLink, { itemId, shared: false });
     await t.mutation(api.items.settleShareLink, { itemId, shared: true });
     const next = await t.mutation(api.items.createShareLink, { itemId });
@@ -3726,7 +3494,6 @@ describe("share links", () => {
   it("keeps a link an older build already handed out when a later share is cancelled", async () => {
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId);
-    // An older build mints and shares without ever settling.
     const token = await t.mutation(api.items.createShareLink, { itemId });
 
     expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
@@ -3754,7 +3521,6 @@ describe("share links", () => {
   it("keeps a link from a client that never reports, when a share is cancelled", async () => {
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId);
-    // An app version from before settling shared this link for real.
     const token = await t.mutation(api.items.createShareLink, { itemId });
 
     await t.mutation(api.items.settleShareLink, { itemId, shared: false });
@@ -3766,8 +3532,6 @@ describe("share links", () => {
   it("withdraws a cancelled link however late the cancel arrives", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     const now = new Date("2026-10-08T12:00:00Z").getTime();
-    // convex-test anchors its clock at a context's first write, so the link
-    // has to be minted before the clock moves on.
     vi.setSystemTime(now - 3 * 60 * 60 * 1000);
     const { t, userId } = await signedInUser(newConvexTest());
     const itemId = await seedItem(t, userId);
@@ -3776,7 +3540,6 @@ describe("share links", () => {
       settles: true,
     });
 
-    // The sheet sat open, or the report waited out a spell offline.
     vi.setSystemTime(now);
     await t.mutation(api.items.settleShareLink, { itemId, shared: false });
     expect(
@@ -3816,8 +3579,6 @@ describe("share links", () => {
 
   it("stops serving the preview the moment account deletion starts", async () => {
     const { t, userId } = await as();
-    // Enough older saves that the cleanup spans several batches, so the
-    // shared item and its link are still stored after the first transaction.
     await seedNotes(t, userId as Id<"users">, 150);
     const itemId = await seedItem(t, userId);
     const token = await t.mutation(api.items.createShareLink, { itemId });

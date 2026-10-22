@@ -14,18 +14,9 @@ import {
 } from "../pageReadCore";
 import { youtubeVideoId } from "../externalUrl";
 
-/** oEmbed statuses that mean "not a video it will describe", not a hiccup. */
 const OEMBED_REFUSALS = new Set([400, 401, 403, 404]);
 
-/**
- * YouTube often answers a server's page load with a consent or bot-check page,
- * so the save came back as a bare "YouTube Video" with no picture. Its public
- * oEmbed endpoint answers with the title, channel, and thumbnail. A link
- * oEmbed refuses (a channel page, a private or embed-blocked video) falls back
- * to the plain page read, so nothing is marked gone on oEmbed's word alone.
- * After a transient oEmbed failure the page read is marked incomplete, so the
- * save can be retried for the real title and thumbnail.
- */
+/** YouTube serves servers a consent/bot-check page; oEmbed gives title, channel and thumbnail. */
 export async function fetchYouTubeOEmbed(url: string): Promise<PageData> {
   const endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
   const result = await safeFetch(endpoint, {
@@ -41,9 +32,7 @@ export async function fetchYouTubeOEmbed(url: string): Promise<PageData> {
       if (typeof parsed === "object" && parsed !== null) {
         data = parsed as Record<string, unknown>;
       }
-    } catch {
-      // Unreadable answer; read the page instead.
-    }
+    } catch {}
   }
   const str = (key: string) => {
     const value = data?.[key];
@@ -116,7 +105,6 @@ function parseYouTubeVideo(body: unknown, id: string): PageData | undefined {
   };
 }
 
-/** Optional description read; every failure preserves the existing oEmbed path. */
 export async function fetchYouTube(url: string): Promise<PageData> {
   const key = env.YOUTUBE_API_KEY;
   const id = youtubeVideoId(url);

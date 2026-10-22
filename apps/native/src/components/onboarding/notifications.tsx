@@ -57,18 +57,11 @@ function hostOf(url: string | undefined): string | null {
   }
 }
 
-/**
- * Right after the first save, asks when that save should come back. Picking
- * a time is the reason for the OS prompt, and the answer is one local
- * reminder that opens the save. Skipped when there is no save to remind
- * about, or when notifications were refused for good.
- */
 export function NotificationsStep({
   saved,
   onAdvance,
 }: {
   saved: DemoSaved | null;
-  /** Gets the slot only when a reminder was actually scheduled. */
   onAdvance: (scheduled?: ReminderSlot) => void;
 }) {
   useAppLocale();
@@ -77,8 +70,6 @@ export function NotificationsStep({
   const [options, setOptions] = useState(() => reminderOptions(new Date()));
   const [picked, setPicked] = useState(0);
   const [busy, setBusy] = useState(false);
-  // The step leaves once: by its own check on entry, or by one tap. `busy`
-  // lands a render later, so a quick second tap must be stopped here too.
   const done = useRef(false);
   const advanceRef = useRef(onAdvance);
   useEffect(() => {
@@ -122,8 +113,6 @@ export function NotificationsStep({
   const host = hostOf(item?.url);
   const title = item?.title || item?.siteName || host;
 
-  // A choice that passed while the screen sat open (or while the OS prompt
-  // waited) is replaced by fresh times instead of being scheduled.
   const expired = () => {
     if (choice.at.getTime() > Date.now()) return false;
     setOptions(reminderOptions(new Date()));
@@ -135,8 +124,6 @@ export function NotificationsStep({
     if (done.current || saved === null || expired()) return;
     done.current = true;
     setBusy(true);
-    // Taken before the permission prompt: a sign-out while it waits clears
-    // the reminder, and this save must not be scheduled after that.
     const ticket = firstSaveReminderTicket();
     let granted = false;
     let scheduled = false;
@@ -154,20 +141,14 @@ export function NotificationsStep({
           at: choice.at,
           ticket,
         });
-        // A sign-out during the prompt makes the schedule a no-op.
         scheduled = firstSaveReminderTicket() === ticket;
       }
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
     }
-    // The small print under the button says the same yes turns the Weekly
-    // shelf on. Skipped if the account changed during the prompt.
-    // Not awaited: it needs the network, and an offline mutation waits for a
-    // reconnect instead of failing, which would hold this step.
     if (granted && firstSaveReminderTicket() === ticket) {
       void session.setWeeklyShelf(true).then(
         (enabled) => {
-          // false: no push token; undefined: another operation was running.
           if (enabled !== true) {
             analytics.captureError(
               "weekly_shelf_preference_failed",
@@ -201,8 +182,6 @@ export function NotificationsStep({
 
   const image = item?.heroImageUrl ?? item?.imageUrl;
   const tag = item?.tags[0];
-  // A place shows its payoff here, before the paywall: the save already
-  // knows where it is.
   const maps = item?.intents?.find((intent) => intent.kind === "open_maps");
 
   return (
@@ -285,8 +264,6 @@ export function NotificationsStep({
           onPress={skip}
           disabled={busy}
         />
-        {/* The same yes also turns on the Weekly shelf and lets save
-            reminders arrive, so the screen says so before the OS asks. */}
         <Text style={styles.consent}>{t("onboarding.remindConsent")}</Text>
       </View>
     </View>

@@ -19,10 +19,6 @@ function reportSaveFailed() {
   );
 }
 
-/** The hero plays over one of the person's own saves that the model already
- * titled and tagged: the plainest way to say what the permission is for.
- * While the read is in flight, or when there is none, it plays over a
- * built-in example instead. */
 function Hero() {
   const { data } = useQuery(
     convexQuery(api.items.listItemsPage, {
@@ -33,8 +29,6 @@ function Hero() {
     (item): item is typeof item & { title: string } =>
       item.status === "ready" && !!item.title && item.tags.length > 0,
   );
-  // The hero draws its first frame once, so it waits for the read rather
-  // than restarting when the person's own save arrives.
   if (data === undefined) return <View style={styles.heroHold} />;
   return (
     <AiConsentHero
@@ -45,12 +39,6 @@ function Hero() {
   );
 }
 
-/**
- * The third-party AI disclosure. It fills the screen and has no close
- * control: the only ways on are its two buttons, which are the same size and
- * weight so declining is as reachable as allowing. It stays up until the
- * server has recorded the answer.
- */
 export function AiConsentCard() {
   useAppLocale();
   const { answer } = useAiConsent();
@@ -136,13 +124,10 @@ export function AiConsentCard() {
   );
 }
 
-/** The Settings switch for the same answer the card records. */
 export function AiConsentSetting() {
   useAppLocale();
   const { theme } = useUnistyles();
   const { status, answer } = useAiConsent();
-  // The switch shows the new value while the server records it, and falls
-  // back to the recorded one if that fails.
   const [pending, setPending] = useState<boolean | null>(null);
   const toggle = async (granted: boolean) => {
     setPending(granted);
@@ -185,8 +170,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: rt.insets.bottom + theme.gap(3),
     gap: theme.gap(2),
   },
-  // Roughly the hero's resting height, so the page does not jump when the
-  // read lands.
   heroHold: { height: 184 },
   title: { marginTop: theme.gap(1) },
   body: { color: theme.colors.muted },
@@ -195,8 +178,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.primaryText,
     textDecorationLine: "underline",
   },
-  // Both choices share one shape and size. Only the fill differs, and the
-  // outlined one keeps full-contrast text, so neither reads as disabled.
   choice: {
     minHeight: theme.control.minHeight,
     padding: theme.gap(1.5),

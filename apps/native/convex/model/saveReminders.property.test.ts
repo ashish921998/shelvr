@@ -12,19 +12,15 @@ import {
 
 const HOUR_MS = 60 * 60 * 1000;
 
-// What must never happen, whatever order the cron checks arrive in: two
-// pushes within the minimum gap, or more than the weekly limit in any week.
 describe("reminder budget", () => {
   it("never sends two pushes too close or too many in a week", () => {
     fc.assert(
       fc.property(
-        // Gaps between successive cron checks, from a minute to two days.
         fc.array(fc.integer({ min: 60_000, max: 48 * HOUR_MS }), {
           minLength: 1,
           maxLength: 200,
         }),
         fc.boolean(),
-        // When in the week the shelf is due; it then repeats weekly.
         fc.integer({ min: 0, max: WEEK_MS - 1 }),
         (gaps, shelfOn, shelfOffset) => {
           const nextShelf = (at: number) =>
@@ -35,8 +31,6 @@ describe("reminder budget", () => {
           for (const gap of gaps) {
             now += gap;
             const sentAt = sent.filter((at) => now - at < WEEK_MS);
-            // Opened reminders keep the ignored-streak pause out of the way,
-            // so the gap and weekly limits are what this run exercises.
             const recent = sent
               .slice(-IGNORED_STREAK)
               .reverse()
@@ -51,7 +45,6 @@ describe("reminder budget", () => {
           for (let i = 1; i < sent.length; i++) {
             expect(sent[i] - sent[i - 1]).toBeGreaterThanOrEqual(MIN_GAP_MS);
           }
-          // Reminders make room for the shelf: none inside the gap before it.
           if (shelfOn) {
             for (const at of sent) {
               expect(nextShelf(at) - at).toBeGreaterThanOrEqual(MIN_GAP_MS);
@@ -61,7 +54,6 @@ describe("reminder budget", () => {
             const inWeek = sent.filter(
               (at) => at >= start && at - start < WEEK_MS,
             ).length;
-            // An unsent shelf keeps one weekly slot for itself.
             expect(inWeek).toBeLessThanOrEqual(
               WEEKLY_LIMIT - (shelfOn ? 1 : 0),
             );

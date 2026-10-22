@@ -4,9 +4,6 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** A save as the app files it: its picture, title, a line of detail and, when
- * the classifier gave one, a tag. The sign-in prompt and the reminder step
- * both show the first save this way. `action` sits beside the tag. */
 export function SaveSummary({
   image,
   title,

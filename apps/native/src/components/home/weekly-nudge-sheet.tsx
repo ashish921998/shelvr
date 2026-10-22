@@ -11,11 +11,6 @@ import { PromptSheet } from "@/components/ui/prompt-sheet";
 import { useEffect, useState } from "react";
 import { Alert, Linking } from "react-native";
 
-/**
- * Asks once whether to turn on the weekly shelf. Queued by the first
- * share-sheet save; `ready` holds it back until Home says the moment is right
- * (see `shouldOfferWeeklyNudge`).
- */
 export function WeeklyNudgeSheet({
   userId,
   previewTitle,
@@ -32,15 +27,12 @@ export function WeeklyNudgeSheet({
   const { data: preferences } = useQuery({
     ...convexQuery(
       api.notifications.getPreferences,
-      // 'skip', not `enabled`: a disabled React Query still subscribes
-      // through the Convex adapter (see the pager).
       pending && ready ? {} : "skip",
     ),
   });
   const alreadyOn = preferences?.weeklyShelfEnabled === true;
 
   useEffect(() => {
-    // Finishing flips `pending`, so the preferences query goes back to "skip".
     if (pending && alreadyOn) weeklyNudge.finish(userId);
   }, [pending, alreadyOn, userId]);
 
@@ -63,11 +55,8 @@ export function WeeklyNudgeSheet({
           ],
         );
       }
-      // Keep the prompt available after Settings, or while another session
-      // operation is busy. Only a saved preference completes this opt-in.
       if (enabled === true) close();
     } catch (err) {
-      // Keep the nudge pending so the user can try again.
       analytics.captureError("weekly_shelf_preference_failed", err);
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
     } finally {

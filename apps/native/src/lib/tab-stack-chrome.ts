@@ -7,8 +7,6 @@ const isIos = process.env.EXPO_OS === "ios";
 
 type Options = {
   headerTransparent?: boolean;
-  // For stacks that also render HeaderScrim. The native soft scroll edge is
-  // iOS 26 only, and a no-op on earlier versions and on Android.
   softScrollEdge?: boolean;
 };
 
@@ -33,8 +31,6 @@ export function useTabStackChrome({
     router.push(href);
   };
 
-  // Per-layout extras (tint, title style) compose at the call site via
-  // spread; React Navigation merges them over these shared defaults.
   const screenOptions = {
     headerTransparent,
     headerStyle:

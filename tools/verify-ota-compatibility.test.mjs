@@ -27,8 +27,6 @@ const BASELINES = {
   preview: { ios: null, android: null },
 };
 
-/** A stand-in for the expo-updates CLI. A platform mapped to an Error rejects,
- * which is how every real failure reaches {@link checkCompatibility}. */
 const fingerprinter = (hashes) => async (platform) => {
   const hash = hashes[platform];
   if (hash instanceof Error) throw hash;
@@ -118,7 +116,6 @@ test("an entry with no usable hash has recorded nothing", async () => {
     });
     assert.equal(results[0].status, "missing-baseline");
     assert.equal(isBlocked(results), true);
-    // A mismatch would send a maintainer to ship a store build over a typo.
     assert.doesNotMatch(formatReport(results), /new store build/);
   }
 });

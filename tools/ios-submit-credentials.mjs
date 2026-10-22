@@ -1,4 +1,3 @@
-// Query the same assignment used by EAS Submit, requesting metadata only.
 export async function verifyIosSubmitCredentials({
   token,
   appId,

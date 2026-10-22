@@ -152,9 +152,6 @@ describe("scheduleCaptureRetry", () => {
   });
 
   it("reports the event lost rather than throwing when the scheduler refuses", async () => {
-    // The first attempt runs inline with a classification or a save; a
-    // scheduler outage must surface as a logged loss, never as that work
-    // failing after it already committed.
     const schedule = vi
       .fn()
       .mockRejectedValue(new Error("scheduler unavailable"));

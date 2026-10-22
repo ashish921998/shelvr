@@ -34,7 +34,6 @@ export default function SpaceScreen() {
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
-  // A trip already made gets its own row under the title, one tap away.
   const { data: storedTrip } = useQuery(
     convexQuery(api.tripData.getSpaceTrip, { spaceId: id as Id<"spaces"> }),
   );
@@ -44,9 +43,6 @@ export default function SpaceScreen() {
   const { guard: planGuard } = usePaywallGuard("make_plan");
   const { guard: tripGuard } = usePaywallGuard("plan_trip");
 
-  // Suggestions lead the feed (they're the ones asking for a decision),
-  // wearing the sparkle badge; saved items follow. Item detail rebuilds this
-  // exact ordering for swipe-paging, so keep the two in sync.
   const feedItems = useMemo<FeedItem[]>(() => {
     if (!space) return [];
     return [
@@ -55,7 +51,6 @@ export default function SpaceScreen() {
     ];
   }, [space]);
 
-  // `undefined` = loading (nothing cached yet); `null` = not found.
   if (space === undefined) {
     return <ScreenLoader label={t("loading.space")} />;
   }
@@ -114,7 +109,6 @@ export default function SpaceScreen() {
     );
   };
 
-  // One Plan button. It asks only when both kinds of plan can be made.
   const openPlan = () => {
     if (canPlan && canTrip) setPicking(true);
     else if (canPlan) makePlan();
@@ -337,7 +331,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
-  // One row under the title; wraps only when the text is too wide.
   headerPills: {
     flexDirection: "row",
     flexWrap: "wrap",

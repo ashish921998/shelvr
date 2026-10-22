@@ -89,7 +89,6 @@ describe("PlanVote", () => {
     tap("Yes to Bastian");
     await settle();
     tap("Yes to Masque");
-    // The first answer lands while the second tap is still settling.
     await act(async () => {
       answer(new Response("{}", { status: 200 }));
     });
@@ -115,7 +114,6 @@ describe("PlanVote", () => {
     await settle();
     tap("Yes to Masque");
     await settle();
-    // The second ballot waits in the queue behind the first request.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     act(() => {
       window.dispatchEvent(new Event("pagehide"));
@@ -126,8 +124,6 @@ describe("PlanVote", () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
       picks: ["p0", "p1"],
     });
-    // The slow answer lands (a page kept in the back-forward cache): the
-    // queued ballot already went out, so it is not sent again.
     await act(async () => {
       answer(new Response("{}", { status: 200 }));
     });
@@ -171,8 +167,6 @@ describe("PlanVote", () => {
     expect(sent).toMatchObject({ picks: ["p0"] });
     await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    // The answer never reaches a closing page, so the ballot waits for the
-    // next visit rather than being remembered as saved.
     expect(window.localStorage.getItem("shelvr.planVote.tok")).toBeNull();
     expect(
       JSON.parse(window.localStorage.getItem("shelvr.planVotePending.tok")!),
@@ -181,7 +175,6 @@ describe("PlanVote", () => {
 
   it("shows and resends a ballot that left with the last visit", async () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
-    // A saved ballot from a page before revisions: bare choices.
     window.localStorage.setItem(
       "shelvr.planVote.tok",
       JSON.stringify({ p1: "pass" }),
@@ -209,7 +202,6 @@ describe("PlanVote", () => {
       window.localStorage.getItem("shelvr.planVotePending.tok"),
     ).toBeNull();
 
-    // The next tap numbers itself above the resent ballot.
     tap("Yes to Masque");
     await settle();
     expect(
@@ -228,7 +220,6 @@ describe("PlanVote", () => {
     tap("Yes to Bastian");
     await settle();
 
-    // In flight: a tab closed now would still find it on the next visit.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(
@@ -267,7 +258,6 @@ describe("PlanVote", () => {
     tap("Yes to Bastian");
     await settle();
     const mine = JSON.parse(fetchMock.mock.calls[0][1].body).revision as number;
-    // Another tab saved and then sent something newer meanwhile.
     const newer = { choices: { p1: "pick" }, revision: mine + 1_000_000 };
     window.localStorage.setItem("shelvr.planVote.tok", JSON.stringify(newer));
     window.localStorage.setItem(

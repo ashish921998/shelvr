@@ -32,7 +32,6 @@ const mock = vi.hoisted(() => ({
     }) => ({ accepted: true }),
   ),
   capture: vi.fn(),
-  // useMutation call counter; see the convex/react mock below.
   mutationCalls: 0,
 }));
 vi.mock("react-native", () => ({
@@ -111,11 +110,8 @@ const react = {
     rendered = undefined;
   },
 };
-/** mount/rerender return a fresh result object per render: always read the
- * current one after an await. */
 const latest = (): Survey => react.rerender();
 
-/** Simulate leaving Shelvr (e.g. to iPhone Settings) and coming back. */
 const roundTrip = async () => {
   act(() => {
     for (const listener of mock.appStateListeners) listener("background");
@@ -135,8 +131,6 @@ beforeEach(() => {
     return { accepted: true };
   });
   mock.respond.mockReset().mockResolvedValue({ accepted: true });
-  // Fake only the retry timer (2s paywall poll); setImmediate-based flush
-  // and promise microtasks stay real so async detection resolves normally.
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   mock.appState = "active";
   mock.appStateListeners = [];
@@ -161,7 +155,6 @@ describe("useCancelSurvey", () => {
     await flush();
 
     expect(latest().visible).toBe(true);
-    // Detection alone must not consume the ask.
     expect(mock.markShown).not.toHaveBeenCalled();
     expect(mock.capture).not.toHaveBeenCalledWith("cancel_survey_shown");
   });
@@ -189,23 +182,22 @@ describe("useCancelSurvey", () => {
     mock.surveyStatus = undefined;
     react.mount(() => useCancelSurvey());
     await flush();
-    // No check happened: nothing is visible and the episode was not spent.
     expect(latest().visible).toBe(false);
 
     mock.surveyStatus = { asked: false };
-    latest(); // render picks up the server answer; the check is scheduled
-    await flush(); // async RevenueCat read resolves and flips visibility
+    latest();
+    await flush();
 
     expect(latest().visible).toBe(true);
   });
 
   it("re-checks after returning from Settings: a cancellation made mid-session is caught", async () => {
-    mock.rcState = "none"; // session starts with the trial still renewing
+    mock.rcState = "none";
     react.mount(() => useCancelSurvey());
     await flush();
     expect(latest().visible).toBe(false);
 
-    mock.rcState = "cancelled"; // user cancelled in iPhone Settings meanwhile
+    mock.rcState = "cancelled";
     await roundTrip();
 
     expect(latest().visible).toBe(true);
@@ -216,7 +208,7 @@ describe("useCancelSurvey", () => {
     await flush();
     expect(latest().visible).toBe(true);
 
-    mock.rcState = "none"; // uncancelled elsewhere
+    mock.rcState = "none";
     await roundTrip();
 
     expect(latest().visible).toBe(false);
@@ -277,19 +269,17 @@ describe("useCancelSurvey", () => {
       release = resolve;
     });
     react.mount(() => useCancelSurvey());
-    await flush(); // first read is gated in flight
+    await flush();
     expect(latest().visible).toBe(false);
 
-    // Navigate away mid-read: the attempt is cancelled and must not consume
-    // the foreground episode.
     mock.segments = ["(app)", "(tabs)", "(search)"];
     react.rerender();
     release();
-    await flush(); // stale read resolves into the void
+    await flush();
 
     mock.segments = ["(app)", "(tabs)", "(home)"];
     react.rerender();
-    await flush(); // a fresh, complete read in the same session
+    await flush();
 
     const { readRcTrialCancellation } = await import("@/lib/entitlement");
     expect(vi.mocked(readRcTrialCancellation)).toHaveBeenCalledTimes(2);
@@ -299,11 +289,11 @@ describe("useCancelSurvey", () => {
   it("waits out a paywall sheet instead of spending the ask under it", async () => {
     mock.paywallPending = true;
     react.mount(() => useCancelSurvey());
-    await flush(); // read resolves, sees the sheet, schedules a retry
+    await flush();
     expect(latest().visible).toBe(false);
     expect(mock.markShown).not.toHaveBeenCalled();
 
-    mock.paywallPending = false; // the sheet closes
+    mock.paywallPending = false;
     vi.advanceTimersByTime(2000);
     await flush();
 
@@ -314,7 +304,7 @@ describe("useCancelSurvey", () => {
     react.mount(() => useCancelSurvey());
     await flush();
     const survey = latest();
-    survey.presented(); // e.g. empty-feed → feed branch switch remounts it
+    survey.presented();
     survey.presented();
     await flush(); // shown fires on the server's accepted verdict
 
@@ -351,8 +341,6 @@ describe("useCancelSurvey", () => {
     latest().presented();
     await flush();
 
-    // A failed verdict never committed, so the ask is unspent, but this
-    // mount cannot cite a win. Fail closed and let a later mount re-ask.
     expect(latest().visible).toBe(false);
     expect(
       mock.capture.mock.calls.filter(
@@ -449,7 +437,7 @@ describe("useCancelSurvey", () => {
     await flush();
     const survey = latest();
     survey.finish({ outcome: "submitted", reason: "too_expensive" });
-    survey.finish({ outcome: "submitted", reason: "other" }); // second tap lands before the re-render hides the card
+    survey.finish({ outcome: "submitted", reason: "other" });
     await flush();
 
     expect(mock.respond).toHaveBeenCalledTimes(1);

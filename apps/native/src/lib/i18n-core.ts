@@ -7,8 +7,6 @@ import {
   type SupportedLocale,
 } from "@/locales/catalogs";
 
-// Catalog files use stable namespace.message identifiers. Expand them into
-// i18n-js's normal namespace tree; English punctuation is only ever a value.
 const translations = Object.fromEntries(
   Object.entries(catalogs).map(([locale, messages]) => {
     const namespaces: Record<
@@ -33,14 +31,12 @@ for (const [locale, rule] of Object.entries(pluralRules)) {
 export function canonicalizeTag(tag: string) {
   try {
     const canonical = Intl.getCanonicalLocales(tag.replaceAll("_", "-"))[0];
-    // Hermes supports canonicalization but does not guarantee Intl.Locale.
     return { canonical, baseName: canonical.split(/-[ux]-/i)[0] };
   } catch {
     return undefined;
   }
 }
 
-/** Follow ordered preferences, resolving only to catalogs included in this build. */
 export function resolveLocale(
   languageTags: readonly string[],
 ): SupportedLocale {
@@ -64,7 +60,6 @@ function formatNumber(locale: string, value: number): string {
   let formatter = numberFormatters.get(locale);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale);
-    // Device tags may include arbitrary region/numbering extensions.
     if (numberFormatters.size >= 32) numberFormatters.clear();
     numberFormatters.set(locale, formatter);
   }
@@ -88,8 +83,6 @@ export function translate(
     if (typeof values.count !== "number" || !Number.isFinite(values.count)) {
       throw new Error("Plural messages require a finite numeric count");
     }
-    // Selection must receive a number, even when interpolation uses regional
-    // grouping such as 1.234 or 12,34,567.
     formatted.formattedCount = formatNumber(numberLocale, values.count);
     return i18n.t(key, { ...formatted, count: values.count, locale });
   }
