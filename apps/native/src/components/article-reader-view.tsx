@@ -425,6 +425,5 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.display,
     fontSize: 18,
     color: theme.colors.foreground,
-    paddingHorizontal: 4,
   },
 }));
