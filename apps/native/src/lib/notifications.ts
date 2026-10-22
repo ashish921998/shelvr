@@ -1,7 +1,6 @@
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
-import { currentLocale, t, useAppLocale } from "@/lib/i18n";
-import { ScreenLoader } from "@/components/ui/screen-loader";
+import { currentLocale, useAppLocale } from "@/lib/i18n";
 import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
@@ -22,7 +21,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { NotificationDeviceSession } from "./notification-device-session";
+import { DeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
@@ -46,8 +45,7 @@ const tokenStore = {
     SecureStore.setItemAsync(tokenStorageKey, JSON.stringify(tokens)),
 };
 
-const NotificationSessionContext =
-  createContext<NotificationDeviceSession | null>(null);
+const NotificationSessionContext = createContext<DeviceSession | null>(null);
 
 export function useNotificationSession() {
   const session = use(NotificationSessionContext);
@@ -84,7 +82,7 @@ export function NotificationSessionProvider({
   const revokeCaptureToken = useMutation(api.appIntents.revokeCaptureToken);
   const session = useMemo(
     () =>
-      new NotificationDeviceSession(tokenStore, {
+      new DeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
         getTimezone: getNotificationTimezone,
@@ -108,10 +106,8 @@ export function NotificationSessionProvider({
           });
           if (!enabled) await clearFirstSaveReminder();
         },
-        signOut: async (reason) => {
-          // Account deletion already drains capture tokens and rejects authenticated writes.
-          if (reason === "sign_out")
-            await revokeSiriCapture(revokeCaptureToken);
+        revokeCapture: () => revokeSiriCapture(revokeCaptureToken),
+        signOut: async () => {
           await signOut();
           await clearFirstSaveReminder();
           await clearTrialReminder();
@@ -197,16 +193,8 @@ export function NotificationSessionProvider({
   return createElement(
     NotificationSessionContext,
     { value: session },
-    createElement(SessionContents, null, children),
+    children,
   );
-}
-
-function SessionContents({ children }: { children: ReactNode }) {
-  const { operation } = useNotificationSession();
-  // Unmount live queries before deletion revokes their authenticated owner.
-  return operation === "delete_account"
-    ? createElement(ScreenLoader, { label: t("loading.app") })
-    : children;
 }
 
 function notificationField(

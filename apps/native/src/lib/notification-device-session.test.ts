@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
-import { NotificationDeviceSession } from "./notification-device-session";
+import { DeviceSession } from "./notification-device-session";
 
 function deferred() {
   let resolve!: () => void;
@@ -26,6 +26,7 @@ function setup(
       async (_token: string, _locale?: string, _timezone?: string) => {},
     ),
     revokeToken: vi.fn(async (_token: string) => {}),
+    revokeCapture: vi.fn(async () => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
     signOut: vi.fn(async () => {}),
@@ -34,7 +35,7 @@ function setup(
     resetAnalytics: vi.fn(),
     reportError: vi.fn(),
   };
-  const session = new NotificationDeviceSession(
+  const session = new DeviceSession(
     {
       read: async () => tokens,
       write: async (next) => {
@@ -274,6 +275,9 @@ describe("notification device session", () => {
     deps.revokeToken.mockImplementation(async (token) => {
       events.push(`revoked:${token}`);
     });
+    deps.revokeCapture.mockImplementation(async () => {
+      events.push("capture revoked");
+    });
     deps.signOut.mockImplementation(async () => {
       events.push("signed out");
     });
@@ -284,7 +288,12 @@ describe("notification device session", () => {
     await logout;
     expect(await blocked).toBe(false);
     expect(deps.saveToken).toHaveBeenCalledTimes(1);
-    expect(events).toEqual(["registered", "revoked:token-a", "signed out"]);
+    expect(events).toEqual([
+      "registered",
+      "revoked:token-a",
+      "capture revoked",
+      "signed out",
+    ]);
   });
 
   it("does not let an old completion suppress a new account registration", async () => {
@@ -401,7 +410,8 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
-    expect(deps.signOut).toHaveBeenCalledWith("account_deleted");
+    expect(deps.revokeToken).toHaveBeenCalledBefore(deps.revokeCapture);
+    expect(deps.revokeCapture).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.clearWidget).toHaveBeenCalledOnce();
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
     expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);

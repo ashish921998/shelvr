@@ -7,7 +7,7 @@ import {
   tapUntilVisible,
 } from "./seeded-home.ts";
 
-startOnSeededHome();
+startOnSeededHome({ reset: "settings" });
 
 test("deletes the development account and starts the next account with no old saves", async ({
   app,
@@ -21,7 +21,10 @@ test("deletes the development account and starts the next account with no old sa
   await scrollSettingsTo(screen, deleteAccount);
   await deleteAccount.tap();
   await expect(screen.getByText("Delete account?")).toBeVisible();
-  await deleteAccount.last().tap();
+  await screen
+    .getByRole("group", "Delete account?")
+    .getByRole("button", "Delete account")
+    .tap();
 
   const signIn = screen.getByTestId("dev-login-button");
   await expect(signIn).toBeVisible({ timeout: 60000 });

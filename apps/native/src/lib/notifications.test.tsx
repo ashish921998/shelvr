@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen, waitFor } from "@testing-library/react";
-import { useEffect } from "react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { releaseSheetLink, rememberSheetLink } from "./deferred-sheet-link";
 import { ConvexError } from "convex/values";
@@ -32,12 +31,8 @@ const mock = vi.hoisted(() => ({
   rotated: null as null | ((token: { type: string; data: string }) => void),
 }));
 vi.mock("@/lib/i18n", () => ({
-  t: (key: string) => key,
   currentLocale: () => mock.locale,
   useAppLocale: () => mock.locale,
-}));
-vi.mock("@/components/ui/screen-loader", () => ({
-  ScreenLoader: vi.fn(({ label }: { label: string }) => <div>{label}</div>),
 }));
 vi.mock("expo-localization", () => ({
   getCalendars: () => [{ timeZone: mock.timezone }],
@@ -71,12 +66,11 @@ vi.mock("@convex/_generated/api", () => ({
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
-  useMutation: (ref: string) =>
-    ref === "register"
-      ? mock.register
-      : ref === "delete"
-        ? mock.deleteAccount
-        : mock.otherMutation,
+  useMutation: (ref: string) => {
+    if (ref === "register") return mock.register;
+    if (ref === "delete") return mock.deleteAccount;
+    return mock.otherMutation;
+  },
 }));
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mock.signOut }),
@@ -138,61 +132,25 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
-  it("unmounts the signed-in screens while deleting and does not revoke an already deleted Siri token", async () => {
-    let finishDeletion!: () => void;
-    mock.deleteAccount.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishDeletion = resolve;
-        }),
-    );
-    const unmounted = vi.fn();
-    const { result } = renderHook(
-      () => {
-        useEffect(
-          () => () => {
-            unmounted();
-          },
-          [],
-        );
-        return useNotificationSession();
-      },
-      { wrapper: NotificationSessionProvider },
-    );
-    await waitFor(() =>
-      expect(result.current.session.isRegistered()).toBe(true),
-    );
-    const session = result.current.session;
-    let deletion!: Promise<void>;
-    act(() => {
-      deletion = session.deleteAccount();
-    });
-    await waitFor(() => expect(mock.deleteAccount).toHaveBeenCalledOnce());
-    expect(screen.getByText("loading.app")).toBeTruthy();
-    expect(unmounted).toHaveBeenCalledOnce();
-    expect(mock.signOut).not.toHaveBeenCalled();
+  it("revokes Siri before deleting the account and signing out", async () => {
+    const { result } = renderSession();
     await act(async () => {
-      finishDeletion();
-      await deletion;
+      await result.current.session.deleteAccount();
     });
-    expect(mock.revokeSiri).not.toHaveBeenCalled();
-    expect(mock.signOut).toHaveBeenCalledOnce();
-    expect(screen.queryByText("loading.app")).toBeNull();
+    expect(mock.revokeSiri).toHaveBeenCalledBefore(mock.deleteAccount);
+    expect(mock.deleteAccount).toHaveBeenCalledBefore(mock.signOut);
   });
 
-  it("restores the signed-in screens when deletion fails, without signing out", async () => {
+  it("keeps the session signed in when account deletion fails", async () => {
     mock.deleteAccount.mockRejectedValueOnce(new Error("offline"));
     const { result } = renderSession();
-    await waitFor(() =>
-      expect(result.current.session.isRegistered()).toBe(true),
-    );
     const session = result.current.session;
     await act(async () => {
       await expect(session.deleteAccount()).rejects.toThrow("offline");
     });
-    expect(screen.queryByText("loading.app")).toBeNull();
+    expect(result.current.operation).toBe("idle");
     expect(result.current.session).toBe(session);
-    expect(mock.revokeSiri).not.toHaveBeenCalled();
+    expect(mock.revokeSiri).toHaveBeenCalledBefore(mock.deleteAccount);
     expect(mock.signOut).not.toHaveBeenCalled();
   });
 

@@ -1,3 +1,5 @@
+import type { Screen } from "e2e";
+
 export const METRO_PORT = process.env.E2E_METRO_PORT ?? "8091";
 export const METRO_URL = `http://localhost:${METRO_PORT}`;
 
@@ -32,3 +34,9 @@ export const LAUNCH_ARGUMENTS = [
   "-E2EHideLogBox",
   "YES",
 ];
+
+export const LAUNCHER_GRACE_MS = 15_000;
+
+export function isExpoLauncher(screen: Screen): Promise<boolean> {
+  return screen.getByText("DEVELOPMENT SERVERS").isVisible();
+}
