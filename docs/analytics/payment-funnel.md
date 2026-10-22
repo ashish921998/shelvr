@@ -73,7 +73,7 @@ Client identity is the same Convex user ID passed to RevenueCat. PostHog identif
 
 ## Reading the dashboard
 
-The September 8 billing-isolation follow-up added `account_created` from the Convex Auth new-account callback and separate signup/authenticated-visit tiles. `account_created` is emitted only for a new database account; `auth_completed` remains a login/cold-start signal. The owner promotional-test email is now included in the internal-user cohort. See [billing isolation verification](../billing-isolation-2026-09-08.md) for environment mapping, the collection baseline, and purchase checks. Historical signups are not backfilled.
+The September 8 billing-isolation follow-up added `account_created` from the Convex Auth new-account callback and separate signup/authenticated-visit tiles. `account_created` is emitted only for a new database account; `auth_completed` remains a login/cold-start signal. The owner promotional-test email is now included in the internal-user cohort. Historical signups are not backfilled.
 
 All insights filter `environment=production` and PostHog test accounts. Backend purchase events become production only when `OBSERVABILITY_ENV=production` **and** RevenueCat reports PRODUCTION. Sandbox purchases are excluded. Account creation uses the backend environment; native builds derive environment from the build variant.
 
