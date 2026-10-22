@@ -21,6 +21,7 @@ import {
 } from "./subscriptions";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
+import { RECALL_MIN_AGE_MS } from "./model/recallAge";
 import { takeWithinBytes } from "./model/readBudget";
 import {
   deleteMembership,
@@ -542,7 +543,6 @@ const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
 const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
 const SIMILAR_MIN_SCORE = 3;
-const SIMILAR_OLD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const SIMILAR_RESERVED_OLD = 3;
 
 function significantWords(text: string): string[] {
@@ -678,7 +678,7 @@ export const similarItems = query({
     }
     scored.sort((a, b) => b.score - a.score);
 
-    const oldCutoff = item._creationTime - SIMILAR_OLD_AGE_MS;
+    const oldCutoff = item._creationTime - RECALL_MIN_AGE_MS;
     const reservedOld = scored
       .filter((candidate) => candidate.item._creationTime <= oldCutoff)
       .slice(0, SIMILAR_RESERVED_OLD);
@@ -1324,7 +1324,7 @@ export async function createItemWithOperation(
     }
 
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-    const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options);
+    const itemId = await createLinkOrNote(ctx, userId, kind, payload, options);
     if (op === null) {
       await ctx.db.insert("itemOperations", {
         userId,
@@ -1345,7 +1345,7 @@ export async function createItemWithOperation(
   }
 
   await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-  return await insertLinkOrNote(ctx, userId, kind, payload, options);
+  return await createLinkOrNote(ctx, userId, kind, payload, options);
 }
 
 function validateLinkOrNotePayload(
@@ -1370,7 +1370,7 @@ function validateLinkOrNotePayload(
   }
 }
 
-async function insertLinkOrNote(
+async function createLinkOrNote(
   ctx: MutationCtx,
   userId: string,
   kind: Extract<OperationKind, "link" | "note">,

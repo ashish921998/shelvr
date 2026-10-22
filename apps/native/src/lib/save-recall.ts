@@ -1,8 +1,7 @@
+import { RECALL_MIN_AGE_MS } from "@convex/model/recallAge";
 import * as SecureStore from "expo-secure-store";
 
 export const RECALL_FRESH_MS = 10 * 60 * 1000;
-
-export const RECALL_MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const RECALL_MAX_SHOWN = 3;
 
