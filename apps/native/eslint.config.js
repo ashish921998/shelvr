@@ -64,6 +64,21 @@ module.exports = defineConfig([
     rules: { "no-console": ["error", { allow: ["warn"] }] },
   },
   {
+    files: ["convex/**/*.ts"],
+    ignores: ["convex/**/*.test.ts", "convex/test.setup.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='filter'][arguments.0.type='ArrowFunctionExpression'][arguments.0.params.0.name='q']",
+          message:
+            "A database .filter((q) => ...) scans the whole table. Add or use an index and read it with .withIndex(name, (q) => ...), or a search index. A filter on an array is fine: name its parameter for the row, not q.",
+        },
+      ],
+    },
+  },
+  {
     files: [
       "convex/model/log.ts",
       "src/lib/analytics.ts",

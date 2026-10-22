@@ -2,9 +2,7 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
-import { convexTest } from "convex-test";
-
-import schema from "../schema";
+import { newConvexTest } from "../test.setup";
 import { effectiveStatus, type MembershipStatus } from "./memberships";
 
 function row(status?: MembershipStatus) {
@@ -30,11 +28,9 @@ describe("effectiveStatus", () => {
   });
 });
 
-const modules = import.meta.glob("../**/*.ts");
-
 describe("convex-test harness", () => {
   it("reads a seeded space through the mock backend without credentials", async () => {
-    const t = convexTest(schema, modules);
+    const t = newConvexTest();
     const spaceId = await t.run(async (ctx) => {
       return await ctx.db.insert("spaces", {
         userId: "user-123",
