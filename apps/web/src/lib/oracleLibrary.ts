@@ -64,7 +64,7 @@ function entry(url: string, title?: string, savedAt?: number): LibraryEntry {
 
 function parseNetscape(blob: string): LibraryEntry[] {
   return [...blob.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/gi)].flatMap(
-    ([, attributes, inner]) => {
+    ([, attributes = "", inner = ""]) => {
       const href = /href="([^"]*)"/i.exec(attributes)?.[1];
       const url = href && httpUrl(decodeEntities(href));
       if (!url) return [];
@@ -150,12 +150,18 @@ export function libraryStats(rows: LibraryEntry[]): LibraryStats {
 
 export function oracleRows(rows: LibraryEntry[], max = 40): LibraryRow[] {
   const step = Math.max(1, rows.length / max);
-  return Array.from({ length: Math.min(max, rows.length) }, (_, i) => {
-    const row = rows[Math.floor(i * step)];
-    return {
-      label: (row.title || row.url).slice(0, MAX_LABEL_CHARS),
-      domain: domainOf(row.url),
-      ...(row.savedAt ? { savedAt: row.savedAt } : {}),
-    };
-  });
+  return Array.from(
+    { length: Math.min(max, rows.length) },
+    (_, i) => rows[Math.floor(i * step)],
+  ).flatMap((row) =>
+    row
+      ? [
+          {
+            label: (row.title || row.url).slice(0, MAX_LABEL_CHARS),
+            domain: domainOf(row.url),
+            ...(row.savedAt ? { savedAt: row.savedAt } : {}),
+          },
+        ]
+      : [],
+  );
 }

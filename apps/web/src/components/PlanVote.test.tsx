@@ -65,7 +65,7 @@ describe("PlanVote", () => {
     await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toMatchObject({
       token: "tok",
       picks: ["p0"],
       passes: ["p1"],
@@ -96,7 +96,7 @@ describe("PlanVote", () => {
     await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toMatchObject({
       picks: ["p0", "p1"],
     });
     expect(container.textContent).toContain("Saved. Ashish will see");
@@ -120,8 +120,8 @@ describe("PlanVote", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({ keepalive: true });
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+    expect(fetchMock.mock.calls[1]![1]).toMatchObject({ keepalive: true });
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toMatchObject({
       picks: ["p0", "p1"],
     });
     await act(async () => {
@@ -150,7 +150,7 @@ describe("PlanVote", () => {
       ([, init]) => JSON.parse(init.body).revision as number,
     );
     expect(revisions).toHaveLength(2);
-    expect(revisions[1]).toBeGreaterThan(revisions[0]);
+    expect(revisions[1]).toBeGreaterThan(revisions[0]!);
   });
 
   it("sends a vote still settling when the page closes, and keeps it until seen saved", async () => {
@@ -162,8 +162,8 @@ describe("PlanVote", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ keepalive: true });
-    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(fetchMock.mock.calls[0]![1]).toMatchObject({ keepalive: true });
+    const sent = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(sent).toMatchObject({ picks: ["p0"] });
     await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -190,7 +190,7 @@ describe("PlanVote", () => {
     ).toHaveProperty("ariaPressed", "true");
     await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toMatchObject({
       picks: ["p0"],
       passes: ["p1"],
       revision: 7,
@@ -205,7 +205,7 @@ describe("PlanVote", () => {
     tap("Yes to Masque");
     await settle();
     expect(
-      JSON.parse(fetchMock.mock.calls[1][1].body).revision,
+      JSON.parse(fetchMock.mock.calls[1]![1].body).revision,
     ).toBeGreaterThan(7);
   });
 
@@ -221,7 +221,7 @@ describe("PlanVote", () => {
     await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const sent = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(
       JSON.parse(window.localStorage.getItem("shelvr.planVotePending.tok")!),
     ).toEqual({ choices: { p0: "pick" }, revision: sent.revision });
@@ -247,7 +247,7 @@ describe("PlanVote", () => {
     tap("Yes to Bastian");
     await settle();
 
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).revision).toBe(
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).revision).toBe(
       ahead + 1,
     );
   });
@@ -257,7 +257,8 @@ describe("PlanVote", () => {
     render();
     tap("Yes to Bastian");
     await settle();
-    const mine = JSON.parse(fetchMock.mock.calls[0][1].body).revision as number;
+    const mine = JSON.parse(fetchMock.mock.calls[0]![1].body)
+      .revision as number;
     const newer = { choices: { p1: "pick" }, revision: mine + 1_000_000 };
     window.localStorage.setItem("shelvr.planVote.tok", JSON.stringify(newer));
     window.localStorage.setItem(

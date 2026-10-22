@@ -156,9 +156,9 @@ function cardVars(card: Card, i: number) {
     "--mess-m": move(x * 0.22 + 10, y * 1.6 + 40, r),
     "--mess-w": move(x, y, r),
     "--mess-s": move(x * 0.62 + 10, y * 1.05 + 20, r),
-    "--tidy-m": move(COLS.m[mCol], ROWS.m[mRow], tilt),
-    "--tidy-w": move(COLS.w[card.col], ROWS.w[card.row], tilt),
-    "--tidy-s": move(COLS.s[card.col], ROWS.s[card.row], tilt),
+    "--tidy-m": move(COLS.m[mCol] ?? 0, ROWS.m[mRow] ?? 0, tilt),
+    "--tidy-w": move(COLS.w[card.col] ?? 0, ROWS.w[card.row] ?? 0, tilt),
+    "--tidy-s": move(COLS.s[card.col] ?? 0, ROWS.s[card.row] ?? 0, tilt),
     "--td-m": `${mCol * 240 + mRow * 70}ms`,
     "--td-w": `${card.col * 240 + card.row * 70}ms`,
   } as CSSProperties;

@@ -84,7 +84,7 @@ it("redacts capability URLs even when event properties try to override them", ()
   captureWebException(new Error("render failed"), {
     $current_url: "https://example.com/i/private-capability",
   });
-  const body = JSON.parse(spy.mock.calls[0][1].body);
+  const body = JSON.parse(spy.mock.calls[0]![1].body);
   expect(body.properties.$current_url).toBe(
     `${window.location.origin}/i/[token]`,
   );
@@ -98,7 +98,7 @@ it("redacts plan vote links too", () => {
   const spy = vi.fn().mockResolvedValue(new Response());
   vi.stubGlobal("fetch", spy);
   captureWebException(new Error("render failed"), {});
-  const body = JSON.parse(spy.mock.calls[0][1].body);
+  const body = JSON.parse(spy.mock.calls[0]![1].body);
   expect(body.properties.$current_url).toBe(
     `${window.location.origin}/p/[token]`,
   );

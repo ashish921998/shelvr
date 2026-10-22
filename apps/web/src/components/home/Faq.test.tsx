@@ -21,9 +21,9 @@ it("keeps one answer open at a time", () => {
   const expanded = () => buttons.map((b) => b.getAttribute("aria-expanded"));
   expect(expanded()).toEqual(["true", "false", "false", "false", "false"]);
 
-  act(() => buttons[2].click());
+  act(() => buttons[2]!.click());
   expect(expanded()).toEqual(["false", "false", "true", "false", "false"]);
 
-  act(() => buttons[2].click());
+  act(() => buttons[2]!.click());
   expect(expanded()).toEqual(["false", "false", "false", "false", "false"]);
 });

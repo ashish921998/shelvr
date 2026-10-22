@@ -53,14 +53,14 @@ describe("parseLibraryExport", () => {
     expect(stats.count).toBe(3);
     expect(stats.oldestAt).toBe(Date.UTC(2014, 0, 2));
     expect(stats.topDomains[0]).toBe("seriouseats.com");
-    expect(rows[0].title).toBe("Cacio e Pepe & Friends");
+    expect(rows[0]!.title).toBe("Cacio e Pepe & Friends");
   });
 
   it("keeps only the text of a bookmark title, however its tags nest", () => {
     const rows = parseLibraryExport(
       `<DL><DT><A HREF="https://example.com/a">Fish <B>&amp; <I>chips</I></B> <<b>script>x</A></DL>`,
     );
-    expect(rows[0].title).toBe("Fish & chips script>x");
+    expect(rows[0]!.title).toBe("Fish & chips script>x");
   });
 
   it("reads an Instagram saved_posts.json export", () => {
@@ -69,7 +69,7 @@ describe("parseLibraryExport", () => {
     expect(stats.count).toBe(2);
     expect(stats.oldestAt).toBe(Date.UTC(2015, 0, 1));
     expect(stats.topDomains).toEqual(["instagram.com"]);
-    expect(rows[0].title).toBe("chef.anna");
+    expect(rows[0]!.title).toBe("chef.anna");
   });
 
   it("reads a plain list of URLs", () => {
@@ -104,7 +104,7 @@ describe("oracleRows", () => {
     }));
     const sample = oracleRows(rows);
     expect(sample).toHaveLength(40);
-    expect(sample[0].label).toBe("https://example.com/0");
-    expect(sample[39].label).toBe("https://example.com/390");
+    expect(sample[0]!.label).toBe("https://example.com/0");
+    expect(sample[39]!.label).toBe("https://example.com/390");
   });
 });

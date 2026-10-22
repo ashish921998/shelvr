@@ -19,7 +19,9 @@ type Result = {
   thumb: string;
 } & ({ tag: string } | { intent: IntentKind; intentLabel: string });
 
-const QUERIES: { q: string; results: Result[] }[] = [
+type Query = { q: string; results: Result[] };
+
+const QUERIES: [Query, ...Query[]] = [
   {
     q: "lisbon weekend",
     results: [
@@ -111,7 +113,7 @@ export default function Search() {
   const [qi, setQi] = useState(0);
   const [typed, setTyped] = useState(0);
   const [out, setOut] = useState(false);
-  const { q, results } = QUERIES[qi];
+  const { q, results } = QUERIES[qi] ?? QUERIES[0];
 
   useEffect(() => {
     if (!inView || reduced) return;
