@@ -1652,9 +1652,13 @@ export const updateNoteItem = mutation({
         : item.titleSource === "user"
           ? undefined
           : item.title;
-    const refreshRunId =
+    const wantsRun =
       (textChanged || (titleChanged && typedTitle === "")) &&
-      item.status !== "failed"
+      item.status !== "failed";
+    const refreshRunId =
+      wantsRun &&
+      (item.status !== "processing" ||
+        (await rateLimiter.limit(ctx, "noteRefresh", { key: userId })).ok)
         ? crypto.randomUUID()
         : undefined;
     await ctx.db.patch(item._id, {

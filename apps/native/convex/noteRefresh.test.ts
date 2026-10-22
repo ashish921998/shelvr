@@ -159,4 +159,22 @@ describe("merged note refresh regression audit", () => {
       tags: NEW_CLASSIFICATION.tags,
     });
   });
+
+  it("stops restarting a processing note once the refresh budget is spent", async () => {
+    const { t, owner, itemId } = await setup("processing");
+    const runIds = new Set<string | undefined>();
+    for (let edit = 0; edit < 21; edit++) {
+      await owner.mutation(api.items.updateNoteItem, {
+        id: itemId,
+        text: `Edit ${edit}`,
+      });
+      const item = await t.run((ctx) => ctx.db.get(itemId));
+      runIds.add(item?.processingRunId);
+    }
+    expect(runIds.size).toBe(20);
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      note: "Edit 20",
+      status: "processing",
+    });
+  });
 });
