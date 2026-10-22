@@ -13,16 +13,16 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Onboarding
 
-<!-- onboarding-flow-version: 11 -->
+<!-- onboarding-flow-version: 12 -->
 
 1. **Opener:** a **Start yours** button and an **Already have an account? Sign in** link.
-2. **Topics:** "What are you into?" offers topics to pick. Each picked topic becomes a space. Nothing has to be picked. Picking Travel opens "What kind of spots?" under the topics; each pick there is a space too, and none is required.
+2. **Topics:** "What are you into?" offers topics to pick. Each picked topic becomes a space. Nothing has to be picked. Picking Travel opens a card under the topics with "What kind of spots?", where each pick is a space too, and "Where are you going next?", a menu of eleven cities or "Not sure yet" (Prague), which is the city of the sample trip. None of it is required.
 3. **Setup:** "What do you save?" picks save kinds and the spaces to start with.
 4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. No account is needed: a sample shows a preview of the result, then "Read and titled. It goes on your shelf once you're in." with **Continue**; a pasted or typed link shows "Got it." with **Continue**. The link is queued on the device and saved to the account after sign-in. **Skip for now** passes the first save.
 5. **Reminder:** "When should it come back?" offers one reminder for a save already in the account, so a signed-out first run skips this step. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
 6. **Share practice:** "Save your first post." has the user share one sample post to Shelvr through the system share sheet, with the **Share this post** button or the Share icon on the post, or skip with **I'll try it later**. A successful share shows "You nailed it." and a **Continue** button.
 7. **Promise:** "Last thing. Make it count." lists three habits the user promises themselves. The promise itself is not saved; as on every onboarding step, the app only remembers the step on the device and records that it was shown and completed in analytics. **I'm in** is the only action. It opens the sample trip when Travel was picked, and the paywall otherwise.
-8. **Sample trip (only when Travel was picked as a topic or a kind of save):** a short screen builds a fixed sample trip to Prague from three sample saves, then shows it locked: the first stop is clear, the rest is blurred behind a lock. Every screen labels it a sample; it is not made from the user's saves and calls no server. **Unlock the full trip** opens the paywall. After a purchase the same sample opens in full; its **Continue** button leads to sign-in. Closing the paywall keeps the locked trip on screen. Everyone who did not pick Travel goes from the promise straight to the paywall.
+8. **Sample trip (only when Travel was picked as a topic or a kind of save):** a short screen builds a fixed sample trip to the city picked on the topics step (Prague when none was picked) from three sample saves, then shows it locked: the first stop is clear, the rest is blurred behind a lock. Every screen labels it a sample; it is not made from the user's saves and calls no server. **Unlock the full trip** opens the paywall. After a purchase the same sample opens in full; its **Continue** button leads to sign-in. Closing the paywall keeps the locked trip on screen. Everyone who did not pick Travel goes from the promise straight to the paywall.
 9. **Paywall:** **I'm in** (or **Unlock the full trip** on the sample trip) opens the RevenueCat paywall. Closing it keeps onboarding on the step that opened it. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves the queued link.
 10. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
 11. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
@@ -113,7 +113,7 @@ Shelvr is a private save-it-for-later app for links, notes, and images. It uses 
 Account access:
 
 1. Launch Shelvr and tap "Start yours". If you already have an account, tap "Already have an account? Sign in" instead.
-2. On "What are you into?", pick any topics or none, and tap Continue. Picking Travel opens "What kind of spots?" under the topics; pick any or none.
+2. On "What are you into?", pick any topics or none, and tap Continue. Picking Travel opens "What kind of spots?" and "Where are you going next?" under the topics; pick any or none, and the sample trip is in the city you choose.
 3. On "What do you save?", pick at least one kind, keep or edit the suggested spaces, and tap Continue.
 4. Tap the featured link to save it. A short preview plays, and the save is kept until the account exists.
 5. After the purchase in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required. Sign in completes through Apple's system authentication flow.
