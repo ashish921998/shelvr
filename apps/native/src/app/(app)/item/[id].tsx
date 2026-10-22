@@ -683,7 +683,12 @@ function ItemScreenContent() {
                     }
                     actions={[
                       ...(activeItem?.status === "ready"
-                        ? [{ label: t("spaces.addItem"), onPress: openSpaces }]
+                        ? [
+                            {
+                              label: t("spaces.changeMembership"),
+                              onPress: openSpaces,
+                            },
+                          ]
                         : []),
                       { label: t("common.share"), onPress: shareActive },
                       ...(activeItem?.url
@@ -720,10 +725,10 @@ function ItemScreenContent() {
           <Stack.Toolbar.Menu icon="ellipsis">
             {activeItem?.status === "ready" ? (
               <Stack.Toolbar.MenuAction
-                icon="rectangle.stack"
+                icon="tray.and.arrow.up"
                 onPress={openSpaces}
               >
-                {t("spaces.addItem")}
+                {t("spaces.changeMembership")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
