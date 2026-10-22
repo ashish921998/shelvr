@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   demoDestination,
   featuredDemoKind,
+  findSample,
   orderDemoSamples,
   practiceShareSample,
 } from "./onboarding-demo";
+import { SAMPLE_CITY_IDS } from "./sample-cities";
 
 describe("orderDemoSamples", () => {
   it("puts the picked kinds' samples first", () => {
@@ -121,5 +123,48 @@ describe("demoDestination", () => {
 
   it("never files an arbitrary shared link", () => {
     expect(demoDestination("https://example.com/post", ["Travel"])).toBeNull();
+  });
+});
+
+describe("the picked city's travel sample", () => {
+  const travel = (city: (typeof SAMPLE_CITY_IDS)[number] | null) =>
+    orderDemoSamples(["Travel"], ["Travel"], city).filter(
+      (sample) => sample.kind === "Travel",
+    );
+
+  it("is Prague's page when no city, or Prague, was picked", () => {
+    expect(travel(null).map((sample) => sample.domain)).toEqual(["prague.eu"]);
+    expect(travel("prague").map((sample) => sample.domain)).toEqual([
+      "prague.eu",
+    ]);
+  });
+
+  it.each(SAMPLE_CITY_IDS.filter((city) => city !== "prague"))(
+    "is a page of its own for %s, shown once and found by its link",
+    (city) => {
+      const [sample, ...rest] = travel(city);
+      expect(rest).toEqual([]);
+      expect(sample?.city).toBe(city);
+      expect(sample?.url).toMatch(/^https:\/\//);
+      expect(sample?.url).not.toContain("prague");
+      expect(findSample(sample!.url)?.pageHeading).toBe(sample?.pageHeading);
+      expect(demoDestination(sample!.url, ["Travel"])).toBe("Travel");
+    },
+  );
+
+  it("leaves the other kinds' samples alone", () => {
+    expect(
+      orderDemoSamples(["Recipes", "Travel"], [], "tokyo").map(
+        (sample) => sample.city ?? sample.kind,
+      ),
+    ).toEqual(["Recipes", "tokyo", "Products"]);
+  });
+
+  it("is what the share practice offers after another save", () => {
+    const article = practiceShareSample(["Travel"], null, "tokyo");
+    expect(article?.kind).toBe("Articles");
+    expect(practiceShareSample(["Travel"], article!.url, "tokyo")?.city).toBe(
+      "tokyo",
+    );
   });
 });

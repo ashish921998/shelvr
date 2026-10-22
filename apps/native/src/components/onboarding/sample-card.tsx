@@ -1,6 +1,7 @@
 import { t } from "@/lib/i18n";
 import type { DemoKind, DemoSample } from "@/lib/onboarding-demo";
 import type { Interest } from "@/lib/onboarding-interests";
+import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
@@ -30,6 +31,8 @@ const INTEREST_IMAGES: Record<Interest, number> = {
 };
 
 export function sampleImage(sample: DemoSample): number {
+  // A picked city's travel sample shows that city.
+  if (sample.city !== undefined) return CITY_PICTURES[sample.city].view;
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
     : INTEREST_IMAGES[sample.interest];

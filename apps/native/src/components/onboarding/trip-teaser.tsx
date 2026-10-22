@@ -1,3 +1,4 @@
+import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { CtaButton } from "@/components/onboarding/parts";
 import { SampleTripCard } from "@/components/onboarding/trip-teaser-card";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -16,55 +17,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // The sample trip steps of onboarding, for people who save travel: the trip
 // builds from three sample saves, shows locked, and opens up after the
 // paywall. Each screen says the trip is a sample.
-
-// Each city's covers: a dish for the reel, a view for the article. Unsplash,
-// under its free licence; credits are kept with the onboarding notes.
-const PICTURES: Record<SampleCityId, Record<"food" | "view", number>> = {
-  barcelona: {
-    food: require("../../../assets/onboarding/city-barcelona-food.jpg"),
-    view: require("../../../assets/onboarding/city-barcelona-view.jpg"),
-  },
-  lisbon: {
-    food: require("../../../assets/onboarding/city-lisbon-food.jpg"),
-    view: require("../../../assets/onboarding/city-lisbon-view.jpg"),
-  },
-  london: {
-    food: require("../../../assets/onboarding/city-london-food.jpg"),
-    view: require("../../../assets/onboarding/city-london-view.jpg"),
-  },
-  "los-angeles": {
-    food: require("../../../assets/onboarding/city-los-angeles-food.jpg"),
-    view: require("../../../assets/onboarding/city-los-angeles-view.jpg"),
-  },
-  "new-york": {
-    food: require("../../../assets/onboarding/city-new-york-food.jpg"),
-    view: require("../../../assets/onboarding/city-new-york-view.jpg"),
-  },
-  paris: {
-    food: require("../../../assets/onboarding/city-paris-food.jpg"),
-    view: require("../../../assets/onboarding/city-paris-view.jpg"),
-  },
-  prague: {
-    food: require("../../../assets/onboarding/city-prague-food.jpg"),
-    view: require("../../../assets/onboarding/prague.jpg"),
-  },
-  "san-francisco": {
-    food: require("../../../assets/onboarding/city-san-francisco-food.jpg"),
-    view: require("../../../assets/onboarding/city-san-francisco-view.jpg"),
-  },
-  seoul: {
-    food: require("../../../assets/onboarding/city-seoul-food.jpg"),
-    view: require("../../../assets/onboarding/city-seoul-view.jpg"),
-  },
-  tokyo: {
-    food: require("../../../assets/onboarding/city-tokyo-food.jpg"),
-    view: require("../../../assets/onboarding/city-tokyo-view.jpg"),
-  },
-  toronto: {
-    food: require("../../../assets/onboarding/city-toronto-food.jpg"),
-    view: require("../../../assets/onboarding/city-toronto-view.jpg"),
-  },
-};
 
 // Each build step takes this long, and the finished list holds a beat before
 // the trip shows.
@@ -124,7 +76,7 @@ function SaveRow({
           />
         ) : (
           <Image
-            source={PICTURES[city][save.picture]}
+            source={CITY_PICTURES[city][save.picture]}
             contentFit="cover"
             style={styles.thumbImage}
           />

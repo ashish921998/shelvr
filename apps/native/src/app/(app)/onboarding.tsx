@@ -264,6 +264,7 @@ export default function OnboardingScreen() {
   const practiceSample = practiceShareSample(
     kinds,
     getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
+    pickedCity,
   );
   const paywall = useOnboardingPaywall({
     // A purchase opens the sample trip; with no trip, onboarding is done.
@@ -393,7 +394,7 @@ export default function OnboardingScreen() {
 
           {step === "demo" && (
             <LiveDemoStep
-              samples={orderDemoSamples(kinds, interests)}
+              samples={orderDemoSamples(kinds, interests, pickedCity)}
               titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
               resume={resumeDemo}
