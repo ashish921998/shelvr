@@ -249,16 +249,19 @@ export function TripBuildStep({
 export function TripRevealStep({
   trip,
   standIn = false,
+  after,
+  onAfter,
   onContinue,
 }: {
   trip: SampleTrip;
   /** The person's own city has no sample, so this one stands in for it. */
   standIn?: boolean;
+  after: EveningAfter;
+  onAfter: (after: EveningAfter) => void;
   onContinue: () => void;
 }) {
   useAppLocale();
   const city = t(trip.name);
-  const [after, setAfter] = useState<EveningAfter>("walk");
   const shown = useMemo(() => eveningWith(trip, after), [trip, after]);
   const [leaving, setLeaving] = useState(false);
   const leftRef = useRef(false);
@@ -289,7 +292,7 @@ export function TripRevealStep({
           </Animated.View>
           <Animated.View entering={SETTLE_CARD} style={styles.revealBody}>
             {trip.kind === "date" ? (
-              <EveningChips picked={after} onPick={setAfter} />
+              <EveningChips picked={after} onPick={onAfter} />
             ) : null}
             <SampleTripCard trip={shown} />
           </Animated.View>

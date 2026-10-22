@@ -144,7 +144,14 @@ describe("TripBuildStep", () => {
 
 describe("TripRevealStep", () => {
   it("shows the open sample trip and says it is a sample", () => {
-    render(<TripRevealStep trip={TRIP} onContinue={vi.fn()} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
     expect(screen.getByTestId("card").dataset.kind).toBe("trip");
     expect(screen.getByText("tripTeaser.revealTitle")).toBeTruthy();
     expect(screen.getByText("tripTeaser.revealBody")).toBeTruthy();
@@ -152,14 +159,28 @@ describe("TripRevealStep", () => {
 
   it("continues with one tap", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
   it("continues once when it is tapped twice before the screen redraws", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
     const button = screen.getByText("common.continue");
     act(() => {
       fireEvent.click(button);
@@ -170,7 +191,14 @@ describe("TripRevealStep", () => {
 
   it("takes no more taps once it has continued", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
     fireEvent.click(screen.getByText("common.continue"));
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();

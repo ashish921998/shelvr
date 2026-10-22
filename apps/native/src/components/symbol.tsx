@@ -27,6 +27,7 @@ const SF_TO_MATERIAL = {
   "square.grid.2x2": "grid_view",
   "square.grid.2x2.fill": "grid_view",
   "star.fill": "star",
+  bell: "notifications",
   heart: "favorite",
   "play.rectangle": "smart_display",
   "play.fill": "play_arrow",

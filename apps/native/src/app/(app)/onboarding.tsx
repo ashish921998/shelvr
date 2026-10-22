@@ -4,7 +4,7 @@ import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import type { SampleCityId } from "@/lib/sample-cities";
-import { isSampleCity, samplePlan } from "@/lib/sample-trip";
+import { type EveningAfter, isSampleCity, samplePlan } from "@/lib/sample-trip";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import {
   GOAL_PLANS,
@@ -122,6 +122,7 @@ export default function OnboardingScreen() {
       : null,
   );
   const [goal, setGoal] = useState<Goal | null>(initialProgress.goal);
+  const [eveningAfter, setEveningAfter] = useState<EveningAfter>("walk");
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
@@ -324,6 +325,8 @@ export default function OnboardingScreen() {
             <TripRevealStep
               trip={trip}
               standIn={cityStandIn}
+              after={eveningAfter}
+              onAfter={setEveningAfter}
               onContinue={advance}
             />
           )}
@@ -352,7 +355,8 @@ export default function OnboardingScreen() {
           {step === "promise" && (
             <PromiseStep
               goal={goal ?? "other"}
-              city={cityStandIn ? null : cityName}
+              city={pickedCity === trip.city ? cityName : null}
+              after={eveningAfter}
               leaving={paywall.asked}
               onCommit={() => {
                 recordCurrentStep();

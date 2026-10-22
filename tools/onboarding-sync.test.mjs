@@ -53,7 +53,7 @@ const normalize = (text) => straighten(text).replace(/\s+/g, " ").trim();
 const COMPOSED = [
   ["Already have an account?", "Sign in"],
   ["Read and titled.", "It goes on your shelf once you're in."],
-  ["Your saves,", "used."],
+  ["No more", "“where should we eat?”"],
 ];
 
 function showing(strings) {
@@ -129,11 +129,11 @@ test("unrelated strings are not joined", () => {
 
 test("the matcher takes a title and its accent, and not a retired title", () => {
   const isShown = showing([
-    "Your saves,",
-    "used.",
+    "No more",
+    "“where should we eat?”",
     "Save your first post.",
   ]);
-  assert.ok(isShown("Your saves, used."));
+  assert.ok(isShown("No more \"where should we eat?\""));
   assert.ok(isShown("Save your first post."));
   // PR 438 renamed the share step and left this quote in the notes.
   assert.ok(!isShown("Save this post the way you will in any app."));

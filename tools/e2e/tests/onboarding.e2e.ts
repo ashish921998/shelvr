@@ -31,10 +31,10 @@ test(
     );
 
     await shareLater.tap();
-    await screen.getByRole("button", "Let's do it").tap({ timeout: 30_000 });
+    await screen.getByRole("button", "Let's go").tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
-    const commit = screen.getByRole("button", "Let's do it");
+    const commit = screen.getByRole("button", "Let's go");
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
     await expect(commit).toBeVisible({ timeout: 30_000 });
@@ -71,7 +71,7 @@ test(
     await expect(screen.getByText("Staré Město")).toBeVisible();
     await screen.getByRole("button", "Continue").tap();
 
-    const commit = screen.getByRole("button", "Let's do it");
+    const commit = screen.getByRole("button", "Let's go");
     await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
     await screen.getByRole("button", "Close").first().tap();
