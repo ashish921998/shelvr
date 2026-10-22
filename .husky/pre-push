@@ -1,3 +1,7 @@
+# Git exports GIT_DIR and its siblings to hooks, and they outrank the directory
+# a command runs in. Clear them so the gate runs as it does in a shell and in CI.
+for name in $(git rev-parse --local-env-vars); do unset "$name"; done
+
 # The gate CI runs on every push. The dependency audit is left out: it needs
 # the network, and a new advisory is not this change's fault.
 pnpm run check:code
