@@ -77,6 +77,7 @@ import {
   reminderSubject,
 } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
+import { buildSearchText } from "./model/searchText";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -339,39 +340,6 @@ async function toItemCard(
     ...card
   } = await enrichItem(ctx, item);
   return recipe ? { ...card, hasRecipe: true } : card;
-}
-
-/** How much of a note's own text the search index carries. Notes are short;
- * the cap keeps a pasted essay from bloating the index. */
-const MAX_SEARCH_NOTE_CHARS = 8000;
-
-/** How much of an extracted article body the search index carries. Without
- * this the index only ever held the classifier's ~40-word summary of a page,
- * so a phrase the reader actually remembers from the article was unfindable.
- * The cap mirrors the note cap rather than MAX_STORED_CONTENT_CHARS (100k):
- * `searchText` rides along on every `enrichedItemValidator` read, so the index
- * copy stays a lede, not a second copy of the body. */
-const MAX_SEARCH_CONTENT_CHARS = 8000;
-
-function buildSearchText(parts: {
-  title?: string;
-  description?: string;
-  tags: string[];
-  siteName?: string;
-  note?: string;
-  content?: string;
-}): string {
-  return [
-    parts.title,
-    parts.description,
-    ...parts.tags,
-    parts.siteName,
-    parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
-    parts.content?.slice(0, MAX_SEARCH_CONTENT_CHARS),
-  ]
-    .filter((p): p is string => typeof p === "string" && p.length > 0)
-    .join(" ")
-    .toLowerCase();
 }
 
 // ---------------------------------------------------------------------------

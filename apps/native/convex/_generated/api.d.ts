@@ -81,6 +81,7 @@ import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as model_saveErrors from "../model/saveErrors.js";
 import type * as model_saveReminders from "../model/saveReminders.js";
 import type * as model_saveSource from "../model/saveSource.js";
+import type * as model_searchText from "../model/searchText.js";
 import type * as model_secureCompare from "../model/secureCompare.js";
 import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
@@ -183,6 +184,7 @@ declare const fullApi: ApiFromModules<{
   "model/saveErrors": typeof model_saveErrors;
   "model/saveReminders": typeof model_saveReminders;
   "model/saveSource": typeof model_saveSource;
+  "model/searchText": typeof model_searchText;
   "model/secureCompare": typeof model_secureCompare;
   "model/spaceName": typeof model_spaceName;
   "model/storage": typeof model_storage;
