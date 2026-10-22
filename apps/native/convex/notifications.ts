@@ -480,7 +480,11 @@ export const prepareWeeklyDigest = internalMutation({
     // A shelf that never reached a device has not shown its saves to anyone.
     const previouslyIncluded = new Set<string>(
       recentDigests
-        .filter((digest) => digest.deliveryStatus !== "failed")
+        .filter(
+          (digest) =>
+            digest.deliveryStatus !== "failed" ||
+            digest.deliverySentAt !== undefined,
+        )
         .flatMap((digest) => digest.itemIds),
     );
     const candidates = shelfCandidates(items, previouslyIncluded, args.now);
