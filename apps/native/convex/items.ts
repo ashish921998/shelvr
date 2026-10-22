@@ -1614,6 +1614,21 @@ export const importLinks = mutation({
 
 export const NOTE_REFRESH_DELAY_MS = 20_000;
 
+async function noteRunDelay(
+  ctx: MutationCtx,
+  item: Doc<"items">,
+): Promise<number> {
+  if (item.status !== "processing") {
+    return NOTE_REFRESH_DELAY_MS;
+  }
+  const { ok, retryAfter } = await rateLimiter.limit(ctx, "noteRefresh", {
+    key: item.userId,
+  });
+  return ok
+    ? NOTE_REFRESH_DELAY_MS
+    : Math.max(NOTE_REFRESH_DELAY_MS, retryAfter ?? 0);
+}
+
 export const updateNoteItem = mutation({
   args: {
     id: v.id("items"),
@@ -1652,15 +1667,13 @@ export const updateNoteItem = mutation({
         : item.titleSource === "user"
           ? undefined
           : item.title;
-    const wantsRun =
+    const runDelay =
       (textChanged || (titleChanged && typedTitle === "")) &&
-      item.status !== "failed";
-    const refreshRunId =
-      wantsRun &&
-      (item.status !== "processing" ||
-        (await rateLimiter.limit(ctx, "noteRefresh", { key: userId })).ok)
-        ? crypto.randomUUID()
+      item.status !== "failed"
+        ? await noteRunDelay(ctx, item)
         : undefined;
+    const refreshRunId =
+      runDelay !== undefined ? crypto.randomUUID() : undefined;
     await ctx.db.patch(item._id, {
       note: text,
       title,
@@ -1681,7 +1694,7 @@ export const updateNoteItem = mutation({
     });
     if (refreshRunId !== undefined) {
       await ctx.scheduler.runAfter(
-        NOTE_REFRESH_DELAY_MS,
+        runDelay ?? NOTE_REFRESH_DELAY_MS,
         internal.ai.processItem,
         {
           itemId: item._id,

@@ -160,21 +160,30 @@ describe("merged note refresh regression audit", () => {
     });
   });
 
-  it("stops restarting a processing note once the refresh budget is spent", async () => {
+  it("waits for the refresh budget before reclassifying a processing note", async () => {
     const { t, owner, itemId } = await setup("processing");
-    const runIds = new Set<string | undefined>();
+    const delays: number[] = [];
     for (let edit = 0; edit < 21; edit++) {
+      const editedAt = Date.now();
       await owner.mutation(api.items.updateNoteItem, {
         id: itemId,
         text: `Edit ${edit}`,
       });
-      const item = await t.run((ctx) => ctx.db.get(itemId));
-      runIds.add(item?.processingRunId);
+      const pending = await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      delays.push(pending[pending.length - 1].scheduledTime - editedAt);
     }
-    expect(runIds.size).toBe(20);
+    expect(delays.slice(0, 20).every((d) => d === 20_000)).toBe(true);
+    expect(delays[20]).toBeGreaterThan(20_000);
+
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(generateObject).toHaveBeenCalledTimes(1);
+    expect(generateObject.mock.calls[0][0].prompt).toContain("Edit 20");
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       note: "Edit 20",
-      status: "processing",
+      status: "ready",
+      description: NEW_CLASSIFICATION.description,
     });
   });
 });
