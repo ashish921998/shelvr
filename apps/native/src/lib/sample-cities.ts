@@ -1,9 +1,5 @@
 import type { TextMessageKey } from "@/locales/message-types";
 
-// Every city the onboarding sample trip can be in. Place names are the
-// places' own and stay untranslated; coordinates are approximate and only
-// place pins on a drawn map.
-
 export const SAMPLE_CITY_IDS = [
   "barcelona",
   "lisbon",
@@ -18,7 +14,6 @@ export const SAMPLE_CITY_IDS = [
   "toronto",
 ] as const;
 export type SampleCityId = (typeof SAMPLE_CITY_IDS)[number];
-/** Every sample day runs in this order, one stop per slot. */
 const DAY_SLOTS = ["morning", "lunch", "afternoon", "dinner"] as const;
 export type SampleSlot = (typeof DAY_SLOTS)[number];
 export type LatLng = { lat: number; lng: number };
@@ -26,26 +21,18 @@ type CityStop = {
   name: string;
   slot: SampleSlot;
   at: LatLng;
-  /** The place really is on the water (a bridge, an island), so its pin may
-   * sit on the drawn river. */
   onWater?: boolean;
 };
 export type SampleDay = { title: TextMessageKey; stops: readonly CityStop[] };
 export type SampleSave = {
   name: string;
-  /** The page's own host, or a label that says what kind of save it is. */
   source: { host: string } | { label: TextMessageKey };
-  /** How many of the trip's places this save names. */
   places: number;
-  /** Which cover the save shows: the city's dish photo, its view photo, or none. */
   picture: "food" | "view" | "place";
 };
 export type SampleCity = {
-  /** The city's name as people say it in their language. */
   name: TextMessageKey;
-  /** Rivers, canals and shorelines near the stops, each a line of points. */
   water: readonly (readonly LatLng[])[];
-  /** How wide the water is drawn, for a narrow stream; a river otherwise. */
   waterWidth?: number;
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
@@ -177,7 +164,6 @@ export const SAMPLE_CITIES = {
       day("tripTeaser.lisbonDayTwo", [
         stop("Mosteiro dos Jerónimos", 38.6979, -9.2066),
         stop("Pastéis de Belém", 38.6975, -9.2032),
-        // The tower stands in the Tagus, off the bank.
         stop("Torre de Belém", 38.6916, -9.216, ON_WATER),
         stop("O Frade", 38.699, -9.2047),
       ]),
@@ -466,7 +452,6 @@ export const SAMPLE_CITIES = {
   },
   seoul: {
     name: "tripTeaser.citySeoul",
-    // Cheonggyecheon is a narrow stream, not a river.
     waterWidth: 6,
     water: [
       [
@@ -614,7 +599,6 @@ export const SAMPLE_CITIES = {
   },
 } as const satisfies Record<SampleCityId, SampleCity>;
 
-/** Whether `value` names a city there is a sample trip for. */
 export function isSampleCity(value: unknown): value is SampleCityId {
   return (
     typeof value === "string" &&

@@ -31,7 +31,6 @@ type PendingRecord = {
   demo: PendingDemo | null;
   saved: PendingSaved | null;
   spaceNames: Record<string, string>;
-  /** The city picked for the sample trip; absent until one is picked. */
   travelCity?: SampleCityId | null;
 };
 

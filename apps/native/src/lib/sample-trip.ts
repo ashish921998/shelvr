@@ -20,8 +20,6 @@ export function showTripTeaser(
   return kinds.includes("Travel") || interests.includes("Travel");
 }
 
-/** The city a sample trip is in when nobody picked one ("Not sure yet",
- * travel picked only as a kind of save, or an older stored pick). */
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
 export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
@@ -57,32 +55,18 @@ export type SampleTrip = {
   name: TextMessageKey;
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
-  /** The city's water as drawing paths, on the same scale as the pins. */
   water: readonly string[];
-  /** How wide the water is drawn. */
   waterWidth: number;
 };
 
-// Where pins may sit: a pin's centre stays this far inside both crops.
 const PIN_BOX = { left: 26, right: 314, top: 50, bottom: 136 };
-// Two pins closer than this would overlap, so they are pushed apart.
 const PIN_GAP = 24;
-// How wide a river is drawn, unless its city says otherwise.
 const WATER_WIDTH = 16;
-// How far a pin's centre stays from the water's edge, so a place on land
-// never reads as in the river. A pin is 22 across, so most of it is on land.
 const WATER_CLEARANCE = 8;
-// A pin this many clearances from a line, on the wrong side, has crossed the
-// water while spreading and goes back to its own bank.
 const CROSSING_REACH = 3;
-// How many spreading passes may run before the pins are left where they are.
 const SPREAD_ROUNDS = 80;
-// Pins on the same spot part along this fixed slant (a unit vector).
 const SAME_SPOT_SLANT = [0.8, 0.6] as const;
 
-/** Places the trip's real coordinates on the drawing: one scale for both
- * axes (a degree of longitude shrinks away from the equator), centred in the
- * pin box. */
 function projection(points: readonly LatLng[]): (at: LatLng) => Point {
   const lats = points.map((point) => point.lat);
   const lngs = points.map((point) => point.lng);
@@ -109,8 +93,6 @@ type Water = { lines: readonly (readonly Point[])[]; width: number };
 
 type Nearest = { near: Point; distance: number; side: number; normal: Point };
 
-/** Where `line` passes closest to `pin`: the point, how far it is, which side
- * of the line the pin is on (1 or -1), and the unit normal on that side. */
 function nearestOnLine(pin: Point, line: readonly Point[]): Nearest {
   let best: Nearest = {
     near: line[0],
@@ -143,8 +125,6 @@ function nearestOnLine(pin: Point, line: readonly Point[]): Nearest {
   return best;
 }
 
-/** Keeps a pin out of the drawn water and on the bank its place is on, the
- * side of each line its real position (`home`) falls. Says whether it moved. */
 function keepOffWater(pin: Point, home: Point, water: Water): boolean {
   const room = water.width / 2 + WATER_CLEARANCE;
   let moved = false;
@@ -154,7 +134,6 @@ function keepOffWater(pin: Point, home: Point, water: Water): boolean {
     const crossed =
       now.side !== bank.side && now.distance < room * CROSSING_REACH;
     if (now.distance >= room && !crossed) continue;
-    // Off the line, square to it, on the place's own bank.
     const sign = now.side === bank.side ? 1 : -1;
     pin.x = now.near.x + now.normal.x * sign * room;
     pin.y = now.near.y + now.normal.y * sign * room;
@@ -163,9 +142,6 @@ function keepOffWater(pin: Point, home: Point, water: Water): boolean {
   return moved;
 }
 
-/** Moves pins that would overlap apart until each has room, and pins of
- * places on land off the water, keeping them in the pin box. Neighbours a
- * street apart still read as two pins. */
 function spreadPins(
   pins: Point[],
   onWater: readonly boolean[],
@@ -246,7 +222,6 @@ function buildTrip(id: SampleCityId): SampleTrip {
 
 const TRIPS = new Map<SampleCityId, SampleTrip>();
 
-/** The sample trip in `city`, or in the default city when there is none. */
 export function sampleTrip(city?: string | null): SampleTrip {
   const id = isSampleCity(city) ? city : DEFAULT_SAMPLE_CITY;
   let trip = TRIPS.get(id);

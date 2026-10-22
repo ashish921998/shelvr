@@ -27,7 +27,6 @@ const INTEREST_IMAGES: Record<Interest, number> = {
 };
 
 export function sampleImage(sample: DemoSample): number {
-  // A picked city's travel sample shows that city.
   if (sample.city !== undefined) return CITY_PICTURES[sample.city].view;
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
