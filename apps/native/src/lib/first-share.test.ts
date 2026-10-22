@@ -82,6 +82,13 @@ describe("weekly nudge timing", () => {
     expect(isFirstSession("user_b")).toBe(false);
   });
 
+  it("gives every launch its own id", async () => {
+    expect(isFirstSession("user_a")).toBe(true);
+    vi.resetModules();
+    const laterLaunch = await import("./first-share");
+    expect(laterLaunch.isFirstSession("user_a")).toBe(false);
+  });
+
   it("waits for three real saves outside the first session", () => {
     const three = { saved: 3, goal: 3 };
     const base = { firstSession: false, progress: three };

@@ -17,7 +17,7 @@ export function hasSavedFirstShare(userId: string): boolean {
 export const isWeeklyNudgePending = weeklyNudge.isPending;
 export const finishWeeklyNudge = weeklyNudge.finish;
 
-const LAUNCH_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const LAUNCH_ID = `${Date.now()}-${performance.now()}`;
 const firstLaunchKey = (userId: string) => `shelvr.firstLaunch.${userId}`;
 
 export function isFirstSession(userId: string): boolean {
