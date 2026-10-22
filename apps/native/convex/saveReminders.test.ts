@@ -701,6 +701,32 @@ describe("delivering a save reminder", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("closes a reminder whose owner is gone instead of queueing it again", async () => {
+    const { t, userId, reminder } = await queued();
+    await t.run((ctx) => ctx.db.delete(userId));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const jobs = async () =>
+      (
+        await t.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter((job) =>
+        /notificationDelivery:sendReminder|captureNotification/.test(job.name),
+      ).length;
+    const before = await jobs();
+    await t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: reminder._id,
+    });
+    await t.mutation(internal.notificationDelivery.recover, {});
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect(await jobs()).toBe(before);
+  });
+
   it("drops a reminder that could not go out the same day", async () => {
     const { t, reminder } = await queued();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));

@@ -489,4 +489,27 @@ describe("durable digest delivery", () => {
     });
     expect((await digest())?.deliveredAt).toBeUndefined();
   });
+
+  it("closes a digest whose owner is gone instead of queueing it again", async () => {
+    const { t, userId, digestId, digest } = await seed();
+    await t.run((ctx) => ctx.db.delete(userId));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const jobs = () =>
+      t.run(async (ctx) =>
+        (await ctx.db.system.query("_scheduled_functions").collect()).filter(
+          (job) =>
+            /notificationDelivery:send|captureNotification/.test(job.name),
+        ),
+      );
+    await t.action(internal.notificationDelivery.send, { digestId });
+    await t.mutation(internal.notificationDelivery.recover, {});
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect((await digest())?.deliveryNextAttemptAt).toBeUndefined();
+    expect(await jobs()).toHaveLength(0);
+  });
 });

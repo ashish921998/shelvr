@@ -181,6 +181,15 @@ type Closed = {
   deliverySentAt?: number;
 };
 
+const OWNER_UNAVAILABLE: Pick<
+  Closed,
+  "deliveryStatus" | "deliveryNextAttemptAt" | "deliveryError"
+> = {
+  deliveryStatus: "failed",
+  deliveryNextAttemptAt: undefined,
+  deliveryError: "owner_unavailable",
+};
+
 function firstSendAt(
   recorded: number | undefined,
   recipients: Recipient[],
@@ -246,7 +255,10 @@ export const claim = internalMutation({
       (digest.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
-    if ((await liveOwner(ctx, digest.userId)) === null) return null;
+    if ((await liveOwner(ctx, digest.userId)) === null) {
+      await ctx.db.patch(digestId, OWNER_UNAVAILABLE);
+      return null;
+    }
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", digest.userId))
@@ -508,7 +520,10 @@ export const claimReminder = internalMutation({
       (reminder.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
-    if ((await liveOwner(ctx, reminder.userId)) === null) return null;
+    if ((await liveOwner(ctx, reminder.userId)) === null) {
+      await ctx.db.patch(reminderId, OWNER_UNAVAILABLE);
+      return null;
+    }
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", reminder.userId))

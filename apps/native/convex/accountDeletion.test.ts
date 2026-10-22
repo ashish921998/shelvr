@@ -935,5 +935,39 @@ describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key].claim))(
         "the claim accepted a notification for an account that began deleting; give it a liveOwner check",
       ).toBeNull();
     });
+
+    it("closes what it refuses, so recovery does not queue it again", async () => {
+      const { backend, t } = await prepared();
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      const jobs = () =>
+        backend.run(
+          async (ctx) =>
+            (
+              await ctx.db.system.query("_scheduled_functions").collect()
+            ).filter((job) =>
+              /notificationDelivery:send|captureNotification/.test(job.name),
+            ).length,
+        );
+      const before = await jobs();
+      await recipe.claim!(backend);
+      await backend.mutation(internal.notificationDelivery.recover, {});
+      expect(
+        await jobs(),
+        "a refused claim scheduled a send or an analytics event, or recover queued the row again",
+      ).toBe(before);
+      const row = await backend.run((ctx) =>
+        ctx.db
+          .query(recipe.table as TableNames)
+          .order("desc")
+          .first(),
+      );
+      expect(
+        row,
+        "the claim refused the notification but left the row open; close it with OWNER_UNAVAILABLE",
+      ).toMatchObject({
+        deliveryStatus: "failed",
+        deliveryError: "owner_unavailable",
+      });
+    });
   },
 );
