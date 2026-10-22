@@ -117,7 +117,9 @@ use `expo lint`, which silently skips the `convex/` backend.
 
 The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
 the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
-same steps, so the pre-commit hook and the remote gate cannot drift. Knip's
+same steps, except that it audits a pull request only when it changes a
+`package.json`, the lockfile or `pnpm-workspace.yaml`; `audit.yml` runs the
+audit daily, and a failed run there is the alert for a new advisory. Knip's
 Convex entries are the top-level `convex/*.ts` modules and their co-located
 tests; every other file under `convex/` is a project file whose exports are
 reported as unused unless another module imports them. The Convex CLI registers

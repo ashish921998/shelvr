@@ -58,7 +58,24 @@ jobs:
       - name: Dead code
         run: pnpm run knip
 
+      # A new advisory appears in the registry, not in anyone's diff, so a
+      # required audit turns every open pull request red for a cause none of
+      # them contains. A pull request is audited only when it changes
+      # dependencies; audit.yml covers the rest on a schedule. Not on push to
+      # main either: Deploy waits for this workflow to pass.
+      - name: Dependency files changed
+        id: deps
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Security audit
+        if: github.event_name == 'workflow_dispatch' || steps.deps.outputs.changed == 'true'
         run: pnpm run audit
 
       - name: Version drift
