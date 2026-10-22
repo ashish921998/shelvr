@@ -60,11 +60,15 @@ it("settles every grid scenario as recorded", async () => {
     const args = legacyArgs(s, await load(t, itemId), ids);
     expect(
       await t.mutation(internal.items.finalizeItem, { itemId, ...args }),
+      s.id,
     ).toBe("applied");
     table[s.id] = snapshotRow(await load(t, itemId), ids);
   }
 
-  await expect(`${JSON.stringify(table, null, 2)}\n`).toMatchFileSnapshot(
+  const lines = Object.entries(table).map(
+    ([id, row]) => `  ${JSON.stringify(id)}: ${JSON.stringify(row)}`,
+  );
+  await expect(`{\n${lines.join(",\n")}\n}\n`).toMatchFileSnapshot(
     "./testdata/settlement/rows.json",
   );
 });
