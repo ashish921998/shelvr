@@ -222,6 +222,31 @@ describe("useMakePlan", () => {
       expect(second.planId).not.toBe(first.planId);
     }
   });
+
+  it("keeps the shown plan and says so when a shuffle fails", async () => {
+    mocks.makePlan
+      .mockResolvedValueOnce({ places: [place("Alpha")], considered: 3 })
+      .mockRejectedValueOnce(new Error("RateLimited"));
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
+    await waitFor(() => expect(result.current.state.status).toBe("ready"));
+    const shown = result.current.state;
+
+    await act(() => result.current.retry());
+
+    expect(result.current.state).toBe(shown);
+    expect(mocks.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the error screen when the first plan fails and its retry fails", async () => {
+    mocks.makePlan.mockRejectedValue(new Error("down"));
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    await act(() => result.current.retry());
+
+    expect(result.current.state.status).toBe("error");
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
 });
 
 describe("usePlanPicker", () => {

@@ -90,11 +90,24 @@ export function useMakePlan(
     };
   }, [load, key, linkLoaded]);
 
+  const resultRef = useRef(result);
+  useEffect(() => {
+    resultRef.current = result;
+  });
+
   const retry = useCallback(async () => {
     const current = ++run.current;
+    const shown =
+      resultRef.current?.key === key ? resultRef.current.state : null;
     setResult(null);
     const next = await load(current);
-    if (current === run.current) setResult({ key, state: next });
+    if (current !== run.current) return;
+    if (next.status === "error" && shown?.status === "ready") {
+      setResult({ key, state: shown });
+      Alert.alert(t("plan.failedTitle"), t("errors.retrySoon"));
+      return;
+    }
+    setResult({ key, state: next });
   }, [load, key]);
 
   const state = result?.key === key ? result.state : LOADING;
