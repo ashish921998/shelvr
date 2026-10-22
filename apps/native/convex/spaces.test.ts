@@ -882,7 +882,7 @@ describe("denormalized space summary", () => {
 });
 
 describe("steering spend controls", () => {
-  it("blocks a burst of addItemToSpace past the steerItem capacity and rolls the add back", async () => {
+  it("keeps filing past the steerItem capacity and only skips the steering", async () => {
     const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
     for (let i = 0; i < 40; i++) {
@@ -890,18 +890,40 @@ describe("steering spend controls", () => {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
     const over = await seedItem(t, userId, "over", false);
-    await expect(
-      t.mutation(api.spaces.addItemToSpace, { itemId: over, spaceId }),
-    ).rejects.toThrow();
-    expect((await readSpace(t, spaceId)).savedCount).toBe(40);
+    await t.mutation(api.spaces.addItemToSpace, { itemId: over, spaceId });
+    expect((await readSpace(t, spaceId)).savedCount).toBe(41);
     expect(await steeringJobs(t)).toHaveLength(40);
-    const joins = await t.run((ctx) =>
-      ctx.db
-        .query("spaceItems")
-        .withIndex("by_item", (q) => q.eq("itemId", over))
-        .collect(),
-    );
-    expect(joins).toHaveLength(0);
+  });
+
+  it("accepts a suggestion after Add all spent the steering budget", async () => {
+    const { t, userId } = await entitledUser();
+    const bulk = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
+    const other = await t.mutation(api.spaces.createSpace, { name: "Other" });
+    const ids: Id<"items">[] = [];
+    for (let i = 0; i < 41; i++) {
+      ids.push(await seedItem(t, userId, `i${i}`, false));
+    }
+    await t.mutation(internal.items.suggestItemsForSpace, {
+      spaceId: bulk,
+      itemIds: ids,
+    });
+    await t.mutation(internal.items.suggestItemsForSpace, {
+      spaceId: other,
+      itemIds: [ids[0]],
+    });
+    await t.mutation(api.spaces.acceptAllSuggestions, { spaceId: bulk });
+
+    expect(
+      await t.mutation(api.spaces.acceptSuggestion, {
+        itemId: ids[0],
+        spaceId: other,
+      }),
+    ).toBe(true);
+    expect(await readSpace(t, other)).toMatchObject({
+      savedCount: 1,
+      suggestedCount: 0,
+    });
+    expect(await steeringJobs(t)).toHaveLength(40);
   });
 
   it("acceptAllSuggestions keeps accepting once the steering budget is spent", async () => {
