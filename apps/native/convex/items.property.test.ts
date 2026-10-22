@@ -190,11 +190,13 @@ type Sub = {
 } | null;
 
 const EXPIRIES: [string, number][] = [
+  ["30 days ago", -30 * DAY_MS],
   ["a day ago", -DAY_MS],
   ["1 ms ago", -1],
   ["now", 0],
   ["in 1 ms", 1],
   ["in a day", DAY_MS],
+  ["in 30 days", 30 * DAY_MS],
 ];
 
 const SUBS: [string, Sub][] = [
