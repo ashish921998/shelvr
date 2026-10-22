@@ -54,6 +54,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
@@ -605,27 +606,29 @@ function ItemScreenContent() {
     reducedMotion,
   ]);
 
-  const onDelete = useCallback(async () => {
+  const onDelete = useCallback(() => {
     if (!activeItem || !items) return;
-    cancelParamWrite();
-    const idx = items.findIndex((item) => item._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    try {
-      await deleteItem({ id: activeItem._id });
-      forgetDeletedSharedItem(activeItem._id);
-      analytics.itemDeleted(activeItem, "item_detail");
-      if (neighbor) {
-        goTo(neighbor._id);
-        writeParams(neighbor._id);
-        listRef.current?.scrollToIndex({
-          index: Math.min(idx, items.length - 2),
-          animated: !reducedMotion,
-        });
-      } else if (router.canGoBack()) router.back();
-      else router.replace("/(app)/(tabs)/(home)");
-    } catch {
-      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-    }
+    confirmItemDelete(async () => {
+      cancelParamWrite();
+      const idx = items.findIndex((item) => item._id === activeItem._id);
+      const neighbor = items[idx + 1] ?? items[idx - 1];
+      try {
+        await deleteItem({ id: activeItem._id });
+        forgetDeletedSharedItem(activeItem._id);
+        analytics.itemDeleted(activeItem, "item_detail");
+        if (neighbor) {
+          goTo(neighbor._id);
+          writeParams(neighbor._id);
+          listRef.current?.scrollToIndex({
+            index: Math.min(idx, items.length - 2),
+            animated: !reducedMotion,
+          });
+        } else if (router.canGoBack()) router.back();
+        else router.replace("/(app)/(tabs)/(home)");
+      } catch {
+        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+      }
+    });
   }, [
     activeItem,
     items,
