@@ -15,14 +15,13 @@ import { settleIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { AccessibilityInfo, Platform, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
 const SETTLE_TITLE = settleIn(200);
 const SETTLE_BODY = settleIn(350);
 const SETTLE_ROW = settleIn(600);
-const SETTLE_CTA = settleIn(850);
 
 type Outcome =
   | "received"
@@ -95,6 +94,9 @@ export function SharePracticeStep({
     }
     setWrongApp(false);
     setReceived(true);
+    AccessibilityInfo.announceForAccessibility(
+      `${t("sharePractice.savedTitle")} ${t("sharePractice.savedBody")}`,
+    );
     report("received");
   }, [report]);
 
@@ -190,13 +192,11 @@ export function SharePracticeStep({
             </Animated.View>
           )}
         </View>
-        <Animated.View entering={SETTLE_CTA}>
-          <CtaButton
-            label={t("common.continue")}
-            onPress={onFinish}
-            busy={leaving}
-          />
-        </Animated.View>
+        <CtaButton
+          label={t("common.continue")}
+          onPress={onFinish}
+          busy={leaving}
+        />
       </View>
     );
   }
