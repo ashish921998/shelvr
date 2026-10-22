@@ -1,6 +1,7 @@
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
-import { currentLocale, useAppLocale } from "@/lib/i18n";
+import { currentLocale, t, useAppLocale } from "@/lib/i18n";
+import { ScreenLoader } from "@/components/ui/screen-loader";
 import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
@@ -107,8 +108,10 @@ export function NotificationSessionProvider({
           });
           if (!enabled) await clearFirstSaveReminder();
         },
-        signOut: async () => {
-          await revokeSiriCapture(revokeCaptureToken);
+        signOut: async (reason) => {
+          // Account deletion already drains capture tokens and rejects authenticated writes.
+          if (reason === "sign_out")
+            await revokeSiriCapture(revokeCaptureToken);
           await signOut();
           await clearFirstSaveReminder();
           await clearTrialReminder();
@@ -194,8 +197,16 @@ export function NotificationSessionProvider({
   return createElement(
     NotificationSessionContext,
     { value: session },
-    children,
+    createElement(SessionContents, null, children),
   );
+}
+
+function SessionContents({ children }: { children: ReactNode }) {
+  const { operation } = useNotificationSession();
+  // Unmount live queries before deletion revokes their authenticated owner.
+  return operation === "delete_account"
+    ? createElement(ScreenLoader, { label: t("loading.app") })
+    : children;
 }
 
 function notificationField(

@@ -401,6 +401,7 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    expect(deps.signOut).toHaveBeenCalledWith("account_deleted");
     expect(deps.clearWidget).toHaveBeenCalledOnce();
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
     expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);

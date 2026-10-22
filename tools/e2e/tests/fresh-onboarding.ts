@@ -66,7 +66,7 @@ export async function relaunchWith(
   launchArguments: readonly string[],
   ready: () => Promise<boolean>,
 ): Promise<void> {
-  const launcher = screen.getByText("Searching for development servers...");
+  const launcher = screen.getByText("DEVELOPMENT SERVERS");
   let openedAt = 0;
   const open = async () => {
     await device.openApp(BUNDLE_ID, { relaunch: true, launchArguments });

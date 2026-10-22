@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { releaseSheetLink, rememberSheetLink } from "./deferred-sheet-link";
 import { ConvexError } from "convex/values";
@@ -16,6 +17,7 @@ const mock = vi.hoisted(() => ({
   token: vi.fn(),
   register: vi.fn(),
   otherMutation: vi.fn(),
+  deleteAccount: vi.fn(async () => {}),
   signOut: vi.fn(),
   clearWidget: vi.fn(async () => true),
   revokeSiri: vi.fn(async () => {}),
@@ -30,8 +32,12 @@ const mock = vi.hoisted(() => ({
   rotated: null as null | ((token: { type: string; data: string }) => void),
 }));
 vi.mock("@/lib/i18n", () => ({
+  t: (key: string) => key,
   currentLocale: () => mock.locale,
   useAppLocale: () => mock.locale,
+}));
+vi.mock("@/components/ui/screen-loader", () => ({
+  ScreenLoader: vi.fn(({ label }: { label: string }) => <div>{label}</div>),
 }));
 vi.mock("expo-localization", () => ({
   getCalendars: () => [{ timeZone: mock.timezone }],
@@ -66,7 +72,11 @@ vi.mock("@convex/_generated/api", () => ({
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
   useMutation: (ref: string) =>
-    ref === "register" ? mock.register : mock.otherMutation,
+    ref === "register"
+      ? mock.register
+      : ref === "delete"
+        ? mock.deleteAccount
+        : mock.otherMutation,
 }));
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mock.signOut }),
@@ -118,6 +128,7 @@ beforeEach(() => {
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
+  mock.deleteAccount.mockReset().mockResolvedValue(undefined);
 });
 
 function renderSession() {
@@ -127,6 +138,64 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
+  it("unmounts the signed-in screens while deleting and does not revoke an already deleted Siri token", async () => {
+    let finishDeletion!: () => void;
+    mock.deleteAccount.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDeletion = resolve;
+        }),
+    );
+    const unmounted = vi.fn();
+    const { result } = renderHook(
+      () => {
+        useEffect(
+          () => () => {
+            unmounted();
+          },
+          [],
+        );
+        return useNotificationSession();
+      },
+      { wrapper: NotificationSessionProvider },
+    );
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    const session = result.current.session;
+    let deletion!: Promise<void>;
+    act(() => {
+      deletion = session.deleteAccount();
+    });
+    await waitFor(() => expect(mock.deleteAccount).toHaveBeenCalledOnce());
+    expect(screen.getByText("loading.app")).toBeTruthy();
+    expect(unmounted).toHaveBeenCalledOnce();
+    expect(mock.signOut).not.toHaveBeenCalled();
+    await act(async () => {
+      finishDeletion();
+      await deletion;
+    });
+    expect(mock.revokeSiri).not.toHaveBeenCalled();
+    expect(mock.signOut).toHaveBeenCalledOnce();
+    expect(screen.queryByText("loading.app")).toBeNull();
+  });
+
+  it("restores the signed-in screens when deletion fails, without signing out", async () => {
+    mock.deleteAccount.mockRejectedValueOnce(new Error("offline"));
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    const session = result.current.session;
+    await act(async () => {
+      await expect(session.deleteAccount()).rejects.toThrow("offline");
+    });
+    expect(screen.queryByText("loading.app")).toBeNull();
+    expect(result.current.session).toBe(session);
+    expect(mock.revokeSiri).not.toHaveBeenCalled();
+    expect(mock.signOut).not.toHaveBeenCalled();
+  });
+
   it("reports the safe file-cleanup category from account deletion", async () => {
     mock.clearWidget.mockRejectedValueOnce(
       new Error("widget_thumbnail_cleanup_failed"),

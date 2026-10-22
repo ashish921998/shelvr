@@ -98,14 +98,17 @@ async function openApp(
   ready: () => Promise<boolean>,
 ): Promise<void> {
   // The dev launcher shows its server list when Metro is slow to answer for the bundle.
-  const launcher = screen.getByText("Searching for development servers...");
+  const launcher = screen.getByText("DEVELOPMENT SERVERS");
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
+  let openedAt = Date.now();
   await app.open();
   await pollUntil(
     async () => {
       if (await ready()) return true;
-      if (await launcher.isVisible()) await app.open();
-      else if (await keepAi.isVisible()) await keepAi.tap();
+      if (Date.now() - openedAt > 15_000 && (await launcher.isVisible())) {
+        openedAt = Date.now();
+        await app.open();
+      } else if (await keepAi.isVisible()) await keepAi.tap();
       return false;
     },
     { timeout: BUNDLE_TIMEOUT },

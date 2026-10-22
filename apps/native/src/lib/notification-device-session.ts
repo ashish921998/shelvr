@@ -29,7 +29,7 @@ type SessionDependencies = {
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   setSaveReminders: (enabled: boolean) => Promise<unknown>;
-  signOut: () => Promise<unknown>;
+  signOut: (reason: "sign_out" | "account_deleted") => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
   clearWidget: () => Promise<unknown>;
   resetAnalytics: () => void;
@@ -203,7 +203,7 @@ export class NotificationDeviceSession {
             await this.deps.revokeToken(token);
           await (operation === "delete_account"
             ? this.deps.deleteAccount()
-            : this.deps.signOut());
+            : this.deps.signOut("sign_out"));
         } catch (error) {
           this.start();
           throw error;
@@ -214,7 +214,7 @@ export class NotificationDeviceSession {
             this.deps.reportError(new Error(widgetClearErrorEvent(error)));
           });
           try {
-            await this.deps.signOut();
+            await this.deps.signOut("account_deleted");
           } catch (error) {
             this.deps.resetAnalytics();
             this.deps.reportError(error);
