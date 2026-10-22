@@ -50,7 +50,12 @@ nothing is started by hand. Before a run:
   `tests/seeded-home.ts`) signs in as the anonymous dev user and taps Settings >
   "Reset flow fixtures": 4 saves (`fixture-item-ramen`, `-belem-tower`,
   `-apartment-checklist`, `-value-of-craft`), 3 spaces, and Pro. That wipes the
-  dev user's data, so never point it at an account you care about.
+  dev user's data, so never point it at an account you care about. The CI job
+  sets `E2E_FIXTURE_RESET=backend`, which resets through
+  `npx convex run devFixtures:resetAnonymousUsersForE2e` instead; that mutation
+  refuses any backend but the local fake-model one, so leave it unset locally.
+  `tests/onboarding.e2e.ts` does not start on the seeded Home: it clears the
+  keychain and starts from "Start yours".
 
 ## Doctor
 
