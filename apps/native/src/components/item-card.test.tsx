@@ -345,6 +345,22 @@ it("still renders the save-actions control and the long-press menu", () => {
   expect(menu).toContain("Delete");
 });
 
+it("keeps the save-actions control on a note with nothing to caption", () => {
+  render(
+    <ItemCard
+      item={{
+        ...base,
+        type: "note",
+        title: "Call the landlord",
+        note: "Call the landlord",
+      }}
+    />,
+  );
+  expect(
+    screen.getAllByRole("button", { name: "Save actions", hidden: true }),
+  ).toHaveLength(1);
+});
+
 it("offers Dismiss in the suggested save's long-press menu", () => {
   render(
     <ItemCard
