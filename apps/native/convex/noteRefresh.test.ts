@@ -98,7 +98,6 @@ describe("merged note refresh regression audit", () => {
         name: "Groceries",
         dynamic: true,
         autoFile: true,
-        // On since before the note was saved, so the edit still auto-files.
         autoFileSince: 0,
       }),
     );
@@ -118,7 +117,6 @@ describe("merged note refresh regression audit", () => {
         .collect(),
     );
     expect(joins).toMatchObject([{ spaceId, status: "saved" }]);
-    // Classification, then the steering pass for the new saved row.
     expect(generateObject).toHaveBeenCalledTimes(2);
   });
 

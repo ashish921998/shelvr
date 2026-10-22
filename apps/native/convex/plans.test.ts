@@ -8,8 +8,6 @@ import type { Id } from "./_generated/dataModel";
 
 const generateObject = vi.hoisted(() => vi.fn());
 
-// Only the provider call is replaced. `ai.ts` builds its language model at
-// import, so wrapLanguageModel is stubbed as well.
 vi.mock("ai", () => ({
   embedMany: vi.fn(),
   generateObject,
@@ -108,7 +106,6 @@ describe("makePlan", () => {
       { title: "Cutest wine bar", content: "@barlola_nyc is a vibe" },
       { title: "Pasta night", content: "no place named here" },
     ]);
-    // The prompt numbers saves newest filed first: pasta night is 1.
     generateObject.mockResolvedValue({
       object: {
         places: [
@@ -118,10 +115,8 @@ describe("makePlan", () => {
             area: "SoHo, NYC",
             why: "The vodka pasta",
           },
-          // Invented: pasta night names no place.
           { saveNumber: 1, name: "Carbone", area: "", why: "Famous pasta" },
           { saveNumber: 2, name: "Bar Lola", area: "", why: "Wine bar vibe" },
-          // Repeat and out-of-range picks are dropped.
           { saveNumber: 3, name: "balthazar", area: "", why: "Again" },
           { saveNumber: 9, name: "Nowhere", area: "", why: "Nope" },
         ],
@@ -155,7 +150,6 @@ describe("makePlan", () => {
       name: "Tigre",
       visited: true,
     });
-    // Newest filed first: Sweet Linda is save 2, Tigre save 3.
     generateObject.mockResolvedValue({
       object: {
         places: [

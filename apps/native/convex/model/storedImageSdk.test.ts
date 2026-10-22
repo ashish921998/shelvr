@@ -2,7 +2,6 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-// A 24-byte ftyp box, as emitted by Apple's HEIC encoder.
 const heic = Uint8Array.from([
   0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 0, 0, 0, 0, 104, 101, 105,
   99, 109, 105, 102, 49,

@@ -5,8 +5,6 @@ import { cancelSurveyReasonValidator } from "@convex/model/cancelSurveyFields";
 const analyticsMock = vi.hoisted(() => ({ capture: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
 
-// Once-per-account persistence is server-side (convex/cancelSurvey.test.ts);
-// this file covers the client boundary: bounded reasons and event payloads.
 describe("cancelSurveyAnalytics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,10 +33,6 @@ describe("cancelSurveyAnalytics", () => {
     );
   });
 
-  // The ids are an analytics contract (PostHog groups cancel_survey_submitted
-  // on them) and a server contract (the respond mutation rejects anything the
-  // validator does not list). Pin both: the literal list catches a rename, the
-  // validator comparison catches the tuple and the union drifting apart.
   it("every reason id is a valid CancelSurveyReason", () => {
     expect(CANCEL_SURVEY_REASONS).toEqual([
       "too_expensive",

@@ -38,34 +38,12 @@ export const authorizeCaptureBody = internalMutation({
   },
 });
 
-// The iOS App Intents (Siri, Shortcuts, the share sheet's Shortcuts actions)
-// save without launching the JavaScript app, so they cannot present a Convex
-// Auth JWT. The signed-in app mints a per-device capture token instead and
-// hands it to the Swift side, which keeps it in the keychain and sends it as a
-// bearer token to the `/app-intents/*` HTTP routes in http.ts. Those routes
-// call the internal mutations below, which resolve the token to its user and
-// then run the very same save helpers the app's own mutations use: the Pro
-// gate, rate limit, photo quota, size checks, and the idempotent operation
-// ledger all apply unchanged. Swift side: `app-intents/`.
-
-/** Tokens kept per user (one per device); the oldest beyond this are deleted
- * when a new one is issued. */
 export const MAX_CAPTURE_TOKENS_PER_USER = 5;
 
-/** `lastUsedAt` is refreshed at most this often, so a burst of captures does
- * not rewrite the token row on every save. */
 const LAST_USED_RESOLUTION_MS = 60 * 60 * 1000;
 
-/** Upper bound on the Siri context (words, on-device text recognition) kept
- * for one capture. Longer context is cut, not refused: it is advisory. */
 const MAX_CAPTURE_CONTEXT_LENGTH = 8000;
 
-/**
- * Mints a capture token for this device. The raw token is returned once and
- * never stored; only its SHA-256 hash is. An action, not a mutation, because
- * mutation randomness is seeded for deterministic retries and a credential
- * must come from an unpredictable source.
- */
 export const issueCaptureToken = action({
   args: {},
   returns: v.string(),
@@ -78,11 +56,6 @@ export const issueCaptureToken = action({
   },
 });
 
-/** Persists a freshly minted token hash and trims the caller's oldest tokens.
- * The caller is derived here, not in the action: Convex forwards the caller's
- * identity to functions run from an action, so authorization and the write
- * are one transaction and a deletion that has already begun fails the same
- * `requireUserId` check every public function uses. */
 export const storeCaptureToken = internalMutation({
   args: { tokenHash: v.string() },
   returns: v.null(),
@@ -93,8 +66,6 @@ export const storeCaptureToken = internalMutation({
       tokenHash: args.tokenHash,
       createdAt: Date.now(),
     });
-    // Newest first. Bounded: trimming on every issue keeps at most
-    // MAX_CAPTURE_TOKENS_PER_USER rows, plus any a racing issue just added.
     const tokens = await ctx.db
       .query("captureTokens")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -107,8 +78,6 @@ export const storeCaptureToken = internalMutation({
   },
 });
 
-/** Revokes this device's capture token on sign-out. A no-op unless the token
- * belongs to the caller. */
 export const revokeCaptureToken = mutation({
   args: { token: v.string() },
   returns: v.null(),
@@ -132,10 +101,6 @@ export const revokeCaptureToken = mutation({
   },
 });
 
-/** The token row for a hash when its owner is still live, or null. Marks it
- * used (coarsely). A row whose owner is missing or deleting is as good as
- * absent: deletion drains tokens in batches, so one can outlive its owner for
- * a moment. */
 async function claimCaptureToken(
   ctx: MutationCtx,
   tokenHash: string,
@@ -156,9 +121,6 @@ async function claimCaptureToken(
   return token;
 }
 
-/** The space to file a capture into, when it is a real space of `userId`. A
- * stale or foreign id picked in Siri is dropped: the save itself must not
- * fail because of it. */
 async function ownedSpaceId(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -178,7 +140,6 @@ function trimContext(context: string | undefined): string | undefined {
 
 const unauthorized = v.object({ kind: v.literal("unauthorized") });
 
-/** Step one of an image capture: `beginImageImport` for the token's user. */
 export const beginImageCapture = internalMutation({
   args: { tokenHash: v.string(), operationId: v.string() },
   returns: v.union(
@@ -193,11 +154,6 @@ export const beginImageCapture = internalMutation({
   },
 });
 
-/** Step two: records the uploaded file on the operation. A separate
- * transaction from finalize on purpose: if finalize is refused (Pro lapsed
- * mid-capture, rate limit), the attached upload stays on a pending ledger row
- * that the stale-import cron reclaims, rather than being rolled back into an
- * orphaned blob nothing references. */
 export const attachImageCapture = internalMutation({
   args: {
     tokenHash: v.string(),
@@ -228,8 +184,6 @@ export const attachImageCapture = internalMutation({
       storageId,
     });
     if (result.error === undefined) return { kind: "attached" as const };
-    // attach reports a size refusal as its user-facing sentence (it returns
-    // rather than throws, so its storage cleanup commits); map it back.
     return {
       kind: "rejected" as const,
       error:
@@ -240,7 +194,6 @@ export const attachImageCapture = internalMutation({
   },
 });
 
-/** Step three: creates the image item, exactly like `finalizeImageImport`. */
 export const finalizeImageCapture = internalMutation({
   args: {
     tokenHash: v.string(),
@@ -263,8 +216,6 @@ export const finalizeImageCapture = internalMutation({
       aspectRatio: args.aspectRatio,
       isSticker: args.isSticker,
       spaceId: await ownedSpaceId(ctx, token.userId, args.spaceId),
-      // A sticker is one object cut out on the device, not a screenshot, so
-      // it classifies like a camera sticker.
       captureContext:
         args.isSticker === true ? undefined : trimContext(args.captureContext),
     });
@@ -272,7 +223,6 @@ export const finalizeImageCapture = internalMutation({
   },
 });
 
-/** A link or note capture, exactly like `createLinkItem` / `createNoteItem`. */
 export const captureLinkOrNote = internalMutation({
   args: {
     tokenHash: v.string(),

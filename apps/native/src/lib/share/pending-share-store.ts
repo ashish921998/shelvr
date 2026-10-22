@@ -37,17 +37,14 @@ export function clearPendingShareOnDevice(): void {
   clearPendingShareInStore(secureStore);
 }
 
-/** Records a batch the user discarded whose native clear failed. */
 export function markShareDiscardedOnDevice(fingerprint: string): void {
   markShareDiscardedInStore(secureStore, fingerprint);
 }
 
-/** True when `fingerprint` is the still-pending discarded batch. */
 export function shareWasDiscardedOnDevice(fingerprint: string): boolean {
   return shareWasDiscardedInStore(secureStore, fingerprint);
 }
 
-/** Drops the discard record once the native store is confirmed empty. */
 export function clearShareDiscardedOnDevice(): void {
   clearShareDiscardedInStore(secureStore);
 }

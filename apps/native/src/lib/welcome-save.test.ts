@@ -36,8 +36,6 @@ vi.mock("@/lib/trial-reminder", () => ({
 vi.mock("expo-router", async () => {
   const { useEffect, useSyncExternalStore } = await import("react");
   return {
-    // Runs the callback while the screen is focused and its cleanup on blur,
-    // like the real hook.
     useFocusEffect: (callback: () => void | (() => void)) => {
       const focused = useSyncExternalStore(
         (listener) => {
@@ -94,7 +92,6 @@ describe("useWelcomeSheetVisible", () => {
     expect(result.current).toBe(false);
     expect(mock.settle).toHaveLength(0);
     act(() => welcomeSave.mark("user_a"));
-    // Queued while the RevenueCat sheet is still closing.
     expect(result.current).toBe(false);
     await settleSheets();
     expect(result.current).toBe(true);
@@ -122,7 +119,6 @@ describe("useWelcomeSheetVisible", () => {
     expect(result.current).toBe(false);
     await settleSheets();
     expect(result.current).toBe(true);
-    // Away and back: a sheet opened elsewhere in between is waited out.
     act(() => setFocused(false));
     act(() => setFocused(true));
     expect(result.current).toBe(false);

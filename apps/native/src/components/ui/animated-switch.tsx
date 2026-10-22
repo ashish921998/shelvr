@@ -1,5 +1,5 @@
-import { Host, Switch } from '@expo/ui';
-import { useUnistyles } from 'react-native-unistyles';
+import { Host, Switch } from "@expo/ui";
+import { useUnistyles } from "react-native-unistyles";
 
 type Props = {
   value: boolean;

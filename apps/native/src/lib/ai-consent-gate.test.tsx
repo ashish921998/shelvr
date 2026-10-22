@@ -4,8 +4,6 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppLayout from "@/app/(app)/_layout";
 
-// The layout is the gate: the stack holds every save screen and every hook
-// that saves on its own, so these check when it is, and is not, mounted.
 const mocks = vi.hoisted(() => ({
   onboarded: true,
   status: "unset",
@@ -197,13 +195,10 @@ describe("plan gate", () => {
   it("keeps a deep link's screen under a cover while the plan is still unknown", () => {
     mocks.entitlement = { entitled: false, loading: true };
     render(<AppLayout />);
-    // No redirect to the gate, so a cold-launch item or digest link keeps
-    // its destination; the cover hides it until the plan is known.
     expect(shows("screen:item/[id]")).toBe(true);
     expect(shows("screen:digest/[id]")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
     expect(shows("plan-loading-cover")).toBe(true);
-    // Sheets and full-screen modals present above the cover, so they wait.
     expect(shows("screen:camera")).toBe(false);
     expect(shows("screen:add")).toBe(false);
   });
@@ -260,7 +255,6 @@ describe("plan gate", () => {
     rerender(<AppLayout />);
     expect(mocks.push).not.toHaveBeenCalled();
     expect(shows("screen:plan-gate")).toBe(true);
-    // Dropped, not kept for a later purchase.
     expect(releaseSheetLink(false)).toBeNull();
   });
 

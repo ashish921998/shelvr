@@ -14,10 +14,6 @@ for (const ext of [".jpg", ".jpeg", ".png"]) {
   };
 }
 
-// Some src modules read the Convex URL at import time and now fail fast
-// without it (src/lib/convex-url.ts). Tests never dial the deployment, but
-// the value must exist for those imports to load; suites that care stub
-// their own.
 process.env.EXPO_PUBLIC_CONVEX_URL ??= "https://test.convex.cloud";
 
 vi.mock("expo-localization", () => ({
@@ -36,9 +32,6 @@ afterEach(async () => {
   cleanup();
 });
 
-// Property tests run on a fixed seed so CI is deterministic: a failure
-// reproduces on every run and points at a real bug, never a lucky draw. Set
-// FC_SEED to explore other inputs locally; a failure prints its seed and path.
 fc.configureGlobal({
   seed: Number(process.env.FC_SEED ?? 20261005),
   numRuns: Number(process.env.FC_RUNS ?? 200),

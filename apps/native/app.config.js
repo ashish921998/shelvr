@@ -14,32 +14,21 @@ const supportsRTL = supportedLocales.some((locale) =>
 
 const BASE_ID = "app.shelvr.save";
 
-// APP_VARIANT is set per EAS build profile (see eas.json). When unset — i.e. a
-// local `expo start` / `expo run` — we fall back to "development" so a simulator
-// install never collides with a production App Store install.
 const variant = process.env.APP_VARIANT ?? "development";
 
 const idSuffix =
   variant === "production" ? "" : variant === "preview" ? ".preview" : ".dev";
 const bundleId = BASE_ID + idSuffix;
 
-// Non-production installs share a distinct icon so dev/preview builds are
-// unmistakable on the home screen next to the App Store build.
 const isProduction = variant === "production";
 const isDevelopment = !isProduction && variant !== "preview";
 
-// Values are passed explicitly (never read via process.env[name]) so the
-// expo/no-dynamic-env-var lint rule stays satisfied.
 function requireProductionValue(name, value, isValid, expected) {
   if (isProduction && process.env.EAS_BUILD === "true" && !isValid(value)) {
     throw new Error(`Production config requires ${name} (${expected}).`);
   }
 }
 
-// Fail the build before an invalid public SDK key can reach App Review. Builds
-// 14 and 16 presented RevenueCat Error 23 during Apple's sandbox purchase flow;
-// the rejected build artifact contained a different key from the current
-// RevenueCat App Store app. Keep this as a permanent release guardrail.
 const buildPlatform = process.env.EAS_BUILD_PLATFORM;
 const productionConvexUrl = productionCloudOrigin;
 const developmentTestKey = "test_VOYicTvOGPXCBFMVdHzyxRndiRi";
@@ -47,9 +36,7 @@ if (!isProduction) {
   let convexOrigin;
   try {
     convexOrigin = new URL(process.env.EXPO_PUBLIC_CONVEX_URL).origin;
-  } catch {
-    // Missing or malformed URLs are handled by the client configuration.
-  }
+  } catch {}
   if (convexOrigin === productionConvexUrl) {
     throw new Error(
       "Development and preview builds must not use production Convex.",
@@ -81,8 +68,6 @@ if (buildPlatform === "android") {
     "a goog_ Google Play public SDK key",
   );
 }
-// The production Convex URL must parse as https:// with a hostname — a bare
-// prefix check would let `https://` (no host) reach a store build.
 requireProductionValue(
   "EXPO_PUBLIC_CONVEX_URL",
   process.env.EXPO_PUBLIC_CONVEX_URL,
@@ -104,9 +89,6 @@ function displayName(base) {
 }
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
-// expo-maps reads the Android Google Maps key from the config block below. A
-// production build without it ships the Pro-gated map screen unconfigured, so
-// fail the build instead — matching the RevenueCat key guardrails above.
 if (buildPlatform === "android") {
   requireProductionValue(
     "GOOGLE_MAPS_API_KEY",
@@ -116,10 +98,6 @@ if (buildPlatform === "android") {
   );
 }
 
-// PostHog source map upload runs inside the native build (Gradle/Xcode) and
-// fails the build when it cannot authenticate. Enable it only once the CLI key
-// is present, so a build without credentials keeps working and uploads switch on
-// the moment the EAS secret is set.
 const uploadsSourceMaps = Boolean(process.env.POSTHOG_CLI_API_KEY);
 const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .split(",")
@@ -139,8 +117,6 @@ module.exports = ({ config }) => ({
     infoPlist: {
       ...appConfig.expo.ios?.infoPlist,
       ...config?.ios?.infoPlist,
-      // Dev and preview builds are named "Shelvr (Dev)" / "Shelvr (Preview)";
-      // this lets Siri and App Shortcut phrases still answer to "Shelvr".
       INAlternativeAppNames: [
         { INAlternativeAppName: appConfig.expo.name ?? "Shelvr" },
       ],
@@ -193,8 +169,6 @@ module.exports = ({ config }) => ({
       "expo-build-properties",
       {
         android: {
-          // Store builds only need physical-device ABIs. Skipping emulator
-          // architectures keeps native C++ compilation within EAS limits.
           buildArchs:
             requestedAndroidBuildArchs.length > 0
               ? requestedAndroidBuildArchs
@@ -207,8 +181,6 @@ module.exports = ({ config }) => ({
     [
       "expo-dev-client",
       {
-        // The generated scheme lets a development client (app.shelvr.save.dev)
-        // open dev-tool deep links without clashing with the production scheme.
         addGeneratedScheme: isDevelopment,
       },
     ],
@@ -227,9 +199,6 @@ module.exports = ({ config }) => ({
         ],
       },
     ],
-    // Uploads the Hermes source map on each native build so error tracking can
-    // symbolicate crash stacks. skipOnConflict keeps a rebuild of the same
-    // commit from failing on an already-uploaded release.
     ...(uploadsSourceMaps
       ? [["posthog-react-native/expo", { skipOnConflict: true }]]
       : []),
@@ -247,8 +216,6 @@ module.exports = ({ config }) => ({
           ...appConfig.expo.extra?.eas?.build?.experimental,
           ios: {
             ...appConfig.expo.extra?.eas?.build?.experimental?.ios,
-            // The share extension's bundle id must track the active variant so
-            // each install owns its own extension target.
             appExtensions: (
               appConfig.expo.extra?.eas?.build?.experimental?.ios
                 ?.appExtensions ?? []
@@ -270,12 +237,7 @@ module.exports = ({ config }) => ({
         },
       },
     },
-    // Ship the full font license with the native app's Expo manifest. JSON
-    // rather than the plain OFL.txt the website serves: the test suite loads
-    // this config without __dirname or require.resolve, so a require() of JSON
-    // is the only form that resolves in both Node and the tests.
     fontLicenses: require("./assets/fonts/crimson-pro-license.json"),
-    // Public ingestion key for Shelvr; development stays opt-in via env.
     posthogProjectToken:
       process.env.POSTHOG_PROJECT_TOKEN ??
       (isProduction

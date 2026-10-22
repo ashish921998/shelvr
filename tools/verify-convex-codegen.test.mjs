@@ -15,8 +15,6 @@ after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-/** A convex directory on disk. Files are written for real rather than mocked,
- * because the rules under test are about filenames and contents. */
 function convexDir(files) {
   const root = mkdtempSync(join(tmpdir(), "codegen-guard-"));
   roots.push(root);
@@ -35,9 +33,6 @@ test("finds modules at the root and in subdirectories", () => {
   assert.deepEqual(discoverModules(root).sort(), ["ai", "model/auth"]);
 });
 
-// The two cases reported on #119. A `.d.ts` has two dots, so Convex never adds
-// it to the inventory and demanding an entry fails a branch that regenerating
-// cannot fix. A `.js` is a real module, so ignoring it lets drift through.
 test("does not demand an entry for a .d.ts, which Convex skips", () => {
   const root = convexDir({ "ai.ts": MODULE, "types.d.ts": "export type A = 1;" });
   assert.deepEqual(discoverModules(root), ["ai"]);
@@ -72,8 +67,6 @@ test("skips the names Convex reserves and the generated directory", () => {
   assert.deepEqual(discoverModules(root), ["ai"]);
 });
 
-// One rule, not four: the dotted names this repo excludes by hand are all just
-// Convex's multiple-dots rule.
 test("skips any filename with more than one dot", () => {
   const root = convexDir({
     "ai.ts": MODULE,

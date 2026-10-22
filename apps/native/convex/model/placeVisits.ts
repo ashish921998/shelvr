@@ -2,7 +2,6 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { placeKey } from "./plan";
 
-/** The user's "We went" mark for a place name, or null. */
 export async function findVisit(
   ctx: QueryCtx,
   userId: Id<"users">,

@@ -10,7 +10,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-// The disabled branch lives in anonymousSignInDisabled.test.ts.
 describe("anonymous sign-in with AUTH_ENABLE_ANONYMOUS=true", () => {
   it("issues tokens and creates one anonymous account", async () => {
     const { privateKey } = await generateKeyPair("RS256", {

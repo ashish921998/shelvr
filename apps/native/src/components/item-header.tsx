@@ -6,11 +6,6 @@ import { displayHost } from "@/lib/url";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// The item-detail header: the item's title (morphing via AnimatedText as the
-// user swipes between siblings) over the date it belongs to: the original
-// camera-roll capture time for imported photos, otherwise when it was saved.
-// Over a media save the title moves into the photo's caption, so the header
-// keeps only the date, in white over the black stage.
 export function ItemHeader({
   item,
   onMedia = false,
@@ -47,8 +42,6 @@ export function ItemHeader({
 
   return (
     <View style={styles.container}>
-      {/* Narrower than the default so the morph canvas clears the back button
-          on the left and the Share item on the right. */}
       <AnimatedText text={title} truncate height={28} style={styles.title} />
       {when ? (
         <AnimatedText

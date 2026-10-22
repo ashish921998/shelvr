@@ -6,12 +6,6 @@ import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 
-/**
- * "We went" on a plan: mark a place visited, or take the mark back. A
- * visited place is ranked last, tagged "Been", the next time any space makes
- * a plan. `itemId` is the save the place came from; `name` is the plan's name
- * for it.
- */
 export const setVisited = mutation({
   args: { itemId: v.id("items"), name: v.string(), visited: v.boolean() },
   returns: v.null(),

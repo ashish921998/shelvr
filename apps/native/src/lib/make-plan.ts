@@ -16,33 +16,20 @@ type PlanState =
       status: "ready";
       places: PlanPlace[];
       considered: number;
-      /** Unique per answer, so anything tied to one plan can key on it. */
       planId: number;
     }
   | { status: "ai_off" }
   | { status: "error" };
 
-/** Where a shared plan sends people who don't have Shelvr yet. */
 export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
 
 const LOADING: PlanState = { status: "loading" };
 
-/** The space's open vote link, as far as the plan screen needs it. */
 type SharedShortlist = {
   expiresAt: number;
   places: PlanPlace[];
 };
 
-/**
- * Runs `plans.makePlan` for a space once per space and locale, and again on
- * `retry`. A late answer from an earlier run never overwrites a newer one, and
- * an answer for another space or locale reads as loading, never as ready.
- *
- * `shared` is the space's open vote link (undefined while it loads). When one
- * is open on arrival, the screen shows its shortlist instead of asking the
- * model again, so the owner comes back to the places people are voting on.
- * Only `retry` replaces it.
- */
 export function useMakePlan(
   spaceId: Id<"spaces">,
   locale: string,
@@ -50,7 +37,6 @@ export function useMakePlan(
 ) {
   const makePlan = useAction(api.plans.makePlan);
   const key = `${spaceId}:${locale}`;
-  // Read once per arrival: a link made from this screen must not reset it.
   const sharedRef = useRef(shared);
   useEffect(() => {
     sharedRef.current = shared;
@@ -62,8 +48,6 @@ export function useMakePlan(
   } | null>(null);
   const run = useRef(0);
 
-  // Resolves to the next state and never throws; callers apply it only if
-  // no newer run has started.
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
@@ -102,7 +86,6 @@ export function useMakePlan(
       if (current === run.current) setResult({ key, state });
     });
     return () => {
-      // Unmounted or regenerating: drop whatever the in-flight run returns.
       run.current += 1;
     };
   }, [load, key, linkLoaded]);
@@ -118,16 +101,9 @@ export function useMakePlan(
   return { state, retry };
 }
 
-/**
- * "We went" for the places on a plan. A tap shows at once and is saved in the
- * background; if the save fails the place goes back to how it was. A place
- * the server already tagged `been` reads as visited until the user takes the
- * mark back.
- */
 export function usePlaceVisits() {
   const setVisited = useMutation(api.placeVisits.setVisited);
   const [marks, setMarks] = useState<ReadonlyMap<string, boolean>>(new Map());
-  // The latest tap per place: an older save failing must not undo a newer tap.
   const latest = useRef(new Map<string, number>());
 
   const isVisited = useCallback(
@@ -163,11 +139,6 @@ export function usePlaceVisits() {
 
 type Deck = { planId: number | null; front: number; flipped: boolean };
 
-/**
- * The plan as a deck of cards: which card is on top and whether it is turned
- * over to show why it was picked. A new plan starts on its first card, face
- * up. `next` sends the top card to the back; `show` brings a card to the top.
- */
 export function usePlanDeck(planId: number | null, count: number) {
   const [deck, setDeck] = useState<Deck>({
     planId,
@@ -194,10 +165,6 @@ export function usePlanDeck(planId: number | null, count: number) {
   return { front, flipped: current.flipped, next, show, flip };
 }
 
-/**
- * Indexes of the cards to draw, back to front: up to `depth` cards, ending
- * with `front`, so the top card renders last.
- */
 export function deckOrder(count: number, front: number, depth = 4): number[] {
   const shown = Math.min(count, depth);
   return Array.from(
@@ -213,11 +180,6 @@ type Pick = {
   spinning: boolean;
 };
 
-/**
- * "Pick for me" for one plan: the spin, its timers and the result all belong
- * to `planId`. A new plan (or none, while one loads) discards the last pick
- * and stops a spin still running; so does unmounting.
- */
 export function usePlanPicker(
   places: PlanPlace[],
   planId: number | null,
@@ -250,7 +212,6 @@ export function usePlanPicker(
     timers.current = [];
     setPick({ planId, highlight: null, picked: null, spinning: true });
     const winner = Math.floor(Math.random() * places.length);
-    // Reduce Motion lands straight on the pick instead of cycling cards.
     const steps = reducedMotion ? [] : spinSteps(places.length, winner);
     let at = 0;
     for (const step of steps) {
@@ -286,7 +247,6 @@ export function usePlanPicker(
   };
 }
 
-/** Ready saves a space needs before it offers a plan. */
 const PLAN_MIN_SAVES = 3;
 
 type PlanCandidate = {
@@ -295,11 +255,6 @@ type PlanCandidate = {
   spaceIntents?: { kind: string }[];
 };
 
-/**
- * Whether a space offers "Make a plan". The planner reads ready saves only,
- * and at least one must already carry a place (an "Open in Maps" action, on
- * the save or steered for this space), so a reading list never offers one.
- */
 export function canMakePlan(items: PlanCandidate[]): boolean {
   const ready = items.filter((item) => item.status === "ready");
   return (
@@ -312,12 +267,10 @@ export function canMakePlan(items: PlanCandidate[]): boolean {
   );
 }
 
-/** `name` plus its area, for display and for the Maps query. */
 export function placeLabel(place: PlanPlace): string {
   return place.area ? `${place.name}, ${place.area}` : place.name;
 }
 
-/** The plain-text plan the share sheet sends. */
 export function planShareText(
   spaceName: string,
   places: PlanPlace[],
@@ -335,10 +288,6 @@ export function planShareText(
   return lines.join("\n");
 }
 
-/**
- * The highlight path for "Pick for me": a few laps through the list that slow
- * down and stop on `winner`. Returns each step's index and how long it holds.
- */
 export function spinSteps(
   count: number,
   winner: number,
@@ -348,22 +297,14 @@ export function spinSteps(
   const total = count * laps + winner + 1;
   return Array.from({ length: total }, (_, step) => ({
     index: step % count,
-    // Ease out: 60 ms per step at the start, about 300 ms at the end.
     holdMs: Math.round(60 + 240 * (step / Math.max(total - 1, 1)) ** 2),
   }));
 }
 
-/** The vote page for a plan link (`apps/web/src/app/p/[token]`). */
 export function planVoteUrl(token: string): string {
   return `https://shelvr-web.vercel.app/p/${token}`;
 }
 
-/**
- * "Ask someone": the share sheet with a vote link for the places on screen.
- * The open link is sent again while it holds this same shortlist, so votes
- * already in stay on the deck; a new shortlist gets a fresh link. One ask at
- * a time; a failed link or sheet says so, a cancelled sheet says nothing.
- */
 export function usePlanAsk(
   spaceId: Id<"spaces">,
   places: PlanPlace[],
@@ -371,7 +312,6 @@ export function usePlanAsk(
 ) {
   const createPlanShare = useMutation(api.planShares.createPlanShare);
   const [asking, setAsking] = useState(false);
-  // A second tap can land before the `asking` render; this one cannot.
   const busy = useRef(false);
 
   const ask = useCallback(async () => {
@@ -404,7 +344,6 @@ export function usePlanAsk(
   return { ask, asking };
 }
 
-/** The share sheet for a made link. Its failure is reported, never thrown. */
 async function sharePlanLink(token: string, placeCount: number) {
   try {
     const result = await Share.share({
@@ -420,14 +359,9 @@ async function sharePlanLink(token: string, placeCount: number) {
   }
 }
 
-/**
- * The open link, when it holds exactly the places on screen. A regenerated
- * plan is a new shortlist, so the old link's votes do not belong on it.
- */
 export function linkForPlan<
   T extends { expiresAt: number; places: { name: string }[] },
 >(link: T | null | undefined, places: PlanPlace[], now = Date.now()): T | null {
-  // A cached query can outlive the link's week; a closed link has no votes to show.
   if (!link || places.length === 0 || link.expiresAt <= now) return null;
   const keys = (names: { name: string }[]) =>
     names
@@ -437,14 +371,12 @@ export function linkForPlan<
   return keys(link.places) === keys(places) ? link : null;
 }
 
-/** The tallies an open vote link holds, by place. */
 type PlanVotes = {
   voters: number;
   expiresAt: number;
   places: { name: string; picks: number; passes: number }[];
 };
 
-/** A place's tally on the link, or null when nobody voted on it. */
 export function votesFor(
   votes: PlanVotes | null | undefined,
   place: PlanPlace,
@@ -456,7 +388,6 @@ export function votesFor(
   return { picks: tally.picks, passes: tally.passes };
 }
 
-/** Whole days the link stays open, at least 1 while it is open. */
 export function daysLeft(expiresAt: number, now = Date.now()): number {
   return Math.max(1, Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000)));
 }

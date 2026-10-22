@@ -1,7 +1,3 @@
-// Tests for the SDK boundary the app configures: the `before_send` hook must
-// apply the same message allowlist to autocaptured `$exception` events that
-// analytics.captureError applies to handled errors. The SDK itself is stubbed,
-// so the real PostHog client never loads. Runs in the Node default env.
 import { describe, expect, it, vi } from "vitest";
 
 import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
@@ -20,9 +16,6 @@ type EventLike = {
 };
 
 const posthogCtor = vi.hoisted(() => {
-  // The module news up the client and registers environment properties on it
-  // at import time, so the stub must be a constructible class exposing the
-  // constructor options (where the send hook lives) and the touched surface.
   class PostHogStub {
     static options: unknown;
     register: unknown;
@@ -53,7 +46,6 @@ vi.mock("expo-constants", () => ({
   },
 }));
 
-// The hook's key is the SDK's fixed snake_case option name.
 function sentBeforeSend(): BeforeSend {
   const options = posthogCtor.options as Record<string, BeforeSend>;
   expect(options, "PostHog was constructed with options").toBeTruthy();
@@ -151,8 +143,6 @@ describe("posthog before_send", () => {
     expect(serialized).not.toContain(noteUrl);
     expect(sent.properties?.$exception_message).toBe("TypeError");
     const list = sent.properties?.$exception_list as ExceptionListEntry[];
-    // The class identifies the exception for grouping; the stack still ships
-    // for symbolication.
     expect(list[0].value).toBe("TypeError");
     expect(list[0].stacktrace).toBe("frame at app.js:1");
   });
@@ -176,8 +166,6 @@ describe("posthog before_send", () => {
       properties: { item_id: "items:1", message: "anything at all" },
     };
     expect(beforeSend(event)).toBe(event);
-    // Value equality, not just identity: the hook must not stamp exception
-    // keys (not even undefined ones) onto ordinary events.
     expect(event.properties).toEqual({
       item_id: "items:1",
       message: "anything at all",
@@ -206,8 +194,6 @@ describe("posthog before_send", () => {
 
 describe("posthog exception autocapture gate", () => {
   it("stays off on a development build", () => {
-    // The module is mocked with variant "development", so a local dev crash
-    // never opens an error issue next to production traffic.
     const options = posthogCtor.options as {
       errorTracking: { autocapture: Record<string, unknown> };
     };
@@ -216,8 +202,6 @@ describe("posthog exception autocapture gate", () => {
   });
 
   it("turns on for a production build", async () => {
-    // Re-import the module against a production config so the gate is read
-    // fresh; the PostHog stub records the new constructor options.
     vi.resetModules();
     vi.doMock("expo-constants", () => ({
       default: {
@@ -313,10 +297,6 @@ describe("superProperties", () => {
 });
 
 describe("push notification capture", () => {
-  // Both options default to true in the SDK, and the native side sends
-  // `$push_notification_opened` without consulting `before_send`, so the
-  // redaction above cannot reach it. Pinned off explicitly: an SDK bump must
-  // not widen what leaves the device.
   it("stays off so no push data bypasses the redaction hook", () => {
     const options = posthogCtor.options as Record<string, unknown>;
     expect(options.capturePushNotificationSubscriptions).toBe(false);

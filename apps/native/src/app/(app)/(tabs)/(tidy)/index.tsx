@@ -69,7 +69,6 @@ export default function TidyScreen() {
     return <Loading />;
   }
 
-  // Tidy is a Pro feature. A lapsed user sees a paywall CTA instead of the deck.
   if (!entitled) {
     return <ProGate />;
   }
@@ -83,15 +82,11 @@ export default function TidyScreen() {
     );
   }
 
-  // `loading` is true until the batch for the active source has resolved
-  // (initial grant or a source switch), which avoids showing a stale deck.
   if (loading || batch === null) {
     return <Loading />;
   }
 
   return (
-    // Keyed by batch so every batch remounts fresh shared values and deck
-    // state: indices always start at the top card.
     <DeckAnimationProvider key={batchId} lastIndex={batch.length - 1}>
       <TidyDeckView
         batch={batch}
@@ -140,8 +135,6 @@ const TidyDeckView: FC<DeckViewProps> = ({
   } = useTidyActions({ batch, noteDeleted });
   const [continuing, setContinuing] = useState(false);
 
-  // Leaving the tab (or backgrounding the screen) flushes queued deletions so
-  // the batch never silently outlives the session.
   useFocusEffect(
     useCallback(() => {
       return () => {
@@ -234,8 +227,6 @@ const TidyDeckView: FC<DeckViewProps> = ({
         }}
       />
 
-      {/* Native header controls: undo on the left, delete on the
-          right with a live count badge. */}
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="left">
           <Stack.Toolbar.Button
@@ -283,7 +274,6 @@ const TidyDeckView: FC<DeckViewProps> = ({
         </Stack.Toolbar>
       ) : null}
 
-      {/* Centered progress counter. */}
       <View style={styles.progressRow}>
         <Text style={styles.progressText}>
           {Math.min(reviewedCount, batch.length)} / {batch.length}
@@ -340,8 +330,6 @@ const PermissionGate: FC<{
 
 const Loading: FC = () => <ScreenLoader label={t("loading.tidy")} />;
 
-/** Pro gate shown to lapsed users on the Tidy tab, with its own paywall
- * placement so the funnel separates a Tidy gate from Map's. */
 const ProGate: FC = () => (
   <ProGateView
     title={t("tidy.proTitle")}
@@ -373,7 +361,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   deckArea: {
     flex: 1,
     marginHorizontal: theme.gap(2),
-    // Clear the floating native tab bar with a comfortable gap.
     marginBottom: rt.insets.bottom + theme.gap(11),
   },
   gate: {

@@ -7,11 +7,6 @@ import { Alert, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
-/**
- * Covers the app while the plan is still loading. The screen underneath stays
- * mounted, so a cold-launch deep link keeps its destination; Sign out stays in
- * reach in case the read never resolves.
- */
 export function PlanLoadingCover() {
   useAppLocale();
   const { session, operation } = useNotificationSession();

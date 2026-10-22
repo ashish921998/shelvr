@@ -10,14 +10,7 @@ import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
 import { BodyTooLargeError, readBoundedText } from "@/lib/requestBody";
 
-/**
- * A visitor's ✓ / ✕ picks on a plan vote link. Forwarded to Convex with the
- * shared secret and the visitor IP, so the per-IP limit there applies to the
- * real client rather than to this server.
- */
 export async function POST(request: Request) {
-  // The ballot's shape is read once, in Convex (`model/planVote.ts`); this
-  // route only bounds the body and passes it on as it came.
   let body: string;
   try {
     body = await readBoundedText(request, 2048);

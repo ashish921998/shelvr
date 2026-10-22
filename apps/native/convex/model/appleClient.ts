@@ -3,8 +3,6 @@ import { signEs256Jwt } from "./appleSigning";
 const TOKEN_URL = "https://appleid.apple.com/auth/token";
 const REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 
-/** Apple's client secret: a short-lived ES256 JWT signed with the team's .p8
- * key. */
 export async function clientSecret(config: {
   clientId: string;
   privateKey: string;
@@ -25,12 +23,6 @@ export async function clientSecret(config: {
   );
 }
 
-/**
- * Trades the native sheet's one-time authorization code for a refresh token,
- * the only thing Apple accepts when an account is deleted and its sign-in has
- * to be revoked. Returns null when Apple refuses or cannot be reached; the
- * caller treats that as "nothing to revoke later", never as a failed sign-in.
- */
 export async function exchangeAuthorizationCode(config: {
   code: string;
   clientId: string;
@@ -39,7 +31,6 @@ export async function exchangeAuthorizationCode(config: {
   teamId: string;
 }): Promise<{
   refreshToken: string | null;
-  /** Names the Apple account the code, and so the refresh token, belongs to. */
   identityToken: string | null;
   status?: number;
 }> {
@@ -69,13 +60,6 @@ export async function exchangeAuthorizationCode(config: {
   };
 }
 
-/**
- * Asks Apple to revoke a refresh token, signing the client secret with the
- * team key itself, like `exchangeAuthorizationCode`. A thrown error is a
- * signing failure (a malformed key); undefined means Apple could not be
- * reached. Runtime-neutral and bounded; callers decide whether a retained
- * row permits a scheduled retry.
- */
 export async function revokeRefreshToken(config: {
   refreshToken: string;
   clientId: string;

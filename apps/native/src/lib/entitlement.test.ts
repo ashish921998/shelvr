@@ -73,9 +73,6 @@ seedRequire("react-native-purchases", {
     getOfferings: mock.getOfferings,
     checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
     getCustomerInfo: mock.getCustomerInfo,
-    // The SDK exposes its intro-eligibility enum as a static on the default
-    // export; the paywall context read uses it directly, so the fake mirrors
-    // the real member names and values.
     INTRO_ELIGIBILITY_STATUS: {
       INTRO_ELIGIBILITY_STATUS_UNKNOWN: 0,
       INTRO_ELIGIBILITY_STATUS_INELIGIBLE: 1,
@@ -148,8 +145,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-// Fresh module state per test, with identity sync already ready so
-// presentPaywall reaches the native sheet instead of the identity gate.
 async function loadReady() {
   vi.resetModules();
   const mod = await import("./entitlement");
@@ -440,8 +435,6 @@ describe("useEntitlementSync on a build with RevenueCat disabled", () => {
     mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = true;
     const { openPaywall } = await loadReady();
     expect(mock.captureError).not.toHaveBeenCalled();
-    // Readiness was never recorded, so the paywall degrades to the fallback
-    // route instead of opening a sheet under an unsynced identity.
     await expect(openPaywall(router, "share")).resolves.toBe(false);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith("/(app)/paywall");
@@ -468,8 +461,6 @@ describe("presentPaywall concurrency", () => {
     const sheet = deferred<string>();
     mock.presentPaywall.mockReturnValue(sheet.promise);
 
-    // Both calls are made before either awaits, reproducing the share screen's
-    // two openPaywall calls 80ms apart.
     const first = openPaywall(router, "share");
     const second = openPaywall(router, "share");
     sheet.resolve("CANCELLED");
@@ -498,7 +489,6 @@ describe("presentPaywall concurrency", () => {
 
     const first = openPaywall(router, "share");
     const second = openPaywall(router, "share");
-    // ERROR maps to `unavailable`, the only outcome that opens the fallback.
     sheet.resolve("ERROR");
 
     expect(await Promise.all([first, second])).toEqual([false, false]);
@@ -551,8 +541,6 @@ describe("a paywall that never came up", () => {
     noteAppTouch();
     await openPaywall(router, "new_space");
 
-    // The onboarding replay waiting on it keeps its work, and no fallback
-    // screen opens for a tap it never made.
     await expect(first).resolves.toBe(false);
     expect(push).not.toHaveBeenCalled();
   });
@@ -585,7 +573,6 @@ describe("a paywall that never came up", () => {
     slow.resolve("CANCELLED");
     await vi.advanceTimersByTimeAsync(5000);
 
-    // The late settle cannot release the newer sheet.
     expect(isPaywallPending()).toBe(true);
   });
 
@@ -661,7 +648,6 @@ describe("restore from the paywall", () => {
     mock.presentPaywall.mockResolvedValue("RESTORED");
 
     await expect(openPaywall(router, "share")).resolves.toBe(false);
-    // Telemetry sees the close too, not a restore.
     expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
   });
 
@@ -800,7 +786,6 @@ describe("paywall outcome", () => {
     const first = openPaywall(router, "plan_gate");
     await vi.waitFor(() => expect(mock.presentPaywall).toHaveBeenCalled());
     endPurchaseLandingSession();
-    // The next account joins the same sheet before it settles.
     const joined = openPaywall(router, "plan_gate");
     finish("PURCHASED");
 
@@ -874,8 +859,6 @@ describe("paywall offering", () => {
       current,
       all: { weekly_annual_draft: noTrial },
     });
-    // A cold sign-in: the read started before identity sync fails, and the
-    // one made after it answers.
     mock.checkEligibility
       .mockRejectedValueOnce(new Error("not configured"))
       .mockResolvedValueOnce({ annual: { status: 2 } });

@@ -48,31 +48,18 @@ const spaceFields = {
   dynamic: v.optional(v.boolean()),
   autoFile: v.optional(v.boolean()),
   autoFileSince: v.optional(v.number()),
-  // Denormalized membership summary (see schema.ts). Optional until the
-  // backfill has visited every legacy row.
   savedCount: v.optional(v.number()),
   suggestedCount: v.optional(v.number()),
   previewItemIds: v.optional(v.array(v.id("items"))),
   suggestedPreviewItemIds: v.optional(v.array(v.id("items"))),
 };
 
-/** Join rows removed per transaction when a space is deleted. */
 const SPACE_DELETE_BATCH = 500;
 
-/**
- * Backfill bounds. A transaction visits at most BACKFILL_BATCH spaces and reads
- * at most BACKFILL_READ_BUDGET join rows in total, completeness probes
- * included. The default budget is the per-space ceiling plus its probe, so a
- * space with exactly BACKFILL_SCAN_LIMIT rows still fits one transaction and
- * one above that ceiling is left legacy. Convex caps documents read per
- * transaction, so the two limits together keep a batch of large spaces from
- * exceeding it.
- */
 const BACKFILL_BATCH = 10;
 const BACKFILL_SCAN_LIMIT = 8000;
 const BACKFILL_READ_BUDGET = BACKFILL_SCAN_LIMIT + 1;
 
-/** A whole number at or above `min`, or `fallback` for anything else. */
 function knob(
   value: number | undefined,
   min: number,
@@ -83,7 +70,6 @@ function knob(
     : fallback;
 }
 
-/** A space's joins split by who owns them: the user (saved) vs Shelvr (suggested). */
 async function splitJoins(ctx: QueryCtx, spaceId: Id<"spaces">) {
   const joins = await ctx.db
     .query("spaceItems")
@@ -98,7 +84,6 @@ async function splitJoins(ctx: QueryCtx, spaceId: Id<"spaces">) {
     } else if (status === "suggested") {
       suggested.push(join);
     }
-    // Dismissed rows exist only so the AI never re-suggests; never surfaced.
   }
   return { saved, suggested };
 }
@@ -118,13 +103,6 @@ async function loadItems(
   return items;
 }
 
-/**
- * The space's summary from its own row, or, for a legacy row the backfill has
- * not visited, a bounded recomputation. The fallback reads at most
- * SUMMARY_SCAN_LIMIT + 1 joins, so a huge legacy space shows a floor rather
- * than the exact count until `backfillSpaceCounters` runs. A query cannot
- * write, so nothing is persisted here.
- */
 async function readSummary(
   ctx: QueryCtx,
   space: Doc<"spaces">,
@@ -142,13 +120,6 @@ type Preview = {
   suggested: boolean;
 };
 
-/**
- * Cover images for the spaces grid, from the previewed item ids only: at most
- * 2 * PREVIEW_LIMIT item reads per space, never a walk over the joins. Saved
- * items front the pile; a fresh space with only suggestions still gets covers
- * (sparkled client-side) instead of looking dead. Items without imagery are
- * skipped, so a space whose newest members are all notes shows fewer covers.
- */
 async function loadPreviews(
   ctx: QueryCtx,
   summary: MembershipSummary,
@@ -181,16 +152,11 @@ async function loadPreviews(
   return previews;
 }
 
-// ---------------------------------------------------------------------------
-// Public queries
-// ---------------------------------------------------------------------------
-
 export const listSpaces = query({
   args: {},
   returns: v.array(
     v.object({
       ...spaceFields,
-      // Saved memberships only: pending suggestions don't inflate the count.
       itemCount: v.number(),
       suggestionCount: v.number(),
       previews: v.array(
@@ -234,8 +200,6 @@ export const getSpace = query({
   returns: v.union(
     v.object({
       ...spaceFields,
-      // Saved items additionally carry this membership's purpose-steered
-      // intents: the same item can act differently on a different shelf.
       items: v.array(
         v.object({
           ...enrichedItemValidator.fields,
@@ -273,10 +237,6 @@ export const getSpace = query({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Public mutations
-// ---------------------------------------------------------------------------
-
 export const createSpace = mutation({
   args: {
     name: v.string(),
@@ -289,11 +249,6 @@ export const createSpace = mutation({
     const userId = await requireUserId(ctx);
     const name = args.name.trim();
 
-    // Onboarding replay may retry after a process death. Treat the user's
-    // trimmed name as the idempotency key so a successful mutation is never
-    // duplicated merely because the client did not persist its acknowledgement.
-    // The lookup runs before validation on purpose: a space created before
-    // the length limit existed must still be found by its replay.
     const existing = await ctx.db
       .query("spaces")
       .withIndex("by_user_and_name", (q) =>
@@ -307,9 +262,6 @@ export const createSpace = mutation({
     const description = validateSpaceDescription(args.description);
 
     await requireProEntitlement(ctx, userId);
-    // The recommendation pass is a paid model call; bound it before writing so
-    // a limited caller sees no half-created space. Idempotent retries above
-    // never reach this line and so never spend a token.
     await rateLimiter.limit(ctx, "recommendSpace", {
       key: userId,
       throws: true,
@@ -319,18 +271,14 @@ export const createSpace = mutation({
       name,
       description,
       dynamic: args.dynamic ?? false,
-      // Auto-file only means anything on a dynamic space.
       ...(args.dynamic === true && args.autoFile === true
         ? { autoFile: true, autoFileSince: Date.now() }
         : { autoFile: false }),
-      // Born with an exact (empty) summary so it never takes the legacy path.
       savedCount: 0,
       suggestedCount: 0,
       previewItemIds: [],
       suggestedPreviewItemIds: [],
     });
-    // Every new space gets one recommendation pass off its title; the dynamic
-    // toggle only governs whether future saves keep getting suggested.
     await ctx.scheduler.runAfter(
       0,
       internal.aiRecommendForSpace.recommendForSpace,
@@ -358,19 +306,10 @@ export const updateSpace = mutation({
     }
     const wasDynamic = space.dynamic === true;
     const enablingDynamic = args.dynamic === true && !wasDynamic;
-    // Auto-file lives only while dynamic does: turning dynamic off clears it
-    // here, so an older build that never sends autoFile cannot bring it back
-    // by switching dynamic on again.
     const nextDynamic = args.dynamic ?? wasDynamic;
     const nextAutoFile =
       nextDynamic && (args.autoFile ?? space.autoFile === true);
     const enablingAutoFile = nextAutoFile && space.autoFile !== true;
-    // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
-    // saves into the space). A lapsed user editing a space's name or turning
-    // dynamic off is allowed, but enabling it requires an active trial/pro.
-    // Check BEFORE patching so a lapsed user can't flip the flag and trigger
-    // the recommendation pass before being rejected. The rate limit sits in
-    // the same spot for the same reason: a limited flip is rejected whole.
     if (enablingDynamic) {
       await requireProEntitlement(ctx, userId);
       await rateLimiter.limit(ctx, "recommendSpace", {
@@ -378,7 +317,6 @@ export const updateSpace = mutation({
         throws: true,
       });
     } else if (enablingAutoFile) {
-      // Auto-filing is part of the same Pro feature as dynamic.
       await requireProEntitlement(ctx, userId);
     }
     const patch: {
@@ -387,9 +325,6 @@ export const updateSpace = mutation({
       autoFile?: boolean;
       autoFileSince?: number;
     } = {};
-    // The edit form always submits the name, changed or not. Only a changed
-    // name is validated, so a space named before the length limit existed can
-    // still have its other settings edited.
     if (args.name !== undefined && args.name.trim() !== space.name) {
       patch.name = validateSpaceName(args.name);
     }
@@ -404,7 +339,6 @@ export const updateSpace = mutation({
       patch.autoFileSince = undefined;
     }
     await ctx.db.patch(space._id, patch);
-    // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
     if (enablingDynamic) {
       await ctx.scheduler.runAfter(
         0,
@@ -427,11 +361,6 @@ export const deleteSpace = mutation({
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
     }
-    // The space row goes first so it leaves every list in this transaction.
-    // Its joins follow in bounded batches; a large space finishes in a
-    // scheduled continuation. Orphan joins in that window are harmless: every
-    // reader null-checks the space, and the AI never suggests into a space it
-    // cannot load.
     await ctx.db.delete(space._id);
     await deleteTripsForSpace(ctx, space._id);
     const more = await deleteSpaceRemains(ctx, space._id);
@@ -444,7 +373,6 @@ export const deleteSpace = mutation({
   },
 });
 
-/** One batch of a deleted space's joins and vote links. True while more remain. */
 async function deleteSpaceRemains(
   ctx: MutationCtx,
   spaceId: Id<"spaces">,
@@ -458,7 +386,6 @@ async function deleteSpaceRemains(
   return moreJoins || !sharesDone;
 }
 
-/** Continuation of deleteSpace for spaces with more joins than one batch. */
 export const purgeSpaceMemberships = internalMutation({
   args: { spaceId: v.id("spaces") },
   returns: v.null(),
@@ -473,7 +400,6 @@ export const purgeSpaceMemberships = internalMutation({
   },
 });
 
-/** Guard shared by the membership mutations: both ends must exist and be the caller's. */
 async function requireItemAndSpace(
   ctx: MutationCtx,
   userId: string,
@@ -491,21 +417,6 @@ async function requireItemAndSpace(
   return { item, space };
 }
 
-/**
- * Schedule the phase-2 purpose-steering enrich pass for a ready item, and
- * report whether it was scheduled.
- *
- * Filing an item into a space is core organization and works for every
- * user; the steering pass is a paid model call and follows the same rule as
- * createSpace: Pro (or trial) only. A non-entitled user keeps the membership
- * and simply gets no steered intents. The rate limit is charged only when a
- * pass would actually run, so idle callers (item still processing, not
- * entitled) never spend a token.
- *
- * With `throws`, a limited caller aborts the whole mutation, so the
- * membership write it made is rolled back with it (matches findLinks).
- * Without it, the caller keeps its writes and just skips the pass.
- */
 async function scheduleSteering(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -519,7 +430,6 @@ async function scheduleSteering(
   if (!(await hasProEntitlement(ctx, userId))) {
     return false;
   }
-  // Nothing would run, so nothing is drawn from the budget.
   if (!(await aiAllowed(ctx, userId))) {
     return false;
   }
@@ -558,7 +468,6 @@ export const addItemToSpace = mutation({
         status: "saved",
       });
     } else if (effectiveStatus(row) !== "saved") {
-      // A direct add upgrades a pending suggestion or overrides a dismissal.
       await setMembershipStatus(ctx, row, "saved");
     } else {
       return null;
@@ -576,7 +485,6 @@ export const removeItemFromSpace = mutation({
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row !== null && effectiveStatus(row) === "saved") {
-      // Remember the user's correction so later classification cannot re-add it.
       await setMembershipStatus(ctx, row, "dismissed");
     }
     return null;
@@ -585,8 +493,6 @@ export const removeItemFromSpace = mutation({
 
 export const acceptSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
-  // True only when a live suggestion actually flipped to saved, so the client
-  // fires `suggestion_accepted` on a real transition rather than a no-op re-tap.
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -597,7 +503,6 @@ export const acceptSuggestion = mutation({
       args.spaceId,
     );
     const row = await getMembership(ctx, args.itemId, args.spaceId);
-    // Tolerate double-taps and races: only a live suggestion flips.
     if (row === null || effectiveStatus(row) !== "suggested") {
       return false;
     }
@@ -624,7 +529,6 @@ export const undoAcceptSuggestion = mutation({
 
 export const dismissSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
-  // True only when a live suggestion actually flipped to dismissed.
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -633,7 +537,6 @@ export const dismissSuggestion = mutation({
     if (row === null || effectiveStatus(row) !== "suggested") {
       return false;
     }
-    // Kept (not deleted) so the AI never nags about this item again.
     await setMembershipStatus(ctx, row, "dismissed");
     return true;
   },
@@ -641,8 +544,6 @@ export const dismissSuggestion = mutation({
 
 export const acceptAllSuggestions = mutation({
   args: { spaceId: v.id("spaces") },
-  // The number of suggestions actually accepted, so analytics report the real
-  // count instead of whatever the client had rendered (which can be stale).
   returns: v.number(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -651,11 +552,6 @@ export const acceptAllSuggestions = mutation({
       throw new Error("Space not found");
     }
     const { suggested } = await splitJoins(ctx, space._id);
-    // Accepting is the user's decision and always lands in full. Steering is
-    // best effort under the per-user budget: once the bucket runs dry the
-    // remaining items are still accepted, just without a steering pass. A
-    // throwing limit here would make a space with more suggestions than the
-    // bucket's capacity impossible to accept at all.
     let steeringAllowed = true;
     for (const row of suggested) {
       await setMembershipStatus(ctx, row, "saved");
@@ -673,31 +569,10 @@ export const acceptAllSuggestions = mutation({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Internal: maintenance
-// ---------------------------------------------------------------------------
-
-/**
- * One-shot backfill of the denormalized summary on spaces written before it
- * existed. Walks `spaces` in `_id` order, at most BACKFILL_BATCH per
- * transaction, and schedules itself until done. The cursor is the id of the
- * last space fully handled, so a batch that stops early because its read
- * budget is spent resumes exactly at the next space. Each space's joins are
- * read in full (up to the smaller of BACKFILL_SCAN_LIMIT and the budget) so
- * the persisted counts are exact; a space over that ceiling is reported in
- * `skipped` and left legacy. Only
- * spaces missing a field are touched unless `force` is set, which recomputes
- * every visited space (a repair tool if the summary ever drifts).
- *
- * Run from apps/native with `npx convex run spaces:backfillSpaceCounters '{}'`
- * (add `--prod` for production). Re-running is safe: it converges.
- */
 export const backfillSpaceCounters = internalMutation({
   args: {
     cursor: v.optional(v.union(v.id("spaces"), v.null())),
     batchSize: v.optional(v.number()),
-    // Join rows one transaction may read across all its spaces. Lower it on
-    // deployments with tighter limits; tests use it to exercise early stops.
     readBudget: v.optional(v.number()),
     force: v.optional(v.boolean()),
   },
@@ -709,13 +584,9 @@ export const backfillSpaceCounters = internalMutation({
     cursor: v.union(v.id("spaces"), v.null()),
   }),
   handler: async (ctx, args) => {
-    // Operator knobs. A batch below one would reschedule forever without
-    // advancing the cursor, and a budget below two cannot fit one row plus its
-    // completeness probe, so anything outside the floor uses the default.
     const batchSize = knob(args.batchSize, 1, BACKFILL_BATCH);
     const readBudget = knob(args.readBudget, 2, BACKFILL_READ_BUDGET);
     const after = args.cursor ?? null;
-    // One extra row tells us whether anything follows the batch.
     const candidates = await ctx.db
       .query("spaces")
       .withIndex("by_id", (q) => (after === null ? q : q.gt("_id", after)))
@@ -734,11 +605,6 @@ export const backfillSpaceCounters = internalMutation({
         cursor = space._id;
         continue;
       }
-      // Every scan, including the first, stays inside the budget so one
-      // transaction never reads more than the caller allowed. The first scan
-      // of a transaction is judged on its own: if it comes back incomplete the
-      // space is over the effective ceiling and is skipped, never retried, so
-      // the loop cannot stall on it. Later scans get what is left.
       const first = remaining === readBudget;
       if (!first && remaining <= 1) {
         moreAfterBatch = true;
@@ -748,11 +614,6 @@ export const backfillSpaceCounters = internalMutation({
       const summary = await summarizeMemberships(ctx, space._id, scanLimit);
       remaining -= summary.scanned;
       if (!summary.complete && !first && scanLimit < BACKFILL_SCAN_LIMIT) {
-        // Cut short by the budget, not by the space's size: leave the cursor
-        // before this space so the continuation retries it with a full budget.
-        // A later scan that still had the full ceiling and came back incomplete
-        // is over the ceiling, so it falls through and is skipped like a first
-        // scan would be.
         moreAfterBatch = true;
         break;
       }
@@ -784,10 +645,6 @@ export const backfillSpaceCounters = internalMutation({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Internal: used by the AI actions
-// ---------------------------------------------------------------------------
-
 export const listSpacesInternal = internalQuery({
   args: { userId: v.string() },
   returns: v.array(v.object(spaceFields)),
@@ -807,7 +664,6 @@ export const getSpaceInternal = internalQuery({
   },
 });
 
-/** Read the space, permission and exclusions in one pre-embedding snapshot. */
 export const recommendationContext = internalQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.union(
@@ -828,7 +684,6 @@ export const recommendationContext = internalQuery({
   },
 });
 
-/** Revalidate hydrated recommendation identities before classification. */
 export const survivingCandidates = internalQuery({
   args: {
     userId: v.string(),
@@ -861,19 +716,11 @@ export const survivingCandidates = internalQuery({
   },
 });
 
-/**
- * The gate and the input for "Make a plan" (`plans.makePlan`), in one
- * transaction: the caller owns the space, is Pro, has not declined AI
- * processing, and has a token left. Returns the space's saved, ready items,
- * newest filed first and bounded, as the text the model reads. An empty
- * space spends no token, since no model call follows.
- */
 export const claimPlanInternal = internalMutation({
   args: { spaceId: v.id("spaces") },
   returns: v.object({
     spaceName: v.string(),
     sources: v.array(planSourceValidator),
-    // Places the user marked "We went", newest first.
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
@@ -896,11 +743,6 @@ export const claimPlanInternal = internalMutation({
   },
 });
 
-/**
- * Ids of spaces the user has directly filed this item into. processItem uses
- * these to kick off the purpose-steering pass once classification lands (a
- * couch saved to "apartment shopping" wants a shopping link on that shelf).
- */
 export const listSavedSpaceIdsForItemInternal = internalQuery({
   args: { itemId: v.id("items") },
   returns: v.array(v.id("spaces")),
@@ -915,12 +757,6 @@ export const listSavedSpaceIdsForItemInternal = internalQuery({
   },
 });
 
-/**
- * The steering pass's write path: intents scoped to one membership row. Only
- * `saved` rows carry them. Steering never runs for pending suggestions.
- * Intents do not affect the space summary, so this is the one spaceItems
- * patch that bypasses model/memberships.ts on purpose.
- */
 export const claimSteeringInternal = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -960,8 +796,6 @@ export const setMembershipIntentsInternal = internalMutation({
     if (row === null || effectiveStatus(row) !== "saved") {
       return null;
     }
-    // Asked in the committing transaction: the model call that produced these
-    // can outlast the owner turning AI off.
     if (!(await aiAllowed(ctx, row.userId))) {
       return null;
     }

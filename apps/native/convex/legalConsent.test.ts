@@ -102,7 +102,7 @@ describe("recorded terms and refund consent", () => {
     const f = await fixture();
     await expect(
       f.signedIn.mutation(api.legalConsent.review, {
-        // @ts-expect-error Runtime validation must also reject an obsolete client.
+        // @ts-expect-error
         version: "old",
         accepted: true,
       }),
@@ -111,7 +111,7 @@ describe("recorded terms and refund consent", () => {
       f.signedIn.mutation(api.legalConsent.review, {
         version: TERMS_VERSION,
         accepted: true,
-        // @ts-expect-error Public API has no userId argument.
+        // @ts-expect-error
         userId: f.userId,
       }),
     ).rejects.toThrow();
@@ -302,13 +302,11 @@ describe("consent delivery reliability", () => {
       syncPending: true,
       syncFailed: true,
     });
-    // The recovery cron skips capped rows instead of rescheduling forever.
     await f.t.mutation(internal.legalConsent.retry, {});
     expect(await f.row()).toMatchObject({
       syncState: "failed",
       attempts: MAX_SYNC_ATTEMPTS,
     });
-    // A fresh decision revives the row with a clean attempt budget.
     vi.setSystemTime(Date.now() + 3_600_000);
     fetchMock.mockImplementation(async () => Response.json({}));
     await f.review(false);

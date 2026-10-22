@@ -7,15 +7,11 @@ type Props = {
   labels: string[];
   selected: number;
   onSelect: (index: number) => void;
-  /** The selected pill is amber rather than the surface color. */
   tinted?: boolean;
-  /** Day tabs scroll sideways; the pace control fills its row. */
   scroll?: boolean;
   accessibilityLabel?: string;
 };
 
-/** A row of pill choices, used for the trip's pace, its city and its day
- * tabs. */
 export function TripSegments({
   labels,
   selected,

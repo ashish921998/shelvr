@@ -17,8 +17,6 @@ const scroll = vi.hoisted(() => ({ to: vi.fn() }));
 
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  // Forwards the ref the reader scrolls through (React 19 passes it as a prop),
-  // so the recycle effect's scroll-to-top actually runs against a handle.
   ScrollView: vi.fn(
     ({
       children,

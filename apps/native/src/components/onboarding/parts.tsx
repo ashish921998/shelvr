@@ -2,7 +2,6 @@ import { Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { StitchRow } from "@/components/ui/stitch-loader";
 
-/** The primary CTA used by every step's footer. */
 export function CtaButton({
   label,
   onPress,
@@ -36,7 +35,6 @@ export function CtaButton({
   );
 }
 
-/** The quiet secondary action under a CTA. */
 export function GhostButton({
   label,
   onPress,

@@ -50,7 +50,6 @@ export default function VerdictCard({
   stats,
   kicker = "The oracle says you are",
 }: {
-  /** A shared verdict has no guesses, so that section is left out. */
   verdict: OracleVerdict;
   stats?: LibraryStats;
   kicker?: string;

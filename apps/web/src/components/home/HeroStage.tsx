@@ -14,8 +14,6 @@ import { useInView, useReducedMotion } from "@/lib/motion";
 import { IntentChip, TagChip, type IntentKind } from "./Chips";
 import styles from "./HeroStage.module.css";
 
-// Three canvases, picked by the same breakpoints as HeroStage.module.css:
-// mobile (<760) 400×920, wide (760–999) 960×590, split (≥1000) 672×610.
 const COLS = { m: [14, 206], w: [30, 262, 494, 726], s: [24, 182, 340, 498] };
 const ROWS = {
   m: [24, 200, 376, 552, 728],
@@ -28,7 +26,6 @@ type Card = {
   h: number;
   col: number;
   row: number;
-  /** Messy x, y, rotation on the 960 canvas. */
   mess: [number, number, number];
 } & (
   | { kind: "photo"; src: string }
@@ -146,7 +143,6 @@ const LABELS = [
 const move = (x: number, y: number, r: number) =>
   `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${r}deg)`;
 
-/** Every layout's mess and tidy transform, as CSS variables the stylesheet picks between. */
 function cardVars(card: Card, i: number) {
   const [x, y, r] = card.mess;
   const tilt = (i % 2 ? 1 : -1) * 0.8;
@@ -221,16 +217,13 @@ function CardBody({ card }: { card: Card }) {
   );
 }
 
-/** The hero demo: a pile of saves that files itself onto labelled shelves. */
 export default function HeroStage() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const inView = useInView(wrapRef, 0.45);
   const reduced = useReducedMotion();
   const [tidy, setTidy] = useState(false);
-  // A click holds the new state longer before the loop takes over again.
   const [held, setHeld] = useState(false);
 
-  // While on screen, alternate mess and shelf. Reduced motion never loops.
   useEffect(() => {
     if (!inView || reduced) return;
     const hold = tidy ? (held ? 9000 : 6500) : held ? 4000 : 2000;
@@ -241,7 +234,6 @@ export default function HeroStage() {
     return () => clearTimeout(timer);
   }, [inView, reduced, tidy, held]);
 
-  // Scrolled away: back to the mess, ready to replay. Reduced motion rests tidy.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!inView || reduced) setTidy(reduced);

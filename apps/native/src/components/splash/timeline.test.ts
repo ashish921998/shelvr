@@ -9,11 +9,6 @@ import {
   TIMELINE,
 } from "./timeline";
 
-// The animation's beats live in two files: `TIMELINE` here and `SCHEDULE` in
-// the composition, because the saves' times are generated where the saves
-// are. These assertions are what keeps the two honest when either is retimed.
-
-/** When the last save finishes its glide onto the shelf. */
 const lastSaveLands =
   SCHEDULE.travelFrom +
   SCHEDULE.travelSpread +
@@ -83,13 +78,10 @@ describe("TIMELINE", () => {
       lastSaveLands,
     );
     expect(lastBeat).toBeLessThanOrEqual(SPLASH_DURATION);
-    // And the cross-fade starts only once the last beat has played, so the
-    // splash is never cut off mid-animation.
     expect(SPLASH_EXIT_FROM).toBeGreaterThanOrEqual(lastBeat);
   });
 });
 
-/** WCAG relative luminance, for comparing one ground against the other. */
 function luminance(hex: string): number {
   const value = Number.parseInt(hex.slice(1), 16);
   const channel = (byte: number) => {
@@ -119,10 +111,6 @@ describe("splash themes", () => {
     expect(SPLASH_THEMES.dark.ground).not.toBe(SPLASH_THEMES.light.ground);
   });
 
-  // No absolute floor: the shipped light palette puts the amber mark at about
-  // 2:1 on warm paper, which is a deliberate look rather than a defect. What
-  // has to hold is that nothing reads worse on the dark ground than it already
-  // does on the light one, which is what a mistyped dark literal would break.
   it("reads at least as well on the dark ground as on the light one", () => {
     for (const role of ["mark", "wordmark", "footer"] as const) {
       expect(

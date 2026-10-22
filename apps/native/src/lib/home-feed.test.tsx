@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-// Tests for the one shared home-feed subscription. convex/react is stubbed, so
-// the pagination states are simulated directly and the provider's contract is
-// what's under test: undefined items until the first page, exact load-more
-// gating, and one context instance shared by every consumer.
 import { render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -26,14 +22,12 @@ vi.mock("@convex/_generated/api", () => ({
   },
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-// The real account-gone boundary wraps the provider; its loader is native UI.
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <div>loader</div>),
 }));
 
 type HomeFeed = ReturnType<typeof useHomeFeed>;
 
-// Renders nothing; hands the context value it sees to the test.
 function Probe({ sink }: { sink: HomeFeed[] }) {
   sink.push(useHomeFeed());
   return null;
@@ -137,7 +131,6 @@ describe("HomeFeedProvider", () => {
     const { rerender } = render(tree());
     expect(screen.getByText("loader")).toBeTruthy();
 
-    // Signed out but not onboarded: the tree stays mounted.
     mocks.useConvexAuth.mockReturnValue({ isAuthenticated: false });
     mocks.usePaginatedQuery.mockReturnValue({
       results: [],
@@ -171,7 +164,6 @@ describe("HomeFeedProvider", () => {
     );
     const { rerender } = render(tree());
 
-    // Onboarding's sign-in step lands; its local state must survive.
     stubFeed("LoadingFirstPage");
     rerender(tree());
     expect(screen.getByText("onboarding")).toBeTruthy();

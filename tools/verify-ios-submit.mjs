@@ -15,7 +15,6 @@ try {
     appleTeamId: eas.submit.production.ios.appleTeamId,
   });
 } catch {
-  // Network/API errors can contain credential material; never echo them.
   process.stderr.write(
     "::error::Unable to confirm an EAS-managed iOS submission key for the production app and Apple team. Check EXPO_TOKEN and configure the key with eas credentials --platform ios (production > App Store Connect > EAS Submit) before retrying.\n",
   );

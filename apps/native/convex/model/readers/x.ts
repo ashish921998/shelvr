@@ -14,14 +14,7 @@ import {
 } from "../pageReadCore";
 import { xStatusId } from "../externalUrl";
 
-/**
- * X serves posts behind JS rendering and a login wall, but its public oEmbed
- * endpoint answers with the post markup and author. The markup is
- * `<blockquote><p>post text</p>&mdash; Author (@handle) <a>date</a></blockquote>`,
- * so only the first paragraph becomes content; the attribution stays out. A
- * body that is not a JSON object is unreadable, like a page that fails to
- * parse, so the item keeps its URL-only fallback instead of crashing.
- */
+/** oEmbed markup: `<blockquote><p>post text</p>&mdash; Author (@handle) <a>date</a></blockquote>`. */
 export async function fetchXoEmbed(url: string): Promise<PageData> {
   const endpoint = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
   const result = await safeFetch(endpoint, {
@@ -56,14 +49,12 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
       .replace(/\s+/g, " ")
       .trim(),
   );
-  // Post links are t.co redirects whose anchor text is the display URL;
-  // attached media links display as pic.twitter.com and lead nowhere useful.
+  // t.co anchors show the display URL; pic.twitter.com media links lead nowhere useful.
   const hrefs = Array.from(
     body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi),
   )
     .filter(([, , label]) => !/^\s*pic\.(twitter|x)\.com/i.test(label))
     .map(([, href]) => decodeEntities(href));
-  // author_url carries the handle; author_name is the display name.
   const handle = str("author_url")?.match(
     /(?:twitter\.com|x\.com)\/([^/?#]+)/i,
   )?.[1];
@@ -102,7 +93,6 @@ const xSyndicationSchema = z.object({
       }),
     )
     .optional(),
-  // Present when `text` is the first 280 characters of a longer post.
   note_tweet: z.object({}).optional(),
   article: z
     .object({
@@ -127,16 +117,12 @@ const X_MEDIA_KINDS: Partial<Record<string, PostMedia["kind"]>> = {
   animated_gif: "gif",
 };
 
-/** pbs.twimg.com serves a small rendition by default (600 px for older
- * posts); `name=large` is the largest one, capped at 2048 px. */
 function xLargeImage(url: string): string {
   const parsed = new URL(url);
   parsed.searchParams.set("name", "large");
   return parsed.toString();
 }
 
-/** A post's display text: X escapes `&`, `<`, and `>`, shortens links to
- * t.co, and appends a t.co link for its attached media. */
 function xPostText(
   post: z.infer<typeof xSyndicationSchema>,
 ): string | undefined {
@@ -166,8 +152,7 @@ function parseXSyndication(body: unknown): PageData | undefined {
     ? undefined
     : post.article?.cover_media?.media_info;
   if (post.article) {
-    // Syndication cuts the preview mid-sentence, and the preview is all an
-    // Article save keeps.
+    // Syndication cuts the preview mid-sentence.
     const preview = post.article.preview_text?.trim();
     return {
       title: post.article.title,
@@ -215,14 +200,10 @@ function parseXSyndication(body: unknown): PageData | undefined {
   };
 }
 
-/** react-tweet's token for the syndication endpoint, derived from the id. */
 function xSyndicationToken(id: string): string {
   return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
 }
 
-/** X's public syndication endpoint (the one embedded posts render from)
- * carries Article titles and covers and the post's media, which oEmbed does
- * not. */
 export async function fetchXPost(url: string): Promise<PageData> {
   const id = xStatusId(url);
   if (id === undefined) {

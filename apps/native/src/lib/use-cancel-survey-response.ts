@@ -9,8 +9,6 @@ import {
   type CancelSurveyResponse,
 } from "@/lib/pending-cancel-survey";
 
-/** The server owns ask-once semantics; local storage only retains an answer
- * until its idempotent mutation finishes, including across app restarts. */
 export function useCancelSurveyResponse(
   userId: string | undefined,
   appState: string | null | undefined,

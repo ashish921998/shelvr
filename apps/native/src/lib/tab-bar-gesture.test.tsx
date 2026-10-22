@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-// Render the real fallback bar. Drivers settle immediately; recorded worklets
-// prove style/gesture contracts, not native animation continuity.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useRef, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -176,8 +174,6 @@ vi.mock("@/lib/tab-search-query", () => ({
 }));
 
 function point(x: number, y: number, id = 1): TouchEvent {
-  // Screen origin intentionally differs from local origin. Move callbacks
-  // receive distorted local coordinates, as a transformed native view does.
   return {
     changedTouches: [{ id, x, y, absoluteX: x + 100, absoluteY: y + 500 }],
   };
@@ -215,8 +211,6 @@ function expectTransform(x: number, y: number, pressed: boolean) {
   const style = pill();
   expect(style.width).toBe(300);
   const transforms = Object.assign({}, ...style.transform);
-  // Independent numeric oracle for existing constants: limit 56, drift .3,
-  // stretch .1, cross-axis squash .5, and press growth .03.
   const stretchX = (Math.sign(x) * 56 * Math.abs(x)) / (Math.abs(x) + 56);
   const stretchY = (Math.sign(y) * 56 * Math.abs(y)) / (Math.abs(y) + 56);
   const growX = (Math.abs(stretchX) / 56) * 0.1;
@@ -284,7 +278,7 @@ describe.each([false, true])(
       move(260, 29);
       move(110, 29);
       move(190, 29);
-      move(40, 29, 2); // A second finger cannot steal the active scrub.
+      move(40, 29, 2);
       expect(mock.presses).not.toHaveBeenCalled();
       release();
       expect(mock.presses.mock.calls).toEqual([["(tidy)"]]);

@@ -1,4 +1,3 @@
-/** The places a ballot may name, and how long a place key or an id may be. */
 export const MAX_VOTE_KEYS = 10;
 const MAX_KEY_CHARS = 8;
 const MAX_TOKEN_CHARS = 64;
@@ -9,11 +8,6 @@ export type PlanVoteBody = {
   voterId: string;
   picks: string[];
   passes: string[];
-  /**
-   * The visitor's own order for their ballots, so one that left the browser
-   * late never replaces a newer one that landed first. Absent from an old
-   * page, which then keeps last-write-wins.
-   */
   revision?: number;
 };
 
@@ -25,11 +19,6 @@ function isKeyList(value: unknown): value is string[] {
   );
 }
 
-/**
- * The one reading of a vote page's ballot. The web route forwards the body
- * as it came, so this is where its shape and limits are decided; null when
- * it is not a ballot.
- */
 export function parsePlanVote(body: unknown): PlanVoteBody | null {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return null;

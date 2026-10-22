@@ -1,7 +1,6 @@
 import { t } from "./i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 
-// Stable kind and preset identities remain compatible with persisted onboarding.
 const LABELS: Record<string, TextMessageKey> = {
   Articles: "presets.articles",
   Recipes: "presets.recipes",

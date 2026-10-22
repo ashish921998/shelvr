@@ -36,8 +36,6 @@ function cityKey(city: string): string {
   return tidyCity(city).toLowerCase();
 }
 
-/** The space's ready saves, newest filed first: saved rows plus legacy rows
- * (no status reads as saved), bounded. Shared with "Make a plan". */
 export async function loadReadySaves(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
@@ -67,8 +65,6 @@ export async function loadReadySaves(
   return saves;
 }
 
-/** Cities the saves name, most saves first, each in the spelling most of
- * them use. */
 function countCities(items: Doc<"items">[]): { city: string; count: number }[] {
   const counts = new Map<
     string,
@@ -95,12 +91,6 @@ function countCities(items: Doc<"items">[]): { city: string; count: number }[] {
     .sort((a, b) => b.count - a.count);
 }
 
-/**
- * The checks "Make a plan" and "Plan my trip" share before they read a
- * space for the model: the space is the caller's, and they are Pro and allow
- * AI. Convex forwards an action caller's identity to its internal mutation,
- * so authorization and the claim are one transaction.
- */
 export async function claimSpaceForModel(
   ctx: MutationCtx,
   spaceId: Id<"spaces">,
@@ -117,7 +107,6 @@ export async function claimSpaceForModel(
   return { userId, space };
 }
 
-/** Places the user marked "We went", newest first. */
 export async function beenPlaces(
   ctx: QueryCtx,
   userId: string,
@@ -138,8 +127,6 @@ export function toPlanSource(
     itemId: item._id,
     title: item.title,
     description: item.description,
-    // A note's words live in `note`; a link can carry the user's note too,
-    // and either may be what names the place.
     content:
       [item.note, item.content]
         .filter(Boolean)
@@ -148,20 +135,12 @@ export function toPlanSource(
     url: item.url,
     siteName: item.siteName,
     author: item.author,
-    // The save's own Maps actions plus any steered for this space.
     places: [...(item.intents ?? []), ...(join.intents ?? [])]
       .filter((intent) => intent.kind === "open_maps")
       .map((intent) => intent.value),
   };
 }
 
-/**
- * Claims one trip: the space is the caller's, they are Pro and allow AI, and
- * the makeTrip limit has room. Returns the saves to read. With `city`, a
- * save that names only other cities is left out; a save that names no city
- * stays, since a reel often shows a place without saying where. The trip's
- * city is `city`, else the one most saves name.
- */
 export const claimTripInternal = internalMutation({
   args: { spaceId: v.id("spaces"), city: v.optional(v.string()) },
   returns: v.object({
@@ -201,8 +180,6 @@ export const claimTripInternal = internalMutation({
   },
 });
 
-/** A stop's save, while the caller still owns it and it is still saved in
- * the trip's space; null once it was deleted or removed from the space. */
 async function liveSave(
   ctx: QueryCtx,
   stop: TripStop,
@@ -217,8 +194,6 @@ async function liveSave(
     : null;
 }
 
-/** Removes a space's trips. A space holds at most one, so one read covers
- * it; the bound only guards against a race that left two. */
 export async function deleteTripsForSpace(
   ctx: MutationCtx,
   spaceId: Id<"spaces">,
@@ -245,7 +220,6 @@ export const saveTripInternal = internalMutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.spaceId);
-    // The space may have been deleted while the trip was being made.
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
     }
@@ -254,16 +228,7 @@ export const saveTripInternal = internalMutation({
   },
 });
 
-/**
- * "Swap": trades one stop for the wishlist place that best takes its spot
- * (same time of day, then nearest). The stop moves to the wishlist, so a
- * second swap can bring it back. No model call.
- */
 export const swapTripStop = mutation({
-  // The stop by its save and name, not by position: the client sees the trip
-  // without stops whose save was deleted, so its indexes can differ. Returns
-  // the stop that took its place, the same way, since the day is put back in
-  // time order and the newcomer can land at another position.
   args: { tripId: v.id("trips"), itemId: v.id("items"), name: v.string() },
   returns: v.object({ itemId: v.id("items"), name: v.string() }),
   handler: async (ctx, args) => {
@@ -284,7 +249,6 @@ export const swapTripStop = mutation({
         break;
       }
     }
-    // Only places whose save is still in the space may take the stop's spot.
     const live: TripStop[] = [];
     for (const stop of trip.wishlist) {
       if (await liveSave(ctx, stop, userId, trip.spaceId)) live.push(stop);
@@ -308,10 +272,7 @@ export const swapTripStop = mutation({
 
 const tripStopViewValidator = v.object({
   ...tripStopValidator.fields,
-  // The user marked this place "We went".
   been: v.optional(v.boolean()),
-  // The save's cover and its creator ("@handle" or the site), for the stop
-  // sheet.
   cover: v.optional(v.string()),
   creator: v.optional(v.string()),
 });
@@ -332,12 +293,6 @@ const tripViewValidator = v.object({
   wishlist: v.array(tripStopViewValidator),
 });
 
-/**
- * The space's trip, or null when there is none. A stop whose save was
- * deleted or taken out of the space since drops out, and its day's areas
- * and meal gaps are worked out again from the stops left. `been` is read
- * from the user's "We went" marks now, not from when the trip was made.
- */
 export const getSpaceTrip = query({
   args: { spaceId: v.id("spaces") },
   returns: v.union(tripViewValidator, v.null()),
@@ -356,7 +311,6 @@ export const getSpaceTrip = query({
       const item = await liveSave(ctx, stop, userId, args.spaceId);
       if (item === null) return null;
       const visit = await findVisit(ctx, userId, stop.name);
-      // An image save's stored file, else a link's page image.
       const cover = item.storageId
         ? await ctx.storage.getUrl(item.storageId)
         : (item.heroImageUrl ?? null);
@@ -384,8 +338,6 @@ export const getSpaceTrip = query({
   },
 });
 
-/** Cities the space's saves name, most saves first, for the plan sheet's
- * city question. Empty when the space is not the caller's. */
 export const tripCities = query({
   args: { spaceId: v.id("spaces") },
   returns: v.array(v.object({ city: v.string(), count: v.number() })),

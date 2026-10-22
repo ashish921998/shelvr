@@ -25,8 +25,6 @@ describe("save error classification", () => {
   });
 
   it("keeps the user-visible copy the current server already throws", () => {
-    // `localizeError` translates by exact English string, so moving any of
-    // these silently drops back to the generic fallback on every locale.
     expect(SAVE_ERROR_MESSAGES.photo_limit).toBe(PHOTO_LIMIT_MESSAGE);
     expect(SAVE_ERROR_MESSAGES.image_too_large).toBe(IMAGE_TOO_LARGE_MESSAGE);
     expect(SAVE_ERROR_MESSAGES.image_empty).toBe(IMAGE_EMPTY_MESSAGE);
@@ -34,8 +32,6 @@ describe("save error classification", () => {
   });
 
   it("returns null for anything that is not a structured save error", () => {
-    // What production hands the client for a plain server Error, and what
-    // today's server throws for an image refusal.
     expect(saveErrorCode(new Error("Server Error"))).toBeNull();
     expect(saveErrorCode(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBeNull();
     expect(
@@ -62,11 +58,6 @@ describe("save failure stages", () => {
   });
 
   it("recognizes a plain Error carrying a fixed refusal sentence", () => {
-    // The legacy transport shape (a sentence straight in ConvexError data)
-    // and the pipeline stages that rethrow a returned error string: the
-    // sentence is the only signal, and matching the canonical table keeps
-    // the stage bounded. The sentences themselves are pinned to the constants
-    // by the copy test above.
     expect(saveFailureStage(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBe(
       "photo_limit",
     );

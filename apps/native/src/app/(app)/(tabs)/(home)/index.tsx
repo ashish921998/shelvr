@@ -41,7 +41,6 @@ import {
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** The weekly sheet is modal, so it waits while any inline prompt is up. */
 function nudgeSheetReady(
   nudgeReady: boolean,
   ...inlinePromptsVisible: boolean[]
@@ -49,8 +48,6 @@ function nudgeSheetReady(
   return nudgeReady && !inlinePromptsVisible.some(Boolean);
 }
 
-/** Prompts after the recall card wait while it, or anything before it, holds
- * or may claim the Home moment. */
 function laterPromptsDeferred(
   progress: { deferLater: boolean },
   recall: { visible: boolean; pending: boolean },
@@ -58,15 +55,6 @@ function laterPromptsDeferred(
   return progress.deferLater || recall.visible || recall.pending;
 }
 
-/**
- * The rating prompt joins Home's moment chain last: it waits while anything
- * earlier holds or may claim the slot (cancel survey, Pro card, welcome,
- * save progress, recall, feedback invitation or form). It also sits out an
- * account's first session and a weekly sheet that may rise. Through the Pro
- * card it also skips locked and lapsed accounts on purpose: someone who
- * can't save right now is the wrong person to ask for a rating. Lifting a
- * hold restarts the prompt's settle window, which covers a sheet's dismissal.
- */
 function useReviewDeferred(
   userId: string | undefined,
   laterDeferred: boolean,
@@ -80,22 +68,14 @@ function useReviewDeferred(
     progress.firstSession ||
     feedback.invitationVisible ||
     feedback.modalOpen ||
-    // Mirrors when HomeSheets can raise the nudge, so a nudge held back
-    // for the rest of the visit does not hold the prompt back with it.
     (nudgePending && progress.nudgeReady && !welcomeSeen)
   );
 }
 
-/** The trial's real end date, only while the account is on a trial. */
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
 }
 
-/**
- * Inline prompts (and the one-shot claims behind them) wait while the cancel
- * survey is up, while Pro is not yet known to be active, and while the
- * post-purchase welcome is queued, so none is spent behind that modal.
- */
 function usePromptsDeferred(
   userId: string | undefined,
   surveyVisible: boolean,
@@ -105,18 +85,13 @@ function usePromptsDeferred(
   return surveyVisible || proPending || welcomePending;
 }
 
-/** The welcome hands off to Add as it closes, so the weekly nudge sits out
- * the rest of this visit instead of rising in the gap. */
 function useWelcomeSeen(userId: string | undefined): boolean {
   const welcomePending = welcomeSave.usePending(userId);
-  // Keyed to the account: Home stays mounted across a sign-out, and the next
-  // account's nudge must not inherit this one's welcome.
   const [seenFor, setSeenFor] = useState<string | null>(null);
   if (welcomePending && userId && seenFor !== userId) setSeenFor(userId);
   return userId !== undefined && seenFor === userId;
 }
 
-/** Home's modal prompts. Pro just started: one real save comes first. */
 function HomeSheets({
   userId,
   entitled,
@@ -155,17 +130,10 @@ export default function HomeScreen() {
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
 
   const cancelSurvey = useCancelSurvey();
-  // Saving is Pro-only. Without Pro (the paywall was closed, or Pro lapsed),
-  // Home offers Pro instead of teaching a save that would only reopen it.
-  // The Pro card owns the header, so the recall and feedback prompts defer
-  // (and spend no one-shot claim) until entitlement is known and active.
   const entitlement = useEntitlement();
   const locked = !entitlement.loading && !entitlement.entitled;
   const proPending = entitlement.loading || locked;
   const { data: user } = useCurrentUser();
-  // The cancel survey owns the Home moment when visible, then the save
-  // progress card, then the save recall card. Each later prompt defers its
-  // one-shot claim so it is never consumed behind a card that holds the slot.
   const progress = useSaveProgress(user?._id, {
     defer: usePromptsDeferred(user?._id, cancelSurvey.visible, proPending),
   });
@@ -184,8 +152,6 @@ export default function HomeScreen() {
   });
   const busySaving = useBusySaving(items);
   const nextUp = useNextUp(user?._id, entitlement.entitled);
-  // The share screen records the first save while Home stays mounted below
-  // it, so re-read the flag on focus.
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
   const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
@@ -193,8 +159,6 @@ export default function HomeScreen() {
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : null;
 
-  // One element, two slots (empty feed and feed header): the survey claims
-  // the Home moment when both prompts are eligible.
   const cancelSurveyCard = cancelSurvey.visible ? (
     <CancelSurveyCard
       onPresented={cancelSurvey.presented}
@@ -232,15 +196,12 @@ export default function HomeScreen() {
     return (
       <View style={styles.container}>
         {emptyFeedStarter(proCard, showHowTo, progressCard) ??
-          // Nothing while the count loads, so the empty state never
-          // flashes before the progress card.
           (progress.pending ? null : (
             <EmptyState
               title={t("home.emptyTitle")}
               message={t("home.emptyBody")}
             />
           ))}
-        {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}
         {nudge}
       </View>
@@ -282,10 +243,7 @@ export default function HomeScreen() {
         onEndReached={canLoadMore ? loadMore : undefined}
         loadingMore={loadingMore}
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
-        // header on iOS and the invitation scrolls with the content. The
-        // cancel survey claims the slot first, then the save progress card,
-        // then the save recall card, then the feedback invitation. "Open
-        // this next" is the standing default when none of them is up.
+        // header on iOS.
         ListHeaderComponent={
           cancelSurveyCard ??
           howToHeader ??
@@ -303,8 +261,6 @@ export default function HomeScreen() {
   );
 }
 
-/** The end of the header chain: the feedback invitation, else "Open this
- * next", the standing default when no prompt holds the slot. */
 function lastHeader(
   feedback: ReturnType<typeof useFeedbackInvitation>,
   busySaving: boolean,
@@ -321,10 +277,6 @@ function lastHeader(
   return nextUpCard;
 }
 
-/** The save progress card covers sharing too, so it replaces the share
- * how-to while it is up. The how-to also waits while the card may still
- * come (count loading, or held behind another prompt), so it never shows
- * first and then gets swapped out. */
 function howToVisible(
   progress: ReturnType<typeof useSaveProgress>,
   firstShareSaved: boolean,
@@ -335,8 +287,6 @@ function howToVisible(
   );
 }
 
-/** What an empty feed shows above everything else, if anything: the Pro
- * card, the share how-to, or the save progress card. */
 function emptyFeedStarter(
   proCard: ReactNode,
   showHowTo: boolean,
@@ -381,8 +331,6 @@ const styles = StyleSheet.create((theme) => ({
   howToOnly: {
     padding: theme.gap(2),
   },
-  // The card brings its own side margins; this matches the how-to's
-  // vertical rhythm.
   progressOnly: {
     paddingVertical: theme.gap(1),
   },

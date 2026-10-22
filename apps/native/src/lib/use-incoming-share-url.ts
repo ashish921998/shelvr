@@ -14,10 +14,6 @@ type ShareIntake =
   | { kind: "hold" }
   | { kind: "consume"; url: string };
 
-/** The demo saves exactly one shared link, and only while it is still asking
- * for one. Anything else stays in expo-sharing for the share screen. A link
- * the demo takes stays there too, until `releaseSavedShare` hears from the
- * server that this link is the one saved. */
 export function decideShareIntake(
   payloads: RawSharePayload[],
   accepting: boolean,
@@ -28,9 +24,6 @@ export function decideShareIntake(
   return url === null ? { kind: "hold" } : { kind: "consume", url };
 }
 
-/** True when the one share held is this link. Anything else held, beside it
- * or in its place, is a different share and must be kept. That includes a
- * second link inside the same text; a caption around the one link is fine. */
 export function holdsOnlyLink(
   payloads: RawSharePayload[],
   url: string,
@@ -39,22 +32,12 @@ export function holdsOnlyLink(
   return (payloads[0].value.match(/https?:\/\//gi) ?? []).length <= 1;
 }
 
-// The link last handed to the demo and still held. The app coming back to the
-// foreground reads the same payload again; it is handed over once. Kept
-// outside the hook so going back and forth between steps does not re-ask.
 let handedUrl: string | null = null;
 
-/**
- * Lets go of a shared link once the server has saved that very link. Until
- * then it stays held, so a save that is cancelled, fails, or comes back as an
- * earlier demo item leaves the link for the share screen instead of losing it.
- */
 export function releaseSavedShare(url: string) {
   try {
     if (!holdsOnlyLink(getSharedPayloads(), url)) return;
     clearSharedPayloads();
-    // A foreground while the save was on its way flags the held link for the
-    // share screen. Nothing is held any more, so the flag goes with it.
     clearPendingShareOnDevice();
     handedUrl = null;
   } catch (err) {
@@ -62,20 +45,13 @@ export function releaseSavedShare(url: string) {
   }
 }
 
-/**
- * Hands a link shared into the demo from another app to its save. The
- * payload is read directly: useIncomingShare caches its state and would not
- * refresh after a clear followed by a second share of the same link.
- */
 export function useIncomingShareUrl({
   canAccept,
   readOnMount,
   onSharedUrl,
 }: {
-  /** Read at intake time, so it sees in-flight refs as well as render state. */
   canAccept: () => boolean;
   readOnMount: boolean;
-  /** A URL the share extension actually delivered to Shelvr. */
   onSharedUrl: (url: string) => void;
 }) {
   const consumeShare = useCallback(() => {

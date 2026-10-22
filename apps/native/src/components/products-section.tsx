@@ -8,15 +8,6 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
-// Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched
-// from the toolbar's action menu (an idle item renders no inline chip: it
-// made every sparse detail page noisier). Post-search states still render
-// inline: results as product cards, a spinner while searching, and a retry
-// chip when the search failed.
-//
-// `inset` is the parent's horizontal padding. The shop row bleeds out of it so
-// cards scroll to the screen edge instead of clipping at the padded bounds,
-// and its content padding restores the same inset at rest.
 export function ProductsSection({
   item,
   inset,
@@ -107,9 +98,6 @@ export function ProductsSection({
     );
   }
 
-  // Idle (never searched): nothing inline. The trigger lives in the action
-  // menu. Only a failed search (retry affordance) or a completed empty search
-  // ("No matches") needs a chip here.
   if (item.productsStatus === undefined) {
     return null;
   }
@@ -147,8 +135,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     justifyContent: "center",
   },
-  // Shared pill for the detail screen's small actions (retry a failed save,
-  // find shopping links).
   chip: {
     flexDirection: "row",
     alignItems: "center",

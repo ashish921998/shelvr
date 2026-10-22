@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-// The share practice's pretend post: the card opens the sheet, and a disabled
-// card does not.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";

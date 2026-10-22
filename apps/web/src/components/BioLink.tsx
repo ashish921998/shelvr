@@ -27,15 +27,12 @@ type BioLinkProps = {
   platform: Platform;
 };
 
-/** The link in a social bio: out of the in-app browser, then to the store. */
 export default function BioLink({
   inApp,
   platform: serverPlatform,
 }: BioLinkProps) {
   const [platform, setPlatform] = useState(serverPlatform);
   useEffect(() => {
-    // iPad Safari asks for desktop sites with a Mac user agent, which only
-    // the browser can tell apart, by its touch screen.
     if (isIPadDesktop(navigator.userAgent, navigator.maxTouchPoints)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlatform("ios");
@@ -118,8 +115,6 @@ export default function BioLink({
   );
 }
 
-/** Sends an Android visitor on to Chrome once per visit. If Chrome cannot
- * take it, the page comes back marked, and the overlay's steps take over. */
 function tryChrome(inApp: InAppBrowser, campaign: string) {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -235,7 +230,6 @@ function InAppOverlay({
 function PlayStoreButton() {
   const [campaign, setCampaign] = useState("web_bio");
   useEffect(() => {
-    // The search string only exists in the browser, after hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCampaign(arrivalCampaign(window.location.search) ?? "web_bio");
   }, []);

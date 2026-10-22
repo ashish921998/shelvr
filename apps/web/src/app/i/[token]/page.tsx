@@ -12,7 +12,6 @@ const FALLBACK_TITLE = "Someone saved this with Shelvr";
 const FALLBACK_DESCRIPTION =
   "Shelvr captures links, images, and notes, then sorts them into spaces so you can find them later.";
 
-/** A note's own words come first; other saves lead with their description. */
 function previewSummary(
   preview: Awaited<ReturnType<typeof fetchSharePreview>>,
 ): string | undefined {
@@ -22,7 +21,6 @@ function previewSummary(
     : preview.description || preview.noteText;
 }
 
-/** "Ashish wanted you to see this", or the generic kicker without a name. */
 function senderLine(
   preview: Awaited<ReturnType<typeof fetchSharePreview>>,
 ): string | undefined {
@@ -39,7 +37,6 @@ export async function generateMetadata({
 
   const title = preview?.title || FALLBACK_TITLE;
   const summary = previewSummary(preview) || FALLBACK_DESCRIPTION;
-  // The link preview in a chat is where the name matters most.
   const sender = senderLine(preview);
   const description = sender ? `${sender}. ${summary}` : summary;
 
@@ -47,7 +44,6 @@ export async function generateMetadata({
     title: `${title} — Shelvr`,
     description,
     alternates: { canonical: `/i/${token}` },
-    // A share link is for its recipients, not for search results.
     robots: { index: false, follow: false },
     openGraph: {
       title,
@@ -78,8 +74,6 @@ export default async function SharedItemPage({ params }: PageProps) {
 
         <div className="mt-10 overflow-hidden rounded-3xl border border-line bg-card shadow-[0_20px_60px_rgba(43,36,24,0.08)]">
           {preview?.imageUrl && (
-            // A remote, per-item image isn't worth configuring next/image's
-            // remote patterns for a page whose host varies by save.
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={preview.imageUrl}

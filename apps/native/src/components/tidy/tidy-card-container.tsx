@@ -16,10 +16,6 @@ type Props = {
   index: number;
 };
 
-// Animated card shell, ported from the Slack Catch Up recreation's
-// channel-container: behind-cards sit at 0.95 scale with a slight downward
-// parallax and interpolate up as the top card leaves; the top card follows
-// the pan and tilts up to 4° with the hinge direction picked by grab point.
 const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({
   children,
   index,
@@ -33,8 +29,6 @@ const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({
 
   const rContainerStyle = useAnimatedStyle(() => {
     const current = currentIndex.get();
-    // Cull cards beyond the visible stack (top, two behind, one just
-    // dismissed) to cut overdraw.
     const isVisible =
       index === current ||
       index === current - 1 ||
@@ -45,8 +39,6 @@ const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({
 
     const sign = absoluteYAnchor.get() > height / 2 ? -1 : 1;
 
-    // The behind-card drop folds into translateY so it travels with the pan
-    // instead of laying out a separate `top` pass.
     const top = interpolate(
       animatedIndex.get(),
       inputRange,
@@ -64,8 +56,6 @@ const TidyCardContainerComponent: FC<PropsWithChildren<Props>> = ({
     );
 
     return {
-      // Opacity alone still receives touches, especially when Reduce Motion
-      // keeps dismissed cards in place instead of moving them off-screen.
       pointerEvents: index === current ? "auto" : "none",
       opacity: isVisible && !(reducedMotion && index > current) ? 1 : 0,
       transform: reducedMotion

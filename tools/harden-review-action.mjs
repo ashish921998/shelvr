@@ -22,8 +22,6 @@ function replaceExact(source, before, after, count = 1) {
   return source.replaceAll(before, after);
 }
 
-/** Download a fixed artifact and check the repository-held digest before
- * execution. No moving installer script or remotely supplied checksum runs. */
 function installBinary(url, checksum, name) {
   return `mkdir -p "$HOME/.local/bin"; curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL '${url}' -o "$HOME/.local/bin/${name}"; echo '${checksum}'\"  $HOME/.local/bin/${name}\" | sha256sum --check --status; chmod +x "$HOME/.local/bin/${name}"`;
 }

@@ -54,11 +54,8 @@ it("does not fire for a downward-dominant drag past the side threshold", () => {
   const { result } = renderHook(() =>
     useSingleHapticOnPan({ thresholdX: 100, thresholdY: 160 }),
   );
-  // 150px right clears thresholdX alone, but 400px down dominates: the
-  // release would refuse, so the drag must not promise a commit either.
   result.current.singleHapticOnChange(150, 400);
   expect(Haptics.impactAsync).not.toHaveBeenCalled();
-  // The dominant upward drag still fires once.
   result.current.singleHapticOnChange(0, -200);
   expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
 });
@@ -68,11 +65,8 @@ it("does not fire at exactly the commit threshold, only past it", () => {
   const { result } = renderHook(() =>
     useSingleHapticOnPan({ thresholdX: 100, thresholdY: 160 }),
   );
-  // Exactly 1.0: the release springs back (swipeDecision needs progress > 1),
-  // so the drag must not promise a commit either.
   result.current.singleHapticOnChange(100, 0);
   expect(Haptics.impactAsync).not.toHaveBeenCalled();
-  // The first value past 1.0 fires once.
   result.current.singleHapticOnChange(101, 0);
   expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
 });
