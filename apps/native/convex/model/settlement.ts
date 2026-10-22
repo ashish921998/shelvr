@@ -1,4 +1,4 @@
-import { v, type Infer } from "convex/values";
+import { v, type Infer, type ObjectType } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import {
   buildEmbeddingText,
@@ -45,17 +45,13 @@ const classificationValidator = v.object({
 export type Reading = Infer<typeof readingValidator>;
 export type Classification = Infer<typeof classificationValidator>;
 
-export type Settlement = {
-  keepTitle?: boolean;
-  reading: Reading;
-  classification?: Classification;
-};
-
 export const runFields = {
   keepTitle: v.optional(v.boolean()),
   reading: readingValidator,
   classification: v.optional(classificationValidator),
 };
+
+export type Settlement = ObjectType<typeof runFields>;
 
 export type ItemPatch = Partial<Omit<Doc<"items">, "_id" | "_creationTime">>;
 
