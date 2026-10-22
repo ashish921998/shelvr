@@ -52,7 +52,10 @@ const mocks = vi.hoisted(() => ({
     </button>
   ),
   sharePractice: vi.fn(
-    (_props: { sample?: { domain: string; pageHeading: string } }) => null,
+    (_props: {
+      title?: string;
+      sample?: { domain: string; pageHeading: string };
+    }) => null,
   ),
   promise: vi.fn((_props: { goal: string }) => null),
   reveal: vi.fn((_props: { trip: { kind: string; city: string } }) => null),
@@ -119,6 +122,13 @@ vi.mock("@/components/onboarding/trip-teaser", () => {
   );
   return { TripBuildStep: build, TripRevealStep: mocks.reveal };
 });
+vi.mock("@/components/onboarding/recipe-reveal", () => ({
+  RecipeRevealStep: vi.fn(({ onContinue }: { onContinue: () => void }) => (
+    <button type="button" onClick={onContinue}>
+      recipe:continue
+    </button>
+  )),
+}));
 vi.mock("@/components/onboarding/parts", () => ({
   CtaButton: mocks.button,
 }));
@@ -233,6 +243,22 @@ it("asks a date-night city, practises with a stop in that plan, then shows the p
   };
   act(onContinue);
   expect(mocks.promise.mock.lastCall?.[0].goal).toBe("date");
+});
+
+it("skips the city for recipes, practises with the recipe post, then shows the recipe and the promise", () => {
+  render(<OnboardingScreen />);
+  tap("goal:recipes");
+  expect(screen.queryByRole("button", { name: "city:paris" })).toBeNull();
+  expect(saved()).toMatchObject({ goal: "recipes", spaces: ["Recipes"] });
+  const practice = mocks.sharePractice.mock.lastCall?.[0];
+  expect(practice?.title).toBe("goal.shareRecipes");
+  expect(practice?.sample?.domain).toBe("bbcgoodfood.com");
+
+  const { onFinish } = practice as unknown as { onFinish: () => void };
+  act(onFinish);
+  expect(mocks.reveal).not.toHaveBeenCalled();
+  tap("recipe:continue");
+  expect(mocks.promise.mock.lastCall?.[0].goal).toBe("recipes");
 });
 
 it("shows a food weekend in Prague when the city is somewhere else", () => {

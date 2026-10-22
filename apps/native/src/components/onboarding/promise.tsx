@@ -53,6 +53,16 @@ function promiseCopy(goal: Goal, city: string | null, after: EveningAfter) {
           t("promise.dateGo"),
         ],
       };
+    case "recipes":
+      return {
+        title: t("promise.noMore"),
+        accent: t("promise.recipesAccent"),
+        lines: [
+          t("promise.recipesSave"),
+          t("promise.recipesPick"),
+          t("promise.recipesGo"),
+        ],
+      };
     case "other":
       return {
         title: t("promise.noMore"),

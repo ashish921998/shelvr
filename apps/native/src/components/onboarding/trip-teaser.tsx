@@ -68,7 +68,7 @@ const SETTLE_HEAD = settleIn(150);
 const SETTLE_CARD = settleIn(450);
 const SETTLE_FOOT = settleIn(700);
 
-function Head({
+export function Head({
   title,
   accent,
   body,

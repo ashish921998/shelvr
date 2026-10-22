@@ -11,6 +11,7 @@ import {
   GOAL_SPACES,
   goalFlow,
   goalShareSample,
+  isPlacesGoal,
   isPracticePost,
   type Goal,
 } from "@/lib/onboarding-goals";
@@ -41,6 +42,7 @@ import { CityStep, GoalStep } from "@/components/onboarding/goal";
 import { InterestsStep } from "@/components/onboarding/interests";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { PromiseStep } from "@/components/onboarding/promise";
+import { RecipeRevealStep } from "@/components/onboarding/recipe-reveal";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import {
   TripBuildStep,
@@ -63,6 +65,7 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   share: 0.6,
   tripBuild: 0.8,
   tripReveal: 0.8,
+  recipeReveal: 0.8,
   promise: 1,
 };
 
@@ -75,9 +78,21 @@ const SHARE_TITLES = {
 /** `city` is null when the sample city only stands in for one we don't cover. */
 function shareTitle(goal: Goal | null, city: string | null) {
   if (goal === null || goal === "other") return undefined;
+  if (goal === "recipes") return t("goal.shareRecipes");
   return city === null
     ? t(SHARE_TITLES[goal].anywhere)
     : t(SHARE_TITLES[goal].inCity, { city });
+}
+
+function practiceSampleFor(
+  goal: Goal | null,
+  city: SampleCityId | null,
+  interests: readonly Interest[],
+) {
+  return (
+    (goal === null ? undefined : goalShareSample(goal, city)) ??
+    practiceShareSample(interests, null)
+  );
 }
 
 function holdIncomingShare() {
@@ -225,10 +240,7 @@ export default function OnboardingScreen() {
     completeOnboarding();
   };
 
-  const practiceSample =
-    goal === null || planKind === null
-      ? practiceShareSample(interests, null)
-      : goalShareSample(goal, pickedCity);
+  const practiceSample = practiceSampleFor(goal, pickedCity, interests);
   const paywall = useOnboardingPaywall({
     onPro: finish,
     onDecline: () => {
@@ -304,13 +316,15 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom },
           ]}
         >
-          {step === "goal" || goal === null || goal === "other" ? (
+          {step === "goal" || !isPlacesGoal(goal) ? (
             <GoalStep goal={goal} onPick={pickGoal} />
           ) : (
             <CityStep goal={goal} city={travelCity} onPick={pickCity} />
           )}
         </View>
-      ) : step === "interests" || step === "tripReveal" ? (
+      ) : step === "interests" ||
+        step === "tripReveal" ||
+        step === "recipeReveal" ? (
         <View
           style={[
             styles.content,
@@ -324,6 +338,8 @@ export default function OnboardingScreen() {
               onToggle={toggleInterest}
               onAdvance={advance}
             />
+          ) : step === "recipeReveal" ? (
+            <RecipeRevealStep onContinue={advance} />
           ) : (
             <TripRevealStep
               trip={trip}

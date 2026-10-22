@@ -1,7 +1,12 @@
 import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
-import { GOALS, GOAL_PLANS, type Goal } from "@/lib/onboarding-goals";
+import {
+  GOALS,
+  GOAL_PLANS,
+  type Goal,
+  type PlacesGoal,
+} from "@/lib/onboarding-goals";
 import { SAMPLE_CITIES, type SampleCityId } from "@/lib/sample-cities";
 import { planCities } from "@/lib/sample-plans";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
@@ -30,6 +35,11 @@ const GOAL_COPY: Record<
     body: "goal.dateBody",
     image: require("../../../assets/onboarding/city-paris-view.jpg"),
   },
+  recipes: {
+    title: "goal.recipes",
+    body: "goal.recipesBody",
+    image: require("../../../assets/onboarding/demo-recipe.jpg"),
+  },
   other: {
     title: "goal.other",
     body: "goal.otherBody",
@@ -37,13 +47,13 @@ const GOAL_COPY: Record<
   },
 };
 
-const CITY_TITLES: Record<Exclude<Goal, "other">, TextMessageKey> = {
+const CITY_TITLES: Record<PlacesGoal, TextMessageKey> = {
   travel: "goal.cityTravel",
   food: "goal.cityFood",
   date: "goal.cityDate",
 };
 
-const CITY_HELP: Record<Exclude<Goal, "other">, TextMessageKey> = {
+const CITY_HELP: Record<PlacesGoal, TextMessageKey> = {
   travel: "goal.cityHelpTravel",
   food: "goal.cityHelpFood",
   date: "goal.cityHelpDate",
@@ -144,7 +154,7 @@ export function CityStep({
   city,
   onPick,
 }: {
-  goal: Exclude<Goal, "other">;
+  goal: PlacesGoal;
   city: SampleCityId | null;
   onPick: (city: SampleCityId | null) => void;
 }) {

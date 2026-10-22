@@ -45,6 +45,7 @@ describe("PromiseStep", () => {
     ["travel", "promise.travelTitle Lisbon", "promise.travelSave Lisbon"],
     ["food", "promise.noMore", "promise.foodSave Lisbon"],
     ["date", "promise.noMore", "promise.dateSave"],
+    ["recipes", "promise.noMore", "promise.recipesSave"],
     ["other", "promise.noMore", "promise.otherSave"],
   ] as const)("words the %s promise for that goal", (goal, title, first) => {
     render(

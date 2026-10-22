@@ -26,6 +26,16 @@ describe("goalFlow", () => {
     },
   );
 
+  it("takes recipes straight from the share to the sample recipe, with no city", () => {
+    expect(goalFlow("recipes")).toEqual([
+      "opener",
+      "goal",
+      "share",
+      "recipeReveal",
+      "promise",
+    ]);
+  });
+
   it("keeps the topics for something else, with no sample", () => {
     expect(goalFlow("other")).toEqual([
       "opener",
@@ -59,6 +69,12 @@ describe("goalShareSample", () => {
   it("offers the picked city's travel post", () => {
     expect(goalShareSample("travel", "lisbon")?.city).toBe("lisbon");
     expect(goalShareSample("travel", null)?.domain).toBe("prague.eu");
+  });
+
+  it("offers the recipe post for recipes, wherever the person is", () => {
+    const sample = goalShareSample("recipes", "paris");
+    expect(sample?.kind).toBe("Recipes");
+    expect(isPracticePost(sample!.url)).toBe(true);
   });
 
   it("leaves something else to the topics", () => {

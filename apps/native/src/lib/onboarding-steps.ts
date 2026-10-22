@@ -7,6 +7,7 @@ export const ONBOARDING_STEPS = [
   "tripBuild",
   "tripReveal",
   "promise",
+  "recipeReveal",
 ] as const;
 export const ONBOARDING_FLOW_VERSION = 14;
 
@@ -21,12 +22,14 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   promise: "promise",
   tripBuild: "trip_build",
   tripReveal: "trip_reveal",
+  recipeReveal: "recipe_reveal",
 };
 
 const NO_BACK: readonly OnboardingStep[] = [
   "opener",
   "tripBuild",
   "tripReveal",
+  "recipeReveal",
   "promise",
 ];
 
