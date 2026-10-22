@@ -3,9 +3,7 @@ import { isInterest } from "@/lib/onboarding-interests";
 import { isPresetSpace, type SaveKind } from "@/lib/save-kinds";
 import { isTravelVibe } from "@/lib/travel-vibes";
 
-/** The onboarding_completed event, from the setup answers. Topics and travel
- * vibes are spaces too, so each is counted in space_count and, being a preset
- * identity, listed in space_names. Only typed names are user content. */
+/** Topics and travel vibes count as spaces; only preset identities are named, typed names are user content. */
 export function onboardingCompletedProperties(
   kinds: readonly SaveKind[],
   spaces: readonly string[],

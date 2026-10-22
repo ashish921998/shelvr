@@ -124,7 +124,6 @@ describe("globeRegion", () => {
     const ids = globeRegion({ lng: 178.4, lat: -18.1 }).nearby.features.map(
       (country) => country.id,
     );
-    // Fiji spans it; Samoa sits on the other side.
     expect(ids).toEqual(expect.arrayContaining(["242", "882"]));
   });
 
@@ -137,7 +136,6 @@ describe("closeUp", () => {
   it("keeps the whole world's land until the close-up fills the screen", () => {
     const tokyo = { lng: 139.7, lat: 35.7 };
     const region = globeRegion(tokyo);
-    // The spin has the far side of the globe facing the screen.
     const diveAt = 18515;
     let closed = false;
     for (let t = diveAt; t <= diveAt + GLOBE_DIVE_MS; t += 25) {
@@ -200,7 +198,6 @@ describe("globePin", () => {
   });
 
   it("holds the target on the globe's edge while it is on the far side", () => {
-    // The spin has the far side of the globe facing Tokyo.
     const camera = globeCamera({
       t: 18515,
       diveAt: null,

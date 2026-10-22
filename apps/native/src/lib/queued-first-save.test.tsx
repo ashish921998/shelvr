@@ -162,7 +162,6 @@ describe("a first save queued before sign-in", () => {
     await mount();
     expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
 
-    // Account A signed out with its save still queued; account B signs in.
     mock.createDemoItem.mockReset().mockResolvedValue(result());
     mock.user = { _id: "user-2" };
     await mount();
