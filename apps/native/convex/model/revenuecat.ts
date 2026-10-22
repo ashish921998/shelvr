@@ -75,6 +75,10 @@ export function mapRevenueCatStatus(
   }
 }
 
+function isDashboardGrant(event: RevenueCatEvent): boolean {
+  return event.periodType === "PROMOTIONAL";
+}
+
 export function requiresAuthoritativeReconciliation(
   event: RevenueCatEvent,
 ): boolean {
@@ -84,18 +88,17 @@ export function requiresAuthoritativeReconciliation(
       return true;
     case "NON_RENEWING_PURCHASE":
       // A lifetime dashboard grant carries no expiry.
-      return event.periodType === "PROMOTIONAL";
+      return isDashboardGrant(event);
     case "CANCELLATION":
       // A failed charge sends BILLING_ERROR with the already-past expiry; only the snapshot knows the billing grace window.
       return (
         event.cancelReason === "CUSTOMER_SUPPORT" ||
         event.cancelReason === "BILLING_ERROR" ||
-        event.periodType === "PROMOTIONAL"
+        isDashboardGrant(event)
       );
     case "EXPIRATION":
       return (
-        event.expirationReason === "CUSTOMER_SUPPORT" ||
-        event.periodType === "PROMOTIONAL"
+        event.expirationReason === "CUSTOMER_SUPPORT" || isDashboardGrant(event)
       );
     default:
       return false;

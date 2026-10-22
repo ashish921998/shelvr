@@ -6,9 +6,9 @@ import { internal } from "./_generated/api";
 import { beginProcessingRun } from "./items";
 import { requireUserId } from "./model/auth";
 import { demoError, MAX_DEMO_RETRIES } from "./model/demoErrors";
-import { normalizeExternalUrl } from "./model/externalUrl";
+import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure, MAX_ITEM_TITLE_CHARS } from "./model/itemFields";
-import { insertMembership } from "./model/memberships";
+import { emptySummary, insertMembership } from "./model/memberships";
 import { validateSpaceName } from "./model/spaceName";
 import { rateLimiter } from "./model/rateLimiter";
 
@@ -47,10 +47,7 @@ async function findOrCreateDynamicSpace(
     userId,
     name,
     dynamic: true,
-    savedCount: 0,
-    suggestedCount: 0,
-    previewItemIds: [],
-    suggestedPreviewItemIds: [],
+    ...emptySummary(),
   });
 }
 
@@ -102,7 +99,9 @@ export const createDemoItem = mutation({
       let urlMatchesRequest = false;
       try {
         urlMatchesRequest = normalizeExternalUrl(args.url) === item.url;
-      } catch {}
+      } catch (error) {
+        if (!isUrlPolicyError(error)) throw error;
+      }
       return {
         itemId: existing.itemId,
         userId,

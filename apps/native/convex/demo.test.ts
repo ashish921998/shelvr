@@ -67,6 +67,21 @@ describe("onboarding demo allowance", () => {
     expect(jobs.filter((job) => job.name === "ai:processItem")).toHaveLength(1);
   });
 
+  it("answers a repeat whose URL the policy rejects instead of failing", async () => {
+    const { t } = await signedInUser(newConvexTest(), { pro: true });
+    const first = await t.mutation(api.demo.createDemoItem, { url: URL });
+    for (const rejected of ["", "mailto:someone@example.com"]) {
+      const repeat = await t.mutation(api.demo.createDemoItem, {
+        url: rejected,
+      });
+      expect(repeat).toMatchObject({
+        itemId: first.itemId,
+        reused: true,
+        urlMatchesRequest: false,
+      });
+    }
+  });
+
   it("keeps the sample's heading as the save's own title", async () => {
     const { t } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, {
