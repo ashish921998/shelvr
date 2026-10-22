@@ -64,6 +64,39 @@ module.exports = defineConfig([
     rules: { "no-console": ["error", { allow: ["warn"] }] },
   },
   {
+    files: ["convex/**/*.ts"],
+    ignores: ["convex/**/*.test.ts", "convex/test.setup.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='filter'][arguments.0.type='ArrowFunctionExpression'][arguments.0.params.0.name='q']",
+          message:
+            "A database .filter((q) => ...) scans the whole table. Add or use an index and read it with .withIndex(name, (q) => ...), or a search index. A filter on an array is fine: name its parameter for the row, not q.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["convex/**/*.test.ts", "src/**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.name='convexTest']",
+          message:
+            "Build the test backend with newConvexTest() from convex/test.setup.ts. A bare convexTest(schema, ...) skips the rate-limiter component, so any mutation that calls rateLimiter.limit fails.",
+        },
+        {
+          selector: "ImportSpecifier[imported.name='convexTest']",
+          message:
+            "Import newConvexTest from convex/test.setup.ts, not convexTest from convex-test.",
+        },
+      ],
+    },
+  },
+  {
     files: [
       "convex/model/log.ts",
       "src/lib/analytics.ts",
