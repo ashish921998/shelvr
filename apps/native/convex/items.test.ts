@@ -127,7 +127,16 @@ describe("listItems (installed builds)", () => {
       );
 
     expect(await ids()).toEqual([itemId]);
-    await t.mutation(internal.items.failItem, { itemId, reason: "error" });
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))?.processingRunId;
+    expect(runId).toBeDefined();
+    expect(
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "error",
+        runId,
+      }),
+    ).toBe("applied");
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.status).toBe("failed");
     expect(await ids()).toEqual([itemId]);
   });
 });
