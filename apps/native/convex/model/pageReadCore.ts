@@ -65,6 +65,7 @@ export function stripTags(html: string): string {
     if (open === -1) return text + html.slice(from);
     text += html.slice(from, open);
     const close = html.indexOf(">", open + 1);
+    if (close === -1) return text + html.slice(open).replaceAll("<", "");
     from = close > open + 1 ? close + 1 : open + 1;
   }
 }

@@ -40,6 +40,12 @@ describe("stripTags", () => {
     );
   });
 
+  it("drops an angle bracket that opens nothing and keeps a stray closing one", () => {
+    expect(stripTags("a<b")).toBe("ab");
+    expect(stripTags("<>a")).toBe(">a");
+    expect(stripTags("x<a>y<z<w")).toBe("xyzw");
+  });
+
   it("cannot be rebuilt into a script tag by nesting tags", () => {
     expect(stripTags("<<b>script>alert(1)<</b>/script>")).toBe(
       "script>alert(1)/script>",
