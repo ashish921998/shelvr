@@ -56,6 +56,13 @@ async function seed(tokens = ["token-a"]) {
 const json = (data: unknown) =>
   new Response(JSON.stringify({ data }), { status: 200 });
 
+const sendJobs = async (t: Awaited<ReturnType<typeof seed>>["t"]) =>
+  (
+    await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())
+  ).filter((job) =>
+    /notificationDelivery:send|captureNotification/.test(job.name),
+  ).length;
+
 describe("durable digest delivery", () => {
   it("sends each device its own language and preserves the legacy fallback", async () => {
     const { t, digestId } = await seed(["token-a", "token-b"]);
@@ -495,13 +502,6 @@ describe("durable digest delivery", () => {
     await t.run((ctx) => ctx.db.delete(userId));
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const jobs = () =>
-      t.run(async (ctx) =>
-        (await ctx.db.system.query("_scheduled_functions").collect()).filter(
-          (job) =>
-            /notificationDelivery:send|captureNotification/.test(job.name),
-        ),
-      );
     await t.action(internal.notificationDelivery.send, { digestId });
     await t.mutation(internal.notificationDelivery.recover, {});
     expect(fetchMock).not.toHaveBeenCalled();
@@ -510,6 +510,30 @@ describe("durable digest delivery", () => {
       deliveryError: "owner_unavailable",
     });
     expect((await digest())?.deliveryNextAttemptAt).toBeUndefined();
-    expect(await jobs()).toHaveLength(0);
+    expect(await sendJobs(t)).toBe(0);
+  });
+
+  it("closes a digest already sent once when its owner is gone, with no send event", async () => {
+    const { t, userId, digestId, digest, advance } = await seed();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json([{ status: "ok", id: "ticket-a" }])),
+    );
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect((await digest())?.deliveryRecipients).toMatchObject([
+      { state: "receipt" },
+    ]);
+    await t.run((ctx) => ctx.db.delete(userId));
+    await advance();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect((await digest())?.deliveryNextAttemptAt).toBeUndefined();
+    expect(await sendJobs(t)).toBe(0);
   });
 });

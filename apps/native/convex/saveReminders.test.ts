@@ -560,6 +560,15 @@ describe("delivering a save reminder", () => {
     return { ...context, reminder };
   }
 
+  const sendJobs = async (t: Awaited<ReturnType<typeof queued>>["t"]) =>
+    (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).filter((job) =>
+      /notificationDelivery:sendReminder|captureNotification/.test(job.name),
+    ).length;
+
   it("names the save, links straight to it, and tags the kind", async () => {
     const { t, reminder } = await queued();
     const fetchMock = vi
@@ -706,15 +715,7 @@ describe("delivering a save reminder", () => {
     await t.run((ctx) => ctx.db.delete(userId));
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const jobs = async () =>
-      (
-        await t.run((ctx) =>
-          ctx.db.system.query("_scheduled_functions").collect(),
-        )
-      ).filter((job) =>
-        /notificationDelivery:sendReminder|captureNotification/.test(job.name),
-      ).length;
-    const before = await jobs();
+    const before = await sendJobs(t);
     await t.action(internal.notificationDelivery.sendReminder, {
       reminderId: reminder._id,
     });
@@ -724,7 +725,34 @@ describe("delivering a save reminder", () => {
       deliveryStatus: "failed",
       deliveryError: "owner_unavailable",
     });
-    expect(await jobs()).toBe(before);
+    expect(await sendJobs(t)).toBe(before);
+  });
+
+  it("closes a reminder already sent once when its owner is gone, with no send event", async () => {
+    const { t, userId, reminder } = await queued();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json([{ status: "ok", id: "ticket-a" }])),
+    );
+    const send = () =>
+      t.action(internal.notificationDelivery.sendReminder, {
+        reminderId: reminder._id,
+      });
+    await send();
+    const sent = await t.run((ctx) => ctx.db.get(reminder._id));
+    expect(sent?.deliveryRecipients).toMatchObject([{ state: "receipt" }]);
+    await t.run((ctx) => ctx.db.delete(userId));
+    vi.setSystemTime(sent!.deliveryNextAttemptAt!);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const before = await sendJobs(t);
+    await send();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect(await sendJobs(t)).toBe(before);
   });
 
   it("drops a reminder that could not go out the same day", async () => {
