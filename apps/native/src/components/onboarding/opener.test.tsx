@@ -30,6 +30,7 @@ const mock = vi.hoisted(() => {
     reduceMotionAtMount: false,
     pager: null as null | ((event: ScrollEvent) => void),
     beginDrag: null as null | (() => void),
+    pageDrag: null as null | (() => void),
     reduceMotionChanged: null as null | ((enabled: boolean) => void),
     view: ({
       children,
@@ -84,6 +85,7 @@ vi.mock("react-native", async () => {
   }) => {
     if (horizontal && onScroll) mock.pager = onScroll;
     if (horizontal && onScrollBeginDrag) mock.beginDrag = onScrollBeginDrag;
+    if (!horizontal && onScrollBeginDrag) mock.pageDrag = onScrollBeginDrag;
     useImperativeHandle(ref, () => ({
       scrollTo: ({ x }: { x: number }) =>
         onScroll?.({
@@ -184,6 +186,7 @@ beforeEach(() => {
   mock.reduceMotionAtMount = false;
   mock.pager = null;
   mock.beginDrag = null;
+  mock.pageDrag = null;
   mock.reduceMotionChanged = null;
   vi.useRealTimers();
 });
@@ -411,5 +414,13 @@ describe("OpenerStep", () => {
     wait(20000);
     expect(dot(0)).toContain("dotOn");
     spy.mockRestore();
+  });
+
+  it("stops advancing once the person scrolls a page's copy", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    act(() => mock.pageDrag?.());
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
   });
 });

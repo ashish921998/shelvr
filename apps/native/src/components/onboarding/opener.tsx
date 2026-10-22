@@ -172,6 +172,7 @@ export function OpenerStep({
                 contentContainerStyle={styles.page}
                 alwaysBounceVertical={false}
                 showsVerticalScrollIndicator={false}
+                onScrollBeginDrag={() => setSwiped(true)}
               >
                 <PhoneFrame
                   overlay={
