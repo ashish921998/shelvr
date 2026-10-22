@@ -49,25 +49,36 @@ function showing(strings) {
   };
 }
 
+const BLOCK_START = /^(#{1,6} |[-*] |\d+\. |\|)/;
+
 function quotedCopy(markdown) {
-  const quotes = [];
+  const blocks = [];
   let inOnboarding = false;
+  let block = null;
   straighten(markdown)
     .split("\n")
     .forEach((line, index) => {
+      if (!line.trim() || BLOCK_START.test(line)) block = null;
       if (line.startsWith("## "))
         inOnboarding = line.startsWith("## Onboarding");
-      const pattern = inOnboarding
-        ? /\*\*([^*]+)\*\*|"([^"]+)"/g
-        : /"([^"]+)"/g;
-      for (const [, bold, quoted] of line.matchAll(pattern)) {
-        const text = normalize(bold ?? quoted);
-        // "Opener:" labels a step and "not" is emphasis; neither is on screen.
-        if (!text.endsWith(":") && !/^[a-z]/.test(text)) {
-          quotes.push({ line: index + 1, text });
-        }
+      if (!line.trim()) return;
+      if (!block) {
+        block = { line: index + 1, text: "", inOnboarding };
+        blocks.push(block);
       }
+      block.text += ` ${line}`;
     });
+  const quotes = [];
+  for (const { line, text: source, inOnboarding: bold } of blocks) {
+    const pattern = bold ? /\*\*([^*]+)\*\*|"([^"]+)"/g : /"([^"]+)"/g;
+    for (const [, boldText, quoted] of source.matchAll(pattern)) {
+      const text = normalize(boldText ?? quoted);
+      // "Opener:" labels a step and "not" is emphasis; neither is on screen.
+      if (!text.endsWith(":") && !/^[a-z]/.test(text)) {
+        quotes.push({ line, text });
+      }
+    }
+  }
   return quotes;
 }
 
@@ -102,6 +113,16 @@ test("the matcher takes a title and its accent, and not a retired title", () => 
   assert.ok(isShown("Save your first post."));
   // PR 438 renamed the share step and left this quote in the notes.
   assert.ok(!isShown("Save this post the way you will in any app."));
+});
+
+test("a quote wrapped over two lines is read, and list items stay apart", () => {
+  assert.deepEqual(
+    quotedCopy(
+      '3. Tap "Save this post the way\n   you will in any app." to share.',
+    ),
+    [{ line: 1, text: "Save this post the way you will in any app." }],
+  );
+  assert.deepEqual(quotedCopy('- a "Start yours\n- b Continue"'), []);
 });
 
 test("the App Review notes quote only text the app shows", () => {

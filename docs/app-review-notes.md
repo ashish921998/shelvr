@@ -16,7 +16,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 <!-- onboarding-flow-version: 11 -->
 
 1. **Opener:** a **Start yours** button and an **Already have an account? Sign in** link.
-2. **Topics:** "What are you into?" offers topics to pick. Each picked topic becomes a space. Nothing has to be picked.
+2. **Topics:** "What are you into?" offers topics to pick. Each picked topic becomes a space. Nothing has to be picked. Picking Travel opens "What kind of spots?" under the topics; each pick there is a space too, and none is required.
 3. **Setup:** "What do you save?" picks save kinds and the spaces to start with.
 4. **First save:** saves one real link. The user taps a sample, pastes a link, or types one. No account is needed: a sample shows a preview of the result, then "Read and titled. It goes on your shelf once you're in." with **Continue**; a pasted or typed link shows "Got it." with **Continue**. The link is queued on the device and saved to the account after sign-in. **Skip for now** passes the first save.
 5. **Reminder:** "When should it come back?" offers one reminder for a save already in the account, so a signed-out first run skips this step. Picking a time is the only place onboarding asks for notifications. **Don't remind me** skips it.
@@ -113,7 +113,7 @@ Shelvr is a private save-it-for-later app for links, notes, and images. It uses 
 Account access:
 
 1. Launch Shelvr and tap "Start yours". If you already have an account, tap "Already have an account? Sign in" instead.
-2. On "What are you into?", pick any topics or none, and tap Continue.
+2. On "What are you into?", pick any topics or none, and tap Continue. Picking Travel opens "What kind of spots?" under the topics; pick any or none.
 3. On "What do you save?", pick at least one kind, keep or edit the suggested spaces, and tap Continue.
 4. Tap the featured link to save it. A short preview plays, and the save is kept until the account exists.
 5. After the purchase in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required. Sign in completes through Apple's system authentication flow.
