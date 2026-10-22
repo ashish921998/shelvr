@@ -32,10 +32,8 @@ button named `Close` (provided by the upgraded native SDK). No assertion matches
 Plan switching has its own test: it opens "View all plans", selects Monthly,
 checks the billed-today disclosure, then selects Annual and checks the trial
 CTA. `expectPaywall` only observes the initial paywall, so the entry and
-dismissal tests never need to switch plans. The onboarding test cold-launches
-once after completion, verifies and dismisses the intentional replay paywall
-for pending unpaid setup, then checks the plan gate and both splash layers. Whole-test
-retries are disabled so a failed launch cannot become a flaky pass.
+dismissal tests never need to switch plans. The paywall at the end of
+onboarding has its own feature file, [onboarding](onboarding.md).
 
 ## Proof
 
