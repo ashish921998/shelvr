@@ -59,56 +59,57 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
 ];
 
 // The travel sample for each city the sample trip can be in, besides Prague,
-// whose page is the Travel sample above. Each is that city's saved place in
-// the sample trip. Same checks as above.
+// whose page is the Travel sample above. Each page is about what the city's
+// photo shows, so the card's picture and title agree. Wikipedia where the
+// tourism sites sit behind bot checks the backend reader cannot pass.
 const CITY_PAGES: Record<
   Exclude<SampleCityId, "prague">,
   Pick<DemoSample, "url" | "pageHeading" | "domain">
 > = {
   barcelona: {
-    url: "https://catedralbcn.org/en/",
-    pageHeading: "Barcelona Cathedral",
-    domain: "catedralbcn.org",
+    url: "https://en.wikipedia.org/wiki/Sagrada_Fam%C3%ADlia",
+    pageHeading: "Sagrada Família",
+    domain: "en.wikipedia.org",
   },
   lisbon: {
-    url: "https://www.visitlisboa.com/en/places/praca-do-comercio-terreiro-do-paco",
-    pageHeading: "Praça do Comércio",
-    domain: "visitlisboa.com",
+    url: "https://en.wikipedia.org/wiki/Bel%C3%A9m_Tower",
+    pageHeading: "Belém Tower",
+    domain: "en.wikipedia.org",
   },
   london: {
-    url: "https://www.visitlondon.com/things-to-do/place/3901803-tower-bridge",
-    pageHeading: "Tower Bridge",
-    domain: "visitlondon.com",
+    url: "https://en.wikipedia.org/wiki/Covent_Garden",
+    pageHeading: "Covent Garden",
+    domain: "en.wikipedia.org",
   },
   "los-angeles": {
-    url: "https://www.discoverlosangeles.com/node/544",
-    pageHeading: "Griffith Observatory",
-    domain: "discoverlosangeles.com",
+    url: "https://en.wikipedia.org/wiki/Venice_Canal_Historic_District",
+    pageHeading: "Venice Canal Historic District",
+    domain: "en.wikipedia.org",
   },
   "new-york": {
-    url: "https://www.nycgovparks.org/parks/washington-square-park",
-    pageHeading: "Washington Square Park",
-    domain: "nycgovparks.org",
+    url: "https://en.wikipedia.org/wiki/Brooklyn_Bridge",
+    pageHeading: "Brooklyn Bridge",
+    domain: "en.wikipedia.org",
   },
   paris: {
-    url: "https://parisjetaime.com/eng/transport/place-des-vosges-p1907",
-    pageHeading: "Place des Vosges",
-    domain: "parisjetaime.com",
+    url: "https://en.wikipedia.org/wiki/Jardin_du_Luxembourg",
+    pageHeading: "Jardin du Luxembourg",
+    domain: "en.wikipedia.org",
   },
   "san-francisco": {
-    url: "https://www.sftravel.com/things-to-do/attractions/iconic-sf/lombard-street",
-    pageHeading: "Lombard Street",
-    domain: "sftravel.com",
+    url: "https://en.wikipedia.org/wiki/Mission_Dolores_Park",
+    pageHeading: "Mission Dolores Park",
+    domain: "en.wikipedia.org",
   },
   seoul: {
-    url: "https://english.visitseoul.net/attractions/Gyeongbokgung-Palace/ENP000072",
-    pageHeading: "Gyeongbokgung Palace",
-    domain: "english.visitseoul.net",
+    url: "https://en.wikipedia.org/wiki/Bukchon_Hanok_Village",
+    pageHeading: "Bukchon Hanok Village",
+    domain: "en.wikipedia.org",
   },
   tokyo: {
-    url: "https://www.gotokyo.org/en/spot/78/index.html",
-    pageHeading: "Shibuya Scramble Crossing",
-    domain: "gotokyo.org",
+    url: "https://en.wikipedia.org/wiki/Sens%C5%8D-ji",
+    pageHeading: "Sensō-ji",
+    domain: "en.wikipedia.org",
   },
   toronto: {
     url: "https://www.cntower.ca/",
