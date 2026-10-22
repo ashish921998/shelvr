@@ -319,6 +319,7 @@ function useDeleteSave({
         forgetDeletedSharedItem(target._id);
         analytics.itemDeleted(target, "item_detail");
         if (neighbor) {
+          cancelParamWrite();
           goTo(neighbor._id);
           writeParams(neighbor._id);
           listRef.current?.scrollToIndex({
