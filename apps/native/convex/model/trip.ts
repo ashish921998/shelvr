@@ -2,11 +2,6 @@ import { type Infer, v } from "convex/values";
 import { distanceKm, MAX_CITY_DISTANCE_KM, type LatLng } from "./appleMaps";
 import type { PlanPlace } from "./plan";
 
-// Trip mode: a travel space's saves laid out as a day-by-day trip. The model
-// picks the places the saves name and a time of day for each; Apple Maps
-// says where they are; this module (pure, tested without either) groups them
-// into one area per day and orders each day.
-
 export const MIN_TRIP_DAYS = 1;
 export const MAX_TRIP_DAYS = 15;
 
@@ -17,19 +12,22 @@ export const tripPaceValidator = v.union(
 );
 export type TripPace = Infer<typeof tripPaceValidator>;
 
-/** Stops a day holds at each pace. */
 export const STOPS_PER_DAY: Record<TripPace, number> = {
   easy: 3,
   balanced: 5,
   packed: 7,
 };
 
-/** Places the model may return for a `days`-day trip: a packed trip of that
- * length, and never fewer than a packed 5-day trip's, so a short trip keeps a
- * wishlist. Every place costs a Maps lookup, so a 2-day trip does not ask for
- * a 15-day trip's worth. */
 export function tripPlaceCap(days: number): number {
   return STOPS_PER_DAY.packed * Math.max(days, 5);
+}
+
+export function tidyCity(city: string): string {
+  return city.replace(/\s+/g, " ").trim();
+}
+
+export function cityKey(city: string): string {
+  return tidyCity(city).toLowerCase();
 }
 
 export const TRIP_SLOTS = [
@@ -55,30 +53,23 @@ export const tripStopValidator = v.object({
   area: v.optional(v.string()),
   why: v.string(),
   slot: tripSlotValidator,
-  // Where Apple Maps puts the place. Absent when the lookup found nothing,
-  // or the map was off; the stop still shows in the day's list.
   lat: v.optional(v.number()),
   lng: v.optional(v.number()),
 });
 export type TripStop = Infer<typeof tripStopValidator>;
 
 export const tripDayValidator = v.object({
-  // Up to two neighbourhoods the day's stops are in, as the saves write them.
   areas: v.array(v.string()),
   stops: v.array(tripStopValidator),
-  // Meals the day has no saved place for, shown as gaps, never filled with a
-  // place the saves don't name.
   gaps: v.array(tripSlotValidator),
 });
 export type TripDay = Infer<typeof tripDayValidator>;
 
-/** A place the model picked, grounded in its save, with where it is. */
 export type TripCandidate = PlanPlace & {
   slot: TripSlot | "any";
   location?: LatLng;
 };
 
-/** "any" (a sight, a shop) fills the afternoon. */
 function slotOf(candidate: TripCandidate): TripSlot {
   return candidate.slot === "any" ? "afternoon" : candidate.slot;
 }
@@ -104,8 +95,6 @@ function centroid(points: LatLng[]): LatLng {
   return { lat: sum.lat / points.length, lng: sum.lng / points.length };
 }
 
-/** Seeds: the best-ranked place, then each next seed the place farthest from
- * every seed so far. Deterministic, so the same saves give the same trip. */
 function seeds(points: LatLng[], k: number): LatLng[] {
   const chosen = [points[0]];
   while (chosen.length < k) {
@@ -123,12 +112,6 @@ function seeds(points: LatLng[], k: number): LatLng[] {
   return chosen;
 }
 
-/**
- * Groups located places into `k` days of at most `capacity` stops: k-means
- * whose assignment step hands out the closest (place, day) pairs first and
- * skips a full day, so no day overflows and each stays in one area.
- * Returns a day index per point.
- */
 export function clusterPlaces(
   points: LatLng[],
   k: number,
@@ -163,12 +146,10 @@ export function clusterPlaces(
   return assignment;
 }
 
-/** The key two places share when the saves put them in the same area. */
 function areaKey(area: string | undefined): string {
   return (area ?? "").split(",")[0].trim().toLowerCase();
 }
 
-/** Up to two areas, most stops first, as the saves write them. */
 function dayAreas(stops: { area?: string }[]): string[] {
   const counts = new Map<string, { label: string; count: number }>();
   for (const stop of stops) {
@@ -185,8 +166,6 @@ function dayAreas(stops: { area?: string }[]): string[] {
     .map((entry) => entry.label);
 }
 
-/** Time of day first; inside one slot, the walk goes to the nearest next
- * stop. Unlocated stops keep the model's order. */
 function orderDay(stops: TripCandidate[]): TripCandidate[] {
   const ordered: TripCandidate[] = [];
   for (const slot of TRIP_SLOTS) {
@@ -213,12 +192,10 @@ function orderDay(stops: TripCandidate[]): TripCandidate[] {
 
 const MEALS: TripSlot[] = ["lunch", "dinner"];
 
-/** Meals a day has no saved place for; an empty day has no gaps. */
 function dayGaps(slots: Set<TripSlot>, stopCount: number): TripSlot[] {
   return stopCount === 0 ? [] : MEALS.filter((meal) => !slots.has(meal));
 }
 
-/** A day of these stops, with the areas and meal gaps they make. */
 export function dayOf<Stop extends Pick<TripStop, "area" | "slot">>(
   stops: Stop[],
 ): { areas: string[]; stops: Stop[]; gaps: TripSlot[] } {
@@ -229,11 +206,7 @@ export function dayOf<Stop extends Pick<TripStop, "area" | "slot">>(
   };
 }
 
-/**
- * Lays out ranked places (best first) as `days` days at `pace`. Places past
- * the trip's room, and any no day can take, go to `wishlist` in rank order.
- * Day 1 is the day holding the best place; empty days come last.
- */
+/** Lays out ranked places (best first) as `days` days at `pace`; places past the room, or that no day can take, go to `wishlist` in rank order. */
 export function buildTrip(
   candidates: TripCandidate[],
   options: { days: number; pace: TripPace },
@@ -255,8 +228,6 @@ export function buildTrip(
   );
   located.forEach((candidate, i) => groups[assignment[i]].push(candidate));
 
-  // Unlocated places join a day already in their area, else the emptiest day
-  // with room.
   for (const candidate of chosen.filter((c) => c.location === undefined)) {
     const key = areaKey(candidate.area);
     const open = groups.filter((group) => group.length < perDay);
@@ -287,11 +258,6 @@ export function buildTrip(
   };
 }
 
-/**
- * Drops lookups that landed far from the rest: a place with the same name in
- * another city. Measured from `centre` (the trip's city) when known, else
- * from the median of the places found.
- */
 export function keepNearby(
   found: (LatLng | null)[],
   centre: LatLng | null,
@@ -311,12 +277,6 @@ export function keepNearby(
   );
 }
 
-/**
- * Swaps one stop for the best wishlist place to take its spot: the same time
- * of day first, then the nearest to it, then the best ranked. The stop goes
- * to the end of the wishlist. Null when the wishlist is empty or the stop is
- * not there.
- */
 export function swapStop(
   trip: { days: TripDay[]; wishlist: TripStop[] },
   dayIndex: number,
@@ -344,8 +304,6 @@ export function swapStop(
     );
   const best = ranked[0].rank;
   const replacement = trip.wishlist[best];
-  // The newcomer can have another time of day, so the day is put back in
-  // time order; the sort is stable, so the walk order within a slot holds.
   const stops = day.stops
     .map((s, i) => (i === stopIndex ? replacement : s))
     .sort((a, b) => TRIP_SLOTS.indexOf(a.slot) - TRIP_SLOTS.indexOf(b.slot));

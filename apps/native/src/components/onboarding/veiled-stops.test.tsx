@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// The veiled stops draw the trip's locked rows with Skia and blur them as one
-// picture. Nothing is drawn until the block has a width and its fonts; then
-// every row's text and badge land where the open rows would put them.
 import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -139,7 +136,6 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => "en",
 }));
 
-// What the locked card veils: everything after day one's header and first stop.
 const LOCKED = sampleRows(sampleTrip("prague")).slice(2);
 
 beforeEach(() => {
@@ -172,7 +168,6 @@ describe("VeiledStops", () => {
   });
 
   it("is as tall as the open rows it stands in for", () => {
-    // Seven stops of 44 and one day header of 64.
     render(<VeiledStops rows={LOCKED} />);
     expect(screen.getByTestId("block").dataset.height).toBe("372");
   });
@@ -246,13 +241,9 @@ describe("VeiledStops", () => {
     render(<VeiledStops rows={LOCKED} />);
     measure(340);
     const [first] = screen.getAllByTestId("badge");
-    // 16 of padding and half of the 22 wide badge from the right edge, and
-    // the middle of a 44 high row under its 1 high divider.
     expect(num(first, "cx")).toBe(313);
     expect(num(first, "cy")).toBeCloseTo(22.5);
-    // The open row's pin shows a disc of 18 inside a 2 wide ring.
     expect(num(first, "r")).toBe(9);
-    // The number is one 7 wide character, centered on the badge.
     expect(num(word("2"), "x")).toBeCloseTo(313 - 3.5);
   });
 
@@ -261,7 +252,6 @@ describe("VeiledStops", () => {
     measure(340);
     const name = word("Grand Café Orient");
     expect(num(name, "x")).toBe(16 + 84 + 12);
-    // A 16 high glyph sits 0.34 of its size above its baseline.
     expect(num(name, "y")).toBeCloseTo(22.5 + 16 * 0.34);
   });
 

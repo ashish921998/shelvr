@@ -39,8 +39,7 @@ vi.mock("convex/react", () => ({
   useMutation: (ref: string) =>
     ref === "createSpace" ? createSpace : createLinkItem,
 }));
-// Stable, as the real router is: a new object each render would re-run the
-// replay effect on its own.
+// Stable like the real router: a new object each render would re-run the replay effect.
 const stableRouter = vi.hoisted(() => ({}));
 vi.mock("expo-router", () => ({ useRouter: () => stableRouter }));
 vi.mock("@/lib/current-user", () => ({
@@ -165,7 +164,6 @@ describe("useReplayOnboarding and the account", () => {
     await settle();
     expect(openPaywall).toHaveBeenCalledOnce();
 
-    // A refresh of the same account does not ask again.
     account.user = { _id: "user_1" };
     hook.rerender();
     await settle();
@@ -352,7 +350,6 @@ describe("a purchase made before sign-in", () => {
     setPendingSpaces(["Recipes"]);
     notePurchaseBeforeSignIn();
 
-    // The app is closed before the purchase reaches the account.
     const first = renderHook(() => useReplayOnboarding());
     await settle();
     first.unmount();
@@ -361,8 +358,6 @@ describe("a purchase made before sign-in", () => {
     expect(openPaywall).not.toHaveBeenCalled();
     expect(createSpace).not.toHaveBeenCalled();
 
-    // Access lands (the webhook, or the attach on this launch) while the
-    // flag is still set: the replay does not wait for the flag too.
     entitlement.entitled = true;
     relaunched.rerender();
     await settle();

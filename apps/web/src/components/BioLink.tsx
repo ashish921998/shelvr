@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import AndroidWaitlist from "@/components/home/AndroidWaitlist";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { arrivalCampaign } from "@/lib/appStore";
-import { useAppStoreLink } from "@/lib/appStoreLink";
+import { useAppStoreLink, useArrivalCampaign } from "@/lib/appStoreLink";
+import { useBrowserValue } from "@/lib/browserValue";
 import {
   CHROME_TRIED_PARAM,
   PLAY_STORE_LIVE,
@@ -31,13 +32,13 @@ export default function BioLink({
   inApp,
   platform: serverPlatform,
 }: BioLinkProps) {
-  const [platform, setPlatform] = useState(serverPlatform);
-  useEffect(() => {
-    if (isIPadDesktop(navigator.userAgent, navigator.maxTouchPoints)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPlatform("ios");
-    }
-  }, []);
+  const platform = useBrowserValue<Platform>(
+    () =>
+      isIPadDesktop(navigator.userAgent, navigator.maxTouchPoints)
+        ? "ios"
+        : serverPlatform,
+    serverPlatform,
+  );
   const action = bioAction(inApp, platform);
 
   useEffect(() => {
@@ -228,11 +229,7 @@ function InAppOverlay({
 }
 
 function PlayStoreButton() {
-  const [campaign, setCampaign] = useState("web_bio");
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCampaign(arrivalCampaign(window.location.search) ?? "web_bio");
-  }, []);
+  const campaign = useArrivalCampaign("web_bio");
   return (
     <a
       href={playStoreUrl(campaign)}

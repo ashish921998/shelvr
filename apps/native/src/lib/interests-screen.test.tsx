@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-// The interests step as the onboarding screen wires it: topics and spots
-// share the screen's one persisted spaces list, and unpicking Travel drops
-// its spots. The other steps and services are stubbed; the real
-// InterestsStep and the screen's own toggles run.
 import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -174,7 +170,6 @@ it("keeps a spot as a space until Travel is unpicked, then forgets it", () => {
   expect(savedSpaces()).toEqual(["Travel", "Good food", "AI & tech"]);
   expect(chip("Good food").getAttribute("aria-checked")).toBe("true");
 
-  // Unpicking a spot alone leaves Travel and the card in place.
   fireEvent.click(chip("Good food"));
   expect(savedSpaces()).toEqual(["Travel", "AI & tech"]);
   fireEvent.click(chip("Hidden gems"));
@@ -183,7 +178,6 @@ it("keeps a spot as a space until Travel is unpicked, then forgets it", () => {
   expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
   expect(savedSpaces()).toEqual(["AI & tech"]);
 
-  // Picked again, Travel's card comes back empty.
   fireEvent.click(chip("Travel"));
   expect(chip("Hidden gems").getAttribute("aria-checked")).toBe("false");
   expect(savedSpaces()).toEqual(["AI & tech", "Travel"]);

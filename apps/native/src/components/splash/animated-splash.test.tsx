@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { SPLASH_DURATION, SPLASH_EXIT_FROM } from "./timeline";
@@ -34,10 +34,8 @@ vi.mock("react-native-reanimated", () => ({
   ReduceMotion: { Never: "never" },
   useAnimatedStyle: (worklet: () => unknown) => worklet(),
   useReducedMotion: () => false,
-  useSharedValue: (value: number) => ({
-    get: () => value,
-    set: () => {},
-  }),
+  useSharedValue: (value: number) =>
+    useState(() => ({ get: () => value, set: () => {} }))[0],
   withTiming: (
     to: number,
     _config: unknown,

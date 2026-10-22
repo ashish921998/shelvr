@@ -14,12 +14,6 @@ import { Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The sample trip steps of onboarding, for people who save travel: the trip
-// builds from three sample saves, shows locked, and opens up after the
-// paywall. Each screen says the trip is a sample.
-
-// Each build step takes this long, and the finished list holds a beat before
-// the trip shows.
 const BUILD_STEP_COUNT = 4;
 const STEP_MS = 750;
 const HOLD_MS = 500;
@@ -138,10 +132,6 @@ function BuildStepRow({
   );
 }
 
-/**
- * The trip builds from three sample saves, one step at a time, then moves on
- * by itself. Nothing is made or fetched; the steps show what a real trip does.
- */
 export function TripBuildStep({
   trip,
   onDone,
@@ -211,17 +201,12 @@ export function TripBuildStep({
   );
 }
 
-/**
- * The finished sample trip, locked: its first stop is clear and the rest is
- * veiled. One button opens the paywall.
- */
 export function TripLockedStep({
   trip,
   leaving,
   onUnlock,
 }: {
   trip: SampleTrip;
-  /** `onUnlock` ran and the paywall is on its way. */
   leaving: boolean;
   onUnlock: () => void;
 }) {
@@ -253,7 +238,6 @@ export function TripLockedStep({
   );
 }
 
-/** The sample trip, open, after the purchase. */
 export function TripRevealStep({
   trip,
   onContinue,
@@ -264,8 +248,6 @@ export function TripRevealStep({
   useAppLocale();
   const [leaving, setLeaving] = useState(false);
   const leftRef = useRef(false);
-  // Continuing ends onboarding, and the screen takes a moment to go. A second
-  // tap in that moment must not end it twice.
   const leave = () => {
     if (leftRef.current) return;
     leftRef.current = true;

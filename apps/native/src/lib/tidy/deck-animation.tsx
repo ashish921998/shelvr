@@ -28,8 +28,7 @@ export const DeckAnimationProvider: FC<Props> = ({ lastIndex, children }) => {
 
   const value = useMemo(
     () => ({ isDragging, animatedIndex, currentIndex, undoIndex }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [isDragging, animatedIndex, currentIndex, undoIndex],
   );
 
   return (

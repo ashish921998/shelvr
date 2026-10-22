@@ -37,6 +37,7 @@ import {
 } from "@/lib/share/pending-share-store";
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
+import { bestEffort } from "@/lib/best-effort";
 import { saveFailureStage } from "@convex/model/saveErrors";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
@@ -491,14 +492,6 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
   if (entry.itemId !== undefined) patch.itemId = entry.itemId;
   if (entry.message !== undefined) patch.message = entry.message;
   updateEntry(shareStore, entry.index, patch, sessionId);
-}
-
-function bestEffort(code: string, run: () => void): void {
-  try {
-    run();
-  } catch (err) {
-    analytics.captureError(code, err);
-  }
 }
 
 type Theme = ReturnType<typeof useUnistyles>["theme"];

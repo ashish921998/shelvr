@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import en from "@/locales/en.json";
-import { SAMPLE_CITIES, SAMPLE_CITY_IDS } from "./sample-cities";
+import { isSampleCity, SAMPLE_CITIES, SAMPLE_CITY_IDS } from "./sample-cities";
 import {
   DEFAULT_SAMPLE_CITY,
-  isSampleCity,
   SAMPLE_CROPS,
   SAMPLE_MAP,
   SAMPLE_SLOT_LABELS,
@@ -46,10 +45,6 @@ describe("sampleTrip", () => {
     expect(isSampleCity("paris")).toBe(true);
     expect(isSampleCity("toString")).toBe(false);
     expect(isSampleCity(7)).toBe(false);
-  });
-
-  it("builds each city's trip once", () => {
-    expect(sampleTrip("seoul")).toBe(sampleTrip("seoul"));
   });
 });
 

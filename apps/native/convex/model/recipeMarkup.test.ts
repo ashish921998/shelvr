@@ -271,6 +271,13 @@ describe("extractRecipeMarkup", () => {
     expect(extractRecipeMarkup(html)?.name).toBe("Weeknight Dal");
   });
 
+  it("tolerates a JSON-LD comment closed with --!>", () => {
+    const html = page(
+      `<script type="application/ld+json"><!--${JSON.stringify(BASIC_RECIPE)}--!></script>`,
+    );
+    expect(extractRecipeMarkup(html)?.name).toBe("Weeknight Dal");
+  });
+
   it("reads microdata when there is no JSON-LD", () => {
     const html = page(`
       <div itemscope itemtype="https://schema.org/Recipe">

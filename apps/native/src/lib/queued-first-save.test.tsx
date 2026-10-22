@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
   store: new Map<string, string>(),
+  keychainFailing: false,
   authenticated: true,
   onboarded: true,
   savesBlocked: false,
@@ -18,7 +19,10 @@ const mock = vi.hoisted(() => ({
 
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
-  setItem: (key: string, value: string) => mock.store.set(key, value),
+  setItem: (key: string, value: string) => {
+    if (mock.keychainFailing) throw new Error("keychain unavailable");
+    mock.store.set(key, value);
+  },
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: { demo: { createDemoItem: "createDemoItem" } },
@@ -80,6 +84,7 @@ async function mount() {
 
 beforeEach(() => {
   mock.store.clear();
+  mock.keychainFailing = false;
   mock.authenticated = true;
   mock.onboarded = true;
   mock.savesBlocked = false;
@@ -162,7 +167,6 @@ describe("a first save queued before sign-in", () => {
     await mount();
     expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
 
-    // Account A signed out with its save still queued; account B signs in.
     mock.createDemoItem.mockReset().mockResolvedValue(result());
     mock.user = { _id: "user-2" };
     await mount();
@@ -192,6 +196,18 @@ describe("a first save queued before sign-in", () => {
     hook.rerender();
     await act(async () => {});
     expect(mock.createDemoItem).toHaveBeenCalledOnce();
+  });
+
+  it("reports a keychain that will not take the claim and leaves the save queued", async () => {
+    queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
+    mock.keychainFailing = true;
+    await mount();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "claim_queued_first_save_failed",
+      expect.any(Error),
+    );
+    expect(mock.createDemoItem).not.toHaveBeenCalled();
+    expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
   });
 
   it("keeps the queued save when the server is only rate limiting", async () => {
