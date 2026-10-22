@@ -76,11 +76,7 @@ const lightTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#8a5a0b",
-    // The body of a phone drawn in the app (the onboarding opener). A device
-    // is dark in every theme, so this never flips with the foreground; the
-    // dark themes go a step past their background so the edge still reads.
     bezel: "#2b2418",
-    // Trip Reveal's globe: sea, land, and the coast and border lines.
     globeOcean: "#e9eef0",
     globeLand: "#e4d6bb",
     globeLandEdge: "#cdbb98",
@@ -165,17 +161,11 @@ type AppThemes = typeof appThemes;
 type AppBreakpoints = typeof breakpoints;
 
 declare module "react-native-unistyles" {
-  // Module augmentation requires empty extending interfaces (type aliases can't
-  // merge across declarations), so the empty-object-type rule doesn't apply.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  // Declaration merging needs interfaces; type aliases cannot merge.
   export interface UnistylesThemes extends AppThemes {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   export interface UnistylesBreakpoints extends AppBreakpoints {}
 }
 
-// Read the persisted appearance at module scope so the cold launch paints in
-// the pinned theme. A pinned mode must disable adaptive theming, otherwise the
-// first OS scheme change would override the user's choice.
 const storedAppearanceMode = readStoredAppearanceMode();
 Appearance.setColorScheme(
   storedAppearanceMode === "system"

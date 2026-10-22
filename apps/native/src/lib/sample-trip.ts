@@ -13,14 +13,6 @@ import type { TextMessageKey } from "@/locales/message-types";
 
 export { isSampleCity };
 
-// The sample trip onboarding builds before the paywall, for people who said
-// they save travel. It is in the city they said they are going to next, the
-// same on every run, and never made by the model: it shows what a trip looks
-// like, and the label on every screen says it is a sample. Place names are
-// the places' own and stay untranslated.
-
-/** Whether onboarding shows the sample trip: travel was picked as a kind of
- * save or as a topic. Everyone else goes from the promise to the paywall. */
 export function showTripTeaser(
   kinds: readonly SaveKind[],
   interests: readonly Interest[],
@@ -32,7 +24,6 @@ export function showTripTeaser(
  * travel picked only as a kind of save, or an older stored pick). */
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
-/** The trip screen's slot labels, so the sample reads like the real trip. */
 export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
   morning: "trip.slotMorning",
   lunch: "trip.slotLunch",
@@ -40,12 +31,8 @@ export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
   dinner: "trip.slotDinner",
 };
 
-/** The drawing the sample map is made on, in points before it scales to the
- * card. Each stop's pin sits on it. */
 export const SAMPLE_MAP = { width: 340, height: 168 } as const;
 
-/** The band of the drawing a card shows, from `top`. The locked card shows
- * less of it than the open one, and every pin lies inside both. */
 export type SampleCrop = { top: number; height: number };
 export const SAMPLE_CROPS = {
   locked: { top: 28, height: 120 },
@@ -65,10 +52,8 @@ type SampleDay = {
   stops: readonly SampleStop[];
 };
 
-/** A city's sample trip, with every stop pinned on the drawing. */
 export type SampleTrip = {
   city: SampleCityId;
-  /** The city's name. */
   name: TextMessageKey;
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
@@ -274,13 +259,10 @@ export function sampleTrip(city?: string | null): SampleTrip {
 
 export type NumberedStop = {
   stop: SampleStop;
-  /** Index of the day the stop belongs to. */
   day: number;
-  /** The stop's number on the map, counted across the whole trip. */
   number: number;
 };
 
-/** Every stop in trip order, numbered as the map numbers its pins. */
 export function sampleStops(trip: SampleTrip): NumberedStop[] {
   return trip.days
     .flatMap((day, dayIndex) =>
@@ -289,12 +271,10 @@ export function sampleStops(trip: SampleTrip): NumberedStop[] {
     .map((entry, index) => ({ ...entry, number: index + 1 }));
 }
 
-/** One line of the trip as the card lists it: a day's header or one stop. */
 export type SampleRow =
   | { kind: "day"; day: number; title: TextMessageKey; places: number }
   | { kind: "stop"; entry: NumberedStop };
 
-/** The trip's rows top to bottom: each day's header, then its stops. */
 export function sampleRows(trip: SampleTrip): SampleRow[] {
   const stops = sampleStops(trip);
   return trip.days.flatMap(({ title, stops: places }, day) => [

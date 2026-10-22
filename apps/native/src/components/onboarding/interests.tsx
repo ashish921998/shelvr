@@ -19,16 +19,8 @@ import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Softens the picks where they pass under Continue, so a cut-off row reads as
-// more to scroll. The picks end this far up, so the last row clears it.
 const FADE_HEIGHT = 32;
 
-/** "What are you into?": each picked topic becomes a space and leads the
- * first-save picker. Picking none is fine; the step never blocks. Picking
- * Travel asks two things more in a card under the topics: what kind of spots,
- * each pick a space too (travel-vibes.ts), and where they are going next,
- * the city the sample trip is in. The picks scroll on their own and Continue
- * stays pinned under them, so the card opening never pushes it off screen. */
 export function InterestsStep({
   picked,
   vibes,
@@ -112,8 +104,6 @@ export function InterestsStep({
   );
 }
 
-/** "Where are you going next?": a field that opens the system menu of cities.
- * Cities sort by their name in the app's language. */
 function CityField({
   city,
   onPick,
@@ -167,8 +157,6 @@ function CityField({
   );
 }
 
-/** One pick. The card's chips are a size down and take the page's background,
- * so they read as sitting inside the card rather than beside the topics. */
 function Chip({
   label,
   active,

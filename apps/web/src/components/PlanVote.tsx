@@ -27,13 +27,13 @@ function ballot(
   });
 }
 
-function store(key: string, value: unknown) {
+function storeQuietly(key: string, value: unknown) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
 }
 
-function forget(key: string) {
+function forgetQuietly(key: string) {
   try {
     window.localStorage.removeItem(key);
   } catch {}
@@ -70,7 +70,7 @@ function storedBallot(key: string): Ballot | undefined {
 function storeIfNewer(key: string, ballot: Ballot) {
   const current = storedBallot(key);
   if (current && current.revision > ballot.revision) return;
-  store(key, ballot);
+  storeQuietly(key, ballot);
 }
 
 function nextRevision(last: { current: number }): number {
@@ -129,7 +129,7 @@ export default function PlanVote({
         if (response.ok) {
           storeIfNewer(savedKey(token), { choices: next, revision });
           if ((storedBallot(pendingKey(token))?.revision ?? 0) <= revision) {
-            forget(pendingKey(token));
+            forgetQuietly(pendingKey(token));
           }
           if (revision === lastRevision.current) {
             setStatus("saved");

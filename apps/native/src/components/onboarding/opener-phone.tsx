@@ -3,25 +3,14 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// A phone drawn in the app, for the opener's pages. Its lower edge runs past
-// the bottom of the stage and fades into the background, so it reads as a
-// device without the page spending height on a chin.
-
-/** How far the phone runs past the bottom of its stage. Screens that put
- * content near the bottom keep it this much higher. */
 export const PHONE_CUT = 40;
-// Short enough that content a screen keeps PHONE_CUT + gap(6) above its
-// bottom edge stays legible, long enough to read as a fade and not a crop.
 const FADE_HEIGHT = 72;
 const PHONE_WIDTH = 236;
 const BEZEL = 9;
 const PHONE_RADIUS = 46;
 const ISLAND_WIDTH = 64;
-// The stage never shrinks below this; the page scrolls instead.
 const STAGE_MIN_HEIGHT = 220;
 
-/** The phone, decorative only. `overlay` draws on the stage, over the
- * phone's edge rather than inside its screen. */
 export function PhoneFrame({
   children,
   overlay,

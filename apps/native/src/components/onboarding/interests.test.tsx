@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-// The interests step: topics as checkboxes and, once Travel is picked, one
-// card more asking what kind of spots. Every pick is handed back to the
-// screen, which keeps topics and spots alike as spaces; the screen's wiring
-// is tested in src/lib/interests-screen.test.tsx.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -94,7 +90,6 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/use-large-text", () => ({ HEADLINE_MAX_SCALE: 1.5 }));
 vi.mock("@/components/onboarding/parts", () => ({ CtaButton: mock.button }));
 
-// With t() returning its key, every label is its catalog key.
 const SPOTS_TITLE = "interests.vibesTitle";
 const chip = (id: string, checked?: boolean) =>
   screen.getByRole("checkbox", { name: onboardingLabel(id), checked });
@@ -136,7 +131,6 @@ describe("InterestsStep", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(
       INTERESTS.length + TRAVEL_VIBES.length,
     );
-    // The card's eyebrow names the topic it follows, under the Travel chip.
     expect(screen.getAllByText(onboardingLabel("Travel"))).toHaveLength(2);
   });
 

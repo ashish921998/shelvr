@@ -1,10 +1,10 @@
+import { RECALL_MIN_AGE_MS } from "@convex/model/recallAge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   olderMatches,
   readHandledRecall,
   recallCandidate,
   RECALL_FRESH_MS,
-  RECALL_MIN_AGE_MS,
   writeHandledRecall,
 } from "./save-recall";
 

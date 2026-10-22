@@ -21,7 +21,6 @@ describe("onboardingCompletedProperties", () => {
       interests: ["Travel", "AI & tech"],
       travel_vibes: ["Good food", "Date nights"],
       space_count: 6,
-      // Vibes are preset identities, so they are named; only "Prague" is typed.
       space_names: [
         "Travel",
         "Good food",

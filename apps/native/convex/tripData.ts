@@ -15,8 +15,10 @@ import {
 import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
+  cityKey,
   dayOf,
   swapStop,
+  tidyCity,
   tripDayValidator,
   tripPaceValidator,
   tripSlotValidator,
@@ -27,14 +29,6 @@ import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 
 const MAX_CITY_CHARS = 80;
-
-function tidyCity(city: string): string {
-  return city.replace(/\s+/g, " ").trim();
-}
-
-function cityKey(city: string): string {
-  return tidyCity(city).toLowerCase();
-}
 
 export async function loadReadySaves(
   ctx: QueryCtx,

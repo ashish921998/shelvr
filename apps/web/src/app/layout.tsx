@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import PageViewTracker from "@/components/PageViewTracker";
+import PageShell from "@/components/PageShell";
 import { APP_STORE_ID } from "@/lib/appStore";
 import "./globals.css";
 
@@ -34,8 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        <PageViewTracker />
+        <PageShell>{children}</PageShell>
       </body>
     </html>
   );

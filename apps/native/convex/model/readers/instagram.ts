@@ -14,6 +14,7 @@ import {
   isTransientFetchFailure,
   logEvent,
   postField,
+  stripTags,
   type PageData,
 } from "../pageReadCore";
 import { instagramMedia } from "../externalUrl";
@@ -34,11 +35,11 @@ export function parseInstagramEmbed(html: string): InstagramEmbedFields {
     ?.trim();
   const caption = block
     ? decodeEntities(
-        block
-          .replace(/<a[^>]*class="CaptionUsername"[^>]*>[^<]*<\/a>/i, "")
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<[^>]+>/g, "")
-          .replace(/</g, ""),
+        stripTags(
+          block
+            .replace(/<a[^>]*class="CaptionUsername"[^>]*>[^<]*<\/a>/i, "")
+            .replace(/<br\s*\/?>/gi, "\n"),
+        ),
       )
         .split("\n")
         .map((line) => line.replace(/[ \t]+/g, " ").trim())

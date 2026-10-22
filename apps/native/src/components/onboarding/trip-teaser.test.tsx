@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// The sample trip steps: the build runs its steps and moves on by itself, the
-// locked trip hands over to the paywall with one tap, and the open trip lets
-// the person continue.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,8 +62,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// A step's timer is set by an effect that runs once the step before it has
-// rendered, so time moves in small acts, not one long one.
 const advance = (ms: number, step = 50) => {
   for (let elapsed = 0; elapsed < ms; elapsed += step) {
     act(() => vi.advanceTimersByTime(Math.min(step, ms - elapsed)));

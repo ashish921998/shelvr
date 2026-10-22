@@ -18,6 +18,7 @@ import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembershipsForSpace,
   effectiveStatus,
+  emptySummary,
   getMembership,
   hasSummary,
   insertMembership,
@@ -274,10 +275,7 @@ export const createSpace = mutation({
       ...(args.dynamic === true && args.autoFile === true
         ? { autoFile: true, autoFileSince: Date.now() }
         : { autoFile: false }),
-      savedCount: 0,
-      suggestedCount: 0,
-      previewItemIds: [],
-      suggestedPreviewItemIds: [],
+      ...emptySummary(),
     });
     await ctx.scheduler.runAfter(
       0,

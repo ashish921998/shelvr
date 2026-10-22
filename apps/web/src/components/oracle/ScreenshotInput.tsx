@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import type { OracleInputProps } from "@/lib/oracle";
 
@@ -32,7 +32,7 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
   const [file, setFile] = useState<File>();
   const [error, setError] = useState<string>();
   const [preparing, setPreparing] = useState(false);
-  const preview = useMemo(() => file && URL.createObjectURL(file), [file]);
+  const [preview, setPreview] = useState<string>();
 
   useEffect(() => {
     return () => {
@@ -46,10 +46,12 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     if (!picked) return;
     if (picked.size > MAX_FILE_BYTES) {
       setFile(undefined);
+      setPreview(undefined);
       setError("That one is over 4 MB. Try a smaller screenshot.");
       return;
     }
     setFile(picked);
+    setPreview(URL.createObjectURL(picked));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
