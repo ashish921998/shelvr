@@ -82,6 +82,7 @@ jobs:
           - name: a
             tests: >-
               tests/create-space.e2e.ts
+              tests/item-detail.e2e.ts
               tests/onboarding.e2e.ts
               tests/paywall.e2e.ts
           - name: b
