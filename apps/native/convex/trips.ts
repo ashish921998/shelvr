@@ -33,7 +33,6 @@ import {
   type TripCandidate,
 } from "./model/trip";
 
-// Up to 60 saves in, up to 35 places out. The user is watching a spinner.
 const TRIP_TIMEOUT_MS = 30_000;
 
 const tripSchema = z.object({
@@ -80,11 +79,6 @@ function lookupQuery(
   return parts.filter(Boolean).join(", ");
 }
 
-/**
- * Where each candidate is, by Apple Maps. Null when the key is unset or
- * Apple cannot be reached; the trip is then made without pins. Lookups that
- * land far from the city are dropped.
- */
 async function locate(
   candidates: TripCandidate[],
   city: string | undefined,
@@ -99,8 +93,6 @@ async function locate(
   const centre: LatLng | null = city
     ? await appleMapsLookup(token, "geocode", city)
     : null;
-  // Each lookup gives up on its own timeout, so one slow place shows
-  // without a pin rather than holding up the trip.
   const found = await Promise.all(
     candidates.map((candidate) =>
       appleMapsLookup(
@@ -114,14 +106,7 @@ async function locate(
   return keepNearby(found, centre);
 }
 
-/**
- * Replaces the space's trip with places grounded in its saves. A null
- * `tripId` leaves the old trip intact; `considered` distinguishes an empty
- * space from saves that named no places.
- */
 export const makeTrip = action({
-  // `city` narrows a space whose saves span cities. `locale` is the app's
-  // catalog locale, for the reasons' language.
   args: {
     spaceId: v.id("spaces"),
     city: v.optional(v.string()),
@@ -142,7 +127,6 @@ export const makeTrip = action({
       MAX_TRIP_DAYS,
       Math.max(MIN_TRIP_DAYS, Math.round(args.days)),
     );
-    // Annotated: inferring through `internal` is circular for an action.
     const claim: {
       spaceName: string;
       city?: string;
@@ -183,7 +167,6 @@ export const makeTrip = action({
         MAX_TRIP_PLACES,
       ).map(({ pick, place }) => ({ ...place, slot: pick.slot }));
     } catch (error) {
-      // Sanitized: a category, never the raw error.
       logEvent("error", "make_trip_failed", {
         space_id: args.spaceId,
         error_category: summarizeError(error),

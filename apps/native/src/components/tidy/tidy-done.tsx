@@ -10,18 +10,13 @@ import type { TidyCounts } from "@/lib/tidy/use-tidy-actions";
 
 type Props = {
   counts: TidyCounts;
-  /** Deletes queued but not yet confirmed via the system dialog. */
   pendingDeleteCount: number;
-  /** Name of the current source, for the empty-source message. */
   sourceTitle: string;
-  /** True when the source had no unreviewed photos at all. */
   empty: boolean;
   loading: boolean;
   onContinue: () => void;
 };
 
-/** Batch checkpoint: summarizes the sweep and gates the next batch behind
- * one delete-confirmation dialog. Also covers a source with nothing left. */
 export const TidyDone: FC<Props> = ({
   counts,
   pendingDeleteCount,

@@ -2,24 +2,10 @@ import { createMMKV } from "react-native-mmkv";
 import { analytics } from "@/lib/analytics";
 import { isAnalyticsAvailable } from "@/lib/posthog";
 
-/**
- * Lightweight in-app feedback.
- *
- * Privacy rules baked in below:
- * - Automatic events (invitation shown/dismissed, form opened) never carry
- *   message text, URLs, or saved-item content.
- * - The typed message is sent only through the Convex `submitFeedback`
- *   mutation on an explicit Send tap; it never enters PostHog in any form.
- *   Telemetry about a submission is bounded to surface, char count, and a
- *   content-free delivery category. Replay masks all text inputs globally
- *   (posthog.ts).
- */
-
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 1000;
 export const FEEDBACK_READY_SAVE_THRESHOLD = 3;
 export const FEEDBACK_MAX_INVITATIONS_PER_ACCOUNT = 2;
 const FEEDBACK_INVITATION_RETRY_MS = 14 * 24 * 60 * 60 * 1000;
-/** How long a native review prompt claims the moment it triggers. */
 export const FEEDBACK_REVIEW_PROMPT_COOLDOWN_MS = 90_000;
 
 export type FeedbackSurface = "home" | "profile";
@@ -29,12 +15,6 @@ export type FeedbackFeedItem = {
   fixtureKey?: string;
 };
 
-// --- eligibility ------------------------------------------------------------
-
-/**
- * Real READY saves toward the threshold: fixture seeds (fixtureKey) never
- * count, and saves still processing or failed don't either.
- */
 export function countEligibleSaves(items: FeedbackFeedItem[]): number {
   return items.filter((item) => item.status === "ready" && !item.fixtureKey)
     .length;
@@ -51,7 +31,6 @@ export function emptyInvitationState(): FeedbackInvitationState {
   return { readyCount: 0, shownCount: 0, lastShownAt: null, submitted: false };
 }
 
-/** The count only grows: deleting saves must not rescind a reached threshold. */
 export function withReadyCount(
   state: FeedbackInvitationState,
   feedCount: number,
@@ -64,11 +43,6 @@ type InvitationGate = {
   reviewPromptedAt: number | null;
 };
 
-/**
- * The single decision for whether the inline home invitation may appear.
- * Caps: at most twice per account with a 14-day gap between, never after a
- * submission, and never in the same breath as the native review prompt.
- */
 export function canShowInvitation(
   state: FeedbackInvitationState,
   gate: InvitationGate,
@@ -119,11 +93,6 @@ export function parseInvitationState(
   };
 }
 
-// --- review-prompt coordination --------------------------------------------
-// `useReviewPrompt` fires on the same 3-ready-saves threshold. It marks here
-// when it claims the moment; the invitation defers while the mark is fresh.
-// Session scope is enough: the native review flow only exists in-session.
-
 let reviewPromptedAt: number | null = null;
 let reviewAttemptInFlight = false;
 
@@ -135,9 +104,6 @@ export function lastNativeReviewPromptAt(): number | null {
   return reviewPromptedAt;
 }
 
-/** The review prompt claims the moment before `StoreReview.hasAction()`
- * resolves and marks the timestamp only after. The invitation waits out this
- * window so a slow `hasAction()` cannot let both prompts appear together. */
 export function setNativeReviewAttemptInFlight(inFlight: boolean): void {
   reviewAttemptInFlight = inFlight;
 }
@@ -146,10 +112,6 @@ export function isNativeReviewAttemptInFlight(): boolean {
   return reviewAttemptInFlight;
 }
 
-// --- route gating -----------------------------------------------------------
-
-/** True only while the focused route is the home tab's root screen. Anything
- * pushed on top (item detail, paywall, onboarding) fails this check. */
 export function isHomeRootRoute(segments: readonly string[]): boolean {
   return (
     segments.length === 3 &&
@@ -158,8 +120,6 @@ export function isHomeRootRoute(segments: readonly string[]): boolean {
     segments[2] === "(home)"
   );
 }
-
-// --- persistence ------------------------------------------------------------
 
 const store = createMMKV({ id: "feedback" });
 
@@ -186,8 +146,6 @@ export function markFeedbackSubmitted(userId: string): void {
 export function sanitizeFeedbackMessage(raw: string): string {
   return raw.trim().slice(0, FEEDBACK_MESSAGE_MAX_LENGTH);
 }
-
-// --- analytics boundary -----------------------------------------------------
 
 export const feedbackAnalytics = {
   isAvailable(): boolean {

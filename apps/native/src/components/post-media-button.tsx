@@ -4,8 +4,6 @@ import type { ReactNode } from "react";
 import { type GestureResponderEvent, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** A post's image or video poster that opens the post on its site. Videos
- * get a play button because the app cannot play them itself. */
 export function PostMediaButton({
   site,
   playable,
@@ -51,7 +49,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    // Nudge the glyph to the optical center of the circle.
     paddingLeft: 4,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     borderWidth: 1,

@@ -1,5 +1,3 @@
-// Node environment by default (no edge-runtime pragma). safeFetch imports
-// undici (node:net/node:tls) which will not load under @edge-runtime/vm.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,9 +10,6 @@ import {
 import type { DnsResolver } from "./safeFetch";
 import { MockAgent, type Dispatcher } from "undici";
 
-// ---------------------------------------------------------------------------
-// Helper: build a resolver that returns canned answers for any hostname.
-// ---------------------------------------------------------------------------
 function resolverFor(addresses: string[]): DnsResolver {
   return async () =>
     addresses.map((address) => ({
@@ -22,10 +17,6 @@ function resolverFor(addresses: string[]): DnsResolver {
       family: address.includes(":") ? 6 : 4,
     }));
 }
-
-// ---------------------------------------------------------------------------
-// IP / address classification
-// ---------------------------------------------------------------------------
 
 describe("isPublicAddress", () => {
   it("rejects loopback", () => {
@@ -38,7 +29,7 @@ describe("isPublicAddress", () => {
     expect(isPublicAddress("192.168.1.1")).toBe(false);
   });
   it("rejects link-local", () => {
-    expect(isPublicAddress("169.254.169.254")).toBe(false); // cloud metadata
+    expect(isPublicAddress("169.254.169.254")).toBe(false);
     expect(isPublicAddress("169.254.0.1")).toBe(false);
   });
   it("rejects multicast", () => {
@@ -48,17 +39,16 @@ describe("isPublicAddress", () => {
     expect(isPublicAddress("0.0.0.0")).toBe(false);
   });
   it("rejects reserved/documentation ranges", () => {
-    expect(isPublicAddress("240.0.0.1")).toBe(false); // class E reserved
-    expect(isPublicAddress("203.0.113.1")).toBe(false); // TEST-NET-3 doc
-    expect(isPublicAddress("198.51.100.1")).toBe(false); // TEST-NET-2 doc
-    expect(isPublicAddress("192.0.2.1")).toBe(false); // TEST-NET-1 doc
+    expect(isPublicAddress("240.0.0.1")).toBe(false);
+    expect(isPublicAddress("203.0.113.1")).toBe(false);
+    expect(isPublicAddress("198.51.100.1")).toBe(false);
+    expect(isPublicAddress("192.0.2.1")).toBe(false);
   });
   it("rejects IPv6 loopback and link-local", () => {
     expect(isPublicAddress("::1")).toBe(false);
     expect(isPublicAddress("fe80::1")).toBe(false);
   });
   it("rejects IPv4-mapped IPv6 of a private address", () => {
-    // ::ffff:127.0.0.1 must be classified via the embedded IPv4 (loopback).
     expect(isPublicAddress("::ffff:127.0.0.1")).toBe(false);
     expect(isPublicAddress("::ffff:10.0.0.1")).toBe(false);
     expect(isPublicAddress("::ffff:169.254.169.254")).toBe(false);
@@ -77,15 +67,6 @@ describe("isPublicAddress", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Connection-bound DNS: the validating lookup is the resolver undici's socket
-// uses. Tested directly with an injected resolver (deterministic, no network):
-// it must block any private answer, block mixed answer sets, and allow only
-// all-public answers.
-// ---------------------------------------------------------------------------
-
-/** Promisify the node-style callback signature makeValidatingLookup returns,
- * in the single-address form (all:false / absent). */
 async function runLookup(
   lookup: ReturnType<typeof makeValidatingLookup>,
   hostname: string,
@@ -101,7 +82,6 @@ async function runLookup(
   });
 }
 
-/** Promisify the lookup in the all:true form (what undici actually requests). */
 async function runLookupAll(
   lookup: ReturnType<typeof makeValidatingLookup>,
   hostname: string,
@@ -125,7 +105,6 @@ describe("makeValidatingLookup (connection-bound DNS)", () => {
     const { err, address } = await runLookup(lookup, "anything.test");
     expect(err).not.toBeNull();
     expect(err?.code).toBe("ECONNREFUSED");
-    // No address is returned to the socket: it cannot connect.
     expect(address).toBe("");
   });
 
@@ -170,9 +149,6 @@ describe("makeValidatingLookup (connection-bound DNS)", () => {
   });
 
   it("returns the array form when called with all:true (undici's actual shape)", async () => {
-    // undici invokes connect.lookup with { all: true }, whose callback contract
-    // is callback(err, addresses[]). Returning the single-address form here
-    // breaks every DNS-hostname fetch with "Invalid IP address: undefined".
     const lookup = makeValidatingLookup(resolverFor(["8.8.8.8", "1.1.1.1"]));
     const { err, addresses } = await runLookupAll(lookup, "public.test");
     expect(err).toBeNull();
@@ -186,34 +162,18 @@ describe("makeValidatingLookup (connection-bound DNS)", () => {
     const lookup = makeValidatingLookup(resolverFor(["8.8.8.8", "127.0.0.1"]));
     const { err, addresses } = await runLookupAll(lookup, "mixed.test");
     expect(err?.code).toBe("ECONNREFUSED");
-    // On error the lookup returns no address array (the second arg is unused).
     expect(Array.isArray(addresses)).toBe(false);
   });
 });
 
-// ---------------------------------------------------------------------------
-// DNS lookup deadline: defaultResolver must fail fast when getaddrinfo hangs,
-// so no DNS work outlives the request (undici does not wire the AbortSignal to
-// the lookup phase). We can't easily hang the real getaddrinfo, so assert the
-// resolver rejects promptly for an already-failing lookup with the coded error.
-// ---------------------------------------------------------------------------
-
 describe("defaultResolver deadline", () => {
   it("rejects (does not hang) when the underlying lookup fails", async () => {
-    // A domain that will not resolve -> getaddrinfo fails fast rather than
-    // hanging. The point is that the resolver surfaces a rejection (coded),
-    // which makeValidatingLookup forwards, instead of lingering indefinitely.
     await expect(
       defaultResolver("nonexistent.invalid.local.test"),
     ).rejects.toThrow();
   });
 });
 
-// ---------------------------------------------------------------------------
-// HTTP policy via injected MockAgent dispatcher (deterministic, no network).
-// ---------------------------------------------------------------------------
-
-/** Configure a MockAgent and return it as the injected dispatcher. */
 function mockDispatcher(): MockAgent {
   const agent = new MockAgent();
   agent.disableNetConnect();
@@ -318,10 +278,6 @@ describe("safeFetch HTTP policy", () => {
 
   it("rejects on the fourth redirect (boundary: third hop allowed)", async () => {
     const agent = mockDispatcher();
-    // Hops: a(302)->b(302)->c(302)->d(302)->e. maxRedirects=3 means after the
-    // initial request up to 3 redirects are followed; the 4th redirect (d->e)
-    // must be rejected. Initial to a is hop 0; a->b (1), b->c (2), c->d (3),
-    // then d responds 302 again which is the 4th redirect -> limit.
     const setRedirect = (host: string, target: string) => {
       agent
         .get(host)
@@ -414,8 +370,6 @@ describe("safeFetch HTTP policy", () => {
   });
 
   it("normalizes content type case-insensitively (RFC 9110)", async () => {
-    // A server may send "Text/HTML"; call-site predicates match lowercase, so
-    // the fetcher must lowercase the header before invoking the predicate.
     const agent = mockDispatcher();
     agent
       .get("http://a.test")
@@ -490,8 +444,6 @@ describe("safeFetch HTTP policy", () => {
   });
 
   it("reports a body under the cap as whole, not truncated", async () => {
-    // The flag must distinguish a short page from a cut one: a caller that
-    // refuses truncated reads would otherwise throw away every small page.
     const agent = mockDispatcher();
     agent
       .get("http://a.test")
@@ -555,16 +507,11 @@ describe("safeFetch HTTP policy", () => {
   });
 
   it("returns timeout (not a successful truncated result) when the deadline fires while draining overflow in truncate mode", async () => {
-    // A body whose first chunk exceeds maxBytes (triggering the truncate
-    // branch) and whose dump() outlives the deadline. safeDump swallows the
-    // abort, so without the post-dump signal.aborted re-check the caller
-    // would get a successful ok:true result instead of a timeout.
     const slowDumpBody = {
       async *[Symbol.asyncIterator]() {
         yield Buffer.alloc(200);
       },
       async dump() {
-        // Drain takes longer than the 100ms deadline.
         await new Promise((r) => setTimeout(r, 400));
       },
     };
@@ -612,17 +559,6 @@ describe("safeFetch HTTP policy", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// IP-literal SSRF: Node's net.connect does NOT call connect.lookup for IP
-// literals, so http://127.0.0.1/ would bypass the validating DNS lookup and
-// connect straight to loopback. assertHostAllowed classifies IP-literal hosts
-// before the request. These tests use a RECORDING dispatcher and assert
-// request() is NEVER called, proving the block happens before dispatch, not
-// as a side effect of the dispatcher refusing the connection.
-// ---------------------------------------------------------------------------
-
-/** A dispatcher that records whether request() was ever invoked. Any call
- * means the SSRF gate FAILED to block the URL before dispatch. */
 function recordingDispatcher(): {
   dispatcher: Dispatcher;
   called: () => boolean;
@@ -683,9 +619,6 @@ describe("safeFetch IP-literal SSRF block", () => {
   });
 
   it("rejects IPv6 loopback literal before dispatch (bracket stripping)", async () => {
-    // Regression: URL.hostname returns "[::1]" with brackets; ipaddr.parse
-    // rejects the bracketed form, so without bracket stripping this bypassed
-    // the gate entirely and reached dispatch.
     const rec = recordingDispatcher();
     const result = await safeFetch("http://[::1]/", {
       timeoutMs: 2000,
@@ -733,22 +666,12 @@ describe("safeFetch IP-literal SSRF block", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Timeout: a dispatcher that never responds must still time out under the
-// single total deadline.
-// ---------------------------------------------------------------------------
-
 describe("safeFetch timeout", () => {
   it("times out when the server never responds", async () => {
-    // A dispatcher that accepts the request but never replies, simulating a
-    // hung server. The single total deadline must still fire.
     const hangingDispatcher: Dispatcher = {
       request() {
-        return new Promise(() => {
-          /* never resolves */
-        });
+        return new Promise(() => {});
       },
-      // The Dispatcher interface requires a few members; stub them.
       dispatch() {
         return false;
       },
@@ -773,23 +696,13 @@ describe("safeFetch timeout", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Secret leakage: a blocked or rejected fetch must never include query-string
-// secrets (e.g. the SerpAPI key) in its result.
-// ---------------------------------------------------------------------------
-
 describe("secret leakage", () => {
   it("never includes a query-string API key in a blocked-fetch result code", async () => {
-    // A SerpAPI-style URL carries the key in the query. When the fetch is
-    // blocked (here by an unreachable host via a hanging dispatcher), the
-    // result must encode only a policy code and never the secret.
     const SECRET = "AKIAFAKEKEY1234567890";
     const url = `https://serpapi.com/search?q=test&api_key=${SECRET}`;
     const hangingDispatcher: Dispatcher = {
       request() {
-        return new Promise(() => {
-          /* never resolves */
-        });
+        return new Promise(() => {});
       },
     } as unknown as Dispatcher;
     const result = await safeFetch(url, {
@@ -798,7 +711,6 @@ describe("secret leakage", () => {
       dispatcher: hangingDispatcher,
     });
     expect(result.ok).toBe(false);
-    // The entire result object must be free of the secret.
     expect(JSON.stringify(result)).not.toContain(SECRET);
     if (!result.ok) {
       expect(result.code).toBe("timeout");
@@ -826,10 +738,6 @@ describe("secret leakage", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// decodeWithContentType: charset-aware decoding
-// ---------------------------------------------------------------------------
-
 describe("decodeWithContentType", () => {
   it("decodes as UTF-8 when no charset is declared", () => {
     const text = "héllo wörld";
@@ -844,16 +752,14 @@ describe("decodeWithContentType", () => {
   });
 
   it("decodes ISO-8859-1 when charset is declared", () => {
-    // 0xe9 is é in ISO-8859-1
-    const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]); // "héllo"
+    const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]);
     expect(decodeWithContentType(bytes, "text/html; charset=iso-8859-1")).toBe(
       "héllo",
     );
   });
 
   it("decodes Windows-1252 when charset is declared", () => {
-    // 0x92 is a curly apostrophe in Windows-1252
-    const bytes = new Uint8Array([0x73, 0x92]); // s + right single quote
+    const bytes = new Uint8Array([0x73, 0x92]);
     const decoded = decodeWithContentType(
       bytes,
       "text/html; charset=windows-1252",
@@ -862,12 +768,10 @@ describe("decodeWithContentType", () => {
   });
 
   it("maps the Windows-1252 C1 range with the WHATWG table on every Node version", () => {
-    // 0x93/0x94 are the curly double quotes, 0x80 is the euro sign.
     const bytes = new Uint8Array([0x93, 0x68, 0x69, 0x94, 0x20, 0x80, 0x35]);
     expect(
       decodeWithContentType(bytes, "text/html; charset=windows-1252"),
     ).toBe("\u201chi\u201d \u20ac5");
-    // The five bytes the standard leaves unmapped decode to themselves.
     const unmapped = new Uint8Array([0x81, 0x8d, 0x8f, 0x90, 0x9d]);
     expect(
       decodeWithContentType(unmapped, "text/html; charset=windows-1252"),
@@ -875,7 +779,6 @@ describe("decodeWithContentType", () => {
   });
 
   it("treats ISO-8859-1 and its aliases as Windows-1252, as browsers do", () => {
-    // 0x92 in a page declared ISO-8859-1 is almost always a Windows-1252 apostrophe.
     const bytes = new Uint8Array([0x73, 0x92, 0xe9]);
     for (const label of ["iso-8859-1", "latin1", "cp1252", "ISO-8859-1"]) {
       expect(decodeWithContentType(bytes, `text/html; charset=${label}`)).toBe(
@@ -886,7 +789,6 @@ describe("decodeWithContentType", () => {
 
   it("falls back to UTF-8 for an unsupported charset", () => {
     const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]);
-    // Non-existent charset: should fall back to UTF-8 without throwing.
     expect(() =>
       decodeWithContentType(bytes, "text/html; charset=fake-charset"),
     ).not.toThrow();

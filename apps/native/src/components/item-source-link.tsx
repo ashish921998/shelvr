@@ -36,7 +36,6 @@ type Props = {
     | StyleProp<ViewStyle>
     | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
   textStyle?: StyleProp<TextStyle>;
-  // Replaces the default open, for a caller that wraps it.
   onPress?: () => void;
 };
 
@@ -59,7 +58,6 @@ export function ItemSourceLink({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={t("item.openSite", { site })}
-      // A single text line is ~18pt tall; the slop lifts the target to 48.
       hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
       style={style}
       onPress={onPress ?? (() => openItemSource(item))}

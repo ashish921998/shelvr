@@ -65,7 +65,6 @@ describe("usePlaceVisits", () => {
     act(() => result.current.toggle(tigre));
 
     expect(result.current.isVisited(tigre)).toBe(true);
-    // The same place spelled another way is the same visit.
     expect(result.current.isVisited(place("TIGRE"))).toBe(true);
     expect(mocks.setVisited).toHaveBeenCalledWith({
       itemId: tigre.itemId,
@@ -156,7 +155,6 @@ describe("useMakePlan", () => {
           area: "Baixa",
           why: "Seafood",
           itemId: "item" as Id<"items">,
-          // Marked "We went" earlier, so the deck shows it as visited.
           been: true,
         },
       ],
@@ -172,7 +170,6 @@ describe("useMakePlan", () => {
     expect(result.current.state).toMatchObject({ places: shared.places });
     expect(mocks.makePlan).not.toHaveBeenCalled();
 
-    // A new plan is the owner's call.
     mocks.makePlan.mockResolvedValue({
       places: [place("Alpha")],
       considered: 3,
@@ -247,7 +244,6 @@ describe("usePlanPicker", () => {
     spinToEnd();
     expect(result.current.pickedPlace?.name).toBe("Alpha");
 
-    // The same index now points at another place: it must not carry over.
     rerender({ places: [place("Beta"), place("Alpha")], planId: 2 });
     expect(result.current.picked).toBeNull();
     expect(result.current.pickedPlace).toBeNull();
@@ -269,20 +265,17 @@ describe("usePlanPicker", () => {
     });
     expect(result.current.isSpinning).toBe(true);
 
-    // Retry: the plan goes back to loading.
     rerender({ planId: null });
     expect(vi.getTimerCount()).toBe(0);
     expect(result.current.isSpinning).toBe(false);
     spinToEnd();
     expect(onPicked).not.toHaveBeenCalled();
 
-    // The next plan can be picked from straight away.
     rerender({ planId: 2 });
     act(() => result.current.pickForMe());
     spinToEnd();
     expect(onPicked).toHaveBeenCalledTimes(1);
     expect(result.current.picked).not.toBeNull();
-    // The deck brings the dealt card to the top by its index.
     expect(onPicked).toHaveBeenCalledWith(result.current.picked);
   });
 
@@ -390,7 +383,6 @@ describe("usePlanAsk", () => {
 
     expect(mocks.setVisited).not.toHaveBeenCalled();
     expect(mocks.share.mock.calls[0][0].message).toContain("/p/open");
-    // A cancelled sheet is not a send and says nothing.
     expect(mocks.capture).not.toHaveBeenCalledWith("plan_asked", {
       place_count: 2,
     });

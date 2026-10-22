@@ -9,29 +9,10 @@ import { formattingLocale, t } from "@/lib/i18n";
 import { getPurchases } from "@/lib/revenuecat-module";
 import { restoreFoundAccess } from "@/lib/paywall-result";
 
-/**
- * The paywall funnel's in-session memory and RevenueCat context reads.
- *
- * A purchase is observed in one place (the sheet's promise), the entitlement
- * row it should produce in another (the Convex query), and a blocked action's
- * later completion in a third (whichever component mounted the guard). This
- * module is the one home for that state, so the funnel reads as one story
- * instead of three loose globals scattered through `entitlement.ts`. All of
- * it is in-session, one action deep, and dropped on sign-out.
- */
-
-// ---------------------------------------------------------------------------
-// Entitlement activation
-// ---------------------------------------------------------------------------
-
-/** The entitled statuses an `entitlement_activated` event may report. */
 type ActiveEntitlementStatus = "trialing" | "pro" | "lifetime";
 
-/** A purchase or restore that succeeded in this session and is waiting for
- * the Convex entitlement row to show it. */
 let pendingAccess: { source: "purchase" | "restore"; at: number } | null = null;
 
-/** The entitled status the client currently sees, or null. */
 let activeEntitlementStatus: ActiveEntitlementStatus | null = null;
 
 function captureEntitlementActivation(
@@ -46,10 +27,6 @@ function captureEntitlementActivation(
   });
 }
 
-/** Records a purchase or restore that just succeeded natively, so its
- * `entitlement_activated` event fires when the Convex entitlement row becomes
- * visible. The webhook can win the race with the native promise. When it
- * does, the row is already visible and the event fires immediately. */
 export function recordAccess(source: "purchase" | "restore"): void {
   const at = Date.now();
   if (activeEntitlementStatus !== null) {
@@ -59,19 +36,10 @@ export function recordAccess(source: "purchase" | "restore"): void {
   pendingAccess = { source, at };
 }
 
-/** True when the client already sees an entitled status, so a Profile restore
- * that finds an active entitlement has nothing new to report. */
 export function hasActiveEntitlement(): boolean {
   return activeEntitlementStatus !== null;
 }
 
-/**
- * Fires `entitlement_activated` once per recorded purchase or restore: the
- * RevenueCat webhook has written the Convex `subscriptions` row and the
- * client's query now shows it. A purchase whose query update raced the native
- * promise is captured by `recordAccess` instead. Mount once beside the
- * entitlement query (in `useEntitlementSync`).
- */
 export function useEntitlementActivation(
   activeStatus: ActiveEntitlementStatus | null,
 ): void {
@@ -84,35 +52,20 @@ export function useEntitlementActivation(
   }, [activeStatus]);
 }
 
-/** Drops every funnel memory. The memory belongs to the account that earned
- * it: a sign-out or account change must never report one person's purchase as
- * the next person's activation. */
 export function forgetPaywallFunnel(): void {
   pendingAccess = null;
   blockedAction = null;
   activeEntitlementStatus = null;
 }
 
-// ---------------------------------------------------------------------------
-// Blocked actions
-// ---------------------------------------------------------------------------
-
-/** The gated action a paywall call did not complete, so its later completion
- * through the guard can be measured. In-session only, and one action deep: a
- * new block replaces it. */
 let blockedAction: {
   placement: string;
   at: number;
   purchased: boolean;
 } | null = null;
 
-/** A blocked action older than this no longer counts as resumed: the person
- * came back for their own reasons, not to finish the blocked step. */
 const BLOCKED_ACTION_RESUME_MS = 30 * 60_000;
 
-/** Records that a paywall at `placement` blocked a gated action, and whether
- * the sheet resolved in a purchase or restore before the caller got control
- * back. */
 export function recordBlockedAction(
   placement: string,
   purchased: boolean,
@@ -120,8 +73,6 @@ export function recordBlockedAction(
   blockedAction = { placement, at: Date.now(), purchased };
 }
 
-/** Reports a gated action that later went through after a paywall block at
- * the same placement, then clears the memory: one resumed event per block. */
 export function resumeBlockedAction(placement: string): void {
   const blocked = blockedAction;
   if (blocked === null || blocked.placement !== placement) return;
@@ -135,26 +86,14 @@ export function resumeBlockedAction(placement: string): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Paywall context reads
-// ---------------------------------------------------------------------------
-
-/** The SDK's intro-eligibility enum, reached through the lazy module handle
- * so this module keeps no static import of the native package. */
 type IntroEligibilityStatuses = NonNullable<
   ReturnType<typeof getPurchases>
 >["INTRO_ELIGIBILITY_STATUS"];
 
-/** Folds the offering's per-product intro-eligibility answers into the one
- * bounded word the funnel reports: any eligible product makes the offering
- * eligible; an offering where every answer says no intro offer exists reports
- * `no_intro`; any ineligible answer reports `ineligible`; anything else,
- * missing answers included, reports `unknown`. */
 function foldTrialEligibility(
   statuses: (number | undefined)[],
   intro: IntroEligibilityStatuses,
 ): TrialEligibility {
-  // An offering with no products has no answer to fold.
   if (statuses.length === 0) return "unknown";
   if (statuses.includes(intro.INTRO_ELIGIBILITY_STATUS_ELIGIBLE)) {
     return "eligible";
@@ -173,10 +112,6 @@ function foldTrialEligibility(
   return "unknown";
 }
 
-/** Reads the paywall context from RevenueCat's caches. Both calls are cache
- * reads in practice, but one shared timeout caps the worst case so a cold SDK
- * can never hold the sheet open for them. Each part is empty when its read
- * fails: the events carry no guess. */
 const PAYWALL_CONTEXT_TIMEOUT_MS = 2_000;
 
 export async function readPaywallContext(): Promise<PaywallContext> {
@@ -201,25 +136,11 @@ export async function readPaywallContext(): Promise<PaywallContext> {
   return { offering_id: offering.identifier, ...eligibility };
 }
 
-/** The offering shown instead of the current one to someone who has already
- * used their free trial. The current offering's early pages promise the
- * trial, and RevenueCat can only check trial eligibility on the last page, so
- * those pages would make that promise to a person who pays today. This one
- * keeps every trial line on its plans page, where it follows eligibility. */
 export const NO_TRIAL_OFFERING_ID = "weekly_annual_draft";
 
-/** The offering the paywall is about to show and the free trial on it, so the
- * timeline dates describe the plan being sold. Call it once RevenueCat
- * identity sync is ready (offerings can be targeted per account) and present
- * the returned offering, so the sheet and its labels come from one snapshot.
- * Empty when the read fails or stalls: the sheet then resolves its own
- * offering and shows its dashboard defaults. */
 export async function readPaywallOffering(): Promise<{
   offering?: import("react-native-purchases").PurchasesOffering;
   trial?: TrialPeriod;
-  /** The trial answer read here, after identity sync, when one was read.
-   * Fresher than the early read that started before sync, which can fail
-   * on a cold sign-in, so the sheet's variables and events prefer it. */
   eligibility?: TrialEligibility;
 }> {
   const rc = getPurchases();
@@ -235,8 +156,6 @@ export async function readPaywallOffering(): Promise<{
   const noTrial = offerings.all[NO_TRIAL_OFFERING_ID];
   if (noTrial && noTrial.identifier !== current.identifier) {
     const ids = products.map((product) => product.identifier);
-    // Its own bounded read: a failed or stalled answer counts as unknown, so
-    // the current offering keeps its dates and price instead of losing them.
     const { eligibility } = await withTimeout(
       rc.checkTrialOrIntroductoryPriceEligibility(ids).then((answers) => ({
         eligibility: foldTrialEligibility(
@@ -246,8 +165,6 @@ export async function readPaywallOffering(): Promise<{
       })),
       Math.max(0, PAYWALL_CONTEXT_TIMEOUT_MS - (Date.now() - startedAt)),
     );
-    // Only a definite "no" switches: an unknown answer keeps the paywall
-    // the dashboard chose.
     if (eligibility === "ineligible") return { offering: noTrial, eligibility };
     return {
       offering: current,
@@ -261,10 +178,6 @@ export async function readPaywallOffering(): Promise<{
   };
 }
 
-/** Every `{{ custom.* }}` value the main paywall reads: the trial timeline
- * when the trial length is known, and the opener's `trial_offer` line.
- * Undefined when there is nothing to fill, so the sheet keeps its dashboard
- * defaults. */
 export function paywallVariables(
   now: number,
   trial: TrialPeriod | undefined,
@@ -285,11 +198,6 @@ type TrialOfferProduct = {
   introPrice: { price: number } | null;
 };
 
-/** The paywall opener's "Start for $0.00, then $39.99/year." line, filled
- * into `{{ custom.trial_offer }}`. Only for someone the store says can still
- * take the trial, and only from a yearly plan that has one, so the opener never
- * offers $0.00 the plan screen won't. Empty otherwise, like the dashboard
- * default, so a build that passes nothing shows no line. */
 export function trialOfferVariables(
   products: TrialOfferProduct[],
   eligibility: TrialEligibility | undefined,
@@ -306,9 +214,6 @@ export function trialOfferVariables(
   return { trial_offer: { type: "string", value } };
 }
 
-/** The free trial the offering's packages share. The paywall has one trial
- * timeline, so packages that disagree on the length leave it undated rather
- * than dating it from the wrong plan. */
 export function singleTrialPeriod(
   products: {
     introPrice: {
@@ -330,8 +235,6 @@ export function singleTrialPeriod(
     : undefined;
 }
 
-/** Resolves to `{}` when `read` rejects or outlasts `ms`, so a stalled SDK
- * call can never hold up the paywall flow for a telemetry property. */
 async function withTimeout<T extends object>(
   read: Promise<T>,
   ms: number,
@@ -351,10 +254,6 @@ async function withTimeout<T extends object>(
   }
 }
 
-/** The store product behind the now-active entitlement, read right after a
- * purchase or restore resolves. Best-effort: the customer info is fresh at
- * that moment, but a slow refresh resolves to no `product_id` rather than a
- * guess. */
 export async function activeProductId(): Promise<{ product_id?: string }> {
   const rc = getPurchases();
   if (!rc) return {};
@@ -365,8 +264,6 @@ export async function activeProductId(): Promise<{ product_id?: string }> {
       ? { product_id: entitlement.productIdentifier }
       : {};
   };
-  // Bounded: the purchase result waits on this read before it reaches the
-  // caller, so a stalled SDK call must not hold up the unlocked action.
   return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
 }
 
@@ -382,6 +279,5 @@ export async function restoreCameBackEmpty(): Promise<boolean> {
   const read = async (): Promise<{ empty?: boolean }> => ({
     empty: !restoreFoundAccess(await rc.getCustomerInfo()),
   });
-  // Bounded for the same reason as `activeProductId`.
   return (await withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS)).empty === true;
 }

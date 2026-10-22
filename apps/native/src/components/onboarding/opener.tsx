@@ -8,16 +8,10 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// The collage never shrinks below this. When the headline pushes it past the
-// screen, the step scrolls instead.
 const COLLAGE_MIN_HEIGHT = 220;
 
-// Below this much room above the footer, the pinned scroll area is too small
-// to read, so the footer joins the scrolling content instead.
 const SCROLL_MIN_HEIGHT = 160;
 
-// Sample saves for the collage. The photos are generated for the app, so they
-// carry no licensing or brand questions.
 type Tile =
   | {
       kind: "link";
@@ -100,22 +94,13 @@ export function OpenerStep({
   onSignIn: () => void;
 }) {
   useAppLocale();
-  // At the accessibility sizes the pinned footer would leave only a sliver to
-  // scroll the headline in, so the sign-in link moves up under the headline
-  // and the Pro line stacks instead of squeezing beside its pill.
   const largeText = useLargeText();
   const [height, setHeight] = useState(0);
   const [footHeight, setFootHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
   const [collageTop, setCollageTop] = useState(0);
-  // On a small phone at the largest sizes the footer alone can take most of
-  // the screen. Then everything scrolls together, footer last, so nothing
-  // ends up out of reach.
   const footScrolls =
     height > 0 && footHeight > 0 && height - footHeight < SCROLL_MIN_HEIGHT;
-  // Only the largest text sizes overflow. Everywhere else the content is
-  // pinned to the viewport, so the collage fills the gap and its fade shows,
-  // exactly as before this step could scroll.
   const overflows =
     footScrolls || (viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport);
 

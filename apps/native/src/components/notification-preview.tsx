@@ -5,10 +5,6 @@ import { StyleSheet } from "react-native-unistyles";
 
 const APP_ICON = require("../../assets/icon.png");
 
-/**
- * A lock-screen style mock of a Shelvr notification. Defaults to the Sunday
- * weekly shelf.
- */
 export function NotificationPreview({
   body,
   title,

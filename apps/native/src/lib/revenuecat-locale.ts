@@ -14,8 +14,6 @@ const REVENUECAT_LOCALES: Record<SupportedLocale, string> = {
   "pt-BR": "pt-BR",
 };
 
-/** Match the app's supported language instead of an unsupported device language.
- * Store prices/currency still come from the user's storefront. */
 export function revenueCatLocale(): string {
   return REVENUECAT_LOCALES[currentLocale()];
 }

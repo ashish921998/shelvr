@@ -1,25 +1,4 @@
 #!/usr/bin/env node
-// Reports when the native fingerprint differs between two git refs.
-//
-// app.json pins the runtime version to the fingerprint policy, so an OTA
-// update only reaches installs whose store build shares its fingerprint. A
-// dependency or config change that moves the fingerprint strands every OTA
-// published from main until a new store build ships, and nothing in the
-// diff says so. This guard exports both refs to a temp dir, installs each
-// from its own lockfile, computes the fingerprint per platform in one
-// environment, and lists every source that differs.
-//
-// On a pull request it runs with --warn-only and never fails the check. A
-// native change is a legitimate thing to merge, and merging it harms nobody.
-// Publishing an update that no released binary can accept is what does, so
-// tools/verify-ota-compatibility.mjs enforces compatibility inside the OTA
-// workflow instead, against the build users actually have.
-//
-// An intended move is acknowledged with a git trailer on a commit in
-// base..head, in the message's trailer block:
-//
-//   Native-Fingerprint: changed
-//
 // Usage: node tools/verify-native-fingerprint.mjs <base-ref> [head-ref] [--warn-only]
 
 import { execFileSync } from "node:child_process";
@@ -131,8 +110,6 @@ function short(sha) {
   return sha.slice(0, 7);
 }
 
-/** Drift never fails the check under --warn-only, so the pull request sees an
- * early warning and the OTA workflow keeps the enforcing verdict. */
 export function exitCode({ drifted, acknowledged, warnOnly }) {
   return drifted && !acknowledged && !warnOnly ? 1 : 0;
 }

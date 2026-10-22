@@ -5,8 +5,6 @@ export const APP_STORE_URL = `https://apps.apple.com/app/id${APP_STORE_ID}`;
 const CAMPAIGN_MAX = 40;
 const CAMPAIGN_STORAGE_KEY = "shelvr_campaign";
 
-/** Lowercase letters, digits, `_` and `-` only, so a campaign read from a URL
- * can never carry arbitrary text into the store link or analytics. */
 export function sanitizeCampaign(value: string | null | undefined) {
   const clean = (value ?? "")
     .trim()
@@ -17,14 +15,8 @@ export function sanitizeCampaign(value: string | null | undefined) {
   return clean || undefined;
 }
 
-/**
- * The campaign a visitor arrived with: `ct` (an App Store campaign token) or
- * `utm_campaign` on the landing URL. It is kept for the browser session, so a
- * creator's link still counts after the visitor clicks around the site.
- */
 export function arrivalCampaign(search: string): string | undefined {
   const params = new URLSearchParams(search);
-  // An empty or unusable `ct` must not hide a valid `utm_campaign`.
   const fromUrl =
     sanitizeCampaign(params.get("ct")) ??
     sanitizeCampaign(params.get("utm_campaign"));

@@ -14,23 +14,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useUnistyles } from "react-native-unistyles";
 
-// Shelvr's loaders. The splash sews saves onto a shelf with a thread and ends
-// on a row of stitches; every later wait picks up the same thread. Three
-// sizes: the S sewing itself for a whole screen (`stitch-mark.tsx`, kept apart
-// because it needs Skia), a ring of stitches in place of a small spinner, and
-// three stitches sewing in a row inside a button.
-// With Reduce Motion on, each one holds its finished, still frame.
-
-/**
- * Where each loader's clock rests under Reduce Motion: every one is fully
- * sewn and not yet fading by this point of its loop.
- */
 const STILL_FRAME = 0.75;
 
-/**
- * A 0 → 1 clock that loops for as long as the loader is on screen. Pass a
- * module-level `easing`: a new function on each render restarts the loop.
- */
 export function useLoop(period: number, easing = Easing.linear) {
   const reducedMotion = useReducedMotion();
   const progress = useSharedValue(reducedMotion ? STILL_FRAME : 0);
@@ -59,10 +44,6 @@ export function useLoop(period: number, easing = Easing.linear) {
   return progress;
 }
 
-/**
- * The default stitch color. On light paper the brand amber is too faint for a
- * small loader, so light mode sews in the deeper amber the app uses for text.
- */
 function useStitchTint(color: string | undefined) {
   const { theme, rt } = useUnistyles();
   if (color) return color;
@@ -73,10 +54,6 @@ function useStitchTint(color: string | undefined) {
 
 const RING_STITCHES = 8;
 
-/**
- * A ring of stitches turning in place, brightest at its leading stitch. Drop-in
- * for a small `ActivityIndicator`.
- */
 export function StitchRing({
   color,
   size = 18,
@@ -165,7 +142,6 @@ function RowStitch({
   );
 }
 
-/** Three stitches sewing left to right. For busy buttons. */
 export function StitchRow({ color }: { color?: string }) {
   const tint = useStitchTint(color);
   const progress = useLoop(1200);

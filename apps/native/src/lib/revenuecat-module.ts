@@ -1,18 +1,5 @@
 import { NativeModules } from "react-native";
 
-// ---------------------------------------------------------------------------
-// Lazy module loaders: the native modules may not be linked in Expo Go or a
-// dev build without `expo prebuild`. We check NativeModules first so require()
-// never runs (and the dev error overlay never fires) when the native side is
-// missing.
-// ---------------------------------------------------------------------------
-
-/**
- * Builds a lazy accessor for a native module: returns the module's default
- * export once it's been confirmed linked (via one of `nativeNames` on
- * NativeModules). Failed loads can be retried. The `require` lives in a
- * static thunk so Metro can statically discover and bundle it.
- */
 function makeLazyModule<T>(
   nativeNames: string[],
   load: () => { default: T },

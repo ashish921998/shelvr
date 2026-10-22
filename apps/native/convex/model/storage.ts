@@ -1,8 +1,7 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 
-// Storage deletion throws when the blob is already missing; cleanup sweeps
-// tolerate stale references instead of getting wedged on them.
+// Storage deletion throws when the blob is already missing.
 export async function safeDeleteStorage(
   ctx: MutationCtx,
   storageId: Id<"_storage">,

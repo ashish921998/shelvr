@@ -1,44 +1,15 @@
-// Deterministic layout for the launch animation ("thread" composition).
-//
-// A thread draws down the screen, hand-sketched saves (notes, recipes,
-// articles, photos, products) fade in scattered along it, then glide onto a
-// shelf row at the centre where each one settles into a stitch.
-//
-// Everything here is pure geometry in a fixed 390x844 design space, generated
-// from one seeded RNG so the scatter is identical on every launch and on every
-// device (the renderer scales the whole composition to the real screen). No
-// Skia or React imports: the shapes are described as primitives and turned into
-// paths once, at mount, by `components/splash/thread-canvas.tsx`.
-
-/**
- * Width of the 390x844 design space the composition is authored against. The
- * renderer scales by this alone and centres on the anchor, so a taller or
- * wider screen simply shows more of the flat ground.
- */
 export const DESIGN_WIDTH = 390;
 
-/** Composition centre: the lockup sits on this point too. */
 export const CENTER_X = 195;
 export const CENTER_Y = 388;
 
-/** The shelf row the marks collect onto, and its span. */
 export const SHELF_Y = CENTER_Y + 48;
 export const SHELF_WIDTH = 240;
 
 export const MARK_COUNT = 30;
 export const DUST_COUNT = 56;
 
-/**
- * When each save appears and travels, in seconds from the start of the
- * animation. These share a clock with `components/splash/timeline.ts` and are
- * retimed with it: the ring, the mark pop and the canvas fade are all placed
- * against when the last save lands.
- *
- * `APPEAR_FROM + APPEAR_SPREAD` must stay below `TRAVEL_FROM`, or a save could
- * set off for the shelf before it has been drawn.
- */
 export const SCHEDULE = {
-  /** A save fades in over this long, wherever its `appearAt` falls. */
   appearDuration: 0.16,
   appearFrom: 0.14,
   appearSpread: 0.52,
@@ -46,15 +17,12 @@ export const SCHEDULE = {
   travelSpread: 0.26,
   travelDurationFrom: 0.36,
   travelDurationSpread: 0.12,
-  /** Dust motes twinkle in on their own stagger, ahead of the saves. */
   dustDuration: 0.18,
   dustFrom: 0.09,
   dustSpread: 0.58,
 } as const;
 
-/** Peak of the arc a mark travels through on its way to the shelf. */
 export const TRAVEL_LIFT = 26;
-/** Half-length of the stitch a mark becomes once it lands. */
 export const STITCH_HALF_WIDTH = 3.4;
 
 type SaveType = "note" | "recipe" | "article" | "photo" | "product";
@@ -67,29 +35,19 @@ const SAVE_TYPES: SaveType[] = [
   "product",
 ];
 
-/**
- * Which palette entry a mark is drawn in. Resolved to hex by the renderer so
- * the composition stays independent of the ground it is drawn on.
- */
 type InkTone = "ink" | "accent" | "cool";
 
 export type Mark = {
-  /** Scatter position in design space. */
   x: number;
   y: number;
   type: SaveType;
-  /** Half-extent of the glyph before the travel shrink. */
   size: number;
-  /** Resting tilt, unwound to 0 as the mark reaches the shelf. */
   rotation: number;
   tone: InkTone;
-  /** Seconds: fade-in start, travel start, travel duration. */
   appearAt: number;
   travelAt: number;
   travelDuration: number;
-  /** Pen-wobble seed, so no two glyphs are drawn quite alike. */
   wobble: number;
-  /** Position in the shelf row, shuffled so travel paths cross. */
   slot: number;
 };
 
@@ -102,10 +60,6 @@ export type Dust = {
 
 export type Point = readonly [number, number];
 
-/**
- * One stroke of a glyph. `polyline` covers straight runs, `arc` the bowls and
- * handles, and `quad` the steam curling off a recipe.
- */
 export type Stroke =
   | { kind: "polyline"; points: Point[]; close: boolean; heavy?: boolean }
   | { kind: "squiggle"; points: Point[] }
@@ -114,17 +68,12 @@ export type Stroke =
   | { kind: "quad"; from: Point; control: Point; to: Point };
 
 export type Composition = {
-  /** The thread, in two segments: above the centre, then below it. */
   threadAbove: Point[];
   threadBelow: Point[];
   marks: Mark[];
   dust: Dust[];
 };
 
-/**
- * Lehmer / Park-Miller generator. Small, fast, and, unlike `Math.random`,
- * reproducible, which is what keeps the scatter stable across launches.
- */
 function createRandom(seed = 7): () => number {
   let state = seed;
   return () => {
@@ -147,10 +96,6 @@ function cubicAt(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
   ];
 }
 
-/**
- * Samples a cubic into a polyline, nudging x by two out-of-phase sines so the
- * thread reads as drawn by hand rather than plotted.
- */
 function sampleThread(
   p0: Point,
   p1: Point,
@@ -169,7 +114,6 @@ function sampleThread(
   return points;
 }
 
-/** Horizontal position of the thread at a given height: the scatter's spine. */
 function threadXAt(above: Point[], below: Point[], y: number): number {
   const points = y < CENTER_Y ? above : below;
   let nearest = points[0];
@@ -179,10 +123,6 @@ function threadXAt(above: Point[], below: Point[], y: number): number {
   return nearest[0];
 }
 
-/**
- * Builds the whole composition. The RNG is consumed in a fixed order, so
- * changing or reordering any draw below reshuffles the entire scatter.
- */
 export function buildComposition(seed = 7): Composition {
   const random = createRandom(seed);
 
@@ -204,8 +144,6 @@ export function buildComposition(seed = 7): Composition {
   const marks: Mark[] = [];
   for (let i = 0; i < MARK_COUNT; i++) {
     const y = 70 + random() * 690;
-    // Three summed draws approximate a normal spread, so marks cluster near
-    // the thread and thin out towards the edges.
     const spread = (random() + random() + random() - 1.5) * 110;
     const x = Math.max(
       18,
@@ -231,8 +169,6 @@ export function buildComposition(seed = 7): Composition {
     });
   }
 
-  // Shuffle the shelf slots so marks cross on the way in instead of filing
-  // into the row in the order they appeared.
   for (let i = MARK_COUNT - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     const slot = marks[i].slot;
@@ -254,21 +190,14 @@ export function buildComposition(seed = 7): Composition {
   return { threadAbove, threadBelow, marks, dust };
 }
 
-/** Where a mark comes to rest in the shelf row. */
 export function shelfSlotX(slot: number): number {
   return CENTER_X - SHELF_WIDTH / 2 + (slot / (MARK_COUNT - 1)) * SHELF_WIDTH;
 }
 
-/**
- * The strokes of one sketched save, centred on the origin and sized by
- * `mark.size`. The pen wobble is applied by the renderer, which needs the
- * point's index along the stroke.
- */
 export function glyphStrokes(mark: Mark): Stroke[] {
   const s = mark.size;
 
   switch (mark.type) {
-    // A page with a folded corner and two scribbled lines.
     case "note":
       return [
         {
@@ -315,7 +244,6 @@ export function glyphStrokes(mark: Mark): Stroke[] {
         },
       ];
 
-    // A bowl on a stand, with two curls of steam.
     case "recipe":
       return [
         {
@@ -356,7 +284,6 @@ export function glyphStrokes(mark: Mark): Stroke[] {
         },
       ];
 
-    // A framed page: heavy heading bar, then three lines of body text.
     case "article":
       return [
         {
@@ -404,7 +331,6 @@ export function glyphStrokes(mark: Mark): Stroke[] {
         },
       ];
 
-    // A frame holding a ridge line and a sun.
     case "photo":
       return [
         {
@@ -431,7 +357,6 @@ export function glyphStrokes(mark: Mark): Stroke[] {
         { kind: "circle", cx: s * 0.55, cy: -s * 0.4, r: s * 0.16 },
       ];
 
-    // A shopping bag: tapered body under a looped handle.
     case "product":
       return [
         {
@@ -456,7 +381,6 @@ export function glyphStrokes(mark: Mark): Stroke[] {
   }
 }
 
-/** Sine-waved run of points: the scribbled "text" on a note. */
 function squiggle(
   x0: number,
   x1: number,
@@ -475,10 +399,6 @@ function squiggle(
   return points;
 }
 
-/**
- * Per-point pen wobble. Applied by index along the stroke so a straight edge
- * ripples like a drawn line instead of shifting as a rigid whole.
- */
 export function applyWobble(point: Point, index: number, seed: number): Point {
   return [
     point[0] + Math.sin(index * 2.1 + seed) * 0.45,
@@ -486,27 +406,16 @@ export function applyWobble(point: Point, index: number, seed: number): Point {
   ];
 }
 
-// The three helpers below run inside Reanimated worklets on the UI thread as
-// well as in plain JS (and in tests), so each carries the directive.
-
-/** Progress through `[from, to]`, clamped to 0..1. */
 export function span(t: number, from: number, to: number): number {
   "worklet";
   return Math.max(0, Math.min(1, (t - from) / (to - from)));
 }
 
-/** Cubic ease-in-out, matching the prototype's timing curve. */
 export function easeInOut(t: number): number {
   "worklet";
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-/**
- * Evaluates a CSS `cubic-bezier(x1, y1, x2, y2)` curve at `t`, so the lockup
- * beats keep the exact easing the design was tuned with. Solves x(u) = t by
- * Newton-Raphson, falling back to bisection where the curve is too flat for
- * the derivative to make progress.
- */
 export function cubicBezierEase(
   t: number,
   x1: number,

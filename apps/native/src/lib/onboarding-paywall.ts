@@ -10,14 +10,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ENTITLEMENT_WAIT_MS = 5000;
 
-/**
- * The paywall at the end of onboarding, after the promise step. `ask` waits
- * for the entitlement to load, then lets a Pro or signed-out account through
- * and shows everyone else the paywall once. A relaunch lands back on the promise step and
- * asks again. A paywall that could not show (RevenueCat not ready, offline)
- * was never declined: `onUnavailable` finishes without saying so, and the
- * app asks again once Home is up.
- */
 export function useOnboardingPaywall({
   onPro,
   onDecline,
@@ -31,8 +23,6 @@ export function useOnboardingPaywall({
   const { isAuthenticated } = useConvexAuth();
   const { entitled, loading } = useEntitlement();
   const [asked, setAsked] = useState(false);
-  // Offline the entitlement never loads. Past this wait the account is
-  // treated as not Pro, so the step cannot hang on a spinner.
   const [waitedOut, setWaitedOut] = useState(false);
   useEffect(() => {
     if (!asked || !loading) return;
@@ -48,8 +38,6 @@ export function useOnboardingPaywall({
   useEffect(() => {
     if (!asked || (loading && !waitedOut) || started.current) return;
     started.current = true;
-    // Skipping the first save skips sign-in too, and a purchase needs an
-    // account. The app asks for both once onboarding is done.
     if (entitled || !isAuthenticated) {
       handlers.current.onPro();
       return;

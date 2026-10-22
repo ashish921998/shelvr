@@ -7,8 +7,6 @@ import { after, test } from "node:test";
 
 import { trailerValues } from "./git-trailer.mjs";
 
-// Reading a trailer is git's job, so the test gives git real commits rather
-// than a string that only looks like one.
 const repo = realpathSync(mkdtempSync(join(tmpdir(), "git-trailer-")));
 const git = (...args) =>
   execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" });

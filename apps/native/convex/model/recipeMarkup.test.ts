@@ -200,9 +200,6 @@ describe("extractRecipeMarkup", () => {
   });
 
   it("reads a section whose itemListElement is one step rather than a list", () => {
-    // schema.org allows a single value where a list is expected. Without the
-    // unwrapping the section falls through to its own name, so the step text
-    // is replaced by the heading it sits under.
     const sectioned = {
       ...BASIC_RECIPE,
       recipeInstructions: [

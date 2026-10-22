@@ -32,11 +32,6 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/**
- * The less frequent account settings, one tap from the Profile sheet so the
- * sheet itself fits without scrolling. Restore purchases, the legal links and
- * account deletion live here; App Review expects them in the app's settings.
- */
 export default function SettingsScreen() {
   useAppLocale();
   const { session, operation } = useNotificationSession();
@@ -54,8 +49,6 @@ export default function SettingsScreen() {
     convexQuery(api.notifications.getPreferences, {}),
   );
   const { status: entitlementStatus } = useEntitlement();
-  // Deleting the account leaves a store subscription running, so a current
-  // subscriber gets a way to cancel it from the confirmation itself.
   const hasLiveSubscription =
     entitlementStatus === "trialing" || entitlementStatus === "pro";
   const { restoring, restore } = useRestorePurchases();
@@ -77,9 +70,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Closes Settings and the Profile sheet under it. A development reload or
-  // direct link can restore Profile as the stack's root, where dismissAll
-  // stops at Profile, so Home replaces it, as Profile's own close does.
   const closeAllSheets = () => {
     const profileIsRoot = navigation.getState().routes[0]?.name === "profile";
     router.dismissAll();
@@ -117,8 +107,6 @@ export default function SettingsScreen() {
         );
         return;
       }
-      // Only a saved preference is a decision. `undefined` means another
-      // session operation held the queue and this toggle changed nothing.
       if (saved === true && !enabled)
         analytics.capture("notification_disabled", { notification_kind: kind });
     } catch (error) {
@@ -149,8 +137,6 @@ export default function SettingsScreen() {
           ? [
               {
                 text: t("pro.manage"),
-                // Settings sits on the Profile sheet, and Customer Center
-                // presents only once both are gone.
                 onPress: () =>
                   void manageSubscription(() =>
                     closeScreen(navigation, closeAllSheets),
@@ -255,7 +241,6 @@ export default function SettingsScreen() {
         accessory={
           <Switch
             accessibilityLabel={t("notifications.remindersToggle")}
-            // Older backends return no field; show it off rather than guess.
             value={notificationPreferences?.remindersEnabled ?? false}
             disabled={notificationPreferences === undefined || busy}
             onValueChange={(value) =>
@@ -342,7 +327,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: {
     padding: theme.gap(3),
     paddingTop: theme.gap(4),
-    // Keeps Delete account clear of the home indicator at full height.
     paddingBottom: rt.insets.bottom + theme.gap(4),
     gap: theme.gap(1.5),
   },

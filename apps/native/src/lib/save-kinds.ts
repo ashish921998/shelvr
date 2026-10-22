@@ -1,7 +1,5 @@
 import { INTERESTS } from "@/lib/onboarding-interests";
 
-// The answers to "What do you save?". Each seeds starter spaces: the first
-// preset of every picked kind starts selected, the rest are offered as chips.
 export const SAVE_KINDS = [
   "Articles",
   "Recipes",
@@ -32,7 +30,6 @@ export const SPACE_PRESETS: Record<SaveKind, readonly string[]> = {
 const GENERIC_PRESETS = ["Read later", "Inspiration", "Wishlist"];
 const DEFAULT_GENERIC = "Read later";
 
-/** Deduped preset identities for the picked kinds, in first-seen order. */
 export function getSpacePresets(kinds: readonly SaveKind[]): string[] {
   return [
     ...new Set([
@@ -42,7 +39,6 @@ export function getSpacePresets(kinds: readonly SaveKind[]): string[] {
   ];
 }
 
-/** The spaces that start selected for the picked kinds. */
 function getDefaultSpaces(kinds: readonly SaveKind[]): string[] {
   return [
     ...new Set([
@@ -58,14 +54,10 @@ const PRESET_SPACES: ReadonlySet<string> = new Set([
   ...INTERESTS,
 ]);
 
-/** Whether a picked space is a preset identity rather than a typed name. */
 export function isPresetSpace(name: string): boolean {
   return PRESET_SPACES.has(name);
 }
 
-/** The picked spaces after `kind` is picked or unpicked. Unpicking drops only
- * the preset that picking the kind added, unless a remaining kind still offers
- * it. Spaces the user picked stay, and the setup step keeps showing them. */
 export function spacesAfterKindToggle(
   kinds: readonly SaveKind[],
   spaces: readonly string[],

@@ -8,10 +8,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type SiteItem = Parameters<typeof openItemSource>[0];
 
-/** A plain link with no picture (a shop page, most often): its site's letter,
- * or the link mark when the host has none, on the no-photo card's warm
- * surface, instead of a page that opens on bare text. Non-collapsable so the
- * card's zoom has a view to land on. */
 export function SitePanel({ url }: { url?: string }) {
   const { theme } = useUnistyles();
   const monogram = siteMonogram(url);
@@ -41,8 +37,6 @@ export function SitePanel({ url }: { url?: string }) {
   );
 }
 
-/** A plain link's main step: watch a YouTube video there, view anything else
- * on its site. The raw address stays in the "…" menu's Copy link. */
 export function SiteButton({ item }: { item: SiteItem }) {
   const site = item.siteName ?? displayHost(item.url);
   return (
@@ -60,8 +54,6 @@ export function SiteButton({ item }: { item: SiteItem }) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  // The no-photo card face, grown to a hero: the same warm surface, with the
-  // site's letter where the picture would be.
   sitePanel: {
     height: 170,
     marginHorizontal: theme.gap(2),

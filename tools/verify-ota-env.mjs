@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import origins from "../apps/native/production-origins.js";
 
-// Read only the values EAS made available, never inherited runner variables.
 const env =
   process.argv[2] === "--current"
     ? process.env

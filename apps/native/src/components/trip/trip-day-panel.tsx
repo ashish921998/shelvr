@@ -21,8 +21,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// Rows fade in 40ms apart with no overshoot. A swap reflows the list with
-// ease-in-out.
 const STAGGER_MS = 40;
 const ROW_OUT = FadeOut.duration(motion.duration.feedback).easing(
   motion.easing.out,
@@ -125,10 +123,6 @@ type Props = {
   onSelectStop: (stop: number) => void;
 };
 
-/**
- * Day tabs, the open day's heading, and its stops in order, with the meals
- * it has no saved place for shown as gaps. Switching days replays the list.
- */
 export function TripDayPanel({
   trip,
   activeDay,

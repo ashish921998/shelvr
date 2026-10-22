@@ -1,25 +1,14 @@
 import { type Infer, v } from "convex/values";
 
-// "Make a plan": one model call over a space's saved items picks a shortlist
-// of real places to go. Nothing is stored; the client holds the result. This
-// module is the pure half (bounds, prompt lines, sanitizing), so it is tested
-// without a model.
-
-/** Saved items sent to the model, newest filed first. */
 export const MAX_PLAN_ITEMS = 60;
-/** Places in a plan. */
 export const MAX_PLAN_PLACES = 5;
-/** Per-item body excerpt. Captions name the place early; the rest is noise. */
 export const PLAN_CONTENT_CHARS = 600;
 const MAX_NAME_CHARS = 80;
 export const MAX_AREA_CHARS = 60;
 export const MAX_WHY_CHARS = 140;
-/** Places marked "We went" that the claim hands the prompt, newest first. */
 export const MAX_BEEN_PLACES = 100;
-/** Longest place name a "We went" row stores. */
 export const MAX_PLACE_NAME_CHARS = MAX_NAME_CHARS;
 
-/** What the claim mutation hands the action for one saved item. */
 export const planSourceValidator = v.object({
   itemId: v.id("items"),
   title: v.optional(v.string()),
@@ -28,7 +17,6 @@ export const planSourceValidator = v.object({
   url: v.optional(v.string()),
   siteName: v.optional(v.string()),
   author: v.optional(v.string()),
-  // The `open_maps` values the classifier already attached to the save.
   places: v.array(v.string()),
 });
 
@@ -39,13 +27,11 @@ export const planPlaceValidator = v.object({
   area: v.optional(v.string()),
   why: v.string(),
   itemId: v.id("items"),
-  // The user marked this place "We went", so it is ranked last.
   been: v.optional(v.boolean()),
 });
 
 export type PlanPlace = Infer<typeof planPlaceValidator>;
 
-/** What the model returns, before sanitizing. */
 export type RawPlanPlace = {
   saveNumber: number;
   name: string;
@@ -58,7 +44,6 @@ function clip(text: string, max: number): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
 }
 
-/** One numbered prompt entry per save. */
 export function planSourceLines(sources: PlanSource[]): string {
   return sources
     .map((source, i) => {
@@ -76,7 +61,6 @@ export function planSourceLines(sources: PlanSource[]): string {
     .join("\n\n");
 }
 
-/** Lowercase letters and digits only, in any script, accents folded. */
 function squash(text: string): string {
   return text
     .normalize("NFKD")
@@ -85,14 +69,10 @@ function squash(text: string): string {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
-/** Shortest word that proves anything: 3 Latin letters, 2 in scripts like
- * Japanese or Korean, where a two-character name is common. */
 function distinctive(word: string): boolean {
   return word.length >= (/^[a-z0-9]+$/.test(word) ? 3 : 2);
 }
 
-// Words that name a kind of place, not a place. A name made only of these
-// ("the cafe") proves nothing about the save.
 const GENERIC_WORDS = new Set([
   "the",
   "and",
@@ -125,12 +105,8 @@ const GENERIC_WORDS = new Set([
   "spot",
 ]);
 
-/** What a save offers as evidence: its text squashed whole, its separate
- * words, and its handles and hashtags squashed ("@parici_cafe" is
- * "paricicafe"), which run a name together with other words. */
 type Evidence = { text: string; words: Set<string>; handles: string[] };
 
-/** Squashed words in any script; punctuation and spaces split them. */
 function splitWords(text: string): string[] {
   return text
     .split(/[^\p{L}\p{N}\p{M}]+/u)
@@ -140,8 +116,6 @@ function splitWords(text: string): string[] {
 
 const APOSTROPHES = /['\u2019\u02bc]/g;
 
-/** Words of a name, an apostrophe kept inside its word, so "McSorley's"
- * reads as "mcsorleys". */
 function wordsOf(text: string): string[] {
   return splitWords(text.replace(APOSTROPHES, ""));
 }
@@ -156,20 +130,11 @@ function evidenceOf(source: PlanSource): Evidence {
   ]
     .filter(Boolean)
     .join(" ");
-  // A pin marks a place the way a handle does ("📍dishoomlondon").
   const tagged = raw.match(/(?:[@#]|\u{1F4CD}\s*)[\p{L}\p{N}\p{M}_.]+/gu) ?? [];
-  // The author is a handle even when written without the "@", but only as a
-  // single token: a spaced name ("Smart Barista") squashed whole would let
-  // "Art Bar" match across its words.
   const author = source.author?.trim() ?? "";
-  // Kept in NFC so Korean is compared by syllable, not by letter.
   const handles = [...tagged, /\s/.test(author) ? "" : author]
     .map((handle) => squash(handle).normalize("NFC"))
     .filter(Boolean);
-  // Both readings of an apostrophe: "Lilia's" names "Lilia" and a caption's
-  // "McSorleys" names "McSorley's". A capital inside a word also starts one,
-  // so "GymkhanaLondon" and "#LondonBAO" name "Gymkhana" and "BAO", and so
-  // does a change between Latin and Japanese or Chinese ("東京でTsujihanの").
   const camel = raw
     .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
     .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
@@ -187,17 +152,11 @@ function evidenceOf(source: PlanSource): Evidence {
   return { text: squash(raw), words, handles };
 }
 
-// Scripts written without spaces between words, where a name sits inside a
-// longer run of text ("四谷のすし匠で").
 const UNSPACED_SCRIPT =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 
-// Korean spaces its words but writes particles onto them ("쵸리상경에서").
 const HANGUL = /\p{Script=Hangul}/u;
 
-/** A Korean word of the save that starts with the piece, compared syllable
- * by syllable: squashed text is decomposed into letters, where "마포" would
- * be a prefix of "마폭". */
 function hangulPrefix(piece: string, evidence: Evidence): boolean {
   const syllables = piece.normalize("NFC");
   return [...evidence.words].some((word) =>
@@ -205,11 +164,6 @@ function hangulPrefix(piece: string, evidence: Evidence): boolean {
   );
 }
 
-/** A whole word of the save; part of one of its handles, at the start
- * ("@tigrenyc"), at the end ("#londonbao") or, for a word of 4 letters or
- * more, anywhere ("@eatatlilia");
- * in Korean, the start of a word, before a particle ("쵸리상경에서"); or, in a
- * script written without spaces, anywhere in its text. */
 function saveSays(piece: string, evidence: Evidence): boolean {
   const composed = piece.normalize("NFC");
   return (
@@ -225,17 +179,6 @@ function saveSays(piece: string, evidence: Evidence): boolean {
   );
 }
 
-/**
- * True when the save names the place. The model may only pick places a save
- * names; this drops one it made up. A name made only of generic words
- * ("Cafe") describes a save, not a place, so it never grounds. Otherwise
- * every distinctive word must be something the save says (see `saveSays`),
- * so "Great pasta tonight" does not ground "Pasta Palace" and "Toronto" does
- * not ground "Oro", while "#TigreNYC" grounds "Tigre". A name may also be
- * written run together, so "@barlola_nyc" grounds "Bar Lola". A name with no
- * distinctive word ("Si Si", "Au 79") must appear word for word. A name with
- * an apostrophe is read both ways, so "L'Artusi" is "lartusi" or "artusi".
- */
 function namesPlace(name: string, evidence: Evidence): boolean {
   const spelled = name.replace(/&/g, " and ");
   return [wordsOf(spelled), splitWords(spelled)].some((words) =>
@@ -256,21 +199,16 @@ function wordsName(words: string[], evidence: Evidence): boolean {
         ))
     );
   }
-  // The whole name must still be long enough to prove anything, so a word
-  // like "Go" or "A" never grounds on its own.
   return (
     distinctive(specific.join("")) &&
     specific.every((word) => evidence.words.has(word))
   );
 }
 
-/** What identifies a place across plans: "Caffé Dante" and "caffe dante"
- * are the same visit. Empty when the name has no letters or digits. */
 export function placeKey(name: string): string {
   return squash(clip(name, MAX_NAME_CHARS));
 }
 
-/** The prompt line for places already visited, or "" when there are none. */
 export function planBeenLine(names: string[]): string {
   if (names.length === 0) return "";
   const list = names.map((name) => clip(name, MAX_NAME_CHARS)).join("; ");
@@ -281,8 +219,6 @@ export function isGrounded(name: string, source: PlanSource): boolean {
   return namesPlace(name, evidenceOf(source));
 }
 
-/** A word of an area: a whole word of the save, or a distinctive one inside
- * its squashed text ("#soho"). */
 function supportsAreaWord(word: string, evidence: Evidence): boolean {
   return (
     evidence.words.has(word) ||
@@ -290,13 +226,6 @@ function supportsAreaWord(word: string, evidence: Evidence): boolean {
   );
 }
 
-/**
- * Keep only the parts of an area the save names: it goes to Maps and shares.
- * Every word of each comma-separated part must be in the save, so "SoHo,
- * London" on a save about SoHo in New York keeps "SoHo" and never sends
- * anyone to the wrong city, and a state code ("IL") stays only when the save
- * has it as a word.
- */
 function groundedArea(area: string, evidence: Evidence): string {
   return area
     .split(",")
@@ -311,8 +240,6 @@ function groundedArea(area: string, evidence: Evidence): string {
     .join(", ");
 }
 
-// A street's type, which ends its name ("Rupert Street", "Old Kent Rd").
-// Squares and ways are left out: they name landmarks ("Times Square").
 const STREET_SUFFIXES = new Set([
   "street",
   "st",
@@ -327,15 +254,8 @@ const STREET_SUFFIXES = new Set([
   "drive",
   "dr",
 ]);
-// A street's type that comes first ("Rue Saint-Denis", "Via Roma").
 const STREET_PREFIXES = new Set(["calle", "rue", "via", "strasse"]);
 
-/**
- * True when a comma-separated part of a name reads as a street address: a
- * house number leads it ("34 Rupert Street"), or a street's type ends or
- * starts it. A number inside a name ("Bar 61") or "St" that starts one
- * ("St John's Wood") is not an address.
- */
 function isAddressPart(part: string): boolean {
   if (/^\s*\p{N}/u.test(part)) return true;
   const words = wordsOf(part);
@@ -346,12 +266,6 @@ function isAddressPart(part: string): boolean {
   );
 }
 
-/**
- * Drop a street address the model wrote into a place's name: "The Palomar,
- * 34 Rupert Street, London" becomes "The Palomar". The cut is at the first
- * comma-separated part that looks like an address, so a comma in the name
- * itself stays, and only when what is left still names the place.
- */
 function withoutAddress(name: string, evidence: Evidence): string {
   const parts = name.split(",");
   const at = parts.findIndex((part, i) => i > 0 && isAddressPart(part));
@@ -360,13 +274,7 @@ function withoutAddress(name: string, evidence: Evidence): string {
   return short !== "" && namesPlace(short, evidence) ? short : name;
 }
 
-/**
- * Keep the model's picks that point at a real save, name a place that save
- * carries, and are not repeats. Order is the model's (best first), except
- * that places in `been` (keys from `placeKey`) move to the end, tagged.
- * Each kept place comes with the pick it was made from, so a caller that
- * asked the model for more fields keeps them.
- */
+/** Keeps deduped picks that point at a real save naming the place; places in `been` go last, tagged. */
 export function sanitizePicks<T extends RawPlanPlace>(
   raw: T[],
   sources: PlanSource[],
@@ -399,15 +307,12 @@ export function sanitizePicks<T extends RawPlanPlace>(
       },
     });
   }
-  // Stable: each group keeps the model's order. Cap after ranking, so a new
-  // place is never cut for a visited one.
   return [
     ...kept.filter(({ place }) => !place.been),
     ...kept.filter(({ place }) => place.been),
   ].slice(0, limit);
 }
 
-/** `sanitizePicks` for a plan: at most `MAX_PLAN_PLACES` places. */
 export function sanitizePlan(
   raw: RawPlanPlace[],
   sources: PlanSource[],
@@ -418,8 +323,6 @@ export function sanitizePlan(
   );
 }
 
-// The model writes each reason in the app's language. Keys are the app's
-// catalog locales; anything else gets English.
 const PLAN_LANGUAGES: Record<string, string> = {
   en: "English",
   de: "German",

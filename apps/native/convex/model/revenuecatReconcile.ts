@@ -2,7 +2,6 @@ import { internal } from "../_generated/api";
 import { env, type ActionCtx } from "../_generated/server";
 import { parseRevenueCatSnapshot } from "./revenuecat";
 
-/** Authoritative events (transfer, refund, billing issue) replace local access with the current Pro entitlement. */
 export async function reconcileRevenueCatCustomers(
   ctx: ActionCtx,
   userIds: string[],

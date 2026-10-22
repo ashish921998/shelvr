@@ -111,8 +111,6 @@ export function LegalConsentPreference() {
   };
   if (reviewing)
     return <LegalConsentReview onComplete={() => setReviewing(false)} />;
-  // A SettingCard like its neighbours on Settings, so it reads as one more
-  // setting rather than loose text between the cards.
   return (
     <SettingCard
       title={t("refundConsent.setting")}
@@ -132,8 +130,6 @@ export function LegalConsentPreference() {
         onPress: () =>
           consent?.refundSharing ? void turnOff() : setReviewing(true),
       }}
-      // Each message stays its own translated sentence on its own line, and
-      // a failed withdrawal still shows a sync the server reports as pending.
       note={
         [
           failed ? t("refundConsent.error") : null,

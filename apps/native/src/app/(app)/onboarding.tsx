@@ -65,8 +65,6 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
 };
 const READING_PROGRESS = 0.625;
 
-// A share that arrived mid-onboarding and was not the demo save is still held
-// by expo-sharing. Flagging it lets the share screen pick it up in the app.
 function holdIncomingShare() {
   try {
     if (getSharedPayloads().length > 0) markPendingShareOnDevice();
@@ -75,10 +73,6 @@ function holdIncomingShare() {
   }
 }
 
-// Saving is Pro, so the practice link of someone who closed the paywall is
-// let go. Left held, the share screen would ask for Pro again in the app.
-// expo-sharing clears every held share at once, so the held batch is read
-// here and cleared only when it is the practice link and nothing else.
 function dropPracticeShare(practiceUrl: string | undefined) {
   try {
     if (practiceUrl === undefined) return;
@@ -107,7 +101,6 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
-  // Restored so a relaunch on the reminder step still offers to remind.
   const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
@@ -117,8 +110,6 @@ export default function OnboardingScreen() {
     (back: (() => void) | null) => setDemoBack(() => back),
     [],
   );
-  // The save a relaunch left unfinished is resumed once. Leaving the demo
-  // step either way drops it, so coming back starts from the picker.
   const [resumeDemo, setResumeDemo] = useState(() =>
     initialStep === "demo" ? initialProgress.demo : null,
   );
@@ -131,7 +122,6 @@ export default function OnboardingScreen() {
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
-  // A picked topic is a picked space, so the topics need no state of their own.
   const interests = spaces.filter(isInterest);
 
   useEffect(() => {
@@ -142,7 +132,6 @@ export default function OnboardingScreen() {
     if (viewedStep.current === step) return;
     viewedStep.current = step;
     stepEnteredAt.current = Date.now();
-    // Going back re-enters a step; the funnel counts the first entry only.
     if (viewedStepsRef.current.has(step)) return;
     viewedStepsRef.current.add(step);
     analytics.capture("onboarding_step_viewed", {
@@ -171,8 +160,6 @@ export default function OnboardingScreen() {
     );
   }, [recordCurrentStep]);
 
-  // A returning account already has its spaces, so the setup answers are
-  // dropped instead of replayed onto it.
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
     holdIncomingShare();
@@ -230,7 +217,6 @@ export default function OnboardingScreen() {
       dropPracticeShare(practiceSample?.url);
       finish();
     },
-    // Not a decline: the practice share stays held for the share screen.
     onUnavailable: finish,
   });
 
@@ -245,8 +231,6 @@ export default function OnboardingScreen() {
 
   const progress =
     step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
-  // With no first save the reminder step passes itself by, so going back
-  // from the share step has to clear it too.
   const previous =
     step === "share" && saved === null ? "demo" : previousOnboardingStep(step);
   const goBack = paywall.asked
@@ -286,8 +270,6 @@ export default function OnboardingScreen() {
       </View>
 
       {step === "opener" ? (
-        // A static frame, not the shared ScrollView: the opener lays out its
-        // own scrolling wall and pinned buttons.
         <View
           style={[
             styles.content,
@@ -381,14 +363,10 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
   },
-  // Tall enough to hold the back button and take its taps. The negative
-  // margins give back all but the bar's own 3pt, so no step's content moves.
   header: {
     height: 28,
     marginTop: -12,
     marginBottom: -13,
-    // The step below overlaps this row by that margin. Stay on top of it, or
-    // the lower half of the back button stops taking taps.
     zIndex: 1,
     flexDirection: "row",
     alignItems: "center",

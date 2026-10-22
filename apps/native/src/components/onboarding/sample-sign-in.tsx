@@ -9,14 +9,6 @@ import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** A previewed sample, signed out: the sample as a filed save, then "Save your
- * shelf". Signing in lets the demo step save it for real; the screen's back
- * button is the way out.
- *
- * Nothing has read the page yet, so the save shows only what is already
- * known: the page's own heading (which the save keeps), its site, and the
- * space it goes to. Tags come from the classifier and appear on the step
- * after sign-in. */
 export function SampleSignIn({
   sample,
   space,
@@ -24,7 +16,6 @@ export function SampleSignIn({
 }: {
   sample: DemoSample;
   space: string | null;
-  /** Signed in and the save is landing: nothing here takes a tap. */
   saving: boolean;
 }) {
   useAppLocale();
@@ -44,8 +35,6 @@ export function SampleSignIn({
         <Text style={styles.verdictMuted}>{t("reveal.previewSubtitle")}</Text>
       </Text>
 
-      {/* No picture yet: the save takes the page's own picture once it is
-          read, and a stand-in here would change under the person. */}
       <SaveSummary
         image={null}
         title={sample.pageHeading}

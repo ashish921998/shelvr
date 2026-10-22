@@ -8,11 +8,6 @@ import { PromptSheet } from "@/components/ui/prompt-sheet";
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 
-/**
- * Right after Pro starts: confirm it, then hand off to one real save. The
- * trial line is the real end date from the entitlement. Queued by
- * `useWelcomeSaveTracker`; `ready` holds it until Home owns the screen.
- */
 export function WelcomeSaveSheet({
   userId,
   ready,

@@ -22,23 +22,17 @@ type Tally = { picks: number; passes: number };
 
 type Props = {
   places: PlanPlace[];
-  /** The card on top. */
   front: number;
-  /** The top card shows its back: why it was picked and where from. */
   flipped: boolean;
   imageFor: (place: PlanPlace) => string | undefined;
   titleFor: (place: PlanPlace) => string | undefined;
   isVisited: (place: PlanPlace) => boolean;
-  /** The place's ✓/✕ count from the open vote link, or null when nobody voted. */
   tallyFor: (place: PlanPlace) => Tally | null;
   onFlip: () => void;
-  /** The top card was swiped away; it goes to the back of the deck. */
   onNext: () => void;
   onOpenMaps: (place: PlanPlace, rank: number) => void;
 };
 
-// Each card under the top one sits a little turned, so the deck reads as a
-// hand of photos rather than a list. Index 0 is the top card.
 const FAN = [
   { rotate: -1, x: 0, y: 0 },
   { rotate: 5, x: 14, y: 8 },
@@ -47,7 +41,6 @@ const FAN = [
 ];
 const FLIP_MS = 360;
 
-/** A plan as a deck of photo cards: swipe for the next, tap to flip. */
 export function PlanDeck({
   places,
   front,
@@ -70,7 +63,6 @@ export function PlanDeck({
   const panX = useSharedValue(0);
   const turn = useSharedValue(flipped ? 1 : 0);
 
-  // A new top card arrives centered, face up.
   useLayoutEffect(() => {
     panX.set(0);
   }, [front, panX]);
@@ -225,7 +217,6 @@ export function PlanDeck({
   );
 }
 
-/** The back read aloud: the place, why, and the save it came from. */
 function backLabel(place: PlanPlace, sourceTitle?: string): string {
   const from = sourceTitle ? t("plan.from", { title: sourceTitle }) : null;
   return [place.name, place.why, from].filter(Boolean).join(". ");
@@ -240,7 +231,6 @@ function cardLabel(place: PlanPlace, tally: Tally | null): string {
   })}`;
 }
 
-/** The photo side: the save's image, the place's name, and a stamp once been. */
 function CardFace({
   place,
   imageUrl,
@@ -254,8 +244,6 @@ function CardFace({
 }) {
   return (
     <>
-      {/* Under the photo, so a save with no image, or one that fails to
-          load, still shows a card rather than a blank block. */}
       <View style={[styles.fill, styles.noImage]}>
         <ThemedText variant="hero" style={styles.initial}>
           {place.name.trim().charAt(0).toUpperCase()}
@@ -299,7 +287,6 @@ function CardFace({
   );
 }
 
-/** "We went", inked on the photo. */
 function Stamp() {
   return (
     <View style={styles.stamp}>
@@ -311,7 +298,6 @@ function Stamp() {
   );
 }
 
-/** The back: why this place, the save it came from, and Maps. */
 function CardBack({
   place,
   imageUrl,
@@ -468,7 +454,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.danger,
     textAlign: "center",
   },
-  // The link's ✓/✕ count, top left so a We went stamp still fits top right.
   tally: {
     position: "absolute",
     top: theme.gap(1.5),

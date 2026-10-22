@@ -24,15 +24,10 @@ import {
 import { keepAppleRefreshToken } from "./model/appleTokens";
 import { errorName, logEvent } from "./model/log";
 
-// The dev deployment serves the development and preview builds; every other
-// deployment serves the store build only.
 const isDevDeployment = () =>
   process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
   "https://amicable-antelope-639.convex.site";
 
-// A token that was verified but never stored (deletion won the persistence
-// race) is revoked here, while it is still in memory: never in a row or a
-// scheduled job argument. Best effort, like the rest of the flow.
 async function revokeUnstoredToken(
   signing: {
     clientId: string;
@@ -50,10 +45,6 @@ async function revokeUnstoredToken(
   );
 }
 
-// The native sheet hands the app a one-time code where the web flow hands the
-// backend a refresh token. Trading the code here is what lets account deletion
-// revoke the sign-in with Apple later. Best effort: a person is signed in
-// whether or not Apple answers, and without the signing key nothing is asked.
 async function keepNativeAppleToken(
   ctx: ActionCtx,
   userId: Id<"users">,
@@ -86,11 +77,6 @@ async function keepNativeAppleToken(
       });
       return;
     }
-    // The code is whatever the caller sent, so it may belong to another Apple
-    // account than the one that just signed in. Apple says whose it is in the
-    // identity token beside the refresh token. Storing a stranger's token
-    // would revoke their sign-in when this account is deleted, and leave this
-    // one's standing.
     const owner =
       identityToken === null
         ? null
@@ -122,13 +108,6 @@ async function keepNativeAppleToken(
   }
 }
 
-// The native Sign in with Apple sheet on iOS. Its identity token names the
-// app's bundle id as audience, where the web flow's names the Service ID. The
-// account is stored under the web flow's provider id, "apple", keyed by the
-// token `sub`, which is the same for both flows within one Apple team. A
-// person who signed in through the web flow therefore lands on the same user.
-// An existing account is returned as it is, so its name and email are never
-// overwritten by a later sign-in that carries neither.
 const AppleNative = ConvexCredentials<DataModel>({
   id: "apple-native",
   authorize: async ({ identityToken, nonce, name, authorizationCode }, ctx) => {
@@ -157,14 +136,6 @@ const AppleNative = ConvexCredentials<DataModel>({
   },
 });
 
-// Google and Apple are configured via @auth/core providers. Their client
-// id/secret come from the AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET and
-// AUTH_APPLE_ID / AUTH_APPLE_SECRET deployment env vars.
-//
-// Anonymous is an instant sign-in (no credentials) used only for local
-// development. It is gated behind AUTH_ENABLE_ANONYMOUS so a production
-// deployment never exposes a passwordless back door. Set it to "true" on
-// the dev deployment only.
 const providers: AuthProviderConfig[] = [
   Google,
   Apple({ profile: normalizeAppleProfile }),

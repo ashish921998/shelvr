@@ -9,7 +9,6 @@ export default defineConfig([
   {
     files: ["**/*.ts"],
     rules: {
-      // Same limits as the app packages.
       complexity: ["error", 30],
       "max-statements": ["error", 50],
       "max-depth": ["error", 4],

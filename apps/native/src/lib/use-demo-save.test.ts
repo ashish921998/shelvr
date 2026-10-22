@@ -110,7 +110,6 @@ function renderDemo(
   return { ...hook, onSaved, onAdvance };
 }
 
-// The save resolves over a few microtasks; fake timers leave promises alone.
 async function flush(run: () => void) {
   await act(async () => {
     run();
@@ -232,8 +231,6 @@ describe("useDemoSave", () => {
       } else {
         unmount();
       }
-      // A newer incoming-share session (including the same URL) must retain
-      // ownership: the stale create result cannot release any share.
       mock.setPendingDemo.mockClear();
       mock.releaseSavedShare.mockClear();
       mock.recordShareSaved.mockClear();
@@ -314,7 +311,6 @@ describe("useDemoSave", () => {
     rerender();
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.create).toHaveBeenCalledTimes(1);
-    // A typed link is no sample, so the classifier names it.
     expect(mock.create).toHaveBeenCalledWith({
       url: "https://sample.test/recipe",
       title: undefined,
@@ -353,7 +349,6 @@ describe("useDemoSave", () => {
     expect(captured("onboarding_demo_result")).toEqual([
       ["onboarding_demo_result", { outcome: "error" }],
     ]);
-    // Saving after sign-in resumes the pick; it is not a second one.
     expect(captured("onboarding_demo_picked")).toHaveLength(1);
 
     mock.setPendingDemo.mockClear();
@@ -510,7 +505,6 @@ describe("useDemoSave", () => {
 
   it("lets go of a shared link only when the server saved that link", async () => {
     mock.releaseSavedShare.mockReset();
-    // The demo save was already spent: the server hands back the old item.
     mock.create.mockResolvedValue({
       ...saved(),
       reused: true,
@@ -657,12 +651,10 @@ describe("useDemoSave", () => {
 
     expect(mock.create).not.toHaveBeenCalled();
 
-    // The preview's step timer depends on this staying the same.
     const previewed = result.current.previewed;
     rerender();
     expect(result.current.previewed).toBe(previewed);
 
-    // The preview ends on the sign-in ask, with the same request.
     act(() => result.current.previewed());
     expect(result.current.view).toBe("auth");
     expect(result.current.authRequest?.url).toBe(
@@ -687,8 +679,6 @@ describe("useDemoSave", () => {
     );
     mock.authenticated = true;
     rerender();
-    // Signed in: the preview already played the reading steps, so the
-    // sign-in ask stays up while the save is on its way.
     expect(result.current.view).toBe("auth");
     await flush(() => reject(new Error("network")));
     expect(mock.create).toHaveBeenCalledTimes(1);
@@ -703,7 +693,6 @@ describe("useDemoSave", () => {
       result.current.submitUrl("https://sample.test/ready-made"),
     );
     expect(mock.create).toHaveBeenCalledTimes(2);
-    // The save keeps the heading its preview showed.
     expect(mock.create).toHaveBeenLastCalledWith(
       expect.objectContaining({ title: "Ready-made heading" }),
     );
@@ -742,9 +731,7 @@ describe("useDemoSave", () => {
       itemId: ITEM_ID,
       savedSpaceNames: [],
     });
-    // Still being read: leaving now would drop the retry a failure needs.
     expect(onAdvance).not.toHaveBeenCalled();
-    // The demo save is spent, so a share arriving now is held, not consumed.
     expect(result.current.view).toBe("auth");
     expect(result.current.canAcceptShare()).toBe(false);
 
@@ -801,7 +788,6 @@ describe("useDemoSave", () => {
     expect(result.current.view).toBe("failed");
     expect(onAdvance).not.toHaveBeenCalled();
 
-    // Retrying watches the item on the reading view, not the sign-in screen.
     mock.retry.mockResolvedValueOnce(null);
     await flush(() => void result.current.retry());
     mock.query = {
@@ -833,13 +819,11 @@ describe("useDemoSave", () => {
       destination: null,
       source: "direct" as const,
     };
-    // Killed during the preview: only the request was persisted.
     const { result, rerender } = renderDemo(request);
     expect(result.current.view).toBe("auth");
     expect(result.current.authRequest).toEqual(request);
     expect(mock.create).not.toHaveBeenCalled();
 
-    // A fresh run reaches the same state once its preview ends.
     const fresh = renderDemo();
     act(() => fresh.result.current.submitUrl(request.url));
     act(() => fresh.result.current.previewed());

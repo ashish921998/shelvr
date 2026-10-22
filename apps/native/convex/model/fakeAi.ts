@@ -1,20 +1,5 @@
 import type { wrapLanguageModel } from "ai";
 
-/**
- * A stand-in for Gemini that only an e2e backend on the CI runner may use.
- *
- * The e2e job runs the app against a throwaway local Convex backend with a
- * placeholder model key, so every real model call fails and a save that needs
- * one can never finish. This model answers instead, from the saved content
- * itself, so a flow like save-note can run on every pull request with no
- * secret. It knows three calls (a note's and a fixture page's
- * classification, and a new space's recommendations) and fails loudly on
- * anything else, so a flow that strays onto an unanswered
- * call fails instead of passing on an invented answer. It recognizes them by
- * the wording of the prompts in ai.ts; aiFakeModel.test.ts runs those real
- * prompts through it, so a rewording that would strand the fake fails there.
- */
-
 type AnyLanguageModel = Parameters<typeof wrapLanguageModel>[0]["model"];
 type FakeLanguageModel = Extract<
   AnyLanguageModel,
@@ -22,12 +7,8 @@ type FakeLanguageModel = Extract<
 >;
 type CallOptions = Parameters<FakeLanguageModel["doGenerate"]>[0];
 
-/** The only value of E2E_FAKE_AI that turns the fake on. Versioned, so a
- * stray "true" or "1" set by hand does nothing. */
 export const FAKE_AI_SWITCH = "local-v1";
 
-/** The placeholder model key the e2e workflow sets. Any other key, above all
- * a real one, keeps the real model. */
 export const FAKE_AI_PLACEHOLDER_KEY = "ci-no-model";
 
 type FakeAiVars = {
@@ -37,19 +18,12 @@ type FakeAiVars = {
   CONVEX_CLOUD_URL?: string;
 };
 
-/** Why the fake stays off. `switch_off` is every real deployment's normal
- * state; the rest mean someone set the switch where it does not belong. */
 export type FakeAiRefusal =
   | "switch_off"
   | "not_local"
   | "dev_sign_in_off"
   | "real_key";
 
-/**
- * Every lock must hold at once: the switch, a backend on this machine's
- * loopback address, dev sign-in (which no cloud deployment but dev enables),
- * and the e2e placeholder key. Exported pure for unit testing.
- */
 export function fakeAiLocks(
   vars: FakeAiVars,
 ): { enabled: true } | { enabled: false; refusedBy: FakeAiRefusal } {
@@ -77,20 +51,12 @@ function isLoopback(url: string | undefined): boolean {
   }
 }
 
-/** The keys of itemAnalysisSchema in ai.ts, sorted: the plain note and
- * web page classification. The recipe and video variants add keys, so the
- * fake does not answer them. */
 const ANALYSIS_KEYS = "cities,description,intents,spaceNames,tags,title";
-// Markers from the note and link prompts in ai.ts: their task lines, the
-// sections that carry the note or the page, and the intents block that
-// always closes both.
 const NOTE_TASK = "Analyze this saved note";
 const NOTE_MARKER = "\n\nNote:\n";
 const LINK_TASK = "Analyze this saved web page";
 const CONTENT_MARKER = "\n\nPage content:\n";
 const INTENTS_MARKER = "\n\nAlso propose up to ";
-/** The key of recommendSchema in aiRecommendForSpace.ts, and the markers of
- * its prompt: the task line, the space's name, and the numbered saves. */
 const RECOMMEND_KEYS = "itemNumbers";
 const RECOMMEND_TASK = "The user just created a space";
 const SPACE_NAME = /^Space name: "(.*)"$/m;
@@ -107,25 +73,16 @@ type Analysis = {
   cities: never[];
 };
 
-/** A web page as the fake reads it back out of the link prompt. */
 type PromptPage = { title?: string; description?: string; content?: string };
 
-/** Words of four letters or more, lowercased, as the fake compares them. */
 function wordsOf(text: string): Set<string> {
   return new Set(text.toLowerCase().match(/\p{L}{4,}/gu) ?? []);
 }
 
-/** Unique lowercase words of four letters or more, as tags. */
 function tagsFrom(text: string): string[] {
   return [...wordsOf(text)].slice(0, MAX_TAGS);
 }
 
-/**
- * What the fake says about a note: its first words as the title, its first
- * line as the description, and its longer words as tags. No space
- * suggestions and no actions, so a flow never depends on the fake's taste.
- * Exported pure for unit testing.
- */
 export function fakeNoteAnalysis(note: string): Analysis {
   const firstLine = note.trim().split("\n")[0]?.trim() ?? "";
   const words = firstLine.split(/\s+/).filter((word) => word.length > 0);
@@ -143,12 +100,6 @@ export function fakeNoteAnalysis(note: string): Analysis {
   };
 }
 
-/**
- * What the fake says about a web page: the page's own title, its meta
- * description (or the first line of its text), and its words as tags.
- * Undefined for a page with no title, which the fake leaves unanswered.
- * Exported pure for unit testing.
- */
 export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
   if (page.title === undefined) return undefined;
   const firstLine = page.content?.trim().split("\n")[0]?.trim();
@@ -162,10 +113,6 @@ export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
   };
 }
 
-/** The note text a note classification prompt carries, or undefined when
- * the prompt is not one. The note sits between its "Note:" section and the
- * intents block, and may itself hold blank lines. Exported pure for unit
- * testing. */
 export function noteFromPrompt(prompt: string): string | undefined {
   if (!prompt.includes(NOTE_TASK)) return undefined;
   const start = prompt.indexOf(NOTE_MARKER);
@@ -174,10 +121,6 @@ export function noteFromPrompt(prompt: string): string | undefined {
   return prompt.slice(start + NOTE_MARKER.length, end);
 }
 
-/** The page a link classification prompt carries, or undefined when the
- * prompt is not one. Its labelled lines come before the page text, which
- * runs to the intents block and may itself hold blank lines. Exported pure
- * for unit testing. */
 export function pageFromPrompt(prompt: string): PromptPage | undefined {
   const end = prompt.lastIndexOf(INTENTS_MARKER);
   if (!prompt.includes(LINK_TASK) || end === -1) return undefined;
@@ -194,9 +137,6 @@ export function pageFromPrompt(prompt: string): PromptPage | undefined {
   };
 }
 
-/** The saves listed after the prompt's saves instruction. A save starts at
- * the line numbered one past the last, so a blank or numbered line inside a
- * description stays part of its save. */
 function savesFromPrompt(prompt: string): string[] {
   const marker = prompt.indexOf(SAVES_MARKER);
   if (marker === -1) return [];
@@ -211,13 +151,6 @@ function savesFromPrompt(prompt: string): string[] {
   return saves;
 }
 
-/**
- * What the fake recommends for a new space: every numbered save whose line
- * shares a word of four letters or more with the space's name, so a flow
- * that names a space after a seeded save sees exactly that save suggested.
- * Undefined when the prompt is not a recommendation prompt. Exported pure for
- * unit testing.
- */
 export function fakeRecommendation(
   prompt: string,
 ): { itemNumbers: number[] } | undefined {
@@ -255,8 +188,6 @@ function schemaKeys(options: CallOptions): string | undefined {
     : Object.keys(properties).sort().join(",");
 }
 
-/** Thrown for any call the fake has no answer for. Its message names no
- * content, so it is safe in the log stream. */
 export class FakeAiUnansweredError extends Error {
   constructor() {
     super("The e2e fake model has no answer for this call");
@@ -264,8 +195,6 @@ export class FakeAiUnansweredError extends Error {
   }
 }
 
-/** The answer to one call, or a thrown FakeAiUnansweredError. Exported for
- * unit testing. */
 export function fakeAnswer(
   options: CallOptions,
 ): Analysis | { itemNumbers: number[] } {
@@ -309,9 +238,7 @@ export const FAKE_MODEL: FakeLanguageModel = {
   },
 };
 
-/** The made-up origin of the e2e fixture pages. `.invalid` never resolves
- * (RFC 2606), so a real fetch of it fails and the fake never stands in for a
- * page anyone could publish. */
+/** `.invalid` never resolves (RFC 2606). */
 export const FIXTURE_ORIGIN = "https://fixtures.e2e.invalid";
 
 type FixturePage = {
@@ -321,8 +248,6 @@ type FixturePage = {
   content: string;
 };
 
-/** The pages a flow can save while the fake is on, by path. The words are
- * in no seeded save, so a search for them finds only the new one. */
 const FIXTURE_PAGES = new Map<string, FixturePage>([
   [
     "/quince-paste",
@@ -336,9 +261,6 @@ const FIXTURE_PAGES = new Map<string, FixturePage>([
   ],
 ]);
 
-/** The fixture page at `url`, or undefined for any other address. The caller
- * asks only while the fake is on, so with it off a fixture URL is read like
- * any other link and fails to resolve. */
 export function fixturePage(url: string): FixturePage | undefined {
   try {
     const parsed = new URL(url);

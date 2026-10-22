@@ -7,8 +7,6 @@ import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** "What are you into?": each picked topic becomes a space and leads the
- * first-save picker. Picking none is fine; the step never blocks. */
 export function InterestsStep({
   picked,
   onToggle,

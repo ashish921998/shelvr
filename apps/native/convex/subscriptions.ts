@@ -18,16 +18,6 @@ const subscriptionStatusValidator = v.union(
   v.literal("lifetime"),
 );
 
-/**
- * The entitlement a client renders. `status` is the stored subscription state
- * (or `"none"` if the user has never started a trial); `expiresAt` is the raw
- * stored period end. The client computes `entitled` from `expiresAt` against
- * its own clock: this query deliberately does NOT read the wall clock, because
- * queries are not rerun as time advances and a `Date.now()` read here would go
- * stale at the exact trial-expiry moment. The server re-checks expiry with
- * `Date.now()` inside gated mutations (see {@link requireProEntitlement}), so
- * the client's slightly-stale view can never grant access the server denies.
- */
 export const getEntitlement = query({
   args: {},
   returns: v.object({
@@ -50,18 +40,6 @@ export const getEntitlement = query({
   },
 });
 
-/**
- * Server-side entitlement gate for Pro mutations. Reads the wall clock
- * (`Date.now()` is allowed in mutations) so a trial that expired between the
- * client's last fetch and this call is correctly rejected: the client's
- * `entitled` is advisory; this is the source of truth. Throws
- * {@link saveError}`("pro_required")` when the user has no active trial or
- * subscription, which the client decodes to present the paywall instead of a
- * generic failure.
- *
- * Pass the `userId` already derived via `requireUserId` so this never performs
- * a second auth lookup.
- */
 export async function requireProEntitlement(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -71,13 +49,6 @@ export async function requireProEntitlement(
   }
 }
 
-/**
- * The same rule as {@link requireProEntitlement}, as a boolean. Mutations
- * whose core write must succeed for every user can use this to skip a
- * Pro-only side effect. Reads the wall clock, so it is mutation-only;
- * queries use {@link hasProEntitlementAt} with a client-supplied clock,
- * or {@link hasProEntitlementStatus} when no clock is available.
- */
 export async function hasProEntitlement(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -85,7 +56,6 @@ export async function hasProEntitlement(
   return await hasProEntitlementAt(ctx, userId, Date.now());
 }
 
-/** The caller's one subscription row, or null when they never started one. */
 async function subscriptionFor(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
@@ -96,7 +66,6 @@ async function subscriptionFor(
     .unique();
 }
 
-/** Query-safe entitlement check. The caller supplies the current client time. */
 export async function hasProEntitlementAt(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
@@ -107,8 +76,6 @@ export async function hasProEntitlementAt(
   return sub !== null && isEntitled(sub.status, sub.expiresAt, now);
 }
 
-/** Server-maintained status: scheduled expiry and a recovery sweep lapse paid
- * periods independently of RevenueCat webhook delivery and client clocks. */
 export async function hasProEntitlementStatus(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
@@ -118,22 +85,6 @@ export async function hasProEntitlementStatus(
   return sub !== null && isEntitled(sub.status, sub.expiresAt, sub.updatedAt);
 }
 
-/**
- * Written by the RevenueCat webhook (`http.ts`). This handler honours the
- * supplied status and never infers access from product ids.
- *
- * Idempotent per user using the RevenueCat `event_timestamp_ms` as the ordering
- * key: a repeat or stale event whose `eventTimestampMs` is not newer than the
- * stored row's is dropped, so a reordered/duplicate webhook delivery never
- * downgrades an active subscriber. Newer events CAN move expiry in either
- * direction (e.g. a refund shortens the period).
- *
- * `status` is optional: when omitted (e.g. a CANCELLATION that still has
- * access until period end) the existing status is preserved and only
- * `expiresAt` is refreshed. When `expiresAt` is 0 and no existing row is found,
- * the event is acknowledged but no row is created unless it is authoritative
- * (a refund snapshot must record its timestamp to reject older purchases).
- */
 export const upsertSubscription = internalMutation({
   args: {
     userId: v.string(),
@@ -150,9 +101,6 @@ export const upsertSubscription = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .unique();
 
-    // Stale/duplicate event? Drop it before doing anything else: cheapest exit.
-    // Once a row has an ordering timestamp, an event without one is also unsafe
-    // to apply because its age is unknown.
     if (
       existing !== null &&
       existing.eventTimestampMs !== undefined &&
@@ -162,34 +110,15 @@ export const upsertSubscription = internalMutation({
       return null;
     }
 
-    // Account deletion removes the users row but deliberately does NOT cancel
-    // the App Store subscription, so RevenueCat keeps sending renewal/
-    // expiration events for the deleted account. Acknowledge the event (so
-    // RevenueCat stops retrying) but do not insert or patch a row. Otherwise
-    // a renewal webhook resurrects an entitlement for a user who no longer
-    // exists. An owner mid-deletion counts as gone for the same reason: its
-    // subscription row is about to drain, and a write here would race the
-    // drain or outlive it. The userId here is the Convex Auth users-table
-    // document id.
     if ((await liveOwner(ctx, args.userId)) === null) {
       return null;
     }
 
-    // A lifetime row is sticky unless an authoritative snapshot replaces it: a
-    // stray CANCELLATION or an EXPIRATION for an unrelated product (this table
-    // is one row per user, not per-product) is preserved as-is. Refunds and
-    // reversals reconcile the current Pro entitlement instead. The webhook
-    // uses this non-expiring status for developer access and authoritative
-    // permanent grants, not a purchasable lifetime plan.
     const stickyLifetime =
       !args.authoritative &&
       existing?.status === "lifetime" &&
       args.status !== "lifetime";
 
-    // An omitted status means "preserve the current status". There is no
-    // current status for a first-seen advisory/unknown event, so acknowledging
-    // it must not manufacture a Pro subscription. This also handles webhook
-    // reordering where CANCELLATION arrives before INITIAL_PURCHASE.
     const status: SubscriptionStatus | undefined = stickyLifetime
       ? "lifetime"
       : (args.status ?? existing?.status);
@@ -197,11 +126,6 @@ export const upsertSubscription = internalMutation({
       return null;
     }
 
-    // Nothing to record: an event with no expiry and no prior state (e.g. a
-    // lapsed non-lifetime event). A lifetime purchase is exempt: it reports
-    // `expiresAt: 0` (non-renewing) but is a real entitlement.
-    // An authoritative lapse records the ordering timestamp even before a
-    // purchase arrives, so a delayed purchase cannot resurrect refunded access.
     if (
       !args.authoritative &&
       existing === null &&
@@ -211,10 +135,6 @@ export const upsertSubscription = internalMutation({
       return null;
     }
 
-    // A sticky lifetime row keeps its expiry; an event with no expiry (0)
-    // preserves the existing row's expiry (e.g. CANCELLATION); otherwise the
-    // event's expiry wins. Lifetime gates check `status` explicitly, so its
-    // stored `expiresAt` value is irrelevant.
     const expiresAt = stickyLifetime
       ? (existing?.expiresAt ?? 0)
       : !args.authoritative && args.expiresAt === 0 && existing !== null
@@ -250,9 +170,6 @@ export const upsertSubscription = internalMutation({
   },
 });
 
-/** The live owners among RevenueCat's app user ids. Anonymous RevenueCat ids,
- * removed accounts and accounts mid-deletion are dropped, so the reconciler
- * neither asks RevenueCat about them nor writes access back for them. */
 export const liveOwners = internalQuery({
   args: { userIds: v.array(v.string()) },
   returns: v.array(v.id("users")),
@@ -280,7 +197,6 @@ export const applySnapshots = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { snapshots, eventTimestampMs }) => {
-    // Nested writes share this transaction: a failed update rolls back both sides.
     for (const snapshot of snapshots) {
       await ctx.runMutation(internal.subscriptions.upsertSubscription, {
         ...snapshot,

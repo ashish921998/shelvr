@@ -4,13 +4,6 @@ import { expect, type Screen } from "e2e";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 
-/**
- * Starts the app as a first-time user on the onboarding opener. Onboarding
- * is gated by a keychain flag and the dev sign-in token lives in the
- * keychain too, so clearing it signs out and forgets onboarding together
- * (docs/architecture/local-qa.md). The next dev sign-in is a new anonymous
- * user with an unused demo save.
- */
 export async function startFreshOnboarding({
   device,
   screen,
@@ -24,11 +17,6 @@ export async function startFreshOnboarding({
   await relaunchWith(device, screen, LAUNCH_ARGUMENTS, () => start.isVisible());
 }
 
-/**
- * Walks the opener, interests and setup steps, picking Articles, which seeds
- * and picks a space of its own so Continue enables. Ends on the first-save
- * step.
- */
 export async function walkToFirstSave(screen: Screen): Promise<void> {
   await screen.getByRole("button", "Start yours").tap();
   await expect(screen.getByText("What are you into?")).toBeVisible({
@@ -47,24 +35,10 @@ export async function walkToFirstSave(screen: Screen): Promise<void> {
   });
 }
 
-/**
- * A launch still on the splash after this long has lost its bundle request
- * (seen on CI: the request to Metro hung and the splash stayed up), so the
- * app is launched again.
- */
 const STALLED_LAUNCH_MS = 75_000;
 
-/**
- * The dev launcher's server list flashes briefly on a normal launch too, so
- * seeing it only counts as a failed launch once this long has passed.
- */
 const LAUNCHER_GRACE_MS = 15_000;
 
-/**
- * Relaunches the app with `launchArguments` and waits until `ready`. Like
- * `openApp`, it opens the app again when the dev launcher shows its server
- * list instead of the bundle, and also when a launch stalls on the splash.
- */
 export async function relaunchWith(
   device: Device,
   screen: Screen,
@@ -94,16 +68,8 @@ export async function relaunchWith(
   });
 }
 
-/** The reminder step's question (`onboarding.remindQuestion`). */
 export const REMINDER_STEP = /When should it come back\?/;
 
-/**
- * Signs in from the first-save step with the dev login, which onboarding
- * offers once a link is picked or shared, and waits for the reminder step.
- * The model is a placeholder on CI, so the save may never be read: whichever
- * way out the reading screen offers is taken, since the reminder step only
- * needs the save to exist.
- */
 export async function signInAndSaveFirst(screen: Screen): Promise<void> {
   await screen.getByTestId("onboarding-dev-login").tap({ timeout: 60_000 });
 

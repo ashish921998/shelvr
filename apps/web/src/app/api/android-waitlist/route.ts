@@ -51,7 +51,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
-  // A hidden honeypot lets ordinary bots succeed without persisting anything.
   if (body.company) return NextResponse.json({ ok: true });
 
   const email =
@@ -77,9 +76,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    // The Convex HTTP action authenticates this server with the shared secret
-    // and reads the visitor IP from a dedicated header, so the per-IP rate
-    // limit applies to the real client rather than to this server.
     const ip = clientIp(request);
     const response = await fetch(`${siteUrl}/waitlist/join`, {
       method: "POST",

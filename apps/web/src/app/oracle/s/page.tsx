@@ -29,7 +29,6 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: "/oracle" },
-    // A shared verdict is for the people it was sent to, not for search.
     robots: { index: false, follow: false },
     openGraph: {
       title,

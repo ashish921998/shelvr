@@ -87,7 +87,6 @@ vi.mock("@convex/_generated/api", () => ({
   api: { notifications: { getPreferences: "preferences" } },
 }));
 vi.mock("@convex-dev/react-query", () => ({
-  // Captures the skip sentinel so tests can assert the subscription flips.
   convexQuery: (_api: unknown, options: unknown) => {
     mock.queries.push(options);
     return {};
@@ -168,8 +167,6 @@ it("finishes an already-enabled shelf and unsubscribes from preferences", async 
   mock.shelfEnabled = true;
   render(<WeeklyNudgeSheet userId="user-a" ready />);
   await waitFor(() => expect(mock.finish).toHaveBeenCalledWith("user-a"));
-  // The query ran while the nudge was pending, then flipped to "skip" once
-  // alreadyOn finished it.
   expect(mock.queries[0]).not.toBe("skip");
   expect(mock.queries.at(-1)).toBe("skip");
   expect(screen.queryByText("weekly.nudgeTitle")).toBeNull();

@@ -40,11 +40,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// A module constant, so the worklet captures this timing object and not
-// all of `motion`.
 const ENTER = motion.timing.enter;
 
-/** Panel content rising into place, by transform only. */
 function rise() {
   "worklet";
   return {
@@ -55,8 +52,6 @@ function rise() {
   };
 }
 
-// The panel comes up on the iOS sheet curve; when its content changes height
-// it resizes in place, easing both ways. The map fades in under it.
 const PANEL_IN = SlideInDown.duration(300).easing(
   Easing.bezier(0.32, 0.72, 0, 1),
 );
@@ -92,8 +87,6 @@ export default function TripScreen() {
   const { isVisited, toggle: toggleVisited } = usePlaceVisits();
   const [editing, setEditing] = useState(false);
   const [activeDay, setActiveDay] = useState(0);
-  // The open stop by its save and name, not its position: a swap puts the
-  // day back in time order, so the newcomer can land at another index.
   const [selected, setSelected] = useState<StopPick | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [lastRequest, setLastRequest] = useState<TripRequest | null>(null);
@@ -106,8 +99,6 @@ export default function TripScreen() {
   );
   const picked = pickedStop(trip?.days, selected);
 
-  // A new trip is stored before its subscription delivers it; until then
-  // the screen keeps building rather than flash the form or the old trip.
   const arrived =
     state.status === "arriving" && !!trip && trip._id !== state.previous;
   useEffect(() => {
@@ -288,8 +279,6 @@ export default function TripScreen() {
     }
   })();
 
-  // Pinned under the day list rather than scrolled with it, so "Change
-  // trip" stays in reach on a day with many stops.
   const footer =
     mode === "days" && trip ? (
       <View style={styles.footer}>
@@ -334,8 +323,6 @@ export default function TripScreen() {
         style={[
           styles.panel,
           overMap ? styles.panelOverMap : styles.panelFull,
-          // The day list keeps one height, so switching days never makes
-          // the sheet jump; a stop sheet is as tall as its content.
           mode === "days" &&
             (overMap ? styles.panelOverMapFixed : styles.panelFullFixed),
         ]}
@@ -349,13 +336,7 @@ export default function TripScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View
-            key={mode}
-            // Rises without fading: Liquid Glass (the Build button) does not
-            // draw under a parent whose opacity animates from zero.
-            entering={rise}
-            exiting={CONTENT_OUT}
-          >
+          <Animated.View key={mode} entering={rise} exiting={CONTENT_OUT}>
             {panel}
           </Animated.View>
         </ScrollView>

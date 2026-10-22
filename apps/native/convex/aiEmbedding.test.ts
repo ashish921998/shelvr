@@ -6,8 +6,6 @@ import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 
 const embedMany = vi.hoisted(() => vi.fn());
 
-// `ai.ts` builds its language model at module load, so the mock has to supply
-// wrapLanguageModel too. Only embedMany is under test here.
 vi.mock("ai", () => ({
   embedMany,
   generateObject: vi.fn(),
@@ -16,7 +14,6 @@ vi.mock("ai", () => ({
 
 const { embedTexts } = await import("./aiEmbeddingSweep");
 
-/** A vector of the indexed width whose components are all `fill`. */
 function vector(fill: number): number[] {
   return Array.from({ length: EMBEDDING_DIMENSIONS }, () => fill);
 }
@@ -31,8 +28,6 @@ describe("embedTexts", () => {
   });
 
   it("normalizes what the provider returns", async () => {
-    // Deliberately un-normalized: the sibling model gemini-embedding-001 does
-    // not normalize truncated output, and cosine scoring assumes unit length.
     embedMany.mockResolvedValue({ embeddings: [vector(7)] });
 
     const [embedding] = (await embedTexts(["something to embed"])).vectors;
@@ -42,14 +37,6 @@ describe("embedTexts", () => {
   });
 
   it("keeps results aligned with the input positions", async () => {
-    // Empty texts are never sent upstream, so the provider's Nth vector does
-    // NOT correspond to the Nth input. Mis-mapping here would file every
-    // save's vector under a different save, silently, and only visible as
-    // bad recommendations much later.
-    //
-    // The two vectors are basis vectors so they stay distinguishable after
-    // normalization; two uniform vectors would both normalize to the same
-    // unit vector and the assertion would hold no matter how they were mapped.
     const firstAxis = vector(0);
     firstAxis[0] = 5;
     const secondAxis = vector(0);
@@ -62,7 +49,6 @@ describe("embedTexts", () => {
     expect(embedMany.mock.calls[0][0].values).toEqual(["first", "second"]);
     expect(result[1]).toBeUndefined();
     expect(result[3]).toBeUndefined();
-    // Each vector landed in its own text's slot, not the provider's ordinal.
     expect(result[0]?.[0]).toBeCloseTo(1, 10);
     expect(result[0]?.[1]).toBeCloseTo(0, 10);
     expect(result[2]?.[0]).toBeCloseTo(0, 10);
@@ -85,15 +71,11 @@ describe("embedTexts", () => {
     expect(options.providerOptions.google.outputDimensionality).toBe(
       EMBEDDING_DIMENSIONS,
     );
-    // Stored vectors are the corpus side of an asymmetric pairing.
     expect(options.providerOptions.google.taskType).toBe("RETRIEVAL_DOCUMENT");
     expect(options.abortSignal).toBeInstanceOf(AbortSignal);
   });
 
   it("drops a wrong-width vector instead of failing the write", async () => {
-    // Convex rejects a vector whose width differs from the index's dimensions.
-    // Letting one through would fail the whole classification transaction
-    // over a field that is optional by design.
     embedMany.mockResolvedValue({
       embeddings: [vector(1).slice(0, EMBEDDING_DIMENSIONS - 1)],
     });
@@ -116,8 +98,6 @@ describe("embedTexts", () => {
   });
 
   it("resolves instead of throwing when the provider fails", async () => {
-    // The contract the whole design rests on: an embedding failure must never
-    // cost the user their save.
     embedMany.mockRejectedValue(new Error("provider exploded"));
 
     await expect(embedTexts(["a", "b"])).resolves.toEqual({

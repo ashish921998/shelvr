@@ -11,8 +11,6 @@ export class StoredImageError extends Error {
   }
 }
 
-// Read directly from storage to avoid the SDK's dynamic undici loader.
-// Preserve MIME metadata: byte sniffing misses some valid HEIC/HEIF headers.
 export async function readStoredImage(
   storage: Pick<StorageActionWriter, "get">,
   storageId: Id<"_storage">,

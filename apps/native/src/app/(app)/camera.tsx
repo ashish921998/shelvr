@@ -36,20 +36,15 @@ import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CaptureMode = "photo" | "sticker";
 
-// The accent color matches theme.colors.primary (identical in both themes).
 const ACCENT = "#e6a23c";
 const INACTIVE = "rgba(255,255,255,0.55)";
 
-/** This screen is only reachable through add.tsx's entitlement guard, so a
- * `pro_required` refusal here means Pro lapsed mid-session. There is no client
- * gate to fall back on: route straight to the paywall. */
 const PAYWALL_PLACEMENT = "camera";
 
 export default function CameraScreen() {
   useAppLocale();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // Opened from a space's add flow: captures are pre-pinned to that space.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
   const pinnedSpace = { spaceId: spaceId as Id<"spaces"> | undefined };
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -59,8 +54,6 @@ export default function CameraScreen() {
   const saveImages = useSaveImages();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<CaptureMode>("photo");
-  // The light status bar belongs to the viewfinder; any route pushed above
-  // (paywall fallback) must get the root layout's theme-driven bar back.
   const [cameraFocused, setCameraFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
@@ -69,7 +62,6 @@ export default function CameraScreen() {
     }, []),
   );
 
-  // Slides the active-label highlight between Photo (0) and Sticker (1).
   const progress = useSharedValue(0);
   useEffect(() => {
     progress.value = withTiming(mode === "sticker" ? 1 : 0, { duration: 200 });
@@ -85,8 +77,6 @@ export default function CameraScreen() {
     });
   }, []);
 
-  // Horizontal swipe over the preview toggles modes (iOS-camera style). The
-  // activeOffsetX keeps taps and vertical drags from triggering it.
   const swipe = useMemo(
     () =>
       Gesture.Pan()
@@ -106,13 +96,8 @@ export default function CameraScreen() {
     color: interpolateColor(progress.value, [0, 1], [INACTIVE, ACCENT]),
   }));
 
-  // Runs a batch, closing on success or reporting a partial outcome. The hook
-  // owns the retry (failed requests keep their operation ids so it resubmits
-  // only them), the `pro_required` paywall route, and the alert.
   const runImageRequests = useSaveImageBatch({
     spaceId: pinnedSpace.spaceId,
-    // The batch backs `pickFromLibrary` only; a capture goes through
-    // `saveSingle` and counts as `camera`.
     saveSource: "photo_import",
     paywallPlacement: PAYWALL_PLACEMENT,
     setBusy,
@@ -125,10 +110,6 @@ export default function CameraScreen() {
 
   const pickFromLibrary = () => pickAndSaveImages(runImageRequests);
 
-  // Saves a single already-built request (used for the initial capture AND for
-  // a retry), reusing the request's operation id verbatim. A retry never
-  // re-captures or mints a fresh id: it replays the exact failed request so
-  // the backend idempotency ledger resumes it.
   const saveSingle = async (request: ImageSaveRequest) => {
     setBusy(true);
     try {
@@ -147,8 +128,6 @@ export default function CameraScreen() {
         await openPaywall(router, PAYWALL_PLACEMENT);
         return;
       }
-      // Preserve the failed request (with its operation id) so the in-screen
-      // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
       Alert.alert(
         t("errors.captureTitle"),

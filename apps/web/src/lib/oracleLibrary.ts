@@ -24,8 +24,6 @@ function httpUrl(value: unknown): string | undefined {
   }
 }
 
-// The oracle accepts saves dated 1990 to 2100; a date outside that is a
-// malformed export, so it is dropped rather than sent.
 const MIN_SAVED_AT = Date.UTC(1990, 0, 1);
 const MAX_SAVED_AT = Date.UTC(2100, 0, 1);
 
@@ -108,8 +106,6 @@ function detectFormat(blob: string): LibraryFormat {
   return "lines";
 }
 
-/** Bookmarks HTML (Chrome, Safari, Firefox), Instagram's saved_posts.json,
- * or one URL per line. savedAt is epoch milliseconds. */
 export function parseLibraryExport(blob: string): LibraryEntry[] {
   return parsers[detectFormat(blob)](blob);
 }
@@ -139,8 +135,6 @@ export function libraryStats(rows: LibraryEntry[]): LibraryStats {
   };
 }
 
-/** An evenly spaced sample, so the oracle sees the whole span of the pile
- * rather than only its newest or oldest end. */
 export function oracleRows(rows: LibraryEntry[], max = 40): LibraryRow[] {
   const step = Math.max(1, rows.length / max);
   return Array.from({ length: Math.min(max, rows.length) }, (_, i) => {

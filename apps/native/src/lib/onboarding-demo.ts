@@ -5,9 +5,6 @@ import {
 } from "@/lib/onboarding-interests";
 import { SPACE_PRESETS, type SaveKind } from "@/lib/save-kinds";
 
-// Real pages, checked to fetch with a 200 and an og:title, so the demo runs the
-// actual pipeline end to end. pageHeading and domain are the page's own text and
-// stay untranslated.
 export type DemoKind = Extract<
   SaveKind,
   "Articles" | "Recipes" | "Products" | "Travel" | "Videos"
@@ -15,7 +12,6 @@ export type DemoKind = Extract<
 
 export type DemoSample = {
   kind: DemoKind;
-  /** Set on a topic's sample, which files into that topic's space. */
   interest?: Interest;
   url: string;
   pageHeading: string;
@@ -63,9 +59,6 @@ const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.map((interest) => ({
 
 const SAMPLE_COUNT = 3;
 
-/** The demo's ready-made links. The first picked kind's sample leads, the
- * picked topics' samples follow it, then the other picked kinds, then the
- * rest, so both setup answers show on a three-link screen. */
 export function orderDemoSamples(
   kinds: readonly SaveKind[],
   interests: readonly Interest[] = [],
@@ -85,7 +78,6 @@ export function orderDemoSamples(
     ...lead.slice(1),
     ...byKind.filter((sample) => !kinds.includes(sample.kind)),
   ];
-  // A topic can offer the same page as a kind; it shows once.
   return ordered
     .filter(
       (sample, index) =>
@@ -94,9 +86,6 @@ export function orderDemoSamples(
     .slice(0, SAMPLE_COUNT);
 }
 
-/** The kind the picker's headline names: the leading sample's, when setup
- * picked it. Null when nothing picked has a sample, and the headline says
- * "link". */
 export function featuredDemoKind(
   kinds: readonly SaveKind[],
   interests: readonly Interest[] = [],
@@ -108,9 +97,6 @@ export function featuredDemoKind(
     : null;
 }
 
-/** The share-sheet practice after the first save: the reading article
- * (it previews reliably), else the picked kinds' first sample, never the link
- * the demo already saved. */
 export function practiceShareSample(
   kinds: readonly SaveKind[],
   savedUrl: string | null,
@@ -122,21 +108,16 @@ export function practiceShareSample(
   ].find((sample) => sample.url !== savedUrl);
 }
 
-/** A ready-made sample, which the demo can preview before sign-in. */
 export function isDemoSample(url: string): boolean {
   return findSample(url) !== undefined;
 }
 
-/** The ready-made sample behind a URL, a kind's or a topic's. */
 export function findSample(url: string): DemoSample | undefined {
   return [...DEMO_SAMPLES, ...INTEREST_SAMPLES].find(
     (sample) => sample.url === url,
   );
 }
 
-/** A topic's sample files into that topic's space, and any other sample into
- * its kind's first preset space, when the user kept that space. Any other
- * link is left to the classifier. */
 export function demoDestination(
   url: string,
   spaces: readonly string[],

@@ -4,8 +4,6 @@ import { liveOwner } from "./model/auth";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
 import { v } from "convex/values";
 
-/** How long webhook dedupe rows are kept. RevenueCat retries deliveries for
- * days, not months, so a purged id cannot cause double counting. */
 export const RECEIPT_RETENTION_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 
 const PURGE_PAGE = 100;
@@ -14,8 +12,6 @@ export const enqueue = internalMutation({
   args: { payment: paymentTelemetryValidator },
   returns: v.null(),
   handler: async (ctx, { payment }) => {
-    // Same fence as the entitlement writes this webhook drives: an owner
-    // mid-deletion counts as gone, so its payment telemetry is skipped too.
     if ((await liveOwner(ctx, payment.userId)) === null) return null;
     const duplicate = await ctx.db
       .query("paymentAnalyticsReceipts")
@@ -32,9 +28,6 @@ export const enqueue = internalMutation({
   },
 });
 
-/** Drops dedupe rows past the retention window so the ledger does not grow
- * forever. Documents scan oldest-first by creation time, so the sweep stops
- * at the first live row and chains itself only after a full expired page. */
 export const purgeExpiredReceipts = internalMutation({
   args: {},
   returns: v.null(),

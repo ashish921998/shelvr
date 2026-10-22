@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-// The first-save picker: a featured sample saved in one tap, the other
-// samples below it, and the paste field. The save hooks are stubbed, so these
-// tests pin what the step itself owns: what is visible, and what each control
-// hands to the hooks.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -364,7 +360,6 @@ describe("first-save picker", () => {
   it("gives the screen a way back from the picker and from a sample's sign-in ask, and none while reading", () => {
     mock.demo.view = "share";
     const { rerender } = render(step());
-    // From the picker, back leaves the step.
     expect(props.onBackChange).toHaveBeenLastCalledWith(props.onExit);
 
     mock.demo.view = "auth";
@@ -392,8 +387,6 @@ describe("first-save picker", () => {
     const { rerender } = render(step());
     expect(mock.intake.canAccept()).toBe(true);
 
-    // Back from a later step: the one demo save is spent, so a held share
-    // is left for the share screen.
     rerender(<LiveDemoStep {...props} alreadySaved />);
     expect(mock.intake.canAccept()).toBe(false);
   });

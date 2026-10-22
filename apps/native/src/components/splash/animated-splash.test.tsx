@@ -6,7 +6,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SPLASH_DURATION, SPLASH_EXIT_FROM } from "./timeline";
 
 const motion = vi.hoisted(() => ({
-  // The last `withTiming` completion callback, so a test can land it or not.
   completions: [] as ((completed: boolean) => void)[],
 }));
 

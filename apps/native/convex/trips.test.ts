@@ -8,8 +8,6 @@ import type { Id } from "./_generated/dataModel";
 
 const generateObject = vi.hoisted(() => vi.fn());
 
-// Only the provider call is replaced. `ai.ts` builds its language model at
-// import, so wrapLanguageModel is stubbed as well.
 vi.mock("ai", () => ({
   embedMany: vi.fn(),
   generateObject,
@@ -95,7 +93,6 @@ async function testKey(): Promise<string> {
   return btoa(String.fromCharCode(...der));
 }
 
-// Saves are numbered newest filed first in the prompt.
 const LISBON_SAVES: Save[] = [
   {
     title: "Pastéis de Belém, the original custard tarts",
@@ -135,7 +132,6 @@ describe("makeTrip", () => {
             why: "Petiscos",
             slot: "dinner",
           },
-          // Invented: no save names it.
           {
             saveNumber: 2,
             name: "Time Out Market",
@@ -177,7 +173,6 @@ describe("makeTrip", () => {
       },
       {
         itemId: itemIds[2],
-        // An area the save never says is dropped, as in a plan.
         name: "Taberna da Rua das Flores",
         why: "Petiscos",
         slot: "dinner",
@@ -199,8 +194,7 @@ describe("makeTrip", () => {
         ? { latitude: 38.6975, longitude: -9.2032 }
         : q === "Lisbon"
           ? { latitude: 38.7223, longitude: -9.1393 }
-          : // The same name in Porto: dropped as another city.
-            { latitude: 41.1579, longitude: -8.6291 };
+          : { latitude: 41.1579, longitude: -8.6291 };
       return Response.json({
         results: [{ coordinate }],
       });
@@ -372,7 +366,6 @@ describe("makeTrip", () => {
     const after = await t.query(api.tripData.getSpaceTrip, { spaceId });
     expect(after?.days[0].stops.map((s) => s.itemId)).not.toContain(itemIds[0]);
     expect(after?.days[0].stops).toHaveLength(2);
-    // Its lunch and its area go with it.
     expect(after?.days[0]).toMatchObject({ areas: [], gaps: ["lunch"] });
 
     await base.run((ctx) => ctx.db.delete(itemIds[1]));
@@ -412,7 +405,6 @@ describe("makeTrip", () => {
       { title: "Lost In esplanada for the view" },
     ]);
     const { t, spaceId } = seeded;
-    // Newest filed first: Lost In 1, Taberna 2, Park 3, Pastéis 4.
     const pick = (saveNumber: number, name: string, slot: string) => ({
       saveNumber,
       name,
@@ -430,7 +422,6 @@ describe("makeTrip", () => {
         ],
       },
     });
-    // An easy day holds three stops, so Lost In waits on the wishlist.
     const { tripId } = await t.action(api.trips.makeTrip, {
       spaceId,
       days: 1,
@@ -462,7 +453,6 @@ describe("makeTrip", () => {
         name: "Not on the trip",
       }),
     ).rejects.toMatchObject({ data: { code: "nothing_to_swap" } });
-    // Park's save is deleted: it may not come back into the day.
     const { base } = seeded;
     const lostIn = trip?.days[0].stops[2];
     if (!lostIn) throw new Error("no stop");

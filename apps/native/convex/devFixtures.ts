@@ -50,12 +50,6 @@ async function requireDevelopmentAnonymousUser(
   }
 }
 
-/**
- * Replace the signed-in anonymous developer's app data with a deterministic
- * fixture library. Auth rows are deliberately preserved so the caller remains
- * signed in. The environment and provider checks keep this mutation unusable
- * by production or OAuth accounts.
- */
 export const resetCurrentUser = mutation({
   args: {},
   returns: resetResultValidator,
@@ -134,8 +128,6 @@ export const resetCurrentUser = mutation({
       url: "https://example.com/recipes/weeknight-miso-ramen",
       siteName: "Example Kitchen",
       tags: ["recipes", "dinner"],
-      // The page loaded but had no extractable article, so the detail
-      // screen shows the plain-link layout (site panel and button).
       enrichment: "no_article",
       intents: [
         {
@@ -181,8 +173,6 @@ export const resetCurrentUser = mutation({
       url: "https://example.com/design/value-of-craft",
       siteName: "Example Journal",
       tags: ["design", "reading"],
-      // A readable article body + hero so this fixture exercises the
-      // ArticleReaderView path (paragraphs split on blank lines).
       heroImageUrl: "https://picsum.photos/seed/value-of-craft/1200/630",
       aspectRatio: 1.91,
       content: [
@@ -253,13 +243,6 @@ export const resetCurrentUser = mutation({
   },
 });
 
-/**
- * Pins a trip on a development deployment that has no Apple Maps key: sets
- * where each named stop is, as `trips.makeTrip` would have, and lays the trip
- * out again from those points. Internal, so it is run from the CLI
- * (`convex run devFixtures:locateTripStops`), with the fixture reset's guards
- * on the trip's owner. Returns how many stops got a point.
- */
 export const locateTripStops = internalMutation({
   args: {
     spaceId: v.id("spaces"),

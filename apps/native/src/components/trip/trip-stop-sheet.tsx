@@ -9,11 +9,8 @@ import { Pressable, View } from "react-native";
 import Animated, { withTiming } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// A module constant, so the worklet captures this timing object and not
-// all of `motion`.
 const ENTER = motion.timing.enter;
 
-/** A new stop's cover fades in and scales up from 95%. */
 function coverIn() {
   "worklet";
   return {
@@ -89,10 +86,6 @@ function Action({
   );
 }
 
-/**
- * One stop, opened from its pin or its row: the save's cover and creator,
- * the reason, and what to do next.
- */
 export function TripStopSheet({
   stop,
   index,
@@ -122,8 +115,6 @@ export function TripStopSheet({
             entering={coverIn}
             style={[
               styles.cover,
-              // A save with no image gets the day's tint and a map mark, not
-              // an empty grey tile.
               !stop.cover && { backgroundColor: `${color}26` },
             ]}
           >

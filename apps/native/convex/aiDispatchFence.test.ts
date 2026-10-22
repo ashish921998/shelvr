@@ -87,8 +87,6 @@ function deferred() {
   return { promise, resolve };
 }
 
-/** Convex registrations retain their original handler at runtime. Only the
- * action context is wrapped; all nested queries/mutations remain real. */
 function handler<Args extends DefaultFunctionArgs, Result>(
   action: RegisteredAction<"internal", Args, Result>,
 ) {
@@ -101,7 +99,6 @@ function handler<Args extends DefaultFunctionArgs, Result>(
 
 type PausedQuery = { name: string; args: unknown; result: unknown };
 
-/** Pause after a real DB query completes, never replace its authorization. */
 function queryBarrier(
   ctx: ActionCtx,
   name: string,
@@ -633,7 +630,6 @@ describe("AI dispatch uses fresh live ownership", () => {
         () => invalidate(f, kind),
       );
       expect(generateObject).not.toHaveBeenCalled();
-      // The earlier authorized space embedding is not recalled.
       expect(embedMany).toHaveBeenCalledOnce();
     },
   );

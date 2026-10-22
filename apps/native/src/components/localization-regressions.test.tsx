@@ -15,8 +15,6 @@ const device = vi.hoisted(() => ({
   fontReady: true,
   listeners: new Set<() => void>(),
 }));
-// The native asset loader normally handles these requires; Node has no font
-// loader. AnimatedText requires both the display TTF and the Satoshi OTFs.
 vi.hoisted(async () => {
   const { createRequire } = await import("node:module");
   const load = createRequire(import.meta.url);
@@ -99,7 +97,6 @@ const mockTheme = vi.hoisted(() => ({
     xxxl: 32,
     huge: 48,
   },
-  // Any variant a component asks for resolves to an empty style.
   type: new Proxy({}, { get: () => ({}) }) as Record<string, object>,
   opacity: { pressed: 0.7, disabled: 0.4 },
   control: { minHeight: 48, pressRetentionOffset: 12 },
@@ -129,8 +126,6 @@ const mockTheme = vi.hoisted(() => ({
 vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: mockTheme }),
   StyleSheet: {
-    // Evaluate style factories with the mock theme so dynamic variant
-    // styles (styles.text(variant)) keep working.
     create: (factory: (theme: typeof mockTheme) => unknown) =>
       typeof factory === "function" ? factory(mockTheme) : factory,
     absoluteFillObject: {},

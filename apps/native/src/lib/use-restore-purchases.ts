@@ -3,8 +3,6 @@ import { t } from "@/lib/i18n";
 import { useState } from "react";
 import { Alert, Platform } from "react-native";
 
-/** Restore purchases with its result alert, shared by Settings and the plan
- * gate. `restoring` is true while a restore runs; a second tap is ignored. */
 export function useRestorePurchases() {
   const [restoring, setRestoring] = useState(false);
   const restore = async () => {

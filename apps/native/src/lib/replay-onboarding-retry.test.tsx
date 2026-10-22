@@ -41,9 +41,6 @@ vi.mock("@/lib/entitlement", () => ({
   waitForSheetTransition: () => Promise.resolve(),
 }));
 
-// Lets every pending mutation promise, store notification and re-render
-// settle. A self-retrying replay keeps scheduling new attempts, so the call
-// count below would keep growing instead of holding still.
 async function settle() {
   for (let i = 0; i < 10; i++) {
     await act(async () => {
@@ -52,8 +49,6 @@ async function settle() {
   }
 }
 
-// Rejects like a server error, but succeeds once the call count shows a retry
-// loop, so a regression fails its assertion instead of exhausting the heap.
 function failingServer() {
   return () =>
     createSpace.mock.calls.length > 20
@@ -163,7 +158,6 @@ describe("useReplayOnboarding retries", () => {
   });
 
   it("runs work that arrives while a pass is in flight", async () => {
-    // An older build's queued link keeps the replay busy after the spaces.
     storage.set(
       "shelvr.pending.onboarding",
       JSON.stringify({

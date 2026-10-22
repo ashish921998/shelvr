@@ -3,41 +3,16 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 
-// Persisted store for onboarding state that must survive leaving the screen
-// (the demo step's inline OAuth) or an app kill: the picked library
-// categories, the picked save kinds, current step, and an in-flight demo save. The
-// same record later drives the post-sign-in replay in lib/replay-onboarding
-// .ts. Backed by SecureStore so the data survives an app kill (iOS can and
-// does kill backgrounded apps). Clears use setItem('') because SecureStore's
-// delete is async-only; getters treat empty as "not set".
-
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-// Older flows stored `step` as an index into a different step list, under the
-// same key. Their step and answers are ignored so progress restarts at the
-// opener; the replay fields (operationId, spaces, demoUrl) still apply.
-// Version 3 inserted the acquisition source step after the opener, 4 the
-// notifications step before the reveal. 5 removed the source step, inserted
-// the interests step after the opener and added the share step. 6 removed
-// the reveal step.
 const PROGRESS_VERSION = 6;
 
-/** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
- * while the save is still processing) resumes the exact save the user asked
- * for. It is kept after the demo step advances so the share practice can
- * avoid offering the same link again. Cancelling the demo's sign-in clears
- * it, and `setPendingSpaces` (the finish path) drops it, so a completed save
- * is never replayed or left behind in SecureStore. */
 export type PendingDemo = {
   url: string;
-  /** The demo's explicit single destination ("just my shelf" when null). */
   destination: string | null;
-  /** Only a URL received through Shelvr's share extension counts as a share. */
   source: "direct" | "share";
 };
 
-/** The demo's finished save, so a relaunch on the reminder step still has
- * the save to remind about. Dropped with the demo when onboarding finishes. */
 type PendingSaved = {
   itemId: Id<"items">;
   savedSpaceNames: string[];
@@ -47,17 +22,14 @@ type PendingRecord = {
   operationId: string;
   spaces: string[];
   demoUrl: string | null;
-  /** Absent on records written by an older flow. */
   progressVersion: number | null;
   saveKinds: string[];
   step: number | null;
   demo: PendingDemo | null;
-  /** Absent on records written before the save was kept. */
   saved: PendingSaved | null;
   spaceNames: Record<string, string>;
 };
 
-/** What onboarding.tsx restores on mount. */
 type OnboardingProgress = {
   saveKinds: string[];
   spaces: string[];
@@ -110,8 +82,6 @@ function readPendingRecord(): PendingRecord | null {
         typeof record.demo.destination === "string")
         ? record.demo
         : null;
-    // Builds before the first-share fix did not persist origin. Treat those
-    // records as direct saves rather than hiding guidance on an assumption.
     const demo: PendingDemo | null =
       storedDemo === null
         ? null
@@ -194,9 +164,6 @@ export function getOrCreatePendingOperationId(): string {
   return operationId;
 }
 
-// Replay retries (refreshOperationId=false) update the existing operation
-// rather than starting a new one; otherwise a successfully-created demo link
-// could be duplicated after a partial space-creation failure.
 function writePendingSpaces(
   spaces: string[],
   refreshOperationId: boolean,
@@ -222,10 +189,6 @@ function writePendingSpaces(
   notifyChanged();
 }
 
-/** Onboarding finished: hand the picked spaces to the replay hook. The demo
- * step is over, so its in-flight record is dropped here as well — otherwise a
- * completed save would outlive onboarding in SecureStore (`hasPending` ignores
- * it, so nothing downstream would ever clear it). */
 export function setPendingSpaces(spaces: string[]) {
   writePendingSpaces(spaces, true, null, null);
 }
@@ -244,12 +207,10 @@ export function getPendingSpaces(): string[] {
   return readPendingRecord()?.spaces ?? [];
 }
 
-/** Read-only: unlike getOrCreatePendingOperationId, never writes a record. */
 export function getPendingOperationId(): string | null {
   return readPendingRecord()?.operationId ?? null;
 }
 
-/** Older builds queued this save until purchase. Preserve that intent. */
 export function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
 }
@@ -266,9 +227,7 @@ export function clearLegacyDemoUrlIfSaved(savedUrl: string) {
   if (!queued) return;
   try {
     if (new URL(queued).href === new URL(savedUrl).href) clearLegacyDemoUrl();
-  } catch {
-    // An invalid old URL remains recoverable instead of being silently lost.
-  }
+  } catch {}
 }
 
 function isCurrentProgress(record: PendingRecord | null): boolean {
@@ -304,7 +263,6 @@ export function setOnboardingProgress(progress: {
     progressVersion: PROGRESS_VERSION,
     saveKinds: progress.saveKinds,
     step: progress.step,
-    // An older flow's in-flight demo belongs to a step this flow restarted.
     demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
     saved: progress.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
@@ -337,8 +295,6 @@ export function hasPending(): boolean {
   );
 }
 
-/** Freeze a preset's persisted name before its first creation. Display labels
- * may change language, but demo and completion must use the same identity. */
 export function resolveOnboardingSpaceName(id: string): string {
   getOrCreatePendingOperationId();
   const record = readPendingRecord();

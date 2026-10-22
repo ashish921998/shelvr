@@ -113,8 +113,6 @@ export class NotificationDeviceSession {
     const operation = this.queue
       .then(async () => {
         if (!current()) return false;
-        // Foreground callers honor the block. Explicit attempts (including a
-        // token rotation) may retry, and their transient failures stay retryable.
         this.registrationBlocked = false;
         const token = await getToken();
         if (!current()) return false;
@@ -126,7 +124,6 @@ export class NotificationDeviceSession {
         const locale = this.deps.getLocale?.();
         const key = `${token}\0${locale ?? ""}`;
         if (key === this.registeredKey) return true;
-        // Persist before the server write so a restart can still revoke an accepted token.
         const tokens = await this.store.read();
         if (!tokens.includes(token)) await this.store.write([...tokens, token]);
         if (!current()) return false;
@@ -161,7 +158,6 @@ export class NotificationDeviceSession {
     return this.setPreference(enabled, this.deps.setSaveReminders);
   }
 
-  /** Turning a kind on asks for permission first; `false` means it was denied. */
   private setPreference(
     enabled: boolean,
     save: (enabled: boolean) => Promise<unknown>,
@@ -198,20 +194,13 @@ export class NotificationDeviceSession {
           throw error;
         }
         this.stop();
-        // After a successful account deletion the server has already ended the
-        // session; clear the local Convex Auth credentials too.
         if (operation === "delete_account") {
-          // Server deletion succeeded even if local auth cleanup fails next.
           void this.deps.clearWidget().catch((error) => {
             this.deps.reportError(new Error(widgetClearErrorEvent(error)));
           });
           try {
             await this.deps.signOut();
           } catch (error) {
-            // Local sign-out failed, so no unauthenticated auth edge may
-            // follow promptly and the identity hook would not fire. Clear
-            // the PostHog identity here so events stop attributing to the
-            // deleted account.
             this.deps.resetAnalytics();
             this.deps.reportError(error);
           }

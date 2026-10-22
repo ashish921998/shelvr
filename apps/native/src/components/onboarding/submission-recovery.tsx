@@ -4,7 +4,6 @@ import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** Creation has not returned an item ID: do not imply a confirmed save. */
 export function SubmissionRecovery({
   onKeepWaiting,
   onContinue,

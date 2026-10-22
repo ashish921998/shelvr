@@ -57,7 +57,6 @@ type Props = {
   onCancel?: () => void;
 };
 
-/** One row of the form: a label on the left, its control on the right. */
 function Row({
   label,
   children,
@@ -73,10 +72,6 @@ function Row({
   );
 }
 
-/** A label over a full-width native segmented control. The label comes
- * first so VoiceOver reads it before the segments; `spoken` gives a bare
- * value like "2" its unit ("2 days") on iOS, which the Expo UI control
- * cannot pass through. */
 function Segmented({
   label,
   values,
@@ -129,8 +124,6 @@ function Segmented({
   );
 }
 
-/** The start date: "Add a date" until one is picked, then the native
- * compact picker (iOS) or the date with a tap to change it (Android). */
 function StartDate({
   value,
   onChange,
@@ -214,10 +207,6 @@ function StartDate({
   );
 }
 
-/**
- * "Plan my trip": how many days, when, how full, and (for a space whose
- * saves span cities) which city. The form never names a place itself.
- */
 export function TripPlanForm({
   saveCount,
   cities,
@@ -234,8 +223,6 @@ export function TripPlanForm({
       ? date
       : null;
   });
-  // Kept by name: the list reorders as saves finish, so an index could
-  // drift to another city while the sheet is open.
   const [picked, setPicked] = useState(initial?.city);
   const cityIndex = Math.max(
     0,
@@ -362,8 +349,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "flex-end",
     gap: theme.gap(1),
   },
-  // The compact picker sizes to its date; without a floor it is laid out
-  // narrower than the text and clips the year.
   compactPicker: {
     minWidth: 132,
   },

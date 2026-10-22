@@ -6,9 +6,6 @@ import { Platform, Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { StitchRow } from "@/components/ui/stitch-loader";
 
-/** Apple (iOS), Google and the dev login, with the failure line and, unless
- * the caller leaves it out, the privacy note. The caller owns the OAuth
- * state, so a sheet can stay open while a sign-in is in flight. */
 export function SignInButtons({
   oauth,
   privacyNote = true,

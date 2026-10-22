@@ -6,14 +6,9 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// What the model writes when a post never says how many it serves. Saves made
-// before the prompt asked it to leave the field out still carry these.
 const NO_YIELD =
   /^(not (specified|stated|mentioned|given)|unspecified|unknown|n\/?a|none|-)\.?$/i;
 
-/** Recipe markup often states the yield as a bare number ("4"); a phrase
- * ("Makes 16 cookies", "2 1/2 cups") is shown as written. A placeholder for a
- * missing yield ("not specified") is not shown at all. */
 function servingsLabel(servings: string | undefined): string | null {
   const text = servings?.trim();
   if (!text || NO_YIELD.test(text)) return null;
@@ -24,12 +19,6 @@ function servingsLabel(servings: string | undefined): string | null {
 const INGREDIENTS = 0;
 const DIRECTIONS = 1;
 
-// The structured recipe lifted out of a recipe page, a video caption, or a
-// screenshot. Rendered instead of the article paragraphs: the user wants the
-// recipe itself, not the blog story around it. Ingredients and directions sit
-// behind the platform's own segmented control, so the method is one tap away
-// instead of below every ingredient. Lists are selectable so quantities can be
-// copied.
 export function RecipeSection({ recipe }: { recipe: Recipe }) {
   useAppLocale();
   const { theme, rt } = useUnistyles();

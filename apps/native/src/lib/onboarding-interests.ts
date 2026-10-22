@@ -1,7 +1,3 @@
-// The answers to "What are you into?". Each picked topic becomes a starter
-// space, and its sample leads the first-save picker, so the first thing a
-// person saves is about something they chose and lands in a space named for it.
-// The ids double as space identities and stay stable; labels are translated.
 export const INTERESTS = [
   "AI",
   "Tech",
@@ -30,8 +26,6 @@ export function isInterest(value: string): value is Interest {
   return INTERESTS.some((interest) => interest === value);
 }
 
-// Real pages, checked with readPage to return a title and readable text.
-// pageHeading and domain are the page's own text and stay untranslated.
 export const INTEREST_PAGES: Record<
   Interest,
   { url: string; pageHeading: string; domain: string }
@@ -116,9 +110,6 @@ export const INTEREST_PAGES: Record<
     pageHeading: "James Webb Space Telescope",
     domain: "en.wikipedia.org",
   },
-  // Travel and Fitness share their identity with the setup kinds' first
-  // preset space, so picking the kind picks the topic and the other way round.
-  // Travel offers the same page as the Travel kind's sample.
   Travel: {
     url: "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/",
     pageHeading: "Old Town Square",

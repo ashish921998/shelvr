@@ -113,8 +113,6 @@ export default function Search() {
   const [out, setOut] = useState(false);
   const { q, results } = QUERIES[qi];
 
-  // Type the query, hold the results, fade out, next query. Only on screen,
-  // and never with reduced motion (which shows the first query in full).
   useEffect(() => {
     if (!inView || reduced) return;
     const [delay, step] =
@@ -134,7 +132,6 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [inView, reduced, typed, out, qi, q.length]);
 
-  // Reduced motion can switch on mid-fade; results must not stay hidden then.
   const hidden = out && !reduced;
   const fade = hidden ? "translate-y-2 opacity-0" : "opacity-100";
 

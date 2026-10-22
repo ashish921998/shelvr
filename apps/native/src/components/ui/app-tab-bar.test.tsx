@@ -4,12 +4,6 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppTabs } from "./app-tab-bar";
 
-// `Tabs` comes from expo-router, so the Unistyles babel plugin never
-// instruments the view it renders and cannot repaint it when the theme
-// changes. These mocks reproduce that: `StyleSheet.create` runs once with the
-// launch theme (as Unistyles caches it), while `useUnistyles` reports the
-// active one. A stylesheet colour therefore stays frozen at the launch theme
-// and only a value read from `useUnistyles` follows a switch.
 const mock = vi.hoisted(() => {
   const gap = (v: number) => v * 8;
   const radius = { sm: 8, md: 11, lg: 16, xl: 24 };
@@ -42,8 +36,6 @@ const mock = vi.hoisted(() => {
       border: "#332c20",
     },
   };
-  // Named here so the gesture mock below assigns it rather than declaring a
-  // PascalCase object method, which the naming-convention rule rejects.
   const manualGesture = () => ({});
   return {
     light,
@@ -80,8 +72,6 @@ vi.mock("react-native", () => {
 });
 
 vi.mock("expo-router/ui", () => ({
-  // Rendering no children keeps this test on the backdrop: the bar drawn inside
-  // has its own theme subscription.
   Tabs: vi.fn(({ style }: { style: unknown }) => {
     mock.tabsStyle = style;
     return null;
@@ -140,10 +130,6 @@ describe("AppTabs", () => {
     expect(backdropColor()).toBe("#faf6ee");
   });
 
-  // The regression: with the colour taken from the stylesheet alone, this
-  // backdrop keeps the launch theme's cream and shows as a light band under the
-  // floating bar for the rest of the session. Re-rendering stands in for the
-  // theme subscription Unistyles drives on a switch.
   it("repaints the backdrop when the theme changes after launch", () => {
     const view = render(<AppTabs />);
     mock.theme = mock.dark;

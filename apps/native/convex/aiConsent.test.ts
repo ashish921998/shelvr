@@ -17,7 +17,6 @@ const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
 const safeFetch = vi.hoisted(() => vi.fn());
 
-// Every provider call is replaced, so a test can assert that none was made.
 vi.mock("ai", () => ({
   embedMany,
   generateObject,
@@ -29,7 +28,6 @@ vi.mock("./model/safeFetch", async (original) => ({
   safeFetch,
 }));
 
-/** The id of the account the current test signed in; set by `signedIn`. */
 let USER: string;
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
   i === 0 ? 1 : 0,
@@ -357,9 +355,6 @@ describe("a user who declined", () => {
   });
 
   it("gets no steering when filing an item into a space", async () => {
-    // Steering only runs for a real, entitled account, so this one is seeded
-    // in full and steered once before the decline to prove the setup reaches
-    // the model.
     const t = newConvexTest();
     const { itemId, spaceId, userId } = await t.run(async (ctx) => {
       const userId = await ctx.db.insert("users", {});

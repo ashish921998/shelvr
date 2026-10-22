@@ -29,7 +29,6 @@ describe("buildComposition", () => {
 
   it("draws the thread in two segments meeting at the centre", () => {
     const { threadAbove, threadBelow } = buildComposition();
-    // The x wobble is applied to every sample, so the join is compared on y.
     expect(threadAbove.at(-1)?.[1]).toBeCloseTo(CENTER_Y, 5);
     expect(threadBelow[0][1]).toBeCloseTo(CENTER_Y, 5);
     expect(threadAbove[0][1]).toBeLessThan(0);
@@ -44,8 +43,6 @@ describe("buildComposition", () => {
       expect(mark.x).toBeLessThanOrEqual(DESIGN_WIDTH - 18);
       expect(mark.y).toBeGreaterThanOrEqual(70);
       expect(mark.size).toBeGreaterThan(0);
-      // Each mark has to be visible before it starts travelling, or it would
-      // pop into existence already sliding towards the shelf.
       expect(mark.appearAt).toBeLessThan(mark.travelAt);
       expect(mark.travelDuration).toBeGreaterThan(0);
     }
@@ -88,7 +85,6 @@ describe("shelfSlotX", () => {
       CENTER_X + SHELF_WIDTH / 2,
       5,
     );
-    // Evenly spaced, so the settled row reads as one tidy run of stitches.
     const gap = shelfSlotX(1) - shelfSlotX(0);
     expect(shelfSlotX(20) - shelfSlotX(19)).toBeCloseTo(gap, 5);
   });
@@ -196,10 +192,6 @@ describe("cubicBezierEase", () => {
   });
 
   it("resolves a curve too flat for Newton-Raphson alone", () => {
-    // Both x control points sit at 0, so the curve leaves the origin with a
-    // near-zero derivative: Newton stalls and the bisection fallback finishes
-    // the solve. The exact value is asserted rather than a range, because a
-    // range passes even when the fallback returns nonsense.
     expect(cubicBezierEase(0.0001, 0, 1 / 3, 0, 2 / 3)).toBeCloseTo(
       0.046482,
       5,

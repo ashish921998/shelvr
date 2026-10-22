@@ -10,7 +10,6 @@ import {
   type TripStop,
 } from "./trip";
 
-// Two Lisbon neighbourhoods about 3 km apart.
 const ALFAMA = { lat: 38.7118, lng: -9.1303 };
 const BELEM = { lat: 38.6976, lng: -9.2063 };
 
@@ -90,7 +89,6 @@ describe("buildTrip", () => {
       pace: "balanced",
     });
     expect(trip.days[0].gaps).toEqual(["dinner"]);
-    // An empty day has nothing to have a gap in.
     expect(trip.days[1]).toEqual({ areas: [], stops: [], gaps: [] });
   });
 

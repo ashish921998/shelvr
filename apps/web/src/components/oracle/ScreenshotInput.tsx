@@ -9,9 +9,6 @@ import { FieldHint, SubmitButton } from "./OracleFields";
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_EDGE_PX = 2000;
 
-/** Re-encodes the image as a JPEG no longer than 2000 px on a side. That keeps
- * a 4 MB camera-roll PNG well under the server's 3 MB cap and the hosting
- * platform's request limit, and still leaves a phone screenshot legible. */
 async function encodeImage(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(
@@ -73,7 +70,6 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     <form onSubmit={submit}>
       <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-line-strong bg-white p-4 text-center transition hover:border-ember-deep focus-within:border-ember-deep">
         {preview ? (
-          // A local object URL; next/image has nothing to optimise here.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={preview}

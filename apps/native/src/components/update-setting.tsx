@@ -5,7 +5,6 @@ import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { useUnistyles } from "react-native-unistyles";
 
-/** Button label and status line for each state; one table, no precedence. */
 function copyFor(state: UpdateState): {
   label: TextMessageKey;
   note: TextMessageKey | null;
@@ -30,12 +29,6 @@ function copyFor(state: UpdateState): {
   }
 }
 
-/**
- * Manual EAS Update check on Profile. The native side already checks on
- * launch; this pulls an update on the build's channel without a cold start.
- * A found update downloads straight away, then the action offers the restart.
- * Ported from Amber (#16).
- */
 export function UpdateSetting() {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -43,8 +36,6 @@ export function UpdateSetting() {
     theme.colors.background,
     theme.colors.primary,
   );
-  // A release build with updates off has nothing to offer; hide the card
-  // rather than call it a development build.
   if (state.kind === "unsupported" && state.reason === "disabled") return null;
   const { label, note } = copyFor(state);
   const busy =

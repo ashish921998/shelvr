@@ -8,11 +8,7 @@ type Props = {
   items: FeedItem[];
   numColumns?: number;
   source?: ItemSource;
-  // Marks the first item (top-left) as the Apple-zoom landing target, so a
-  // withAppleZoom link that pushed this screen zooms into where the feed begins.
   firstItemZoomTarget?: boolean;
-  // Paginated feeds ask for the next page as the user nears the bottom; leave
-  // unset when there is nothing more to load.
   onEndReached?: () => void;
   loadingMore?: boolean;
   ListEmptyComponent?: React.ComponentType | React.ReactElement;
@@ -51,8 +47,6 @@ export function MasonryFeed({
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       onScrollBeginDrag={onScrollBeginDrag}
-      // Each cell pads 4, so 12 here puts the outer cards 16 from the screen
-      // edge, the same margin as the headers and every other page.
       contentContainerStyle={{
         flexGrow: items.length === 0 ? 1 : undefined,
         paddingHorizontal: theme.gap(1.5),
@@ -63,8 +57,6 @@ export function MasonryFeed({
       onEndReachedThreshold={1}
       ListEmptyComponent={listEmptyComponent}
       ListHeaderComponent={listHeaderComponent}
-      // Headers already inset themselves 16, so they step back out of the
-      // grid's padding instead of doubling it.
       ListHeaderComponentStyle={styles.edgeToEdge}
       ListFooterComponent={
         loadingMore ? (

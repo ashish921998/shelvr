@@ -38,15 +38,6 @@ import {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// A character-diffing text morph rendered through Skia so each glyph can
-// carry a real Gaussian blur. When `text` changes, characters shared with the
-// previous string persist (same key → same glyph) and glide to their new
-// position, while removed characters animate out (up + right, shrink, blur,
-// fade) and added characters animate in (rise from below, grow, sharpen,
-// fade), staggered left to right. The scene is bounded by the slot width and
-// MAX_MORPH_GLYPHS, interruption-aware, and pruned in one batch, so a long
-// note or rapid paging cannot flood it with worklet nodes.
-
 const FONTS: Record<string, number> = {
   "CrimsonProRoman-Regular": require("../../assets/fonts/CrimsonProRoman-Regular.ttf"),
   "Satoshi-Regular": require("../../assets/fonts/Satoshi-Regular.otf"),
@@ -56,25 +47,10 @@ const FONTS: Record<string, number> = {
 
 const morph = motion.textMorph;
 const CANVAS_HEIGHT = 56;
-// Fixed layout width. Kept just under the native header's title slot (~242pt
-// between the bar buttons) so it is never clamped. iOS then centers the whole
-// canvas on screen and the text, centered within it, lands dead-center.
 const DEFAULT_WIDTH = 240;
 const DEFAULT_FONT_SIZE = 24;
-// How long a slot may stay blank waiting for Skia to resolve its font, so the
-// title can rise into an empty header instead of replacing text already on
-// screen. About one screen transition, so the gap hides inside the push, and
-// bounded so a slow or failed font load still shows the title. Timed from
-// mount to resolve on an iOS simulator over Metro's fetch: 53ms for a
-// session's first slot, 30ms warm. Losing the race costs a late title and a
-// 2pt baseline step where the canvas replaces native text. The figures are
-// simulator ones; a real device or Android still pays a typeface parse, so
-// re-time it there before moving the hold.
 const FONT_HOLD_MS = motion.duration.enter;
 
-// How long a started transition stays active: the slowest of its staggered
-// entrance and its delayed position glide. An interrupted transition drops the
-// stagger, so it settles on the short feedback timing instead.
 function morphDuration(glyphs: number, interrupted: boolean) {
   if (interrupted) return motion.timing.feedback.duration;
   return Math.max(
@@ -100,7 +76,6 @@ type CharGlyphProps = {
   blurMax: number;
 };
 
-// Primitive props let unchanged glyphs skip reconciliation work.
 const CharGlyph = memo(function CharGlyph({
   char,
   x,
@@ -132,8 +107,6 @@ const CharGlyph = memo(function CharGlyph({
         ? withTiming(x, motion.timing.feedback)
         : withDelay(morph.glideDelay, withTiming(x, morph.glide)),
     );
-    // Rapid paging unmounts glyphs mid-glide, and withDelay keeps its timer
-    // running until the delay elapses. Stop it with the glyph.
     return () => {
       cancelAnimation(gx);
     };
@@ -144,15 +117,11 @@ const CharGlyph = memo(function CharGlyph({
     const staggerEntrance = firstAppearance.current && animateIn;
     firstAppearance.current = false;
 
-    // withDelay keeps the PREVIOUS animation running during its delay. Stop
-    // it explicitly, otherwise a returning letter continues fading to zero.
     cancelAnimation(progress);
     cancelAnimation(fade);
 
     if (!isExiting) {
       direction.set(1);
-      // Reversals resume immediately from the current value. Only a newly
-      // added letter receives the signature stagger.
       const delay = staggerEntrance
         ? morph.enterDelay + charIndex * morph.stagger
         : 0;
@@ -173,8 +142,6 @@ const CharGlyph = memo(function CharGlyph({
       fade.set(withDelay(delay, withTiming(0, morph.exit)));
     }
 
-    // Effect reactivation must always restore the target. A persistent phase
-    // guard would skip setup after Reanimated cancels values during cleanup.
     return () => {
       cancelAnimation(progress);
       cancelAnimation(fade);
@@ -195,7 +162,6 @@ const CharGlyph = memo(function CharGlyph({
     ];
   });
   const blur = useDerivedValue(() => blurMax * (1 - fade.get()));
-  // Scale around the glyph's centre rather than the baseline origin.
   const origin = useMemo(
     () => ({ x: glyphWidth / 2, y: -fontSize * 0.34 }),
     [glyphWidth, fontSize],
@@ -214,7 +180,6 @@ type AnimatedTextProps = {
   style?: StyleProp<TextStyle>;
   containerStyle?: StyleProp<ViewStyle>;
   width?: number;
-  /** Layout height. The canvas includes overflow for glyph travel and blur. */
   height?: number;
   blurMax?: number;
   truncate?: boolean;
@@ -242,21 +207,14 @@ export function AnimatedText({
     fontSize,
   );
 
-  // Native text shapes joined scripts, bidi, combining marks and emoji as
-  // runs; Dynamic Type and Reduce Motion skip the spatial glyph choreography.
   const nativeText =
     needsNativeText(text) ||
     Boolean(font?.getGlyphIDs(text).some((glyph) => glyph === 0));
   const forceNative = nativeText || reducedMotion || fontScale > 1;
 
-  // Latches once native text has been on screen, so a later canvas mount can
-  // never blank a title the reader is already looking at. Native shaping
-  // latches on the next tick, having painted; a pending font gets the hold.
   const [paintedNative, setPaintedNative] = useState(false);
   useEffect(() => {
     if (paintedNative) return;
-    // A resolved font with nothing painted yet is the one case that may
-    // stagger in, so it is also the one case that starts no timer.
     if (font && !forceNative) return;
     const timer = setTimeout(
       () => setPaintedNative(true),
@@ -271,8 +229,6 @@ export function AnimatedText({
     paintedNative,
   );
 
-  // The `!font` test never decides the branch, since mode is only "morph" once
-  // the font resolves. It is what narrows the type for the canvas below.
   if (!font || mode !== "morph") {
     return (
       <View style={[styles.container, { width }, containerStyle]}>
@@ -281,8 +237,6 @@ export function AnimatedText({
             style,
             { maxWidth: width },
             nativeText && { fontFamily: undefined },
-            // Laid out but unpainted: the canvas is about to rise into this
-            // slot, and the reader must not watch a title appear then vanish.
             mode === "hold" && styles.held,
           ]}
           numberOfLines={truncate ? 1 : undefined}
@@ -293,8 +247,6 @@ export function AnimatedText({
     );
   }
 
-  // Compact header slots must not crop the rising/blurred letters at their
-  // edges: the canvas extends past the slot on every side.
   const overscan = Math.ceil(
     Math.max(morph.enterRise, morph.exitUp, morph.exitRight) + blurMax * 3,
   );
@@ -318,10 +270,6 @@ export function AnimatedText({
   );
 }
 
-// Mounts only when the font is ready. Its initial scene staggers in only when
-// the slot painted nothing before it, so rebuilding a native header never
-// replays a transparent title. Unmounting when native shaping takes over also
-// drops any stale exit glyphs.
 function MorphText({
   text,
   font,
@@ -363,8 +311,6 @@ function MorphText({
     }
     const now = performance.now();
     return {
-      // Reconciling against no previous scene marks every glyph as added, so
-      // the whole title staggers in the way a text change does.
       cells: reconcileMorphCells(
         [],
         laid,
@@ -372,8 +318,6 @@ function MorphText({
         morph.exit.duration,
         morph.stagger,
       ),
-      // Record the entrance as a running transition. A title that changes
-      // mid-stagger must read as an interruption, not stack a second one.
       deadline: now + morphDuration(laid.length, false),
     };
   });
@@ -408,14 +352,8 @@ function MorphText({
     );
     scene.current = next;
     lastChange.current = includeMorphExits(transition, next);
-    // Reconciling a stateful transition against the previous glyph scene is
-    // not a pure render derivation, so state is set from the effect by design.
     setTransition({ cells: next, interrupted });
 
-    // Keep completion entirely on RN. A callback for each departing letter
-    // crossed Worklets' remote-function registry and rebuilt the Skia scene N
-    // times. One cancellable batch also prevents an old exit from deleting a
-    // letter that returned and started another exit in the meantime.
     const lastExit = next.reduce(
       (latest, cell) => Math.max(latest, cell.exitAt ?? 0),
       0,

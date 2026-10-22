@@ -9,8 +9,6 @@ import {
   type PageData,
 } from "../pageReadCore";
 
-/** A short link (vm.tiktok.com, tiktok.com/t/) resolved to the video it
- * names, from the oEmbed author and video id. */
 function tikTokPostUrl(
   handle: string | undefined,
   videoId: string | undefined,
@@ -23,12 +21,7 @@ function tikTokPostUrl(
     : undefined;
 }
 
-/**
- * TikTok refuses bot page loads, but its public oEmbed endpoint answers with
- * the caption, creator, and a 9:16 poster — everything the card needs. TikTok
- * also returns 400 for unsupported URL shapes, so only true 404/410 responses
- * are treated as permanently gone by the shared page reader.
- */
+/** TikTok refuses bot page loads; oEmbed answers. It returns 400 for unsupported URLs, so only 404/410 mean gone. */
 export async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
   const result = await safeFetch(endpoint, {

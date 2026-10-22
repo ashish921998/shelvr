@@ -39,7 +39,7 @@
 
   --color-ink: #2b2418;
   --color-ink-soft: #443a2a;
-  --color-muted: #756a5b; /* 4.9:1 on paper — AA for body text */
+  --color-muted: #756a5b;
   --color-muted-soft: #b5aa97;
   --color-paper: #faf6ee;
   --color-paper-deep: #f3ecdd;
@@ -108,8 +108,6 @@
   }
 }
 
-/* ---------- texture & decoration ---------- */
-
 .section-kicker {
   display: inline-flex;
   align-items: center;
@@ -141,8 +139,6 @@
   font-style: normal;
   letter-spacing: 0.02em;
 }
-
-/* ---------- landing demos ---------- */
 
 @keyframes blink {
   0%,

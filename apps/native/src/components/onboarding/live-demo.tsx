@@ -30,14 +30,8 @@ import { Modal, Pressable, Text, TextInput, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The first save is a pasted, typed or ready-made link; a link shared from
-// another app still arrives through expo-sharing. The save pipeline lives in
-// useDemoSave, share intake in useIncomingShareUrl.
-
 export type { DemoSaved };
 
-// The headline names what the leading sample is, so a person who said they
-// save videos is asked to save a video.
 const TITLES: Record<DemoKind, TextMessageKey> = {
   Articles: "demo.titleArticles",
   Recipes: "demo.titleRecipes",
@@ -58,21 +52,14 @@ export function LiveDemoStep({
   onExit,
   onAdvance,
 }: {
-  /** Ready-made links, the picked kinds first. */
   samples: DemoSample[];
-  /** The leading sample's kind when setup picked it, else null. */
   titleKind: DemoKind | null;
-  /** Stable preset identities kept in setup. */
   spaces: string[];
-  /** A save captured before an earlier sign-in or relaunch. */
   resume: PendingDemo | null;
-  /** Came back from the reveal: the first save exists, so offer the way on. */
   alreadySaved: boolean;
   onSaved: (saved: DemoSaved) => void;
   onReadingChange: (reading: boolean) => void;
-  /** Hands the screen's back button what to do here, or null to hide it. */
   onBackChange: (back: (() => void) | null) => void;
-  /** Back from the picker: leave this step for the one before it. */
   onExit: () => void;
   onAdvance: () => void;
 }) {
@@ -85,8 +72,6 @@ export function LiveDemoStep({
     onAdvance,
   });
   useIncomingShareUrl({
-    // The one demo save is spent once a first save exists. Coming back to
-    // this step must not consume a share it can no longer save.
     canAccept: () => !alreadySaved && demo.canAcceptShare(),
     readOnMount: resume === null,
     onSharedUrl: demo.submitSharedUrl,
@@ -98,9 +83,6 @@ export function LiveDemoStep({
     onReadingChange(view === "reading" || view === "preview");
   }, [view, onReadingChange]);
 
-  // The sign-in ask after a previewed sample goes back to the picker, and
-  // the picker goes back a step unless a save is on its way. The preview and
-  // the reading view have no way back: they move on by themselves.
   const cancelAuthRef = useRef(demo.cancelAuth);
   useEffect(() => {
     cancelAuthRef.current = demo.cancelAuth;
@@ -125,8 +107,6 @@ export function LiveDemoStep({
     return () => onBackChange(null);
   }, [signInAsk, picking, onBackChange, onExit]);
 
-  // A paste saves at once when it holds a link and shows just that link.
-  // Otherwise the text stays in the field so the user sees what was pasted.
   const savePasted = (text: string) => {
     const url = linkFromText(text);
     setDraft(url ?? text.trim());
@@ -166,9 +146,6 @@ export function LiveDemoStep({
     );
   }
 
-  // A previewed sample (or one restored after a relaunch) asks for sign-in
-  // on its own screen. A previewed one keeps that screen up while its save
-  // lands, then goes to the reveal; a restored one reads here like any other.
   const authSample = view === "auth" ? findSample(demo.authUrl) : undefined;
   if (authSample !== undefined) {
     return (
@@ -204,8 +181,6 @@ export function LiveDemoStep({
     demo.error === null ? null : (
       <Text style={styles.error}>{t(demo.error)}</Text>
     );
-  // An error about the link field sits under the field; everything else
-  // (a failed save) stays by the control it came from.
   const inputError =
     demo.error === "demo.clipboardNoLink" || demo.error === "demo.notALink";
 
@@ -273,8 +248,6 @@ export function LiveDemoStep({
     demo.demoUsed || alreadySaved ? (
       <GhostButton label={t("common.continue")} onPress={demo.advance} />
     ) : (
-      // Always a way on: after a failed save it reads as carrying on, before
-      // one as skipping the first save.
       <GhostButton
         label={t(demo.canSkip ? "common.continue" : "demo.skip")}
         onPress={demo.skip}
@@ -312,9 +285,6 @@ type PickerProps = {
   pasteRow: ReactNode;
 };
 
-/** The first save is one tap on a sample matched to the kinds picked in
- * setup. The share sheet is taught after it, once the first save has landed
- * (see share-practice.tsx). */
 function SamplePicker({
   samples,
   titleKind,
@@ -401,9 +371,6 @@ function DemoAuthSheet({
   };
   const pageHeading = findSample(url)?.pageHeading ?? displayHost(url);
 
-  // A cancel keeps the sheet open: the auth session reports its own failures
-  // as cancels, and closing on them reads as a button that does nothing.
-  // Back and the scrim still close it.
   return (
     <Modal
       visible={visible}

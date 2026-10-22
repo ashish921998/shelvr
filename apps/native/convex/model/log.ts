@@ -2,8 +2,6 @@ import { env } from "../_generated/server";
 
 type LogLevel = "info" | "warn" | "error";
 
-/** Only scalars: a field is a category, code, id, count, or flag. Never a
- * message, URL, or user content. Those stay out of the log stream. */
 type LogFieldValue = string | number | boolean | null | undefined;
 type LogFields = Record<string, LogFieldValue>;
 
@@ -27,7 +25,6 @@ export function logEvent(
   }
 }
 
-/** Constructor name, or `typeof`. Safe to log: a message can echo args. */
 export function errorName(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }

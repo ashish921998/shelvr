@@ -12,12 +12,6 @@ import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
-/**
- * No entry without a plan. A signed-in account without an active entitlement
- * lands here instead of the app (the guard is in `(app)/_layout.tsx`), and
- * closing the paywall comes back here. Restore, sign out and Settings, where
- * account deletion lives, stay one tap away: App Review requires them.
- */
 export default function PlanGateScreen() {
   useAppLocale();
   const router = useRouter();
@@ -35,7 +29,6 @@ export default function PlanGateScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Scrolls so large accessibility text still reaches every action. */}
       <ScrollView contentContainerStyle={styles.content}>
         <Wordmark size={30} />
         <View style={styles.middle}>

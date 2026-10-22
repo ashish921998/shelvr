@@ -1,4 +1,3 @@
-/** The part of a native-stack screen's navigation this module listens on. */
 export type ClosingScreen = {
   addListener: (
     type: "transitionEnd",
@@ -6,23 +5,10 @@ export type ClosingScreen = {
   ) => () => void;
 };
 
-/**
- * Upper bound on the wait. Expo SDK 58's form sheet takes over a second to
- * close, so this only caps a lost event; it is not the expected wait.
- */
 const DISMISS_TIMEOUT_MS = 2500;
 
-/** UIKit clears its presented controller just after the screen disappears. */
 const AFTER_DISMISS_MS = 100;
 
-/**
- * Runs `close`, then resolves once this screen has finished closing: the
- * native stack's closing `transitionEnd`, sent when UIKit's dismissal ends.
- * RevenueCat UI presents from the root view controller and UIKit refuses
- * while a sheet is still dismissing, so a paywall opened from a sheet waits
- * here. A fixed delay guessed the dismissal's length and fell short once SDK
- * 58 slowed the form sheet, leaving the paywall unshown and its latch held.
- */
 export function closeScreen(
   screen: ClosingScreen,
   close: () => void,

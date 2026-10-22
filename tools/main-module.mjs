@@ -18,10 +18,6 @@ import { fileURLToPath } from "node:url";
  */
 export function isMainModule(moduleUrl) {
   const entry = process.argv[1];
-  // node was given no file to run at all (--eval, stdin, the REPL), so no
-  // module is the program. An EACCES or ELOOP on a path that does exist is a
-  // different thing, and swallowing it would exit 0 without running the check
-  // it was asked for, so it propagates.
   if (typeof entry !== "string" || entry === "") return false;
   return realpathSync(entry) === realpathSync(fileURLToPath(moduleUrl));
 }

@@ -2,8 +2,6 @@ import { analytics } from "@/lib/analytics";
 import type { TextMessageKey } from "@/locales/message-types";
 import * as SecureStore from "expo-secure-store";
 
-// Per account: the instant this device first saw the shelf short of the save
-// goal, then "done" once the goal was reported (or found already met).
 const saveGoalKey = (userId: string) => `shelvr.saveGoal.${userId}`;
 const DONE = "done";
 const HOUR_MS = 60 * 60 * 1000;
@@ -14,13 +12,6 @@ type SaveGoalStep =
   | { kind: "reached"; hoursSinceStart: number }
   | { kind: "skip" };
 
-/**
- * What one save-progress read means for the "goal reached" signal. The clock
- * starts the first time a shelf is seen short of the goal, which for a new
- * account is its first Home visit after onboarding. A shelf already at the
- * goal when first seen (an existing user) is skipped, so the event only
- * counts shelves that were watched filling up.
- */
 export function nextSaveGoalStep(
   stored: string | null,
   progress: { saved: number; goal: number },
@@ -30,7 +21,6 @@ export function nextSaveGoalStep(
   if (stored === DONE) return { kind: "none" };
   const start = stored === null || stored === "" ? null : Number(stored);
   if (progress.saved < progress.goal) {
-    // The clock waits for the card itself, not another Home prompt.
     return (start === null || !Number.isFinite(start)) && cardVisible
       ? { kind: "start", at: now }
       : { kind: "none" };
@@ -38,14 +28,10 @@ export function nextSaveGoalStep(
   if (start === null || !Number.isFinite(start)) return { kind: "skip" };
   return {
     kind: "reached",
-    // Rounded up to the hundredth, so anything past 48 hours can never
-    // read as 48 in a "within 48 hours" filter.
     hoursSinceStart: Math.ceil(((now - start) / HOUR_MS) * 100) / 100,
   };
 }
 
-/** Applies `nextSaveGoalStep` for this account and fires
- * `save_goal_reached` once. Storage failures only cost the signal. */
 export function trackSaveGoal(
   userId: string,
   progress: { saved: number; goal: number },
@@ -79,7 +65,6 @@ export function trackSaveGoal(
   }
 }
 
-/** The progress card's title counts down the saves still to go. */
 export function progressTitleKey(saved: number, goal: number): TextMessageKey {
   const left = goal - saved;
   if (left <= 1) return "home.progressTitleLast";

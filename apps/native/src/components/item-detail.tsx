@@ -58,14 +58,6 @@ type CardRow = FunctionReturnType<
 >["page"][number];
 type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 
-// A row as handed to a detail page. The feed and similar-items queries return
-// the card shape: everything a card shows, but not the article body or the
-// shopping results. getItem and getSpace carry those, and so does searchItems
-// for now (it keeps full rows while builds before the paginated feed are
-// installed). The body fields are therefore optional here; a row that lacks
-// them is filled in from getItem, and one that has them paints at once. Rows
-// from getSpace additionally carry `spaceIntents`: purpose-steered actions
-// scoped to that space's membership.
 export type DetailItem = CardRow &
   Partial<
     Pick<
@@ -81,26 +73,17 @@ type Props = {
   // Only the page matching the pushed id owns the Apple-zoom transition target;
   // pairing more than one target with a single push confuses the animation.
   isZoomTarget: boolean;
-  // The pager's page height, which a media save's stage fills.
   pageHeight: number;
-  // The pager pins a bar over this page's bottom (a suggestion decision, or
-  // its undo), so a media caption must sit above it.
   reserveFooter: boolean;
   onSheetUnderHeader?: (itemId: string, under: boolean) => void;
 };
 
-// Shared data for both render paths: the full document (list rows carry
-// neither the article body nor the space memberships), similar items, the hero
-// URI, and parsed article paragraphs.
 function useItemDetailData(item: DetailItem) {
   const { data: withSpaces, isError: fullRowFailed } = useQuery(
     convexQuery(api.items.getItem, { id: item._id }),
   );
   const spaces = withSpaces?.spaces ?? [];
 
-  // The full document wins once it arrives; until then the row is all we have.
-  // `spaceIntents` is the one field only the row knows. Memoized so the
-  // children see a stable `item` across parent re-renders.
   const detail = useMemo<DetailItem>(
     () =>
       withSpaces
@@ -109,23 +92,12 @@ function useItemDetailData(item: DetailItem) {
     [item, withSpaces],
   );
 
-  // A link's layout depends on whether it has an article body, and a card row
-  // cannot say. Hold the body until getItem answers rather than paint the plain
-  // layout and then jump to the reader. Rows that already carry `content`
-  // (getSpace) and non-link items render at once. If getItem fails, paint what
-  // the row has rather than spin forever.
   const bodyPending =
     item.type === "link" &&
     item.content === undefined &&
     withSpaces === undefined &&
     !fullRowFailed;
 
-  // Lexical-similarity strip for the bottom of the page (v0, a vector index
-  // upgrade slots in behind the same query). Only ready items have signal.
-  // Conditional queries use the 'skip' sentinel, not `enabled` (see the
-  // pager): a disabled React Query still subscribes through the Convex
-  // adapter. The short gcTime ends each visited page's subscription soon
-  // after it unmounts instead of holding one for the session-long default.
   const similarReady = item.status === "ready" && item.type !== "note";
   const { data: similar } = useQuery({
     ...convexQuery(
@@ -149,10 +121,6 @@ function useItemDetailData(item: DetailItem) {
   return { detail, bodyPending, spaces, similar, heroUri, paragraphs };
 }
 
-// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
-// is stable across swipes (Convex query data, staleTime Infinity). Without this,
-// every parent re-render (setActiveId on each swipe) re-rendered every mounted
-// page and its ~100+ paragraph Text nodes, the dominant swipe cost profiled.
 export const ItemDetail = memo(function ItemDetail({
   item,
   isZoomTarget,
@@ -166,10 +134,6 @@ export const ItemDetail = memo(function ItemDetail({
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  // iOS keeps a transparent header (blur band behind it, full-bleed hero), so
-  // its pages pad the header band in. Android owns an opaque toolbar (see
-  // item/[id].tsx), so its content already starts below the header. Padding
-  // by the header height there would open a blank band under the toolbar.
   const headerInset = Platform.OS === "ios" ? headerHeight : 0;
 
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
@@ -185,11 +149,8 @@ export const ItemDetail = memo(function ItemDetail({
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [item._id]);
 
-  // A social save's "content" is its caption, not an article: keep the
-  // poster layout.
   const social = socialPost(item);
 
-  // Link saves with extracted content get the compact reader layout.
   if (
     !bodyPending &&
     item.type === "link" &&
@@ -209,13 +170,10 @@ export const ItemDetail = memo(function ItemDetail({
     );
   }
 
-  // The item's own actions, plus any purpose-steered ones from the space this
-  // page was opened through (deduped: steering may echo a general intent).
   const intents = (() => {
     const base = item.intents ?? [];
     const scoped = item.spaceIntents ?? [];
     const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
-    // An action that only reopens the save's own page repeats the source line.
     return withoutSourceLink(
       [
         ...base,
@@ -227,8 +185,6 @@ export const ItemDetail = memo(function ItemDetail({
     );
   })();
 
-  // `detail`, not `item`: a row from a search or a space carries the recipe
-  // itself, and getItem fills it in for one that only has the card's flag.
   if (heroUri && isMediaSave(detail)) {
     return (
       <MediaViewerPage
@@ -266,18 +222,11 @@ export const ItemDetail = memo(function ItemDetail({
     );
   }
 
-  // Cap the hero so a tall portrait image can't fill the whole screen and hide
-  // the title, description, and actions below it.
   const maxHeroHeight = height * 0.55;
 
   const letterboxed = letterboxedVideoRatio(item.url, item.aspectRatio);
   const heroAspect = pageHeroAspect(item, social, letterboxed);
 
-  // Size the framed photo up front from its aspect ratio: fill the width the
-  // frame allows, but never taller than the cap, and when the cap bites, pull
-  // the width back in too so the image keeps its shape and the frame hugs it
-  // (no cropping, no lopsided gap). The frame insets the image by its own
-  // horizontal margin + padding.
   const frameInset = theme.gap(2) * 2 + theme.gap(1) * 2;
   const frameSize = (aspect: number) => {
     const frameHeight = Math.min((width - frameInset) / aspect, maxHeroHeight);
@@ -285,9 +234,6 @@ export const ItemDetail = memo(function ItemDetail({
   };
   const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
-  // A post on this layout is one with a recipe (see isMediaSave). Its poster
-  // is a short, cropped band that opens the post, so the recipe it was saved
-  // for starts on the first screen.
   const heroKind = pageHeroKind(item, social);
   const poster = heroKind === "poster";
 
@@ -323,8 +269,6 @@ export const ItemDetail = memo(function ItemDetail({
       heroImage
     );
 
-  // A recipe post's other photos stay on the post: here they would push the
-  // recipe back below the fold.
   const moreMedia =
     social && item.url && !poster
       ? (item.media ?? []).slice(1).map((media, index) => (
@@ -373,16 +317,12 @@ export const ItemDetail = memo(function ItemDetail({
     style: [styles.container, { paddingTop: headerInset + theme.gap(5) }],
     contentContainerStyle: { paddingBottom: insets.bottom + theme.gap(4) },
     showsVerticalScrollIndicator: false,
-    // Note pages are edited in place: keep the caret above the keyboard and
-    // let a drag down dismiss it.
     automaticallyAdjustKeyboardInsets: true,
     keyboardDismissMode: "interactive" as const,
     keyboardShouldPersistTaps: "handled" as const,
   };
 
   if (bodyPending) {
-    // The hero is up so the zoom transition has its target; the body waits for
-    // getItem (see useItemDetailData).
     return (
       <ScrollView {...scrollProps}>
         {heroBlock}
@@ -413,14 +353,10 @@ export const ItemDetail = memo(function ItemDetail({
 
 const YOUTUBE: SocialPost = { site: "YouTube", playable: true };
 
-/** A link that is neither a post nor an article: a product, a video, any page
- * Shelvr read no body from. Its page leads with one button to the site. */
 function plainLink(item: DetailItem, social: SocialPost | undefined): boolean {
   return item.type === "link" && social === undefined;
 }
 
-/** What the hero opens when tapped: a post on its site, or a YouTube video,
- * which plays there and so gets the same play button a video post does. */
 function heroOpensAs(
   item: DetailItem,
   social: SocialPost | undefined,
@@ -431,10 +367,6 @@ function heroOpensAs(
     : undefined;
 }
 
-/** Whether a plain link with no picture shows its site's panel in its place.
- * While the body loads the page may still become the reader, so the panel
- * waits, unless the save already says it has no article; then it is up for
- * the card's zoom. */
 function showsSitePanel(
   item: DetailItem,
   social: SocialPost | undefined,
@@ -454,9 +386,6 @@ function pageHeroKind(
   return social ? "poster" : "framed";
 }
 
-/** The hero's shape: a letterboxed video thumbnail's video, else the
- * picture's own, else the usual shape of what was saved (OpenGraph images
- * default to 1200×630, about 1.91). */
 function pageHeroAspect(
   item: DetailItem,
   social: SocialPost | undefined,
@@ -469,9 +398,6 @@ function pageHeroAspect(
   );
 }
 
-/** The page hero's fit and box: a recipe post's short cropped poster, a
- * full-bleed sticker, or a photo sized to its matted frame. A letterboxed
- * video thumbnail fills its frame, which crops the black bars away. */
 function pageHeroLook(
   kind: PageHeroKind,
   aspect: number,
@@ -493,8 +419,6 @@ function pageHeroLook(
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
-/** A carousel post's photos after the first, at the top of the media
- * viewer's details sheet. Each opens the post, as the first one does. */
 function MoreMedia({ item, site }: { item: DetailItem; site: string }) {
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
@@ -535,7 +459,6 @@ type DetailBodyProps = {
   social: SocialPost | undefined;
 };
 
-/** The body of a save's own page, under its hero. */
 function ItemPageBody({
   item,
   detail,
@@ -564,13 +487,7 @@ function ItemPageBody({
   }
 
   return (
-    <View
-      style={[
-        styles.body,
-        // The ScrollView already clears the header; only a hero needs a gap.
-        hasHero ? { paddingTop: theme.gap(5) } : null,
-      ]}
-    >
+    <View style={[styles.body, hasHero ? { paddingTop: theme.gap(5) } : null]}>
       <SaveStatusNotice item={item} centered />
 
       {item.status === "ready" ? (
@@ -578,7 +495,6 @@ function ItemPageBody({
       ) : null}
 
       {item.url && plainLink(item, social) ? (
-        // The site button leads, with the other actions close under it.
         <View style={styles.siteActions}>
           <SiteButton item={item} />
           <IntentsRow item={item} intents={intents} />
@@ -609,8 +525,6 @@ function ItemPageBody({
         </>
       )}
 
-      {/* A post saved for its recipe goes straight to the tabs: the summary
-          only restates the dish the title and poster already name. */}
       {item.description && !(social && detail.recipe) ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
@@ -642,9 +556,6 @@ function ItemPageBody({
   );
 }
 
-/** The details sheet under a media save. Its caption already carries the
- * status, source and actions; the sheet adds a carousel's other photos and
- * the full description. */
 function ItemSheetBody({
   item,
   detail,
@@ -677,8 +588,6 @@ function ItemSheetBody({
   );
 }
 
-/** What a save's page and a media save's sheet both show after their heads:
- * the post caption, tags, products, recipe or article, and similar saves. */
 function DetailSections({
   item,
   detail,
@@ -687,13 +596,9 @@ function DetailSections({
   social,
 }: Omit<DetailBodyProps, "spaces">) {
   const { theme } = useUnistyles();
-  // Keyed by item so a recycled pager page opens a new recipe on Ingredients.
   const recipe = detail.recipe ? (
     <RecipeSection key={item._id} recipe={detail.recipe} />
   ) : null;
-  // A post's recipe is what it was saved for, so it comes first and stands in
-  // for the caption it was lifted from: a recipe caption is the same
-  // ingredients and steps again, plus hashtags the tags already carry.
   const recipeFirst = social !== undefined && recipe !== null;
   return (
     <>
@@ -711,9 +616,6 @@ function DetailSections({
         <ProductsSection item={detail} inset={theme.gap(2)} />
       ) : null}
 
-      {/* A recipe replaces the article paragraphs: the pipeline already lifted
-          the ingredients and steps out of the story around them. A recipe
-          screenshot gets the card under the photo. */}
       {recipeFirst ? null : recipe ? (
         recipe
       ) : !social && paragraphs.length > 0 ? (
@@ -736,7 +638,6 @@ function DetailSections({
   );
 }
 
-/** The item's suggested actions (add to calendar, open a link, …) as chips. */
 function IntentsRow({
   item,
   intents,
@@ -744,7 +645,6 @@ function IntentsRow({
 }: {
   item: DetailItem;
   intents: ItemIntent[];
-  // "start" lines the chips up with a media save's left-aligned caption.
   align?: "center" | "start";
 }) {
   if (intents.length === 0) return null;
@@ -791,27 +691,19 @@ function TagsRow({ tags }: { tags: string[] }) {
   );
 }
 
-/** How the save itself went, derived once from the item's pipeline fields so
- * the rendering below stays a flat switch. */
 type SaveState = "image_too_large" | "gone" | "failed" | "stalled" | "partial";
 
 function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status === "failed") {
     if (item.failureReason === "image_too_large") return "image_too_large";
-    // Missing sources cannot be recovered by retrying.
     return item.failureReason === "not_found" ? "gone" : "failed";
   }
-  // A run older than the backend's stale threshold has lost its action. The
-  // sweeper will fail it on its next tick; until then offer the retry here,
-  // which reprocessItem accepts for exactly this case.
   if (isStaleProcessing(item, now)) {
     return "stalled";
   }
   if (item.status !== "ready") {
     return null;
   }
-  // "no_article" (the page read fine, with no article body) is no fault: a
-  // product or a video has none. Its page leads with the site button instead.
   return item.enrichment === "partial" ? "partial" : null;
 }
 
@@ -833,15 +725,6 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
   return t(SAVE_STATE_NOTICE[state]);
 }
 
-/**
- * How the save itself went: still reading, unreadable, gone, or enriched from
- * the URL alone. Without this a failed item renders as an untitled page with no
- * explanation and no way forward, indistinguishable from one still processing.
- *
- * A `not_found` page is gone for good, so it gets no retry, only a reason.
- */
-// `centered` follows the link layout, whose title, source and chips all sit on
-// the centre axis; the note layout keeps the notice flush with its editor.
 function SaveStatusNotice({
   item,
   centered = false,
@@ -849,15 +732,12 @@ function SaveStatusNotice({
 }: {
   item: DetailItem;
   centered?: boolean;
-  // Over a media save's dark caption scrim rather than the page.
   onMedia?: boolean;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
   const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
-  // Guards the retry gesture: disabled while in flight, and a rejection gets
-  // user-visible feedback instead of an unhandled promise.
   const [retrying, setRetrying] = useState(false);
   // Seeded in a useState initializer and advanced inside the effect so Date.now
   // stays out of the render body (the React compiler flags impure calls
@@ -915,8 +795,6 @@ function SaveStatusNotice({
               try {
                 const scheduled = await reprocess({ id: item._id });
                 if (!scheduled) {
-                  // The server still sees this run as live. Usually a device
-                  // clock running ahead of the backend's stale threshold.
                   Alert.alert(t("item.stillWorking"), t("item.retryLater"));
                 }
               } catch {
@@ -952,14 +830,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   hero: {
     width: "100%",
-    // Full-bleed so the card image (a die-cut sticker) zooms edge-to-edge.
   },
-  // Non-sticker heroes get the same matted frame as the home cards, so
-  // the padded look carries through the Apple zoom into this screen.
   heroContainer: {
     backgroundColor: theme.colors.frame,
-    // Hug the image so a capped portrait sits as a centered card rather than
-    // leaving a gap in a full-width frame.
     alignSelf: "center",
     marginHorizontal: theme.gap(2),
     borderRadius: theme.radius.lg,
@@ -972,7 +845,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   moreMediaList: {
     gap: theme.gap(2),
-    // The sheet body is already inset; the frames bring their own margin.
     marginHorizontal: -theme.gap(2),
   },
   poster: {
@@ -1103,8 +975,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     paddingHorizontal: 4,
   },
-  // Shared pill for the detail screen's small actions (retry a failed save,
-  // find shopping links).
   chip: {
     flexDirection: "row",
     alignItems: "center",
