@@ -477,17 +477,18 @@ export const getItem = query({
       .query("spaceItems")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
       .collect();
-    const spaces: { _id: Id<"spaces">; name: string }[] = [];
-    for (const join of joins) {
-      if (effectiveStatus(join) !== "saved") {
-        continue;
-      }
-      const space = await ctx.db.get(join.spaceId);
-      if (space !== null) {
-        spaces.push({ _id: space._id, name: space.name });
-      }
-    }
-    const enriched = await enrichItem(ctx, item);
+    // The space reads and the image URL go out together.
+    const [rows, enriched] = await Promise.all([
+      Promise.all(
+        joins
+          .filter((join) => effectiveStatus(join) === "saved")
+          .map((join) => ctx.db.get(join.spaceId)),
+      ),
+      enrichItem(ctx, item),
+    ]);
+    const spaces = rows
+      .filter((space): space is Doc<"spaces"> => space !== null)
+      .map((space) => ({ _id: space._id, name: space.name }));
     return { ...enriched, spaces };
   },
 });
