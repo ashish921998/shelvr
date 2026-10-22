@@ -286,7 +286,7 @@ describe("weekly shelf notifications", () => {
       await t.run(async (ctx) => {
         for (let i = 0; i < total; i++) {
           await ctx.db.insert("notificationPreferences", {
-            userId: `due-${i}`,
+            userId: await ctx.db.insert("users", {}),
             weeklyShelfEnabled: true,
             nextDigestAt: now - 1000,
             updatedAt: now,

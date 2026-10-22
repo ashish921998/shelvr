@@ -12,7 +12,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
-import { requireUserId } from "./model/auth";
+import { liveOwner, requireUserId } from "./model/auth";
 import {
   localHour,
   nextLocalHourAt,
@@ -451,6 +451,7 @@ export const prepareWeeklyDigest = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    if ((await liveOwner(ctx, args.userId)) === null) return null;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -604,6 +605,7 @@ export const prepareSaveReminder = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
   handler: async (ctx, { userId, now }) => {
+    if ((await liveOwner(ctx, userId)) === null) return null;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))

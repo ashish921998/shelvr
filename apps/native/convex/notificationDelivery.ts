@@ -6,6 +6,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { liveOwner } from "./model/auth";
 import {
   awaitingOutcome,
   recipientValidator,
@@ -245,6 +246,7 @@ export const claim = internalMutation({
       (digest.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
+    if ((await liveOwner(ctx, digest.userId)) === null) return null;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", digest.userId))
@@ -506,6 +508,7 @@ export const claimReminder = internalMutation({
       (reminder.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
+    if ((await liveOwner(ctx, reminder.userId)) === null) return null;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", reminder.userId))
