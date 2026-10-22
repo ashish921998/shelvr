@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import * as SecureStore from "expo-secure-store";
 
@@ -55,7 +56,8 @@ function attachWindowEnded(): boolean {
       return false;
     }
     return Date.now() - at > PURCHASE_ATTACH_WINDOW_MS;
-  } catch {
+  } catch (error) {
+    analytics.captureError("purchase_attach_window_failed", error);
     return false;
   }
 }

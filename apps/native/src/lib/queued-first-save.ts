@@ -51,7 +51,8 @@ function claimQueued(save: QueuedSave, owner: string): boolean {
   try {
     SecureStore.setItem(KEY, JSON.stringify({ ...save, owner }));
     return true;
-  } catch {
+  } catch (error) {
+    analytics.captureError("claim_queued_first_save_failed", error);
     return false;
   }
 }

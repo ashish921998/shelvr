@@ -46,6 +46,12 @@ describe("stripTags", () => {
     expect(stripTags("x<a>y<z<w")).toBe("xyzw");
   });
 
+  it("takes linear time on a long run of angle brackets that open nothing", () => {
+    const started = performance.now();
+    expect(stripTags("<".repeat(1_000_000))).toBe("");
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   it("cannot be rebuilt into a script tag by nesting tags", () => {
     expect(stripTags("<<b>script>alert(1)<</b>/script>")).toBe(
       "script>alert(1)/script>",

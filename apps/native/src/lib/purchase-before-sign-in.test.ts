@@ -76,4 +76,17 @@ describe("purchase before sign-in", () => {
       expect.any(Error),
     );
   });
+
+  it("reports a keychain that will not stamp the attach window and keeps the claim", () => {
+    notePurchaseBeforeSignIn();
+    expect(claimPurchaseBeforeSignIn("first")).toBe(true);
+    store.delete("shelvr.purchase.beforeSignIn.at");
+
+    keychain.failing = true;
+    expect(claimPurchaseBeforeSignIn("first")).toBe(true);
+    expect(captureError).toHaveBeenLastCalledWith(
+      "purchase_attach_window_failed",
+      expect.any(Error),
+    );
+  });
 });
