@@ -354,7 +354,7 @@ function unclassified(
   };
 }
 
-function withoutModel(
+export function withoutModel(
   item: Doc<"items">,
   page: { title?: string; description?: string } | undefined,
 ): Classification["result"] {
@@ -382,7 +382,7 @@ async function itemAllowed(
   });
 }
 
-function classifiedFields(
+export function classifiedFields(
   aiAllowed: boolean,
   result: Classification["result"],
   item: Doc<"items">,

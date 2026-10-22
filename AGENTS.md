@@ -60,6 +60,15 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   per-host readers in `convex/model/readers/`, on top of
   `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
+- **Domain language:** `GLOSSARY.md` at the repo root defines the terms to use in
+  copy and docs (save, reading, classification, settlement). Tables and
+  functions keep `items` and `finalizeItem`.
+- **Finished-save rules:** `convex/model/settlement.ts` (`completionPatch`)
+  decides what a processing run writes to a save; `finalizeItem` in
+  `convex/items.ts` is its adapter. `convex/finalizeItem.grid.test.ts` pins the
+  rules with the recorded rows in `convex/testdata/settlement/rows.json`.
+  Re-record only for a change you intend, with the command in the test header,
+  and review the row diff.
 - **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
   and `convex/model/pageReadCore.ts` (about 550). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.

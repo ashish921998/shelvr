@@ -78,6 +78,8 @@ import {
   reminderSubject,
 } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
+import { buildSearchText } from "./model/searchText";
+import { completionPatch } from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
@@ -270,31 +272,6 @@ async function toItemCard(
     ...card
   } = await enrichItem(ctx, item);
   return recipe ? { ...card, hasRecipe: true } : card;
-}
-
-const MAX_SEARCH_NOTE_CHARS = 8000;
-
-const MAX_SEARCH_CONTENT_CHARS = 8000;
-
-function buildSearchText(parts: {
-  title?: string;
-  description?: string;
-  tags: string[];
-  siteName?: string;
-  note?: string;
-  content?: string;
-}): string {
-  return [
-    parts.title,
-    parts.description,
-    ...parts.tags,
-    parts.siteName,
-    parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
-    parts.content?.slice(0, MAX_SEARCH_CONTENT_CHARS),
-  ]
-    .filter((p): p is string => typeof p === "string" && p.length > 0)
-    .join(" ")
-    .toLowerCase();
 }
 
 export const listItems = query({
@@ -2081,63 +2058,14 @@ export const finalizeItem = internalMutation({
   returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    const embedAllowed = item !== null && (await aiAllowed(ctx, item.userId));
+    const allowed = item !== null && (await aiAllowed(ctx, item.userId));
     if (item === null) {
       return "missing";
     }
-    const withdrawn = args.classified === true && !embedAllowed;
-    const description = withdrawn ? (item.description ?? "") : args.description;
-    const tags = withdrawn ? item.tags : args.tags;
-    const intents = withdrawn ? item.intents : args.intents;
-    const cities = withdrawn ? item.cities : args.cities;
-    const recipe = withdrawn ? item.recipe : args.recipe;
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    const title =
-      (item.titleSource === "user" || args.keepTitle === true) &&
-      item.title !== undefined
-        ? item.title
-        : ((withdrawn ? undefined : args.title) ?? item.title);
-    const searchText = buildSearchText({
-      title,
-      description,
-      tags,
-      siteName: args.siteName,
-      note: item.note,
-      content: args.content,
-    });
-    // ctx.db.patch removes a field set to undefined, hence the ?? fallbacks and conditional spreads.
-    await ctx.db.patch(args.itemId, {
-      title,
-      description,
-      tags,
-      content: args.content,
-      recipe,
-      siteName: args.siteName,
-      author: args.author,
-      heroImageUrl: args.heroImageUrl,
-      media: args.media,
-      articleMedia: args.articleMedia,
-      ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
-      aspectRatio: args.aspectRatio,
-      intents,
-      ...(cities !== undefined ? { cities } : {}),
-      status: args.status,
-      enrichment: args.enrichment,
-      failureReason: undefined,
-      searchText,
-      // Convex rejects a wrong-width vector at write time, which would fail this whole transaction.
-      ...(embedAllowed &&
-      args.embedding !== undefined &&
-      isValidEmbedding(args.embedding)
-        ? {
-            embedding: args.embedding,
-            embeddingVersion: CURRENT_EMBEDDING_VERSION,
-            embeddingAttempts: undefined,
-          }
-        : { embeddingVersion: undefined, embeddingAttempts: undefined }),
-    });
+    await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
     if (
       args.storageId !== undefined &&
       item.storageId !== undefined &&

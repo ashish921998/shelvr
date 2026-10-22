@@ -22,7 +22,12 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
       reportsDirectory: "./coverage",
       include: ["convex/**/*.ts", "src/lib/**/*.ts", "src/lib/**/*.tsx"],
-      exclude: ["**/*.test.ts", "convex/_generated/**", "convex/test.setup.ts"],
+      exclude: [
+        "**/*.test.ts",
+        "convex/**/*.grid.ts",
+        "convex/_generated/**",
+        "convex/test.setup.ts",
+      ],
       thresholds: {
         statements: 60,
         branches: 55,

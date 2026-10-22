@@ -37,13 +37,13 @@ replacing one with the other.
 
 ## Phase 0: index the article body (implemented)
 
-`buildSearchText` (`items.ts:224`) gains a bounded slice of `content`:
+`buildSearchText` (`model/searchText.ts`) gains a bounded slice of `content`:
 
 ```ts
 const MAX_SEARCH_CONTENT_CHARS = 8000; // mirrors MAX_SEARCH_NOTE_CHARS
 ```
 
-Both `buildSearchText` call sites (`items.ts:1504`, `items.ts:1783`) pass it.
+Every `buildSearchText` call site passes it.
 No schema change, no client change, no new dependency. Existing rows pick it up
 on their next classification; a backfill is optional (Phase 1's sweeper can
 rewrite `searchText` in the same pass).
