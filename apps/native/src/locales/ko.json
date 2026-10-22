@@ -219,6 +219,7 @@
   "tidy.continue": "계속하기",
   "tidy.keep": "유지",
   "tidy.save": "Shelvr에 저장",
+  "tidy.swipeHint": "오른쪽으로 밀어 유지, 왼쪽은 삭제, 위로는 저장",
   "common.loading": "불러오는 중",
   "navigation.home": "홈",
   "navigation.tidy": "사진 정리",

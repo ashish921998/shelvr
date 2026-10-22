@@ -217,6 +217,7 @@
   "tidy.continue": "Continuar",
   "tidy.keep": "Manter",
   "tidy.save": "Salvar no Shelvr",
+  "tidy.swipeHint": "Deslize para a direita para manter, para a esquerda para excluir e para cima para salvar",
   "common.loading": "Carregando",
   "navigation.home": "Início",
   "navigation.tidy": "Organizar",

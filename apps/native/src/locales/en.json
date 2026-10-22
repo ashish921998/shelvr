@@ -217,6 +217,7 @@
   "tidy.continue": "Keep going",
   "tidy.keep": "Keep",
   "tidy.save": "Save to Shelvr",
+  "tidy.swipeHint": "Swipe right to keep, left to delete, up to save",
   "common.loading": "Loading",
   "navigation.home": "Home",
   "navigation.tidy": "Tidy",

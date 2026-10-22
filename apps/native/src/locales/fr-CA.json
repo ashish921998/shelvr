@@ -217,6 +217,7 @@
   "tidy.continue": "Poursuivre",
   "tidy.keep": "Garder",
   "tidy.save": "Enregistrer dans Shelvr",
+  "tidy.swipeHint": "Glissez à droite pour garder, à gauche pour supprimer, vers le haut pour enregistrer",
   "common.loading": "Chargement",
   "navigation.home": "Accueil",
   "navigation.tidy": "Trier",
