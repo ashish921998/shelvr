@@ -3,11 +3,16 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
-import { showTripTeaser } from "@/lib/sample-trip";
+import type { SampleCityId } from "@/lib/sample-cities";
+import { isSampleCity, sampleTrip, showTripTeaser } from "@/lib/sample-trip";
 import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
-import { isTravelVibe, spacesAfterInterestToggle } from "@/lib/travel-vibes";
+import {
+  isTravelVibe,
+  spacesAfterInterestToggle,
+  VIBES_INTEREST,
+} from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -112,6 +117,11 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
+  const [travelCity, setTravelCity] = useState<SampleCityId | null>(() =>
+    isSampleCity(initialProgress.travelCity)
+      ? initialProgress.travelCity
+      : null,
+  );
   const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
@@ -137,10 +147,20 @@ export default function OnboardingScreen() {
   const interests = spaces.filter(isInterest);
   const vibes = spaces.filter(isTravelVibe);
   const teaser = showTripTeaser(kinds, interests);
+  // The city is asked under the Travel topic, so it counts only while that is
+  // picked; Travel as a kind of save alone gets the default city.
+  const pickedCity = interests.includes(VIBES_INTEREST) ? travelCity : null;
+  const trip = sampleTrip(pickedCity);
 
   useEffect(() => {
-    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
-  }, [kinds, spaces, stepIndex, saved]);
+    setOnboardingProgress({
+      saveKinds: kinds,
+      spaces,
+      travelCity,
+      step: stepIndex,
+      saved,
+    });
+  }, [kinds, spaces, travelCity, stepIndex, saved]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -197,8 +217,13 @@ export default function OnboardingScreen() {
         : [...current, name],
     );
 
-  const toggleInterest = (interest: Interest) =>
+  const toggleInterest = (interest: Interest) => {
+    // The city leaves with Travel, as its kinds of spots do.
+    if (interest === VIBES_INTEREST && interests.includes(interest)) {
+      setTravelCity(null);
+    }
     setSpaces((current) => spacesAfterInterestToggle(current, interest));
+  };
 
   const addSpace = (name: string) =>
     setSpaces((current) =>
@@ -211,7 +236,7 @@ export default function OnboardingScreen() {
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(kinds, spaces),
+      onboardingCompletedProperties(kinds, spaces, pickedCity),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -222,6 +247,7 @@ export default function OnboardingScreen() {
   const practiceSample = practiceShareSample(
     kinds,
     getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
+    pickedCity,
   );
   const paywall = useOnboardingPaywall({
     onPro: teaser ? () => setStep("tripReveal") : finish,
@@ -308,8 +334,10 @@ export default function OnboardingScreen() {
           <InterestsStep
             picked={interests}
             vibes={vibes}
+            city={travelCity}
             onToggle={toggleInterest}
             onToggleVibe={toggleSpace}
+            onPickCity={setTravelCity}
             onAdvance={advance}
           />
         </View>
@@ -338,7 +366,7 @@ export default function OnboardingScreen() {
 
           {step === "demo" && (
             <LiveDemoStep
-              samples={orderDemoSamples(kinds, interests)}
+              samples={orderDemoSamples(kinds, interests, pickedCity)}
               titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
               resume={resumeDemo}
@@ -373,10 +401,13 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripBuild" && <TripBuildStep onDone={advance} />}
+          {step === "tripBuild" && (
+            <TripBuildStep trip={trip} onDone={advance} />
+          )}
 
           {step === "tripLocked" && (
             <TripLockedStep
+              trip={trip}
               leaving={paywall.asked}
               onUnlock={() => {
                 recordCurrentStep();
@@ -385,7 +416,9 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripReveal" && <TripRevealStep onContinue={finish} />}
+          {step === "tripReveal" && (
+            <TripRevealStep trip={trip} onContinue={finish} />
+          )}
         </ScrollView>
       )}
     </View>

@@ -10,7 +10,7 @@ export const ONBOARDING_STEPS = [
   "tripLocked",
   "tripReveal",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 11;
+export const ONBOARDING_FLOW_VERSION = 12;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 

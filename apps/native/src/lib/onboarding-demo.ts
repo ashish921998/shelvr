@@ -3,6 +3,7 @@ import {
   INTERESTS,
   type Interest,
 } from "@/lib/onboarding-interests";
+import type { SampleCityId } from "@/lib/sample-cities";
 import { SPACE_PRESETS, type SaveKind } from "@/lib/save-kinds";
 
 export type DemoKind = Extract<
@@ -13,6 +14,8 @@ export type DemoKind = Extract<
 export type DemoSample = {
   kind: DemoKind;
   interest?: Interest;
+  /** Set on a travel sample for a city picked on the interests step. */
+  city?: SampleCityId;
   url: string;
   pageHeading: string;
   domain: string;
@@ -51,6 +54,79 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
   },
 ];
 
+// Wikipedia where the tourism sites sit behind bot checks the backend reader cannot pass.
+const CITY_PAGES: Record<
+  Exclude<SampleCityId, "prague">,
+  Pick<DemoSample, "url" | "pageHeading" | "domain">
+> = {
+  barcelona: {
+    url: "https://en.wikipedia.org/wiki/Sagrada_Fam%C3%ADlia",
+    pageHeading: "Sagrada Família",
+    domain: "en.wikipedia.org",
+  },
+  lisbon: {
+    url: "https://en.wikipedia.org/wiki/Bel%C3%A9m_Tower",
+    pageHeading: "Belém Tower",
+    domain: "en.wikipedia.org",
+  },
+  london: {
+    url: "https://en.wikipedia.org/wiki/Covent_Garden",
+    pageHeading: "Covent Garden",
+    domain: "en.wikipedia.org",
+  },
+  "los-angeles": {
+    url: "https://en.wikipedia.org/wiki/Venice_Canal_Historic_District",
+    pageHeading: "Venice Canal Historic District",
+    domain: "en.wikipedia.org",
+  },
+  "new-york": {
+    url: "https://en.wikipedia.org/wiki/Brooklyn_Bridge",
+    pageHeading: "Brooklyn Bridge",
+    domain: "en.wikipedia.org",
+  },
+  paris: {
+    url: "https://en.wikipedia.org/wiki/Jardin_du_Luxembourg",
+    pageHeading: "Jardin du Luxembourg",
+    domain: "en.wikipedia.org",
+  },
+  "san-francisco": {
+    url: "https://en.wikipedia.org/wiki/Mission_Dolores_Park",
+    pageHeading: "Mission Dolores Park",
+    domain: "en.wikipedia.org",
+  },
+  seoul: {
+    url: "https://en.wikipedia.org/wiki/Bukchon_Hanok_Village",
+    pageHeading: "Bukchon Hanok Village",
+    domain: "en.wikipedia.org",
+  },
+  tokyo: {
+    url: "https://en.wikipedia.org/wiki/Sens%C5%8D-ji",
+    pageHeading: "Sensō-ji",
+    domain: "en.wikipedia.org",
+  },
+  toronto: {
+    url: "https://www.cntower.ca/",
+    pageHeading: "CN Tower",
+    domain: "cntower.ca",
+  },
+};
+
+const CITY_SAMPLES: readonly DemoSample[] = Object.entries(CITY_PAGES).map(
+  ([city, page]) => ({
+    kind: "Travel",
+    city: city as SampleCityId,
+    ...page,
+  }),
+);
+
+function inCity(sample: DemoSample, city: SampleCityId | null): DemoSample {
+  if (sample.kind !== "Travel" || city === null || city === "prague") {
+    return sample;
+  }
+  const local = CITY_SAMPLES.find((other) => other.city === city);
+  return local === undefined ? sample : { ...local, interest: sample.interest };
+}
+
 const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.flatMap(
   (interest) => {
     const page = INTEREST_PAGES[interest];
@@ -65,6 +141,7 @@ const SAMPLE_COUNT = 3;
 export function orderDemoSamples(
   kinds: readonly SaveKind[],
   interests: readonly Interest[] = [],
+  city: SampleCityId | null = null,
 ): DemoSample[] {
   const rank = (sample: DemoSample) => {
     const index = kinds.indexOf(sample.kind);
@@ -80,7 +157,7 @@ export function orderDemoSamples(
     ...topical,
     ...lead.slice(1),
     ...byKind.filter((sample) => !kinds.includes(sample.kind)),
-  ];
+  ].map((sample) => inCity(sample, city));
   return ordered
     .filter(
       (sample, index) =>
@@ -103,16 +180,17 @@ export function featuredDemoKind(
 export function practiceShareSample(
   kinds: readonly SaveKind[],
   savedUrl: string | null,
+  city: SampleCityId | null = null,
 ): DemoSample | undefined {
   const featured = DEMO_SAMPLES.find((sample) => sample.kind === "Articles");
   return [
     ...(featured === undefined ? [] : [featured]),
-    ...orderDemoSamples(kinds),
+    ...orderDemoSamples(kinds, [], city),
   ].find((sample) => sample.url !== savedUrl);
 }
 
 export function findSample(url: string): DemoSample | undefined {
-  return [...DEMO_SAMPLES, ...INTEREST_SAMPLES].find(
+  return [...DEMO_SAMPLES, ...INTEREST_SAMPLES, ...CITY_SAMPLES].find(
     (sample) => sample.url === url,
   );
 }

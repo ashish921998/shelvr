@@ -1,9 +1,15 @@
 import { CtaButton } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { withAlpha } from "@/lib/color";
 import { t, useAppLocale } from "@/lib/i18n";
 import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import {
+  SAMPLE_CITIES,
+  SAMPLE_CITY_IDS,
+  type SampleCityId,
+} from "@/lib/sample-cities";
 import {
   TRAVEL_VIBES,
   VIBES_INTEREST,
@@ -18,14 +24,19 @@ const FADE_HEIGHT = 32;
 export function InterestsStep({
   picked,
   vibes,
+  city,
   onToggle,
   onToggleVibe,
+  onPickCity,
   onAdvance,
 }: {
   picked: readonly Interest[];
   vibes: readonly TravelVibe[];
+  /** The city picked for the sample trip; null for "Not sure yet". */
+  city: SampleCityId | null;
   onToggle: (interest: Interest) => void;
   onToggleVibe: (vibe: TravelVibe) => void;
+  onPickCity: (city: SampleCityId | null) => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -79,6 +90,7 @@ export function InterestsStep({
                   />
                 ))}
               </View>
+              <CityField city={city} onPick={onPickCity} />
             </View>
           ) : null}
         </ScrollView>
@@ -88,6 +100,59 @@ export function InterestsStep({
       <View style={styles.foot}>
         <CtaButton label={t("common.continue")} onPress={onAdvance} />
       </View>
+    </View>
+  );
+}
+
+function CityField({
+  city,
+  onPick,
+}: {
+  city: SampleCityId | null;
+  onPick: (city: SampleCityId | null) => void;
+}) {
+  const { theme } = useUnistyles();
+  const notSure = t("interests.cityNotSure");
+  const cities = SAMPLE_CITY_IDS.map((id) => ({
+    id,
+    name: t(SAMPLE_CITIES[id].name),
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  const value = city === null ? notSure : t(SAMPLE_CITIES[city].name);
+  return (
+    <View style={styles.city}>
+      <View style={styles.cardHead}>
+        <Text style={styles.cardTitle}>{t("interests.cityTitle")}</Text>
+        <Text style={styles.cityHelp}>{t("interests.cityHelp")}</Text>
+      </View>
+      <ActionMenu
+        label={`${t("interests.cityTitle")} ${value}`}
+        title={t("interests.cityTitle")}
+        actions={[
+          {
+            id: "none",
+            label: notSure,
+            selected: city === null,
+            onPress: () => onPick(null),
+          },
+          ...cities.map(({ id, name }) => ({
+            id,
+            label: name,
+            selected: city === id,
+            onPress: () => onPick(id),
+          })),
+        ]}
+      >
+        <View style={styles.cityField}>
+          <Text style={styles.cityValue} numberOfLines={1}>
+            {value}
+          </Text>
+          <AppSymbolIcon
+            name="chevron.up.chevron.down"
+            size={14}
+            tintColor={theme.colors.muted}
+          />
+        </View>
+      </ActionMenu>
     </View>
   );
 }
@@ -233,6 +298,36 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 17,
     lineHeight: 22,
+    color: theme.colors.foreground,
+  },
+  city: {
+    gap: theme.gap(1.5),
+    paddingTop: theme.gap(2),
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  cityHelp: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 19,
+    color: theme.colors.muted,
+  },
+  cityField: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  cityValue: {
+    flex: 1,
+    fontFamily: theme.fonts.medium,
+    fontSize: 16,
     color: theme.colors.foreground,
   },
   foot: {

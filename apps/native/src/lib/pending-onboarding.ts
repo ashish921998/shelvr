@@ -2,6 +2,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
@@ -30,11 +31,14 @@ type PendingRecord = {
   demo: PendingDemo | null;
   saved: PendingSaved | null;
   spaceNames: Record<string, string>;
+  /** The city picked for the sample trip; absent until one is picked. */
+  travelCity?: SampleCityId | null;
 };
 
 type OnboardingProgress = {
   saveKinds: string[];
   spaces: string[];
+  travelCity: SampleCityId | null;
   step: number | null;
   demo: PendingDemo | null;
   saved: PendingSaved | null;
@@ -121,6 +125,7 @@ function readPendingRecord(): PendingRecord | null {
       demo,
       saved: readSaved(record.saved),
       spaceNames: readSpaceNames(record.spaceNames),
+      travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
     };
   } catch {
     return null;
@@ -200,6 +205,7 @@ function writePendingSpaces(
     demo,
     saved,
     spaceNames: existing?.spaceNames ?? {},
+    travelCity: existing?.travelCity ?? null,
   });
   notifyChanged();
 }
@@ -284,11 +290,19 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { saveKinds: [], spaces: [], step: null, demo: null, saved: null };
+    return {
+      saveKinds: [],
+      spaces: [],
+      travelCity: null,
+      step: null,
+      demo: null,
+      saved: null,
+    };
   }
   return {
     saveKinds: record.saveKinds,
     spaces: record.spaces,
+    travelCity: record.travelCity ?? null,
     step: record.step,
     demo: record.demo,
     saved: record.saved,
@@ -298,6 +312,7 @@ export function getOnboardingProgress(): OnboardingProgress {
 export function setOnboardingProgress(progress: {
   saveKinds: string[];
   spaces: string[];
+  travelCity?: SampleCityId | null;
   step: number;
   saved?: PendingSaved | null;
 }) {
@@ -315,6 +330,7 @@ export function setOnboardingProgress(progress: {
     demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
     saved: progress.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
+    travelCity: progress.travelCity ?? null,
   });
   notifyChanged();
 }
@@ -335,6 +351,7 @@ export function setPendingDemo(demo: PendingDemo | null) {
     demo,
     saved: existing?.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
+    travelCity: existing?.travelCity ?? null,
   });
   notifyChanged();
 }

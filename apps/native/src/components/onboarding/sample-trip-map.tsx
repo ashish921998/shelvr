@@ -2,15 +2,14 @@ import { isDarkThemeName } from "@/lib/appearance";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   SAMPLE_MAP,
-  SAMPLE_TRIP,
   sampleStops,
   type SampleCrop,
+  type SampleTrip,
 } from "@/lib/sample-trip";
 import {
   Canvas,
   DashPathEffect,
   Group,
-  Oval,
   Path,
   RoundedRect,
 } from "@shopify/react-native-skia";
@@ -27,13 +26,9 @@ const BLOCKS = [
   [104, 72, 30, 14],
   [136, 100, 24, 12],
 ] as const;
-const RIVER = "M196 176 C192 140 176 118 184 92 S214 52 262 36 S330 14 346 10";
-const BRIDGE = "M164 88 L214 96";
 // A zero-length dash with a round cap is a dot.
 const DOTS = [0.1, 6];
 const WATER = { light: "#cfdcd7", dark: "#2f4147" };
-const PARK = { light: "#e3e6cd", dark: "#2c3626" };
-const ROAD_ALPHA = "59";
 
 export function usePinColors() {
   const { theme } = useUnistyles();
@@ -53,8 +48,8 @@ export function PinBadge({ number, day }: { number: number; day: number }) {
   );
 }
 
-function routePath(day: number): string {
-  return sampleStops()
+function routePath(trip: SampleTrip, day: number): string {
+  return sampleStops(trip)
     .filter((entry) => entry.day === day)
     .map(
       ({ stop }, index) =>
@@ -63,14 +58,20 @@ function routePath(day: number): string {
     .join(" ");
 }
 
-export function SampleTripMap({ crop }: { crop: SampleCrop }) {
+export function SampleTripMap({
+  trip,
+  crop,
+}: {
+  trip: SampleTrip;
+  crop: SampleCrop;
+}) {
   useAppLocale();
   const { theme, rt } = useUnistyles();
   const pinColors = usePinColors();
   const [width, setWidth] = useState(0);
   const dark = isDarkThemeName(rt.themeName);
   const scale = width / SAMPLE_MAP.width;
-  const stops = sampleStops();
+  const stops = sampleStops(trip);
 
   return (
     <View
@@ -81,7 +82,7 @@ export function SampleTripMap({ crop }: { crop: SampleCrop }) {
       accessible
       accessibilityRole="image"
       accessibilityLabel={t("tripTeaser.mapLabel", {
-        city: t("tripTeaser.city"),
+        city: t(trip.name),
         places: String(stops.length),
       })}
     >
@@ -89,13 +90,6 @@ export function SampleTripMap({ crop }: { crop: SampleCrop }) {
         <>
           <Canvas style={styles.canvas} pointerEvents="none">
             <Group transform={[{ scale }, { translateY: -crop.top }]}>
-              <Oval
-                x={24}
-                y={108}
-                width={124}
-                height={52}
-                color={dark ? PARK.dark : PARK.light}
-              />
               {BLOCKS.map(([x, y, w, h]) => (
                 <RoundedRect
                   key={`${x}:${y}`}
@@ -107,24 +101,21 @@ export function SampleTripMap({ crop }: { crop: SampleCrop }) {
                   color={theme.colors.border}
                 />
               ))}
-              <Path
-                path={RIVER}
-                style="stroke"
-                strokeWidth={20}
-                strokeCap="round"
-                color={dark ? WATER.dark : WATER.light}
-              />
-              <Path
-                path={BRIDGE}
-                style="stroke"
-                strokeWidth={4}
-                strokeCap="round"
-                color={`${theme.colors.muted}${ROAD_ALPHA}`}
-              />
-              {SAMPLE_TRIP.days.map((_, day) => (
+              {trip.water.map((line) => (
+                <Path
+                  key={line}
+                  path={line}
+                  style="stroke"
+                  strokeWidth={trip.waterWidth}
+                  strokeCap="round"
+                  strokeJoin="round"
+                  color={dark ? WATER.dark : WATER.light}
+                />
+              ))}
+              {trip.days.map((_, day) => (
                 <Path
                   key={day}
-                  path={routePath(day)}
+                  path={routePath(trip, day)}
                   style="stroke"
                   strokeWidth={2.5}
                   strokeCap="round"
