@@ -63,7 +63,7 @@ const mock = vi.hoisted(() => {
 });
 
 vi.mock("react-native", async () => {
-  const { useEffect } = await import("react");
+  const { useEffect, useRef } = await import("react");
   const ScrollView = ({
     children,
     horizontal,
@@ -75,16 +75,16 @@ vi.mock("react-native", async () => {
     onScroll?: (event: ScrollEvent) => void;
   }) => {
     if (horizontal && onScroll) mock.pager = onScroll;
+    const laidOut = useRef(false);
     useEffect(() => {
-      if (horizontal)
-        onLayout?.({
-          nativeEvent: {
-            layout: { x: 0, y: 0, width: PAGE_WIDTH, height: 600 },
-          },
-        });
-      // Once, as a layout pass would.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+      if (!horizontal || laidOut.current) return;
+      laidOut.current = true;
+      onLayout?.({
+        nativeEvent: {
+          layout: { x: 0, y: 0, width: PAGE_WIDTH, height: 600 },
+        },
+      });
+    }, [horizontal, onLayout]);
     return <div>{children}</div>;
   };
   return {

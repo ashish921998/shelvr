@@ -162,9 +162,7 @@ type AppBreakpoints = typeof breakpoints;
 
 declare module "react-native-unistyles" {
   // Declaration merging needs interfaces; type aliases cannot merge.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   export interface UnistylesThemes extends AppThemes {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   export interface UnistylesBreakpoints extends AppBreakpoints {}
 }
 
