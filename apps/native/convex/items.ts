@@ -78,6 +78,7 @@ import {
 } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { buildSearchText } from "./model/searchText";
+import { completionPatch } from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -2648,18 +2649,10 @@ export const finalizeItem = internalMutation({
     const item = await ctx.db.get(args.itemId);
     // Checked in the committing transaction: a vector made just before the
     // owner turned AI off must not land after their vectors were cleared.
-    const embedAllowed = item !== null && (await aiAllowed(ctx, item.userId));
+    const allowed = item !== null && (await aiAllowed(ctx, item.userId));
     if (item === null) {
       return "missing";
     }
-    // The same answer decides the model's words: the owner can turn AI off
-    // while the embedding call is still out, after the action last asked.
-    const withdrawn = args.classified === true && !embedAllowed;
-    const description = withdrawn ? (item.description ?? "") : args.description;
-    const tags = withdrawn ? item.tags : args.tags;
-    const intents = withdrawn ? item.intents : args.intents;
-    const cities = withdrawn ? item.cities : args.cities;
-    const recipe = withdrawn ? item.recipe : args.recipe;
     // Race: the user pressed retry while this run was still awaiting the
     // model. The retry owns the item now; writing here would overwrite its
     // result with ours (or flip a newer `processing` back to `ready` with
@@ -2669,76 +2662,7 @@ export const finalizeItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    // Intents are actions, not descriptive text, and deliberately kept out of
-    // searchText so labels like "Open in X" don't skew search relevance.
-    // A title the owner typed outranks the classifier's, and so does the one a
-    // refreshed note already has; the rest of the classification still lands.
-    const title =
-      (item.titleSource === "user" || args.keepTitle === true) &&
-      item.title !== undefined
-        ? item.title
-        : // A run with no title to offer (AI off, nothing readable) keeps the
-          // one the save already has; patching undefined would remove it.
-          ((withdrawn ? undefined : args.title) ?? item.title);
-    const searchText = buildSearchText({
-      title,
-      description,
-      tags,
-      siteName: args.siteName,
-      note: item.note,
-      content: args.content,
-    });
-    await ctx.db.patch(args.itemId, {
-      title,
-      description,
-      tags,
-      content: args.content,
-      recipe,
-      siteName: args.siteName,
-      author: args.author,
-      heroImageUrl: args.heroImageUrl,
-      media: args.media,
-      articleMedia: args.articleMedia,
-      ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
-      aspectRatio: args.aspectRatio,
-      intents,
-      // Patching undefined would remove the field, so a run with no cities to
-      // offer keeps what an earlier run wrote.
-      ...(cities !== undefined ? { cities } : {}),
-      status: args.status,
-      // Always written so a successful retry clears a previous "partial" flag
-      // and a previous failureReason (patching undefined removes the field).
-      enrichment: args.enrichment,
-      failureReason: undefined,
-      searchText,
-      // Written in the same run-fenced transaction as the classification it
-      // describes, so a superseded run can never leave a vector that
-      // disagrees with the text beside it.
-      // Re-checked here even though the action already validated: Convex
-      // rejects a vector whose width differs from the index at write time, and
-      // that would fail this whole transaction, losing the classification
-      // over a field that is optional by design.
-      ...(embedAllowed &&
-      args.embedding !== undefined &&
-      isValidEmbedding(args.embedding)
-        ? {
-            embedding: args.embedding,
-            embeddingVersion: CURRENT_EMBEDDING_VERSION,
-            embeddingAttempts: undefined,
-          }
-        : // This run could not embed. Keep whatever vector the row already
-          // carried: a slightly stale semantic match beats none, but drop
-          // the generation stamp so the sweeper re-embeds it against the text
-          // just written. Patching `embedding: undefined` instead would
-          // delete a good vector over a transient provider failure.
-          //
-          // The attempt count is cleared for the same reason it is on a
-          // success: the budget belongs to one particular text, and this
-          // classification just wrote new text. Carried over, a row with four
-          // prior attempts would be stamped current after one failure on the
-          // new text, keeping a vector that describes the old.
-          { embeddingVersion: undefined, embeddingAttempts: undefined }),
-    });
+    await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
     if (
       args.storageId !== undefined &&
       item.storageId !== undefined &&
