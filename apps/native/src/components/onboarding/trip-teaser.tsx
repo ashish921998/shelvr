@@ -1,4 +1,5 @@
 import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
+import { EveningChips } from "@/components/onboarding/evening-chips";
 import { CtaButton } from "@/components/onboarding/parts";
 import { withAlpha } from "@/lib/color";
 import { SampleTripCard } from "@/components/onboarding/trip-teaser-card";
@@ -7,11 +8,15 @@ import { StitchRing } from "@/components/ui/stitch-loader";
 import { t, useAppLocale } from "@/lib/i18n";
 import { settleIn } from "@/lib/motion";
 import type { SampleCityId, SampleSave } from "@/lib/sample-cities";
-import type { SampleTrip } from "@/lib/sample-trip";
+import {
+  eveningWith,
+  type EveningAfter,
+  type SampleTrip,
+} from "@/lib/sample-trip";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -28,6 +33,10 @@ const KIND_COPY: Record<
       | "plan.buildAccentWeekend";
     plan: TextMessageKey;
     reveal: TextMessageKey;
+    revealAccent:
+      | "tripTeaser.revealAccent"
+      | "plan.revealAccentDate"
+      | "plan.revealAccentWeekend";
   }
 > = {
   trip: {
@@ -35,18 +44,21 @@ const KIND_COPY: Record<
     accent: "tripTeaser.buildTitleAccent",
     plan: "tripTeaser.stepPlan",
     reveal: "tripTeaser.revealBody",
+    revealAccent: "tripTeaser.revealAccent",
   },
   date: {
     title: "plan.buildTitleDate",
     accent: "plan.buildAccentDate",
     plan: "plan.stepPlanDate",
     reveal: "plan.revealBodyDate",
+    revealAccent: "plan.revealAccentDate",
   },
   weekend: {
     title: "plan.buildTitleWeekend",
     accent: "plan.buildAccentWeekend",
     plan: "plan.stepPlanWeekend",
     reveal: "plan.revealBodyWeekend",
+    revealAccent: "plan.revealAccentWeekend",
   },
 };
 const STEP_MS = 750;
@@ -236,12 +248,18 @@ export function TripBuildStep({
 
 export function TripRevealStep({
   trip,
+  standIn = false,
   onContinue,
 }: {
   trip: SampleTrip;
+  /** The person's own city has no sample, so this one stands in for it. */
+  standIn?: boolean;
   onContinue: () => void;
 }) {
   useAppLocale();
+  const city = t(trip.name);
+  const [after, setAfter] = useState<EveningAfter>("walk");
+  const shown = useMemo(() => eveningWith(trip, after), [trip, after]);
   const [leaving, setLeaving] = useState(false);
   const leftRef = useRef(false);
   const leave = () => {
@@ -261,11 +279,19 @@ export function TripRevealStep({
           <Animated.View entering={SETTLE_HEAD}>
             <Head
               title={t("tripTeaser.revealTitle")}
-              body={t(KIND_COPY[trip.kind].reveal)}
+              accent={t(KIND_COPY[trip.kind].revealAccent, { city })}
+              body={
+                standIn
+                  ? t("plan.revealBodyStandIn", { city })
+                  : t(KIND_COPY[trip.kind].reveal)
+              }
             />
           </Animated.View>
-          <Animated.View entering={SETTLE_CARD}>
-            <SampleTripCard trip={trip} />
+          <Animated.View entering={SETTLE_CARD} style={styles.revealBody}>
+            {trip.kind === "date" ? (
+              <EveningChips picked={after} onPick={setAfter} />
+            ) : null}
+            <SampleTripCard trip={shown} />
           </Animated.View>
         </ScrollView>
         <View pointerEvents="none" style={styles.fade} />
@@ -301,6 +327,9 @@ const styles = StyleSheet.create((theme) => ({
       theme.colors.background,
       0,
     )} 0%, ${theme.colors.background} 100%)`,
+  },
+  revealBody: {
+    gap: theme.gap(2),
   },
   revealFoot: {
     paddingTop: theme.gap(1),

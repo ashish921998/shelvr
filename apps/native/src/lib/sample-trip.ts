@@ -228,8 +228,12 @@ const TRIPS = new Map<string, SampleTrip>();
 /** The sample a goal shows: a trip in the picked city, or a date night or weekend there, in Prague when that city has none. */
 export function samplePlan(kind: PlanKind, city?: string | null): SampleTrip {
   const picked = isSampleCity(city) ? city : null;
+  const tripCity =
+    picked !== null && SAMPLE_CITIES[picked].days.length > 0 ? picked : null;
   const id =
-    kind === "trip" ? (picked ?? DEFAULT_SAMPLE_CITY) : planCity(kind, picked);
+    kind === "trip"
+      ? (tripCity ?? DEFAULT_SAMPLE_CITY)
+      : planCity(kind, picked);
   const key = `${kind}:${id}`;
   let trip = TRIPS.get(key);
   if (trip === undefined) {
@@ -273,4 +277,21 @@ export function sampleRows(trip: SampleTrip): SampleRow[] {
       .filter((entry) => entry.day === day)
       .map((entry) => ({ kind: "stop" as const, entry })),
   ]);
+}
+
+export const EVENING_AFTER = ["walk", "drinks", "dessert"] as const;
+export type EveningAfter = (typeof EVENING_AFTER)[number];
+
+/** A date night cut to dinner and the one stop picked for after it; other plans pass through. */
+export function eveningWith(trip: SampleTrip, after: EveningAfter): SampleTrip {
+  if (trip.kind !== "date") return trip;
+  return {
+    ...trip,
+    days: trip.days.map((day) => ({
+      ...day,
+      stops: day.stops.filter(
+        (stop) => stop.slot === "dinner" || stop.slot === after,
+      ),
+    })),
+  };
 }

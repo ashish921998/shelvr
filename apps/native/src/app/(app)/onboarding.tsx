@@ -51,7 +51,6 @@ import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TextMessageKey } from "@/locales/message-types";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -67,12 +66,19 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   promise: 1,
 };
 
-const SHARE_TITLES: Record<Goal, TextMessageKey> = {
-  travel: "goal.shareTravel",
-  food: "goal.shareFood",
-  date: "goal.shareDate",
-  other: "sharePractice.title",
-};
+const SHARE_TITLES = {
+  travel: { inCity: "goal.shareTravel", anywhere: "sharePractice.title" },
+  food: { inCity: "goal.shareFood", anywhere: "goal.shareFoodAnywhere" },
+  date: { inCity: "goal.shareDate", anywhere: "goal.shareDateAnywhere" },
+} as const;
+
+/** `city` is null when the sample city only stands in for one we don't cover. */
+function shareTitle(goal: Goal | null, city: string | null) {
+  if (goal === null || goal === "other") return undefined;
+  return city === null
+    ? t(SHARE_TITLES[goal].anywhere)
+    : t(SHARE_TITLES[goal].inCity, { city });
+}
 
 function holdIncomingShare() {
   try {
@@ -129,6 +135,9 @@ export default function OnboardingScreen() {
   const planKind = goal === null ? null : GOAL_PLANS[goal];
   const pickedCity = planKind === null ? null : travelCity;
   const trip = samplePlan(planKind ?? "trip", pickedCity);
+  const cityName = t(trip.name);
+  const cityStandIn =
+    planKind !== null && planKind !== "trip" && pickedCity !== trip.city;
 
   useEffect(() => {
     setOnboardingProgress({
@@ -312,7 +321,11 @@ export default function OnboardingScreen() {
               onAdvance={advance}
             />
           ) : (
-            <TripRevealStep trip={trip} onContinue={advance} />
+            <TripRevealStep
+              trip={trip}
+              standIn={cityStandIn}
+              onContinue={advance}
+            />
           )}
         </View>
       ) : (
@@ -329,7 +342,7 @@ export default function OnboardingScreen() {
         >
           {step === "share" && (
             <SharePracticeStep
-              title={SHARE_TITLES[goal ?? "other"]}
+              title={shareTitle(goal, cityStandIn ? null : cityName)}
               sample={practiceSample}
               leaving={paywall.asked}
               onFinish={advance}
@@ -339,6 +352,7 @@ export default function OnboardingScreen() {
           {step === "promise" && (
             <PromiseStep
               goal={goal ?? "other"}
+              city={cityStandIn ? null : cityName}
               leaving={paywall.asked}
               onCommit={() => {
                 recordCurrentStep();

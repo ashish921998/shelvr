@@ -20,10 +20,10 @@ const ROUNDING_SLACK = 0.5;
 describe("samplePlan", () => {
   it.each([
     ["date", "paris", "paris"],
-    ["date", "tokyo", "prague"],
+    ["date", "las-vegas", "prague"],
     ["date", null, "prague"],
     ["weekend", "new-york", "new-york"],
-    ["weekend", "seoul", "prague"],
+    ["weekend", "las-vegas", "prague"],
   ] as const)(
     "draws a %s picked in %s in %s, Prague when the city has none",
     (kind, picked, expected) => {
@@ -39,7 +39,9 @@ describe("samplePlan", () => {
         expect(samplePlan(kind, city).city).toBe(city);
       }
     }
-    expect(planCities("trip")).toEqual(SAMPLE_CITY_IDS);
+    expect(planCities("trip")).toEqual(
+      SAMPLE_CITY_IDS.filter((id) => id !== "seattle"),
+    );
   });
 });
 
@@ -64,7 +66,7 @@ describe("sampleTrip", () => {
   });
 });
 
-describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
+describe.each(planCities("trip"))("the %s sample trip", (city) => {
   const trip = sampleTrip(city);
   const stops = sampleStops(trip);
 
@@ -87,7 +89,7 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
 });
 
 const PLANS = [
-  ...SAMPLE_CITY_IDS.map((city) => ["trip", city] as const),
+  ...planCities("trip").map((city) => ["trip", city] as const),
   ...planCities("date").map((city) => ["date", city] as const),
   ...planCities("weekend").map((city) => ["weekend", city] as const),
 ];

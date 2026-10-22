@@ -2,28 +2,36 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton } from "@/components/onboarding/parts";
 import type { Goal } from "@/lib/onboarding-goals";
-import type { TextMessageKey } from "@/locales/message-types";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-const USE_LINES: Record<Goal, TextMessageKey> = {
-  travel: "goal.promiseTravel",
-  food: "goal.promiseFood",
-  date: "goal.promiseDate",
-  other: "promise.use",
-};
+const USE_LINES = {
+  travel: { inCity: "goal.promiseTravel", anywhere: "promise.use" },
+  food: { inCity: "goal.promiseFood", anywhere: "goal.promiseFoodAnywhere" },
+  date: { inCity: "goal.promiseDate", anywhere: "goal.promiseDateAnywhere" },
+} as const;
 
 export function PromiseStep({
   goal,
+  city,
   leaving,
   onCommit,
 }: {
   goal: Goal;
+  /** null when the sample city only stands in for one we don't cover. */
+  city: string | null;
   leaving: boolean;
   onCommit: () => void;
 }) {
   useAppLocale();
-  const lines: TextMessageKey[] = ["promise.comeBack", USE_LINES[goal]];
+  const lines = [
+    t("promise.comeBack"),
+    goal === "other"
+      ? t("promise.use")
+      : city === null
+        ? t(USE_LINES[goal].anywhere)
+        : t(USE_LINES[goal].inCity, { city }),
+  ];
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -40,9 +48,9 @@ export function PromiseStep({
       <View style={styles.card}>
         <Text style={styles.eyebrow}>{t("promise.eyebrow")}</Text>
         {lines.map((line, index) => (
-          <View key={line} style={styles.line}>
+          <View key={index} style={styles.line}>
             <Text style={styles.number}>{index + 1}</Text>
-            <Text style={styles.lineText}>{t(line)}</Text>
+            <Text style={styles.lineText}>{line}</Text>
           </View>
         ))}
       </View>

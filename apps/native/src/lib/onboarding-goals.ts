@@ -74,6 +74,6 @@ export function goalShareSample(
     picture: post.picture,
     url: post.url,
     pageHeading: post.name,
-    domain: "en.wikipedia.org",
+    domain: new URL(post.url).hostname,
   };
 }

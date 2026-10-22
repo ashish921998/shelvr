@@ -7,7 +7,8 @@ import { planCities } from "@/lib/sample-plans";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const GOAL_COPY: Record<
@@ -41,6 +42,18 @@ const CITY_TITLES: Record<Exclude<Goal, "other">, TextMessageKey> = {
   food: "goal.cityFood",
   date: "goal.cityDate",
 };
+
+const CITY_HELP: Record<Exclude<Goal, "other">, TextMessageKey> = {
+  travel: "goal.cityHelpTravel",
+  food: "goal.cityHelpFood",
+  date: "goal.cityHelpDate",
+};
+
+const fold = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 
 function Head({ title, body }: { title: string; body: string }) {
   return (
@@ -136,17 +149,44 @@ export function CityStep({
   onPick: (city: SampleCityId | null) => void;
 }) {
   useAppLocale();
+  const { theme } = useUnistyles();
+  const [query, setQuery] = useState("");
   const kind = GOAL_PLANS[goal]!;
+  const needle = fold(query.trim());
   const cities = planCities(kind)
     .map((id) => ({ id, name: t(SAMPLE_CITIES[id].name) }))
+    .filter(
+      ({ id, name }) =>
+        fold(name).includes(needle) || id.replace(/-/g, " ").includes(needle),
+    )
     .sort((a, b) => a.name.localeCompare(b.name));
   return (
-    <ScrollView
-      contentContainerStyle={styles.body}
-      showsVerticalScrollIndicator={false}
-    >
-      <Head title={t(CITY_TITLES[goal])} body={t("goal.cityHelp")} />
-      <View style={styles.list}>
+    <View style={styles.cityStep}>
+      <Head title={t(CITY_TITLES[goal])} body={t(CITY_HELP[goal])} />
+      <View style={styles.search}>
+        <AppSymbolIcon
+          name="magnifyingglass"
+          size={16}
+          tintColor={theme.colors.muted}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={t("goal.citySearch")}
+          placeholderTextColor={theme.colors.faint}
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+      </View>
+      <ScrollView
+        style={styles.cityList}
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
         {cities.map(({ id, name }) => (
           <Option
             key={id}
@@ -163,8 +203,8 @@ export function CityStep({
           active={false}
           onPress={() => onPick(null)}
         />
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -190,6 +230,33 @@ const styles = StyleSheet.create((theme) => ({
   },
   list: {
     gap: theme.gap(1),
+    paddingBottom: theme.gap(2),
+  },
+  cityStep: {
+    flex: 1,
+    gap: theme.gap(2),
+  },
+  cityList: {
+    flex: 1,
+  },
+  search: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: theme.gap(1),
+    fontFamily: theme.fonts.regular,
+    fontSize: 16,
+    color: theme.colors.foreground,
   },
   option: {
     minHeight: 56,

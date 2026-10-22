@@ -210,7 +210,7 @@ afterEach(cleanup);
 it("asks a date-night city, practises with a stop in that plan, then shows the plan and the promise", () => {
   render(<OnboardingScreen />);
   tap("goal:date");
-  expect(screen.queryByRole("button", { name: "city:tokyo" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "city:las-vegas" })).toBeNull();
   tap("city:paris");
   expect(saved()).toMatchObject({
     goal: "date",

@@ -1,7 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import type { DemoSample } from "@/lib/onboarding-demo";
-import type { TextMessageKey } from "@/locales/message-types";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
@@ -52,12 +51,12 @@ function heldShares(): string {
 }
 
 export function SharePracticeStep({
-  title = "sharePractice.title",
+  title,
   sample,
   leaving,
   onFinish,
 }: {
-  title?: TextMessageKey;
+  title?: string;
   sample: DemoSample | undefined;
   leaving: boolean;
   onFinish: () => void;
@@ -210,7 +209,7 @@ export function SharePracticeStep({
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         >
-          {t(title)}
+          {title ?? t("sharePractice.title")}
         </Text>
         <Text style={styles.support}>{t("sharePractice.subtitle")}</Text>
       </View>
