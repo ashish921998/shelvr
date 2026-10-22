@@ -39,6 +39,7 @@ export type SampleStop = {
   name: string;
   slot: SampleSlot;
   pin: Point;
+  at: LatLng;
 };
 
 type SampleDay = {
@@ -207,7 +208,7 @@ function buildTrip(
       stops: day.stops.map((stop) => {
         const pin = pins[next];
         next += 1;
-        return { name: stop.name, slot: stop.slot, pin };
+        return { name: stop.name, slot: stop.slot, pin, at: stop.at };
       }),
     })),
     water: water.lines.map((line) =>

@@ -297,7 +297,7 @@ export default function OnboardingScreen() {
             <CityStep goal={goal} city={travelCity} onPick={pickCity} />
           )}
         </View>
-      ) : step === "interests" ? (
+      ) : step === "interests" || step === "tripReveal" ? (
         <View
           style={[
             styles.content,
@@ -305,11 +305,15 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom + theme.gap(3) },
           ]}
         >
-          <InterestsStep
-            picked={interests}
-            onToggle={toggleInterest}
-            onAdvance={advance}
-          />
+          {step === "interests" ? (
+            <InterestsStep
+              picked={interests}
+              onToggle={toggleInterest}
+              onAdvance={advance}
+            />
+          ) : (
+            <TripRevealStep trip={trip} onContinue={advance} />
+          )}
         </View>
       ) : (
         <ScrollView
@@ -345,10 +349,6 @@ export default function OnboardingScreen() {
 
           {step === "tripBuild" && (
             <TripBuildStep trip={trip} onDone={advance} />
-          )}
-
-          {step === "tripReveal" && (
-            <TripRevealStep trip={trip} onContinue={advance} />
           )}
         </ScrollView>
       )}

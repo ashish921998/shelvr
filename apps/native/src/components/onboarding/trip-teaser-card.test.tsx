@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
     <div aria-label={accessibilityLabel}>{children}</div>
   ),
   text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
+  appleMap: () => null,
   map: ({ crop }: { crop: { top: number } }) => (
     <div data-testid="map" data-top={crop.top} />
   ),
@@ -25,6 +26,9 @@ const mock = vi.hoisted(() => ({
 vi.mock("react-native", () => ({ View: mock.view, Text: mock.text }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
+}));
+vi.mock("@/components/onboarding/sample-apple-map", () => ({
+  SampleAppleMap: mock.appleMap,
 }));
 vi.mock("@/components/onboarding/sample-trip-map", () => ({
   SampleTripMap: mock.map,

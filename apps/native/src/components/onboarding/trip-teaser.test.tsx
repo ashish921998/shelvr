@@ -33,7 +33,11 @@ const mock = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock("react-native", () => ({ View: mock.view, Text: mock.text }));
+vi.mock("react-native", () => ({
+  View: mock.view,
+  Text: mock.text,
+  ScrollView: mock.view,
+}));
 vi.mock("react-native-reanimated", () => ({ default: { View: mock.view } }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },

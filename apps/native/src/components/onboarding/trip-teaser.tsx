@@ -1,5 +1,6 @@
 import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { CtaButton } from "@/components/onboarding/parts";
+import { withAlpha } from "@/lib/color";
 import { SampleTripCard } from "@/components/onboarding/trip-teaser-card";
 import { AppSymbolIcon } from "@/components/symbol";
 import { StitchRing } from "@/components/ui/stitch-loader";
@@ -11,7 +12,7 @@ import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -251,16 +252,25 @@ export function TripRevealStep({
   };
   return (
     <View style={styles.wrap}>
-      <Animated.View entering={SETTLE_HEAD}>
-        <Head
-          title={t("tripTeaser.revealTitle")}
-          body={t(KIND_COPY[trip.kind].reveal)}
-        />
-      </Animated.View>
-      <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard trip={trip} />
-      </Animated.View>
-      <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
+      <View style={styles.scroll}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollBody}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={SETTLE_HEAD}>
+            <Head
+              title={t("tripTeaser.revealTitle")}
+              body={t(KIND_COPY[trip.kind].reveal)}
+            />
+          </Animated.View>
+          <Animated.View entering={SETTLE_CARD}>
+            <SampleTripCard trip={trip} />
+          </Animated.View>
+        </ScrollView>
+        <View pointerEvents="none" style={styles.fade} />
+      </View>
+      <Animated.View style={styles.revealFoot} entering={SETTLE_FOOT}>
         <CtaButton
           label={t("common.continue")}
           onPress={leave}
@@ -271,7 +281,30 @@ export function TripRevealStep({
   );
 }
 
+const FADE_HEIGHT = 32;
+
 const styles = StyleSheet.create((theme) => ({
+  scroll: {
+    flex: 1,
+  },
+  scrollBody: {
+    gap: theme.gap(3),
+    paddingBottom: FADE_HEIGHT,
+  },
+  fade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: FADE_HEIGHT,
+    experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(
+      theme.colors.background,
+      0,
+    )} 0%, ${theme.colors.background} 100%)`,
+  },
+  revealFoot: {
+    paddingTop: theme.gap(1),
+  },
   wrap: {
     flex: 1,
     gap: theme.gap(3),

@@ -2,6 +2,7 @@ import {
   PinBadge,
   SampleTripMap,
 } from "@/components/onboarding/sample-trip-map";
+import { SampleAppleMap } from "@/components/onboarding/sample-apple-map";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   SAMPLE_CROPS,
@@ -89,7 +90,11 @@ export function SampleTripCard({ trip }: { trip: SampleTrip }) {
   return (
     <View style={styles.card}>
       <View>
-        <SampleTripMap trip={trip} crop={SAMPLE_CROPS.reveal} />
+        {process.env.EXPO_OS === "ios" ? (
+          <SampleAppleMap trip={trip} />
+        ) : (
+          <SampleTripMap trip={trip} crop={SAMPLE_CROPS.reveal} />
+        )}
         <View style={styles.badge} pointerEvents="none">
           <Text style={styles.badgeText}>{t(SAMPLE_BADGES[trip.kind])}</Text>
         </View>
