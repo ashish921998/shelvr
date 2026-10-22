@@ -342,8 +342,7 @@ const styles = StyleSheet.create((theme) => ({
   sourceText: {
     minWidth: 0,
     flexShrink: 1,
-    fontFamily: theme.fonts.medium,
-    fontSize: 11,
+    ...theme.type.label,
     color: theme.colors.muted,
   },
   description: {
@@ -362,14 +361,12 @@ const styles = StyleSheet.create((theme) => ({
   tagsText: {
     minWidth: 0,
     flexShrink: 1,
-    fontFamily: theme.fonts.medium,
-    fontSize: 11,
+    ...theme.type.label,
     color: theme.colors.muted,
   },
   tagsAction: {
     flexShrink: 0,
-    fontFamily: theme.fonts.medium,
-    fontSize: 10,
+    ...theme.type.label,
     color: theme.colors.primaryText,
   },
   expandedTags: {
