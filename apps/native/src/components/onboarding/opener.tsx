@@ -67,11 +67,18 @@ const AUTO_ADVANCE_MS = 4000;
 function useLiveReducedMotion() {
   const [reduced, setReduced] = useState(useReducedMotion());
   useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduced(enabled);
+    });
     const subscription = AccessibilityInfo.addEventListener(
       "reduceMotionChanged",
       setReduced,
     );
-    return () => subscription.remove();
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
   }, []);
   return reduced;
 }

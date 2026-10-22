@@ -27,6 +27,7 @@ const mock = vi.hoisted(() => {
     capture: vi.fn(),
     largeText: false,
     reducedMotion: false,
+    reduceMotionAtMount: false,
     pager: null as null | ((event: ScrollEvent) => void),
     beginDrag: null as null | (() => void),
     reduceMotionChanged: null as null | ((enabled: boolean) => void),
@@ -110,6 +111,7 @@ vi.mock("react-native", async () => {
     Pressable: mock.pressable,
     ScrollView,
     AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(mock.reduceMotionAtMount),
       addEventListener: (_event: string, listener: (on: boolean) => void) => {
         mock.reduceMotionChanged = listener;
         return { remove: () => (mock.reduceMotionChanged = null) };
@@ -179,6 +181,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.largeText = false;
   mock.reducedMotion = false;
+  mock.reduceMotionAtMount = false;
   mock.pager = null;
   mock.beginDrag = null;
   mock.reduceMotionChanged = null;
@@ -383,5 +386,14 @@ describe("OpenerStep", () => {
     act(() => mock.reduceMotionChanged?.(true));
     wait(20000);
     expect(dot(1)).toContain("dotOn");
+  });
+
+  it("never advances when Reduce Motion was turned on after the app started", async () => {
+    vi.useFakeTimers();
+    mock.reduceMotionAtMount = true;
+    renderOpener();
+    await act(async () => {});
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
   });
 });
