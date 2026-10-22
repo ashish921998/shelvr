@@ -167,6 +167,38 @@ describe("fitCamera", () => {
       0,
     );
   });
+
+  it("centers the pins right of a side panel", () => {
+    const side = {
+      width: 951,
+      height: 669,
+      top: 100,
+      bottom: 20,
+      left: 372,
+      worldWidth: 951,
+      centerY: 100 + (669 - 100 - 20) / 2,
+    };
+    const points = [
+      { latitude: 35.6702, longitude: 139.7027 },
+      { latitude: 35.6764, longitude: 139.6993 },
+      { latitude: 35.6696, longitude: 139.7056 },
+    ];
+    const camera = fitCamera(points, side)!;
+    const lngPerPoint = 360 / (side.worldWidth * 2 ** camera.zoom);
+    const xs = points.map(
+      (point) =>
+        side.width / 2 +
+        (point.longitude - camera.coordinates.longitude) / lngPerPoint,
+    );
+    for (const x of xs) {
+      expect(x).toBeGreaterThan(side.left);
+      expect(x).toBeLessThan(side.width);
+    }
+    expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(
+      side.left + (side.width - side.left) / 2,
+      0,
+    );
+  });
 });
 
 describe("pickedStop", () => {

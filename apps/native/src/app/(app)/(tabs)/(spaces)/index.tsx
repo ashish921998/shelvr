@@ -2,6 +2,7 @@ import { analytics } from "@/lib/analytics";
 import { clampRatio } from "@/lib/aspect-ratio";
 import { isEmptySpace } from "@/lib/empty-space";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useFeedColumns } from "@/lib/wide-layout";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/empty-state";
 import { SuggestedBadge } from "@/components/suggested-badge";
@@ -318,6 +319,7 @@ export default function SpacesScreen() {
   };
 
   const reducedMotion = useReducedMotion();
+  const columns = useFeedColumns();
 
   if (spaces === undefined) {
     return <ScreenLoader label={t("loading.spaces")} />;
@@ -361,7 +363,7 @@ export default function SpacesScreen() {
         data={filled}
         ListFooterComponent={emptySpaces}
         masonry
-        numColumns={2}
+        numColumns={columns}
         optimizeItemArrangement
         keyExtractor={(space) => space._id}
         contentInsetAdjustmentBehavior="automatic"

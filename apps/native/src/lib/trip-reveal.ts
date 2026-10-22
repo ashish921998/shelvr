@@ -91,8 +91,13 @@ export function revealLayout(
   height: number,
   covers: number,
 ): RevealLayout {
-  const sx = width / FRAME.width;
   const sy = height / FRAME.height;
+  // One scale for the dot map, so a wide screen (an unfolded iPhone Duo) does not stretch it sideways.
+  const scale = Math.min(width / FRAME.width, sy);
+  const point = (x: number, y: number) => ({
+    x: width / 2 + (x - FRAME.width / 2) * scale,
+    y: height / 2 + (y - FRAME.height / 2) * scale,
+  });
   const cardWidth = (width - 24) / 2;
   const gridTop = 228 * sy;
   const cardHeight = Math.min(
@@ -103,6 +108,7 @@ export function revealLayout(
   const cards = used.map((card, index) => {
     const left = 12 + (index % 2) * cardWidth;
     const top = gridTop + Math.floor(index / 2) * cardHeight;
+    const target = point(card.to[0], card.to[1]);
     return {
       left,
       top,
@@ -111,12 +117,12 @@ export function revealLayout(
       rank: card.rank,
       dx: card.dx,
       rotate: card.r,
-      toX: card.to[0] * sx - (left + cardWidth / 2),
-      toY: card.to[1] * sy - (top + cardHeight / 2),
+      toX: target.x - (left + cardWidth / 2),
+      toY: target.y - (top + cardHeight / 2),
     };
   });
-  const dots = [...used.map((card) => card.to), ...EXTRA_DOTS].map(
-    ([x, y]) => ({ x: x * sx, y: y * sy }),
+  const dots = [...used.map((card) => card.to), ...EXTRA_DOTS].map(([x, y]) =>
+    point(x, y),
   );
   return { cards, dots, landing: { x: width / 2, y: height / 2 } };
 }

@@ -103,6 +103,8 @@ type MapView = {
   height: number;
   top: number;
   bottom: number;
+  /** Points covered by a side panel; the pins center in the rest. */
+  left?: number;
   worldWidth: number;
   centerY: number;
 };
@@ -125,8 +127,9 @@ export function fitCamera(
   // In Mercator a degree of latitude is 1 / cos(latitude) times taller than a degree of longitude is wide.
   const cos = Math.cos((midLat * Math.PI) / 180);
   const visible = Math.max(view.height - view.top - view.bottom, 1);
+  const left = view.left ?? 0;
   const byWidth = Math.log2(
-    (360 * FIT_FILL * view.width) /
+    (360 * FIT_FILL * Math.max(view.width - left, 1)) /
       (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
   );
   const byHeight = Math.log2(
@@ -139,7 +142,10 @@ export function fitCamera(
   return {
     coordinates: {
       latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
-      longitude: (minLng + maxLng) / 2,
+      // The camera centers on the whole view; shift it so the pins center right of the panel.
+      longitude:
+        (minLng + maxLng) / 2 -
+        (left / 2) * (360 / (view.worldWidth * 2 ** zoom)),
     },
     zoom,
   };

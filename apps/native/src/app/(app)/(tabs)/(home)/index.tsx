@@ -238,7 +238,6 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <MasonryFeed
         items={items}
-        numColumns={2}
         source={{ from: "home" }}
         onEndReached={canLoadMore ? loadMore : undefined}
         loadingMore={loadingMore}
