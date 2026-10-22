@@ -5,7 +5,6 @@ import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import type { SampleCityId } from "@/lib/sample-cities";
 import { isSampleCity, sampleTrip, showTripTeaser } from "@/lib/sample-trip";
-import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
 import {
@@ -13,11 +12,7 @@ import {
   spacesAfterInterestToggle,
   TRAVEL_INTEREST,
 } from "@/lib/travel-vibes";
-import {
-  featuredDemoKind,
-  orderDemoSamples,
-  practiceShareSample,
-} from "@/lib/onboarding-demo";
+import { practiceShareSample } from "@/lib/onboarding-demo";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
@@ -34,24 +29,13 @@ import {
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import {
-  isSaveKind,
-  spacesAfterKindToggle,
-  type SaveKind,
-} from "@/lib/save-kinds";
-import {
   clearPendingShareOnDevice,
   markPendingShareOnDevice,
 } from "@/lib/share/pending-share-store";
 import { SignInView } from "@/components/sign-in-view";
-import {
-  LiveDemoStep,
-  type DemoSaved,
-} from "@/components/onboarding/live-demo";
 import { InterestsStep } from "@/components/onboarding/interests";
-import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { PromiseStep } from "@/components/onboarding/promise";
-import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import {
   TripBuildStep,
@@ -69,17 +53,13 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  interests: 0.2,
-  setup: 0.35,
-  demo: 0.5,
-  notifications: 0.7,
-  share: 0.85,
+  interests: 0.35,
+  share: 0.7,
   promise: 1,
   tripBuild: 1,
   tripLocked: 1,
   tripReveal: 1,
 };
-const READING_PROGRESS = 0.625;
 
 function holdIncomingShare() {
   try {
@@ -113,31 +93,14 @@ export default function OnboardingScreen() {
     restoreOnboardingStep(initialProgress.step),
   );
   const [step, setStep] = useState<OnboardingStep>(initialStep);
-  const [kinds, setKinds] = useState<SaveKind[]>(() =>
-    initialProgress.saveKinds.filter(isSaveKind),
-  );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
   const [travelCity, setTravelCity] = useState<SampleCityId | null>(() =>
     isSampleCity(initialProgress.travelCity)
       ? initialProgress.travelCity
       : null,
   );
-  const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
-  const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [demoBack, setDemoBack] = useState<(() => void) | null>(null);
-  const changeDemoBack = useCallback(
-    (back: (() => void) | null) => setDemoBack(() => back),
-    [],
-  );
-  const [resumeDemo, setResumeDemo] = useState(() =>
-    initialStep === "demo" ? initialProgress.demo : null,
-  );
-  const exitDemo = useCallback(() => {
-    setResumeDemo(null);
-    setStep("setup");
-  }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const [viewedOpenerPages] = useState(() => new Set<number>());
@@ -146,19 +109,17 @@ export default function OnboardingScreen() {
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const interests = spaces.filter(isInterest);
   const vibes = spaces.filter(isTravelVibe);
-  const teaser = showTripTeaser(kinds, interests);
+  const teaser = showTripTeaser(interests);
   const pickedCity = interests.includes(TRAVEL_INTEREST) ? travelCity : null;
   const trip = sampleTrip(pickedCity);
 
   useEffect(() => {
     setOnboardingProgress({
-      saveKinds: kinds,
       spaces,
       travelCity,
       step: stepIndex,
-      saved,
     });
-  }, [kinds, spaces, travelCity, stepIndex, saved]);
+  }, [spaces, travelCity, stepIndex]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -199,15 +160,6 @@ export default function OnboardingScreen() {
     completeOnboarding();
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
-  const toggleKind = (kind: SaveKind) => {
-    setSpaces(spacesAfterKindToggle(kinds, spaces, kind));
-    setKinds(
-      kinds.includes(kind)
-        ? kinds.filter((value) => value !== kind)
-        : [...kinds, kind],
-    );
-  };
-
   const toggleSpace = (name: string) =>
     setSpaces((current) =>
       current.includes(name)
@@ -222,18 +174,13 @@ export default function OnboardingScreen() {
     setSpaces((current) => spacesAfterInterestToggle(current, interest));
   };
 
-  const addSpace = (name: string) =>
-    setSpaces((current) =>
-      current.includes(name) ? current : [...current, name],
-    );
-
   const finish = () => {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(kinds, spaces, pickedCity),
+      onboardingCompletedProperties(spaces, pickedCity),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -241,11 +188,7 @@ export default function OnboardingScreen() {
     completeOnboarding();
   };
 
-  const practiceSample = practiceShareSample(
-    kinds,
-    getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
-    pickedCity,
-  );
+  const practiceSample = practiceShareSample(interests, pickedCity);
   const paywall = useOnboardingPaywall({
     onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
@@ -264,17 +207,10 @@ export default function OnboardingScreen() {
     );
   }
 
-  const progress =
-    step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
-  const previous =
-    step === "share" && saved === null ? "demo" : previousOnboardingStep(step);
-  const goBack = paywall.asked
-    ? null
-    : previous
-      ? () => setStep(previous)
-      : step === "demo"
-        ? demoBack
-        : null;
+  const progress = PROGRESS[step];
+  const previous = previousOnboardingStep(step);
+  const goBack =
+    paywall.asked || previous === null ? null : () => setStep(previous);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -350,39 +286,6 @@ export default function OnboardingScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          {step === "setup" && (
-            <SetupStep
-              kinds={kinds}
-              spaces={spaces}
-              onToggleKind={toggleKind}
-              onToggleSpace={toggleSpace}
-              onAddSpace={addSpace}
-              onAdvance={advance}
-            />
-          )}
-
-          {step === "demo" && (
-            <LiveDemoStep
-              samples={orderDemoSamples(kinds, interests, pickedCity)}
-              titleKind={featuredDemoKind(kinds, interests)}
-              spaces={spaces}
-              resume={resumeDemo}
-              alreadySaved={saved !== null}
-              onSaved={setSaved}
-              onReadingChange={setReading}
-              onBackChange={changeDemoBack}
-              onExit={exitDemo}
-              onAdvance={() => {
-                setResumeDemo(null);
-                advance();
-              }}
-            />
-          )}
-
-          {step === "notifications" && (
-            <NotificationsStep saved={saved} onAdvance={() => advance()} />
-          )}
-
           {step === "share" && (
             <SharePracticeStep
               sample={practiceSample}

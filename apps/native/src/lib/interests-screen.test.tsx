@@ -32,11 +32,20 @@ const mocks = vi.hoisted(() => ({
       {children}
     </button>
   ),
-  button: ({ label, onPress }: { label: string; onPress: () => void }) => (
-    <button type="button" onClick={onPress}>
+  button: ({
+    label,
+    onPress,
+    disabled,
+  }: {
+    label: string;
+    onPress: () => void;
+    disabled?: boolean;
+  }) => (
+    <button type="button" onClick={onPress} disabled={disabled}>
       {label}
     </button>
   ),
+  sharePractice: vi.fn((_props: { sample?: { domain: string } }) => null),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -53,17 +62,11 @@ vi.mock("@/lib/onboarding-paywall", () => ({
   useOnboardingPaywall: () => ({ asked: false, ask: vi.fn() }),
 }));
 vi.mock("@/lib/use-incoming-share-url", () => ({ holdsOnlyLink: () => false }));
-vi.mock("@/lib/queued-first-save", () => ({
-  getQueuedFirstSaveUrl: () => null,
-}));
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
   getOnboardingProgress: () => ({
-    saveKinds: [],
     spaces: [],
     step: ONBOARDING_STEPS.indexOf("interests"),
-    demo: null,
-    saved: null,
     travelCity: null,
   }),
   resolveOnboardingSpaceName: (name: string) => name,
@@ -75,23 +78,14 @@ vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice: vi.fn(),
 }));
 vi.mock("@/components/sign-in-view", () => ({ SignInView: vi.fn(() => null) }));
-vi.mock("@/components/onboarding/live-demo", () => ({
-  LiveDemoStep: vi.fn(() => null),
-}));
-vi.mock("@/components/onboarding/notifications", () => ({
-  NotificationsStep: vi.fn(() => null),
-}));
 vi.mock("@/components/onboarding/opener", () => ({
   OpenerStep: vi.fn(() => null),
 }));
 vi.mock("@/components/onboarding/promise", () => ({
   PromiseStep: vi.fn(() => null),
 }));
-vi.mock("@/components/onboarding/setup", () => ({
-  SetupStep: vi.fn(() => null),
-}));
 vi.mock("@/components/onboarding/share-practice", () => ({
-  SharePracticeStep: vi.fn(() => null),
+  SharePracticeStep: mocks.sharePractice,
 }));
 vi.mock("@/components/onboarding/trip-teaser", () => ({
   TripBuildStep: vi.fn(() => null),
@@ -156,6 +150,7 @@ const savedSpaces = () =>
 
 beforeEach(() => {
   mocks.setOnboardingProgress.mockClear();
+  mocks.sharePractice.mockClear();
 });
 afterEach(cleanup);
 
@@ -192,4 +187,16 @@ it("keeps the picked city with the progress until Travel is unpicked", () => {
   expect(city()).toBe("tokyo");
   fireEvent.click(chip("Travel"));
   expect(city()).toBeNull();
+});
+
+it("moves on to share practice only once a topic is picked, with that topic's post", () => {
+  render(<OnboardingScreen />);
+  const next = screen.getByRole("button", { name: "common.continue" });
+  expect(next.hasAttribute("disabled")).toBe(true);
+
+  fireEvent.click(chip("AI & tech"));
+  fireEvent.click(next);
+  expect(mocks.sharePractice.mock.lastCall?.[0].sample?.domain).toBe(
+    "anthropic.com",
+  );
 });

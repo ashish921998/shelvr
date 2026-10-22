@@ -1,25 +1,19 @@
 export const ONBOARDING_STEPS = [
   "opener",
   "interests",
-  "setup",
-  "demo",
-  "notifications",
   "share",
   "promise",
   "tripBuild",
   "tripLocked",
   "tripReveal",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 12;
+export const ONBOARDING_FLOW_VERSION = 13;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
-  setup: "setup",
   interests: "interests",
-  demo: "live_demo",
-  notifications: "notifications",
   share: "share_practice",
   promise: "promise",
   tripBuild: "trip_build",
@@ -30,10 +24,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
 const PREVIOUS_STEP: Record<OnboardingStep, OnboardingStep | null> = {
   opener: null,
   interests: "opener",
-  setup: "interests",
-  demo: null,
-  notifications: "demo",
-  share: "notifications",
+  share: "interests",
   promise: null,
   tripBuild: null,
   tripLocked: null,

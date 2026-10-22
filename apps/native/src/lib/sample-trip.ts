@@ -1,5 +1,4 @@
 import type { Interest } from "@/lib/onboarding-interests";
-import type { SaveKind } from "@/lib/save-kinds";
 import {
   SAMPLE_CITIES,
   isSampleCity,
@@ -13,11 +12,8 @@ import type { TextMessageKey } from "@/locales/message-types";
 
 export { isSampleCity };
 
-export function showTripTeaser(
-  kinds: readonly SaveKind[],
-  interests: readonly Interest[],
-): boolean {
-  return kinds.includes("Travel") || interests.includes("Travel");
+export function showTripTeaser(interests: readonly Interest[]): boolean {
+  return interests.includes("Travel");
 }
 
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";

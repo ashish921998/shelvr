@@ -194,14 +194,13 @@ export type AnalyticsEventProperties = {
   trip_stop_swapped: { day: number };
   onboarding_completed: {
     save_pileup: string[];
-    save_types: string[];
     interests: string[];
     travel_vibes: string[];
     sample_city: SampleCityId | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
-    $set: { save_pileup: string[]; save_types: string[] };
+    $set: { save_pileup: string[] };
   };
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
@@ -212,9 +211,6 @@ export type AnalyticsEventProperties = {
     delivery: "scheduled" | "unconfigured";
   };
   onboarding_demo_submitted: Record<string, never>;
-  onboarding_demo_skipped: Record<string, never>;
-  onboarding_demo_deferred: { sample: boolean };
-  onboarding_demo_picked: { sample: boolean; signed_in: boolean };
   onboarding_signin_prompt: {
     surface: "demo_sheet" | "sample_preview";
     action: "shown" | "dismissed";
@@ -227,14 +223,6 @@ export type AnalyticsEventProperties = {
       | "sheet_stuck"
       | "skipped"
       | "sheet_failed";
-  };
-  onboarding_reminder: {
-    action: "remind" | "skip";
-    slot: "tonight" | "tomorrow" | "weekend" | "nextWeek";
-    granted: boolean;
-  };
-  onboarding_demo_result: {
-    outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
   // Android replays a share on task restore; counts the replays the share screen skipped.

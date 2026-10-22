@@ -1,4 +1,3 @@
-import type { Id } from "@convex/_generated/dataModel";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -6,17 +5,12 @@ import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 6;
+const PROGRESS_VERSION = 7;
 
 export type PendingDemo = {
   url: string;
   destination: string | null;
   source: "direct" | "share";
-};
-
-type PendingSaved = {
-  itemId: Id<"items">;
-  savedSpaceNames: string[];
 };
 
 type PendingRecord = {
@@ -26,21 +20,15 @@ type PendingRecord = {
   demoSpace: string | null;
   demoOwner: string | null;
   progressVersion: number | null;
-  saveKinds: string[];
   step: number | null;
-  demo: PendingDemo | null;
-  saved: PendingSaved | null;
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
 };
 
 type OnboardingProgress = {
-  saveKinds: string[];
   spaces: string[];
   travelCity: SampleCityId | null;
   step: number | null;
-  demo: PendingDemo | null;
-  saved: PendingSaved | null;
 };
 
 let revision = 0;
@@ -77,24 +65,7 @@ function readPendingRecord(): PendingRecord | null {
         ? value
         : null;
     const spaces = stringArray(record.spaces);
-    const saveKinds = stringArray(record.saveKinds) ?? [];
     const step = typeof record.step === "number" ? record.step : null;
-    const storedDemo =
-      record.demo !== null &&
-      typeof record.demo === "object" &&
-      typeof record.demo.url === "string" &&
-      (record.demo.destination === null ||
-        typeof record.demo.destination === "string")
-        ? record.demo
-        : null;
-    const demo: PendingDemo | null =
-      storedDemo === null
-        ? null
-        : {
-            url: storedDemo.url,
-            destination: storedDemo.destination,
-            source: storedDemo.source === "share" ? "share" : "direct",
-          };
     if (
       typeof record.operationId !== "string" ||
       record.operationId === "" ||
@@ -119,28 +90,13 @@ function readPendingRecord(): PendingRecord | null {
         typeof record.progressVersion === "number"
           ? record.progressVersion
           : null,
-      saveKinds,
       step,
-      demo,
-      saved: readSaved(record.saved),
       spaceNames: readSpaceNames(record.spaceNames),
       travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
     };
   } catch {
     return null;
   }
-}
-
-function readSaved(value: unknown): PendingSaved | null {
-  if (typeof value !== "object" || value === null) return null;
-  const { itemId, savedSpaceNames } = value as Partial<PendingSaved>;
-  if (typeof itemId !== "string" || itemId === "") return null;
-  if (
-    !Array.isArray(savedSpaceNames) ||
-    !savedSpaceNames.every((name) => typeof name === "string")
-  )
-    return null;
-  return { itemId, savedSpaceNames };
 }
 
 function readSpaceNames(value: unknown): Record<string, string> {
@@ -172,21 +128,13 @@ export function getOrCreatePendingOperationId(): string {
     demoSpace: null,
     demoOwner: null,
     progressVersion: null,
-    saveKinds: [],
     step: null,
-    demo: null,
-    saved: null,
     spaceNames: {},
   });
   return operationId;
 }
 
-function writePendingSpaces(
-  spaces: string[],
-  refreshOperationId: boolean,
-  demo: PendingDemo | null,
-  saved: PendingSaved | null,
-) {
+function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
   const existing = readPendingRecord();
   const operationId =
     spaces.length > 0 && refreshOperationId && !existing?.demoUrl
@@ -199,29 +147,20 @@ function writePendingSpaces(
     demoSpace: existing?.demoSpace ?? null,
     demoOwner: existing?.demoOwner ?? null,
     progressVersion: existing?.progressVersion ?? null,
-    saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
-    demo,
-    saved,
     spaceNames: existing?.spaceNames ?? {},
     travelCity: existing?.travelCity ?? null,
   });
   notifyChanged();
 }
 
-/** Onboarding finished: hands the spaces to the replay hook and drops the in-flight demo and saved record. */
+/** Onboarding finished: hands the spaces to the replay hook. */
 export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true, null, null);
+  writePendingSpaces(spaces, true);
 }
 
 export function updatePendingSpaces(spaces: string[]) {
-  const existing = readPendingRecord();
-  writePendingSpaces(
-    spaces,
-    false,
-    existing?.demo ?? null,
-    existing?.saved ?? null,
-  );
+  writePendingSpaces(spaces, false);
 }
 
 export function getPendingSpaces(): string[] {
@@ -274,14 +213,6 @@ export function clearLegacyDemoUrl() {
   notifyChanged();
 }
 
-export function clearLegacyDemoUrlIfSaved(savedUrl: string) {
-  const queued = getPendingDemoUrl();
-  if (!queued) return;
-  try {
-    if (new URL(queued).href === new URL(savedUrl).href) clearLegacyDemoUrl();
-  } catch {}
-}
-
 function isCurrentProgress(record: PendingRecord | null): boolean {
   return record?.progressVersion === PROGRESS_VERSION;
 }
@@ -289,31 +220,19 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return {
-      saveKinds: [],
-      spaces: [],
-      travelCity: null,
-      step: null,
-      demo: null,
-      saved: null,
-    };
+    return { spaces: [], travelCity: null, step: null };
   }
   return {
-    saveKinds: record.saveKinds,
     spaces: record.spaces,
     travelCity: record.travelCity ?? null,
     step: record.step,
-    demo: record.demo,
-    saved: record.saved,
   };
 }
 
 export function setOnboardingProgress(progress: {
-  saveKinds: string[];
   spaces: string[];
   travelCity?: SampleCityId | null;
   step: number;
-  saved?: PendingSaved | null;
 }) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
@@ -324,33 +243,9 @@ export function setOnboardingProgress(progress: {
     demoSpace: existing?.demoSpace ?? null,
     demoOwner: existing?.demoOwner ?? null,
     progressVersion: PROGRESS_VERSION,
-    saveKinds: progress.saveKinds,
     step: progress.step,
-    demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
-    saved: progress.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
     travelCity: progress.travelCity ?? null,
-  });
-  notifyChanged();
-}
-
-export function setPendingDemo(demo: PendingDemo | null) {
-  const existing = readPendingRecord();
-  if (existing === null && demo === null) return;
-  const operationId = existing?.operationId ?? createOperationId();
-  writePendingRecord({
-    operationId,
-    spaces: existing?.spaces ?? [],
-    demoUrl: existing?.demoUrl ?? null,
-    demoSpace: existing?.demoSpace ?? null,
-    demoOwner: existing?.demoOwner ?? null,
-    progressVersion: existing?.progressVersion ?? null,
-    saveKinds: existing?.saveKinds ?? [],
-    step: existing?.step ?? null,
-    demo,
-    saved: existing?.saved ?? null,
-    spaceNames: existing?.spaceNames ?? {},
-    travelCity: existing?.travelCity ?? null,
   });
   notifyChanged();
 }

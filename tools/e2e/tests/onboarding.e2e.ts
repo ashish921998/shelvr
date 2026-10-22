@@ -3,10 +3,9 @@ import { expect } from "e2e";
 
 import {
   SHARE_LATER,
-  queueFirstSave,
   relaunchWith,
   startFreshOnboarding,
-  walkToFirstSave,
+  walkToSharePractice,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
@@ -21,8 +20,7 @@ test(
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToFirstSave(screen);
-    await queueFirstSave(screen);
+    await walkToSharePractice(screen);
 
     const shareLater = screen.getByRole("button", SHARE_LATER);
     await relaunchWith(
@@ -59,12 +57,11 @@ test(
 );
 
 test(
-  "builds a sample trip before the paywall for someone who saves travel",
+  "builds a sample trip before the paywall for someone into travel",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToFirstSave(screen, "Travel");
-    await queueFirstSave(screen);
+    await walkToSharePractice(screen, "Travel");
 
     await screen.getByRole("button", SHARE_LATER).tap();
     await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });

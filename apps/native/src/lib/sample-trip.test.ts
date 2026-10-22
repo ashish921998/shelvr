@@ -18,17 +18,13 @@ const ROUNDING_SLACK = 0.5;
 
 describe("showTripTeaser", () => {
   it.each([
-    [["Travel"], [], true],
-    [[], ["Travel"], true],
-    [["Recipes", "Travel"], ["AI & tech"], true],
-    [["Articles"], ["Home & design", "Films, books & music"], false],
-    [[], [], false],
-  ] as const)(
-    "for kinds %j and topics %j shows the trip: %s",
-    (kinds, interests, expected) => {
-      expect(showTripTeaser(kinds, interests)).toBe(expected);
-    },
-  );
+    [["Travel"], true],
+    [["AI & tech", "Travel"], true],
+    [["Home & design", "Films, books & music"], false],
+    [[], false],
+  ] as const)("for topics %j shows the trip: %s", (interests, expected) => {
+    expect(showTripTeaser(interests)).toBe(expected);
+  });
 });
 
 describe("sampleTrip", () => {

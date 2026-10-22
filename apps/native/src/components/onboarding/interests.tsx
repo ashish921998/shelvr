@@ -97,7 +97,11 @@ export function InterestsStep({
       </View>
 
       <View style={styles.foot}>
-        <CtaButton label={t("common.continue")} onPress={onAdvance} />
+        <CtaButton
+          label={t("common.continue")}
+          onPress={onAdvance}
+          disabled={picked.length === 0}
+        />
       </View>
     </View>
   );

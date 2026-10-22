@@ -610,11 +610,11 @@ receives nothing at all. The people most likely to churn are the ones the
 system is silent toward. That is a real gap, and earlier drafts of this
 document did not mention it.
 
-Two facts soften it, both verified. **Onboarding already captures interests.**
-The "What do you save?" step in `save-kinds.ts` offers Articles, Recipes,
-Products, Home & decor, Travel, Inspiration, Fitness and Videos, and seeds
-starter spaces from the answers. And **every user makes one real save during
-onboarding**, recorded in `onboardingDemos`, so no account is literally empty.
+One fact softens it. **Onboarding already captures interests.** The "What are
+you into?" step (`onboarding-interests.ts`) offers eight topics, and each picked
+topic becomes a starter space. Onboarding no longer makes a save of its own: its
+share practice hands one sample post to the share screen, which saves it after
+sign-in only if the user shared it.
 
 **A push is the wrong instrument.** A user who has saved nothing in their first
 week has an activation problem: they have not learned the share sheet, or they
@@ -622,20 +622,20 @@ forgot Shelvr existed at the moment they needed it. A notification saying "you
 haven't saved anything yet" cannot teach the share sheet, and it is the same
 notification as "you haven't opened Shelvr in 5 days", already on the
 do-not-build list above. Activation is fixed in onboarding and in empty states.
-If a brand-new user is notified at all, it should be about the demo save they
-made, because that one is theirs.
+If a brand-new user is notified at all, it should be about the post they shared
+in onboarding, because that one is theirs.
 
 ### Using the interest data already captured
 
 The onboarding answers exist and currently only seed spaces. Three uses that
 cost little and keep the promise that Shelvr shows a user their own things:
 
-- **Match the demo article to the answer.** Someone who picks Recipes does
-  their onboarding save on a recipe, so their single item is relevant from the
+- **Match the practice post to the answer.** Done: someone who picks Food &
+  recipes practises sharing a recipe, so their first item is relevant from the
   first minute.
-- **Rank their own saves.** `resurfacing` and `reading_time` prefer the types
-  the user said they save.
-- **Write a specific empty state.** "You said you save recipes. Here's how to
+- **Rank their own saves.** `resurfacing` and `reading_time` prefer the topics
+  the user picked.
+- **Write a specific empty state.** "You said you're into recipes. Here's how to
   grab one from Instagram" lands where activation actually happens.
 
 ### Open: does Shelvr ever send content the user did not save?

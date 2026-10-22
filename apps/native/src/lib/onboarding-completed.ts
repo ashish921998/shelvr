@@ -1,25 +1,22 @@
 import type { AnalyticsEventProperties } from "@/lib/analytics";
 import { isInterest } from "@/lib/onboarding-interests";
 import type { SampleCityId } from "@/lib/sample-cities";
-import { isPresetSpace, type SaveKind } from "@/lib/save-kinds";
+import { isPresetSpace } from "@/lib/save-kinds";
 import { isTravelVibe } from "@/lib/travel-vibes";
 
 /** Topics and travel vibes count as spaces; only preset identities are named, typed names are user content, and the sample city is one of a fixed list. */
 export function onboardingCompletedProperties(
-  kinds: readonly SaveKind[],
   spaces: readonly string[],
   travelCity: SampleCityId | null = null,
 ): AnalyticsEventProperties["onboarding_completed"] {
-  const saveTypes = [...kinds];
   return {
     save_pileup: [],
-    save_types: saveTypes,
     interests: spaces.filter(isInterest),
     travel_vibes: spaces.filter(isTravelVibe),
     sample_city: travelCity,
     space_count: spaces.length,
     space_names: spaces.filter(isPresetSpace),
     custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
-    $set: { save_pileup: [], save_types: saveTypes },
+    $set: { save_pileup: [] },
   };
 }
