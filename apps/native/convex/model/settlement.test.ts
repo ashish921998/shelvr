@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import recorded from "../testdata/settlement/rows.json";
 import { CURRENT_EMBEDDING_VERSION, EMBEDDING_DIMENSIONS } from "./embedding";
-import { completionPatch, embeddingText, type ItemPatch } from "./settlement";
+import {
+  completionPatch,
+  embeddingText,
+  runOf,
+  type ItemPatch,
+} from "./settlement";
 import {
   consentOf,
   gridArgs,
@@ -173,6 +178,70 @@ describe("the embedding a run brings", () => {
     const before = embeddingText(savedItem(), { reading, classification });
     const typed = savedItem({ title: "My soup", titleSource: "user" });
     expect(lands(typed, before)).toBe(false);
+  });
+});
+
+describe("flat arguments from an action started on the previous deploy", () => {
+  const item = savedItem({
+    title: "Saved title",
+    description: "Saved description",
+    tags: ["saved"],
+    recipe: { ingredients: ["saved ingredient"], steps: ["saved step"] },
+  });
+  const classified = {
+    title: "Model title",
+    description: "Model description",
+    tags: ["model"],
+    recipe: { ingredients: ["model ingredient"], steps: ["model step"] },
+    embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.25),
+    classified: true,
+    status: "ready" as const,
+  };
+
+  it("settles a classified run like the new arguments", () => {
+    expect(completionPatch(item, runOf(classified), true)).toEqual(
+      completionPatch(
+        item,
+        {
+          reading: {},
+          classification: {
+            title: "Model title",
+            description: "Model description",
+            tags: ["model"],
+            recipe: classified.recipe,
+          },
+        },
+        true,
+      ),
+    );
+  });
+
+  it("keeps the save's own words when the decline lands at commit", () => {
+    expect(completionPatch(item, runOf(classified), false)).toMatchObject({
+      title: "Saved title",
+      description: "Saved description",
+      tags: ["saved"],
+      recipe: item.recipe,
+    });
+  });
+
+  it("settles an unclassified run from what it read", () => {
+    const patch = completionPatch(
+      item,
+      runOf({ title: "Page title", description: "Page description" }),
+      true,
+    );
+    expect(patch).toMatchObject({
+      title: "Page title",
+      description: "Page description",
+      tags: ["saved"],
+    });
+  });
+
+  it("leaves the save for the embedding sweep", () => {
+    expect(
+      completionPatch(item, runOf(classified), true).embeddingVersion,
+    ).toBeUndefined();
   });
 });
 

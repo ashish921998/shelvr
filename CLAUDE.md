@@ -283,8 +283,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `no-console` enforces this).
 - **`model/settlement.ts`**: `completionPatch(item, run, aiAllowed)`, the pure rule for what a
   finished processing run writes to a save. `run` holds the run's `reading` (what Shelvr read
-  itself) and, when the model was consulted, its `classification`; `readingValidator` and
-  `classificationValidator` are `finalizeItem`'s arguments. With AI declined, whether the owner
+  itself) and, when the model was consulted, its `classification`; `runFields` are
+  `finalizeItem`'s arguments. Until actions started on the deploy before it drain, they also
+  accept the old flat fields, which `runOf` turns into a reading and classification; remove
+  them in the next backend release. With AI declined, whether the owner
   declined before the run asked or while it ran, the classification is ignored and the save settles
   from the reading alone: the page's title, description and recipe, or a note's first line, plus the
   save's own tags, intents and cities. A recipe the save already has stays when the page offers none.

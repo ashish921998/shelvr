@@ -79,11 +79,7 @@ import {
 } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { buildSearchText } from "./model/searchText";
-import {
-  classificationValidator,
-  completionPatch,
-  readingValidator,
-} from "./model/settlement";
+import { completionPatch, runFields, runOf } from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
@@ -2039,9 +2035,7 @@ export const finalizeItem = internalMutation({
   args: {
     itemId: v.id("items"),
     runId: v.optional(v.string()),
-    keepTitle: v.optional(v.boolean()),
-    reading: readingValidator,
-    classification: v.optional(classificationValidator),
+    ...runFields,
   },
   returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
@@ -2053,8 +2047,9 @@ export const finalizeItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
-    const { storageId, enrichment } = args.reading;
+    const run = runOf(args);
+    await ctx.db.patch(args.itemId, completionPatch(item, run, allowed));
+    const { storageId, enrichment } = run.reading;
     if (
       storageId !== undefined &&
       item.storageId !== undefined &&

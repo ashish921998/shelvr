@@ -3133,6 +3133,36 @@ describe("stale processing runs", () => {
     });
   });
 
+  it("finalizeItem accepts the flat arguments an action from the previous deploy sends", async () => {
+    const { t, userId } = await as();
+    const itemId = await processingLink(t, userId, FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+
+    const outcome = await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Model title",
+      keepTitle: false,
+      description: "Model description",
+      tags: ["model"],
+      siteName: "Page site",
+      embedding: [0.25],
+      classified: true,
+      status: "ready",
+    });
+
+    expect(outcome).toBe("applied");
+    const saved = await t.run((ctx) => ctx.db.get(itemId));
+    expect(saved).toMatchObject({
+      status: "ready",
+      title: "Model title",
+      description: "Model description",
+      tags: ["model"],
+      siteName: "Page site",
+    });
+    expect(saved?.embeddingVersion).toBeUndefined();
+  });
+
   it("schedules one processed event for each applied terminal outcome", async () => {
     const t = newConvexTest();
     const readyId = await processingLink(t, "processed", FRESH_AGE);

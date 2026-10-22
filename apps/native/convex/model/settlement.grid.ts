@@ -1,12 +1,14 @@
-import type { FunctionArgs, WithoutSystemFields } from "convex/server";
-import type { internal } from "../_generated/api";
+import type { WithoutSystemFields } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { CURRENT_EMBEDDING_VERSION, EMBEDDING_DIMENSIONS } from "./embedding";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
 import type { PageData } from "./pageRead";
-import { embeddingText, type Classification, type Reading } from "./settlement";
-
-type FinalizeArgs = FunctionArgs<typeof internal.items.finalizeItem>;
+import {
+  embeddingText,
+  type Classification,
+  type Reading,
+  type Settlement,
+} from "./settlement";
 
 const MODES = {
   allowed: { asked: "granted", committed: "granted" },
@@ -401,7 +403,7 @@ export function gridArgs(
   s: Scenario,
   item: Doc<"items">,
   ids: GridIds,
-): Omit<FinalizeArgs, "itemId"> {
+): Settlement & { runId: string } {
   const keepTitle = s.lock === "refresh";
   const reading = readingFor(s, item, ids);
   if (MODES[s.mode].asked === "declined") {
