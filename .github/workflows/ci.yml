@@ -120,14 +120,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The base commit this pull request was opened against, not the branch
-      # tip. Main can move while a run waits, and comparing against a newer tip
-      # reports its functions as removed by this pull request, failing a
-      # blocking check over a change it does not contain.
+      # The base branch, not the pull request's base.sha: the checked-out merge
+      # commit already carries whatever main gained since that sha, and the
+      # script compares from the point the head left the base, so only this
+      # pull request's own changes are measured.
       - name: Public Convex contract
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node tools/verify-convex-api.mjs "$BASE_SHA" HEAD
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/verify-convex-api.mjs "origin/$BASE_REF" HEAD
 
   # An OTA update only reaches installs whose store build shares the native
   # fingerprint. This job reports a pull request that moves it and never fails,

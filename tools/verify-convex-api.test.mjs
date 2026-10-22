@@ -1,5 +1,16 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   ACKNOWLEDGEMENT,
@@ -381,4 +392,98 @@ export const listTags = query({ ...contract, handler: async () => null });
     signatures(tree({ api: spread("number") })),
   );
   assert.deepEqual(diff.changed, ["api:listTags"]);
+});
+
+// Which commits get compared is decided by git, so these run the script
+// against a real repository where main has moved on without the branches.
+const checkScript = fileURLToPath(
+  new URL("./verify-convex-api.mjs", import.meta.url),
+);
+const repo = realpathSync(mkdtempSync(join(tmpdir(), "convex-api-")));
+after(() => rmSync(repo, { recursive: true, force: true }));
+
+const git = (...args) =>
+  execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+const commit = (files, message) => {
+  for (const [file, source] of Object.entries(files)) {
+    mkdirSync(join(repo, dirname(file)), { recursive: true });
+    writeFileSync(join(repo, file), source);
+  }
+  git("add", "--all");
+  git("commit", "--quiet", "--allow-empty", "-m", message);
+};
+const check = (base, head) =>
+  spawnSync(process.execPath, [checkScript, base, head], {
+    cwd: repo,
+    encoding: "utf8",
+  });
+
+git("init", "--quiet", "--initial-branch=main");
+git("config", "user.email", "test@example.com");
+git("config", "user.name", "Test");
+git("config", "commit.gpgsign", "false");
+
+commit({ [path("items")]: items, [path("model/items")]: shared }, "root");
+
+const withoutDelete = items.replace(
+  /export const deleteItem[\s\S]*?\n\}\);\n/,
+  "",
+);
+const branchFromMain = (name, files, message) => {
+  git("checkout", "--quiet", "-b", name, "main");
+  commit(files, message);
+  git("checkout", "--quiet", "main");
+};
+branchFromMain(
+  "unrelated",
+  { "apps/native/src/other.ts": "export {};\n" },
+  "feat: unrelated",
+);
+branchFromMain(
+  "narrows",
+  { [path("items")]: withoutDelete },
+  "refactor: drop deleteItem",
+);
+branchFromMain(
+  "acknowledged",
+  { [path("items")]: withoutDelete },
+  "refactor: drop deleteItem\n\nConvex-Api: changed",
+);
+git("checkout", "--quiet", "--orphan", "elsewhere");
+commit({}, "unrelated history");
+git("checkout", "--quiet", "main");
+
+// Squash-merged: the trailer sits mid-message, where git reads none.
+commit(
+  {
+    [path("items")]: items.replace(
+      'args: { itemId: v.id("items") }',
+      'args: { itemId: v.id("items"), reason: v.string() }',
+    ),
+  },
+  "feat: ask why (#1)\n\n* feat: ask why\n\nConvex-Api: changed\n\n* fix: review",
+);
+
+test("a branch is not charged for what main changed after it left", () => {
+  const result = check("main", "unrelated");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /No public contract was narrowed/);
+});
+
+test("a branch's own narrowing still fails once main has moved", () => {
+  const result = check("main", "narrows");
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /items:deleteItem/);
+});
+
+test("the branch's own trailer acknowledges its own change", () => {
+  const result = check("main", "acknowledged");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Acknowledged/);
+});
+
+test("refs with no common history are refused, not compared", () => {
+  const result = check("main", "elsewhere");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /share no history/);
 });
