@@ -29,7 +29,7 @@ export type CatalogItem = Pick<
   | "tags"
 >;
 
-export type CatalogSpace = Pick<
+type CatalogSpace = Pick<
   FunctionReturnType<typeof api.spaces.listSpaces>[number],
   "_id" | "name" | "description"
 >;
@@ -116,7 +116,7 @@ export function isSavableUrl(url: string): boolean {
   return url.length <= MAX_URL_LENGTH && /^https?:\/\//i.test(url.trim());
 }
 
-export type StagedImagePath = { path: string; operationId: string };
+type StagedImagePath = { path: string; operationId: string };
 
 /** The image paths a `saveImages` invocation carries, each with the operation
  * id the Swift side sent for it, or one derived from the invocation's. Paths
