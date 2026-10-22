@@ -20,7 +20,7 @@ it.each([
   ["ko", 1, "other"],
   ["de", 1, "one"],
 ] as const)("%s selects %s as %s", (locale, count, category) => {
-  expect(pluralRules[locale](count)).toBe(category);
+  expect(pluralRules[locale]!(count)).toBe(category);
 });
 
 it("uses natural singular and plural English in newly registered notifications", () => {

@@ -145,7 +145,7 @@ describe("YouTube description reader", () => {
           heroAspectRatio: width / height,
         },
       });
-      const [endpoint, options] = safeFetch.mock.calls[0];
+      const [endpoint, options] = safeFetch.mock.calls[0]!;
       expect(new URL(endpoint).searchParams.get("part")).toBe("snippet");
       expect(new URL(endpoint).searchParams.get("id")).toBe("Ab_cd-Ef123");
       expect(options).toMatchObject({ timeoutMs: 15000, maxBytes: 64 * 1024 });
@@ -285,7 +285,7 @@ describe("YouTube description reader", () => {
         },
       });
       expect(safeFetch).toHaveBeenCalledTimes(2);
-      expect(safeFetch.mock.calls[1][0]).toBe(link);
+      expect(safeFetch.mock.calls[1]![0]).toBe(link);
     },
   );
   it.each([
@@ -373,7 +373,7 @@ describe("YouTube description reader", () => {
       );
       await readPage(unsupportedUrl);
       expect(safeFetch).toHaveBeenCalledTimes(1);
-      expect(safeFetch.mock.calls[0][0]).toContain("/oembed?");
+      expect(safeFetch.mock.calls[0]![0]).toContain("/oembed?");
     },
   );
 });

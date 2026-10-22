@@ -38,10 +38,10 @@ describe("DeckAnimationProvider", () => {
         <Probe sink={sink} />
       </DeckAnimationProvider>,
     );
-    expect(sink[0].isDragging.value).toBe(false);
-    expect(sink[0].animatedIndex.value).toBe(2);
-    expect(sink[0].currentIndex.value).toBe(2);
-    expect(sink[0].undoIndex.value).toBeNull();
+    expect(sink[0]!.isDragging.value).toBe(false);
+    expect(sink[0]!.animatedIndex.value).toBe(2);
+    expect(sink[0]!.currentIndex.value).toBe(2);
+    expect(sink[0]!.undoIndex.value).toBeNull();
   });
 
   it("throws when a card uses the hook outside the provider", () => {
@@ -69,7 +69,7 @@ describe("DeckAnimationProvider", () => {
         <Probe sink={sink} />
       </DeckAnimationProvider>,
     );
-    sink[0].currentIndex.set(0);
-    expect(sink[0].currentIndex.get()).toBe(0);
+    sink[0]!.currentIndex.set(0);
+    expect(sink[0]!.currentIndex.get()).toBe(0);
   });
 });

@@ -199,9 +199,9 @@ describe("capture tokens", () => {
     const { t, userId, token } = await setup();
     const rows = await t.run((ctx) => ctx.db.query("captureTokens").collect());
     expect(rows).toHaveLength(1);
-    expect(rows[0].userId).toBe(userId);
-    expect(rows[0].tokenHash).toBe(await sha256Hex(token));
-    expect(rows[0].tokenHash).not.toContain(token);
+    expect(rows[0]!.userId).toBe(userId);
+    expect(rows[0]!.tokenHash).toBe(await sha256Hex(token));
+    expect(rows[0]!.tokenHash).not.toContain(token);
   });
 
   it("keeps only the newest tokens per user", async () => {
@@ -418,7 +418,7 @@ describe("image capture", () => {
     });
     const runs = await scheduledProcessRuns(t);
     expect(runs).toHaveLength(1);
-    expect(runs[0].args[0]).toMatchObject({
+    expect(runs[0]!.args[0]).toMatchObject({
       itemId,
       captureContext: "Siri: save this\n\nText in the image:\nMiso ramen",
     });
@@ -444,7 +444,7 @@ describe("image capture", () => {
     );
     expect(finish.status).toBe(200);
     const runs = await scheduledProcessRuns(t);
-    expect(runs[0].args[0].captureContext).toBeUndefined();
+    expect(runs[0]!.args[0].captureContext).toBeUndefined();
   });
 
   it("refuses to begin without Pro", async () => {

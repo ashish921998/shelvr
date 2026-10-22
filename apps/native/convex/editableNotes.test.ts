@@ -81,12 +81,12 @@ describe("updateNoteItem", () => {
 
     const jobs = await refreshJobs(t);
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].args[0]).toEqual({
+    expect(jobs[0]!.args[0]).toEqual({
       itemId: id,
       runId: note?.processingRunId,
       refresh: true,
     });
-    expect(jobs[0].scheduledTime).toBeGreaterThanOrEqual(
+    expect(jobs[0]!.scheduledTime).toBeGreaterThanOrEqual(
       before + NOTE_REFRESH_DELAY_MS,
     );
   });

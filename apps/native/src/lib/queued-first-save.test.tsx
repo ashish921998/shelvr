@@ -139,7 +139,7 @@ describe("a first save queued before sign-in", () => {
     hook.rerender();
     await act(async () => {});
     expect(mock.createDemoItem).toHaveBeenCalledOnce();
-    expect(mock.createDemoItem.mock.calls[0][0].spaceName).toBeUndefined();
+    expect(mock.createDemoItem.mock.calls[0]![0].spaceName).toBeUndefined();
   });
 
   it("hands the link and its space to the Pro replay when the account's demo save is spent", async () => {

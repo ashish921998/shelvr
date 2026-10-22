@@ -177,7 +177,7 @@ describe("useAnalyticsIdentity", () => {
     renderHook(() => useAnalyticsIdentity());
     expect(mock.resetIfIdentified).toHaveBeenCalledOnce();
     expect(mock.removeQueries).toHaveBeenCalledOnce();
-    const { predicate } = mock.removeQueries.mock.calls[0][0] as {
+    const { predicate } = mock.removeQueries.mock.calls[0]![0] as {
       predicate: (query: { queryKey: unknown[] }) => boolean;
     };
     expect(predicate({ queryKey: ["convexQuery"] })).toBe(true);

@@ -377,7 +377,7 @@ describe("useOAuthSignIn", () => {
 
       expect(outcome).toBe("completed");
       expect(mock.openAuthSessionAsync).not.toHaveBeenCalled();
-      const { nonce } = mock.signIn.mock.calls[0][1];
+      const { nonce } = mock.signIn.mock.calls[0]![1];
       expect(mock.appleSignIn).toHaveBeenCalledWith({
         requestedScopes: [0, 1],
         nonce: `sha256(${nonce})`,
@@ -404,7 +404,7 @@ describe("useOAuthSignIn", () => {
 
       await run("apple");
 
-      expect(mock.signIn.mock.calls[0][1]).not.toHaveProperty("name");
+      expect(mock.signIn.mock.calls[0]![1]).not.toHaveProperty("name");
     });
 
     it("reports a person closing the sheet as a cancel, without the retry hint", async () => {

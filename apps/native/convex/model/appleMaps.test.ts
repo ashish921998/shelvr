@@ -52,12 +52,11 @@ describe("appleMapsAccessToken", () => {
       { headers: Record<string, string> },
     ];
     expect(url).toBe("https://maps-api.apple.com/v1/token");
-    const [header, claims] = init.headers.Authorization.replace(
-      "Bearer ",
-      "",
-    ).split(".");
-    expect(decode(header)).toEqual({ alg: "ES256", kid: "KEY1", typ: "JWT" });
-    expect(decode(claims)).toMatchObject({
+    const [header, claims] = init.headers
+      .Authorization!.replace("Bearer ", "")
+      .split(".");
+    expect(decode(header!)).toEqual({ alg: "ES256", kid: "KEY1", typ: "JWT" });
+    expect(decode(claims!)).toMatchObject({
       iss: "TEAM1",
       scope: "server_api",
     });

@@ -43,7 +43,7 @@ describe("reminder budget", () => {
             }
           }
           for (let i = 1; i < sent.length; i++) {
-            expect(sent[i] - sent[i - 1]).toBeGreaterThanOrEqual(MIN_GAP_MS);
+            expect(sent[i]! - sent[i - 1]!).toBeGreaterThanOrEqual(MIN_GAP_MS);
           }
           if (shelfOn) {
             for (const at of sent) {

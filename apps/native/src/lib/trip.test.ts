@@ -95,7 +95,7 @@ describe("locatedStops", () => {
       stop({ lat: 38.71, lng: -9.13 }),
     ]);
     expect(located.map((s) => s.index)).toEqual([0, 2]);
-    expect(located[1].coordinates).toEqual({
+    expect(located[1]!.coordinates).toEqual({
       latitude: 38.71,
       longitude: -9.13,
     });

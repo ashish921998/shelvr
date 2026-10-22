@@ -78,7 +78,7 @@ async function setup(
 }
 
 function promptOf(call = 0): string {
-  return (generateObject.mock.calls[call][0] as { prompt: string }).prompt;
+  return (generateObject.mock.calls[call]![0] as { prompt: string }).prompt;
 }
 
 async function testKey(): Promise<string> {
@@ -161,10 +161,10 @@ describe("makeTrip", () => {
       wishlist: [],
     });
     expect(trip?.days).toHaveLength(1);
-    expect(trip?.days[0].gaps).toEqual(["lunch"]);
-    expect(trip?.days[0].stops).toEqual([
+    expect(trip?.days[0]!.gaps).toEqual(["lunch"]);
+    expect(trip?.days[0]!.stops).toEqual([
       {
-        itemId: itemIds[0],
+        itemId: itemIds[0]!,
         name: "Pastéis de Belém",
         area: "Belém",
         why: "The custard tarts",
@@ -249,9 +249,9 @@ describe("makeTrip", () => {
     await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
 
     const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
-    const [tarts, taberna] = trip?.days[0].stops ?? [];
-    expect(tarts.lat).toBe(38.6975);
-    expect(taberna.lat).toBeUndefined();
+    const [tarts, taberna] = trip?.days[0]!.stops ?? [];
+    expect(tarts!.lat).toBe(38.6975);
+    expect(taberna!.lat).toBeUndefined();
     const queries = fetchMock.mock.calls.map(([input]) =>
       new URL(input).searchParams.get("q"),
     );
@@ -312,7 +312,7 @@ describe("makeTrip", () => {
         .collect(),
     );
     expect(trips.map((trip) => trip._id)).toEqual([tripId]);
-    expect(trips[0].pace).toBe("packed");
+    expect(trips[0]!.pace).toBe("packed");
   });
 
   it('shows a stop\'s current "We went" mark, not the one it was made with', async () => {
@@ -332,12 +332,13 @@ describe("makeTrip", () => {
     });
     await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
     const stopOf = async () =>
-      (await t.query(api.tripData.getSpaceTrip, { spaceId }))?.days[0].stops[0];
+      (await t.query(api.tripData.getSpaceTrip, { spaceId }))?.days[0]!
+        .stops[0];
     expect((await stopOf())?.been).toBeUndefined();
 
     const mark = (visited: boolean) =>
       t.mutation(api.placeVisits.setVisited, {
-        itemId: itemIds[1],
+        itemId: itemIds[1]!,
         name: "Park",
         visited,
       });
@@ -350,7 +351,7 @@ describe("makeTrip", () => {
   it("drops a stop whose save was removed or deleted, and shows a link's image", async () => {
     const { t, base, spaceId, itemIds } = await setup(LISBON_SAVES);
     await base.run((ctx) =>
-      ctx.db.patch(itemIds[0], { heroImageUrl: "https://example.com/a.jpg" }),
+      ctx.db.patch(itemIds[0]!, { heroImageUrl: "https://example.com/a.jpg" }),
     );
     const pick = (
       saveNumber: number,
@@ -375,7 +376,7 @@ describe("makeTrip", () => {
     });
     await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
     const before = await t.query(api.tripData.getSpaceTrip, { spaceId });
-    const first = before?.days[0].stops.find((s) => s.itemId === itemIds[0]);
+    const first = before?.days[0]!.stops.find((s) => s.itemId === itemIds[0]);
     expect(first?.cover).toBe("https://example.com/a.jpg");
     expect(before?.days[0]).toMatchObject({
       areas: ["Belém"],
@@ -383,18 +384,20 @@ describe("makeTrip", () => {
     });
 
     await t.mutation(api.spaces.removeItemFromSpace, {
-      itemId: itemIds[0],
+      itemId: itemIds[0]!,
       spaceId,
     });
 
     const after = await t.query(api.tripData.getSpaceTrip, { spaceId });
-    expect(after?.days[0].stops.map((s) => s.itemId)).not.toContain(itemIds[0]);
-    expect(after?.days[0].stops).toHaveLength(2);
+    expect(after?.days[0]!.stops.map((s) => s.itemId)).not.toContain(
+      itemIds[0],
+    );
+    expect(after?.days[0]!.stops).toHaveLength(2);
     expect(after?.days[0]).toMatchObject({ areas: [], gaps: ["lunch"] });
 
-    await base.run((ctx) => ctx.db.delete(itemIds[1]));
+    await base.run((ctx) => ctx.db.delete(itemIds[1]!));
     const deleted = await t.query(api.tripData.getSpaceTrip, { spaceId });
-    expect(deleted?.days[0].stops.map((s) => s.name)).toEqual([
+    expect(deleted?.days[0]!.stops.map((s) => s.name)).toEqual([
       "Taberna da Rua das Flores",
     ]);
   });
@@ -454,7 +457,7 @@ describe("makeTrip", () => {
     if (tripId === null) throw new Error("no trip");
 
     const park = (await t.query(api.tripData.getSpaceTrip, { spaceId }))
-      ?.days[0].stops[2];
+      ?.days[0]!.stops[2];
     if (!park) throw new Error("no stop");
     const replacement = await t.mutation(api.tripData.swapTripStop, {
       tripId,
@@ -464,7 +467,7 @@ describe("makeTrip", () => {
 
     const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
     expect(replacement).toMatchObject({ name: "Lost In" });
-    expect(trip?.days[0].stops.map((s) => s.name)).toEqual([
+    expect(trip?.days[0]!.stops.map((s) => s.name)).toEqual([
       "Pastéis de Belém",
       "Taberna da Rua das Flores",
       "Lost In",
@@ -478,7 +481,7 @@ describe("makeTrip", () => {
       }),
     ).rejects.toMatchObject({ data: { code: "nothing_to_swap" } });
     const { base } = seeded;
-    const lostIn = trip?.days[0].stops[2];
+    const lostIn = trip?.days[0]!.stops[2];
     if (!lostIn) throw new Error("no stop");
     await base.run((ctx) => ctx.db.delete(park.itemId));
     await expect(

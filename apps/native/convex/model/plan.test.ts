@@ -269,12 +269,12 @@ describe("sanitizePlan", () => {
       [{ saveNumber: 1, name: "Balthazar", area: "SoHo", why: "Go" }],
       sources,
     );
-    expect(kept.area).toBe("SoHo");
+    expect(kept!.area).toBe("SoHo");
     const [dropped] = sanitizePlan(
       [{ saveNumber: 1, name: "Balthazar", area: "Brooklyn", why: "Go" }],
       sources,
     );
-    expect(dropped.area).toBeUndefined();
+    expect(dropped!.area).toBeUndefined();
   });
 
   it("drops a city the save does not name", () => {
@@ -283,12 +283,12 @@ describe("sanitizePlan", () => {
       [{ saveNumber: 1, name: "Balthazar", area: "SoHo, London", why: "Go" }],
       sources,
     );
-    expect(pick.area).toBe("SoHo");
+    expect(pick!.area).toBe("SoHo");
     const [whole] = sanitizePlan(
       [{ saveNumber: 1, name: "Balthazar", area: "SoHo, New York", why: "Go" }],
       sources,
     );
-    expect(whole.area).toBe("SoHo, New York");
+    expect(whole!.area).toBe("SoHo, New York");
   });
 
   it("drops the region and country a save never names", () => {
@@ -303,7 +303,7 @@ describe("sanitizePlan", () => {
       ],
       [source({ title: "Lola in London" })],
     );
-    expect(pick.area).toBe("London");
+    expect(pick!.area).toBe("London");
   });
 
   it("keeps a short state code only when the save names it", () => {
@@ -319,7 +319,7 @@ describe("sanitizePlan", () => {
       ],
       sources,
     );
-    expect(kept.area).toBe("Springfield, IL");
+    expect(kept!.area).toBe("Springfield, IL");
     const [dropped] = sanitizePlan(
       [
         {
@@ -331,7 +331,7 @@ describe("sanitizePlan", () => {
       ],
       sources,
     );
-    expect(dropped.area).toBe("Springfield");
+    expect(dropped!.area).toBe("Springfield");
   });
 
   it("strips a street address from a place's name", () => {
@@ -347,12 +347,12 @@ describe("sanitizePlan", () => {
       ],
       sources,
     );
-    expect(pick.name).toBe("The Palomar");
+    expect(pick!.name).toBe("The Palomar");
     const [kept] = sanitizePlan(
       [{ saveNumber: 1, name: "The Palomar, Soho", area: "", why: "Go" }],
       sources,
     );
-    expect(kept.name).toBe("The Palomar, Soho");
+    expect(kept!.name).toBe("The Palomar, Soho");
   });
 
   it("cuts at the address, keeping commas and numbers in the name", () => {
@@ -367,7 +367,7 @@ describe("sanitizePlan", () => {
       ],
       [source({ title: "Paul, Smith & Co" })],
     );
-    expect(withComma.name).toBe("Paul, Smith & Co");
+    expect(withComma!.name).toBe("Paul, Smith & Co");
     const sources = [
       source({ itemId: "a" as Id<"items">, title: "Copper, Bar 61" }),
       source({ itemId: "b" as Id<"items">, title: "Copper, Bar 62" }),
@@ -390,12 +390,12 @@ describe("sanitizePlan", () => {
       [{ saveNumber: 1, name: "The Ivy, St John's Wood", area: "", why: "Go" }],
       [source({ title: "The Ivy, St John's Wood" })],
     );
-    expect(pick.name).toBe("The Ivy, St John's Wood");
+    expect(pick!.name).toBe("The Ivy, St John's Wood");
     const [cut] = sanitizePlan(
       [{ saveNumber: 1, name: "The Ivy, 9 Rupert St", area: "", why: "Go" }],
       [source({ title: "The Ivy" })],
     );
-    expect(cut.name).toBe("The Ivy");
+    expect(cut!.name).toBe("The Ivy");
   });
 
   it("keeps a landmark square and strips a street with no number", () => {
@@ -410,7 +410,7 @@ describe("sanitizePlan", () => {
       ],
       [source({ title: "Shake Shack, Times Square" })],
     );
-    expect(square.name).toBe("Shake Shack, Times Square");
+    expect(square!.name).toBe("Shake Shack, Times Square");
     const [street] = sanitizePlan(
       [
         {
@@ -422,7 +422,7 @@ describe("sanitizePlan", () => {
       ],
       [source({ title: "The Palomar" })],
     );
-    expect(street.name).toBe("The Palomar");
+    expect(street!.name).toBe("The Palomar");
   });
 
   it("caps the shortlist after visited places move last", () => {
@@ -439,7 +439,7 @@ describe("sanitizePlan", () => {
     const places = sanitizePlan(raw, sources, been);
     expect(places).toHaveLength(5);
     expect(places[0]).toMatchObject({ name: "Spot5" });
-    expect(places[0].been).toBeUndefined();
+    expect(places[0]!.been).toBeUndefined();
   });
 
   it("keeps the address when the name before it proves nothing alone", () => {
@@ -447,7 +447,7 @@ describe("sanitizePlan", () => {
       [{ saveNumber: 1, name: "Cafe, 12 Main St", area: "", why: "Go" }],
       [source({ title: "The cafe at 12 Main St" })],
     );
-    expect(pick.name).toBe("Cafe, 12 Main St");
+    expect(pick!.name).toBe("Cafe, 12 Main St");
   });
 
   it("drops picks with an empty reason and trims long fields", () => {
@@ -462,6 +462,6 @@ describe("sanitizePlan", () => {
       [{ saveNumber: 1, name: "Balthazar", area: "", why: "x".repeat(300) }],
       sources,
     );
-    expect(place.why.length).toBeLessThanOrEqual(140);
+    expect(place!.why.length).toBeLessThanOrEqual(140);
   });
 });

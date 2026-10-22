@@ -465,7 +465,7 @@ describe("POST /waitlist/join authentication", () => {
   it("no longer exposes waitlist:join as a public action", async () => {
     const t = setup();
     await expect(
-      t.action(anyApi.waitlist.join, {
+      t.action(anyApi.waitlist!.join!, {
         email: "direct@example.com",
         source: "hero",
       }),

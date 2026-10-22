@@ -30,7 +30,7 @@ describe("syncPurchase", () => {
     );
     expect(await f.t.action(api.subscriptions.syncPurchase, {})).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain(
+    expect(String(fetchMock.mock.calls[0]![0])).toContain(
       encodeURIComponent(f.userId),
     );
     expect(await f.rows()).toMatchObject([

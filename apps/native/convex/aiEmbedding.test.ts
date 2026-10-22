@@ -52,7 +52,7 @@ describe("embedTexts", () => {
     const { vectors: result } = await embedTexts(["first", "", "second", ""]);
 
     expect(embedMany).toHaveBeenCalledTimes(1);
-    expect(embedMany.mock.calls[0][0].values).toEqual(["first", "second"]);
+    expect(embedMany.mock.calls[0]![0].values).toEqual(["first", "second"]);
     expect(result[1]).toBeUndefined();
     expect(result[3]).toBeUndefined();
     expect(result[0]?.[0]).toBeCloseTo(1, 10);
@@ -73,7 +73,7 @@ describe("embedTexts", () => {
 
     await embedTexts(["text"]);
 
-    const options = embedMany.mock.calls[0][0];
+    const options = embedMany.mock.calls[0]![0];
     expect(options.providerOptions.google.outputDimensionality).toBe(
       EMBEDDING_DIMENSIONS,
     );

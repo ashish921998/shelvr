@@ -48,7 +48,7 @@ describe("sanitizePlan area grounding", () => {
           pickedCity === savedCity
             ? `${neighbourhood}, ${pickedCity}`
             : neighbourhood;
-        expect(pick.area).toBe(expected);
+        expect(pick!.area).toBe(expected);
       }),
       { seed: SEED, numRuns: 200 },
     );

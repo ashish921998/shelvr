@@ -98,7 +98,7 @@ vi.mock("react-native-reanimated", () => ({
   cancelAnimation: vi.fn(),
   Extrapolation: { CLAMP: "clamp" },
   interpolate: (value: number, input: number[], output: number[]) =>
-    value <= input[0] ? output[0] : output.at(-1),
+    value <= input[0]! ? output[0] : output.at(-1),
 }));
 
 vi.mock("react-native-worklets", () => ({

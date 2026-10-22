@@ -207,7 +207,7 @@ describe("a plain link's page", () => {
 
   it("plays a YouTube thumbnail on YouTube and asks to watch there", () => {
     renderPage(video);
-    expect(vi.mocked(PostMediaButton).mock.calls[0][0]).toMatchObject({
+    expect(vi.mocked(PostMediaButton).mock.calls[0]![0]).toMatchObject({
       site: "YouTube",
       playable: true,
     });
@@ -219,23 +219,23 @@ describe("a plain link's page", () => {
 
   it("crops the black bars off YouTube's 4:3 thumbnail", () => {
     renderPage(video);
-    const hero = vi.mocked(Image).mock.calls[0][0] as {
+    const hero = vi.mocked(Image).mock.calls[0]![0] as {
       contentFit: string;
       style: { width: number; height: number }[];
     };
     expect(hero.contentFit).toBe("cover");
-    const { width, height } = hero.style[1];
+    const { width, height } = hero.style[1]!;
     expect(width / height).toBeCloseTo(16 / 9);
   });
 
   it("leaves a YouTube Short's thumbnail at its own shape", () => {
     renderPage({ ...video, url: "https://www.youtube.com/shorts/abc123" });
-    const hero = vi.mocked(Image).mock.calls[0][0] as {
+    const hero = vi.mocked(Image).mock.calls[0]![0] as {
       contentFit: string;
       style: { width: number; height: number }[];
     };
     expect(hero.contentFit).toBe("contain");
-    const { width, height } = hero.style[1];
+    const { width, height } = hero.style[1]!;
     expect(width / height).toBeCloseTo(4 / 3);
   });
 

@@ -38,7 +38,7 @@ describe("onboarding demo allowance", () => {
     expect(runs).toHaveLength(1);
     expect(item?.processingRunId).toBeDefined();
     expect(item?.processingStartedAt).toBeDefined();
-    expect(runs[0].args[0]).toMatchObject({
+    expect(runs[0]!.args[0]).toMatchObject({
       itemId,
       runId: item?.processingRunId,
     });
@@ -324,14 +324,14 @@ describe("onboarding demo allowance", () => {
       (job) => job.name === "analytics:captureSave",
     );
     expect(telemetry).toHaveLength(1);
-    expect(telemetry[0].args[0]).toMatchObject({
+    expect(telemetry[0]!.args[0]).toMatchObject({
       itemId,
       userId,
       itemType: "link",
       sessionId: "demo-session",
       saveSource: "onboarding_demo",
     });
-    expect(JSON.stringify(telemetry[0].args[0])).not.toContain("bbcgoodfood");
+    expect(JSON.stringify(telemetry[0]!.args[0])).not.toContain("bbcgoodfood");
   });
 });
 

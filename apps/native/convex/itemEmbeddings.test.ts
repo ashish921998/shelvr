@@ -72,7 +72,7 @@ describe("the retrieval vector stays inside the backend", () => {
       paginationOpts: { numItems: 10, cursor: null },
     });
     const found = await t.query(api.items.searchItems, { query: "otters" });
-    const detail = await t.query(api.items.getItem, { id: feed[0]._id });
+    const detail = await t.query(api.items.getItem, { id: feed[0]!._id });
 
     expect(feed).toHaveLength(1);
     expect(page.page).toHaveLength(1);
@@ -293,8 +293,8 @@ describe("the embedding sweep", () => {
     );
 
     expect(pending.map((p) => p.itemId)).toEqual([stale]);
-    expect(pending[0].text).toContain("Needs embedding");
-    expect(pending[0].text).toContain("No vector yet");
+    expect(pending[0]!.text).toContain("Needs embedding");
+    expect(pending[0]!.text).toContain("No vector yet");
   });
 
   it("re-enlists rows stamped by an older generation", async () => {
@@ -673,7 +673,7 @@ describe("listReadyItemsByIdInternal", () => {
 
     const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
       userId: "hydrate",
-      itemIds: [ids[2], ids[0], ids[1]],
+      itemIds: [ids[2]!, ids[0]!, ids[1]!],
       limit: 10,
     });
 
@@ -749,7 +749,7 @@ describe("listReadyItemsByIdInternal", () => {
     });
 
     expect(rows).toHaveLength(1);
-    expect("embedding" in rows[0]).toBe(false);
+    expect("embedding" in rows[0]!).toBe(false);
   });
 
   it("drops a hit whose vector belongs to an older generation", async () => {

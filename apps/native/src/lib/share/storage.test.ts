@@ -100,8 +100,8 @@ describe("reconcileSession", () => {
     expect(result.session.phase).toBe("active");
     expect(result.session.sessionId).toBe("sess-1");
     expect(result.session.entries).toHaveLength(1);
-    expect(result.session.entries[0].operationId).toBe("share:sess-1:0");
-    expect(result.session.entries[0].status).toBe("pending");
+    expect(result.session.entries[0]!.operationId).toBe("share:sess-1:0");
+    expect(result.session.entries[0]!.status).toBe("pending");
     expect(loadSession(store)?.fingerprint).toBe(
       fingerprintSharePayloads(BATCH_A),
     );
@@ -116,8 +116,8 @@ describe("reconcileSession", () => {
     const result = reconcileSession(store, USER, BATCH_A, id);
     expect(result.kind).toBe("resume");
     if (result.kind !== "resume") return;
-    expect(result.session.entries[0].status).toBe("saved");
-    expect(result.session.entries[0].itemId).toBe("items-1");
+    expect(result.session.entries[0]!.status).toBe("saved");
+    expect(result.session.entries[0]!.itemId).toBe("items-1");
   });
 
   it("directs a clear for a matching completed session but KEEPS the record until clear succeeds", () => {
@@ -147,7 +147,7 @@ describe("reconcileSession", () => {
     const result = reconcileSession(store, USER, BATCH_A_DUP, id);
     expect(result.kind).toBe("new");
     if (result.kind !== "new") return;
-    expect(result.session.entries[0].status).toBe("pending");
+    expect(result.session.entries[0]!.status).toBe("pending");
   });
 
   it("keeps directing a clear on repeated remounts until the caller deletes (throwing-clear safety)", () => {
@@ -331,7 +331,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     forgetDeletedShareItem(store, "items-1");
     const result = reconcileSession(store, USER, BATCH_A, () => "sess-9");
     expect(result.kind).toBe("new");
-    expect(loadSession(store)?.entries[0].status).toBe("pending");
+    expect(loadSession(store)?.entries[0]!.status).toBe("pending");
   });
 
   it("keeps skipping the other saved entries after one item is deleted", () => {
@@ -345,7 +345,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     reconcileSession(store, USER, batch, () => "sess-9");
     const entries = loadSession(store)?.entries ?? [];
     expect(entries[0]).toMatchObject({ status: "saved", itemId: "items-1" });
-    expect(entries[1].status).toBe("pending");
+    expect(entries[1]!.status).toBe("pending");
   });
 
   it("still skips a replay when an unrelated item is deleted", () => {
@@ -368,7 +368,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     );
     expect(session.sessionId).toBe("sess-9");
     expect(session.phase).toBe("active");
-    expect(session.entries[0].operationId).toBe("share:sess-9:0");
+    expect(session.entries[0]!.operationId).toBe("share:sess-9:0");
     expect(loadSession(store)?.sessionId).toBe("sess-9");
   });
 });
@@ -631,7 +631,7 @@ describe("session-scoped mutations (new-share-during-in-flight-run safety)", () 
     updateEntry(store, 0, { status: "saved", kind: "link" }, firstSessionId);
     const live = loadSession(store);
     expect(live?.sessionId).toBe("sess-2");
-    expect(live?.entries[0].status).toBe("pending");
+    expect(live?.entries[0]!.status).toBe("pending");
   });
 
   it("markComplete is a no-op when sessionId does not match", () => {

@@ -135,7 +135,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
 
     expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
     expect(exchanges).toHaveLength(1);
-    expect(Object.fromEntries(exchanges[0])).toMatchObject({
+    expect(Object.fromEntries(exchanges[0]!)).toMatchObject({
       client_id: "app.shelvr.save",
       grant_type: "authorization_code",
       code: "c.code",
@@ -260,7 +260,7 @@ describe("keeping Apple's refresh token from the native sheet", () => {
         nonce: NONCE,
       });
       const { users } = await tables(backend);
-      const userId = users[0]._id;
+      const userId = users[0]!._id;
       await seedNotes(backend, userId, DELETE_BATCH + 1);
       const sessionId = await backend.run((ctx) =>
         ctx.db.insert("authSessions", {
@@ -303,9 +303,9 @@ describe("keeping Apple's refresh token from the native sheet", () => {
       expect(exchanges).toHaveLength(1);
       expect(await appleTokens(backend)).toEqual([]);
       expect(revocations).toHaveLength(1);
-      expect(revocations[0].get("client_id")).toBe("app.shelvr.save");
-      expect(revocations[0].get("token") === "r.native").toBe(true);
-      expect(revocations[0].get("token_type_hint")).toBe("refresh_token");
+      expect(revocations[0]!.get("client_id")).toBe("app.shelvr.save");
+      expect(revocations[0]!.get("token") === "r.native").toBe(true);
+      expect(revocations[0]!.get("token_type_hint")).toBe("refresh_token");
       const state = await backend.run(async (ctx) => ({
         user: await ctx.db.get(userId),
         jobs: await ctx.db.system.query("_scheduled_functions").collect(),

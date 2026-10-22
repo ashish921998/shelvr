@@ -81,7 +81,7 @@ describe("durable digest delivery", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     await t.action(internal.notificationDelivery.send, { digestId });
-    const payloads = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const payloads = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(
       payloads.find((p: { to: string }) => p.to === "token-a"),
     ).toMatchObject({
@@ -122,7 +122,7 @@ describe("durable digest delivery", () => {
     await advance();
     await t.action(internal.notificationDelivery.send, { digestId });
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    const retried = JSON.parse(fetchMock.mock.calls[2][1].body);
+    const retried = JSON.parse(fetchMock.mock.calls[2]![1].body);
     expect(retried[0]).toMatchObject({
       title: translations.ja.title,
       body: translations.ja.namedSingle.replace("%{title}", "A note"),
@@ -167,7 +167,7 @@ describe("durable digest delivery", () => {
       deliveryAttempts: 2,
       deliveryRecipients: [{ state: "receipt", ticketId: "ticket-a" }],
     });
-    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(fetchMock.mock.calls[0]![1].signal).toBeInstanceOf(AbortSignal);
     expect(
       await t.run((ctx) => ctx.db.query("weeklyDigests").collect()),
     ).toHaveLength(1);
@@ -204,7 +204,7 @@ describe("durable digest delivery", () => {
     await advance();
     await t.action(internal.notificationDelivery.send, { digestId });
     expect(
-      JSON.parse(fetchMock.mock.calls[2][1].body).map(
+      JSON.parse(fetchMock.mock.calls[2]![1].body).map(
         (message: { to: string }) => message.to,
       ),
     ).toEqual(["token-c"]);
@@ -333,8 +333,8 @@ describe("durable digest delivery", () => {
     await advance();
     await t.action(internal.notificationDelivery.send, { digestId });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][0]).toContain("getReceipts");
-    expect((await digest())?.deliveryRecipients?.[0].state).toBe("receipt");
+    expect(fetchMock.mock.calls[1]![0]).toContain("getReceipts");
+    expect((await digest())?.deliveryRecipients?.[0]!.state).toBe("receipt");
   });
 
   it("honors opt-out before delivery", async () => {
@@ -376,7 +376,7 @@ describe("durable digest delivery", () => {
     await t.mutation(internal.notificationDelivery.recover, {});
     await t.finishAllScheduledFunctions(() => vi.runAllTimers());
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect((await digest())?.deliveryRecipients?.[0].state).toBe("receipt");
+    expect((await digest())?.deliveryRecipients?.[0]!.state).toBe("receipt");
     expect(
       (await t.run((ctx) => ctx.db.get(completedId)))?.deliveryStatus,
     ).toBe("complete");
@@ -404,7 +404,7 @@ describe("durable digest delivery", () => {
       .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
     vi.stubGlobal("fetch", fetchMock);
     await t.action(internal.notificationDelivery.send, { digestId });
-    const [payload] = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const [payload] = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(payload.body).toContain("A note");
     expect(payload.body).not.toContain("Guessed from the URL");
     expect(payload.data).toMatchObject({
@@ -436,7 +436,7 @@ describe("durable digest delivery", () => {
     await t.action(internal.notificationDelivery.send, { digestId });
     const jobs = await telemetry();
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].args[0]).toMatchObject({
+    expect(jobs[0]!.args[0]).toMatchObject({
       userId,
       notificationId: digestId,
       kind: "weekly_shelf",
@@ -481,7 +481,7 @@ describe("durable digest delivery", () => {
       )
     ).filter((job) => job.name.includes("captureNotification"));
     expect(events).toHaveLength(1);
-    expect(events[0].args[0]).toMatchObject({ delivered: true });
+    expect(events[0]!.args[0]).toMatchObject({ delivered: true });
   });
 
   it("does not treat a malformed successful HTTP response as delivery", async () => {

@@ -107,7 +107,7 @@ describe("saveImageOperations", () => {
       stage: "attach",
       message: "This photo is empty. Please save it again.",
     });
-    expect(results[1].status).toBe("saved");
+    expect(results[1]!.status).toBe("saved");
     expect(finalize).toHaveBeenCalledTimes(1);
     expect(finalize).toHaveBeenCalledWith(
       expect.objectContaining({ operationId: "image:valid" }),
@@ -185,7 +185,7 @@ describe("saveImageOperations", () => {
       [{ image: img("a"), operationId: "image:op-a" }],
       deps,
     );
-    expect(results[0].status).toBe("failed");
+    expect(results[0]!.status).toBe("failed");
     expect(
       (results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage,
     ).toBe("begin");

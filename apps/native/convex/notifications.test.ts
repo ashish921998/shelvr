@@ -306,7 +306,7 @@ describe("weekly shelf notifications", () => {
         job.name.endsWith("prepareDueWeeklyDigests"),
       );
       expect(chained).toHaveLength(1);
-      expect(chained[0].args[0]).toMatchObject({
+      expect(chained[0]!.args[0]).toMatchObject({
         now,
         cursor: expect.any(String),
       });
@@ -668,7 +668,7 @@ describe("weekly shelf selection", () => {
     const ids: Id<"items">[] = [];
     for (let i = 0; i < count; i++) {
       vi.setSystemTime(NOW - (count - i) * 60_000);
-      ids.push(await seedItem(t, userA, types[i % types.length]));
+      ids.push(await seedItem(t, userA, types[i % types.length]!));
     }
     return ids.reverse();
   }
@@ -771,7 +771,7 @@ describe("weekly shelf selection", () => {
     const t = await user();
     await seedOld(t, 6);
     const order = await checkOrder(t);
-    await markOpened(t, [order[0], order[2]]);
+    await markOpened(t, [order[0]!, order[2]!]);
 
     expect(shelfIds(await prepare(t))).toEqual([order[1], order[3], order[4]]);
   });
@@ -789,7 +789,7 @@ describe("weekly shelf selection", () => {
   it("fails a preparation that checks a poisoned save", async () => {
     const t = await user();
     await seedOld(t, 3);
-    await poison(t, [(await checkOrder(t))[0]]);
+    await poison(t, [(await checkOrder(t))[0]!]);
 
     await expect(prepare(t)).rejects.toThrow();
   });

@@ -87,7 +87,7 @@ describe("normalizeImage", () => {
   it("does not resize at or below the cap", async () => {
     setup(MAX_IMAGE_EDGE, 900);
     const out = await normalizeImage({ uri: "file:///a.jpg" });
-    expect(contexts[0].resizedTo).toBeUndefined();
+    expect(contexts[0]!.resizedTo).toBeUndefined();
     expect(out).toMatchObject({ width: MAX_IMAGE_EDGE, height: 900 });
   });
 
@@ -99,12 +99,12 @@ describe("normalizeImage", () => {
       height: 3000,
     });
     expect(contexts).toHaveLength(1);
-    expect(contexts[0].resizedTo).toEqual({ height: MAX_IMAGE_EDGE });
+    expect(contexts[0]!.resizedTo).toEqual({ height: MAX_IMAGE_EDGE });
     expect(out).toMatchObject({ width: 1200, height: MAX_IMAGE_EDGE });
 
     setup(4000, 3000);
     const landscape = await normalizeImage({ uri: "file:///a.jpg" });
-    expect(contexts[0].resizedTo).toEqual({ width: MAX_IMAGE_EDGE });
+    expect(contexts[0]!.resizedTo).toEqual({ width: MAX_IMAGE_EDGE });
     expect(landscape).toMatchObject({ width: MAX_IMAGE_EDGE, height: 1200 });
   });
 

@@ -125,7 +125,7 @@ describe("recorded terms and refund consent", () => {
       await f.review(accepted);
       await f.send();
       expect(fetchMock).toHaveBeenCalledOnce();
-      const [url, request] = fetchMock.mock.calls[0];
+      const [url, request] = fetchMock.mock.calls[0]!;
       expect(url).toBe(
         `https://api.revenuecat.com/v1/subscribers/${f.userId}/attributes`,
       );
@@ -174,7 +174,7 @@ describe("recorded terms and refund consent", () => {
     });
     await f.send();
     expect(
-      JSON.parse(fetchMock.mock.calls[1][1].body).attributes
+      JSON.parse(fetchMock.mock.calls[1]![1].body).attributes
         .apple_refund_consent.value,
     ).toBe("false");
     expect((await f.row())?.syncState).toBe("synced");
@@ -228,7 +228,7 @@ describe("consent delivery reliability", () => {
     await f.review(true);
     await f.send();
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[1][0]).toBe(
+    expect(fetchMock.mock.calls[1]![0]).toBe(
       `https://api.revenuecat.com/v1/subscribers/${f.userId}`,
     );
     expect((await f.row())?.syncState).toBe("synced");
@@ -385,7 +385,7 @@ describe("consent delivery reliability", () => {
     });
     await f.send();
     expect(
-      JSON.parse(fetchMock.mock.calls[1][1].body).attributes
+      JSON.parse(fetchMock.mock.calls[1]![1].body).attributes
         .apple_refund_consent.value,
     ).toBe("false");
     expect((await f.row())?.syncState).toBe("synced");
@@ -474,7 +474,7 @@ describe("consent delivery reliability", () => {
     });
     await f.send();
     expect(
-      JSON.parse(fetchMock.mock.calls[1][1].body).attributes
+      JSON.parse(fetchMock.mock.calls[1]![1].body).attributes
         .apple_refund_consent.value,
     ).toBe("false");
     expect(await f.row()).toBeNull();

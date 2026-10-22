@@ -103,10 +103,10 @@ describe("server-confirmed payments", () => {
     await t.action(internal.analytics.capturePayment, {
       payment,
       attempt: 1,
-      deliveryId: jobs[0].args[0].deliveryId,
+      deliveryId: jobs[0]!.args[0].deliveryId,
     });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).uuid).toBe(
-      jobs[0].args[0].deliveryId,
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).uuid).toBe(
+      jobs[0]!.args[0].deliveryId,
     );
   });
   it("authenticates the webhook and schedules exactly one payment alongside entitlement sync", async () => {
@@ -148,7 +148,7 @@ describe("server-confirmed payments", () => {
       ctx.db.query("subscriptions").collect(),
     );
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].status).toBe("lapsed");
+    expect(subscriptions[0]!.status).toBe("lapsed");
     expect(
       await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),
@@ -216,7 +216,7 @@ describe("server-confirmed payments", () => {
       "subscription_uncancelled",
       "trial_expired",
     ]);
-    expect(jobs[1].args[0].payment).toMatchObject({
+    expect(jobs[1]!.args[0].payment).toMatchObject({
       cancel_reason: "UNSUBSCRIBE",
       cancel_category: "voluntary",
     });
@@ -225,7 +225,7 @@ describe("server-confirmed payments", () => {
       ctx.db.query("subscriptions").collect(),
     );
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].status).toBe("lapsed");
+    expect(subscriptions[0]!.status).toBe("lapsed");
   });
   it("distinguishes a free trial, trial conversion, renewal, and lifetime purchase", () => {
     expect(parsePaymentTelemetry({ event })?.event).toBe("payment_succeeded");
@@ -346,12 +346,12 @@ describe("server-confirmed payments", () => {
     const jobs = await t.run((ctx) =>
       ctx.db.system.query("_scheduled_functions").collect(),
     );
-    const first = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const first = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(first.properties.environment).toBe("sandbox");
     expect(first.timestamp).toBe(new Date(event.purchased_at_ms).toISOString());
     expect(first.properties.revenue_usd).toBe(4.99);
-    await t.action(internal.analytics.capturePayment, jobs[0].args[0]);
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(first);
+    await t.action(internal.analytics.capturePayment, jobs[0]!.args[0]);
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toEqual(first);
   });
 
   it("delivers cancellation events with their reason classification and leaves purchase bodies unchanged", async () => {
@@ -373,7 +373,7 @@ describe("server-confirmed payments", () => {
     });
     if (!cancelled) throw new Error("Invalid test fixture");
     await t.action(internal.analytics.capturePayment, { payment: cancelled });
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body).toMatchObject({
       event: "trial_cancelled",
       timestamp: new Date(1700000100000).toISOString(),
@@ -389,7 +389,7 @@ describe("server-confirmed payments", () => {
     const purchase = parsePaymentTelemetry({ event });
     if (!purchase) throw new Error("Invalid test fixture");
     await t.action(internal.analytics.capturePayment, { payment: purchase });
-    const purchaseBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    const purchaseBody = JSON.parse(fetchMock.mock.calls[1]![1].body);
     expect(purchaseBody.properties).not.toHaveProperty("cancel_reason");
     expect(purchaseBody.properties).not.toHaveProperty("cancel_category");
   });

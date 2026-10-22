@@ -93,7 +93,7 @@ describe("refund webhook reconciliation", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].args[0].payment).toMatchObject({
+    expect(jobs[0]!.args[0].payment).toMatchObject({
       event: "subscription_cancelled",
       cancel_category: "refund",
     });

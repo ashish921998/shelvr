@@ -109,7 +109,7 @@ describe("transfer webhook reconciliation", () => {
     vi.stubGlobal("fetch", fetchMock);
     expect((await f.send()).status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain(
+    expect(String(fetchMock.mock.calls[0]![0])).toContain(
       encodeURIComponent(f.ids.from),
     );
     const rows = await f.rows();

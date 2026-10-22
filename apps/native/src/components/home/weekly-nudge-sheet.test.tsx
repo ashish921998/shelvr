@@ -128,7 +128,7 @@ it("keeps the opt-in pending after denied permission and lets the user finish af
   await waitFor(() => expect(mock.alert).toHaveBeenCalledTimes(1));
   expect(mock.finish).not.toHaveBeenCalled();
   expect(screen.getByText("weekly.remindMe")).toBeDefined();
-  const buttons = mock.alert.mock.calls[0][2] as {
+  const buttons = mock.alert.mock.calls[0]![2] as {
     text: string;
     onPress: () => void;
   }[];

@@ -206,7 +206,7 @@ describe.each([false, true])("with reduced motion %s", (reduced) => {
         />,
       );
       const assertShell = () => {
-        const shell = vi.mocked(View).mock.calls[0][0];
+        const shell = vi.mocked(View).mock.calls[0]![0];
         expect(shell).not.toHaveProperty("entering", expect.anything());
         expect(shell).not.toHaveProperty("exiting", expect.anything());
         expect(shell).not.toHaveProperty("layout", expect.anything());
@@ -556,7 +556,7 @@ it("crops the black bars off a YouTube video's 4:3 thumbnail", () => {
       }}
     />,
   );
-  const picture = vi.mocked(Image).mock.calls[0][0] as {
+  const picture = vi.mocked(Image).mock.calls[0]![0] as {
     contentFit: string;
     style: unknown[];
   };
@@ -719,7 +719,7 @@ describe("a save that names a place", () => {
   it("shows no Maps chip on a save that is not a place", () => {
     render(
       <ItemCard
-        item={{ ...place, intents: [place.intents![0]] }}
+        item={{ ...place, intents: [place.intents![0]!] }}
         source={{ from: "home" }}
       />,
     );

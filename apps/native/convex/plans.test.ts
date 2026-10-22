@@ -92,7 +92,7 @@ async function setup(
 }
 
 function promptOf(call = 0): string {
-  return (generateObject.mock.calls[call][0] as { prompt: string }).prompt;
+  return (generateObject.mock.calls[call]![0] as { prompt: string }).prompt;
 }
 
 beforeEach(() => {
@@ -132,7 +132,7 @@ describe("makePlan", () => {
           name: "Balthazar",
           area: "SoHo",
           why: "The vodka pasta",
-          itemId: itemIds[0],
+          itemId: itemIds[0]!,
         },
         { name: "Bar Lola", why: "Wine bar vibe", itemId: itemIds[1] },
       ],
@@ -146,7 +146,7 @@ describe("makePlan", () => {
       { title: "Third save" },
     ]);
     await t.mutation(api.placeVisits.setVisited, {
-      itemId: itemIds[0],
+      itemId: itemIds[0]!,
       name: "Tigre",
       visited: true,
     });

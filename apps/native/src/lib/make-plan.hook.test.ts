@@ -143,7 +143,7 @@ describe("useMakePlan", () => {
       await second.promise;
     });
     const state = result.current.state;
-    expect(state.status === "ready" && state.places[0].name).toBe("Beta");
+    expect(state.status === "ready" && state.places[0]!.name).toBe("Beta");
   });
 
   it("waits for the vote link, then shows its shortlist without the model", async () => {
@@ -203,7 +203,7 @@ describe("useMakePlan", () => {
     );
     await act(() => result.current.ask());
     expect(mocks.setVisited).toHaveBeenCalledTimes(1);
-    expect(mocks.share.mock.calls[0][0].message).toContain("/p/fresh");
+    expect(mocks.share.mock.calls[0]![0].message).toContain("/p/fresh");
   });
 
   it("gives every answer its own plan id", async () => {
@@ -363,7 +363,7 @@ describe("usePlanAsk", () => {
     await act(() => result.current.ask());
 
     expect(mocks.setVisited).toHaveBeenCalledTimes(1);
-    expect(mocks.share.mock.calls[0][0].message).toContain("/p/tok1");
+    expect(mocks.share.mock.calls[0]![0].message).toContain("/p/tok1");
     expect(mocks.capture).toHaveBeenCalledWith("plan_asked", {
       place_count: 2,
     });
@@ -382,7 +382,7 @@ describe("usePlanAsk", () => {
     await act(() => result.current.ask());
 
     expect(mocks.setVisited).not.toHaveBeenCalled();
-    expect(mocks.share.mock.calls[0][0].message).toContain("/p/open");
+    expect(mocks.share.mock.calls[0]![0].message).toContain("/p/open");
     expect(mocks.capture).not.toHaveBeenCalledWith("plan_asked", {
       place_count: 2,
     });

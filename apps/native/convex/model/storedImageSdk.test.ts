@@ -52,7 +52,7 @@ describe("stored image MIME type through the real AI SDK", () => {
     });
     expect(result.text).toBe("A photo");
     expect(request).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(String(request.mock.calls[0][1]?.body));
+    const body = JSON.parse(String(request.mock.calls[0]![1]?.body));
     expect(body.contents[0].parts[0].inlineData).toEqual({
       mimeType: expectedType,
       data: Buffer.from(bytes).toString("base64"),

@@ -249,9 +249,9 @@ it("keeps every beat inside the hero's one run, in order", () => {
   const [revealFrom, revealTo] = HERO_BEATS.reveal;
   const [lastFrom, lastTo] = HERO_BEATS.tag(2);
   expect(0 < scanFrom && scanFrom < scanTo).toBe(true);
-  expect(revealFrom < revealTo && revealTo < lastFrom).toBe(true);
+  expect(revealFrom < revealTo && revealTo < lastFrom!).toBe(true);
   expect(lastTo).toBeLessThanOrEqual(1);
   expect(beat(0, scanFrom, scanTo)).toBe(0);
-  expect(beat(1, lastFrom, lastTo)).toBe(1);
+  expect(beat(1, lastFrom!, lastTo!)).toBe(1);
   expect(beat((scanFrom + scanTo) / 2, scanFrom, scanTo)).toBeGreaterThan(0.5);
 });

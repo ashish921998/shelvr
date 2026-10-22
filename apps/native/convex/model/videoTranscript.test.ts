@@ -113,7 +113,7 @@ describe("fetchVideoTranscript", () => {
       status: "ok",
       text: "Pasta al limone. 8 oz of mascarpone.",
     });
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
     expect(url.pathname).toBe(
       "/call/scrapecreators.x.v2-instagram-media-transcript",
     );

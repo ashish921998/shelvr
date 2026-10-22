@@ -26,10 +26,10 @@ function resolveProfile(name: string): {
   env: Record<string, string>;
 } {
   const profile = eas.build[name];
-  const parent = profile.extends
-    ? resolveProfile(profile.extends)
+  const parent = profile!.extends
+    ? resolveProfile(profile!.extends)
     : { env: {} };
-  return { ...parent, ...profile, env: { ...parent.env, ...profile.env } };
+  return { ...parent, ...profile, env: { ...parent.env, ...profile!.env } };
 }
 
 function evaluate(key: string, profile: string): string {

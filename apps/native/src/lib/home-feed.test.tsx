@@ -85,9 +85,9 @@ describe("HomeFeedProvider", () => {
         </HomeFeedProvider>,
       );
       const feed = sink[0];
-      expect(feed.items).toEqual(items);
-      expect(feed.canLoadMore).toBe(canLoadMore);
-      expect(feed.loadingMore).toBe(loadingMore);
+      expect(feed!.items).toEqual(items);
+      expect(feed!.canLoadMore).toBe(canLoadMore);
+      expect(feed!.loadingMore).toBe(loadingMore);
     },
   );
 
@@ -101,7 +101,7 @@ describe("HomeFeedProvider", () => {
         <Probe sink={sink} />
       </HomeFeedProvider>,
     );
-    sink[0].loadMore();
+    sink[0]!.loadMore();
     expect(loadMore).toHaveBeenCalledTimes(1);
     expect(loadMore).toHaveBeenCalledWith(40);
 
@@ -112,7 +112,7 @@ describe("HomeFeedProvider", () => {
         <Probe sink={exhaustedSink} />
       </HomeFeedProvider>,
     );
-    exhaustedSink[0].loadMore();
+    exhaustedSink[0]!.loadMore();
     expect(loadMore).toHaveBeenCalledTimes(1);
   });
 

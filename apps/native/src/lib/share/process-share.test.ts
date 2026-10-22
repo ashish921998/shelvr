@@ -212,7 +212,7 @@ describe("classifyEntries", () => {
       "pending",
       "failed",
     ]);
-    expect(entries[2].message).toBe("Image could not be resolved");
+    expect(entries[2]!.message).toBe("Image could not be resolved");
   });
 
   it("classifies URL-less text beside a shared link as that link", () => {
@@ -285,10 +285,10 @@ describe("processSession", () => {
       "saved",
     ]);
     const failed = result.entries[1];
-    expect(failed.kind).toBe("link");
-    expect(failed.message).toBe("link b down");
-    expect(result.entries[0].itemId).toBeDefined();
-    expect(result.entries[2].itemId).toBeDefined();
+    expect(failed!.kind).toBe("link");
+    expect(failed!.message).toBe("link b down");
+    expect(result.entries[0]!.itemId).toBeDefined();
+    expect(result.entries[2]!.itemId).toBeDefined();
   });
 
   it("retries only failed entries on a second pass; saved entries are not re-saved", async () => {
@@ -325,7 +325,7 @@ describe("processSession", () => {
       "saved",
     ]);
     expect(saveLink).toHaveBeenCalledTimes(1);
-    expect(saveLink.mock.calls[0][0].operationId).toBe(
+    expect(saveLink.mock.calls[0]![0].operationId).toBe(
       operationIdFor("sess-1", 1),
     );
   });
@@ -352,8 +352,8 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries[0].status).toBe("unsupported");
-    expect(result.entries[1].status).toBe("saved");
+    expect(result.entries[0]!.status).toBe("unsupported");
+    expect(result.entries[1]!.status).toBe("saved");
     expect(saveLink).toHaveBeenCalledTimes(1);
   });
 
@@ -372,10 +372,10 @@ describe("processSession", () => {
     const deps = makeDeps({ saveLink, saveNote });
 
     const result = await processSession(session, resolved, deps);
-    expect(result.entries[0].kind).toBe("link");
-    expect(result.entries[0].status).toBe("saved");
+    expect(result.entries[0]!.kind).toBe("link");
+    expect(result.entries[0]!.status).toBe("saved");
     expect(saveLink).toHaveBeenCalledTimes(1);
-    expect(saveLink.mock.calls[0][0].url).toBe(
+    expect(saveLink.mock.calls[0]![0].url).toBe(
       "https://www.tiktok.com/@creator/video/7301234567890123456",
     );
     expect(saveNote).not.toHaveBeenCalled();
@@ -397,7 +397,7 @@ describe("processSession", () => {
     );
 
     expect(saveLink).toHaveBeenCalledTimes(1);
-    expect(saveLink.mock.calls[0][0]).toEqual({
+    expect(saveLink.mock.calls[0]![0]).toEqual({
       url: reel,
       operationId: operationIdFor("sess-1", 0),
     });
@@ -435,8 +435,8 @@ describe("processSession", () => {
 
     expect(saveNote).not.toHaveBeenCalled();
     expect(saveLink).toHaveBeenCalledTimes(1);
-    expect(saveLink.mock.calls[0][0].url).toBe(reel);
-    const itemId = saveLink.mock.calls[0][0].operationId;
+    expect(saveLink.mock.calls[0]![0].url).toBe(reel);
+    const itemId = saveLink.mock.calls[0]![0].operationId;
     expect(result.entries.map((e) => [e.kind, e.status, e.itemId])).toEqual([
       ["link", "saved", `items:${itemId}`],
       ["link", "saved", `items:${itemId}`],
@@ -457,8 +457,8 @@ describe("processSession", () => {
     const prior: ShareSession = {
       ...session,
       entries: [
-        { ...session.entries[0], status: "saved", itemId: "items:first" },
-        { ...session.entries[1], status: "failed", message: "offline" },
+        { ...session.entries[0]!, status: "saved", itemId: "items:first" },
+        { ...session.entries[1]!, status: "failed", message: "offline" },
       ],
     };
 
@@ -484,12 +484,12 @@ describe("processSession", () => {
       ...session,
       entries: [
         {
-          ...session.entries[0],
+          ...session.entries[0]!,
           kind: "note",
           status: "saved",
           itemId: "items:note",
         },
-        { ...session.entries[1], status: "failed", message: "offline" },
+        { ...session.entries[1]!, status: "failed", message: "offline" },
       ],
     };
 
@@ -541,8 +541,8 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries[0].status).toBe("failed");
-    expect(result.entries[0].message).toBe("Upload failed (502)");
+    expect(result.entries[0]!.status).toBe("failed");
+    expect(result.entries[0]!.message).toBe("Upload failed (502)");
   });
 
   it("deduplicates an idempotent re-process: a saved entry's operation is not re-invoked", async () => {
@@ -566,8 +566,8 @@ describe("processSession", () => {
       ),
     };
     const result = await processSession(pre, resolved, deps);
-    expect(result.entries[0].status).toBe("saved");
-    expect(result.entries[0].itemId).toBe("items:prior");
+    expect(result.entries[0]!.status).toBe("saved");
+    expect(result.entries[0]!.itemId).toBe("items:prior");
     expect(saveLink).toHaveBeenCalledTimes(1);
   });
 
@@ -588,13 +588,13 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(first.entries[0].status).toBe("failed");
+    expect(first.entries[0]!.status).toBe("failed");
 
     const second = await processSession(first, resolved, deps);
-    expect(second.entries[0].status).toBe("saved");
-    expect(second.entries[0].itemId).toBe("items:survived");
-    expect(saveLink.mock.calls[0][0].operationId).toBe(
-      saveLink.mock.calls[1][0].operationId,
+    expect(second.entries[0]!.status).toBe("saved");
+    expect(second.entries[0]!.itemId).toBe("items:survived");
+    expect(saveLink.mock.calls[0]![0].operationId).toBe(
+      saveLink.mock.calls[1]![0].operationId,
     );
   });
 
@@ -615,15 +615,15 @@ describe("processSession", () => {
     expect(result.entries.map((e) => e.status)).toEqual(["failed", "failed"]);
     expect(saveLink).not.toHaveBeenCalled();
     expect(saveNote).not.toHaveBeenCalled();
-    expect(result.entries[0].message).toBe("Shared link was not a valid URL");
-    expect(result.entries[1].message).toBe("Shared text was empty");
+    expect(result.entries[0]!.message).toBe("Shared link was not a valid URL");
+    expect(result.entries[1]!.message).toBe("Shared text was empty");
   });
 
   it("saves an image correctly on resume even if its persisted kind placeholder is link", async () => {
     const session = makeSession(1);
     const resolved = [imagePayload("file://img.jpg")];
     const persistedPending: ShareEntry[] = [
-      { ...session.entries[0], kind: "link", status: "pending" },
+      { ...session.entries[0]!, kind: "link", status: "pending" },
     ];
     const saveImage = vi.fn(async ({ operationId }) => ({
       status: "saved" as const,
@@ -639,8 +639,8 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries[0].status).toBe("saved");
-    expect(result.entries[0].itemId).toBe("items:image-resume");
+    expect(result.entries[0]!.status).toBe("saved");
+    expect(result.entries[0]!.itemId).toBe("items:image-resume");
     expect(saveImage).toHaveBeenCalledTimes(1);
     expect(saveLink).not.toHaveBeenCalled();
   });
@@ -649,7 +649,7 @@ describe("processSession", () => {
     const session = makeSession(1);
     const resolved = [imagePayload("file://img.jpg")];
     const persistedPending: ShareEntry[] = [
-      { ...session.entries[0], kind: "link", status: "pending" },
+      { ...session.entries[0]!, kind: "link", status: "pending" },
     ];
     const deps = makeDeps({
       saveImage: async ({ operationId }) => ({
@@ -665,15 +665,15 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries[0].kind).toBe("image");
-    expect(result.entries[0].status).toBe("saved");
+    expect(result.entries[0]!.kind).toBe("image");
+    expect(result.entries[0]!.status).toBe("saved");
   });
 
   it("fails an image with no contentUri without a backend call", async () => {
     const session = makeSession(1);
     const resolved = [imagePayload(null)];
     const classified = classifyEntries(session, resolved);
-    expect(classified[0].status).toBe("failed");
+    expect(classified[0]!.status).toBe("failed");
     const saveImage = vi.fn(async () => ({
       status: "saved" as const,
       operationId: "x",
@@ -686,8 +686,8 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries[0].status).toBe("failed");
-    expect(result.entries[0].message).toBe("Image could not be resolved");
+    expect(result.entries[0]!.status).toBe("failed");
+    expect(result.entries[0]!.message).toBe("Image could not be resolved");
     expect(saveImage).not.toHaveBeenCalled();
   });
 
@@ -707,9 +707,9 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries[0].status).toBe("failed");
-    expect(result.entries[0].message).not.toContain("https://");
-    expect(result.entries[0].message).not.toContain(
+    expect(result.entries[0]!.status).toBe("failed");
+    expect(result.entries[0]!.message).not.toContain("https://");
+    expect(result.entries[0]!.message).not.toContain(
       "kg2e5gqf40sy8kdqxcm3vp7hn96wtxyz",
     );
   });
@@ -748,13 +748,13 @@ describe("resolvedFromRawPayloads", () => {
 
   it("keeps image payloads classified but without a contentUri, so they fail explicitly", async () => {
     const resolved = resolvedFromRawPayloads([raw("ph://IMG_0001", "image")]);
-    expect(resolved[0].contentType).toBe("image");
-    expect(resolved[0].contentUri).toBeNull();
+    expect(resolved[0]!.contentType).toBe("image");
+    expect(resolved[0]!.contentUri).toBeNull();
 
     const session = makeSession(1);
     const classified = classifyEntries(session, resolved);
-    expect(classified[0].kind).toBe("image");
-    expect(classified[0].status).toBe("failed");
+    expect(classified[0]!.kind).toBe("image");
+    expect(classified[0]!.status).toBe("failed");
     const saveImage = vi.fn(async () => ({
       status: "saved" as const,
       operationId: "x",
@@ -766,7 +766,7 @@ describe("resolvedFromRawPayloads", () => {
       resolved,
       makeDeps({ saveImage }),
     );
-    expect(result.entries[0].status).toBe("failed");
+    expect(result.entries[0]!.status).toBe("failed");
     expect(saveImage).not.toHaveBeenCalled();
   });
 
@@ -793,8 +793,8 @@ describe("resolvedFromRawPayloads", () => {
     const resolved = resolvedFromRawPayloads([
       raw("watch this https://a.example/v", "bogus-type"),
     ]);
-    expect(resolved[0].contentType).toBe("text");
-    expect(classifyPayload(resolved[0])).toEqual({
+    expect(resolved[0]!.contentType).toBe("text");
+    expect(classifyPayload(resolved[0]!)).toEqual({
       kind: "link",
       url: "https://a.example/v",
     });
@@ -804,7 +804,7 @@ describe("resolvedFromRawPayloads", () => {
     const resolved = resolvedFromRawPayloads([
       raw("https://www.tiktok.com/@nasa/video/1", "url"),
     ]);
-    expect(classifyPayload(resolved[0])).toEqual({ kind: "link" });
+    expect(classifyPayload(resolved[0]!)).toEqual({ kind: "link" });
   });
 });
 

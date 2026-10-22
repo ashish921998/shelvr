@@ -54,14 +54,16 @@ const sample = DEMO_SAMPLES[1];
 describe("practice post", () => {
   it("opens the sheet from the card", () => {
     const onPress = vi.fn();
-    render(<PracticePost sample={sample} disabled={false} onPress={onPress} />);
+    render(
+      <PracticePost sample={sample!} disabled={false} onPress={onPress} />,
+    );
     fireEvent.click(screen.getByRole("button"));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it("takes no taps while the step is leaving", () => {
     const onPress = vi.fn();
-    render(<PracticePost sample={sample} disabled onPress={onPress} />);
+    render(<PracticePost sample={sample!} disabled onPress={onPress} />);
     fireEvent.click(screen.getByRole("button"));
     expect(onPress).not.toHaveBeenCalled();
   });
