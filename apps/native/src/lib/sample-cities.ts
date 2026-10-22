@@ -20,7 +20,14 @@ export const SAMPLE_CITY_IDS = [
 export type SampleCityId = (typeof SAMPLE_CITY_IDS)[number];
 export type SampleSlot = "morning" | "lunch" | "afternoon" | "dinner";
 export type LatLng = { lat: number; lng: number };
-type SampleStop = { name: string; slot: SampleSlot; at: LatLng };
+type SampleStop = {
+  name: string;
+  slot: SampleSlot;
+  at: LatLng;
+  /** The place really is on the water (a bridge, an island), so its pin may
+   * sit on the drawn river. */
+  onWater?: boolean;
+};
 export type SampleDay = { title: TextMessageKey; stops: readonly SampleStop[] };
 export type SampleSave = {
   name: string;
@@ -36,6 +43,8 @@ export type SampleCity = {
   name: TextMessageKey;
   /** Rivers, canals and shorelines near the stops, each a line of points. */
   water: readonly (readonly LatLng[])[];
+  /** How wide the water is drawn, for a narrow stream; a river otherwise. */
+  waterWidth?: number;
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
 };
@@ -202,6 +211,8 @@ export const SAMPLE_CITIES = {
             name: "Torre de Belém",
             slot: "afternoon",
             at: { lat: 38.6916, lng: -9.216 },
+            // The tower stands in the Tagus, off the bank.
+            onWater: true,
           },
           {
             name: "O Frade",
@@ -287,6 +298,7 @@ export const SAMPLE_CITIES = {
             name: "Tower Bridge",
             slot: "afternoon",
             at: { lat: 51.5055, lng: -0.0754 },
+            onWater: true,
           },
           {
             name: "José Tapas Bar",
@@ -517,6 +529,7 @@ export const SAMPLE_CITIES = {
             name: "Notre-Dame de Paris",
             slot: "morning",
             at: { lat: 48.853, lng: 2.3499 },
+            onWater: true,
           },
           {
             name: "Chez Alain Miam Miam",
@@ -614,6 +627,7 @@ export const SAMPLE_CITIES = {
             name: "Charles Bridge",
             slot: "afternoon",
             at: { lat: 50.0865, lng: 14.4114 },
+            onWater: true,
           },
           {
             name: "Lokál Dlouhááá",
@@ -739,6 +753,8 @@ export const SAMPLE_CITIES = {
   },
   seoul: {
     name: "tripTeaser.citySeoul",
+    // Cheonggyecheon is a narrow stream, not a river.
+    waterWidth: 6,
     water: [
       [
         { lat: 37.53, lng: 126.93 },

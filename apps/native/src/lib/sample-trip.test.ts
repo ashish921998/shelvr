@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import en from "@/locales/en.json";
-import { SAMPLE_CITY_IDS } from "./sample-cities";
+import { SAMPLE_CITIES, SAMPLE_CITY_IDS } from "./sample-cities";
 import {
   DEFAULT_SAMPLE_CITY,
   isSampleCity,
@@ -105,6 +105,51 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
           a.stop.pin.y - b.stop.pin.y,
         );
         expect(apart).toBeGreaterThanOrEqual(20);
+      }
+    }
+  });
+
+  it("keeps the pins of places on land off the drawn water", () => {
+    const trip = sampleTrip(city);
+    const lines = trip.water.map((path) =>
+      [...path.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map(([, x, y]) => ({
+        x: Number(x),
+        y: Number(y),
+      })),
+    );
+    const onWater = new Set<string>(
+      SAMPLE_CITIES[city].days.flatMap((day) =>
+        day.stops
+          .filter((stop) => "onWater" in stop && stop.onWater)
+          .map((stop) => stop.name),
+      ),
+    );
+    // Half the drawn width, plus most of a 22 wide pin.
+    const room = trip.waterWidth / 2 + 7.5;
+    for (const { stop } of sampleStops(trip)) {
+      if (onWater.has(stop.name)) continue;
+      for (const line of lines) {
+        for (let index = 1; index < line.length; index += 1) {
+          const a = line[index - 1]!;
+          const b = line[index]!;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const t = Math.min(
+            1,
+            Math.max(
+              0,
+              ((stop.pin.x - a.x) * dx + (stop.pin.y - a.y) * dy) /
+                (dx * dx + dy * dy || 1),
+            ),
+          );
+          const gap = Math.hypot(
+            stop.pin.x - (a.x + t * dx),
+            stop.pin.y - (a.y + t * dy),
+          );
+          expect(gap, `${stop.name} is in the water`).toBeGreaterThanOrEqual(
+            room,
+          );
+        }
       }
     }
   });

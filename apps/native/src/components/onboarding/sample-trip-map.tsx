@@ -115,7 +115,7 @@ export function SampleTripMap({
                   key={line}
                   path={line}
                   style="stroke"
-                  strokeWidth={20}
+                  strokeWidth={trip.waterWidth}
                   strokeCap="round"
                   strokeJoin="round"
                   color={dark ? WATER.dark : WATER.light}
