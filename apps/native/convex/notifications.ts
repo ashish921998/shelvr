@@ -468,7 +468,9 @@ export const prepareWeeklyDigest = internalMutation({
     const { rows: items } = await takeWithinBytes(
       ctx.db
         .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .withIndex("by_user_and_status", (q) =>
+          q.eq("userId", args.userId).eq("status", "ready"),
+        )
         .order("desc"),
       { maxRows: SHELF_SCAN_ITEMS, maxBytes: SHELF_SCAN_BYTES },
     );

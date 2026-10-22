@@ -2,6 +2,7 @@
 /// <reference types="vite/client" />
 import { expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
+import { SHELF_SIZE } from "./model/weeklyShelf";
 import { newConvexTest, signedInUser } from "./test.setup";
 
 // convex-test does not enforce Convex's per-transaction read limit, so a small budget stands in for it.
@@ -57,4 +58,47 @@ it("stops reading saves once the scan reaches its byte budget", async () => {
       .unique(),
   );
   expect(preferences?.nextDigestAt).toBeGreaterThan(now);
+});
+
+it("spends the budget only on ready saves, so failed or processing ones can't crowd them out", async () => {
+  const { t, userId } = await signedInUser(newConvexTest());
+  const now = Date.now();
+  const ready = await t.run(async (ctx) => {
+    const ids = [];
+    for (let i = 0; i < SHELF_SIZE; i++) {
+      ids.push(
+        await ctx.db.insert("items", {
+          userId,
+          type: "note",
+          status: "ready",
+          title: `Worth a look ${i}`,
+          tags: [],
+          searchText: "worth",
+        }),
+      );
+    }
+    for (const status of ["failed", "processing"] as const) {
+      await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        url: `https://example.com/${status}`,
+        status,
+        content: "word ".repeat(12_000),
+        tags: [],
+        searchText: status,
+      });
+    }
+    return ids;
+  });
+  await t.mutation(api.notifications.setPreferences, {
+    weeklyShelfEnabled: true,
+    nextDigestAt: now - 1,
+  });
+
+  await t.mutation(internal.notifications.prepareWeeklyDigest, { userId, now });
+
+  const digest = await t.query(api.notifications.getDigest, {});
+  expect(digest?.items.map((item) => item._id).sort()).toEqual(
+    [...ready].sort(),
+  );
 });
