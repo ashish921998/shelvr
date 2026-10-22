@@ -127,17 +127,18 @@ export function NoteEditor({ item }: { item: DetailItem }) {
 
   useEffect(() => () => void queue.flush(), [queue]);
 
+  const shelvrTitle =
+    item.titleSource !== "user" && item.title ? item.title : undefined;
+
   return (
     <View style={styles.editor}>
       <TextInput
         value={draft.title}
         onChangeText={(title) => change({ title })}
-        placeholder={
-          item.titleSource !== "user" && item.title
-            ? item.title
-            : t("item.noteTitlePlaceholder")
+        placeholder={shelvrTitle ?? t("item.noteTitlePlaceholder")}
+        placeholderTextColor={
+          shelvrTitle ? theme.colors.foreground : theme.colors.muted
         }
-        placeholderTextColor={theme.colors.muted}
         accessibilityLabel={t("item.noteTitleLabel")}
         maxLength={MAX_ITEM_TITLE_CHARS}
         multiline

@@ -27,7 +27,9 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { muted: "gray" } } }),
+  useUnistyles: () => ({
+    theme: { colors: { muted: "gray", foreground: "ink" } },
+  }),
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: React.ReactNode }) => (
@@ -38,13 +40,19 @@ vi.mock("react-native", () => ({
       value,
       onChangeText,
       accessibilityLabel,
+      placeholder,
+      placeholderTextColor,
     }: {
       value: string;
       onChangeText: (text: string) => void;
       accessibilityLabel: string;
+      placeholder: string;
+      placeholderTextColor: string;
     }) => (
       <textarea
         aria-label={accessibilityLabel}
+        placeholder={placeholder}
+        data-placeholder-color={placeholderTextColor}
         value={value}
         onChange={(event) => onChangeText(event.target.value)}
       />
@@ -292,3 +300,17 @@ it.each(["before", "after"])(
     expect(titleInput.value).toBe("Remote title");
   },
 );
+
+it("shows Shelvr's title in the title color, not as a faded hint", () => {
+  render(<NoteEditor item={item} />);
+  const title = screen.getByLabelText("item.noteTitleLabel");
+  expect(title.getAttribute("placeholder")).toBe("AI title");
+  expect(title.getAttribute("data-placeholder-color")).toBe("ink");
+});
+
+it("fades the hint when the note has no title yet", () => {
+  render(<NoteEditor item={{ ...item, title: undefined }} />);
+  const title = screen.getByLabelText("item.noteTitleLabel");
+  expect(title.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
+  expect(title.getAttribute("data-placeholder-color")).toBe("gray");
+});
