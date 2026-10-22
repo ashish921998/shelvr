@@ -297,8 +297,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.
   A run that fails writes `failurePatch(reason)` from the same module: only the status and
-  reason, so the save keeps what earlier runs gave it. `failItem` and the stale-processing
-  cron are its adapters, and `failItem.test.ts` tests them directly.
+  reason, so the save keeps what earlier runs gave it. A save the run already settled ready
+  stays ready, and `failItem` answers `settled`. `failItem` and the stale-processing cron are
+  its adapters, and `failItem.test.ts` tests them directly.
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
 (auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var, an AI Studio API key).

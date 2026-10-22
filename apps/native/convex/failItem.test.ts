@@ -4,6 +4,7 @@ import type { WithoutSystemFields } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { PROCESSING_STALE_MS } from "./model/itemFields";
+import { failurePatch } from "./model/settlement";
 import { newConvexTest, type TestBackend } from "./test.setup";
 
 const RUN_ID = "run-1";
@@ -91,23 +92,20 @@ it("writes only how the run ended and keeps what earlier runs gave the save", as
   }
 });
 
-it("fails a save even after its run settled it ready", async () => {
+it("leaves a save alone once its run settled it ready", async () => {
   const t = newConvexTest();
   for (const before of SETTLED) {
     for (const reason of REASONS) {
       const { itemId, item } = await seed(t, before);
+      expect(failurePatch(item, reason), `${before}/${reason}`).toBeNull();
       const outcome = await t.mutation(internal.items.failItem, {
         itemId,
         reason,
         runId: RUN_ID,
       });
-      expect(outcome, `${before}/${reason}`).toBe("applied");
-      expect(await t.run((ctx) => ctx.db.get(itemId))).toEqual({
-        ...item,
-        status: "failed",
-        failureReason: reason,
-      });
-      expect(await telemetry(t, itemId)).toEqual([`failed:${reason}`]);
+      expect(outcome, `${before}/${reason}`).toBe("settled");
+      expect(await t.run((ctx) => ctx.db.get(itemId))).toEqual(item);
+      expect(await telemetry(t, itemId)).toEqual([]);
     }
   }
 });

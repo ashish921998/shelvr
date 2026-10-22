@@ -191,9 +191,15 @@ export function completionPatch(
   };
 }
 
-/** A failed run writes only how it ended; the save keeps what earlier runs gave it. */
+/**
+ * A failed run writes only how it ended; the save keeps what earlier runs gave it.
+ * Null once the run has settled the save ready: a later step's error is not the save's.
+ */
 export function failurePatch(
+  item: Doc<"items">,
   reason: Infer<typeof failureReasonValidator>,
-): ItemPatch {
-  return { status: "failed", failureReason: reason };
+): ItemPatch | null {
+  return item.status === "ready"
+    ? null
+    : { status: "failed", failureReason: reason };
 }
