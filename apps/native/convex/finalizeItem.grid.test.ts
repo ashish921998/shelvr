@@ -7,8 +7,8 @@ import type { DataModel, Id } from "./_generated/dataModel";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import {
   consentOf,
+  gridArgs,
   itemFields,
-  legacyArgs,
   SCENARIOS,
   snapshotRow,
 } from "./model/settlement.grid";
@@ -57,7 +57,7 @@ it("settles every grid scenario as recorded", async () => {
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", itemFields(s, ids, owners[consentOf(s.mode)])),
     );
-    const args = legacyArgs(s, await load(t, itemId), ids);
+    const args = gridArgs(s, await load(t, itemId), ids);
     expect(
       await t.mutation(internal.items.finalizeItem, { itemId, ...args }),
       s.id,

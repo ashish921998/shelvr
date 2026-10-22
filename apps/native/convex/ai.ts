@@ -19,10 +19,14 @@ import {
   type ShortFormSource,
 } from "./model/pageRead";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { INTENT_KINDS, normalizeCities, type Recipe } from "./model/itemFields";
+import { INTENT_KINDS, normalizeCities } from "./model/itemFields";
 import { logEvent } from "./model/log";
-import { sanitizeRecipe, type RecipeDraft } from "./model/recipeMarkup";
-import { buildEmbeddingText } from "./model/embedding";
+import { sanitizeRecipe } from "./model/recipeMarkup";
+import {
+  embeddingText,
+  type Classification,
+  type Reading,
+} from "./model/settlement";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -329,40 +333,18 @@ function spacesPromptBlock(
   return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, list the exact names of the spaces this item clearly belongs to, or an empty array if none do. Each name becomes a suggestion the user reviews, so leave out borderline matches.`;
 }
 
-type Classification = {
-  result: Omit<z.infer<typeof itemAnalysisSchema>, "title"> & {
-    title?: string;
-    recipe?: z.infer<typeof recipeSchema>;
-  };
+type ModelResult = Omit<z.infer<typeof itemAnalysisSchema>, "title"> & {
+  title?: string;
+  recipe?: z.infer<typeof recipeSchema>;
+};
+
+type Analysis = {
+  result?: ModelResult;
   page?: PageData;
   linkRead?: LinkRead;
 };
 
-type AnalysisOutcome = Classification | { terminal: true };
-
-function unclassified(
-  title: string | undefined,
-  description = "",
-): Classification["result"] {
-  return {
-    title,
-    description,
-    tags: [],
-    spaceNames: [],
-    intents: [],
-    cities: [],
-  };
-}
-
-export function withoutModel(
-  item: Doc<"items">,
-  page: { title?: string; description?: string } | undefined,
-): Classification["result"] {
-  if (item.type === "note") {
-    return unclassified(firstLine(item.note ?? ""));
-  }
-  return unclassified(page?.title, page?.description);
-}
+type AnalysisOutcome = Analysis | { terminal: true };
 
 async function stillAllowed(
   ctx: ActionCtx,
@@ -382,32 +364,43 @@ async function itemAllowed(
   });
 }
 
-export function classifiedFields(
-  aiAllowed: boolean,
-  result: Classification["result"],
-  item: Doc<"items">,
-) {
-  if (aiAllowed) {
-    return {
-      tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
-      description: result.description,
-      intents: sanitizeIntents(result.intents),
-      cities: normalizeCities(result.cities),
-    };
-  }
-  return {
-    tags: item.tags,
-    description: result.description || (item.description ?? ""),
-    intents: item.intents ?? [],
-    cities: item.cities,
-  };
-}
-
 const MAX_NOTE_LINE_TITLE_CHARS = 80;
 
 function firstLine(note: string): string | undefined {
   const line = note.split("\n").find((l) => l.trim() !== "");
   return line?.trim().slice(0, MAX_NOTE_LINE_TITLE_CHARS);
+}
+
+function readingOf(
+  item: Doc<"items">,
+  { page, linkRead }: Analysis,
+  posterStorageId: Id<"_storage"> | undefined,
+): Reading {
+  return {
+    title: item.type === "note" ? firstLine(item.note ?? "") : page?.title,
+    description: page?.description,
+    recipe: page?.recipe,
+    content: page?.content,
+    siteName: page?.siteName,
+    author: page?.author,
+    heroImageUrl: page?.heroImageUrl,
+    media: page?.media,
+    storageId: posterStorageId,
+    aspectRatio:
+      item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
+    enrichment: linkEnrichment(linkRead),
+  };
+}
+
+function classificationOf(model: ModelResult): Classification {
+  return {
+    title: model.title,
+    description: model.description,
+    tags: model.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
+    intents: sanitizeIntents(model.intents),
+    cities: normalizeCities(model.cities),
+    recipe: sanitizeRecipe(model.recipe),
+  };
 }
 
 function captionIntro(source: ShortFormSource | undefined): string {
@@ -487,11 +480,7 @@ async function analyzeLinkItem(
   }
   const page = read.status === "unreadable" ? undefined : read.page;
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
-    return {
-      result: unclassified(page?.title, page?.description),
-      page,
-      linkRead: read,
-    };
+    return { page, linkRead: read };
   }
   const askForRecipe = read.status === "ok" && read.askForRecipe;
   const result = await classifyLink(
@@ -527,7 +516,7 @@ type LinkCall = {
   prompt: string;
 };
 
-type LinkAnalysis = Classification["result"] & { cookingVideo?: boolean };
+type LinkAnalysis = ModelResult & { cookingVideo?: boolean };
 
 async function classifyLink(
   call: LinkCall,
@@ -684,16 +673,16 @@ async function analyzeImageItem(
   spacesBlock: string,
   aiAllowed: boolean,
   captureContext?: string,
-): Promise<Classification> {
+): Promise<Analysis> {
   if (!item.storageId) {
     throw new StoredImageError("not_found");
   }
   if (!aiAllowed) {
-    return { result: unclassified(undefined) };
+    return {};
   }
   const image = await readStoredImage(ctx.storage, item.storageId);
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
-    return { result: unclassified(undefined) };
+    return {};
   }
   const { object } = await generateObject({
     model: MODEL,
@@ -731,12 +720,12 @@ async function analyzeNoteItem(
   spacesBlock: string,
   aiAllowed: boolean,
   captureContext?: string,
-): Promise<Classification> {
+): Promise<Analysis> {
   if (!item.note) {
     throw new Error("Note item has no text");
   }
   if (!aiAllowed) {
-    return { result: unclassified(firstLine(item.note)) };
+    return {};
   }
   const { object } = await generateObject({
     model: MODEL,
@@ -755,13 +744,6 @@ async function analyzeNoteItem(
     ].join("\n\n"),
   });
   return { result: object };
-}
-
-export function finalRecipe(
-  page: { recipe?: Recipe } | undefined,
-  result: { recipe?: RecipeDraft | null },
-): Recipe | undefined {
-  return page?.recipe ?? sanitizeRecipe(result.recipe);
 }
 
 function spaceNameIds(
@@ -865,32 +847,10 @@ async function refreshClaimed(
   });
 }
 
-async function embedForRun(params: {
-  item: { title?: string; titleSource?: "user"; note?: string };
-  refresh: boolean;
-  title?: string;
-  description: string;
-  tags: string[];
-  siteName?: string;
-  content?: string;
-}): Promise<number[] | undefined> {
-  const keepsExistingTitle =
-    params.item.titleSource === "user" || params.refresh;
-  const storedTitle =
-    keepsExistingTitle && params.item.title !== undefined
-      ? params.item.title
-      : params.title;
-  const { vectors } = await embedTexts([
-    buildEmbeddingText({
-      title: storedTitle,
-      description: params.description,
-      tags: params.tags,
-      siteName: params.siteName,
-      note: params.item.note,
-      content: params.content,
-    }),
-  ]);
-  return vectors[0];
+async function embedText(text: string): Promise<Classification["embedding"]> {
+  const { vectors } = await embedTexts([text]);
+  const vector = vectors[0];
+  return vector === undefined ? undefined : { text, vector };
 }
 
 export const processItem = internalAction({
@@ -958,54 +918,24 @@ export const processItem = internalAction({
         ? await storePoster(ctx, page.heroImageUrl)
         : undefined;
 
-      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item);
-      const result =
-        allowedAtStart && !aiAllowed
-          ? withoutModel(item, page)
-          : outcome.result;
-      const spaceIds = spaceNameIds(result.spaceNames, spaces);
-
-      const { tags, description, intents, cities } = classifiedFields(
-        aiAllowed,
-        result,
-        item,
-      );
-      const pageContent = page?.content;
-      const pageSiteName = page?.siteName;
-      const embedding = aiAllowed
-        ? await embedForRun({
-            item,
-            refresh: args.refresh === true,
-            title: result.title,
-            description,
-            tags,
-            siteName: pageSiteName,
-            content: pageContent,
-          })
+      const model = (await stillAllowed(ctx, allowedAtStart, item))
+        ? outcome.result
         : undefined;
+      const keepTitle = args.refresh === true;
+      const reading = readingOf(item, outcome, posterStorageId);
+      const classification = model && classificationOf(model);
+      const embedding =
+        classification &&
+        (await embedText(
+          embeddingText(item, { keepTitle, reading, classification }),
+        ));
 
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
-        title: result.title,
-        keepTitle: args.refresh === true,
-        description,
-        tags,
-        content: pageContent,
-        siteName: pageSiteName,
-        embedding,
-        classified: aiAllowed,
-        author: page?.author,
-        heroImageUrl: page?.heroImageUrl,
-        media: page?.media,
-        storageId: posterStorageId,
-        aspectRatio:
-          item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-        intents,
-        cities,
-        recipe: finalRecipe(page, result),
-        enrichment: linkEnrichment(linkRead),
-        status: "ready",
+        keepTitle,
+        reading,
+        classification: classification && { ...classification, embedding },
       });
       if (finalized !== "applied") {
         if (posterStorageId !== undefined) {
@@ -1015,15 +945,15 @@ export const processItem = internalAction({
         }
         return null;
       }
-      const autoFiled = aiAllowed
+      const autoFiled = model
         ? await ctx.runMutation(internal.items.setSpacesForItem, {
             itemId: args.itemId,
-            spaceIds,
+            spaceIds: spaceNameIds(model.spaceNames, spaces),
             runId: args.runId,
           })
         : [];
 
-      if (args.refresh === true || !aiAllowed) {
+      if (args.refresh === true || !model) {
         await scheduleSteeringFor(ctx, args.itemId, autoFiled);
         return null;
       }

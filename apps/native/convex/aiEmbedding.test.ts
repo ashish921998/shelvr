@@ -2,13 +2,19 @@
 /// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
+import { api, internal } from "./_generated/api";
+import {
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_DIMENSIONS,
+} from "./model/embedding";
+import { newConvexTest, signedInUser } from "./test.setup";
 
 const embedMany = vi.hoisted(() => vi.fn());
+const generateObject = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({
   embedMany,
-  generateObject: vi.fn(),
+  generateObject,
   wrapLanguageModel: vi.fn(() => ({})),
 }));
 
@@ -114,5 +120,77 @@ describe("embedTexts", () => {
       vectors: [undefined],
       callFailed: true,
     });
+  });
+});
+
+describe("processItem embedding", () => {
+  const CLASSIFICATION = {
+    title: "Model title",
+    description: "Model description.",
+    tags: ["model"],
+    spaceNames: [],
+    intents: [],
+  };
+
+  beforeEach(() => {
+    embedMany.mockReset();
+    embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
+      embeddings: values.map(() => vector(1)),
+    }));
+    generateObject.mockReset();
+    generateObject.mockResolvedValue({ object: CLASSIFICATION });
+  });
+
+  async function noteInFlight() {
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        note: "Buy lentils",
+        tags: [],
+        searchText: "",
+      }),
+    );
+    return { t, itemId };
+  }
+
+  it("stamps the vector it computed for the text the save ends up with", async () => {
+    const { t, itemId } = await noteInFlight();
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      title: "Model title",
+      embeddingVersion: CURRENT_EMBEDDING_VERSION,
+    });
+    expect(item?.embedding).toHaveLength(EMBEDDING_DIMENSIONS);
+  });
+
+  it("leaves the save for the sweep when the user types a title while the run is out", async () => {
+    const { t, itemId } = await noteInFlight();
+    generateObject.mockImplementationOnce(async () => {
+      await t.mutation(api.items.updateNoteItem, {
+        id: itemId,
+        title: "My lentils",
+      });
+      return { object: CLASSIFICATION };
+    });
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      status: "ready",
+      title: "My lentils",
+      titleSource: "user",
+      description: "Model description.",
+    });
+    expect(item?.embeddingVersion).toBeUndefined();
+    expect(item?.embedding).toBeUndefined();
   });
 });

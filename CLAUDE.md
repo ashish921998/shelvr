@@ -281,11 +281,19 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
-- **`model/settlement.ts`**: `completionPatch(item, args, aiAllowed)`, the pure rule for what a
-  finished processing run writes to a save. When the owner declines AI after the run last asked, it
-  drops the run's title, description, tags, intents, cities and recipe and keeps the row's own. A
-  typed or refreshed title wins, and a vector lands only while AI is allowed (consent not declined).
-  `finalizeItem` is its adapter (run fence, consent read, poster cleanup, telemetry).
+- **`model/settlement.ts`**: `completionPatch(item, run, aiAllowed)`, the pure rule for what a
+  finished processing run writes to a save. `run` holds the run's `reading` (what Shelvr read
+  itself) and, when the model was consulted, its `classification`; `runFields` are
+  `finalizeItem`'s arguments. Until actions started on the deploy before it drain, they also
+  accept the old flat fields, which `runOf` turns into a reading and classification; remove
+  them in the next backend release. With AI declined, whether the owner
+  declined before the run asked or while it ran, the classification is ignored and the save settles
+  from the reading alone: the page's title, description and recipe, or a note's first line, plus the
+  save's own tags, intents and cities. A recipe the save already has stays when the page offers none.
+  A typed or refreshed title wins. A vector lands only while AI is allowed (consent not declined)
+  and only if the text it was computed from is the text the save settles to (`embeddingText`);
+  otherwise the stamp and attempts clear and the sweep embeds the save again. `finalizeItem` is its
+  adapter (run fence, consent read, poster cleanup, telemetry).
   `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.
