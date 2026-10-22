@@ -161,7 +161,10 @@ export default function OnboardingScreen() {
   const vibes = spaces.filter(isTravelVibe);
   // People who save travel see a sample trip build and lock before the paywall.
   const teaser = showTripTeaser(kinds, interests);
-  const trip = sampleTrip(travelCity);
+  // The city is asked under the Travel topic, so it counts only while that is
+  // picked; Travel as a kind of save alone gets the default city.
+  const pickedCity = interests.includes(VIBES_INTEREST) ? travelCity : null;
+  const trip = sampleTrip(pickedCity);
 
   useEffect(() => {
     setOnboardingProgress({
@@ -250,7 +253,7 @@ export default function OnboardingScreen() {
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(kinds, spaces, travelCity),
+      onboardingCompletedProperties(kinds, spaces, pickedCity),
     );
     recordCurrentStep();
     holdIncomingShare();

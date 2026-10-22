@@ -86,6 +86,8 @@ describe("TripBuildStep", () => {
     expect(screen.getByText("tripTeaser.stepPlan")).toBeTruthy();
     expect(screen.getAllByTestId("ring")).toHaveLength(1);
     expect(screen.queryAllByTestId("icon-checkmark")).toHaveLength(0);
+    // The saved place is a landmark, so it shows a pin, not a dining icon.
+    expect(screen.getAllByTestId("icon-mappin")).toHaveLength(1);
   });
 
   it("says each sample save names its places", () => {

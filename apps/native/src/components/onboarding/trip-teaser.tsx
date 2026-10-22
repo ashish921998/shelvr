@@ -118,7 +118,7 @@ function SaveRow({
       <View style={styles.thumb}>
         {save.picture === "place" ? (
           <AppSymbolIcon
-            name="fork.knife"
+            name="mappin"
             size={22}
             tintColor={theme.colors.primaryText}
           />
