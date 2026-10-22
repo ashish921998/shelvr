@@ -33,6 +33,15 @@ export type MembershipSummary = {
   suggestedPreviewItemIds: Id<"items">[];
 };
 
+export function emptySummary(): MembershipSummary {
+  return {
+    savedCount: 0,
+    suggestedCount: 0,
+    previewItemIds: [],
+    suggestedPreviewItemIds: [],
+  };
+}
+
 export function hasSummary(
   space: Doc<"spaces">,
 ): space is Doc<"spaces"> & MembershipSummary {
@@ -55,12 +64,7 @@ export async function summarizeMemberships(
     .order("desc")
     .take(scanLimit + 1);
   const complete = joins.length <= scanLimit;
-  const summary: MembershipSummary = {
-    savedCount: 0,
-    suggestedCount: 0,
-    previewItemIds: [],
-    suggestedPreviewItemIds: [],
-  };
+  const summary = emptySummary();
   for (const join of joins.slice(0, scanLimit)) {
     const status = effectiveStatus(join);
     if (status === "saved") {

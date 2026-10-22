@@ -89,10 +89,8 @@ export function TripMap({
     );
   }, [active, days, width, height, top, rt.insets.bottom]);
 
-  // On iOS the effect moves the camera, so day switches fly: the prop holds
-  // the first camera only (expo-maps also applies every prop change, without
-  // animation). Moving it imperatively goes through the native view, which is
-  // not registered yet on mount, so the first camera is left to the prop.
+  // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
+  // setCameraPosition goes through the native view, which is not registered yet on mount.
   const [firstCamera, setFirstCamera] = useState(camera);
   if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
   useEffect(() => {

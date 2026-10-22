@@ -48,6 +48,10 @@ module.exports = defineConfig([
           leadingUnderscore: "allow",
         },
       ],
+      "@typescript-eslint/no-empty-object-type": [
+        "error",
+        { allowInterfaces: "with-single-extends" },
+      ],
       complexity: ["error", 30],
       "max-statements": ["error", 50],
       "max-depth": ["error", 4],

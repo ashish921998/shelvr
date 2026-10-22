@@ -156,6 +156,21 @@ describe("the sample trip's city", () => {
     setOnboardingProgress({ saveKinds: [], spaces: [], step: 1 });
     expect(getOnboardingProgress().travelCity).toBeNull();
   });
+
+  it("reads back as none when the stored city is not a sample city", () => {
+    setOnboardingProgress({
+      saveKinds: [],
+      spaces: ["Travel"],
+      step: 2,
+      travelCity: "tokyo",
+    });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({ ...stored, travelCity: "atlantis" }),
+    );
+    expect(getOnboardingProgress().travelCity).toBeNull();
+  });
 });
 
 describe("a first save queued before sign-in", () => {

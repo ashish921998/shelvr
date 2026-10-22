@@ -9,16 +9,11 @@ import { Text, View, type LayoutChangeEvent } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The three app screens the opener's phone shows, one per page: a travel
-// video with the share sheet up, a space with its saves filed, and a trip
-// day on a map. Each is a still drawn from theme tokens; nothing is live.
-
 // Generated for the app, so it carries no licensing or brand questions.
 const VIDEO = require("../../../assets/onboarding/prague.jpg");
 const APP_ICON = require("../../../assets/icon.png");
 
 export type SceneProps = {
-  /** The page has been reached, so a part that enters may enter now. */
   shown: boolean;
 };
 
@@ -33,7 +28,6 @@ const SHEET_APPS: { icon: AppSymbolName; label: TextMessageKey }[] = [
   { icon: "note.text", label: "onboarding.sceneNotes" },
 ];
 
-/** A vertical video with the share sheet rising over it, Shelvr ringed. */
 export function ShareScene({ shown }: SceneProps) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -106,7 +100,6 @@ const PLACES: { name: TextMessageKey; icon: AppSymbolName }[] = [
   { name: "onboarding.sceneLxFactory", icon: "paintpalette.fill" },
 ];
 
-/** A travel space with four saves filed as places. */
 export function FileScene(_props: SceneProps) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -139,7 +132,6 @@ export function FileScene(_props: SceneProps) {
   );
 }
 
-/** The "Filed in Lisbon" toast, drawn over the phone's edge. */
 export function FiledToast() {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -158,8 +150,6 @@ export function FiledToast() {
 
 type Point = { x: number; y: number };
 
-// Where the day's four stops sit on the map, as shares of its size, in the
-// order they are visited.
 const PINS: Point[] = [
   { x: 0.26, y: 0.3 },
   { x: 0.6, y: 0.2 },
@@ -167,7 +157,6 @@ const PINS: Point[] = [
   { x: 0.34, y: 0.74 },
 ];
 
-// City blocks, as shares of the map's size.
 const BLOCKS = [
   { left: "6%", top: "8%", width: "26%", height: "18%" },
   { left: "40%", top: "6%", width: "32%", height: "14%" },
@@ -185,7 +174,6 @@ const STOPS: { slot: TextMessageKey; name: TextMessageKey }[] = [
 
 const DOT_SPACING = 7;
 
-/** The dots of a route through `points`, in pixels, leaving each stop clear. */
 function routeDots(points: Point[], width: number, height: number): Point[] {
   const dots: Point[] = [];
   for (let i = 1; i < points.length; i++) {
@@ -204,7 +192,6 @@ function routeDots(points: Point[], width: number, height: number): Point[] {
   return dots;
 }
 
-/** One trip day: numbered pins and a dotted route on a map, the stops below. */
 export function PlanScene(_props: SceneProps) {
   useAppLocale();
   const [map, setMap] = useState({ width: 0, height: 0 });
@@ -386,7 +373,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
   },
   cardTile: {
-    // Flatter than the real card, so a two-line name keeps the grid's height.
     aspectRatio: 1.7,
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
@@ -396,7 +382,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   cardTitle: {
     ...theme.type.captionStrong,
-    // Two lines held for every card, so a short name keeps its row even.
     lineHeight: 15,
     minHeight: 30,
     color: theme.colors.foreground,
@@ -480,7 +465,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   day: {
     paddingTop: theme.gap(1.5),
-    // The last stop sits above the cut and most of the fade.
     paddingBottom: PHONE_CUT + theme.gap(6),
     gap: theme.gap(0.75),
   },
@@ -495,14 +479,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   stopSlot: {
     ...theme.type.badge,
-    // Wide enough for "Afternoon" in one line; longer translations shrink.
     width: 72,
     letterSpacing: 0.6,
     textTransform: "uppercase",
     color: theme.colors.primaryText,
   },
   stopName: {
-    // Shrinks a little before it cuts, so "Miradouro da Graça" reads in full.
     ...theme.type.captionLabel,
     flex: 1,
     color: theme.colors.foreground,

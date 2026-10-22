@@ -18,9 +18,11 @@ export const SAMPLE_CITY_IDS = [
   "toronto",
 ] as const;
 export type SampleCityId = (typeof SAMPLE_CITY_IDS)[number];
-export type SampleSlot = "morning" | "lunch" | "afternoon" | "dinner";
+/** Every sample day runs in this order, one stop per slot. */
+const DAY_SLOTS = ["morning", "lunch", "afternoon", "dinner"] as const;
+export type SampleSlot = (typeof DAY_SLOTS)[number];
 export type LatLng = { lat: number; lng: number };
-type SampleStop = {
+type CityStop = {
   name: string;
   slot: SampleSlot;
   at: LatLng;
@@ -28,7 +30,7 @@ type SampleStop = {
    * sit on the drawn river. */
   onWater?: boolean;
 };
-export type SampleDay = { title: TextMessageKey; stops: readonly SampleStop[] };
+export type SampleDay = { title: TextMessageKey; stops: readonly CityStop[] };
 export type SampleSave = {
   name: string;
   /** The page's own host, or a label that says what kind of save it is. */
@@ -49,6 +51,37 @@ export type SampleCity = {
   days: readonly SampleDay[];
 };
 
+const ON_WATER = true;
+
+type DayStop = Omit<CityStop, "slot">;
+
+function stop(
+  name: string,
+  lat: number,
+  lng: number,
+  onWater = false,
+): DayStop {
+  return onWater
+    ? { name, at: { lat, lng }, onWater }
+    : { name, at: { lat, lng } };
+}
+
+function day(title: TextMessageKey, stops: readonly DayStop[]): SampleDay {
+  return {
+    title,
+    stops: stops.map((place, index) => ({ ...place, slot: DAY_SLOTS[index] })),
+  };
+}
+
+function save(
+  name: string,
+  source: SampleSave["source"],
+  places: number,
+  picture: SampleSave["picture"],
+): SampleSave {
+  return { name, source, places, picture };
+}
+
 export const SAMPLE_CITIES = {
   barcelona: {
     name: "tripTeaser.cityBarcelona",
@@ -65,76 +98,38 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Barcelona",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Barcelona",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Catedral de Barcelona",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Barcelona",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Barcelona",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save(
+        "Catedral de Barcelona",
+        { label: "tripTeaser.sourcePlace" },
+        1,
+        "place",
+      ),
     ],
     days: [
-      {
-        title: "tripTeaser.barcelonaDayOne",
-        stops: [
-          {
-            name: "Catedral de Barcelona",
-            slot: "morning",
-            at: { lat: 41.3839, lng: 2.1763 },
-          },
-          {
-            name: "Bar del Pla",
-            slot: "lunch",
-            at: { lat: 41.3853, lng: 2.1808 },
-          },
-          {
-            name: "Basílica de Santa Maria del Mar",
-            slot: "afternoon",
-            at: { lat: 41.3836, lng: 2.182 },
-          },
-          {
-            name: "El Xampanyet",
-            slot: "dinner",
-            at: { lat: 41.3848, lng: 2.1815 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.barcelonaDayTwo",
-        stops: [
-          {
-            name: "La Sagrada Família",
-            slot: "morning",
-            at: { lat: 41.4036, lng: 2.1744 },
-          },
-          {
-            name: "Cerveceria Catalana",
-            slot: "lunch",
-            at: { lat: 41.3924, lng: 2.16 },
-          },
-          {
-            name: "Park Güell",
-            slot: "afternoon",
-            at: { lat: 41.4145, lng: 2.1527 },
-          },
-          {
-            name: "Berbena",
-            slot: "dinner",
-            at: { lat: 41.3978, lng: 2.1545 },
-          },
-        ],
-      },
+      day("tripTeaser.barcelonaDayOne", [
+        stop("Catedral de Barcelona", 41.3839, 2.1763),
+        stop("Bar del Pla", 41.3853, 2.1808),
+        stop("Basílica de Santa Maria del Mar", 41.3836, 2.182),
+        stop("El Xampanyet", 41.3848, 2.1815),
+      ]),
+      day("tripTeaser.barcelonaDayTwo", [
+        stop("La Sagrada Família", 41.4036, 2.1744),
+        stop("Cerveceria Catalana", 41.3924, 2.16),
+        stop("Park Güell", 41.4145, 2.1527),
+        stop("Berbena", 41.3978, 2.1545),
+      ]),
     ],
   },
   lisbon: {
@@ -153,74 +148,39 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Lisbon",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Lisbon",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Praça do Comércio",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Lisbon",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Lisbon",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save(
+        "Praça do Comércio",
+        { label: "tripTeaser.sourcePlace" },
+        1,
+        "place",
+      ),
     ],
     days: [
-      {
-        title: "tripTeaser.lisbonDayOne",
-        stops: [
-          {
-            name: "Castelo de São Jorge",
-            slot: "morning",
-            at: { lat: 38.7139, lng: -9.1334 },
-          },
-          {
-            name: "As Bifanas do Afonso",
-            slot: "lunch",
-            at: { lat: 38.7125, lng: -9.136 },
-          },
-          {
-            name: "Praça do Comércio",
-            slot: "afternoon",
-            at: { lat: 38.7075, lng: -9.1364 },
-          },
-          { name: "Prado", slot: "dinner", at: { lat: 38.7102, lng: -9.1345 } },
-        ],
-      },
-      {
-        title: "tripTeaser.lisbonDayTwo",
-        stops: [
-          {
-            name: "Mosteiro dos Jerónimos",
-            slot: "morning",
-            at: { lat: 38.6979, lng: -9.2066 },
-          },
-          {
-            name: "Pastéis de Belém",
-            slot: "lunch",
-            at: { lat: 38.6975, lng: -9.2032 },
-          },
-          {
-            name: "Torre de Belém",
-            slot: "afternoon",
-            at: { lat: 38.6916, lng: -9.216 },
-            // The tower stands in the Tagus, off the bank.
-            onWater: true,
-          },
-          {
-            name: "O Frade",
-            slot: "dinner",
-            at: { lat: 38.699, lng: -9.2047 },
-          },
-        ],
-      },
+      day("tripTeaser.lisbonDayOne", [
+        stop("Castelo de São Jorge", 38.7139, -9.1334),
+        stop("As Bifanas do Afonso", 38.7125, -9.136),
+        stop("Praça do Comércio", 38.7075, -9.1364),
+        stop("Prado", 38.7102, -9.1345),
+      ]),
+      day("tripTeaser.lisbonDayTwo", [
+        stop("Mosteiro dos Jerónimos", 38.6979, -9.2066),
+        stop("Pastéis de Belém", 38.6975, -9.2032),
+        // The tower stands in the Tagus, off the bank.
+        stop("Torre de Belém", 38.6916, -9.216, ON_WATER),
+        stop("O Frade", 38.699, -9.2047),
+      ]),
     ],
   },
   london: {
@@ -240,73 +200,33 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in London",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in London",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Tower Bridge",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in London",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in London",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save("Tower Bridge", { label: "tripTeaser.sourcePlace" }, 1, "place"),
     ],
     days: [
-      {
-        title: "tripTeaser.londonDayOne",
-        stops: [
-          {
-            name: "Covent Garden Market",
-            slot: "morning",
-            at: { lat: 51.5119, lng: -0.1231 },
-          },
-          { name: "Kiln", slot: "lunch", at: { lat: 51.5115, lng: -0.1362 } },
-          {
-            name: "Carnaby Street",
-            slot: "afternoon",
-            at: { lat: 51.5134, lng: -0.1392 },
-          },
-          {
-            name: "Andrew Edmunds",
-            slot: "dinner",
-            at: { lat: 51.5122, lng: -0.1365 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.londonDayTwo",
-        stops: [
-          {
-            name: "Southwark Cathedral",
-            slot: "morning",
-            at: { lat: 51.5062, lng: -0.0902 },
-          },
-          {
-            name: "Padella",
-            slot: "lunch",
-            at: { lat: 51.5052, lng: -0.0909 },
-          },
-          {
-            name: "Tower Bridge",
-            slot: "afternoon",
-            at: { lat: 51.5055, lng: -0.0754 },
-            onWater: true,
-          },
-          {
-            name: "José Tapas Bar",
-            slot: "dinner",
-            at: { lat: 51.5011, lng: -0.0808 },
-          },
-        ],
-      },
+      day("tripTeaser.londonDayOne", [
+        stop("Covent Garden Market", 51.5119, -0.1231),
+        stop("Kiln", 51.5115, -0.1362),
+        stop("Carnaby Street", 51.5134, -0.1392),
+        stop("Andrew Edmunds", 51.5122, -0.1365),
+      ]),
+      day("tripTeaser.londonDayTwo", [
+        stop("Southwark Cathedral", 51.5062, -0.0902),
+        stop("Padella", 51.5052, -0.0909),
+        stop("Tower Bridge", 51.5055, -0.0754, ON_WATER),
+        stop("José Tapas Bar", 51.5011, -0.0808),
+      ]),
     ],
   },
   "los-angeles": {
@@ -323,76 +243,38 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Los Angeles",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Los Angeles",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Griffith Observatory",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Los Angeles",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Los Angeles",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save(
+        "Griffith Observatory",
+        { label: "tripTeaser.sourcePlace" },
+        1,
+        "place",
+      ),
     ],
     days: [
-      {
-        title: "tripTeaser.losAngelesDayOne",
-        stops: [
-          {
-            name: "Griffith Observatory",
-            slot: "morning",
-            at: { lat: 34.1183, lng: -118.3003 },
-          },
-          {
-            name: "Kismet",
-            slot: "lunch",
-            at: { lat: 34.1016, lng: -118.2896 },
-          },
-          {
-            name: "Hollyhock House",
-            slot: "afternoon",
-            at: { lat: 34.1009, lng: -118.2943 },
-          },
-          {
-            name: "All Time",
-            slot: "dinner",
-            at: { lat: 34.1058, lng: -118.2877 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.losAngelesDayTwo",
-        stops: [
-          {
-            name: "Santa Monica Pier",
-            slot: "morning",
-            at: { lat: 34.0086, lng: -118.4986 },
-          },
-          {
-            name: "Gjusta",
-            slot: "lunch",
-            at: { lat: 33.9962, lng: -118.4745 },
-          },
-          {
-            name: "Venice Canals",
-            slot: "afternoon",
-            at: { lat: 33.9836, lng: -118.4653 },
-          },
-          {
-            name: "Felix Trattoria",
-            slot: "dinner",
-            at: { lat: 33.9935, lng: -118.4728 },
-          },
-        ],
-      },
+      day("tripTeaser.losAngelesDayOne", [
+        stop("Griffith Observatory", 34.1183, -118.3003),
+        stop("Kismet", 34.1016, -118.2896),
+        stop("Hollyhock House", 34.1009, -118.2943),
+        stop("All Time", 34.1058, -118.2877),
+      ]),
+      day("tripTeaser.losAngelesDayTwo", [
+        stop("Santa Monica Pier", 34.0086, -118.4986),
+        stop("Gjusta", 33.9962, -118.4745),
+        stop("Venice Canals", 33.9836, -118.4653),
+        stop("Felix Trattoria", 33.9935, -118.4728),
+      ]),
     ],
   },
   "new-york": {
@@ -415,76 +297,38 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in New York",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in New York",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Washington Square Park",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in New York",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in New York",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save(
+        "Washington Square Park",
+        { label: "tripTeaser.sourcePlace" },
+        1,
+        "place",
+      ),
     ],
     days: [
-      {
-        title: "tripTeaser.newYorkDayOne",
-        stops: [
-          {
-            name: "The High Line",
-            slot: "morning",
-            at: { lat: 40.748, lng: -74.0047 },
-          },
-          {
-            name: "Via Carota",
-            slot: "lunch",
-            at: { lat: 40.7332, lng: -74.0032 },
-          },
-          {
-            name: "Washington Square Park",
-            slot: "afternoon",
-            at: { lat: 40.7308, lng: -73.9975 },
-          },
-          {
-            name: "L'Artusi",
-            slot: "dinner",
-            at: { lat: 40.7339, lng: -74.0048 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.newYorkDayTwo",
-        stops: [
-          {
-            name: "Brooklyn Bridge",
-            slot: "morning",
-            at: { lat: 40.7057, lng: -73.9964 },
-          },
-          {
-            name: "Juliana's",
-            slot: "lunch",
-            at: { lat: 40.7027, lng: -73.9935 },
-          },
-          {
-            name: "Brooklyn Bridge Park",
-            slot: "afternoon",
-            at: { lat: 40.6978, lng: -73.9983 },
-          },
-          {
-            name: "Celestine",
-            slot: "dinner",
-            at: { lat: 40.704, lng: -73.9893 },
-          },
-        ],
-      },
+      day("tripTeaser.newYorkDayOne", [
+        stop("The High Line", 40.748, -74.0047),
+        stop("Via Carota", 40.7332, -74.0032),
+        stop("Washington Square Park", 40.7308, -73.9975),
+        stop("L'Artusi", 40.7339, -74.0048),
+      ]),
+      day("tripTeaser.newYorkDayTwo", [
+        stop("Brooklyn Bridge", 40.7057, -73.9964),
+        stop("Juliana's", 40.7027, -73.9935),
+        stop("Brooklyn Bridge Park", 40.6978, -73.9983),
+        stop("Celestine", 40.704, -73.9893),
+      ]),
     ],
   },
   paris: {
@@ -502,77 +346,33 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Paris",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Paris",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Place des Vosges",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Paris",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Paris",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save("Place des Vosges", { label: "tripTeaser.sourcePlace" }, 1, "place"),
     ],
     days: [
-      {
-        title: "tripTeaser.parisDayOne",
-        stops: [
-          {
-            name: "Notre-Dame de Paris",
-            slot: "morning",
-            at: { lat: 48.853, lng: 2.3499 },
-            onWater: true,
-          },
-          {
-            name: "Chez Alain Miam Miam",
-            slot: "lunch",
-            at: { lat: 48.8627, lng: 2.3623 },
-          },
-          {
-            name: "Place des Vosges",
-            slot: "afternoon",
-            at: { lat: 48.8556, lng: 2.3655 },
-          },
-          {
-            name: "Chez Janou",
-            slot: "dinner",
-            at: { lat: 48.8566, lng: 2.3668 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.parisDayTwo",
-        stops: [
-          {
-            name: "Panthéon",
-            slot: "morning",
-            at: { lat: 48.8462, lng: 2.346 },
-          },
-          {
-            name: "Bouillon Racine",
-            slot: "lunch",
-            at: { lat: 48.8508, lng: 2.3418 },
-          },
-          {
-            name: "Jardin du Luxembourg",
-            slot: "afternoon",
-            at: { lat: 48.8462, lng: 2.3372 },
-          },
-          {
-            name: "Les Papilles",
-            slot: "dinner",
-            at: { lat: 48.8447, lng: 2.3415 },
-          },
-        ],
-      },
+      day("tripTeaser.parisDayOne", [
+        stop("Notre-Dame de Paris", 48.853, 2.3499, ON_WATER),
+        stop("Chez Alain Miam Miam", 48.8627, 2.3623),
+        stop("Place des Vosges", 48.8556, 2.3655),
+        stop("Chez Janou", 48.8566, 2.3668),
+      ]),
+      day("tripTeaser.parisDayTwo", [
+        stop("Panthéon", 48.8462, 2.346),
+        stop("Bouillon Racine", 48.8508, 2.3418),
+        stop("Jardin du Luxembourg", 48.8462, 2.3372),
+        stop("Les Papilles", 48.8447, 2.3415),
+      ]),
     ],
   },
   prague: {
@@ -590,77 +390,33 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Prague",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Prague",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Old Town Square",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Prague",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Prague",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save("Old Town Square", { label: "tripTeaser.sourcePlace" }, 1, "place"),
     ],
     days: [
-      {
-        title: "tripTeaser.pragueDayOne",
-        stops: [
-          {
-            name: "Old Town Square",
-            slot: "morning",
-            at: { lat: 50.0875, lng: 14.4213 },
-          },
-          {
-            name: "Grand Café Orient",
-            slot: "lunch",
-            at: { lat: 50.0869, lng: 14.4276 },
-          },
-          {
-            name: "Charles Bridge",
-            slot: "afternoon",
-            at: { lat: 50.0865, lng: 14.4114 },
-            onWater: true,
-          },
-          {
-            name: "Lokál Dlouhááá",
-            slot: "dinner",
-            at: { lat: 50.0905, lng: 14.4259 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.pragueDayTwo",
-        stops: [
-          {
-            name: "Prague Castle",
-            slot: "morning",
-            at: { lat: 50.091, lng: 14.4002 },
-          },
-          {
-            name: "Café Savoy",
-            slot: "lunch",
-            at: { lat: 50.0801, lng: 14.4097 },
-          },
-          {
-            name: "Petřín Lookout Tower",
-            slot: "afternoon",
-            at: { lat: 50.0833, lng: 14.3954 },
-          },
-          {
-            name: "Terasa U Zlaté studně",
-            slot: "dinner",
-            at: { lat: 50.0897, lng: 14.4045 },
-          },
-        ],
-      },
+      day("tripTeaser.pragueDayOne", [
+        stop("Old Town Square", 50.0875, 14.4213),
+        stop("Grand Café Orient", 50.0869, 14.4276),
+        stop("Charles Bridge", 50.0865, 14.4114, ON_WATER),
+        stop("Lokál Dlouhááá", 50.0905, 14.4259),
+      ]),
+      day("tripTeaser.pragueDayTwo", [
+        stop("Prague Castle", 50.091, 14.4002),
+        stop("Café Savoy", 50.0801, 14.4097),
+        stop("Petřín Lookout Tower", 50.0833, 14.3954),
+        stop("Terasa U Zlaté studně", 50.0897, 14.4045),
+      ]),
     ],
   },
   "san-francisco": {
@@ -679,76 +435,33 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in San Francisco",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in San Francisco",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Lombard Street",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in San Francisco",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in San Francisco",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save("Lombard Street", { label: "tripTeaser.sourcePlace" }, 1, "place"),
     ],
     days: [
-      {
-        title: "tripTeaser.sanFranciscoDayOne",
-        stops: [
-          {
-            name: "Mission Dolores Park",
-            slot: "morning",
-            at: { lat: 37.7596, lng: -122.4269 },
-          },
-          {
-            name: "Tartine Bakery",
-            slot: "lunch",
-            at: { lat: 37.7615, lng: -122.4241 },
-          },
-          {
-            name: "Clarion Alley",
-            slot: "afternoon",
-            at: { lat: 37.7627, lng: -122.4206 },
-          },
-          {
-            name: "Foreign Cinema",
-            slot: "dinner",
-            at: { lat: 37.7562, lng: -122.419 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.sanFranciscoDayTwo",
-        stops: [
-          {
-            name: "Lombard Street",
-            slot: "morning",
-            at: { lat: 37.802, lng: -122.4189 },
-          },
-          {
-            name: "Swan Oyster Depot",
-            slot: "lunch",
-            at: { lat: 37.7914, lng: -122.421 },
-          },
-          {
-            name: "Coit Tower",
-            slot: "afternoon",
-            at: { lat: 37.8025, lng: -122.4058 },
-          },
-          {
-            name: "Cotogna",
-            slot: "dinner",
-            at: { lat: 37.7972, lng: -122.4036 },
-          },
-        ],
-      },
+      day("tripTeaser.sanFranciscoDayOne", [
+        stop("Mission Dolores Park", 37.7596, -122.4269),
+        stop("Tartine Bakery", 37.7615, -122.4241),
+        stop("Clarion Alley", 37.7627, -122.4206),
+        stop("Foreign Cinema", 37.7562, -122.419),
+      ]),
+      day("tripTeaser.sanFranciscoDayTwo", [
+        stop("Lombard Street", 37.802, -122.4189),
+        stop("Swan Oyster Depot", 37.7914, -122.421),
+        stop("Coit Tower", 37.8025, -122.4058),
+        stop("Cotogna", 37.7972, -122.4036),
+      ]),
     ],
   },
   seoul: {
@@ -774,76 +487,38 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Seoul",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Seoul",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Gyeongbokgung Palace",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Seoul",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Seoul",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save(
+        "Gyeongbokgung Palace",
+        { label: "tripTeaser.sourcePlace" },
+        1,
+        "place",
+      ),
     ],
     days: [
-      {
-        title: "tripTeaser.seoulDayOne",
-        stops: [
-          {
-            name: "Gyeongbokgung Palace",
-            slot: "morning",
-            at: { lat: 37.5796, lng: 126.977 },
-          },
-          {
-            name: "Tosokchon Samgyetang",
-            slot: "lunch",
-            at: { lat: 37.5772, lng: 126.9716 },
-          },
-          {
-            name: "Bukchon Hanok Village",
-            slot: "afternoon",
-            at: { lat: 37.5826, lng: 126.9833 },
-          },
-          {
-            name: "Gaeseong Mandu Koong",
-            slot: "dinner",
-            at: { lat: 37.5745, lng: 126.9855 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.seoulDayTwo",
-        stops: [
-          {
-            name: "N Seoul Tower",
-            slot: "morning",
-            at: { lat: 37.5512, lng: 126.9882 },
-          },
-          {
-            name: "Myeongdong Kyoja",
-            slot: "lunch",
-            at: { lat: 37.5628, lng: 126.9856 },
-          },
-          {
-            name: "Dongdaemun Design Plaza",
-            slot: "afternoon",
-            at: { lat: 37.5669, lng: 127.0095 },
-          },
-          {
-            name: "Woo Lae Oak",
-            slot: "dinner",
-            at: { lat: 37.5672, lng: 126.9992 },
-          },
-        ],
-      },
+      day("tripTeaser.seoulDayOne", [
+        stop("Gyeongbokgung Palace", 37.5796, 126.977),
+        stop("Tosokchon Samgyetang", 37.5772, 126.9716),
+        stop("Bukchon Hanok Village", 37.5826, 126.9833),
+        stop("Gaeseong Mandu Koong", 37.5745, 126.9855),
+      ]),
+      day("tripTeaser.seoulDayTwo", [
+        stop("N Seoul Tower", 37.5512, 126.9882),
+        stop("Myeongdong Kyoja", 37.5628, 126.9856),
+        stop("Dongdaemun Design Plaza", 37.5669, 127.0095),
+        stop("Woo Lae Oak", 37.5672, 126.9992),
+      ]),
     ],
   },
   tokyo: {
@@ -860,76 +535,38 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Tokyo",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Tokyo",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "Shibuya Scramble Crossing",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Tokyo",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Tokyo",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save(
+        "Shibuya Scramble Crossing",
+        { label: "tripTeaser.sourcePlace" },
+        1,
+        "place",
+      ),
     ],
     days: [
-      {
-        title: "tripTeaser.tokyoDayOne",
-        stops: [
-          {
-            name: "Meiji Jingu",
-            slot: "morning",
-            at: { lat: 35.6764, lng: 139.6993 },
-          },
-          {
-            name: "Fuunji",
-            slot: "lunch",
-            at: { lat: 35.6843, lng: 139.6999 },
-          },
-          {
-            name: "Shibuya Scramble Crossing",
-            slot: "afternoon",
-            at: { lat: 35.6595, lng: 139.7005 },
-          },
-          {
-            name: "Kaikaya by the Sea",
-            slot: "dinner",
-            at: { lat: 35.6575, lng: 139.6945 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.tokyoDayTwo",
-        stops: [
-          {
-            name: "Senso-ji",
-            slot: "morning",
-            at: { lat: 35.7148, lng: 139.7967 },
-          },
-          {
-            name: "Daikokuya Tempura",
-            slot: "lunch",
-            at: { lat: 35.7121, lng: 139.7952 },
-          },
-          {
-            name: "Tokyo Skytree",
-            slot: "afternoon",
-            at: { lat: 35.7101, lng: 139.8107 },
-          },
-          {
-            name: "Otafuku",
-            slot: "dinner",
-            at: { lat: 35.718, lng: 139.794 },
-          },
-        ],
-      },
+      day("tripTeaser.tokyoDayOne", [
+        stop("Meiji Jingu", 35.6764, 139.6993),
+        stop("Fuunji", 35.6843, 139.6999),
+        stop("Shibuya Scramble Crossing", 35.6595, 139.7005),
+        stop("Kaikaya by the Sea", 35.6575, 139.6945),
+      ]),
+      day("tripTeaser.tokyoDayTwo", [
+        stop("Senso-ji", 35.7148, 139.7967),
+        stop("Daikokuya Tempura", 35.7121, 139.7952),
+        stop("Tokyo Skytree", 35.7101, 139.8107),
+        stop("Otafuku", 35.718, 139.794),
+      ]),
     ],
   },
   toronto: {
@@ -946,76 +583,41 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      {
-        name: "Where to eat in Toronto",
-        source: { label: "tripTeaser.sourceReel" },
-        places: 4,
-        picture: "food",
-      },
-      {
-        name: "Three days in Toronto",
-        source: { label: "tripTeaser.sourceArticle" },
-        places: 3,
-        picture: "view",
-      },
-      {
-        name: "CN Tower",
-        source: { label: "tripTeaser.sourcePlace" },
-        places: 1,
-        picture: "place",
-      },
+      save(
+        "Where to eat in Toronto",
+        { label: "tripTeaser.sourceReel" },
+        4,
+        "food",
+      ),
+      save(
+        "Three days in Toronto",
+        { label: "tripTeaser.sourceArticle" },
+        3,
+        "view",
+      ),
+      save("CN Tower", { label: "tripTeaser.sourcePlace" }, 1, "place"),
     ],
     days: [
-      {
-        title: "tripTeaser.torontoDayOne",
-        stops: [
-          {
-            name: "CN Tower",
-            slot: "morning",
-            at: { lat: 43.6426, lng: -79.3871 },
-          },
-          {
-            name: "Pai Northern Thai Kitchen",
-            slot: "lunch",
-            at: { lat: 43.6484, lng: -79.3889 },
-          },
-          {
-            name: "Hockey Hall of Fame",
-            slot: "afternoon",
-            at: { lat: 43.6469, lng: -79.3772 },
-          },
-          {
-            name: "Richmond Station",
-            slot: "dinner",
-            at: { lat: 43.6515, lng: -79.3792 },
-          },
-        ],
-      },
-      {
-        title: "tripTeaser.torontoDayTwo",
-        stops: [
-          {
-            name: "Kensington Market",
-            slot: "morning",
-            at: { lat: 43.6548, lng: -79.4007 },
-          },
-          {
-            name: "Seven Lives Tacos y Mariscos",
-            slot: "lunch",
-            at: { lat: 43.6544, lng: -79.4005 },
-          },
-          {
-            name: "Chinatown",
-            slot: "afternoon",
-            at: { lat: 43.6529, lng: -79.398 },
-          },
-          {
-            name: "Grey Gardens",
-            slot: "dinner",
-            at: { lat: 43.6553, lng: -79.4016 },
-          },
-        ],
-      },
+      day("tripTeaser.torontoDayOne", [
+        stop("CN Tower", 43.6426, -79.3871),
+        stop("Pai Northern Thai Kitchen", 43.6484, -79.3889),
+        stop("Hockey Hall of Fame", 43.6469, -79.3772),
+        stop("Richmond Station", 43.6515, -79.3792),
+      ]),
+      day("tripTeaser.torontoDayTwo", [
+        stop("Kensington Market", 43.6548, -79.4007),
+        stop("Seven Lives Tacos y Mariscos", 43.6544, -79.4005),
+        stop("Chinatown", 43.6529, -79.398),
+        stop("Grey Gardens", 43.6553, -79.4016),
+      ]),
     ],
   },
 } as const satisfies Record<SampleCityId, SampleCity>;
+
+/** Whether `value` names a city there is a sample trip for. */
+export function isSampleCity(value: unknown): value is SampleCityId {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(SAMPLE_CITIES, value)
+  );
+}

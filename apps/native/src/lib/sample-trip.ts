@@ -2,6 +2,7 @@ import type { Interest } from "@/lib/onboarding-interests";
 import type { SaveKind } from "@/lib/save-kinds";
 import {
   SAMPLE_CITIES,
+  isSampleCity,
   type LatLng,
   type SampleCity,
   type SampleCityId,
@@ -10,14 +11,8 @@ import {
 } from "@/lib/sample-cities";
 import type { TextMessageKey } from "@/locales/message-types";
 
-// The sample trip onboarding builds before the paywall, for people who said
-// they save travel. It is in the city they said they are going to next, the
-// same on every run, and never made by the model: it shows what a trip looks
-// like, and the label on every screen says it is a sample. Place names are
-// the places' own and stay untranslated.
+export { isSampleCity };
 
-/** Whether onboarding shows the sample trip: travel was picked as a kind of
- * save or as a topic. Everyone else goes from the promise to the paywall. */
 export function showTripTeaser(
   kinds: readonly SaveKind[],
   interests: readonly Interest[],
@@ -29,7 +24,6 @@ export function showTripTeaser(
  * travel picked only as a kind of save, or an older stored pick). */
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
-/** The trip screen's slot labels, so the sample reads like the real trip. */
 export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
   morning: "trip.slotMorning",
   lunch: "trip.slotLunch",
@@ -37,12 +31,8 @@ export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
   dinner: "trip.slotDinner",
 };
 
-/** The drawing the sample map is made on, in points before it scales to the
- * card. Each stop's pin sits on it. */
 export const SAMPLE_MAP = { width: 340, height: 168 } as const;
 
-/** The band of the drawing a card shows, from `top`. The locked card shows
- * less of it than the open one, and every pin lies inside both. */
 export type SampleCrop = { top: number; height: number };
 export const SAMPLE_CROPS = {
   locked: { top: 28, height: 120 },
@@ -62,10 +52,8 @@ type SampleDay = {
   stops: readonly SampleStop[];
 };
 
-/** A city's sample trip, with every stop pinned on the drawing. */
 export type SampleTrip = {
   city: SampleCityId;
-  /** The city's name. */
   name: TextMessageKey;
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
@@ -84,6 +72,13 @@ const WATER_WIDTH = 16;
 // How far a pin's centre stays from the water's edge, so a place on land
 // never reads as in the river. A pin is 22 across, so most of it is on land.
 const WATER_CLEARANCE = 8;
+// A pin this many clearances from a line, on the wrong side, has crossed the
+// water while spreading and goes back to its own bank.
+const CROSSING_REACH = 3;
+// How many spreading passes may run before the pins are left where they are.
+const SPREAD_ROUNDS = 80;
+// Pins on the same spot part along this fixed slant (a unit vector).
+const SAME_SPOT_SLANT = [0.8, 0.6] as const;
 
 /** Places the trip's real coordinates on the drawing: one scale for both
  * axes (a degree of longitude shrinks away from the equator), centred in the
@@ -156,7 +151,8 @@ function keepOffWater(pin: Point, home: Point, water: Water): boolean {
   for (const line of water.lines) {
     const bank = nearestOnLine(home, line);
     const now = nearestOnLine(pin, line);
-    const crossed = now.side !== bank.side && now.distance < room * 3;
+    const crossed =
+      now.side !== bank.side && now.distance < room * CROSSING_REACH;
     if (now.distance >= room && !crossed) continue;
     // Off the line, square to it, on the place's own bank.
     const sign = now.side === bank.side ? 1 : -1;
@@ -177,7 +173,7 @@ function spreadPins(
 ): Point[] {
   const spread = pins.map((pin) => ({ ...pin }));
   const homes = pins.map((pin) => ({ ...pin }));
-  for (let round = 0; round < 80; round += 1) {
+  for (let round = 0; round < SPREAD_ROUNDS; round += 1) {
     let moved = false;
     for (let a = 0; a < spread.length; a += 1) {
       for (let b = a + 1; b < spread.length; b += 1) {
@@ -186,9 +182,8 @@ function spreadPins(
         const distance = Math.hypot(dx, dy);
         if (distance >= PIN_GAP) continue;
         moved = true;
-        // Pins on the same spot part along a fixed slant.
         const [ux, uy] =
-          distance === 0 ? [0.8, 0.6] : [dx / distance, dy / distance];
+          distance === 0 ? SAME_SPOT_SLANT : [dx / distance, dy / distance];
         const push = (PIN_GAP - distance) / 2;
         spread[a].x -= ux * push;
         spread[a].y -= uy * push;
@@ -251,14 +246,6 @@ function buildTrip(id: SampleCityId): SampleTrip {
 
 const TRIPS = new Map<SampleCityId, SampleTrip>();
 
-/** Whether `value` names a city there is a sample trip for. */
-export function isSampleCity(value: unknown): value is SampleCityId {
-  return (
-    typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(SAMPLE_CITIES, value)
-  );
-}
-
 /** The sample trip in `city`, or in the default city when there is none. */
 export function sampleTrip(city?: string | null): SampleTrip {
   const id = isSampleCity(city) ? city : DEFAULT_SAMPLE_CITY;
@@ -272,13 +259,10 @@ export function sampleTrip(city?: string | null): SampleTrip {
 
 export type NumberedStop = {
   stop: SampleStop;
-  /** Index of the day the stop belongs to. */
   day: number;
-  /** The stop's number on the map, counted across the whole trip. */
   number: number;
 };
 
-/** Every stop in trip order, numbered as the map numbers its pins. */
 export function sampleStops(trip: SampleTrip): NumberedStop[] {
   return trip.days
     .flatMap((day, dayIndex) =>
@@ -287,12 +271,10 @@ export function sampleStops(trip: SampleTrip): NumberedStop[] {
     .map((entry, index) => ({ ...entry, number: index + 1 }));
 }
 
-/** One line of the trip as the card lists it: a day's header or one stop. */
 export type SampleRow =
   | { kind: "day"; day: number; title: TextMessageKey; places: number }
   | { kind: "stop"; entry: NumberedStop };
 
-/** The trip's rows top to bottom: each day's header, then its stops. */
 export function sampleRows(trip: SampleTrip): SampleRow[] {
   const stops = sampleStops(trip);
   return trip.days.flatMap(({ title, stops: places }, day) => [

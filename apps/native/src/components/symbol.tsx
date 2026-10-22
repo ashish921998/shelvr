@@ -69,8 +69,6 @@ const SF_TO_MATERIAL = {
   mappin: "location_on",
   lock: "lock",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
-  // The onboarding opener's drawn phone: a video's rail, a share sheet's
-  // apps, and the icon tiles of a travel space.
   "heart.fill": "favorite",
   "bubble.right.fill": "chat_bubble",
   "square.and.arrow.up.fill": "ios_share",

@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// The sample map lays itself out at the card's width: nothing is drawn until
-// the card is measured, then every pin lands where the drawing puts it, scaled
-// to the card and cut to the crop.
 import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -157,8 +154,7 @@ describe("SampleTripMap", () => {
         .getByText(String(n))
         .closest("[data-left]")
         ?.getAttribute("data-top");
-    // The locked crop starts at y 28 and a pin is 22 across, so its corner is
-    // 11 short of its center.
+    // The locked crop starts at y 28 and a pin is 22 across, so its corner is 11 short of its center.
     expect([left(1), top(1)]).toEqual([
       String(FIRST.x - 11),
       String(FIRST.y - 28 - 11),
