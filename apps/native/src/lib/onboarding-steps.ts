@@ -1,40 +1,42 @@
 export const ONBOARDING_STEPS = [
   "opener",
+  "goal",
+  "city",
   "interests",
   "share",
-  "promise",
   "tripBuild",
-  "tripLocked",
   "tripReveal",
+  "promise",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 13;
+export const ONBOARDING_FLOW_VERSION = 14;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
+  goal: "goal",
+  city: "city",
   interests: "interests",
   share: "share_practice",
   promise: "promise",
   tripBuild: "trip_build",
-  tripLocked: "trip_locked",
   tripReveal: "trip_reveal",
 };
 
-const PREVIOUS_STEP: Record<OnboardingStep, OnboardingStep | null> = {
-  opener: null,
-  interests: "opener",
-  share: "interests",
-  promise: null,
-  tripBuild: null,
-  tripLocked: null,
-  tripReveal: null,
-};
+const NO_BACK: readonly OnboardingStep[] = [
+  "opener",
+  "tripBuild",
+  "tripReveal",
+  "promise",
+];
 
+/** The step before `step` in `flow`; none once the sample is being built, so the build never replays. */
 export function previousOnboardingStep(
   step: OnboardingStep,
+  flow: readonly OnboardingStep[],
 ): OnboardingStep | null {
-  return PREVIOUS_STEP[step];
+  if (NO_BACK.includes(step)) return null;
+  return flow[flow.indexOf(step) - 1] ?? null;
 }
 
 /** `step` must be an index written by this flow version; getOnboardingProgress drops older flows' records. */

@@ -26,7 +26,9 @@ const INTEREST_IMAGES: Record<Interest, number> = {
 };
 
 export function sampleImage(sample: DemoSample): number {
-  if (sample.city !== undefined) return CITY_PICTURES[sample.city].view;
+  if (sample.city !== undefined) {
+    return CITY_PICTURES[sample.city][sample.picture ?? "view"];
+  }
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
     : INTEREST_IMAGES[sample.interest];

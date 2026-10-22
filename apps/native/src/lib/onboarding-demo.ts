@@ -15,6 +15,7 @@ export type DemoSample = {
   kind: DemoKind;
   interest?: Interest;
   city?: SampleCityId;
+  picture?: "food" | "view";
   url: string;
   pageHeading: string;
   domain: string;

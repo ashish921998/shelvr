@@ -1,20 +1,29 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton } from "@/components/onboarding/parts";
+import type { Goal } from "@/lib/onboarding-goals";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-const LINES: TextMessageKey[] = ["promise.comeBack", "promise.use"];
+const USE_LINES: Record<Goal, TextMessageKey> = {
+  travel: "goal.promiseTravel",
+  food: "goal.promiseFood",
+  date: "goal.promiseDate",
+  other: "promise.use",
+};
 
 export function PromiseStep({
+  goal,
   leaving,
   onCommit,
 }: {
+  goal: Goal;
   leaving: boolean;
   onCommit: () => void;
 }) {
   useAppLocale();
+  const lines: TextMessageKey[] = ["promise.comeBack", USE_LINES[goal]];
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -30,7 +39,7 @@ export function PromiseStep({
 
       <View style={styles.card}>
         <Text style={styles.eyebrow}>{t("promise.eyebrow")}</Text>
-        {LINES.map((line, index) => (
+        {lines.map((line, index) => (
           <View key={line} style={styles.line}>
             <Text style={styles.number}>{index + 1}</Text>
             <Text style={styles.lineText}>{t(line)}</Text>

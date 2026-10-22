@@ -610,9 +610,11 @@ receives nothing at all. The people most likely to churn are the ones the
 system is silent toward. That is a real gap, and earlier drafts of this
 document did not mention it.
 
-One fact softens it. **Onboarding already captures interests.** The "What are
-you into?" step (`onboarding-interests.ts`) offers eight topics, and each picked
-topic becomes a starter space. Onboarding no longer makes a save of its own: its
+One fact softens it. **Onboarding already captures interests.** "What do you
+save?" (`onboarding-goals.ts`) asks for travel ideas, food places, date-night
+spots or something else; each of the first three starts one space, and
+"something else" leads to "What are you into?" (`onboarding-interests.ts`), where
+each picked topic becomes a starter space. Onboarding no longer makes a save of its own: its
 share practice hands one sample post to the share screen, which saves it after
 sign-in only if the user shared it.
 

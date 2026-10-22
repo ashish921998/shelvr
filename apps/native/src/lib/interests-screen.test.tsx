@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -45,7 +51,17 @@ const mocks = vi.hoisted(() => ({
       {label}
     </button>
   ),
-  sharePractice: vi.fn((_props: { sample?: { domain: string } }) => null),
+  sharePractice: vi.fn(
+    (_props: { sample?: { domain: string; pageHeading: string } }) => null,
+  ),
+  promise: vi.fn((_props: { goal: string }) => null),
+  reveal: vi.fn((_props: { trip: { kind: string; city: string } }) => null),
+  progress: {
+    spaces: [] as string[],
+    step: 1,
+    travelCity: null as string | null,
+    goal: null as string | null,
+  },
   payloads: [] as { value: string; shareType: string }[],
   clearSharedPayloads: vi.fn(),
   paywall: { onDecline: () => {} },
@@ -76,11 +92,7 @@ vi.mock("@/lib/share/process-share", () => ({
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
-  getOnboardingProgress: () => ({
-    spaces: [],
-    step: ONBOARDING_STEPS.indexOf("interests"),
-    travelCity: null,
-  }),
+  getOnboardingProgress: () => mocks.progress,
   resolveOnboardingSpaceName: (name: string) => name,
   setOnboardingProgress: mocks.setOnboardingProgress,
   setPendingSpaces: mocks.setPendingSpaces,
@@ -94,37 +106,55 @@ vi.mock("@/components/onboarding/opener", () => ({
   OpenerStep: vi.fn(() => null),
 }));
 vi.mock("@/components/onboarding/promise", () => ({
-  PromiseStep: vi.fn(() => null),
+  PromiseStep: mocks.promise,
 }));
 vi.mock("@/components/onboarding/share-practice", () => ({
   SharePracticeStep: mocks.sharePractice,
 }));
-vi.mock("@/components/onboarding/trip-teaser", () => ({
-  TripBuildStep: vi.fn(() => null),
-  TripLockedStep: vi.fn(() => null),
-  TripRevealStep: vi.fn(() => null),
-}));
+vi.mock("@/components/onboarding/trip-teaser", () => {
+  const build = ({ onDone }: { onDone: () => void }) => (
+    <button type="button" onClick={onDone}>
+      built
+    </button>
+  );
+  return { TripBuildStep: build, TripRevealStep: mocks.reveal };
+});
 vi.mock("@/components/onboarding/parts", () => ({
   CtaButton: mocks.button,
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
-vi.mock("@/components/ui/action-menu", () => ({
-  ActionMenu: vi.fn(
-    ({
-      children,
-      actions,
-    }: Children & { actions: { label: string; onPress: () => void }[] }) => (
-      <div>
-        {children}
-        {actions.map((action) => (
-          <button key={action.label} type="button" onClick={action.onPress}>
-            {action.label}
-          </button>
-        ))}
-      </div>
-    ),
-  ),
-}));
+vi.mock("@/components/onboarding/goal", async () => {
+  const { GOALS, GOAL_PLANS } = await import("@/lib/onboarding-goals");
+  const { planCities } = await import("@/lib/sample-plans");
+  const goals = ({ onPick }: { onPick: (goal: string) => void }) => (
+    <div>
+      {GOALS.map((goal) => (
+        <button key={goal} type="button" onClick={() => onPick(goal)}>
+          {`goal:${goal}`}
+        </button>
+      ))}
+    </div>
+  );
+  const cities = ({
+    goal,
+    onPick,
+  }: {
+    goal: "travel" | "food" | "date";
+    onPick: (city: string | null) => void;
+  }) => (
+    <div>
+      {planCities(GOAL_PLANS[goal]!).map((city) => (
+        <button key={city} type="button" onClick={() => onPick(city)}>
+          {`city:${city}`}
+        </button>
+      ))}
+      <button type="button" onClick={() => onPick(null)}>
+        city:none
+      </button>
+    </div>
+  );
+  return { GoalStep: goals, CityStep: cities };
+});
 vi.mock("@/lib/use-large-text", () => ({ HEADLINE_MAX_SCALE: 1.5 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: false }),
@@ -154,76 +184,104 @@ vi.mock("react-native", () => ({
   useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
 }));
 
-const SPOTS_TITLE = "interests.vibesTitle";
 const chip = (id: string) =>
   screen.getByRole("checkbox", { name: onboardingLabel(id) });
-const savedSpaces = () =>
-  mocks.setOnboardingProgress.mock.lastCall?.[0].spaces as string[];
+const tap = (name: string) =>
+  fireEvent.click(screen.getByRole("button", { name }));
+const saved = () => mocks.setOnboardingProgress.mock.lastCall?.[0];
+const shared = () => mocks.sharePractice.mock.lastCall?.[0].sample;
 
 beforeEach(() => {
   mocks.setOnboardingProgress.mockClear();
   mocks.sharePractice.mockClear();
+  mocks.promise.mockClear();
+  mocks.reveal.mockClear();
   mocks.clearSharedPayloads.mockClear();
   mocks.payloads = [];
+  mocks.progress = {
+    spaces: [],
+    step: ONBOARDING_STEPS.indexOf("goal"),
+    travelCity: null,
+    goal: null,
+  };
 });
 afterEach(cleanup);
 
-it("keeps a spot as a space until Travel is unpicked, then forgets it", () => {
+it("asks a date-night city, practises with a stop in that plan, then shows the plan and the promise", () => {
   render(<OnboardingScreen />);
-  expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
+  tap("goal:date");
+  expect(screen.queryByRole("button", { name: "city:tokyo" })).toBeNull();
+  tap("city:paris");
+  expect(saved()).toMatchObject({
+    goal: "date",
+    spaces: ["Date nights"],
+    travelCity: "paris",
+  });
+  expect(shared()?.pageHeading).toBe("Pont des Arts");
 
-  fireEvent.click(chip("Travel"));
-  expect(screen.getByText(SPOTS_TITLE)).toBeTruthy();
-  fireEvent.click(chip("Good food"));
-  fireEvent.click(chip("AI & tech"));
-  expect(savedSpaces()).toEqual(["Travel", "Good food", "AI & tech"]);
-  expect(chip("Good food").getAttribute("aria-checked")).toBe("true");
-
-  fireEvent.click(chip("Good food"));
-  expect(savedSpaces()).toEqual(["Travel", "AI & tech"]);
-  fireEvent.click(chip("Hidden gems"));
-
-  fireEvent.click(chip("Travel"));
-  expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
-  expect(savedSpaces()).toEqual(["AI & tech"]);
-
-  fireEvent.click(chip("Travel"));
-  expect(chip("Hidden gems").getAttribute("aria-checked")).toBe("false");
-  expect(savedSpaces()).toEqual(["AI & tech", "Travel"]);
+  const { onFinish } = mocks.sharePractice.mock.lastCall?.[0] as unknown as {
+    onFinish: () => void;
+  };
+  act(onFinish);
+  tap("built");
+  expect(mocks.reveal.mock.lastCall?.[0].trip).toMatchObject({
+    kind: "date",
+    city: "paris",
+  });
+  const { onContinue } = mocks.reveal.mock.lastCall?.[0] as unknown as {
+    onContinue: () => void;
+  };
+  act(onContinue);
+  expect(mocks.promise.mock.lastCall?.[0].goal).toBe("date");
 });
 
-it("keeps the picked city with the progress until Travel is unpicked", () => {
+it("shows a food weekend in Prague when the city is somewhere else", () => {
   render(<OnboardingScreen />);
-  const city = () => mocks.setOnboardingProgress.mock.lastCall?.[0].travelCity;
-  fireEvent.click(chip("Travel"));
-  expect(city()).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "tripTeaser.cityTokyo" }));
-  expect(city()).toBe("tokyo");
-  fireEvent.click(chip("Travel"));
-  expect(city()).toBeNull();
+  tap("goal:food");
+  tap("city:none");
+  expect(saved()).toMatchObject({
+    goal: "food",
+    spaces: ["Restaurants to try"],
+  });
+  expect(shared()?.pageHeading).toBe("U Fleků");
 });
 
-it("moves on to share practice only once a topic is picked, with that topic's post", () => {
+it("keeps today's topics for something else, and moves on only once one is picked", () => {
   render(<OnboardingScreen />);
+  tap("goal:other");
   const next = screen.getByRole("button", { name: "common.continue" });
   expect(next.hasAttribute("disabled")).toBe(true);
+  expect(
+    screen.queryByRole("checkbox", { name: onboardingLabel("Travel") }),
+  ).toBeNull();
 
   fireEvent.click(chip("AI & tech"));
+  expect(saved()).toMatchObject({ goal: "other", spaces: ["AI & tech"] });
   fireEvent.click(next);
-  expect(mocks.sharePractice.mock.lastCall?.[0].sample?.domain).toBe(
-    "anthropic.com",
-  );
+  expect(shared()?.domain).toBe("anthropic.com");
 });
 
-it("drops a declined practice share even after the topics changed", () => {
+it("starts the shelf again when a different goal is picked", () => {
+  mocks.progress = {
+    spaces: ["AI & tech"],
+    step: ONBOARDING_STEPS.indexOf("goal"),
+    travelCity: null,
+    goal: "other",
+  };
   render(<OnboardingScreen />);
-  fireEvent.click(chip("Food & recipes"));
-  mocks.payloads = [
-    {
-      value: "https://www.anthropic.com/research/building-effective-agents",
-      shareType: "url",
-    },
-  ];
+  tap("goal:travel");
+  expect(saved()).toMatchObject({ goal: "travel", spaces: ["Travel"] });
+});
+
+it.each([
+  [
+    "a topic's post",
+    "https://www.anthropic.com/research/building-effective-agents",
+  ],
+  ["a date-night post", "https://en.wikipedia.org/wiki/Pont_des_Arts"],
+])("drops a declined practice share of %s", (_name, url) => {
+  render(<OnboardingScreen />);
+  mocks.payloads = [{ value: url, shareType: "url" }];
   mocks.paywall.onDecline();
   expect(mocks.clearSharedPayloads).toHaveBeenCalledTimes(1);
 });

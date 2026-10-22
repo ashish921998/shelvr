@@ -6,6 +6,7 @@ import {
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
+import type { Goal } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
 import Constants from "expo-constants";
 
@@ -197,6 +198,7 @@ export type AnalyticsEventProperties = {
     interests: string[];
     travel_vibes: string[];
     sample_city: SampleCityId | null;
+    goal: Goal | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;

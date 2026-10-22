@@ -8,6 +8,7 @@ import { settleIn } from "@/lib/motion";
 import type { SampleCityId, SampleSave } from "@/lib/sample-cities";
 import type { SampleTrip } from "@/lib/sample-trip";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
+import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -15,6 +16,38 @@ import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const BUILD_STEP_COUNT = 4;
+
+const KIND_COPY: Record<
+  SampleTrip["kind"],
+  {
+    title: TextMessageKey;
+    accent:
+      | "tripTeaser.buildTitleAccent"
+      | "plan.buildAccentDate"
+      | "plan.buildAccentWeekend";
+    plan: TextMessageKey;
+    reveal: TextMessageKey;
+  }
+> = {
+  trip: {
+    title: "tripTeaser.buildTitle",
+    accent: "tripTeaser.buildTitleAccent",
+    plan: "tripTeaser.stepPlan",
+    reveal: "tripTeaser.revealBody",
+  },
+  date: {
+    title: "plan.buildTitleDate",
+    accent: "plan.buildAccentDate",
+    plan: "plan.stepPlanDate",
+    reveal: "plan.revealBodyDate",
+  },
+  weekend: {
+    title: "plan.buildTitleWeekend",
+    accent: "plan.buildAccentWeekend",
+    plan: "plan.stepPlanWeekend",
+    reveal: "plan.revealBodyWeekend",
+  },
+};
 const STEP_MS = 750;
 const HOLD_MS = 500;
 
@@ -144,7 +177,7 @@ export function TripBuildStep({
     t("tripTeaser.stepRead", { saves }),
     t("tripTeaser.stepFind"),
     t("tripTeaser.stepPin"),
-    t("tripTeaser.stepPlan"),
+    t(KIND_COPY[trip.kind].plan),
   ];
   const [finished, setFinished] = useState(0);
   const doneRef = useRef(onDone);
@@ -164,8 +197,8 @@ export function TripBuildStep({
   return (
     <View style={styles.wrap}>
       <Head
-        title={t("tripTeaser.buildTitle")}
-        accent={t("tripTeaser.buildTitleAccent", { city: t(trip.name) })}
+        title={t(KIND_COPY[trip.kind].title)}
+        accent={t(KIND_COPY[trip.kind].accent, { city: t(trip.name) })}
         body={t("tripTeaser.buildBody", { saves })}
       />
       <View style={styles.card}>
@@ -200,43 +233,6 @@ export function TripBuildStep({
   );
 }
 
-export function TripLockedStep({
-  trip,
-  leaving,
-  onUnlock,
-}: {
-  trip: SampleTrip;
-  leaving: boolean;
-  onUnlock: () => void;
-}) {
-  useAppLocale();
-  const city = t(trip.name);
-  return (
-    <View style={styles.wrap}>
-      <Animated.View entering={SETTLE_HEAD}>
-        <Head
-          title={t("tripTeaser.lockedTitle", { city })}
-          accent={t("tripTeaser.lockedTitleAccent")}
-          body={t("tripTeaser.sampleBody", {
-            saves: String(trip.saves.length),
-          })}
-        />
-      </Animated.View>
-      <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard trip={trip} locked />
-      </Animated.View>
-      <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
-        <CtaButton
-          label={t("tripTeaser.unlock")}
-          onPress={onUnlock}
-          busy={leaving}
-        />
-        <Text style={styles.note}>{t("tripTeaser.unlockNote")}</Text>
-      </Animated.View>
-    </View>
-  );
-}
-
 export function TripRevealStep({
   trip,
   onContinue,
@@ -258,11 +254,11 @@ export function TripRevealStep({
       <Animated.View entering={SETTLE_HEAD}>
         <Head
           title={t("tripTeaser.revealTitle")}
-          body={t("tripTeaser.revealBody")}
+          body={t(KIND_COPY[trip.kind].reveal)}
         />
       </Animated.View>
       <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard trip={trip} locked={false} />
+        <SampleTripCard trip={trip} />
       </Animated.View>
       <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
         <CtaButton

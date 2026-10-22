@@ -26,6 +26,7 @@ describe("onboardingCompletedProperties", () => {
       ],
       custom_space_count: 1,
       sample_city: null,
+      goal: null,
       $set: { save_pileup: [] },
     });
   });
@@ -38,6 +39,12 @@ describe("onboardingCompletedProperties", () => {
       space_names: [],
       custom_space_count: 0,
     });
+  });
+
+  it("names the goal picked first", () => {
+    expect(
+      onboardingCompletedProperties(["Date nights"], "paris", "date"),
+    ).toMatchObject({ goal: "date", sample_city: "paris" });
   });
 
   it("names the sample trip's city when one was picked", () => {

@@ -125,9 +125,11 @@ beforeEach(() => {
 const measure = (width: number) =>
   act(() => mock.layout?.({ nativeEvent: { layout: { width } } }));
 
+const CROP = { top: 28, height: 120 };
+
 describe("SampleTripMap", () => {
   it("is described as a map of the sample city and its eight stops", () => {
-    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.reveal} />);
     expect(
       screen.getByLabelText(
         'tripTeaser.mapLabel:{"city":"tripTeaser.cityPrague","places":"8"}',
@@ -136,13 +138,13 @@ describe("SampleTripMap", () => {
   });
 
   it("draws nothing until the card is measured", () => {
-    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.reveal} />);
     expect(screen.queryByTestId("canvas")).toBeNull();
     expect(screen.queryAllByText(/^[1-8]$/)).toHaveLength(0);
   });
 
   it("places each pin at the drawing's point, cut to the crop", () => {
-    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={CROP} />);
     measure(340);
     const left = (n: number) =>
       screen
@@ -154,7 +156,7 @@ describe("SampleTripMap", () => {
         .getByText(String(n))
         .closest("[data-left]")
         ?.getAttribute("data-top");
-    // The locked crop starts at y 28 and a pin is 22 across, so its corner is 11 short of its center.
+    // CROP starts at y 28 and a pin is 22 across, so its corner is 11 short of its center.
     expect([left(1), top(1)]).toEqual([
       String(FIRST.x - 11),
       String(FIRST.y - 28 - 11),
@@ -166,7 +168,7 @@ describe("SampleTripMap", () => {
   });
 
   it("scales the pins' places and the drawing with the card's width", () => {
-    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={CROP} />);
     measure(680);
     const place = screen.getByText("1").closest("[data-left]");
     expect(place?.getAttribute("data-left")).toBe(String(FIRST.x * 2 - 11));
@@ -178,7 +180,7 @@ describe("SampleTripMap", () => {
     );
   });
 
-  it("starts the open card's crop higher", () => {
+  it("cuts the map at the sample card's crop", () => {
     render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.reveal} />);
     measure(340);
     const place = screen.getByText("1").closest("[data-left]");
@@ -186,7 +188,7 @@ describe("SampleTripMap", () => {
   });
 
   it("joins each day's stops with a dotted route in that day's color", () => {
-    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.reveal} />);
     measure(340);
     const drawn = (path: string) =>
       screen
@@ -198,7 +200,7 @@ describe("SampleTripMap", () => {
   });
 
   it("re-draws when the card is measured again", () => {
-    render(<SampleTripMap trip={TRIP} crop={SAMPLE_CROPS.locked} />);
+    render(<SampleTripMap trip={TRIP} crop={CROP} />);
     measure(340);
     measure(300);
     expect(screen.getByTestId("group").dataset.transform).toBe(

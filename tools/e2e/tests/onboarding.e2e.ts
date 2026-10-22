@@ -57,24 +57,26 @@ test(
 );
 
 test(
-  "builds a sample trip before the paywall for someone into travel",
+  "shows a sample trip, open, before the promise and the paywall for someone saving travel ideas",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToSharePractice(screen, "Travel");
+    await walkToSharePractice(screen, "Travel ideas");
 
     await screen.getByRole("button", SHARE_LATER).tap();
-    await screen.getByRole("button", "I'm in").tap({ timeout: 30_000 });
+    await expect(screen.getByText("There it is.")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(screen.getByText("Sample trip")).toBeVisible();
+    await expect(screen.getByText("Staré Město")).toBeVisible();
+    await screen.getByRole("button", "Continue").tap();
 
-    const unlock = screen.getByRole("button", "Unlock the full trip");
-    await expect(unlock).toBeVisible({ timeout: 30_000 });
-    await expect(screen.getByText(/sample Prague trip/)).toBeVisible();
-    await unlock.tap();
+    const commit = screen.getByRole("button", "I'm in");
+    await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
-
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
-    await expect(unlock).toBeVisible({ timeout: 30_000 });
+    await expect(commit).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );

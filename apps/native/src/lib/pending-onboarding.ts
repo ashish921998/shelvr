@@ -1,11 +1,12 @@
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import { isGoal, type Goal } from "@/lib/onboarding-goals";
 import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 7;
+const PROGRESS_VERSION = 8;
 
 export type PendingDemo = {
   url: string;
@@ -23,11 +24,13 @@ type PendingRecord = {
   step: number | null;
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
+  goal?: Goal | null;
 };
 
 type OnboardingProgress = {
   spaces: string[];
   travelCity: SampleCityId | null;
+  goal: Goal | null;
   step: number | null;
 };
 
@@ -93,6 +96,7 @@ function readPendingRecord(): PendingRecord | null {
       step,
       spaceNames: readSpaceNames(record.spaceNames),
       travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
+      goal: isGoal(record.goal) ? record.goal : null,
     };
   } catch {
     return null;
@@ -150,6 +154,7 @@ function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
     step: existing?.step ?? null,
     spaceNames: existing?.spaceNames ?? {},
     travelCity: existing?.travelCity ?? null,
+    goal: existing?.goal ?? null,
   });
   notifyChanged();
 }
@@ -220,11 +225,12 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { spaces: [], travelCity: null, step: null };
+    return { spaces: [], travelCity: null, goal: null, step: null };
   }
   return {
     spaces: record.spaces,
     travelCity: record.travelCity ?? null,
+    goal: record.goal ?? null,
     step: record.step,
   };
 }
@@ -232,6 +238,7 @@ export function getOnboardingProgress(): OnboardingProgress {
 export function setOnboardingProgress(progress: {
   spaces: string[];
   travelCity?: SampleCityId | null;
+  goal?: Goal | null;
   step: number;
 }) {
   const existing = readPendingRecord();
@@ -246,6 +253,7 @@ export function setOnboardingProgress(progress: {
     step: progress.step,
     spaceNames: existing?.spaceNames ?? {},
     travelCity: progress.travelCity ?? null,
+    goal: progress.goal ?? null,
   });
   notifyChanged();
 }

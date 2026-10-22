@@ -15,7 +15,13 @@ export const SAMPLE_CITY_IDS = [
 ] as const;
 export type SampleCityId = (typeof SAMPLE_CITY_IDS)[number];
 const DAY_SLOTS = ["morning", "lunch", "afternoon", "dinner"] as const;
-export type SampleSlot = (typeof DAY_SLOTS)[number];
+export type SampleSlot =
+  | (typeof DAY_SLOTS)[number]
+  | "drinks"
+  | "dessert"
+  | "walk"
+  | "brunch"
+  | "coffee";
 export type LatLng = { lat: number; lng: number };
 type CityStop = {
   name: string;

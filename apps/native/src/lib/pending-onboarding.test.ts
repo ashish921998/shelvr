@@ -57,6 +57,7 @@ describe("onboarding recovery", () => {
       spaces: ["Travel"],
       step: 2,
       travelCity: null,
+      goal: null,
     });
   });
 });
@@ -80,6 +81,23 @@ describe("the sample trip's city", () => {
       JSON.stringify({ ...stored, travelCity: "atlantis" }),
     );
     expect(getOnboardingProgress().travelCity).toBeNull();
+  });
+});
+
+describe("the goal", () => {
+  it("is kept with the progress through a relaunch", () => {
+    setOnboardingProgress({ spaces: ["Date nights"], step: 2, goal: "date" });
+    expect(getOnboardingProgress().goal).toBe("date");
+  });
+
+  it("reads back as none when the stored goal is not one onboarding asks", () => {
+    setOnboardingProgress({ spaces: [], step: 1, goal: "food" });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({ ...stored, goal: "shopping" }),
+    );
+    expect(getOnboardingProgress().goal).toBeNull();
   });
 });
 
@@ -116,7 +134,7 @@ describe("a first save queued before sign-in", () => {
 });
 
 describe("progress written by an older onboarding flow", () => {
-  const fresh = { spaces: [], step: null, travelCity: null };
+  const fresh = { spaces: [], step: null, travelCity: null, goal: null };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
     "restarts a record at old step %i with fresh progress",
@@ -145,6 +163,7 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow before the interests step", { progressVersion: 4 }],
     ["the flow that had the reveal step", { progressVersion: 5 }],
     ["the flow that had the first save", { progressVersion: 6 }],
+    ["the flow that asked topics first", { progressVersion: 7 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -168,7 +187,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 7,
+        progressVersion: 8,
         step: 2,
         spaceNames: {},
       }),
@@ -177,6 +196,7 @@ describe("progress written by an older onboarding flow", () => {
       spaces: ["Travel"],
       step: 2,
       travelCity: null,
+      goal: null,
     });
   });
 
@@ -196,6 +216,7 @@ describe("progress written by an older onboarding flow", () => {
       spaces: [],
       step: 0,
       travelCity: null,
+      goal: null,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

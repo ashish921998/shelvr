@@ -4,15 +4,18 @@ import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import type { SampleCityId } from "@/lib/sample-cities";
-import { isSampleCity, sampleTrip, showTripTeaser } from "@/lib/sample-trip";
+import { isSampleCity, samplePlan } from "@/lib/sample-trip";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
-import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
 import {
-  isTravelVibe,
-  spacesAfterInterestToggle,
-  TRAVEL_INTEREST,
-} from "@/lib/travel-vibes";
-import { findSample, practiceShareSample } from "@/lib/onboarding-demo";
+  GOAL_PLANS,
+  GOAL_SPACES,
+  goalFlow,
+  goalShareSample,
+  isPracticePost,
+  type Goal,
+} from "@/lib/onboarding-goals";
+import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
+import { practiceShareSample } from "@/lib/onboarding-demo";
 import { firstSharedUrl } from "@/lib/share/process-share";
 import {
   ONBOARDING_FLOW_VERSION,
@@ -34,13 +37,13 @@ import {
   markPendingShareOnDevice,
 } from "@/lib/share/pending-share-store";
 import { SignInView } from "@/components/sign-in-view";
+import { CityStep, GoalStep } from "@/components/onboarding/goal";
 import { InterestsStep } from "@/components/onboarding/interests";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { PromiseStep } from "@/components/onboarding/promise";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import {
   TripBuildStep,
-  TripLockedStep,
   TripRevealStep,
 } from "@/components/onboarding/trip-teaser";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -48,18 +51,27 @@ import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { TextMessageKey } from "@/locales/message-types";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  interests: 0.35,
-  share: 0.7,
+  goal: 0.2,
+  city: 0.4,
+  interests: 0.4,
+  share: 0.6,
+  tripBuild: 0.8,
+  tripReveal: 0.8,
   promise: 1,
-  tripBuild: 1,
-  tripLocked: 1,
-  tripReveal: 1,
+};
+
+const SHARE_TITLES: Record<Goal, TextMessageKey> = {
+  travel: "goal.shareTravel",
+  food: "goal.shareFood",
+  date: "goal.shareDate",
+  other: "sharePractice.title",
 };
 
 function holdIncomingShare() {
@@ -70,12 +82,12 @@ function holdIncomingShare() {
   }
 }
 
-/** Drops a held practice share by what was shared, since the topics, and so the offered post, can change after it. */
+/** Drops a held practice share by what was shared, since the goal, city or topics, and so the offered post, can change after it. */
 function dropPracticeShare() {
   try {
     const payloads = getSharedPayloads();
     const url = firstSharedUrl(payloads);
-    if (url === null || findSample(url) === undefined) return;
+    if (url === null || !isPracticePost(url)) return;
     if (!holdsOnlyLink(payloads, url)) return;
     clearSharedPayloads();
     clearPendingShareOnDevice();
@@ -103,6 +115,7 @@ export default function OnboardingScreen() {
       ? initialProgress.travelCity
       : null,
   );
+  const [goal, setGoal] = useState<Goal | null>(initialProgress.goal);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
@@ -112,18 +125,19 @@ export default function OnboardingScreen() {
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const interests = spaces.filter(isInterest);
-  const vibes = spaces.filter(isTravelVibe);
-  const teaser = showTripTeaser(interests);
-  const pickedCity = interests.includes(TRAVEL_INTEREST) ? travelCity : null;
-  const trip = sampleTrip(pickedCity);
+  const flow = goalFlow(goal);
+  const planKind = goal === null ? null : GOAL_PLANS[goal];
+  const pickedCity = planKind === null ? null : travelCity;
+  const trip = samplePlan(planKind ?? "trip", pickedCity);
 
   useEffect(() => {
     setOnboardingProgress({
       spaces,
       travelCity,
+      goal,
       step: stepIndex,
     });
-  }, [spaces, travelCity, stepIndex]);
+  }, [spaces, travelCity, goal, stepIndex]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -151,11 +165,24 @@ export default function OnboardingScreen() {
 
   const advance = useCallback(() => {
     recordCurrentStep();
-    setStep(
-      (current) =>
-        ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(current) + 1] ?? current,
-    );
-  }, [recordCurrentStep]);
+    setStep((current) => flow[flow.indexOf(current) + 1] ?? current);
+  }, [recordCurrentStep, flow]);
+
+  const pickGoal = (picked: Goal) => {
+    recordCurrentStep();
+    if (picked !== goal) {
+      setGoal(picked);
+      setSpaces([...GOAL_SPACES[picked]]);
+      setTravelCity(null);
+    }
+    const next = goalFlow(picked);
+    setStep(next[next.indexOf("goal") + 1]);
+  };
+
+  const pickCity = (city: SampleCityId | null) => {
+    setTravelCity(city);
+    advance();
+  };
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
@@ -164,19 +191,12 @@ export default function OnboardingScreen() {
     completeOnboarding();
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
-  const toggleSpace = (name: string) =>
+  const toggleInterest = (interest: Interest) =>
     setSpaces((current) =>
-      current.includes(name)
-        ? current.filter((value) => value !== name)
-        : [...current, name],
+      current.includes(interest)
+        ? current.filter((value) => value !== interest)
+        : [...current, interest],
     );
-
-  const toggleInterest = (interest: Interest) => {
-    if (interest === TRAVEL_INTEREST && interests.includes(interest)) {
-      setTravelCity(null);
-    }
-    setSpaces((current) => spacesAfterInterestToggle(current, interest));
-  };
 
   const finish = () => {
     if (process.env.EXPO_OS === "ios") {
@@ -184,7 +204,7 @@ export default function OnboardingScreen() {
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(spaces, pickedCity),
+      onboardingCompletedProperties(spaces, pickedCity, goal),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -192,9 +212,12 @@ export default function OnboardingScreen() {
     completeOnboarding();
   };
 
-  const practiceSample = practiceShareSample(interests, pickedCity);
+  const practiceSample =
+    goal === null || planKind === null
+      ? practiceShareSample(interests, null)
+      : goalShareSample(goal, pickedCity);
   const paywall = useOnboardingPaywall({
-    onPro: teaser ? () => setStep("tripReveal") : finish,
+    onPro: finish,
     onDecline: () => {
       dropPracticeShare();
       finish();
@@ -212,7 +235,7 @@ export default function OnboardingScreen() {
   }
 
   const progress = PROGRESS[step];
-  const previous = previousOnboardingStep(step);
+  const previous = previousOnboardingStep(step, flow);
   const goBack =
     paywall.asked || previous === null ? null : () => setStep(previous);
 
@@ -260,6 +283,20 @@ export default function OnboardingScreen() {
             viewedPages={viewedOpenerPages}
           />
         </View>
+      ) : step === "goal" || step === "city" ? (
+        <View
+          style={[
+            styles.content,
+            styles.scroll,
+            { paddingBottom: insets.bottom },
+          ]}
+        >
+          {step === "goal" || goal === null || goal === "other" ? (
+            <GoalStep goal={goal} onPick={pickGoal} />
+          ) : (
+            <CityStep goal={goal} city={travelCity} onPick={pickCity} />
+          )}
+        </View>
       ) : step === "interests" ? (
         <View
           style={[
@@ -270,11 +307,7 @@ export default function OnboardingScreen() {
         >
           <InterestsStep
             picked={interests}
-            vibes={vibes}
-            city={travelCity}
             onToggle={toggleInterest}
-            onToggleVibe={toggleSpace}
-            onPickCity={setTravelCity}
             onAdvance={advance}
           />
         </View>
@@ -292,6 +325,7 @@ export default function OnboardingScreen() {
         >
           {step === "share" && (
             <SharePracticeStep
+              title={SHARE_TITLES[goal ?? "other"]}
               sample={practiceSample}
               leaving={paywall.asked}
               onFinish={advance}
@@ -300,8 +334,12 @@ export default function OnboardingScreen() {
 
           {step === "promise" && (
             <PromiseStep
+              goal={goal ?? "other"}
               leaving={paywall.asked}
-              onCommit={teaser ? advance : paywall.ask}
+              onCommit={() => {
+                recordCurrentStep();
+                paywall.ask();
+              }}
             />
           )}
 
@@ -309,19 +347,8 @@ export default function OnboardingScreen() {
             <TripBuildStep trip={trip} onDone={advance} />
           )}
 
-          {step === "tripLocked" && (
-            <TripLockedStep
-              trip={trip}
-              leaving={paywall.asked}
-              onUnlock={() => {
-                recordCurrentStep();
-                paywall.ask();
-              }}
-            />
-          )}
-
           {step === "tripReveal" && (
-            <TripRevealStep trip={trip} onContinue={finish} />
+            <TripRevealStep trip={trip} onContinue={advance} />
           )}
         </ScrollView>
       )}

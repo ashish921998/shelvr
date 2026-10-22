@@ -20,17 +20,22 @@ export async function startFreshOnboarding({
 
 export async function walkToSharePractice(
   screen: Screen,
-  topic: "AI & tech" | "Travel" = "AI & tech",
+  goal: "Something else" | "Travel ideas" = "Something else",
 ): Promise<void> {
   await tapUntilVisible(
     screen.getByRole("button", "Start yours"),
-    screen.getByText("What are you into?"),
+    screen.getByText("What do you save?"),
     { waitMs: 5_000, timeout: 60_000 },
   );
-  await screen.getByRole("checkbox", new RegExp(`^${topic}`)).tap();
-  const next = screen.getByRole("button", "Continue");
-  await expect(next).toBeEnabled({ timeout: 10_000 });
-  await next.tap();
+  await screen.getByRole("button", new RegExp(`^${goal}`)).tap();
+  if (goal === "Travel ideas") {
+    await screen.getByRole("button", "Not sure yet").tap({ timeout: 30_000 });
+  } else {
+    await screen.getByRole("checkbox", /^AI & tech/).tap({ timeout: 30_000 });
+    const next = screen.getByRole("button", "Continue");
+    await expect(next).toBeEnabled({ timeout: 10_000 });
+    await next.tap();
+  }
   await expect(screen.getByRole("button", SHARE_LATER)).toBeVisible({
     timeout: 30_000,
   });
