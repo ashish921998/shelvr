@@ -149,6 +149,8 @@ test("without the flag the report claims no other gate", () => {
 });
 
 const { dir: repo, commit, remove } = createRepo("fingerprint-trailer-");
+after(() => remove());
+
 commit("base");
 commit(
   [
@@ -173,8 +175,6 @@ commit(
     "Co-Authored-By: Someone <someone@example.com>",
   ].join("\n"),
 );
-
-after(() => remove());
 
 test("prose and subjects that repeat the line do not acknowledge", () => {
   assert.deepEqual(acknowledgementValues(repo, "HEAD~3..HEAD~1"), []);

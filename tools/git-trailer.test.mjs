@@ -5,11 +5,10 @@ import { trailerValues } from "./git-trailer.mjs";
 import { createRepo } from "./temp-repo.mjs";
 
 const { dir: repo, git, commit, remove } = createRepo("git-trailer-");
+after(() => remove());
 
 commit("root");
 const root = git("rev-parse", "HEAD").trim();
-
-after(() => remove());
 
 test("a value containing a comma stays one value", () => {
   commit(

@@ -9,21 +9,27 @@ import { createRepo } from "./temp-repo.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const victim = createRepo("temp-repo-victim-");
-victim.commit("root");
-const worktree = `${victim.dir}-worktree`;
-victim.git("worktree", "add", "--quiet", "-b", "other", worktree);
+let worktree;
 after(() => {
   victim.remove();
-  rmSync(worktree, { recursive: true, force: true });
+  if (worktree) rmSync(worktree, { recursive: true, force: true });
 });
+
+victim.commit("root");
+worktree = `${victim.dir}-worktree`;
+victim.git("worktree", "add", "--quiet", "-b", "other", worktree);
 
 test("GIT_DIR from a hook cannot redirect the temp repository", () => {
   const helper = new URL("./temp-repo.mjs", import.meta.url).href;
   const script = `
     import { createRepo } from ${JSON.stringify(helper)};
     const inner = createRepo("temp-repo-inner-");
-    inner.commit("inside");
-    console.log(inner.dir);
+    try {
+      inner.commit("inside");
+      console.log(inner.dir);
+    } finally {
+      inner.remove();
+    }
   `;
   const result = spawnSync(
     process.execPath,
@@ -37,7 +43,6 @@ test("GIT_DIR from a hook cannot redirect the temp repository", () => {
     },
   );
   assert.equal(result.status, 0, result.stderr);
-  rmSync(result.stdout.trim(), { recursive: true, force: true });
 
   assert.equal(victim.git("rev-list", "--all", "--count").trim(), "1");
   assert.equal(victim.git("config", "--get", "core.bare").trim(), "false");

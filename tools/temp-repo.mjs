@@ -20,12 +20,18 @@ export function createRepo(prefix) {
   }
 
   const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const remove = () => rmSync(dir, { recursive: true, force: true });
   const git = (...args) =>
     execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" });
-  git("init", "--quiet", "--initial-branch=main");
-  git("config", "user.email", "test@example.com");
-  git("config", "user.name", "Test");
-  git("config", "commit.gpgsign", "false");
+  try {
+    git("init", "--quiet", "--initial-branch=main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "Test");
+    git("config", "commit.gpgsign", "false");
+  } catch (error) {
+    remove();
+    throw error;
+  }
 
   const commit = (message, files = {}) => {
     for (const [file, source] of Object.entries(files)) {
@@ -40,6 +46,6 @@ export function createRepo(prefix) {
     dir,
     git,
     commit,
-    remove: () => rmSync(dir, { recursive: true, force: true }),
+    remove,
   };
 }

@@ -441,6 +441,18 @@ test("the branch's own trailer acknowledges its own change", () => {
   assert.match(result.stdout, /Acknowledged/);
 });
 
+test("a trailer on a commit main gained after the fork acknowledges nothing", () => {
+  git("checkout", "--quiet", "-b", "pr", "main");
+  commit("refactor: drop deleteItem", { [path("items")]: withoutDelete });
+  git("checkout", "--quiet", "-b", "moved", "main");
+  commit("chore: elsewhere\n\nConvex-Api: changed");
+  git("checkout", "--quiet", "-b", "synthetic", "moved");
+  git("merge", "--quiet", "--no-ff", "-m", "Merge pr into moved", "pr");
+  git("checkout", "--quiet", "main");
+  const result = check("moved", "synthetic");
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+});
+
 test("refs with no common history are refused, not compared", () => {
   const result = check("main", "elsewhere");
   assert.notEqual(result.status, 0);
