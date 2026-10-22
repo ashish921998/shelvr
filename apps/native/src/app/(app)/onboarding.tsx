@@ -122,7 +122,9 @@ export default function OnboardingScreen() {
       : null,
   );
   const [goal, setGoal] = useState<Goal | null>(initialProgress.goal);
-  const [eveningAfter, setEveningAfter] = useState<EveningAfter>("walk");
+  const [eveningAfter, setEveningAfter] = useState<EveningAfter>(
+    initialProgress.eveningAfter ?? "walk",
+  );
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
@@ -145,9 +147,10 @@ export default function OnboardingScreen() {
       spaces,
       travelCity,
       goal,
+      eveningAfter,
       step: stepIndex,
     });
-  }, [spaces, travelCity, goal, stepIndex]);
+  }, [spaces, travelCity, goal, eveningAfter, stepIndex]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;

@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import { isGoal, type Goal } from "@/lib/onboarding-goals";
 import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
+import { isEveningAfter, type EveningAfter } from "@/lib/sample-trip";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
@@ -25,12 +26,14 @@ type PendingRecord = {
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
   goal?: Goal | null;
+  eveningAfter?: EveningAfter | null;
 };
 
 type OnboardingProgress = {
   spaces: string[];
   travelCity: SampleCityId | null;
   goal: Goal | null;
+  eveningAfter: EveningAfter | null;
   step: number | null;
 };
 
@@ -97,6 +100,9 @@ function readPendingRecord(): PendingRecord | null {
       spaceNames: readSpaceNames(record.spaceNames),
       travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
       goal: isGoal(record.goal) ? record.goal : null,
+      eveningAfter: isEveningAfter(record.eveningAfter)
+        ? record.eveningAfter
+        : null,
     };
   } catch {
     return null;
@@ -225,12 +231,19 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { spaces: [], travelCity: null, goal: null, step: null };
+    return {
+      spaces: [],
+      travelCity: null,
+      goal: null,
+      eveningAfter: null,
+      step: null,
+    };
   }
   return {
     spaces: record.spaces,
     travelCity: record.travelCity ?? null,
     goal: record.goal ?? null,
+    eveningAfter: record.eveningAfter ?? null,
     step: record.step,
   };
 }
@@ -239,6 +252,7 @@ export function setOnboardingProgress(progress: {
   spaces: string[];
   travelCity?: SampleCityId | null;
   goal?: Goal | null;
+  eveningAfter?: EveningAfter | null;
   step: number;
 }) {
   const existing = readPendingRecord();
@@ -254,6 +268,7 @@ export function setOnboardingProgress(progress: {
     spaceNames: existing?.spaceNames ?? {},
     travelCity: progress.travelCity ?? null,
     goal: progress.goal ?? null,
+    eveningAfter: progress.eveningAfter ?? null,
   });
   notifyChanged();
 }

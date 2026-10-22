@@ -282,6 +282,9 @@ export function sampleRows(trip: SampleTrip): SampleRow[] {
 export const EVENING_AFTER = ["walk", "drinks", "dessert"] as const;
 export type EveningAfter = (typeof EVENING_AFTER)[number];
 
+export const isEveningAfter = (value: unknown): value is EveningAfter =>
+  EVENING_AFTER.some((after) => after === value);
+
 /** A date night cut to dinner and the one stop picked for after it; other plans pass through. */
 export function eveningWith(trip: SampleTrip, after: EveningAfter): SampleTrip {
   if (trip.kind !== "date") return trip;

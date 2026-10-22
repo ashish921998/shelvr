@@ -58,7 +58,30 @@ describe("onboarding recovery", () => {
       step: 2,
       travelCity: null,
       goal: null,
+      eveningAfter: null,
     });
+  });
+});
+
+describe("the date night's after-dinner pick", () => {
+  it("is kept with the progress through a relaunch", () => {
+    setOnboardingProgress({
+      spaces: ["Date nights"],
+      step: 5,
+      goal: "date",
+      eveningAfter: "dessert",
+    });
+    expect(getOnboardingProgress().eveningAfter).toBe("dessert");
+  });
+
+  it("reads back as none when the stored pick is not one of the chips", () => {
+    setOnboardingProgress({ spaces: [], step: 5, eveningAfter: "drinks" });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({ ...stored, eveningAfter: "karaoke" }),
+    );
+    expect(getOnboardingProgress().eveningAfter).toBeNull();
   });
 });
 
@@ -134,7 +157,13 @@ describe("a first save queued before sign-in", () => {
 });
 
 describe("progress written by an older onboarding flow", () => {
-  const fresh = { spaces: [], step: null, travelCity: null, goal: null };
+  const fresh = {
+    spaces: [],
+    step: null,
+    travelCity: null,
+    goal: null,
+    eveningAfter: null,
+  };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
     "restarts a record at old step %i with fresh progress",
@@ -197,6 +226,7 @@ describe("progress written by an older onboarding flow", () => {
       step: 2,
       travelCity: null,
       goal: null,
+      eveningAfter: null,
     });
   });
 
@@ -217,6 +247,7 @@ describe("progress written by an older onboarding flow", () => {
       step: 0,
       travelCity: null,
       goal: null,
+      eveningAfter: null,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
