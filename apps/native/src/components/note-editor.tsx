@@ -128,7 +128,11 @@ export function NoteEditor({ item }: { item: DetailItem }) {
   useEffect(() => () => void queue.flush(), [queue]);
 
   const shelvrTitle =
-    item.titleSource !== "user" && item.title ? item.title : undefined;
+    item.titleSource !== "user" &&
+    item.title &&
+    item.title.trim() !== draft.text.trim().split("\n")[0]?.trim()
+      ? item.title
+      : undefined;
 
   return (
     <View style={styles.editor}>

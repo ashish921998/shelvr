@@ -314,3 +314,18 @@ it("fades the hint when the note has no title yet", () => {
   expect(title.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
   expect(title.getAttribute("data-placeholder-color")).toBe("gray");
 });
+
+it("leaves the title empty when Shelvr's title only repeats the first line", () => {
+  render(
+    <NoteEditor
+      item={{
+        ...item,
+        title: "Call the landlord",
+        note: "Call the landlord\nabout the tap",
+      }}
+    />,
+  );
+  const title = screen.getByLabelText("item.noteTitleLabel");
+  expect(title.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
+  expect(title.getAttribute("data-placeholder-color")).toBe("gray");
+});
