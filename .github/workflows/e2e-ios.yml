@@ -395,7 +395,7 @@ jobs:
           # Each session keeps its runner's log under the daemon's state; the
           # path, flattened, keeps sessions apart.
           mkdir -p tools/e2e/.e2e/runner-logs
-          find "$HOME/.agent-device" "${TMPDIR:-/tmp}/agent-device" -name '*.log' ! -name daemon.log 2>/dev/null |
+          find "$HOME/.agent-device" "${TMPDIR:-/tmp}/agent-device" -name '*.xcresult' -prune -o -name '*.log' ! -name daemon.log -print 2>/dev/null |
             while read -r log; do cp "$log" "tools/e2e/.e2e/runner-logs/$(echo "${log#"$HOME"/}" | tr '/' '_')"; done || true
 
       - name: Upload the run
