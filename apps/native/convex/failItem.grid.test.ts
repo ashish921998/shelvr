@@ -6,6 +6,8 @@ import type { TestConvexForDataModel } from "convex-test";
 import { internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { PROCESSING_STALE_MS } from "./model/itemFields";
+import { failurePatch, type ItemPatch } from "./model/settlement";
+import recorded from "./testdata/settlement/failure-rows.json";
 import { newConvexTest } from "./test.setup";
 
 type T = TestConvexForDataModel<DataModel>;
@@ -50,6 +52,31 @@ function itemFields(
   };
 }
 
+const FIELDS = [
+  "status",
+  "failureReason",
+  "enrichment",
+  "title",
+  "description",
+  "content",
+  "processingRunId",
+] as const;
+
+function fieldsOf(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(FIELDS.map((key) => [key, row[key] ?? null]));
+}
+
+function patched(
+  item: Record<string, unknown>,
+  patch: ItemPatch,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...item, ...patch };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) delete next[key];
+  }
+  return next;
+}
+
 async function snapshotRow(
   t: T,
   itemId: Id<"items">,
@@ -69,13 +96,7 @@ async function snapshotRow(
     .map((job) => `${job.args[0].outcome}:${job.args[0].failureReason}`);
   return {
     ...(outcome !== undefined ? { outcome } : {}),
-    status: item.status,
-    failureReason: item.failureReason ?? null,
-    enrichment: item.enrichment ?? null,
-    title: item.title ?? null,
-    description: item.description ?? null,
-    content: item.content ?? null,
-    processingRunId: item.processingRunId ?? null,
+    ...fieldsOf(item),
     telemetry,
   };
 }
@@ -134,4 +155,26 @@ it("fails every grid scenario as recorded", async () => {
   await expect(`{\n${lines.join(",\n")}\n}\n`).toMatchFileSnapshot(
     "./testdata/settlement/failure-rows.json",
   );
+});
+
+it("replays every row a failing run writes through failurePatch", () => {
+  const rows: Record<string, Record<string, unknown>> = recorded;
+  const owner = "owner" as Id<"users">;
+  const replays = [
+    ...(Object.keys(BEFORES) as Before[]).flatMap((before) =>
+      REASONS.map(
+        (reason) =>
+          [`failItem/${before}/${reason}/own`, before, reason] as const,
+      ),
+    ),
+    ...(["fresh", "retried"] as const).map(
+      (before) => [`cron/${before}/stale`, before, "error"] as const,
+    ),
+  ];
+  for (const [id, before, reason] of replays) {
+    const seed = itemFields(before, owner, 0);
+    expect(fieldsOf(patched(seed, failurePatch(reason))), id).toEqual(
+      fieldsOf(rows[id]),
+    );
+  }
 });

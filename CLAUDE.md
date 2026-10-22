@@ -295,6 +295,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.
+  A run that fails writes `failurePatch(reason)` from the same module: only the status and
+  reason, so the save keeps what earlier runs gave it. `failItem` and the stale-processing
+  cron are its adapters, and `failItem.grid.test.ts` pins them against
+  `testdata/settlement/failure-rows.json`.
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
 (auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var, an AI Studio API key).

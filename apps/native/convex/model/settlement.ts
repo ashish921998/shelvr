@@ -8,6 +8,7 @@ import {
 import {
   articleMediaValidator,
   enrichmentValidator,
+  failureReasonValidator,
   intentValidator,
   postMediaValidator,
   recipeValidator,
@@ -188,4 +189,11 @@ export function completionPatch(
     }),
     ...embeddingPatch(item, run, aiAllowed),
   };
+}
+
+/** A failed run writes only how it ended; the save keeps what earlier runs gave it. */
+export function failurePatch(
+  reason: Infer<typeof failureReasonValidator>,
+): ItemPatch {
+  return { status: "failed", failureReason: reason };
 }

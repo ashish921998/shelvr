@@ -79,7 +79,7 @@ import {
 } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { buildSearchText } from "./model/searchText";
-import { completionPatch, runFields } from "./model/settlement";
+import { completionPatch, failurePatch, runFields } from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
@@ -2327,10 +2327,7 @@ export const failItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    await ctx.db.patch(args.itemId, {
-      status: "failed",
-      failureReason: args.reason,
-    });
+    await ctx.db.patch(args.itemId, failurePatch(args.reason));
     await scheduleProcessedTelemetry(ctx, item, {
       status: "failed",
       failureReason: args.reason,
@@ -2358,10 +2355,7 @@ export const failStaleProcessingItems = internalMutation({
       if (!isStaleProcessing(item, now)) {
         continue;
       }
-      await ctx.db.patch(item._id, {
-        status: "failed",
-        failureReason: "error",
-      });
+      await ctx.db.patch(item._id, failurePatch("error"));
       await scheduleProcessedTelemetry(ctx, item, {
         status: "failed",
         failureReason: "error",
