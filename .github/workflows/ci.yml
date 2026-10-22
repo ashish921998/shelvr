@@ -70,7 +70,11 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$'; then
+          # Captured before matching: a pipe into grep -q can fail git diff
+          # with SIGPIPE under pipefail, and a failed diff must fail the step
+          # rather than skip the audit.
+          changed_files=$(git diff --name-only "$BASE_SHA" HEAD)
+          if grep -qE '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$' <<< "$changed_files"; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
