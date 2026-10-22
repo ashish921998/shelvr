@@ -71,26 +71,34 @@ export default function SpaceScreen() {
         style: "destructive",
         onPress: async () => {
           router.back();
-          await deleteSpace({ id: space._id });
-          analytics.capture("space_deleted");
+          try {
+            await deleteSpace({ id: space._id });
+            analytics.capture("space_deleted");
+          } catch (error) {
+            analytics.captureError("space_delete_failed", error);
+            Alert.alert(t("errors.unexpectedTitle"), t("errors.connection"));
+          }
         },
       },
     ]);
   };
 
   const addAll = () => {
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
     acceptAllSuggestions({ spaceId: space._id })
       .then((count) => {
+        if (process.env.EXPO_OS === "ios") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         if (count > 0) {
           analytics.capture("space_suggestions_accepted", {
             suggestion_count: count,
           });
         }
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        analytics.captureError("space_accept_all_failed", error);
+        Alert.alert(t("spaces.addFailed"), t("errors.pleaseRetry"));
+      });
   };
 
   const suggestionCount = space.suggestions.length;

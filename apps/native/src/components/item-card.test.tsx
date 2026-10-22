@@ -449,6 +449,45 @@ it("reports a confirmed delete from the feed", async () => {
   );
 });
 
+it("says so when a confirmed delete fails", async () => {
+  vi.mocked(Alert.alert).mockClear();
+  vi.mocked(analytics.itemDeleted).mockClear();
+  mutate.mockRejectedValueOnce(new Error("offline"));
+  render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
+  labelledProps(Pressable, "Miso soup recipe").onAccessibilityAction?.({
+    nativeEvent: { actionName: "Delete" },
+  } as never);
+  const buttons = vi.mocked(Alert.alert).mock.calls[0]?.[2] ?? [];
+  buttons.find((button) => button.style === "destructive")?.onPress?.();
+  await waitFor(() =>
+    expect(Alert.alert).toHaveBeenLastCalledWith(
+      "Couldn't delete save",
+      expect.any(String),
+    ),
+  );
+  expect(analytics.itemDeleted).not.toHaveBeenCalled();
+});
+
+it("says so when dismissing a suggestion fails", async () => {
+  vi.mocked(Alert.alert).mockClear();
+  mutate.mockRejectedValueOnce(new Error("offline"));
+  render(
+    <ItemCard
+      item={{ ...base, title: "Miso soup recipe", suggested: true }}
+      source={{ from: "space", spaceId: "space-1" }}
+    />,
+  );
+  labelledProps(Pressable, "Miso soup recipe").onAccessibilityAction?.({
+    nativeEvent: { actionName: "Dismiss suggestion" },
+  } as never);
+  await waitFor(() =>
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Couldn't change space",
+      expect.any(String),
+    ),
+  );
+});
+
 describe("inside a space", () => {
   const inSpace = { from: "space", spaceId: "space-1" } as const;
 

@@ -587,11 +587,16 @@ function ItemScreenContent() {
     } else {
       router.back();
     }
-    const changed = await dismissSuggestion({
-      itemId: dismissedId,
-      spaceId: spaceId as Id<"spaces">,
-    });
-    if (changed) analytics.capture("suggestion_dismissed");
+    try {
+      const changed = await dismissSuggestion({
+        itemId: dismissedId,
+        spaceId: spaceId as Id<"spaces">,
+      });
+      if (changed) analytics.capture("suggestion_dismissed");
+    } catch (error) {
+      analytics.captureError("suggestion_dismiss_failed", error);
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    }
   }, [
     spaceId,
     activeId,
