@@ -609,6 +609,34 @@ describe("weekly shelf archive saves", () => {
     }
   });
 
+  it("offers the saves of a shelf that never reached a device again", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      for (let i = 0; i < 3; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+
+      const first = await prepare(t, START + 60 * DAY);
+      const firstId = first?._id;
+      if (firstId === undefined) throw new Error("expected a first shelf");
+      await t.run((ctx) =>
+        ctx.db.patch(firstId, {
+          deliveryStatus: "failed",
+          deliveryError: "no_devices",
+        }),
+      );
+      const second = await prepare(t, START + 67 * DAY);
+
+      expect(second?._id).not.toBe(firstId);
+      expect(second?.items.map((item) => item._id).sort()).toEqual(
+        first?.items.map((item) => item._id).sort(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("tells delivery when the shelf holds older saves", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
