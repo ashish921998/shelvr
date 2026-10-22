@@ -34,7 +34,7 @@ type Certificate = {
 };
 
 class AppleJwsError extends Error {
-  name = "AppleJwsError";
+  override name = "AppleJwsError";
 }
 
 function fail(reason: string): never {

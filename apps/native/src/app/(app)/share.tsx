@@ -242,7 +242,7 @@ export default function ShareScreen() {
 
   if (phase.kind === "locked") {
     return (
-      <PhaseSurface key="locked" phaseKey="locked">
+      <PhaseSurface key="locked">
         <Text style={styles.title(theme)}>{t("pro.unlockShelvr")}</Text>
         <Text style={styles.subtitle(theme)}>{t("share.proHelp")}</Text>
         <View style={styles.actions}>
@@ -306,7 +306,7 @@ export default function ShareScreen() {
         ? t("share.pending")
         : t("share.failureCount", { count: failed });
     return (
-      <PhaseSurface key="partial" phaseKey="partial">
+      <PhaseSurface key="partial">
         <Text style={styles.title(theme)}>
           {t("share.savedCount", { saved, total })}
         </Text>
@@ -498,14 +498,8 @@ type Theme = ReturnType<typeof useUnistyles>["theme"];
 
 /** Phase chrome with enter/exit transitions. The Reanimated drivers fire on
  * mount/unmount, so a phase change only animates if React remounts the
- * surface: callers must pass `key={phaseKey}` at each call site. */
-function PhaseSurface({
-  phaseKey,
-  children,
-}: {
-  phaseKey: string;
-  children: ReactNode;
-}) {
+ * surface: callers must pass a distinct `key` for each phase. */
+function PhaseSurface({ children }: { children: ReactNode }) {
   const reducedMotion = useReducedMotion();
 
   return (
@@ -532,7 +526,7 @@ function Centered({
   theme: Theme;
 }) {
   return (
-    <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
+    <PhaseSurface key={phaseKey}>
       {spinner ? <StitchRing size={22} /> : null}
       <Text style={styles.label(theme)}>{label}</Text>
     </PhaseSurface>
@@ -559,7 +553,7 @@ function ErrorActions({
   single?: boolean;
 }) {
   return (
-    <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
+    <PhaseSurface key={phaseKey}>
       <Text style={styles.title(theme)}>{title}</Text>
       <View style={styles.actions}>
         {single ||

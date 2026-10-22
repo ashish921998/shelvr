@@ -2,6 +2,10 @@
   "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
     "paths": {
       "@/*": ["./src/*"],
       "@convex/*": ["./convex/*"],

@@ -573,7 +573,7 @@ describe("processSession", () => {
 
   it("retries a failed entry and reports saved when the backend now returns the existing item", async () => {
     let attempts = 0;
-    const saveLink = vi.fn(async ({ operationId }) => {
+    const saveLink = vi.fn(async (_link: { operationId: string }) => {
       attempts += 1;
       if (attempts === 1) throw new Error("network blip");
       return "items:survived" as Id<"items">;
