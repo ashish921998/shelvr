@@ -9,6 +9,7 @@ import {
   globePin,
   globeRegion,
   globeSettled,
+  thinLand,
   tripCenter,
 } from "./trip-globe";
 import { REVEAL_TIMING } from "./trip-reveal";
@@ -184,6 +185,53 @@ describe("globePaths", () => {
     expect(globePaths(early, SCREEN, region).country).toBe("");
     expect(countryLight(landed.dive)).toBe(1);
     expect(globePaths(landed, SCREEN, region).country).toMatch(/^M/);
+  });
+});
+
+describe("thinLand", () => {
+  it("keeps each ring's ends, drops close points and rings too small to draw", () => {
+    const ring = [
+      [0, 0],
+      [0.2, 0],
+      [2, 0],
+      [2, 2],
+      [0.1, 2],
+      [0, 0],
+    ];
+    const speck = [
+      [5, 5],
+      [5.1, 5],
+      [5, 5.1],
+      [5, 5],
+    ];
+    const land = {
+      type: "FeatureCollection" as const,
+      features: [
+        {
+          type: "Feature" as const,
+          properties: {},
+          geometry: {
+            type: "MultiPolygon" as const,
+            coordinates: [[ring], [speck]],
+          },
+        },
+      ],
+    };
+    const thin = thinLand(land, 1);
+    expect(thin.geometry).toEqual({
+      type: "MultiPolygon",
+      coordinates: [
+        [
+          [
+            [0, 0],
+            [2, 0],
+            [2, 2],
+            [0.1, 2],
+            [0, 0],
+          ],
+        ],
+      ],
+    });
   });
 });
 

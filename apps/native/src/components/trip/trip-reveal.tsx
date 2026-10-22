@@ -29,6 +29,8 @@ import {
   Circle,
   Group,
   Path,
+  Skia,
+  type SkPath,
 } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -437,7 +439,10 @@ type GlobeFrame = {
   pin: Pin | null;
 };
 
-const SPIN_FRAME_MS = 1000 / 30;
+const SPIN_FRAME_MS = 1000 / 24;
+
+const toSkPath = (svg: string): SkPath | null =>
+  svg === "" ? null : Skia.Path.MakeFromSVGString(svg);
 
 const HIDDEN: GlobeFrame = {
   paths: { sphere: "", graticule: "", land: "", country: "" },
@@ -474,8 +479,12 @@ function Globe({
   const width = rt.screen.width;
   const height = rt.screen.height;
 
-  // Parsing the map takes a moment; do it while the saves lift off.
-  useEffect(warmGlobe, []);
+  // Parsing the map takes a moment; do it while the saves lift off. A tick
+  // later, so the cards' springs start first (this effect runs before theirs).
+  useEffect(() => {
+    const id = setTimeout(warmGlobe, 0);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     const aim = lng !== undefined && lat !== undefined ? { lng, lat } : null;
@@ -497,7 +506,7 @@ function Globe({
       const t = Date.now() - startedAt;
       const diveAt = dive.current?.at ?? null;
       // The spin can run for as long as the build takes, so it draws at
-      // 30fps to spare the JS thread; the short dive gets every frame.
+      // 24fps to spare the JS thread; the short dive gets every frame.
       if (diveAt === null && t - drawn < SPIN_FRAME_MS) {
         handle = requestAnimationFrame(tick);
         return;
@@ -527,7 +536,18 @@ function Globe({
 
   // The land, the glow, the dots and the name all draw from this one frame,
   // so a slow render holds them back together.
-  const { paths, light } = frame;
+  const { light } = frame;
+  // Parsed once each: the land and the sphere are drawn twice (fill, then
+  // edge), and a string would be parsed again for every <Path>.
+  const paths = useMemo(
+    () => ({
+      sphere: toSkPath(frame.paths.sphere),
+      graticule: toSkPath(frame.paths.graticule),
+      land: toSkPath(frame.paths.land),
+      country: toSkPath(frame.paths.country),
+    }),
+    [frame.paths],
+  );
   const pin = frame.pin ?? { ...landing, dive: 0 };
   return (
     <>
