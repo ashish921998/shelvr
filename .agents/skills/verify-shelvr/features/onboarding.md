@@ -18,17 +18,18 @@ out through the paywall and signs in after it.
 
 ## How to get to it (user POV)
 
-A fresh install, or a signed-out app with an empty keychain: launch and tap
-"Start yours". The tests relaunch with `-E2EHidePro YES` before "I'm in" so a
+A fresh install: launch and tap "Start yours". A development build launched
+with `-E2EFreshInstall YES` forgets its sign-in and onboarding state first
+(`src/lib/e2e-fresh-install.ts`). The tests relaunch with `-E2EHidePro YES` before "I'm in" so a
 development build shows the paywall (`src/lib/e2e-hide-pro.ts`).
 
 ## Driving it with e2e
 
 `tests/onboarding.e2e.ts`, no model, two tests, `retries: 0`. Helpers in
-`tests/fresh-onboarding.ts`: `startFreshOnboarding` closes the app and clears
-the keychain, `walkToFirstSave(screen, "Articles" | "Travel")`,
-`queueFirstSave`, `relaunchWith`. `afterEach` clears the keychain again, so
-the next test signs in from scratch. It does not use `startOnSeededHome`.
+`tests/fresh-onboarding.ts`: `startFreshOnboarding` relaunches with
+`-E2EFreshInstall YES`, `walkToFirstSave(screen, "Articles" | "Travel")`,
+`queueFirstSave`, `relaunchWith`. `afterEach` runs `startFreshOnboarding`
+again, so the next test starts signed out at the opener. It does not use `startOnSeededHome`.
 
 ## Proof
 
@@ -47,5 +48,8 @@ onboarding-travel|ios|skeptic|From a fresh install, pick Travel, queue the first
 
 - Each test can take several minutes (timeout 600 s): two cold launches
   through the dev client.
-- Clearing the keychain signs the dev user out; the next seeded test signs in
+- The fresh launch signs the dev user out; the next seeded test signs in
   again through `dev-login-button`.
+- Do not reset the simulator keychain (`device.clearKeychain()`) instead. It
+  restarts the test runner, which took one to three minutes on CI and timed
+  the flow out.

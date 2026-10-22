@@ -12,11 +12,20 @@ export async function startFreshOnboarding({
   device: Device;
   screen: Screen;
 }): Promise<void> {
-  await device.closeApp().catch(() => undefined);
-  await device.clearKeychain();
   const start = screen.getByRole("button", "Start yours");
-  await relaunchWith(device, screen, LAUNCH_ARGUMENTS, () => start.isVisible());
+  await relaunchWith(device, screen, FRESH_INSTALL_ARGUMENTS, () =>
+    start.isVisible(),
+  );
 }
+
+// The app forgets its sign-in and onboarding state on this launch
+// (src/lib/e2e-fresh-install.ts). Resetting the simulator keychain instead
+// restarts the test runner, which takes minutes on CI.
+const FRESH_INSTALL_ARGUMENTS = [
+  ...LAUNCH_ARGUMENTS,
+  "-E2EFreshInstall",
+  "YES",
+];
 
 export async function walkToFirstSave(
   screen: Screen,

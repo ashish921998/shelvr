@@ -54,8 +54,8 @@ nothing is started by hand. Before a run:
   sets `E2E_FIXTURE_RESET=backend`, which resets through
   `npx convex run devFixtures:resetAnonymousUsersForE2e` instead; that mutation
   refuses any backend but the local fake-model one, so leave it unset locally.
-  `tests/onboarding.e2e.ts` does not start on the seeded Home: it clears the
-  keychain and starts from "Start yours".
+  `tests/onboarding.e2e.ts` does not start on the seeded Home: it launches
+  with `-E2EFreshInstall YES` and starts from "Start yours".
 
 ## Doctor
 
