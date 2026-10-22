@@ -62,7 +62,7 @@ function ActionButton({
       <View style={styles.actionIcon}>
         <AppSymbolIcon
           name={icon}
-          size={40}
+          size={26}
           tintColor={theme.colors.foreground}
         />
       </View>
@@ -471,18 +471,23 @@ const styles = StyleSheet.create((theme) => ({
   },
   actions: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: theme.gap(2),
+    gap: theme.gap(1.25),
   },
   action: {
+    flex: 1,
     alignItems: "center",
     gap: theme.gap(0.75),
-    minWidth: 64,
   },
   actionIcon: {
-    padding: theme.gap(1),
+    alignSelf: "stretch",
+    height: 64,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   actionLabel: {
     fontFamily: theme.fonts.medium,
