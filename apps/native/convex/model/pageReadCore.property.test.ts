@@ -10,15 +10,25 @@ const markup = fc
   )
   .map((parts) => parts.join(""));
 
-const regexPair = (html: string) =>
-  html.replace(/<[^>]+>/g, "").replace(/</g, "");
+const text = fc.string().filter((value) => !/[<>]/.test(value));
+const tagBody = fc
+  .string({ minLength: 1 })
+  .filter((value) => !value.includes(">"));
 
 describe("stripTags", () => {
-  it("matches the pair of regexes it replaced", () => {
+  it("keeps the text between tags and drops every tag", () => {
     fc.assert(
-      fc.property(markup, (html) => {
-        expect(stripTags(html)).toBe(regexPair(html));
-      }),
+      fc.property(
+        fc.array(fc.tuple(text, tagBody), { maxLength: 8 }),
+        text,
+        (pieces, tail) => {
+          const html =
+            pieces.map(([before, body]) => `${before}<${body}>`).join("") +
+            tail;
+          const expected = pieces.map(([before]) => before).join("") + tail;
+          expect(stripTags(html)).toBe(expected);
+        },
+      ),
     );
   });
 
