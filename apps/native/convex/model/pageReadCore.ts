@@ -70,9 +70,20 @@ export function stripTags(html: string): string {
   }
 }
 
+// An attribute value runs to the quote that opened it, so "Sally's" keeps its apostrophe.
+const QUOTED_VALUE = `(?:"([^"]*)"|'([^']*)')`;
+
+function attributeValue(
+  match: RegExpMatchArray | null | undefined,
+): string | undefined {
+  return match ? (match[1] ?? match[2]) : undefined;
+}
+
 export function extractCanonical(html: string): string | undefined {
   const tag = html.match(/<link[^>]*rel\s*=\s*["']canonical["'][^>]*>/i)?.[0];
-  const href = tag?.match(/href\s*=\s*["']([^"']*)["']/i)?.[1]?.trim();
+  const href = attributeValue(
+    tag?.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i),
+  )?.trim();
   return href ? decodeEntities(href) : undefined;
 }
 
@@ -83,19 +94,17 @@ export function extractMetaContent(
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const patterns = [
     new RegExp(
-      `<meta[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*["']([^"']*)["'][^>]*>`,
+      `<meta[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*${QUOTED_VALUE}[^>]*>`,
       "i",
     ),
     new RegExp(
-      `<meta[^>]*content\\s*=\\s*["']([^"']*)["'][^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
+      `<meta[^>]*content\\s*=\\s*${QUOTED_VALUE}[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
       "i",
     ),
   ];
   for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match && match[1].trim() !== "") {
-      return decodeEntities(match[1].trim());
-    }
+    const value = attributeValue(html.match(pattern))?.trim();
+    if (value) return decodeEntities(value);
   }
   return undefined;
 }
