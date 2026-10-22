@@ -14,10 +14,10 @@ description: Check that deleting a Shelvr account leaves nothing of the person i
 ## Run it
 
 ```bash
-cd apps/native && pnpm exec vitest run convex/accountDeletion.test.ts convex/notificationDelivery.test.ts convex/saveReminders.test.ts
+cd apps/native && pnpm exec vitest run convex/accountDeletion.test.ts convex/notificationDelivery.test.ts convex/notifications.test.ts convex/saveReminders.test.ts
 ```
 
-The two delivery files hold the unit tests the claim checks below name. `accountDeletion.test.ts` runs in the Node environment, not `edge-runtime` like most Convex tests, because it reads source files. It never needs a simulator, a deployment or a secret.
+`notificationDelivery.test.ts` and `saveReminders.test.ts` hold the unit tests the claim checks below name; `notifications.test.ts` exercises `prepareWeeklyDigest` with a live owner. `accountDeletion.test.ts` runs in the Node environment, not `edge-runtime` like most Convex tests, because it reads source files. It never needs a simulator, a deployment or a secret.
 
 Run it after any change under `apps/native/convex/`. CI runs it too, but CI cannot tell whether the reasons recorded in the policy tables still describe the code: `UNOWNED_TABLES`, `RETAINED_ROWS` and `ONE_ROW_PER_ACCOUNT` at the top of the test file, `RECIPES` further down. When a change touches the deletion drain (`users.ts`, `planShares.ts`), `schema.ts`, `model/auth.ts`, the notification writers and claims, or the Apple token and refund-consent retention, reread them.
 
