@@ -1,0 +1,3 @@
+# The gate CI runs on every push. The dependency audit is left out: it needs
+# the network, and a new advisory is not this change's fault.
+pnpm run check:code

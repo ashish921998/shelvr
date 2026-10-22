@@ -115,11 +115,15 @@ use `expo lint`, which silently skips the `convex/` backend.
 4. Run the narrowest relevant check, then run `pnpm run check` before finishing.
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
-The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
-the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
-same steps, except that it audits a pull request only when it changes a
-`package.json`, the lockfile or `pnpm-workspace.yaml`; `audit.yml` runs the
-audit daily, and a failed run there is the alert for a new advisory. Knip's
+`pnpm run check` is `check:code` (lint, typecheck, codegen and agent-docs drift,
+tooling tests, coverage thresholds, Knip, Syncpack) followed by the dependency
+audit (`pnpm run audit`, blocks on high/critical). CI runs the `check:code`
+steps on every push and the pre-push hook runs `check:code` before a push
+leaves the machine; `pnpm --filter <app> check` runs it too, so no narrower
+script passes where the gate would fail. The audit is left out of both: CI
+audits a pull request only when it changes a `package.json`, the lockfile or
+`pnpm-workspace.yaml`, and `audit.yml` runs it daily, where a failed run is the
+alert for a new advisory. Knip's
 Convex entries are the top-level `convex/*.ts` modules and their co-located
 tests; every other file under `convex/` is a project file whose exports are
 reported as unused unless another module imports them. The Convex CLI registers

@@ -1,7 +1,3 @@
-# Staged-file formatting only (Prettier via lint-staged). The full check
-# (typecheck, coverage, knip)
-# runs in CI on every push — duplicating it here added minutes per commit
-# without extra safety. The dependency audit runs in CI when a pull request
-# changes dependencies, and daily in audit.yml; it is network-bound, so it
-# could fail offline.
+# Staged-file formatting only (Prettier via lint-staged). The gate runs in
+# .husky/pre-push, once per push instead of once per commit.
 pnpm exec lint-staged

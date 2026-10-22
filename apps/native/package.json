@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "check": "pnpm --workspace-root run check:code"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.39",

@@ -94,7 +94,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 
 ## Before submitting
 
-- Run `pnpm --filter native-app check` and test the signed production build on a physical iPhone.
+- Run `pnpm run check` and test the signed production build on a physical iPhone.
 - Confirm `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_REVENUECAT_IOS_KEY` exist in the EAS production environment.
 - Confirm the production Convex deployment has working Apple/Google OAuth, AI, and RevenueCat webhook configuration.
 - Confirm the Monthly and Annual subscriptions are attached to the submission, available in every intended territory, and render localized prices and renewal periods in the paywall.
