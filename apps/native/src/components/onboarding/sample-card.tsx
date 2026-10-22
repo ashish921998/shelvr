@@ -1,6 +1,7 @@
 import { t } from "@/lib/i18n";
 import type { DemoKind, DemoSample } from "@/lib/onboarding-demo";
 import type { Interest } from "@/lib/onboarding-interests";
+import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
@@ -13,8 +14,7 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
   Videos: require("../../../assets/onboarding/topic-talk.jpg"),
 };
-// Each topic's picture. The topic photos are from Unsplash, under its free
-// licence.
+// The topic photos are from Unsplash, under its free licence.
 const INTEREST_IMAGES: Record<Interest, number> = {
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
   "Food & recipes": require("../../../assets/onboarding/demo-recipe.jpg"),
@@ -27,6 +27,8 @@ const INTEREST_IMAGES: Record<Interest, number> = {
 };
 
 export function sampleImage(sample: DemoSample): number {
+  // A picked city's travel sample shows that city.
+  if (sample.city !== undefined) return CITY_PICTURES[sample.city].view;
   return sample.interest === undefined
     ? SAMPLE_IMAGES[sample.kind]
     : INTEREST_IMAGES[sample.interest];

@@ -1,9 +1,3 @@
-// The answers to "What are you into?". Each picked topic becomes a starter
-// space, and its sample leads the first-save picker, so the first thing a
-// person saves is about something they chose and lands in a space named for it.
-// The ids double as space identities and stay stable; labels are translated.
-// A few broad topics, one per thing people save, so the list fits one screen.
-// Travel comes first so it sits in the first row of chips.
 export const INTERESTS = [
   "Travel",
   "Food & recipes",
@@ -20,10 +14,6 @@ export function isInterest(value: string): value is Interest {
   return INTERESTS.some((interest) => interest === value);
 }
 
-// Real pages, checked with readPage to return a title and readable text.
-// pageHeading and domain are the page's own text and stay untranslated.
-// A topic whose subject has a setup kind with a sample (Travel, Recipes,
-// Products) names that kind and uses its sample, so the page is defined once.
 type InterestPage =
   | { url: string; pageHeading: string; domain: string }
   | { sampleOf: "Travel" | "Recipes" | "Products" };

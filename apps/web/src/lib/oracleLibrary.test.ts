@@ -56,6 +56,13 @@ describe("parseLibraryExport", () => {
     expect(rows[0].title).toBe("Cacio e Pepe & Friends");
   });
 
+  it("keeps only the text of a bookmark title, however its tags nest", () => {
+    const rows = parseLibraryExport(
+      `<DL><DT><A HREF="https://example.com/a">Fish <B>&amp; <I>chips</I></B> <<b>script>x</A></DL>`,
+    );
+    expect(rows[0].title).toBe("Fish & chips script>x");
+  });
+
   it("reads an Instagram saved_posts.json export", () => {
     const rows = parseLibraryExport(instagramJson);
     const stats = libraryStats(rows);

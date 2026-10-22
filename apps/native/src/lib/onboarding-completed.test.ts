@@ -21,7 +21,6 @@ describe("onboardingCompletedProperties", () => {
       interests: ["Travel", "AI & tech"],
       travel_vibes: ["Good food", "Date nights"],
       space_count: 6,
-      // Vibes are preset identities, so they are named; only "Prague" is typed.
       space_names: [
         "Travel",
         "Good food",
@@ -30,6 +29,7 @@ describe("onboardingCompletedProperties", () => {
         "Read later",
       ],
       custom_space_count: 1,
+      sample_city: null,
       $set: { save_pileup: [], save_types: ["Travel"] },
     });
   });
@@ -42,5 +42,11 @@ describe("onboardingCompletedProperties", () => {
       space_names: [],
       custom_space_count: 0,
     });
+  });
+
+  it("names the sample trip's city when one was picked", () => {
+    expect(
+      onboardingCompletedProperties(["Travel"], ["Travel"], "tokyo"),
+    ).toMatchObject({ sample_city: "tokyo" });
   });
 });

@@ -51,6 +51,7 @@ const SF_TO_MATERIAL = {
   "chevron.left": "arrow_back",
   "chevron.right": "arrow_forward",
   "chevron.up": "expand_less",
+  "chevron.up.chevron.down": "unfold_more",
   "arrow.uturn.backward": "undo",
   "house.fill": "home",
   gearshape: "settings",
@@ -65,10 +66,9 @@ const SF_TO_MATERIAL = {
   "arrow.up": "arrow_upward",
   "doc.text": "description",
   "fork.knife": "restaurant",
+  mappin: "location_on",
   lock: "lock",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
-  // The onboarding opener's drawn phone: a video's rail, a share sheet's
-  // apps, and the icon tiles of a travel space.
   "heart.fill": "favorite",
   "bubble.right.fill": "chat_bubble",
   "square.and.arrow.up.fill": "ios_share",

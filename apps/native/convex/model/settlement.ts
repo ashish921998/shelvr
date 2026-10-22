@@ -32,7 +32,7 @@ const LEAVE_FOR_EMBEDDING_SWEEP = {
   embeddingAttempts: undefined,
 };
 
-/** A key set to `undefined` removes that field from the row. */
+/** A key set to `undefined` removes that field from the row, hence the `??` fallbacks and conditional spreads. */
 export function completionPatch(
   item: Doc<"items">,
   args: FinalizeValues,
@@ -75,6 +75,7 @@ export function completionPatch(
       note: item.note,
       content: args.content,
     }),
+    // Convex rejects a wrong-width vector at write time, which would fail this whole transaction.
     ...(aiAllowed &&
     args.embedding !== undefined &&
     isValidEmbedding(args.embedding)

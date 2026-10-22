@@ -3,11 +3,16 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
-import { showTripTeaser } from "@/lib/sample-trip";
+import type { SampleCityId } from "@/lib/sample-cities";
+import { isSampleCity, sampleTrip, showTripTeaser } from "@/lib/sample-trip";
 import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
-import { isTravelVibe, spacesAfterInterestToggle } from "@/lib/travel-vibes";
+import {
+  isTravelVibe,
+  spacesAfterInterestToggle,
+  VIBES_INTEREST,
+} from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -112,6 +117,11 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
+  const [travelCity, setTravelCity] = useState<SampleCityId | null>(() =>
+    isSampleCity(initialProgress.travelCity)
+      ? initialProgress.travelCity
+      : null,
+  );
   const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
@@ -130,20 +140,27 @@ export default function OnboardingScreen() {
   }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
-  // Mutated in place by the opener; the state only keeps one set per mount.
   const [viewedOpenerPages] = useState(() => new Set<number>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const interests = spaces.filter(isInterest);
-  // So are the kinds of spots picked under Travel; they leave with it.
   const vibes = spaces.filter(isTravelVibe);
-  // People who save travel see a sample trip build and lock before the paywall.
   const teaser = showTripTeaser(kinds, interests);
+  // The city is asked under the Travel topic, so it counts only while that is
+  // picked; Travel as a kind of save alone gets the default city.
+  const pickedCity = interests.includes(VIBES_INTEREST) ? travelCity : null;
+  const trip = sampleTrip(pickedCity);
 
   useEffect(() => {
-    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
-  }, [kinds, spaces, stepIndex, saved]);
+    setOnboardingProgress({
+      saveKinds: kinds,
+      spaces,
+      travelCity,
+      step: stepIndex,
+      saved,
+    });
+  }, [kinds, spaces, travelCity, stepIndex, saved]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -200,8 +217,13 @@ export default function OnboardingScreen() {
         : [...current, name],
     );
 
-  const toggleInterest = (interest: Interest) =>
+  const toggleInterest = (interest: Interest) => {
+    // The city leaves with Travel, as its kinds of spots do.
+    if (interest === VIBES_INTEREST && interests.includes(interest)) {
+      setTravelCity(null);
+    }
     setSpaces((current) => spacesAfterInterestToggle(current, interest));
+  };
 
   const addSpace = (name: string) =>
     setSpaces((current) =>
@@ -214,7 +236,7 @@ export default function OnboardingScreen() {
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(kinds, spaces),
+      onboardingCompletedProperties(kinds, spaces, pickedCity),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -225,9 +247,9 @@ export default function OnboardingScreen() {
   const practiceSample = practiceShareSample(
     kinds,
     getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
+    pickedCity,
   );
   const paywall = useOnboardingPaywall({
-    // A purchase opens the sample trip; with no trip, onboarding is done.
     onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
       dropPracticeShare(practiceSample?.url);
@@ -294,10 +316,7 @@ export default function OnboardingScreen() {
           ]}
         >
           <OpenerStep
-            // On iOS, a live text-size change can leave native text
-            // measurements stale (react-native#57512), so the expected
-            // onLayout updates never arrive. Remounting forces fresh
-            // measurement.
+            // iOS: a live text-size change leaves native text measurements stale (react-native#57512); remounting re-measures.
             key={fontScale}
             onStart={advance}
             onSignIn={() => setShowSignIn(true)}
@@ -305,8 +324,6 @@ export default function OnboardingScreen() {
           />
         </View>
       ) : step === "interests" ? (
-        // Also a static frame: the step scrolls its picks and pins Continue,
-        // so the travel card opening never pushes it off screen.
         <View
           style={[
             styles.content,
@@ -317,8 +334,10 @@ export default function OnboardingScreen() {
           <InterestsStep
             picked={interests}
             vibes={vibes}
+            city={travelCity}
             onToggle={toggleInterest}
             onToggleVibe={toggleSpace}
+            onPickCity={setTravelCity}
             onAdvance={advance}
           />
         </View>
@@ -347,7 +366,7 @@ export default function OnboardingScreen() {
 
           {step === "demo" && (
             <LiveDemoStep
-              samples={orderDemoSamples(kinds, interests)}
+              samples={orderDemoSamples(kinds, interests, pickedCity)}
               titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
               resume={resumeDemo}
@@ -382,10 +401,13 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripBuild" && <TripBuildStep onDone={advance} />}
+          {step === "tripBuild" && (
+            <TripBuildStep trip={trip} onDone={advance} />
+          )}
 
           {step === "tripLocked" && (
             <TripLockedStep
+              trip={trip}
               leaving={paywall.asked}
               onUnlock={() => {
                 recordCurrentStep();
@@ -394,7 +416,9 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === "tripReveal" && <TripRevealStep onContinue={finish} />}
+          {step === "tripReveal" && (
+            <TripRevealStep trip={trip} onContinue={finish} />
+          )}
         </ScrollView>
       )}
     </View>

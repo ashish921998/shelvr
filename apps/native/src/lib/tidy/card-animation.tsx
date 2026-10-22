@@ -186,7 +186,6 @@ export const CardAnimationProvider: FC<Props> = ({
             }),
           );
         }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       handleDecision,
       singleHapticOnChange,
@@ -196,6 +195,14 @@ export const CardAnimationProvider: FC<Props> = ({
       height,
       panDistanceX,
       panDistanceY,
+      panX,
+      panY,
+      startX,
+      startY,
+      absoluteYAnchor,
+      animatedIndex,
+      currentIndex,
+      isDragging,
     ],
   );
 
@@ -207,8 +214,7 @@ export const CardAnimationProvider: FC<Props> = ({
       panDistanceX,
       panDistanceY,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panDistanceX, panDistanceY],
+    [panX, panY, absoluteYAnchor, panDistanceX, panDistanceY],
   );
 
   return (

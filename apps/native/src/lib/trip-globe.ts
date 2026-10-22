@@ -1,7 +1,3 @@
-// Trip Reveal's globe: a real world map, drawn as seen from space. It spins
-// while the trip is built, then turns to the trip's city and zooms in until
-// the city's country fills the screen. Pure, so every frame can be tested;
-// the reveal draws the paths it returns with Skia.
 import {
   geoBounds,
   geoContains,
@@ -19,17 +15,14 @@ import { REVEAL_TIMING } from "./trip-reveal";
 
 export type GlobeTarget = { lng: number; lat: number };
 
-/** Where the globe is turned to, how big it is, and where its centre sits. */
 type GlobeCamera = {
   rotate: [number, number];
   scale: number;
   x: number;
   y: number;
-  /** How far the dive into the city has gone, 0 to 1. */
   dive: number;
 };
 
-/** The countries drawn once the globe is close, and the one to light up. */
 export type GlobeRegion = {
   center: GlobeTarget;
   nearby: FeatureCollection;
@@ -44,20 +37,14 @@ export type GlobePaths = {
 };
 
 const RADIUS = 230;
-/** The radius once landed: about a country's width across the screen. */
 const LANDED_RADIUS = 2600;
-/** Above this the detailed map may take over from the coarse one. */
 const DETAIL_RADIUS = 700;
-/** Degrees round the target the detailed map covers. */
 const NEARBY = 25;
 const DEGREES = 180 / Math.PI;
-/** Degrees a second while the trip is built. */
 const SPIN = 20;
-/** Tipped so the northern hemisphere, where most trips go, faces the screen. */
 const TILT = -28;
 const RISE_MS = 1100;
 export const GLOBE_DIVE_MS = 1100;
-/** About 1°, in radians. */
 const NEAR_COAST = Math.PI / 180;
 const EMPTY: GlobePaths = { sphere: "", graticule: "", land: "", country: "" };
 const GRATICULE = geoGraticule10();
@@ -65,11 +52,9 @@ const GRATICULE = geoGraticule10();
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 const lerp = (from: number, to: number, share: number) =>
   from + (to - from) * share;
-// The camera moves like the Maps fly-to: slow out, fast across, slow in.
 const easeInOut = (k: number) =>
   k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 const easeOut = (k: number) => 1 - Math.pow(1 - k, 4);
-/** `to`, moved by whole turns so it is at most 180° from `from`. */
 const nearestTurn = (from: number, to: number) =>
   from + ((((to - from) % 360) + 540) % 360) - 180;
 
@@ -90,8 +75,6 @@ function loadWorld() {
   return world;
 }
 
-/** The middle of a trip's stops, which the globe dives into. Null when no
- * stop has a pin. The median, so one far-off stop cannot pull it away. */
 export function tripCenter(
   days: readonly { stops: readonly { lat?: number; lng?: number }[] }[] = [],
 ): GlobeTarget | null {
@@ -109,8 +92,6 @@ export function tripCenter(
       ? sorted[middle]
       : (sorted[middle - 1] + sorted[middle]) / 2;
   };
-  // Stops either side of ±180° are moved next to the first, so their middle
-  // is not on the far side of the globe.
   const lng = median(pins.map((pin) => nearestTurn(pins[0].lng, pin.lng)));
   return {
     lng: ((((lng + 180) % 360) + 360) % 360) - 180,
@@ -118,18 +99,13 @@ export function tripCenter(
   };
 }
 
-/** The spin's longitude `t` ms into the reveal. */
 const spinAt = (t: number) => (SPIN * t) / 1000;
 
-/** The point the dive lands on: the target, or with no pins whatever faces
- * the screen when the dive starts. */
 export function diveTarget(target: GlobeTarget | null, diveAt: number) {
   return target ?? { lng: -spinAt(diveAt), lat: -TILT };
 }
 
-/** The camera `t` ms into the reveal. The globe rises with the dots, spins
- * while the trip is built and, from `diveAt`, turns to the target and zooms
- * in until the target sits on the landing point, the screen's centre. */
+/** The camera `t` ms into the reveal; `diveAt` is when the dive starts, or null while the globe still spins. */
 export function globeCamera({
   t,
   diveAt,
@@ -171,19 +147,16 @@ export function globeCamera({
   };
 }
 
-/** The countries near the target, and the one it is in, for the close-up. */
 export function globeRegion(target: GlobeTarget): GlobeRegion {
   const { countries, bounds } = loadWorld();
   const point: [number, number] = [target.lng, target.lat];
-  // Every point within NEARBY degrees: meridians close in towards the poles,
-  // so the box is wider in longitude the further north or south it reaches.
   const edge = Math.min(89, Math.abs(target.lat) + NEARBY) / DEGREES;
   const span = Math.min(180, NEARBY / Math.cos(edge));
   const near = ([[west, south], [east, north]]: number[][]) => {
     if (north < target.lat - NEARBY || south > target.lat + NEARBY) {
       return false;
     }
-    // A box across the antimeridian has its west edge east of its east edge.
+    // geoBounds gives a box across the antimeridian a west edge east of its east edge.
     if (west > east || span === 180) return true;
     return [-360, 0, 360].some(
       (turn) =>
@@ -202,9 +175,7 @@ export function globeRegion(target: GlobeTarget): GlobeRegion {
   };
 }
 
-/** The simplified map loses estuaries, so a coastal city like Lisbon can
- * fall just outside its country: take the one with a border point within
- * about 1° instead, and none out at sea. */
+// The simplified map loses estuaries, so a coastal city can fall just outside its country.
 function coastalCountry(point: [number, number]): Feature | null {
   const { countries, bounds } = loadWorld();
   let best: Feature | null = null;
@@ -230,19 +201,15 @@ function coastalCountry(point: [number, number]): Feature | null {
   return best;
 }
 
-/** How lit the target's country is, 0 to 1, as the dive closes in. */
 export const countryLight = (dive: number) => clamp((dive - 0.5) / 0.4);
 
-/** Whether the detailed map covers everything on screen. It holds only
- * countries near the target, so while the camera is still turning towards
- * it, the coarse map has to stay or land would vanish. */
+/** True when the detailed map, which holds only countries near the target, covers everything on screen. */
 export function closeUp(
   camera: GlobeCamera,
   screen: { width: number; height: number },
   region: GlobeRegion,
 ) {
   if (camera.scale <= DETAIL_RADIUS) return false;
-  // The farthest corner from the globe's centre, in degrees of arc.
   const reach = Math.hypot(
     screen.width / 2 + Math.abs(camera.x - screen.width / 2),
     screen.height / 2 + Math.abs(camera.y - screen.height / 2),
@@ -254,8 +221,7 @@ export function closeUp(
   return off + view < NEARBY;
 }
 
-/** SVG paths for one frame, clipped to the screen. Empty strings while the
- * globe is still below the screen, and for no country. */
+/** SVG paths for one frame, clipped to the screen; empty strings when there is nothing to draw. */
 export function globePaths(
   camera: GlobeCamera,
   screen: { width: number; height: number },
@@ -271,7 +237,6 @@ export function globePaths(
       [-8, -8],
       [screen.width + 8, screen.height + 8],
     ])
-    // Coarser while the whole globe is in view: it is small, and spinning.
     .precision(camera.scale > DETAIL_RADIUS ? 0.5 : 1);
   const path = geoPath(projection);
   const close = region !== null && closeUp(camera, screen, region);
@@ -286,9 +251,7 @@ export function globePaths(
   };
 }
 
-/** Where the target sits on screen this frame. The dots, the glow and the
- * city's name follow it. While the target is on the far side it is held on
- * the globe's edge, where it will come round, so nothing jumps as it does. */
+/** Where the target sits on screen; held on the globe's edge while it is on the far side. */
 export function globePin(
   camera: GlobeCamera,
   target: GlobeTarget,
@@ -305,7 +268,6 @@ export function globePin(
     return { x, y };
   }
   const away = Math.hypot(x - camera.x, y - camera.y);
-  // Exactly behind the centre: no direction to lean, so the top edge.
   if (away < 1e-6) return { x: camera.x, y: camera.y - camera.scale };
   return {
     x: camera.x + ((x - camera.x) / away) * camera.scale,
@@ -313,9 +275,7 @@ export function globePin(
   };
 }
 
-/** Parses the map ahead of its first frame, so that frame does not stall. */
 export const warmGlobe = () => void loadWorld();
 
-/** Whether the globe has stopped moving, so frames can stop. */
 export const globeSettled = (t: number, diveAt: number | null) =>
   diveAt !== null && t >= diveAt + GLOBE_DIVE_MS;

@@ -51,12 +51,6 @@ async function requireDevelopmentAnonymousUser(
   }
 }
 
-/**
- * Replace the signed-in anonymous developer's app data with a deterministic
- * fixture library. Auth rows are deliberately preserved so the caller remains
- * signed in. The environment and provider checks keep this mutation unusable
- * by production or OAuth accounts.
- */
 export const resetCurrentUser = mutation({
   args: {},
   returns: resetResultValidator,
@@ -67,21 +61,8 @@ export const resetCurrentUser = mutation({
   },
 });
 
-/** How many anonymous accounts one backend reset may touch. A run makes a
- * handful (the warm-up sign-in, the seeded user, onboarding's fresh ones). */
 const BACKEND_RESET_ACCOUNTS = 25;
 
-/**
- * The e2e job's fixture reset, run from the CLI
- * (`convex run devFixtures:resetAnonymousUsersForE2e`) instead of through
- * Settings, which cost each flow about 50 seconds of taps and a relaunch.
- * The runner does not know which anonymous account the app is signed in as,
- * so every live anonymous account gets the fixtures. It runs only where the
- * fake model's locks all hold (a loopback backend URL, dev sign-in, the
- * placeholder key and the switch): the e2e job's local backend, or a local
- * one set up the same way, never a shared deployment. Returns how many
- * accounts were reset.
- */
 export const resetAnonymousUsersForE2e = internalMutation({
   args: {},
   returns: v.number(),
@@ -189,8 +170,6 @@ async function seedFixtures(
     url: "https://example.com/recipes/weeknight-miso-ramen",
     siteName: "Example Kitchen",
     tags: ["recipes", "dinner"],
-    // The page loaded but had no extractable article, so the detail
-    // screen shows the plain-link layout (site panel and button).
     enrichment: "no_article",
     intents: [
       {
@@ -236,8 +215,6 @@ async function seedFixtures(
     url: "https://example.com/design/value-of-craft",
     siteName: "Example Journal",
     tags: ["design", "reading"],
-    // A readable article body + hero so this fixture exercises the
-    // ArticleReaderView path (paragraphs split on blank lines).
     heroImageUrl: "https://picsum.photos/seed/value-of-craft/1200/630",
     aspectRatio: 1.91,
     content: [
@@ -307,13 +284,6 @@ async function seedFixtures(
   return { items: 4, spaces: 3, memberships: 4 };
 }
 
-/**
- * Pins a trip on a development deployment that has no Apple Maps key: sets
- * where each named stop is, as `trips.makeTrip` would have, and lays the trip
- * out again from those points. Internal, so it is run from the CLI
- * (`convex run devFixtures:locateTripStops`), with the fixture reset's guards
- * on the trip's owner. Returns how many stops got a point.
- */
 export const locateTripStops = internalMutation({
   args: {
     spaceId: v.id("spaces"),

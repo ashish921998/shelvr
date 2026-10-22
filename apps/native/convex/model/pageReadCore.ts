@@ -57,6 +57,19 @@ export function decodeEntities(text: string): string {
     .replace(/&amp;/g, "&");
 }
 
+export function stripTags(html: string): string {
+  let text = "";
+  let from = 0;
+  for (;;) {
+    const open = html.indexOf("<", from);
+    if (open === -1) return text + html.slice(from);
+    text += html.slice(from, open);
+    const close = html.indexOf(">", open + 1);
+    if (close === -1) return text + html.slice(open).replaceAll("<", "");
+    from = close > open + 1 ? close + 1 : open + 1;
+  }
+}
+
 export function extractCanonical(html: string): string | undefined {
   const tag = html.match(/<link[^>]*rel\s*=\s*["']canonical["'][^>]*>/i)?.[0];
   const href = tag?.match(/href\s*=\s*["']([^"']*)["']/i)?.[1]?.trim();

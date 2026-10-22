@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -54,12 +54,17 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   const clock = useSharedValue(0);
   const reducedProgress = useSharedValue(0);
 
+  const onFinishRef = useRef(onFinish);
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  });
+
   useEffect(() => {
     let finished = false;
     const finish = () => {
       if (finished) return;
       finished = true;
-      onFinish?.();
+      onFinishRef.current?.();
     };
 
     if (reducedMotion) {
@@ -95,8 +100,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
       clearTimeout(fallbackTimer);
       cancelAnimation(clock);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reducedMotion]);
+  }, [reducedMotion, clock, reducedProgress]);
 
   const rowStyle = useAnimatedStyle(() => ({
     opacity: reducedMotion ? reducedProgress.get() : 1,

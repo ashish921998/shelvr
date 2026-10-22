@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
-// The veiled stops draw the trip's locked rows with Skia and blur them as one
-// picture. Nothing is drawn until the block has a width and its fonts; then
-// every row's text and badge land where the open rows would put them.
 import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sampleRows } from "@/lib/sample-trip";
+import { sampleRows, sampleTrip } from "@/lib/sample-trip";
 import { VeiledStops } from "./veiled-stops";
 
 type Style = { height?: number } | undefined;
@@ -139,8 +136,7 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => "en",
 }));
 
-// What the locked card veils: everything after day one's header and first stop.
-const LOCKED = sampleRows().slice(2);
+const LOCKED = sampleRows(sampleTrip("prague")).slice(2);
 
 beforeEach(() => {
   mock.fontsReady = true;
@@ -172,9 +168,8 @@ describe("VeiledStops", () => {
   });
 
   it("is as tall as the open rows it stands in for", () => {
-    // Four stops of 44 and one day header of 64.
     render(<VeiledStops rows={LOCKED} />);
-    expect(screen.getByTestId("block").dataset.height).toBe("240");
+    expect(screen.getByTestId("block").dataset.height).toBe("372");
   });
 
   it("blurs every row as one picture", () => {
@@ -191,17 +186,21 @@ describe("VeiledStops", () => {
     render(<VeiledStops rows={LOCKED} />);
     measure(340);
     for (const name of [
-      "Café Louvre",
+      "Grand Café Orient",
       "Charles Bridge",
+      "Lokál Dlouhááá",
       "Prague Castle",
+      "Café Savoy",
       "Petřín Lookout Tower",
+      "Terasa U Zlaté studně",
     ]) {
       expect(word(name)).toBeTruthy();
     }
     expect(screen.getAllByText("trip.slotMorning")).toHaveLength(1);
+    expect(screen.getAllByText("trip.slotLunch")).toHaveLength(2);
     expect(screen.getAllByText("trip.slotAfternoon")).toHaveLength(2);
-    expect(screen.getAllByText("trip.slotEvening")).toHaveLength(1);
-    for (const number of ["2", "3", "4", "5"]) {
+    expect(screen.getAllByText("trip.slotDinner")).toHaveLength(2);
+    for (const number of ["2", "3", "4", "5", "6", "7", "8"]) {
       expect(word(number)).toBeTruthy();
     }
   });
@@ -210,8 +209,8 @@ describe("VeiledStops", () => {
     render(<VeiledStops rows={LOCKED} />);
     measure(340);
     expect(word('trip.dayTab:{"day":"2"}'.toLocaleUpperCase())).toBeTruthy();
-    expect(word("tripTeaser.dayTwoTitle")).toBeTruthy();
-    expect(word('tripTeaser.placeCount:{"count":2}')).toBeTruthy();
+    expect(word("tripTeaser.pragueDayTwo")).toBeTruthy();
+    expect(word('tripTeaser.placeCount:{"count":4}')).toBeTruthy();
   });
 
   it("draws a divider above every row", () => {
@@ -220,8 +219,8 @@ describe("VeiledStops", () => {
     const tops = screen
       .getAllByTestId("divider")
       .map((divider) => num(divider, "y"));
-    // Stop 44, stop 44, day header 64, stop 44, stop 44.
-    expect(tops).toEqual([0, 44, 88, 152, 196]);
+    // Three stops of 44, a day header of 64, then four more stops.
+    expect(tops).toEqual([0, 44, 88, 132, 196, 240, 284, 328]);
   });
 
   it("colors each stop's badge as its day's pins", () => {
@@ -230,38 +229,36 @@ describe("VeiledStops", () => {
     const colors = screen
       .getAllByTestId("badge")
       .map((badge) => badge.dataset.color);
-    expect(colors).toEqual(["#amber", "#amber", "#dark", "#dark"]);
+    expect(colors).toEqual([
+      ...Array<string>(3).fill("#amber"),
+      ...Array<string>(4).fill("#dark"),
+    ]);
     expect(word("2").dataset.color).toBe("#onamber");
-    expect(word("4").dataset.color).toBe("#ondark");
+    expect(word("5").dataset.color).toBe("#ondark");
   });
 
   it("puts each badge at the right edge and centers its number on it", () => {
     render(<VeiledStops rows={LOCKED} />);
     measure(340);
     const [first] = screen.getAllByTestId("badge");
-    // 16 of padding and half of the 22 wide badge from the right edge, and
-    // the middle of a 44 high row under its 1 high divider.
     expect(num(first, "cx")).toBe(313);
     expect(num(first, "cy")).toBeCloseTo(22.5);
-    // The open row's pin shows a disc of 18 inside a 2 wide ring.
     expect(num(first, "r")).toBe(9);
-    // The number is one 7 wide character, centered on the badge.
     expect(num(word("2"), "x")).toBeCloseTo(313 - 3.5);
   });
 
   it("sets a stop's name on its row's middle, after the time of day", () => {
     render(<VeiledStops rows={LOCKED} />);
     measure(340);
-    const name = word("Café Louvre");
+    const name = word("Grand Café Orient");
     expect(num(name, "x")).toBe(16 + 84 + 12);
-    // A 16 high glyph sits 0.34 of its size above its baseline.
     expect(num(name, "y")).toBeCloseTo(22.5 + 16 * 0.34);
   });
 
   it("right-aligns a day's count to the edge", () => {
     render(<VeiledStops rows={LOCKED} />);
     measure(340);
-    const text = 'tripTeaser.placeCount:{"count":2}';
+    const text = 'tripTeaser.placeCount:{"count":4}';
     expect(num(word(text), "x")).toBe(340 - 16 - text.length * 7);
   });
 

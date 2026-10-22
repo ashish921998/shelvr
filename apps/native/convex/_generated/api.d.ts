@@ -72,6 +72,7 @@ import type * as model_readers_pinterest from "../model/readers/pinterest.js";
 import type * as model_readers_tiktok from "../model/readers/tiktok.js";
 import type * as model_readers_x from "../model/readers/x.js";
 import type * as model_readers_youtube from "../model/readers/youtube.js";
+import type * as model_recallAge from "../model/recallAge.js";
 import type * as model_recipeMarkup from "../model/recipeMarkup.js";
 import type * as model_resend from "../model/resend.js";
 import type * as model_retentionMessaging from "../model/retentionMessaging.js";
@@ -176,6 +177,7 @@ declare const fullApi: ApiFromModules<{
   "model/readers/tiktok": typeof model_readers_tiktok;
   "model/readers/x": typeof model_readers_x;
   "model/readers/youtube": typeof model_readers_youtube;
+  "model/recallAge": typeof model_recallAge;
   "model/recipeMarkup": typeof model_recipeMarkup;
   "model/resend": typeof model_resend;
   "model/retentionMessaging": typeof model_retentionMessaging;

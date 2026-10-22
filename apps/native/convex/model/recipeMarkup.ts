@@ -57,7 +57,7 @@ function collectRecipeNodes(root: unknown): JsonObject[] {
 function parseJsonLd(text: string): unknown {
   const stripped = text
     .replace(/^\s*<!--/, "")
-    .replace(/-->\s*$/, "")
+    .replace(/--!?>\s*$/, "")
     .replace(/^\s*\/\/\s*<!\[CDATA\[/, "")
     .replace(/\/\/\s*\]\]>\s*$/, "")
     .trim();

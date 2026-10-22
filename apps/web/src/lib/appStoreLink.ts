@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { appStoreUrl, arrivalCampaign } from "@/lib/appStore";
 import { bioAppStoreUrl } from "@/lib/bioLink";
+import { useBrowserValue } from "@/lib/browserValue";
 import { sharePageUrl, shareRef } from "@/lib/shareRef";
 
 type AppStoreLinkSource =
@@ -16,16 +15,20 @@ type AppStoreLinkSource =
   | "plan"
   | "bio";
 
+export function useArrivalCampaign(fallback: string) {
+  return useBrowserValue(
+    () => arrivalCampaign(window.location.search) ?? fallback,
+    fallback,
+  );
+}
+
 export function useAppStoreLink(
   source: AppStoreLinkSource,
   shareToken?: string,
 ) {
-  const fallback = source === "share" ? "share" : `web_${source}`;
-  const [campaign, setCampaign] = useState(fallback);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCampaign(arrivalCampaign(window.location.search) ?? fallback);
-  }, [fallback]);
+  const campaign = useArrivalCampaign(
+    source === "share" ? "share" : `web_${source}`,
+  );
 
   const onClick = () => {
     if (!shareToken) {

@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
-// The sample trip card: open it shows every day and stop; locked it shows the
-// first stop and hands the rest to the blurred stops, hidden from screen
-// readers, behind a lock.
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { SampleRow } from "@/lib/sample-trip";
+import { sampleTrip, type SampleRow } from "@/lib/sample-trip";
 import { SampleTripCard } from "./trip-teaser-card";
 
 type ViewProps = {
@@ -72,43 +69,44 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => "en",
 }));
 
-const STOPS = [
-  "Old Town Square",
-  "Café Louvre",
-  "Charles Bridge",
-  "Prague Castle",
-  "Petřín Lookout Tower",
-];
+const TRIP = sampleTrip("prague");
+const STOPS = TRIP.days.flatMap((day) => day.stops.map((stop) => stop.name));
 const veiledAncestor = (element: HTMLElement) =>
   element.closest('[data-hidden="true"]');
 
 describe("SampleTripCard open", () => {
-  it("shows both days and all five stops, none of them hidden", () => {
-    render(<SampleTripCard locked={false} />);
+  it("shows both days and all eight stops, none of them hidden", () => {
+    render(<SampleTripCard trip={TRIP} locked={false} />);
     for (const name of STOPS) {
       expect(veiledAncestor(screen.getByText(name))).toBeNull();
     }
     expect(screen.getByText('trip.dayTab:{"day":"1"}')).toBeTruthy();
     expect(screen.getByText('trip.dayTab:{"day":"2"}')).toBeTruthy();
-    expect(screen.getByText("tripTeaser.dayOneTitle")).toBeTruthy();
-    expect(screen.getByText("tripTeaser.dayTwoTitle")).toBeTruthy();
+    expect(screen.getByText("tripTeaser.pragueDayOne")).toBeTruthy();
+    expect(screen.getByText("tripTeaser.pragueDayTwo")).toBeTruthy();
   });
 
   it("counts the places in each day", () => {
-    render(<SampleTripCard locked={false} />);
-    expect(screen.getByText('tripTeaser.placeCount:{"count":3}')).toBeTruthy();
-    expect(screen.getByText('tripTeaser.placeCount:{"count":2}')).toBeTruthy();
+    render(<SampleTripCard trip={TRIP} locked={false} />);
+    expect(
+      screen.getAllByText('tripTeaser.placeCount:{"count":4}'),
+    ).toHaveLength(2);
   });
 
   it("labels each stop with its time of day", () => {
-    render(<SampleTripCard locked={false} />);
-    expect(screen.getAllByText("trip.slotMorning")).toHaveLength(2);
-    expect(screen.getAllByText("trip.slotAfternoon")).toHaveLength(2);
-    expect(screen.getAllByText("trip.slotEvening")).toHaveLength(1);
+    render(<SampleTripCard trip={TRIP} locked={false} />);
+    for (const slot of [
+      "trip.slotMorning",
+      "trip.slotLunch",
+      "trip.slotAfternoon",
+      "trip.slotDinner",
+    ]) {
+      expect(screen.getAllByText(slot)).toHaveLength(2);
+    }
   });
 
-  it("numbers the pins 1 to 5, the first day apart from the second", () => {
-    render(<SampleTripCard locked={false} />);
+  it("numbers the pins 1 to 8, the first day apart from the second", () => {
+    render(<SampleTripCard trip={TRIP} locked={false} />);
     const pins = screen.getAllByTestId("pin");
     expect(pins.map((pin) => pin.textContent)).toEqual([
       "1",
@@ -116,18 +114,24 @@ describe("SampleTripCard open", () => {
       "3",
       "4",
       "5",
+      "6",
+      "7",
+      "8",
     ]);
     expect(pins.map((pin) => pin.dataset.day)).toEqual([
       "0",
       "0",
       "0",
+      "0",
+      "1",
+      "1",
       "1",
       "1",
     ]);
   });
 
   it("says it is a sample, shows the taller map and has no lock or blur", () => {
-    render(<SampleTripCard locked={false} />);
+    render(<SampleTripCard trip={TRIP} locked={false} />);
     expect(screen.getByText("tripTeaser.sampleBadge")).toBeTruthy();
     expect(screen.getByTestId("map").dataset.top).toBe("10");
     expect(screen.queryByLabelText("tripTeaser.lockedLabel")).toBeNull();
@@ -137,7 +141,7 @@ describe("SampleTripCard open", () => {
 
 describe("SampleTripCard locked", () => {
   it("shows the first stop clearly", () => {
-    render(<SampleTripCard locked />);
+    render(<SampleTripCard trip={TRIP} locked />);
     expect(veiledAncestor(screen.getByText("Old Town Square"))).toBeNull();
     expect(screen.getByText('trip.dayTab:{"day":"1"}')).toBeTruthy();
     expect(
@@ -146,40 +150,38 @@ describe("SampleTripCard locked", () => {
   });
 
   it("hands every other stop and the second day to the blurred stops", () => {
-    render(<SampleTripCard locked />);
+    render(<SampleTripCard trip={TRIP} locked />);
     const rows = Array.from(screen.getByTestId("veiled").children);
     expect(rows.map((row) => row.textContent)).toEqual([
-      "Café Louvre",
-      "Charles Bridge",
+      ...STOPS.slice(1, 4),
       "day 1",
-      "Prague Castle",
-      "Petřín Lookout Tower",
+      ...STOPS.slice(4),
     ]);
   });
 
   it("hides the blurred stops from screen readers on both platforms", () => {
-    render(<SampleTripCard locked />);
+    render(<SampleTripCard trip={TRIP} locked />);
     const hidden = veiledAncestor(screen.getByTestId("veiled"));
     expect(hidden).not.toBeNull();
     expect(hidden?.getAttribute("data-android-hidden")).toBe("true");
   });
 
   it("draws only the clear stop as a pin, the rest are drawn blurred", () => {
-    render(<SampleTripCard locked />);
+    render(<SampleTripCard trip={TRIP} locked />);
     expect(screen.getAllByTestId("pin").map((pin) => pin.textContent)).toEqual([
       "1",
     ]);
   });
 
   it("puts one labelled lock outside the hidden rows", () => {
-    render(<SampleTripCard locked />);
+    render(<SampleTripCard trip={TRIP} locked />);
     const lock = screen.getByLabelText("tripTeaser.lockedLabel");
     expect(veiledAncestor(lock)).toBeNull();
     expect(screen.getAllByTestId("icon-lock")).toHaveLength(1);
   });
 
   it("shows the shorter map", () => {
-    render(<SampleTripCard locked />);
+    render(<SampleTripCard trip={TRIP} locked />);
     expect(screen.getByTestId("map").dataset.top).toBe("28");
   });
 });
