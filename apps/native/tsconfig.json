@@ -5,6 +5,7 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedParameters": true,
     "paths": {
       "@/*": ["./src/*"],
