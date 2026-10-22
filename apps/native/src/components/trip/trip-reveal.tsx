@@ -17,6 +17,7 @@ import {
   tripCenter,
 } from "@/lib/trip-globe";
 import {
+  REVEAL_LIFT,
   REVEAL_TIMING,
   revealCovers,
   revealLayout,
@@ -262,7 +263,7 @@ function Card({
     if (stage === "lift") {
       opacity.value = withDelay(delay, withTiming(1, fade(200)));
       x.value = withDelay(delay, withSpring(card.dx, SPRING.lift));
-      y.value = withDelay(delay, withSpring(-36, SPRING.lift));
+      y.value = withDelay(delay, withSpring(-REVEAL_LIFT, SPRING.lift));
       rotate.value = withDelay(delay, withSpring(card.rotate, SPRING.lift));
       scale.value = withDelay(delay, withSpring(0.92, SPRING.lift));
     } else if (stage === "dots") {

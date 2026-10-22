@@ -1,6 +1,10 @@
+import { cityKey } from "@convex/model/trip";
+
 const FRAME = { width: 390, height: 844 };
 
 export const REVEAL_COVERS = 6;
+
+export const REVEAL_LIFT = 36;
 
 export const REVEAL_TIMING = {
   dots: 1500,
@@ -20,9 +24,6 @@ type RevealSave = {
 };
 
 export type RevealCover = { id: string; title: string; imageUrl: string };
-
-const cityKey = (value: string) =>
-  value.replace(/\s+/g, " ").trim().toLowerCase();
 
 export function revealCovers(
   items: readonly RevealSave[],
@@ -94,7 +95,10 @@ export function revealLayout(
   const sy = height / FRAME.height;
   const cardWidth = (width - 24) / 2;
   const gridTop = 228 * sy;
-  const cardHeight = Math.min(cardWidth * 1.15, (height - gridTop + 36) / 3);
+  const cardHeight = Math.min(
+    cardWidth * 1.15,
+    (height - gridTop + REVEAL_LIFT) / 3,
+  );
   const used = CARDS.slice(0, covers);
   const cards = used.map((card, index) => {
     const left = 12 + (index % 2) * cardWidth;

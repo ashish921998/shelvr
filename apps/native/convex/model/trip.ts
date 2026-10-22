@@ -22,6 +22,14 @@ export function tripPlaceCap(days: number): number {
   return STOPS_PER_DAY.packed * Math.max(days, 5);
 }
 
+export function tidyCity(city: string): string {
+  return city.replace(/\s+/g, " ").trim();
+}
+
+export function cityKey(city: string): string {
+  return tidyCity(city).toLowerCase();
+}
+
 export const TRIP_SLOTS = [
   "morning",
   "lunch",
