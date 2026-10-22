@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemDetail, type DetailItem } from "./item-detail";
+import { DeleteActiveSaveContext } from "@/lib/delete-active-save";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { PostMediaButton } from "@/components/post-media-button";
 import { Link } from "expo-router";
@@ -278,6 +279,26 @@ describe("a plain link's page", () => {
         "errors.retrySoon",
       ),
     );
+  });
+
+  it("offers to delete a page that is gone instead of sending people to it", () => {
+    const deleteSave = vi.fn();
+    render(
+      <DeleteActiveSaveContext value={deleteSave}>
+        <ItemDetail
+          item={{ ...product, status: "failed", failureReason: "not_found" }}
+          isZoomTarget={false}
+          pageHeight={844}
+          reserveFooter={false}
+        />
+      </DeleteActiveSaveContext>,
+    );
+    expect(screen.getByText("item.pageGone")).toBeTruthy();
+    expect(screen.queryByText("common.tryAgain")).toBeNull();
+    expect(screen.queryByText(/item\.(view|watch)OnSite/)).toBeNull();
+    expect(ItemSourceLink).toHaveBeenCalled();
+    fireEvent.click(screen.getByText("common.delete"));
+    expect(deleteSave).toHaveBeenCalledOnce();
   });
 
   it("keeps the retry for a page that read only partly", () => {

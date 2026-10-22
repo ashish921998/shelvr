@@ -16,6 +16,7 @@ import { SimilarGrid } from "@/components/similar-grid";
 import { TagChip } from "@/components/tag-chip";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
+import { DeleteActiveSaveContext } from "@/lib/delete-active-save";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
 import { withoutSourceLink } from "@/lib/source-link";
@@ -34,6 +35,7 @@ import type { FunctionReturnType } from "convex/server";
 import {
   memo,
   type ReactNode,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -475,6 +477,8 @@ function ItemPageBody({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const gone =
+    item.status === "failed" && isTerminalFailure(item.failureReason);
   if (item.type === "note") {
     return (
       <View style={styles.body}>
@@ -495,7 +499,7 @@ function ItemPageBody({
         <ItemSpaces itemId={item._id} spaces={spaces} centered />
       ) : null}
 
-      {item.url && plainLink(item, social) ? (
+      {item.url && plainLink(item, social) && !gone ? (
         <View style={styles.siteActions}>
           <SiteButton item={item} />
           <IntentsRow item={item} intents={intents} />
@@ -738,6 +742,7 @@ function SaveStatusNotice({
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
+  const deleteSave = useContext(DeleteActiveSaveContext);
   const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
   const [retrying, setRetrying] = useState(false);
   // The React Compiler flags impure calls such as Date.now() in the render body.
@@ -782,7 +787,29 @@ function SaveStatusNotice({
       >
         {noticeFor(state, item.type)}
       </Text>
-      {isTerminalFailure(item.failureReason) ? null : (
+      {isTerminalFailure(item.failureReason) ? (
+        deleteSave ? (
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.chip,
+              styles.deleteChip,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={deleteSave}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          >
+            <AppSymbolIcon
+              name="trash"
+              size={12}
+              tintColor={theme.colors.danger}
+            />
+            <Text style={[styles.chipLabel, styles.deleteChipLabel]}>
+              {t("common.delete")}
+            </Text>
+          </Pressable>
+        ) : null
+      ) : (
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
@@ -986,5 +1013,11 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.primaryText,
+  },
+  deleteChip: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  deleteChipLabel: {
+    color: theme.colors.danger,
   },
 }));

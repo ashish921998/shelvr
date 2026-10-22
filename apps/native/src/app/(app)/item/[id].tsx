@@ -5,6 +5,7 @@ import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ItemDetail, type DetailItem } from "@/components/item-detail";
+import { DeleteActiveSaveContext } from "@/lib/delete-active-save";
 import { ItemHeader } from "@/components/item-header";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
@@ -764,22 +765,24 @@ function ItemScreenContent() {
         </Stack.Toolbar>
       ) : null}
 
-      <FlashList
-        ref={listRef}
-        style={styles.container}
-        onLayout={onListLayout}
-        data={items}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={pagerKey}
-        initialScrollIndex={startIndex >= 0 ? startIndex : 0}
-        renderItem={renderItem}
-        onViewableItemsChanged={onViewable}
-        viewabilityConfig={VIEWABILITY_CONFIG}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={2}
-      />
+      <DeleteActiveSaveContext value={onDelete}>
+        <FlashList
+          ref={listRef}
+          style={styles.container}
+          onLayout={onListLayout}
+          data={items}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={pagerKey}
+          initialScrollIndex={startIndex >= 0 ? startIndex : 0}
+          renderItem={renderItem}
+          onViewableItemsChanged={onViewable}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={2}
+        />
+      </DeleteActiveSaveContext>
 
       <PagerHeaderBackdrop onMedia={media.onMedia} />
 
