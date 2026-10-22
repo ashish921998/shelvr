@@ -85,6 +85,7 @@ import type * as model_saveSource from "../model/saveSource.js";
 import type * as model_searchText from "../model/searchText.js";
 import type * as model_secureCompare from "../model/secureCompare.js";
 import type * as model_settlement from "../model/settlement.js";
+import type * as model_similarity from "../model/similarity.js";
 import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
@@ -190,6 +191,7 @@ declare const fullApi: ApiFromModules<{
   "model/searchText": typeof model_searchText;
   "model/secureCompare": typeof model_secureCompare;
   "model/settlement": typeof model_settlement;
+  "model/similarity": typeof model_similarity;
   "model/spaceName": typeof model_spaceName;
   "model/storage": typeof model_storage;
   "model/storedImage": typeof model_storedImage;
