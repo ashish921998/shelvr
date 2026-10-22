@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { finalRecipe } from "./ai";
 import {
   extractBodyText,
   fetchInstagram,
@@ -208,31 +207,6 @@ describe("firstLinkedUrl", () => {
     expect(firstLinkedUrl('(see https://example.com/a?b=1&c=2) "x"')).toBe(
       "https://example.com/a?b=1&c=2",
     );
-  });
-});
-
-describe("finalRecipe", () => {
-  const markup = { ingredients: ["1 cup rice"], steps: ["Cook it."] };
-  const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
-
-  it("prefers the page's structured recipe over the model's proposal", () => {
-    expect(finalRecipe({ recipe: markup }, { recipe: proposed })).toBe(markup);
-  });
-
-  it("falls back to the sanitized model proposal when the page has none", () => {
-    expect(finalRecipe({}, { recipe: proposed })).toStrictEqual({
-      ingredients: ["2 eggs"],
-      steps: ["Fry."],
-    });
-    expect(finalRecipe(undefined, { recipe: proposed })).toStrictEqual({
-      ingredients: ["2 eggs"],
-      steps: ["Fry."],
-    });
-  });
-
-  it("is absent when neither source produced one", () => {
-    expect(finalRecipe({}, { recipe: null })).toBeUndefined();
-    expect(finalRecipe(undefined, {})).toBeUndefined();
   });
 });
 
@@ -1554,6 +1528,38 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     const item = await save(cutAt(microdataHtml(), "the salt."), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
+  });
+
+  describe("when the model proposes a recipe too", () => {
+    const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
+
+    beforeEach(() => {
+      generateObject.mockResolvedValue({
+        object: {
+          title: "Miso butter chicken",
+          description: "A whole roast chicken with miso butter.",
+          tags: ["recipes"],
+          spaceNames: [],
+          intents: [],
+          recipe: proposed,
+        },
+      });
+    });
+
+    it("keeps the page's structured recipe over the proposal", async () => {
+      const item = await save(microdataHtml());
+      expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    });
+
+    it("stores the proposal, trimmed, when the page has no recipe", async () => {
+      const item = await save(
+        "<!DOCTYPE html><html><head><title>Notes</title></head><body><p>No recipe markup here.</p></body></html>",
+      );
+      expect(item?.recipe).toStrictEqual({
+        ingredients: ["2 eggs"],
+        steps: ["Fry."],
+      });
+    });
   });
 });
 

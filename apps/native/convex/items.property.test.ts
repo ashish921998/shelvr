@@ -290,10 +290,8 @@ async function saveFinished(
   await base.mutation(internal.items.finalizeItem, {
     itemId,
     runId: item?.processingRunId,
-    title: title.join(" "),
-    description: "",
-    tags: [],
-    status: "ready",
+    reading: {},
+    classification: { title: title.join(" "), description: "", tags: [] },
   });
   return itemId;
 }

@@ -4,8 +4,8 @@ import recorded from "../testdata/settlement/rows.json";
 import { completionPatch, type ItemPatch } from "./settlement";
 import {
   consentOf,
+  gridArgs,
   itemFields,
-  legacyArgs,
   SCENARIOS,
   snapshotRow,
   type GridIds,
@@ -47,7 +47,7 @@ describe("completionPatch", () => {
 
   it.each(SCENARIOS.map((s) => [s.id, s] as const))("settles %s", (_id, s) => {
     const item = seeded(s);
-    const args = { itemId: item._id, ...legacyArgs(s, item, ids) };
+    const args = { itemId: item._id, ...gridArgs(s, item, ids) };
     const patch = completionPatch(item, args, consentOf(s.mode) === "granted");
     expect(snapshotRow(patched(item, patch), ids)).toEqual(rows[s.id]);
   });

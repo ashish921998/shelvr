@@ -281,11 +281,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
-- **`model/settlement.ts`**: `completionPatch(item, args, aiAllowed)`, the pure rule for what a
-  finished processing run writes to a save. When the owner declines AI after the run last asked, it
-  drops the run's title, description, tags, intents, cities and recipe and keeps the row's own. A
-  typed or refreshed title wins, and a vector lands only while AI is allowed (consent not declined).
-  `finalizeItem` is its adapter (run fence, consent read, poster cleanup, telemetry).
+- **`model/settlement.ts`**: `completionPatch(item, run, aiAllowed)`, the pure rule for what a
+  finished processing run writes to a save. `run` holds the run's `reading` (what Shelvr read
+  itself) and, when the model was consulted, its `classification`; `readingValidator` and
+  `classificationValidator` are `finalizeItem`'s arguments. When the owner declines AI after the run
+  last asked, it drops the classification's title, description, tags, intents, cities and recipe and
+  keeps the row's own. A typed or refreshed title wins, and a vector lands only while AI is allowed
+  (consent not declined). `finalizeItem` is its adapter (run fence, consent read, poster cleanup,
+  telemetry).
   `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.

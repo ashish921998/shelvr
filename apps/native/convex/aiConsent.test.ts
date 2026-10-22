@@ -508,11 +508,12 @@ describe("a decline that lands while a run is still out", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Model title",
-      description: "Model description.",
-      tags: ["model"],
-      classified: true,
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Model title",
+        description: "Model description.",
+        tags: ["model"],
+      },
     });
 
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
@@ -527,12 +528,7 @@ describe("a decline that lands while a run is still out", () => {
     await t.mutation(api.aiConsent.setConsent, { granted: false });
     const itemId = await ready(t);
 
-    await t.mutation(internal.items.finalizeItem, {
-      itemId,
-      description: "",
-      tags: ["food"],
-      status: "ready",
-    });
+    await t.mutation(internal.items.finalizeItem, { itemId, reading: {} });
 
     expect((await t.run((ctx) => ctx.db.get(itemId)))?.title).toBe(
       "Lentil soup",

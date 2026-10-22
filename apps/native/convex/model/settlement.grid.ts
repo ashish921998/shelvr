@@ -1,21 +1,18 @@
 import type { FunctionArgs, WithoutSystemFields } from "convex/server";
 import type { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import { classifiedFields, finalRecipe, withoutModel } from "../ai";
 import { CURRENT_EMBEDDING_VERSION, EMBEDDING_DIMENSIONS } from "./embedding";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
 import type { PageData } from "./pageRead";
+import type { Classification, Reading } from "./settlement";
 
 type FinalizeArgs = FunctionArgs<typeof internal.items.finalizeItem>;
-type ModelResult = Parameters<typeof classifiedFields>[1];
 
 const MODES = {
-  allowed: { asked: "granted", committed: "granted", flagged: true },
-  late: { asked: "granted", committed: "declined", flagged: true },
-  early: { asked: "declined", committed: "declined", flagged: true },
-  regranted: { asked: "declined", committed: "granted", flagged: true },
-  legacyAllowed: { asked: "granted", committed: "granted", flagged: false },
-  legacyDeclined: { asked: "granted", committed: "declined", flagged: false },
+  allowed: { asked: "granted", committed: "granted" },
+  late: { asked: "granted", committed: "declined" },
+  early: { asked: "declined", committed: "declined" },
+  regranted: { asked: "declined", committed: "granted" },
 } as const;
 
 type Mode = keyof typeof MODES;
@@ -36,7 +33,7 @@ export type Scenario = {
   prior: "none" | "stamped";
   poster: "none" | "same" | "replaced";
   hadPoster: boolean;
-  enrichment: FinalizeArgs["enrichment"];
+  enrichment: Reading["enrichment"];
 };
 
 export type GridIds = {
@@ -46,7 +43,8 @@ export type GridIds = {
 };
 
 const RUN_ID = "run-1";
-const NOTE_TEXT = "First line\nSecond line";
+const NOTE_FIRST_LINE = "First line";
+const NOTE_TEXT = `${NOTE_FIRST_LINE}\nSecond line`;
 const OLD_FILL = 0.5;
 const NEW_FILL = 0.25;
 
@@ -111,21 +109,20 @@ const PAGES: Record<Shape, PageData> = {
   empty: {},
 };
 
-const MODEL: ModelResult = {
+const MODEL: Classification = {
   title: "Model title",
   description: "Model description",
-  tags: ["Model", " Tag "],
-  spaceNames: [],
+  tags: ["model", "tag"],
   intents: [
     { kind: "open_url", label: "Open", value: "https://example.com/model" },
   ],
-  cities: ["Paris", "paris"],
+  cities: ["Paris"],
 };
 
-const MODELS: Record<Shape, ModelResult> = {
+const MODELS: Record<Shape, Classification> = {
   rich: { ...MODEL, recipe: MODEL_RECIPE },
   noRecipe: MODEL,
-  empty: { description: "", tags: [], spaceNames: [], intents: [], cities: [] },
+  empty: { description: "", tags: [], intents: [], cities: [] },
 };
 
 const RETRIED = {
@@ -209,8 +206,6 @@ const EMBEDS_BY_MODE = [
   ["late", ["valid", "none"]],
   ["early", ["none"]],
   ["regranted", ["none"]],
-  ["legacyAllowed", ["valid", "none", "badWidth"]],
-  ["legacyDeclined", ["valid", "none"]],
 ] as const;
 
 const embedding = EMBEDS_BY_MODE.flatMap(([mode, embeds]) =>
@@ -271,7 +266,7 @@ const recipes = product({
 );
 
 const omittedCities = product({
-  mode: ["allowed", "legacyAllowed"] as const,
+  mode: ["allowed"] as const,
   before: BEFORES,
 }).map((axes) =>
   scenario(`cities/omitted/${axes.mode}/${axes.before}`, {
@@ -364,23 +359,12 @@ function posterId(
   return poster === "replaced" ? ids.newPoster : undefined;
 }
 
-export function legacyArgs(
-  s: Scenario,
-  item: Doc<"items">,
-  ids: GridIds,
-): Omit<FinalizeArgs, "itemId"> {
+function readingFor(s: Scenario, item: Doc<"items">, ids: GridIds): Reading {
   const page = s.kind === "link" ? PAGES[s.page] : undefined;
-  const mode = MODES[s.mode];
-  const declined = mode.asked === "declined";
-  const result: ModelResult = declined
-    ? withoutModel(item, page)
-    : MODELS[s.model];
   return {
-    runId: RUN_ID,
-    title: s.title === "blank" ? "" : result.title,
-    keepTitle: s.lock === "refresh",
-    ...classifiedFields(!declined, result, item),
-    ...(s.cities === "omitted" ? { cities: undefined } : {}),
+    title: s.kind === "note" ? NOTE_FIRST_LINE : page?.title,
+    description: page?.description,
+    recipe: page?.recipe,
     content: page?.content,
     siteName: page?.siteName,
     author: page?.author,
@@ -389,11 +373,31 @@ export function legacyArgs(
     articleMedia: s.page === "rich" && page ? NEW_ARTICLE_MEDIA : undefined,
     storageId: posterId(s.poster, ids),
     aspectRatio: s.kind === "link" ? page?.heroAspectRatio : item.aspectRatio,
-    recipe: finalRecipe(page, result),
     enrichment: s.enrichment,
-    classified: mode.flagged ? !declined : undefined,
+  };
+}
+
+function classificationFor(s: Scenario): Classification {
+  return {
+    ...MODELS[s.model],
+    ...(s.title === "blank" ? { title: "" } : {}),
+    ...(s.cities === "omitted" ? { cities: undefined } : {}),
     embedding: EMBEDDINGS[s.embed],
-    status: "ready",
+  };
+}
+
+export function gridArgs(
+  s: Scenario,
+  item: Doc<"items">,
+  ids: GridIds,
+): Omit<FinalizeArgs, "itemId"> {
+  return {
+    runId: RUN_ID,
+    keepTitle: s.lock === "refresh",
+    reading: readingFor(s, item, ids),
+    ...(MODES[s.mode].asked === "declined"
+      ? {}
+      : { classification: classificationFor(s) }),
   };
 }
 

@@ -115,11 +115,13 @@ describe("finalizeItem", () => {
 
     const outcome = await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Classified",
-      description: "A description",
-      tags: ["cooking"],
-      embedding: vector(0.02),
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Classified",
+        description: "A description",
+        tags: ["cooking"],
+        embedding: vector(0.02),
+      },
     });
 
     expect(outcome).toBe("applied");
@@ -138,10 +140,12 @@ describe("finalizeItem", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Reclassified",
-      description: "New text, no new vector",
-      tags: [],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Reclassified",
+        description: "New text, no new vector",
+        tags: [],
+      },
     });
 
     const stored = await t.run((ctx) => ctx.db.get(itemId));
@@ -160,10 +164,12 @@ describe("finalizeItem", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Reclassified",
-      description: "New text, and this run could not embed it",
-      tags: [],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Reclassified",
+        description: "New text, and this run could not embed it",
+        tags: [],
+      },
     });
 
     const stored = await t.run((ctx) => ctx.db.get(itemId));
@@ -182,11 +188,13 @@ describe("finalizeItem", () => {
     const outcome = await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId: "run-superseded",
-      title: "Stale",
-      description: "From a run the user retried past",
-      tags: [],
-      embedding: vector(0.04),
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Stale",
+        description: "From a run the user retried past",
+        tags: [],
+        embedding: vector(0.04),
+      },
     });
 
     expect(outcome).toBe("stale_run");
@@ -234,11 +242,14 @@ describe("the article body reaches the full-text index", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "An article",
-      description: "A summary that never says the word",
-      tags: ["reading"],
-      content: "Deep in the third paragraph sits the word pangolin.",
-      status: "ready",
+      reading: {
+        content: "Deep in the third paragraph sits the word pangolin.",
+      },
+      classification: {
+        title: "An article",
+        description: "A summary that never says the word",
+        tags: ["reading"],
+      },
     });
 
     const results = await t.query(api.items.searchItems, {

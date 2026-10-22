@@ -79,7 +79,11 @@ import {
 } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { buildSearchText } from "./model/searchText";
-import { completionPatch } from "./model/settlement";
+import {
+  classificationValidator,
+  completionPatch,
+  readingValidator,
+} from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
@@ -2035,25 +2039,9 @@ export const finalizeItem = internalMutation({
   args: {
     itemId: v.id("items"),
     runId: v.optional(v.string()),
-    title: v.optional(v.string()),
     keepTitle: v.optional(v.boolean()),
-    description: v.string(),
-    tags: v.array(v.string()),
-    content: v.optional(v.string()),
-    recipe: v.optional(recipeValidator),
-    siteName: v.optional(v.string()),
-    author: v.optional(v.string()),
-    heroImageUrl: v.optional(v.string()),
-    media: v.optional(v.array(postMediaValidator)),
-    articleMedia: v.optional(v.array(articleMediaValidator)),
-    storageId: v.optional(v.id("_storage")),
-    aspectRatio: v.optional(v.number()),
-    intents: v.optional(v.array(intentValidator)),
-    cities: v.optional(v.array(v.string())),
-    embedding: v.optional(v.array(v.float64())),
-    classified: v.optional(v.boolean()),
-    status: itemStatusValidator,
-    enrichment: v.optional(enrichmentValidator),
+    reading: readingValidator,
+    classification: v.optional(classificationValidator),
   },
   returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
@@ -2066,18 +2054,19 @@ export const finalizeItem = internalMutation({
       return "stale_run";
     }
     await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
+    const { storageId, enrichment } = args.reading;
     if (
-      args.storageId !== undefined &&
+      storageId !== undefined &&
       item.storageId !== undefined &&
-      item.storageId !== args.storageId &&
+      item.storageId !== storageId &&
       (await isStorageUnreferenced(ctx, item.storageId))
     ) {
       await safeDeleteStorage(ctx, item.storageId);
     }
-    if (args.status === "ready" && item.status !== "ready") {
+    if (item.status !== "ready") {
       await scheduleProcessedTelemetry(ctx, item, {
         status: "ready",
-        enrichment: args.enrichment,
+        enrichment,
       });
     }
     return "applied";
