@@ -79,24 +79,6 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ["convex/**/*.test.ts", "src/**/*.test.{ts,tsx}"],
-    rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "CallExpression[callee.name='convexTest']",
-          message:
-            "Build the test backend with newConvexTest() from convex/test.setup.ts. A bare convexTest(schema, ...) skips the rate-limiter component, so any mutation that calls rateLimiter.limit fails.",
-        },
-        {
-          selector: "ImportSpecifier[imported.name='convexTest']",
-          message:
-            "Import newConvexTest from convex/test.setup.ts, not convexTest from convex-test.",
-        },
-      ],
-    },
-  },
-  {
     files: [
       "convex/model/log.ts",
       "src/lib/analytics.ts",
