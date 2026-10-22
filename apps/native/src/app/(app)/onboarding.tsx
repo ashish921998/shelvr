@@ -11,7 +11,7 @@ import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
 import {
   isTravelVibe,
   spacesAfterInterestToggle,
-  VIBES_INTEREST,
+  TRAVEL_INTEREST,
 } from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
@@ -147,7 +147,7 @@ export default function OnboardingScreen() {
   const interests = spaces.filter(isInterest);
   const vibes = spaces.filter(isTravelVibe);
   const teaser = showTripTeaser(kinds, interests);
-  const pickedCity = interests.includes(VIBES_INTEREST) ? travelCity : null;
+  const pickedCity = interests.includes(TRAVEL_INTEREST) ? travelCity : null;
   const trip = sampleTrip(pickedCity);
 
   useEffect(() => {
@@ -216,7 +216,7 @@ export default function OnboardingScreen() {
     );
 
   const toggleInterest = (interest: Interest) => {
-    if (interest === VIBES_INTEREST && interests.includes(interest)) {
+    if (interest === TRAVEL_INTEREST && interests.includes(interest)) {
       setTravelCity(null);
     }
     setSpaces((current) => spacesAfterInterestToggle(current, interest));

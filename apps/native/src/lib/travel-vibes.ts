@@ -13,7 +13,7 @@ export function isTravelVibe(value: string): value is TravelVibe {
   return TRAVEL_VIBES.some((vibe) => vibe === value);
 }
 
-export const VIBES_INTEREST: Interest = "Travel";
+export const TRAVEL_INTEREST: Interest = "Travel";
 
 /** The spaces after `interest` is toggled; unpicking Travel drops its vibes too, since their card hides with it. */
 export function spacesAfterInterestToggle(
@@ -22,7 +22,7 @@ export function spacesAfterInterestToggle(
 ): string[] {
   if (!spaces.includes(interest)) return [...spaces, interest];
   const rest = spaces.filter((name) => name !== interest);
-  return interest === VIBES_INTEREST
+  return interest === TRAVEL_INTEREST
     ? rest.filter((name) => !isTravelVibe(name))
     : rest;
 }
