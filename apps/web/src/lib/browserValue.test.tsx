@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -11,10 +12,15 @@ function Probe() {
 
 describe("useBrowserValue", () => {
   it("reads the browser on the client", () => {
-    const { result } = renderHook(() =>
-      useBrowserValue(() => window.location.pathname, "server"),
-    );
-    expect(result.current).toBe(window.location.pathname);
+    (
+      globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+    window.history.replaceState({}, "", "/client-path");
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    act(() => root.render(<Probe />));
+    expect(container.textContent).toBe("/client-path");
+    act(() => root.unmount());
   });
 
   it("renders the server value on the server, so hydration matches", () => {
