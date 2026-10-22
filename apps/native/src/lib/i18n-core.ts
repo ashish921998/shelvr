@@ -1,4 +1,3 @@
-import { I18n } from "i18n-js";
 import type { MessageKey } from "@/locales/message-types";
 import { pluralRules } from "@convex/model/localization";
 import {
@@ -7,25 +6,51 @@ import {
   type SupportedLocale,
 } from "@/locales/catalogs";
 
-const translations = Object.fromEntries(
-  Object.entries(catalogs).map(([locale, messages]) => {
-    const namespaces: Record<
-      string,
-      Record<string, string | Record<string, string>>
-    > = {};
-    for (const [key, message] of Object.entries(messages)) {
-      const [namespace, name] = key.split(".");
-      (namespaces[namespace] ??= {})[name] = message;
+type Message = string | Record<string, string>;
+
+// The locales a lookup tries in order: the exact one, its language, then
+// English (the same chain i18n-js used with enableFallback).
+function fallbackChain(locale: string): string[] {
+  const chain: string[] = [];
+  for (const entry of [locale, "en"]) {
+    const codes = entry.split("-");
+    for (const candidate of [
+      entry,
+      ...(codes.length === 3 ? [`${codes[0]}-${codes[1]}`] : []),
+      codes[0],
+    ]) {
+      if (!chain.includes(candidate)) chain.push(candidate);
     }
-    return [locale, namespaces];
-  }),
-);
-const i18n = new I18n(translations, {
-  defaultLocale: "en",
-  enableFallback: true,
-});
-for (const [locale, rule] of Object.entries(pluralRules)) {
-  i18n.pluralization.register(locale, (_i18n, count) => [rule(Number(count))]);
+  }
+  return chain;
+}
+
+function lookup(locale: string, key: MessageKey): Message | undefined {
+  for (const candidate of fallbackChain(locale)) {
+    const message = isSupportedLocale(candidate)
+      ? (catalogs[candidate][key] as Message | undefined)
+      : undefined;
+    if (message !== undefined && message !== null) return message;
+  }
+  return undefined;
+}
+
+const PLACEHOLDER = /(?:\{\{|%\{)(.*?)(?:\}\}?)/g;
+
+function interpolate(
+  message: string,
+  values: Record<string, string | number>,
+): string {
+  return message.replace(PLACEHOLDER, (placeholder, name: string) => {
+    const value = values[name] as string | number | undefined | null;
+    return value === undefined || value === null
+      ? `[missing "${placeholder}" value]`
+      : value.toString();
+  });
+}
+
+function missing(locale: string, scope: string): string {
+  return `[missing "${locale}.${scope}" translation]`;
 }
 
 export function canonicalizeTag(tag: string) {
@@ -84,7 +109,16 @@ export function translate(
       throw new Error("Plural messages require a finite numeric count");
     }
     formatted.formattedCount = formatNumber(numberLocale, values.count);
-    return i18n.t(key, { ...formatted, count: values.count, locale });
   }
-  return i18n.t(key, { ...formatted, locale });
+  const found = lookup(locale, key);
+  if (typeof found === "string") {
+    return interpolate(found, { ...formatted, locale });
+  }
+  if (found === undefined || typeof values.count !== "number") {
+    return missing(locale, key);
+  }
+  const category = (pluralRules[locale] ?? pluralRules.en)(values.count);
+  const variant = found[category] as string | undefined;
+  if (variant === undefined) return missing(locale, `${key}.${category}`);
+  return interpolate(variant, { ...formatted, count: values.count, locale });
 }
