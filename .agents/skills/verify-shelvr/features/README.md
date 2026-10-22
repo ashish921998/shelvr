@@ -2,8 +2,9 @@
 
 One file per core feature of the Shelvr iOS app, from the user's point of
 view. Each names the test that pins it, the locators that matter, the proof,
-and its bug-bash charters. Every test starts on the seeded Home
-(`startOnSeededHome` in `tools/e2e/tests/seeded-home.ts`). Not mapped yet:
+and its bug-bash charters. Every test but onboarding starts on the seeded
+Home (`startOnSeededHome` in `tools/e2e/tests/seeded-home.ts`); onboarding
+clears the keychain and starts at "Start yours". Not mapped yet:
 Tidy, Map, item detail editing, sharing, settings, notifications. Map them when a change touches them.
 
 | Feature                           | Where                                       | Test                                                          | Status                                     |

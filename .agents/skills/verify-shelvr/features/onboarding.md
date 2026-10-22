@@ -1,7 +1,9 @@
 # Onboarding
 
 A new account walks a short setup before Home: what they are into, what they
-save, a first save, and then the paywall. Sign-in comes after that paywall.
+save, a first save, and then the paywall. The opener carries an "Already have
+an account? Sign in" link for returning people; a new account stays signed
+out through the paywall and signs in after it.
 
 ## Sub-features
 
