@@ -433,7 +433,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   panelSide: {
     left: rt.insets.left + TRIP_SIDE_PANEL_MARGIN,
     top: rt.insets.top + theme.gap(7),
-    bottom: rt.insets.bottom + TRIP_SIDE_PANEL_MARGIN,
+    // The content and footer already pad for the bottom inset.
+    bottom: TRIP_SIDE_PANEL_MARGIN,
     width: TRIP_SIDE_PANEL_WIDTH,
     borderRadius: theme.radius.xl,
     boxShadow: "0 8px 30px rgba(0,0,0,0.25)",

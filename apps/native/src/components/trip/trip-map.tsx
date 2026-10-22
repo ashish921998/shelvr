@@ -87,7 +87,8 @@ export function TripMap({
         ...(side
           ? {
               bottom: rt.insets.bottom,
-              left: TRIP_SIDE_PANEL_MARGIN + TRIP_SIDE_PANEL_WIDTH,
+              left:
+                rt.insets.left + TRIP_SIDE_PANEL_MARGIN + TRIP_SIDE_PANEL_WIDTH,
             }
           : { bottom: height * TRIP_PANEL_SHARE }),
         ...(process.env.EXPO_OS === "ios"
@@ -98,7 +99,16 @@ export function TripMap({
           : { worldWidth: 256, centerY: height / 2 }),
       },
     );
-  }, [active, days, width, height, top, side, rt.insets.bottom]);
+  }, [
+    active,
+    days,
+    width,
+    height,
+    top,
+    side,
+    rt.insets.bottom,
+    rt.insets.left,
+  ]);
 
   // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
   // setCameraPosition goes through the native view, which is not registered yet on mount.
