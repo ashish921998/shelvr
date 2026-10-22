@@ -263,7 +263,6 @@ describe("onboarding demo allowance", () => {
     const { t } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await t.mutation(api.items.deleteItem, { id: itemId });
-    // ConvexError, not Error: production redacts a plain Error's message to "Server Error".
     const error = await t.mutation(api.demo.createDemoItem, { url: URL }).then(
       () => null,
       (e: unknown) => e,

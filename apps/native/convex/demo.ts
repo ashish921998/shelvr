@@ -12,17 +12,12 @@ import { insertMembership } from "./model/memberships";
 import { validateSpaceName } from "./model/spaceName";
 import { rateLimiter } from "./model/rateLimiter";
 
-// User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
-// a ConvexError with structured data the client branches on. A plain Error's
-// message is redacted to "Server Error" in production.
-
 const demoStatusValidator = v.union(
   v.literal("processing"),
   v.literal("ready"),
   v.literal("failed"),
 );
 
-/** The optional space the user picked for this link; omitted means "just my shelf". */
 function validateDestination(
   spaceName: string | undefined,
 ): string | undefined {
@@ -30,13 +25,10 @@ function validateDestination(
   try {
     return validateSpaceName(spaceName);
   } catch {
-    // Same rule as createSpace, but the demo client branches on codes.
     throw demoError("invalid_space_name");
   }
 }
 
-/** Same idempotency key as createSpace (trimmed name), but not Pro-gated and
- * created dynamic so the classifier can keep suggesting into it. */
 async function findOrCreateDynamicSpace(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -55,8 +47,6 @@ async function findOrCreateDynamicSpace(
     userId,
     name,
     dynamic: true,
-    // Born with an exact (empty) summary, like createSpace, so it never takes
-    // the legacy scan path in listSpaces.
     savedCount: 0,
     suggestedCount: 0,
     previewItemIds: [],
@@ -64,7 +54,6 @@ async function findOrCreateDynamicSpace(
   });
 }
 
-/** Names of the caller's spaces this item is explicitly saved into. */
 async function savedSpaceNames(
   ctx: QueryCtx,
   itemId: Id<"items">,
@@ -82,26 +71,12 @@ async function savedSpaceNames(
   return names;
 }
 
-/**
- * The pre-payment onboarding demo: ONE real link save per authenticated user
- * without Pro. The only exception to the `requireProEntitlement` gates on the
- * regular create mutations.
- *
- *  - Idempotent: a repeat (retry, double-tap, different URL) returns the same
- *    itemId with `reused: true` and never schedules a second `processItem`.
- *    Deleting the item does not reset the allowance (`demo_used`).
- *  - Race-safe: the (empty index read + insert) pair relies on Convex's
- *    serializable OCC, same idiom as operation ids in `items.ts`.
- *  - `spaceName` is the user's explicit pick and becomes a `saved` membership;
- *    classification may only add `suggested` rows afterwards.
- */
+/** The one link save a user gets without Pro; a repeat returns that item with `reused: true`. */
 export const createDemoItem = mutation({
   args: {
     url: v.string(),
     spaceName: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
-    // The heading the onboarding preview showed, kept so the save comes back
-    // under the same name. Older builds omit it.
     title: v.optional(v.string()),
   },
   returns: v.object({
@@ -120,8 +95,6 @@ export const createDemoItem = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     if (existing !== null) {
-      // Return the original save (its URL, its current destinations), never
-      // the newly typed input.
       const item = await ctx.db.get(existing.itemId);
       if (item === null || item.userId !== userId || !item.url) {
         throw demoError("demo_used");
@@ -129,9 +102,7 @@ export const createDemoItem = mutation({
       let urlMatchesRequest = false;
       try {
         urlMatchesRequest = normalizeExternalUrl(args.url) === item.url;
-      } catch {
-        // A repeat stays idempotent even when its new URL is invalid.
-      }
+      } catch {}
       return {
         itemId: existing.itemId,
         userId,
@@ -142,20 +113,12 @@ export const createDemoItem = mutation({
       };
     }
 
-    // Validate before any write so an invalid request consumes no allowance.
     const url = normalizeExternalUrl(args.url);
     const destination = validateDestination(args.spaceName);
 
-    // Limit after the idempotent return so a retry is never billed a token.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
 
-    // Same run stamp as every other save, so finalizeItem/failItem fence this
-    // run and the stale sweeper measures from now rather than creation.
     const run = beginProcessingRun();
-    // The heading the onboarding preview showed for a sample the person
-    // picked, kept as theirs so the save matches what they chose. The client
-    // sends it only for that sample's own URL. A title past the limit is a
-    // hint lost, not an error: the classifier names the save instead.
     const title = args.title?.trim() ?? "";
     const keptTitle =
       title !== "" && title.length <= MAX_ITEM_TITLE_CHARS
@@ -172,9 +135,9 @@ export const createDemoItem = mutation({
     });
     if (destination !== undefined) {
       const spaceId = await findOrCreateDynamicSpace(ctx, userId, destination);
-      // Through the helper so the space's saved count and preview stay exact.
       await insertMembership(ctx, { userId, spaceId, itemId, status: "saved" });
     }
+    // Convex has no unique indexes: OCC retries a racing call, which then finds this row.
     await ctx.db.insert("onboardingDemos", {
       userId,
       itemId,
@@ -204,16 +167,6 @@ export const createDemoItem = mutation({
   },
 });
 
-/**
- * Retry for a failed demo classification, so a transient fetch/LLM error
- * cannot lock a non-entitled user out (reprocessItem is Pro-gated). Re-runs the
- * pipeline on the same item; only a `failed` item is rescheduled. Bounded by
- * the `demoRetry` rate limiter (cooldown) and `retryCount` (total cap).
- *
- * Same gate as `reprocessItem`: a terminal failure (the page is gone) is
- * refused outright (it would spend a classification without changing the
- * result) and consumes neither the retry cap nor the rate-limit bucket.
- */
 export const retryDemoItem = mutation({
   args: {},
   returns: v.object({
@@ -230,7 +183,6 @@ export const retryDemoItem = mutation({
       throw demoError("no_demo");
     }
     const item = await ctx.db.get(demo.itemId);
-    // Defense-in-depth ownership check on the item row itself.
     if (item === null || item.userId !== userId) {
       throw demoError("demo_used");
     }
@@ -247,8 +199,6 @@ export const retryDemoItem = mutation({
     await ctx.db.patch(demo._id, {
       retryCount: (demo.retryCount ?? 0) + 1,
     });
-    // A fresh run id: the previous run, if it is somehow still alive, can no
-    // longer write over this retry's result.
     const run = beginProcessingRun();
     await ctx.db.patch(item._id, {
       ...run,
