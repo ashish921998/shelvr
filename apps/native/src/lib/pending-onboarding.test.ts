@@ -74,6 +74,17 @@ describe("the date night's after-dinner pick", () => {
     expect(getOnboardingProgress().eveningAfter).toBe("dessert");
   });
 
+  it("is kept when onboarding hands its spaces to the replay", () => {
+    setOnboardingProgress({
+      spaces: ["Date nights"],
+      step: 5,
+      goal: "date",
+      eveningAfter: "dessert",
+    });
+    setPendingSpaces(["Date nights"]);
+    expect(getOnboardingProgress().eveningAfter).toBe("dessert");
+  });
+
   it("reads back as none when the stored pick is not one of the chips", () => {
     setOnboardingProgress({ spaces: [], step: 5, eveningAfter: "drinks" });
     const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");

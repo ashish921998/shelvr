@@ -39,7 +39,7 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
+export type OAuthSurface = "sign_in_view";
 export type AuthMethod = "native" | "web";
 
 export type TrialEligibility =
@@ -213,10 +213,6 @@ export type AnalyticsEventProperties = {
     delivery: "scheduled" | "unconfigured";
   };
   onboarding_demo_submitted: Record<string, never>;
-  onboarding_signin_prompt: {
-    surface: "demo_sheet" | "sample_preview";
-    action: "shown" | "dismissed";
-  };
   onboarding_share_practice: {
     outcome:
       | "received"

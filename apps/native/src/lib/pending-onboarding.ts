@@ -161,6 +161,7 @@ function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
     spaceNames: existing?.spaceNames ?? {},
     travelCity: existing?.travelCity ?? null,
     goal: existing?.goal ?? null,
+    eveningAfter: existing?.eveningAfter ?? null,
   });
   notifyChanged();
 }

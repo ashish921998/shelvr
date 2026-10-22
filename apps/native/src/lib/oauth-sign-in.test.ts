@@ -64,11 +64,8 @@ function endSession(result: object, ms = 5_000) {
   });
 }
 
-async function run(
-  provider: "apple" | "google" | "anonymous",
-  surface: "sign_in_view" | "demo_sheet" = "sign_in_view",
-) {
-  const hook = renderHook(() => useOAuthSignIn(surface));
+async function run(provider: "apple" | "google" | "anonymous") {
+  const hook = renderHook(() => useOAuthSignIn("sign_in_view"));
   let outcome: string | undefined;
   await act(async () => {
     outcome = await hook.result.current.signInWith(provider);
@@ -116,10 +113,10 @@ describe("useOAuthSignIn", () => {
         "(com.apple.AuthenticationServices.WebAuthenticationSession error 3.)",
     });
 
-    await run("google", "demo_sheet");
+    await run("google");
 
     expect(captured("auth_cancelled")).toMatchObject({
-      surface: "demo_sheet",
+      surface: "sign_in_view",
       result: "cancel",
       native_error_domain:
         "com.apple.AuthenticationServices.WebAuthenticationSession",

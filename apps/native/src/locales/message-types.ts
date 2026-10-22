@@ -213,7 +213,6 @@ export type MessageParams = {
   "feedback.cancel": undefined;
   "feedback.sending": undefined;
   "feedback.send": undefined;
-  "demo.signInTitle": undefined;
   "tidy.completeTitle": undefined;
   "tidy.batchTitle": undefined;
   "tidy.continue": undefined;
