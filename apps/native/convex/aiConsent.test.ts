@@ -578,8 +578,12 @@ describe("a decline that lands while a run is still out", () => {
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
 
     const item = await t.run((ctx) => ctx.db.get(itemId));
-    expect(item).toMatchObject({ status: "ready", tags: [] });
-    expect(item?.title).not.toBe("Model title");
+    expect(item).toMatchObject({
+      status: "ready",
+      title: "Buy lentils",
+      description: "",
+      tags: [],
+    });
     expect(item?.embedding).toBeUndefined();
   });
 

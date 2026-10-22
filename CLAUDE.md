@@ -284,11 +284,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/settlement.ts`**: `completionPatch(item, run, aiAllowed)`, the pure rule for what a
   finished processing run writes to a save. `run` holds the run's `reading` (what Shelvr read
   itself) and, when the model was consulted, its `classification`; `readingValidator` and
-  `classificationValidator` are `finalizeItem`'s arguments. When the owner declines AI after the run
-  last asked, it drops the classification's title, description, tags, intents, cities and recipe and
-  keeps the row's own. A typed or refreshed title wins, and a vector lands only while AI is allowed
-  (consent not declined). `finalizeItem` is its adapter (run fence, consent read, poster cleanup,
-  telemetry).
+  `classificationValidator` are `finalizeItem`'s arguments. With AI declined, whether the owner
+  declined before the run asked or while it ran, the classification is ignored and the save settles
+  from the reading alone: the page's title, description and recipe, or a note's first line, plus the
+  save's own tags, intents and cities. A recipe the save already has stays when the page offers none.
+  A typed or refreshed title wins, and a vector lands only while AI is allowed (consent not
+  declined). `finalizeItem` is its adapter (run fence, consent read, poster cleanup, telemetry).
   `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.

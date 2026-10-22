@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import recorded from "../testdata/settlement/rows.json";
+import { EMBEDDING_DIMENSIONS } from "./embedding";
 import { completionPatch, type ItemPatch } from "./settlement";
 import {
   consentOf,
@@ -73,6 +74,47 @@ describe("a run without the model", () => {
       true,
     );
     expect(patch.recipe).toEqual(page);
+  });
+});
+
+describe("a decline that lands at commit", () => {
+  const item = savedItem({
+    title: "Saved title",
+    description: "Saved description",
+    tags: ["saved"],
+  });
+  const reading = { title: "Page title", description: "Page description" };
+  const classification = {
+    title: "Model title",
+    description: "Model description",
+    tags: ["model"],
+    intents: [],
+    cities: ["Paris"],
+    embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.25),
+  };
+
+  it.each(
+    SCENARIOS.filter((s) => s.mode === "late").map((s) => [s.id, s] as const),
+  )("settles %s like a decline that came earlier", (_id, s) => {
+    const saved = seeded(s);
+    expect(completionPatch(saved, gridArgs(s, saved, ids), false)).toEqual(
+      completionPatch(
+        saved,
+        gridArgs({ ...s, mode: "early" }, saved, ids),
+        false,
+      ),
+    );
+  });
+
+  it("shows what Shelvr read and none of the model's words", () => {
+    const patch = completionPatch(item, { reading, classification }, false);
+    expect(patch).toMatchObject({
+      title: "Page title",
+      description: "Page description",
+      tags: ["saved"],
+    });
+    expect(patch.cities).toBeUndefined();
+    expect(patch.embeddingVersion).toBeUndefined();
   });
 });
 

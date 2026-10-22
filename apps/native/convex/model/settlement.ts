@@ -86,28 +86,14 @@ function classifiedWords(
   };
 }
 
-function withdrawnWords(item: Doc<"items">): Words {
-  return {
-    title: undefined,
-    description: item.description ?? "",
-    tags: item.tags,
-    intents: item.intents,
-    cities: item.cities,
-    recipe: item.recipe,
-  };
-}
-
 function settledWords(
   item: Doc<"items">,
   { reading, classification }: Settlement,
   aiAllowed: boolean,
 ): Words {
-  if (classification === undefined) {
-    return readingWords(item, reading);
-  }
-  return aiAllowed
+  return classification !== undefined && aiAllowed
     ? classifiedWords(reading, classification)
-    : withdrawnWords(item);
+    : readingWords(item, reading);
 }
 
 function embeddingPatch(
