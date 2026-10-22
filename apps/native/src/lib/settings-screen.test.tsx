@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   stackRoot: "(tabs)",
   status: "none",
+  permission: "granted" as "granted" | "ask" | "blocked" | undefined,
   preferences: { weeklyShelfEnabled: true, remindersEnabled: true } as
     | { weeklyShelfEnabled: boolean; remindersEnabled: boolean }
     | undefined,
@@ -59,6 +60,9 @@ vi.mock("@/lib/notifications", () => ({
       setSaveReminders: mocks.setSaveReminders,
     },
   }),
+}));
+vi.mock("@/lib/use-notification-permission", () => ({
+  useNotificationPermission: () => mocks.permission,
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.preferences }),
@@ -159,6 +163,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.preferences = { weeklyShelfEnabled: true, remindersEnabled: true };
   mocks.status = "none";
+  mocks.permission = "granted";
   mocks.stackRoot = "(tabs)";
 });
 afterEach(cleanup);
@@ -304,4 +309,43 @@ it("leaves a toggle unrecorded when another operation held the queue", async () 
   );
   expect(mocks.capture).not.toHaveBeenCalled();
   expect(mocks.alert).not.toHaveBeenCalled();
+});
+
+it.each(["blocked", "ask"] as const)(
+  "shows notifications off when the device permission is %s, though the preferences are on",
+  (permission) => {
+    mocks.permission = permission;
+    render(<SettingsScreen />);
+    expect(
+      (screen.getByLabelText("notifications.toggleLabel") as HTMLInputElement)
+        .checked,
+    ).toBe(false);
+    expect(
+      (
+        screen.getByLabelText(
+          "notifications.remindersToggle",
+        ) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
+  },
+);
+
+it("keeps the saved preference on screen until the permission has been read", () => {
+  mocks.permission = undefined;
+  render(<SettingsScreen />);
+  expect(
+    (screen.getByLabelText("notifications.toggleLabel") as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+});
+
+it("turns a toggle shown off for a blocked device on, which leads to system settings", async () => {
+  mocks.permission = "blocked";
+  mocks.setWeeklyShelf.mockResolvedValue(false);
+  render(<SettingsScreen />);
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("notifications.toggleLabel")),
+  );
+  expect(mocks.setWeeklyShelf).toHaveBeenCalledWith(true);
+  expect(lastAlert().title).toBe("notifications.disabledTitle");
 });
