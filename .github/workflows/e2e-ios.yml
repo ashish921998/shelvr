@@ -316,7 +316,18 @@ jobs:
           CONVEX_AGENT_MODE: anonymous
         run: |
           test -f .e2e/report.json || exit 1
-          grep -qE "Daemon request timed out|test tool stopped answering|overran its watchdog|runner is wedged" .e2e/report.json || exit 1
+          # Only a failure --last-failed reruns counts: a test's final
+          # attempt, or a beforeAll/afterAll hook, not a flaky test's
+          # earlier attempt.
+          node -e '
+            const run = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8")).run;
+            const wedged = /Daemon request timed out|test tool stopped answering|overran its watchdog|runner is wedged/;
+            const failed = run.results
+              .filter((r) => ["failed", "timed-out", "interrupted"].includes(r.status))
+              .map((r) => r.attempts?.at(-1)?.error ?? r.error);
+            const hooks = run.errors.filter((e) => e.phase === "beforeAll" || e.phase === "afterAll");
+            process.exit([...failed, ...hooks].some((e) => wedged.test(JSON.stringify(e ?? ""))) ? 0 : 1);
+          ' || exit 1
           echo "::warning title=Test tool wedged::restarting the daemon and simulator, then rerunning the tests that did not pass"
           # The rerun writes its own report; keep the first run's for the artifact.
           first="$RUNNER_TEMP/first-run"
@@ -381,8 +392,11 @@ jobs:
         run: |
           cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
           cp ~/.agent-device/daemon.log tools/e2e/.e2e/ 2>/dev/null || true
+          # Each session keeps its runner's log under the daemon's state; the
+          # path, flattened, keeps sessions apart.
           mkdir -p tools/e2e/.e2e/runner-logs
-          cp "${TMPDIR:-/tmp}"/agent-device/apple-runner/logs/*.log tools/e2e/.e2e/runner-logs/ 2>/dev/null || true
+          find "$HOME/.agent-device" "${TMPDIR:-/tmp}/agent-device" -name '*.log' ! -name daemon.log 2>/dev/null |
+            while read -r log; do cp "$log" "tools/e2e/.e2e/runner-logs/$(echo "${log#"$HOME"/}" | tr '/' '_')"; done || true
 
       - name: Upload the run
         if: ${{ !cancelled() }}
