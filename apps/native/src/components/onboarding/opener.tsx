@@ -14,6 +14,7 @@ import {
 import { CtaButton } from "@/components/onboarding/parts";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
+  AccessibilityInfo,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -63,6 +64,18 @@ const PAGES: Page[] = [
 const COPY_MIN_HEIGHT = 150;
 const AUTO_ADVANCE_MS = 4000;
 
+function useLiveReducedMotion() {
+  const [reduced, setReduced] = useState(useReducedMotion());
+  useEffect(() => {
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduced,
+    );
+    return () => subscription.remove();
+  }, []);
+  return reduced;
+}
+
 export function OpenerStep({
   onStart,
   onSignIn,
@@ -78,7 +91,7 @@ export function OpenerStep({
   const [page, setPage] = useState(0);
   const [reached, setReached] = useState(0);
   const [swiped, setSwiped] = useState(false);
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useLiveReducedMotion();
   const pager = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {

@@ -29,6 +29,7 @@ const mock = vi.hoisted(() => {
     reducedMotion: false,
     pager: null as null | ((event: ScrollEvent) => void),
     beginDrag: null as null | (() => void),
+    reduceMotionChanged: null as null | ((enabled: boolean) => void),
     view: ({
       children,
       testID,
@@ -108,6 +109,12 @@ vi.mock("react-native", async () => {
     Text: mock.text,
     Pressable: mock.pressable,
     ScrollView,
+    AccessibilityInfo: {
+      addEventListener: (_event: string, listener: (on: boolean) => void) => {
+        mock.reduceMotionChanged = listener;
+        return { remove: () => (mock.reduceMotionChanged = null) };
+      },
+    },
   };
 });
 vi.mock("react-native-unistyles", () => ({
@@ -174,6 +181,7 @@ beforeEach(() => {
   mock.reducedMotion = false;
   mock.pager = null;
   mock.beginDrag = null;
+  mock.reduceMotionChanged = null;
   vi.useRealTimers();
 });
 
@@ -365,5 +373,15 @@ describe("OpenerStep", () => {
     renderOpener();
     wait(20000);
     expect(dot(0)).toContain("dotOn");
+  });
+
+  it("stops advancing when Reduce Motion is turned on mid-way", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    wait(4000);
+    expect(dot(1)).toContain("dotOn");
+    act(() => mock.reduceMotionChanged?.(true));
+    wait(20000);
+    expect(dot(1)).toContain("dotOn");
   });
 });
