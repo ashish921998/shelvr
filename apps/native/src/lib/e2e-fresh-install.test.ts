@@ -8,6 +8,7 @@ const mock = vi.hoisted(() => ({
   devSignIn: true,
   forgetStoredSession: vi.fn(),
   forgetOnboarded: vi.fn(),
+  clearSharedPayloads: vi.fn(),
 }));
 
 vi.mock("react-native", () => ({
@@ -32,7 +33,9 @@ vi.mock("@/lib/purchase-before-sign-in", () => ({
   clearPurchaseBeforeSignIn: vi.fn(),
 }));
 vi.mock("@/lib/queued-first-save", () => ({ clearQueued: vi.fn() }));
-vi.mock("expo-sharing", () => ({ clearSharedPayloads: vi.fn() }));
+vi.mock("expo-sharing", () => ({
+  clearSharedPayloads: mock.clearSharedPayloads,
+}));
 vi.mock("@/lib/share/pending-share-store", () => ({
   clearPendingShareOnDevice: vi.fn(),
   clearShareDiscardedOnDevice: vi.fn(),
@@ -53,6 +56,7 @@ describe("startFreshForE2E", () => {
   it("signs out and forgets onboarding on a development build launched with the argument", () => {
     startFreshForE2E();
     expect(signedOut()).toBe(true);
+    expect(mock.clearSharedPayloads).toHaveBeenCalled();
   });
 
   it("does nothing without the argument", () => {

@@ -82,7 +82,8 @@ only loads bundles whose native fingerprint matches. Rebuild with
   the V1 paywall, so QA against it gives misleading results. Test-store prices
   stay separate from Apple's.
 
-- **First-run onboarding.** Relaunch the development build with the
+- **First-run onboarding.** On a build with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`
+  set to `true`, relaunch the development build with the
   `-E2EFreshInstall YES` argument (`src/lib/e2e-fresh-install.ts`). It clears
   the auth token, the onboarded flag and pending onboarding progress, so the
   launch is signed out at "Start yours" and the next dev sign-in is a new
