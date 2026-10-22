@@ -2,6 +2,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 // Persisted store for onboarding state that must survive leaving the screen
 // (the demo step's inline OAuth) or an app kill: the picked library
@@ -62,14 +63,14 @@ type PendingRecord = {
   saved: PendingSaved | null;
   spaceNames: Record<string, string>;
   /** The city picked for the sample trip; absent until one is picked. */
-  travelCity?: string | null;
+  travelCity?: SampleCityId | null;
 };
 
 /** What onboarding.tsx restores on mount. */
 type OnboardingProgress = {
   saveKinds: string[];
   spaces: string[];
-  travelCity: string | null;
+  travelCity: SampleCityId | null;
   step: number | null;
   demo: PendingDemo | null;
   saved: PendingSaved | null;
@@ -158,10 +159,7 @@ function readPendingRecord(): PendingRecord | null {
       demo,
       saved: readSaved(record.saved),
       spaceNames: readSpaceNames(record.spaceNames),
-      travelCity:
-        typeof record.travelCity === "string" && record.travelCity !== ""
-          ? record.travelCity
-          : null,
+      travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
     };
   } catch {
     return null;
@@ -363,7 +361,7 @@ export function getOnboardingProgress(): OnboardingProgress {
 export function setOnboardingProgress(progress: {
   saveKinds: string[];
   spaces: string[];
-  travelCity?: string | null;
+  travelCity?: SampleCityId | null;
   step: number;
   saved?: PendingSaved | null;
 }) {
