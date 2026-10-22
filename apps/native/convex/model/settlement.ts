@@ -1,6 +1,10 @@
 import { v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { CURRENT_EMBEDDING_VERSION, isValidEmbedding } from "./embedding";
+import {
+  buildEmbeddingText,
+  CURRENT_EMBEDDING_VERSION,
+  isValidEmbedding,
+} from "./embedding";
 import {
   articleMediaValidator,
   enrichmentValidator,
@@ -33,7 +37,9 @@ export const classificationValidator = v.object({
   intents: v.optional(v.array(intentValidator)),
   cities: v.optional(v.array(v.string())),
   recipe: v.optional(recipeValidator),
-  embedding: v.optional(v.array(v.float64())),
+  embedding: v.optional(
+    v.object({ text: v.string(), vector: v.array(v.float64()) }),
+  ),
 });
 
 export type Reading = Infer<typeof readingValidator>;
@@ -96,14 +102,44 @@ function settledWords(
     : readingWords(item, reading);
 }
 
+function settledTitle(
+  item: Doc<"items">,
+  keepTitle: boolean | undefined,
+  words: Words,
+): string | undefined {
+  return (item.titleSource === "user" || keepTitle === true) &&
+    item.title !== undefined
+    ? item.title
+    : (words.title ?? item.title);
+}
+
+export function embeddingText(item: Doc<"items">, run: Settlement): string {
+  const words = settledWords(item, run, true);
+  return buildEmbeddingText({
+    title: settledTitle(item, run.keepTitle, words),
+    description: words.description,
+    tags: words.tags,
+    siteName: run.reading.siteName,
+    note: item.note,
+    content: run.reading.content,
+  });
+}
+
 function embeddingPatch(
-  vector: number[] | undefined,
+  item: Doc<"items">,
+  run: Settlement,
   aiAllowed: boolean,
 ): Pick<ItemPatch, "embedding" | "embeddingVersion" | "embeddingAttempts"> {
+  const embedding = run.classification?.embedding;
   // Convex rejects a wrong-width vector at write time, which would fail this whole transaction.
-  if (aiAllowed && vector !== undefined && isValidEmbedding(vector)) {
+  if (
+    aiAllowed &&
+    embedding !== undefined &&
+    embedding.text === embeddingText(item, run) &&
+    isValidEmbedding(embedding.vector)
+  ) {
     return {
-      embedding: vector,
+      embedding: embedding.vector,
       embeddingVersion: CURRENT_EMBEDDING_VERSION,
       embeddingAttempts: undefined,
     };
@@ -117,13 +153,9 @@ export function completionPatch(
   run: Settlement,
   aiAllowed: boolean,
 ): ItemPatch {
-  const { reading, classification } = run;
+  const { reading } = run;
   const words = settledWords(item, run, aiAllowed);
-  const title =
-    (item.titleSource === "user" || run.keepTitle === true) &&
-    item.title !== undefined
-      ? item.title
-      : (words.title ?? item.title);
+  const title = settledTitle(item, run.keepTitle, words);
   return {
     title,
     description: words.description,
@@ -152,6 +184,6 @@ export function completionPatch(
       note: item.note,
       content: reading.content,
     }),
-    ...embeddingPatch(classification?.embedding, aiAllowed),
+    ...embeddingPatch(item, run, aiAllowed),
   };
 }

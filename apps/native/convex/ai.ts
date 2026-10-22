@@ -22,8 +22,11 @@ import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { INTENT_KINDS, normalizeCities } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { sanitizeRecipe } from "./model/recipeMarkup";
-import type { Classification, Reading } from "./model/settlement";
-import { buildEmbeddingText } from "./model/embedding";
+import {
+  embeddingText,
+  type Classification,
+  type Reading,
+} from "./model/settlement";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -844,32 +847,10 @@ async function refreshClaimed(
   });
 }
 
-async function embedForRun(params: {
-  item: { title?: string; titleSource?: "user"; note?: string };
-  refresh: boolean;
-  title?: string;
-  description: string;
-  tags: string[];
-  siteName?: string;
-  content?: string;
-}): Promise<number[] | undefined> {
-  const keepsExistingTitle =
-    params.item.titleSource === "user" || params.refresh;
-  const storedTitle =
-    keepsExistingTitle && params.item.title !== undefined
-      ? params.item.title
-      : params.title;
-  const { vectors } = await embedTexts([
-    buildEmbeddingText({
-      title: storedTitle,
-      description: params.description,
-      tags: params.tags,
-      siteName: params.siteName,
-      note: params.item.note,
-      content: params.content,
-    }),
-  ]);
-  return vectors[0];
+async function embedText(text: string): Promise<Classification["embedding"]> {
+  const { vectors } = await embedTexts([text]);
+  const vector = vectors[0];
+  return vector === undefined ? undefined : { text, vector };
 }
 
 export const processItem = internalAction({
@@ -940,24 +921,19 @@ export const processItem = internalAction({
       const model = (await stillAllowed(ctx, allowedAtStart, item))
         ? outcome.result
         : undefined;
+      const keepTitle = args.refresh === true;
       const reading = readingOf(item, outcome, posterStorageId);
       const classification = model && classificationOf(model);
       const embedding =
         classification &&
-        (await embedForRun({
-          item,
-          refresh: args.refresh === true,
-          title: classification.title,
-          description: classification.description,
-          tags: classification.tags,
-          siteName: reading.siteName,
-          content: reading.content,
-        }));
+        (await embedText(
+          embeddingText(item, { keepTitle, reading, classification }),
+        ));
 
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
-        keepTitle: args.refresh === true,
+        keepTitle,
         reading,
         classification: classification && { ...classification, embedding },
       });

@@ -288,8 +288,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   declined before the run asked or while it ran, the classification is ignored and the save settles
   from the reading alone: the page's title, description and recipe, or a note's first line, plus the
   save's own tags, intents and cities. A recipe the save already has stays when the page offers none.
-  A typed or refreshed title wins, and a vector lands only while AI is allowed (consent not
-  declined). `finalizeItem` is its adapter (run fence, consent read, poster cleanup, telemetry).
+  A typed or refreshed title wins. A vector lands only while AI is allowed (consent not declined)
+  and only if the text it was computed from is the text the save settles to (`embeddingText`);
+  otherwise the stamp and attempts clear and the sweep embeds the save again. `finalizeItem` is its
+  adapter (run fence, consent read, poster cleanup, telemetry).
   `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.

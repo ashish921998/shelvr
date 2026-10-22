@@ -4,7 +4,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { CURRENT_EMBEDDING_VERSION, EMBEDDING_DIMENSIONS } from "./embedding";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
 import type { PageData } from "./pageRead";
-import type { Classification, Reading } from "./settlement";
+import { embeddingText, type Classification, type Reading } from "./settlement";
 
 type FinalizeArgs = FunctionArgs<typeof internal.items.finalizeItem>;
 
@@ -27,7 +27,7 @@ export type Scenario = {
   mode: Mode;
   page: Shape;
   model: Shape;
-  embed: "none" | "valid" | "badWidth" | "zeros" | "notFinite";
+  embed: "none" | "valid" | "badWidth" | "zeros" | "notFinite" | "otherText";
   title: "model" | "blank";
   cities: "sent" | "omitted";
   prior: "none" | "stamped";
@@ -286,8 +286,8 @@ const blankTitles = product({
   }),
 );
 
-const unusableVectors = product({
-  embed: ["zeros", "notFinite"] as const,
+const unusableEmbeddings = product({
+  embed: ["zeros", "notFinite", "otherText"] as const,
   prior: PRIORS,
   before: BEFORES,
 }).map((axes) =>
@@ -305,7 +305,7 @@ export const SCENARIOS: Scenario[] = [
   ...recipes,
   ...omittedCities,
   ...blankTitles,
-  ...unusableVectors,
+  ...unusableEmbeddings,
 ];
 
 export function consentOf(mode: Mode): "granted" | "declined" {
@@ -349,7 +349,10 @@ const EMBEDDINGS = {
   badWidth: [1, 2, 3],
   zeros: vectorOf(0),
   notFinite: [...NEW_VECTOR.slice(0, -1), Number.NaN],
+  otherText: NEW_VECTOR,
 };
+
+const OTHER_TEXT = "the text of another version of this save";
 
 function posterId(
   poster: Scenario["poster"],
@@ -382,8 +385,16 @@ function classificationFor(s: Scenario): Classification {
     ...MODELS[s.model],
     ...(s.title === "blank" ? { title: "" } : {}),
     ...(s.cities === "omitted" ? { cities: undefined } : {}),
-    embedding: EMBEDDINGS[s.embed],
   };
+}
+
+function embeddingFor(
+  s: Scenario,
+  settledText: string,
+): Classification["embedding"] {
+  const vector = EMBEDDINGS[s.embed];
+  if (vector === undefined) return undefined;
+  return { text: s.embed === "otherText" ? OTHER_TEXT : settledText, vector };
 }
 
 export function gridArgs(
@@ -391,13 +402,22 @@ export function gridArgs(
   item: Doc<"items">,
   ids: GridIds,
 ): Omit<FinalizeArgs, "itemId"> {
+  const keepTitle = s.lock === "refresh";
+  const reading = readingFor(s, item, ids);
+  if (MODES[s.mode].asked === "declined") {
+    return { runId: RUN_ID, keepTitle, reading };
+  }
+  const words = classificationFor(s);
+  const settledText = embeddingText(item, {
+    keepTitle,
+    reading,
+    classification: words,
+  });
   return {
     runId: RUN_ID,
-    keepTitle: s.lock === "refresh",
-    reading: readingFor(s, item, ids),
-    ...(MODES[s.mode].asked === "declined"
-      ? {}
-      : { classification: classificationFor(s) }),
+    keepTitle,
+    reading,
+    classification: { ...words, embedding: embeddingFor(s, settledText) },
   };
 }
 

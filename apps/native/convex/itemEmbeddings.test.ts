@@ -120,7 +120,14 @@ describe("finalizeItem", () => {
         title: "Classified",
         description: "A description",
         tags: ["cooking"],
-        embedding: vector(0.02),
+        embedding: {
+          text: buildEmbeddingText({
+            title: "Classified",
+            description: "A description",
+            tags: ["cooking"],
+          }),
+          vector: vector(0.02),
+        },
       },
     });
 
@@ -193,7 +200,13 @@ describe("finalizeItem", () => {
         title: "Stale",
         description: "From a run the user retried past",
         tags: [],
-        embedding: vector(0.04),
+        embedding: {
+          text: buildEmbeddingText({
+            title: "Stale",
+            description: "From a run the user retried past",
+          }),
+          vector: vector(0.04),
+        },
       },
     });
 
