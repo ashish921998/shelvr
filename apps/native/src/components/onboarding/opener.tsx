@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
-import { fadeIn, fadeOut, motion, motionCSS } from "@/lib/motion";
+import { motion, motionCSS } from "@/lib/motion";
 import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { PhoneFrame } from "@/components/onboarding/opener-phone";
@@ -12,17 +12,19 @@ import {
   type SceneProps,
 } from "@/components/onboarding/opener-scenes";
 import { CtaButton } from "@/components/onboarding/parts";
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
+  AccessibilityInfo,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   Text,
   View,
 } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
 type Page = {
@@ -60,6 +62,30 @@ const PAGES: Page[] = [
 ];
 
 const COPY_MIN_HEIGHT = 150;
+const AUTO_ADVANCE_MS = 4000;
+
+function useLiveReducedMotion() {
+  const [reduced, setReduced] = useState(useReducedMotion());
+  useEffect(() => {
+    let mounted = true;
+    let changed = false;
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      (enabled) => {
+        changed = true;
+        setReduced(enabled);
+      },
+    );
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted && !changed) setReduced(enabled);
+    });
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+  return reduced;
+}
 
 export function OpenerStep({
   onStart,
@@ -75,12 +101,24 @@ export function OpenerStep({
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [page, setPage] = useState(0);
   const [reached, setReached] = useState(0);
+  const [swiped, setSwiped] = useState(false);
+  const reducedMotion = useLiveReducedMotion();
+  const pager = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     if (viewedPages.has(page)) return;
     viewedPages.add(page);
     analytics.capture("onboarding_opener_page_viewed", { page_index: page });
   }, [page, viewedPages]);
+
+  useEffect(() => {
+    if (swiped || reducedMotion || size.width <= 0) return;
+    if (page >= PAGES.length - 1) return;
+    const timer = setTimeout(() => {
+      pager.current?.scrollTo({ x: (page + 1) * size.width, animated: true });
+    }, AUTO_ADVANCE_MS);
+    return () => clearTimeout(timer);
+  }, [page, swiped, reducedMotion, size.width]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -116,11 +154,13 @@ export function OpenerStep({
   return (
     <View style={styles.wrap}>
       <ScrollView
+        ref={pager}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}
+        onScrollBeginDrag={() => setSwiped(true)}
         onLayout={onLayout}
         style={styles.pager}
       >
@@ -132,6 +172,7 @@ export function OpenerStep({
                 contentContainerStyle={styles.page}
                 alwaysBounceVertical={false}
                 showsVerticalScrollIndicator={false}
+                onScrollBeginDrag={() => setSwiped(true)}
               >
                 <PhoneFrame
                   overlay={
@@ -150,7 +191,7 @@ export function OpenerStep({
                   </Text>
                   <Text style={styles.support}>{t(item.body)}</Text>
                 </View>
-                {largeText && index === 0 ? signIn : null}
+                {largeText ? signIn : null}
               </ScrollView>
             ))
           : null}
@@ -180,15 +221,7 @@ export function OpenerStep({
 
       <View style={styles.foot}>
         <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-        {largeText ? null : (
-          <View style={styles.signInSlot}>
-            {page === 0 ? (
-              <Animated.View entering={fadeIn} exiting={fadeOut}>
-                {signIn}
-              </Animated.View>
-            ) : null}
-          </View>
-        )}
+        {largeText ? null : signIn}
       </View>
     </View>
   );
@@ -244,10 +277,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   foot: {
     gap: theme.gap(1.5),
-  },
-  signInSlot: {
-    minHeight: 44,
-    justifyContent: "center",
   },
   signIn: {
     minHeight: 44,
