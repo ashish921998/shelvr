@@ -340,7 +340,14 @@ function recipeFromMarkup(
   html: string,
   truncated: true | undefined,
 ): Recipe | undefined {
-  return truncated ? undefined : sanitizeRecipe(extractRecipeMarkup(html));
+  if (!truncated) return sanitizeRecipe(extractRecipeMarkup(html));
+  // A cut page can end mid-recipe or drop a second recipe, but a head that arrived whole is complete.
+  const headEnd = html.search(/<\/head\s*>/i);
+  return headEnd === -1
+    ? undefined
+    : sanitizeRecipe(
+        extractRecipeMarkup(`${html.slice(0, headEnd)}</head></html>`),
+      );
 }
 
 export async function withLinkedRecipe(page: PageData): Promise<PageData> {
