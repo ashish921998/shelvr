@@ -82,6 +82,16 @@ const SF_TO_MATERIAL = {
   "fork.knife": "restaurant",
   lock: "lock",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
+  // The onboarding opener's drawn phone: a video's rail, a share sheet's
+  // apps, and the icon tiles of a travel space.
+  "heart.fill": "favorite",
+  "bubble.right.fill": "chat_bubble",
+  "square.and.arrow.up.fill": "ios_share",
+  "message.fill": "chat",
+  "note.text": "sticky_note_2",
+  "cup.and.saucer.fill": "local_cafe",
+  "binoculars.fill": "landscape",
+  "paintpalette.fill": "palette",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;

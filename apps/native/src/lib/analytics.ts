@@ -94,6 +94,9 @@ export type AnalyticsEventProperties = {
     flow_version: number;
     duration_ms: number;
   };
+  // The opener step's three swipeable pages (onboarding/opener.tsx). Fired
+  // the first time each page is shown in a mount; swiping back fires nothing.
+  onboarding_opener_page_viewed: { page_index: number };
   // The four OAuth flow events share one `auth_attempt_id` per
   // `signInWith` call, so a funnel can pair each start with the outcome that
   // ended it and count repeat starts by one person without guessing on time.

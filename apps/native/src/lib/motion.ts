@@ -2,6 +2,7 @@ import {
   cubicBezier,
   Easing,
   FadeIn,
+  FadeInDown,
   FadeOut,
   ReduceMotion,
 } from "react-native-reanimated";
@@ -112,6 +113,12 @@ export const settleIn = (delay: number) =>
     .duration(520)
     .easing(easing.out)
     .reduceMotion(ReduceMotion.Never);
+
+/** A short rise with a fade, for a sheet or a toast settling into place. It
+ * moves, so Reduce Motion drops it to a plain appearance. */
+export const riseIn = FadeInDown.duration(duration.enter)
+  .easing(easing.out)
+  .reduceMotion(ReduceMotion.System);
 
 // Reduced motion keeps the state change legible without translation or scale.
 export const REDUCED_FADE_IN = FadeIn.duration(duration.feedback)
