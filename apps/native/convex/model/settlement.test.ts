@@ -40,6 +40,42 @@ function patched(item: Doc<"items">, patch: ItemPatch): Doc<"items"> {
   return next as Doc<"items">;
 }
 
+function savedItem(fields: Partial<Doc<"items">> = {}): Doc<"items"> {
+  return {
+    _id: "item" as Id<"items">,
+    _creationTime: 0,
+    userId: "owner" as Id<"users">,
+    type: "link",
+    status: "failed",
+    tags: [],
+    searchText: "",
+    ...fields,
+  };
+}
+
+describe("a run without the model", () => {
+  const saved = { ingredients: ["saved ingredient"], steps: ["saved step"] };
+  const page = { ingredients: ["page ingredient"], steps: ["page step"] };
+
+  it("keeps the recipe the save already has when the page offers none", () => {
+    const patch = completionPatch(
+      savedItem({ recipe: saved }),
+      { reading: {} },
+      true,
+    );
+    expect(patch.recipe).toEqual(saved);
+  });
+
+  it("takes the page's recipe when the page offers one", () => {
+    const patch = completionPatch(
+      savedItem({ recipe: saved }),
+      { reading: { recipe: page } },
+      true,
+    );
+    expect(patch.recipe).toEqual(page);
+  });
+});
+
 describe("completionPatch", () => {
   it("replays exactly the scenarios the database pass recorded", () => {
     expect(Object.keys(rows).sort()).toEqual(SCENARIOS.map((s) => s.id).sort());

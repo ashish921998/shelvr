@@ -68,7 +68,7 @@ function readingWords(item: Doc<"items">, reading: Reading): Words {
     tags: item.tags,
     intents: item.intents ?? [],
     cities: item.cities,
-    recipe: reading.recipe,
+    recipe: reading.recipe ?? item.recipe,
   };
 }
 
