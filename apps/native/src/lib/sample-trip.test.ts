@@ -3,6 +3,7 @@ import en from "@/locales/en.json";
 import { isSampleCity, SAMPLE_CITIES, SAMPLE_CITY_IDS } from "./sample-cities";
 import {
   DEFAULT_SAMPLE_CITY,
+  PIN_SIZE,
   SAMPLE_CROPS,
   SAMPLE_MAP,
   SAMPLE_SLOT_LABELS,
@@ -10,7 +11,10 @@ import {
   sampleStops,
   sampleTrip,
   showTripTeaser,
+  WATER_CLEARANCE,
 } from "./sample-trip";
+
+const ROUNDING_SLACK = 0.5;
 
 describe("showTripTeaser", () => {
   it.each([
@@ -82,7 +86,7 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
   it.each(Object.entries(SAMPLE_CROPS))(
     "keeps every pin, and its edge, inside the %s crop",
     (_, crop) => {
-      const edge = 11;
+      const edge = PIN_SIZE / 2;
       for (const { stop } of stops) {
         expect(stop.pin.x - edge).toBeGreaterThanOrEqual(0);
         expect(stop.pin.x + edge).toBeLessThanOrEqual(SAMPLE_MAP.width);
@@ -99,7 +103,7 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
           a.stop.pin.x - b.stop.pin.x,
           a.stop.pin.y - b.stop.pin.y,
         );
-        expect(apart).toBeGreaterThanOrEqual(20);
+        expect(apart).toBeGreaterThanOrEqual(PIN_SIZE - 2);
       }
     }
   });
@@ -119,7 +123,7 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
           .map((stop) => stop.name),
       ),
     );
-    const room = trip.waterWidth / 2 + 7.5;
+    const room = trip.waterWidth / 2 + WATER_CLEARANCE - ROUNDING_SLACK;
     for (const { stop } of sampleStops(trip)) {
       if (onWater.has(stop.name)) continue;
       for (const line of lines) {
@@ -153,9 +157,7 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
       trip.name,
       ...Object.values(SAMPLE_SLOT_LABELS),
       ...trip.days.map((day) => day.title),
-      ...trip.saves.flatMap((save) =>
-        "label" in save.source ? [save.source.label] : [],
-      ),
+      ...trip.saves.map((save) => save.source),
     ];
     for (const key of keys) expect(en).toHaveProperty([key]);
   });

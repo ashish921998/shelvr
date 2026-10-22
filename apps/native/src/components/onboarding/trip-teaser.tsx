@@ -57,8 +57,7 @@ function SaveRow({
   divider: boolean;
 }) {
   const { theme } = useUnistyles();
-  const source =
-    "host" in save.source ? save.source.host : t(save.source.label);
+  const source = t(save.source);
   return (
     <View style={[styles.saveRow, divider && styles.divider]}>
       <View style={styles.thumb}>

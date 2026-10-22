@@ -1,6 +1,7 @@
 import { isDarkThemeName } from "@/lib/appearance";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
+  PIN_SIZE,
   SAMPLE_MAP,
   sampleStops,
   type SampleCrop,
@@ -17,7 +18,6 @@ import { useState } from "react";
 import { Text, View, type LayoutChangeEvent } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const PIN_SIZE = 22;
 const BLOCKS = [
   [226, 52, 34, 16],
   [268, 60, 30, 20],

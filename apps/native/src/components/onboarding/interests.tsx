@@ -12,7 +12,7 @@ import {
 } from "@/lib/sample-cities";
 import {
   TRAVEL_VIBES,
-  VIBES_INTEREST,
+  TRAVEL_INTEREST,
   type TravelVibe,
 } from "@/lib/travel-vibes";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
@@ -68,11 +68,11 @@ export function InterestsStep({
             ))}
           </View>
 
-          {picked.includes(VIBES_INTEREST) ? (
+          {picked.includes(TRAVEL_INTEREST) ? (
             <View style={styles.card}>
               <View style={styles.cardHead}>
                 <Text style={styles.eyebrow}>
-                  {onboardingLabel(VIBES_INTEREST)}
+                  {onboardingLabel(TRAVEL_INTEREST)}
                 </Text>
                 <Text style={styles.cardTitle}>
                   {t("interests.vibesTitle")}

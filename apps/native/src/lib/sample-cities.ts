@@ -26,7 +26,7 @@ type CityStop = {
 export type SampleDay = { title: TextMessageKey; stops: readonly CityStop[] };
 export type SampleSave = {
   name: string;
-  source: { host: string } | { label: TextMessageKey };
+  source: TextMessageKey;
   places: number;
   picture: "food" | "view" | "place";
 };
@@ -39,6 +39,7 @@ export type SampleCity = {
 };
 
 const ON_WATER = true;
+const STREAM_WIDTH = 6;
 
 type DayStop = Omit<CityStop, "slot">;
 
@@ -85,24 +86,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Barcelona",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Barcelona",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save(
-        "Catedral de Barcelona",
-        { label: "tripTeaser.sourcePlace" },
-        1,
-        "place",
-      ),
+      save("Where to eat in Barcelona", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Barcelona", "tripTeaser.sourceArticle", 3, "view"),
+      save("Catedral de Barcelona", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.barcelonaDayOne", [
@@ -135,24 +121,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Lisbon",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Lisbon",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save(
-        "Praça do Comércio",
-        { label: "tripTeaser.sourcePlace" },
-        1,
-        "place",
-      ),
+      save("Where to eat in Lisbon", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Lisbon", "tripTeaser.sourceArticle", 3, "view"),
+      save("Praça do Comércio", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.lisbonDayOne", [
@@ -186,19 +157,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in London",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in London",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save("Tower Bridge", { label: "tripTeaser.sourcePlace" }, 1, "place"),
+      save("Where to eat in London", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in London", "tripTeaser.sourceArticle", 3, "view"),
+      save("Tower Bridge", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.londonDayOne", [
@@ -229,24 +190,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Los Angeles",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Los Angeles",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save(
-        "Griffith Observatory",
-        { label: "tripTeaser.sourcePlace" },
-        1,
-        "place",
-      ),
+      save("Where to eat in Los Angeles", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Los Angeles", "tripTeaser.sourceArticle", 3, "view"),
+      save("Griffith Observatory", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.losAngelesDayOne", [
@@ -283,24 +229,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in New York",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in New York",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save(
-        "Washington Square Park",
-        { label: "tripTeaser.sourcePlace" },
-        1,
-        "place",
-      ),
+      save("Where to eat in New York", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in New York", "tripTeaser.sourceArticle", 3, "view"),
+      save("Washington Square Park", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.newYorkDayOne", [
@@ -332,19 +263,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Paris",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Paris",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save("Place des Vosges", { label: "tripTeaser.sourcePlace" }, 1, "place"),
+      save("Where to eat in Paris", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Paris", "tripTeaser.sourceArticle", 3, "view"),
+      save("Place des Vosges", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.parisDayOne", [
@@ -376,19 +297,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Prague",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Prague",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save("Old Town Square", { label: "tripTeaser.sourcePlace" }, 1, "place"),
+      save("Where to eat in Prague", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Prague", "tripTeaser.sourceArticle", 3, "view"),
+      save("Old Town Square", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.pragueDayOne", [
@@ -421,19 +332,14 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in San Francisco",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
+      save("Where to eat in San Francisco", "tripTeaser.sourceReel", 4, "food"),
       save(
         "Three days in San Francisco",
-        { label: "tripTeaser.sourceArticle" },
+        "tripTeaser.sourceArticle",
         3,
         "view",
       ),
-      save("Lombard Street", { label: "tripTeaser.sourcePlace" }, 1, "place"),
+      save("Lombard Street", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.sanFranciscoDayOne", [
@@ -452,7 +358,7 @@ export const SAMPLE_CITIES = {
   },
   seoul: {
     name: "tripTeaser.citySeoul",
-    waterWidth: 6,
+    waterWidth: STREAM_WIDTH,
     water: [
       [
         { lat: 37.53, lng: 126.93 },
@@ -472,24 +378,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Seoul",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Seoul",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save(
-        "Gyeongbokgung Palace",
-        { label: "tripTeaser.sourcePlace" },
-        1,
-        "place",
-      ),
+      save("Where to eat in Seoul", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Seoul", "tripTeaser.sourceArticle", 3, "view"),
+      save("Gyeongbokgung Palace", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.seoulDayOne", [
@@ -520,24 +411,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Tokyo",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Tokyo",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save(
-        "Shibuya Scramble Crossing",
-        { label: "tripTeaser.sourcePlace" },
-        1,
-        "place",
-      ),
+      save("Where to eat in Tokyo", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Tokyo", "tripTeaser.sourceArticle", 3, "view"),
+      save("Shibuya Scramble Crossing", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.tokyoDayOne", [
@@ -568,19 +444,9 @@ export const SAMPLE_CITIES = {
       ],
     ],
     saves: [
-      save(
-        "Where to eat in Toronto",
-        { label: "tripTeaser.sourceReel" },
-        4,
-        "food",
-      ),
-      save(
-        "Three days in Toronto",
-        { label: "tripTeaser.sourceArticle" },
-        3,
-        "view",
-      ),
-      save("CN Tower", { label: "tripTeaser.sourcePlace" }, 1, "place"),
+      save("Where to eat in Toronto", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Toronto", "tripTeaser.sourceArticle", 3, "view"),
+      save("CN Tower", "tripTeaser.sourcePlace", 1, "place"),
     ],
     days: [
       day("tripTeaser.torontoDayOne", [

@@ -60,9 +60,10 @@ export type SampleTrip = {
 };
 
 const PIN_BOX = { left: 26, right: 314, top: 50, bottom: 136 };
-const PIN_GAP = 24;
+export const PIN_SIZE = 22;
+const PIN_GAP = PIN_SIZE + 2;
 const WATER_WIDTH = 16;
-const WATER_CLEARANCE = 8;
+export const WATER_CLEARANCE = 8;
 const CROSSING_REACH = 3;
 const SPREAD_ROUNDS = 80;
 const SAME_SPOT_SLANT = [0.8, 0.6] as const;
@@ -91,7 +92,7 @@ const clamp = (value: number, low: number, high: number) =>
 
 type Water = { lines: readonly (readonly Point[])[]; width: number };
 
-type Nearest = { near: Point; distance: number; side: number; normal: Point };
+type Nearest = { near: Point; distance: number; side: 1 | -1; normal: Point };
 
 function nearestOnLine(pin: Point, line: readonly Point[]): Nearest {
   let best: Nearest = {
