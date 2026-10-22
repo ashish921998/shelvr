@@ -46,7 +46,6 @@ export default function PhotoTidy() {
     if (!swipe) setSwipe(dir);
   };
 
-  // A swipe flies the top card off, then the deck advances.
   useEffect(() => {
     if (!swipe) return;
     const timer = setTimeout(() => {
@@ -57,7 +56,6 @@ export default function PhotoTidy() {
     return () => clearTimeout(timer);
   }, [swipe]);
 
-  // Auto-swipe, alternating right and left, only while on screen.
   useEffect(() => {
     if (!inView || reduced || swipe) return;
     const timer = setTimeout(

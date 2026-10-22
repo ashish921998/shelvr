@@ -6,7 +6,6 @@ import { isPublicAddress } from "./safeFetch";
 
 const octet = fc.integer({ min: 0, max: 255 });
 
-/** An IPv4 address inside `base/prefix`, as four octets. */
 function inRange(base: [number, number, number, number], prefix: number) {
   const start =
     ((base[0] << 24) | (base[1] << 16) | (base[2] << 8) | base[3]) >>> 0;
@@ -16,8 +15,6 @@ function inRange(base: [number, number, number, number], prefix: number) {
   });
 }
 
-// Ranges a link save must never reach: the server's own network, the cloud
-// metadata service, and everything not routable on the public internet.
 const PRIVATE = fc.oneof(
   inRange([0, 0, 0, 0], 8),
   inRange([10, 0, 0, 0], 8),
@@ -58,7 +55,6 @@ describe("isPublicAddress", () => {
   it("never allows a string that is not an IP address", () => {
     fc.assert(
       fc.property(fc.string(), (s) => {
-        // Let the parser decide: ipaddr.js also accepts forms like `0x8.8.8.8`.
         fc.pre(!ipaddr.isValid(s));
         expect(isPublicAddress(s)).toBe(false);
       }),

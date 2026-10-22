@@ -5,7 +5,6 @@ import {
   type RefObject,
 } from "react";
 
-/** Whether the element is on screen, so demos can pause their timers when it isn't. */
 export function useInView(ref: RefObject<Element | null>, threshold = 0) {
   const [inView, setInView] = useState(false);
   useEffect(() => {

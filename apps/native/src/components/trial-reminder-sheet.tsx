@@ -7,10 +7,6 @@ import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { PromptSheet } from "@/components/ui/prompt-sheet";
 
-/**
- * Says what the trial reminder is for before the OS permission prompt, so the
- * ask comes with a reason the user cares about: no surprise renewal.
- */
 export function TrialReminderPrimerSheet() {
   useAppLocale();
   const open = useTrialReminderPrimerOpen();

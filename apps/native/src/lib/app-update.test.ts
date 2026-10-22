@@ -8,7 +8,6 @@ import {
   type UpdateSignals,
 } from "./app-update";
 
-// The module reads __DEV__ at import; a release build is what ships.
 vi.hoisted(() => {
   (globalThis as { __DEV__?: boolean }).__DEV__ = false;
 });
@@ -177,7 +176,6 @@ describe("useAppUpdate", () => {
       "update_restart_failed",
       expect.any(Error),
     );
-    // The retry restarts again rather than starting a new check.
     updates.reloadAsync.mockResolvedValue(undefined);
     await act(() => result.current.act());
     expect(updates.reloadAsync).toHaveBeenCalledTimes(2);

@@ -104,7 +104,6 @@ describe("useNextUp", () => {
       kind: "read",
     });
 
-    // The server is asked to skip it and answers with the next save.
     expect(mock.lastArgs).toMatchObject({ skip: ["item-1"] });
     mock.data = { kind: "cook", subject: "Lasagna", item: { _id: "item-2" } };
     rerender();

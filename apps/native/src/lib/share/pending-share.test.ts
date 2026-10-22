@@ -72,9 +72,6 @@ describe("discarded share record", () => {
 
 describe("decidePostAuthRoute", () => {
   it("resumes the share flow when a share is owed", () => {
-    // The two owed signals (deferred flag, resumable payload batch) merge
-    // into hasOwedShare at the call site, so the matrix collapses to the
-    // outcome itself.
     expect(decidePostAuthRoute({ hasOwedShare: true })).toBe("/share");
   });
 

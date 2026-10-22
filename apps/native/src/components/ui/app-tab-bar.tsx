@@ -51,12 +51,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 
-// The Android and web tab bar: a floating pill of four tabs beside a round
-// search button. A finger can scrub across the pill, with a tick as it crosses
-// each tab, and the pill stretches when pulled past its edge. Opening Search
-// collapses the pill into a single button back to the last tab and grows the
-// search button into the field, mirroring the iOS search tab.
-
 const PILL_TABS = [
   {
     name: "(home)",
@@ -100,31 +94,18 @@ const BAR_SIDE = 16;
 const BAR_GAP = 10;
 const PILL_INSET = 5;
 const ICON_SIZE = 22;
-/** Space between the bar and the screen content above it. */
 const CONTENT_GAP = 12;
-/** Bar lift above the keyboard while typing a search. */
 const KEYBOARD_BOTTOM = 8;
-/** How far a scrubbing finger may drift above or below the pill and still pick
- * a tab. Past it, releasing cancels the switch. */
 const VERTICAL_SLOP = 28;
 const GLOW_SIZE = 140;
-/** Largest extra stretch along the pull, as a fraction of the pill's size. */
 const MAX_STRETCH = 0.1;
-/** How much the cross axis narrows as the pull axis stretches. */
 const SQUASH = 0.5;
-/** How far the pill drifts toward the finger, as a fraction of the pull. */
 const DRIFT = 0.3;
 const PRESS_GROWTH = 0.03;
-/** Lets the collapse settle before the keyboard slides in over it. */
 const SEARCH_FOCUS_DELAY_MS = 160;
-/** Sideways travel before a press counts as a scrub. Below it, a tap never
- * flashes the name bubble. */
 const SCRUB_SLOP = 8;
-/** Room for one tab-name bubble, centred over its tab. The bubble itself is
- * only as wide as its (translated) text. */
 const SCRUB_LABEL_WIDTH = 132;
 const SCRUB_LABEL_HEIGHT = 30;
-/** Gap between the top of the pill and the bottom of the name bubble. */
 const SCRUB_LABEL_LIFT = 10;
 
 const PRESS_SPRING = { damping: 20, stiffness: 320, mass: 0.7 };
@@ -165,8 +146,6 @@ export function AppTabs() {
   const insets = useSafeAreaInsets();
   const restingBottom = Math.max(insets.bottom, 10);
 
-  // The search text lives as long as the tabs, like the iOS Search screen's
-  // own state. Signing out unmounts them, so the next account starts empty.
   useEffect(() => () => setTabSearchQuery(""), []);
 
   return (
@@ -185,7 +164,6 @@ export function AppTabs() {
             { paddingBottom: restingBottom + BAR_HEIGHT + CONTENT_GAP },
           ]}
         />
-        {/* Registers the routes with the navigator; FloatingTabBar draws them. */}
         <TabList style={styles.routeRegistry}>
           {[...PILL_TABS, SEARCH_TAB].map((tab) => (
             <TabTrigger key={tab.name} name={tab.name} href={tab.href} />
@@ -205,7 +183,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   const query = useTabSearchQuery();
   const inputRef = useRef<TextInputInstance>(null);
 
-  // One call per route rather than a loop, so the hook order never changes.
   const home = useTabTrigger({ name: PILL_TABS[0].name });
   const spaces = useTabTrigger({ name: PILL_TABS[1].name });
   const tidy = useTabTrigger({ name: PILL_TABS[2].name });
@@ -217,8 +194,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     (trigger) => trigger.triggerProps.isFocused,
   );
   const searchFocused = search.triggerProps.isFocused;
-  // The tab the collapsed pill returns to. Home when Search was reached some
-  // other way, such as a deep link.
   const [returnIndex, setReturnIndex] = useState(Math.max(focusedIndex, 0));
 
   const pillWidth = windowWidth - BAR_SIDE * 2 - BAR_GAP - BAR_HEIGHT;
@@ -243,15 +218,10 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   const touchY = useSharedValue(0);
   const glow = useSharedValue(0);
   const searchPressed = useSharedValue(0);
-  // 1 once the finger has travelled past SCRUB_SLOP since touching down.
   const scrubbing = useSharedValue(0);
   const touchStartX = useSharedValue(0);
-  // The pill scales and drifts under the finger, so a touch's view-relative
-  // x/y stop matching its resting layout. Where the resting pill sits on screen
-  // is recorded at touch down, and later points are measured from there.
   const originX = useSharedValue(0);
   const originY = useSharedValue(0);
-  // The finger driving the gesture; others are ignored. -1 when idle.
   const touchId = useSharedValue(-1);
 
   useEffect(() => {
@@ -259,8 +229,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   }, [morph, searchFocused]);
 
   useEffect(() => {
-    // Check the render's revision on the UI thread, where a newer release may
-    // already have selected another tab while this effect was waiting to run.
     scheduleOnUI(() => {
       selection.set(
         reconcileTabSelection(selection.get(), focusedIndex, renderedRevision),
@@ -300,8 +268,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     selectTab(returnIndex);
   };
 
-  // Rebuilt each render so the worklets always call this render's handlers;
-  // GestureDetector updates the attached gesture in place.
   const pillGesture = Gesture.Manual()
     .shouldCancelWhenOutside(false)
     .onTouchesDown((event, manager) => {
@@ -376,8 +342,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
       pullX.set(withSpring(0, SETTLE_SPRING));
       pullY.set(withSpring(0, SETTLE_SPRING));
       if (morph.get() > 0.5) {
-        // Collapsed, the pill is one round button: only a release over it
-        // counts, so dragging off is a way to cancel.
         const x = touchX.get();
         const y = touchY.get();
         const releasedInside =
@@ -600,10 +564,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   );
 }
 
-/** The name of the tab under a scrubbing finger, floated above the pill so the
- * finger never covers it. There is one per tab so each bubble sizes to its own
- * translation, and only the hovered one shows. It is decorative: TalkBack
- * already announces every tab by name. */
 function ScrubLabel({
   index,
   label,
@@ -715,8 +675,6 @@ const styles = StyleSheet.create((theme) => {
     fill: {
       ...StyleSheet.absoluteFillObject,
     },
-    // A soft top-lit sheen, strong enough to read on the light palette and
-    // faint on the dark ones.
     sheen: {
       ...StyleSheet.absoluteFillObject,
       experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(

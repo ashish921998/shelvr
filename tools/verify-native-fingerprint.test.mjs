@@ -139,7 +139,6 @@ test("the early warning names the release gate as what enforces compatibility", 
   const report = drifted(true);
   assert.match(report, /early warning and does not fail the check/);
   assert.match(report, /verify-ota-compatibility\.mjs/);
-  // Same comparison either way: the flag changes the verdict, not the finding.
   assert.match(report, /ios {6}1111111 -> 2222222 {2}CHANGED/);
   assert.match(report, /posthog-react-native/);
   assert.match(report, /Native-Fingerprint: changed/);

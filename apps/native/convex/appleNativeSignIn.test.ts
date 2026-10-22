@@ -7,14 +7,10 @@ import { api } from "./_generated/api";
 import { gate, newConvexTest, seedNotes } from "./test.setup";
 import { DELETE_BATCH } from "./users";
 
-// The native Sign in with Apple path end to end: the client's identity token
-// goes in, a session comes out, and the account lands where the web Apple flow
-// keeps it.
 const NONCE = "raw-nonce";
 const SUB = "001234.abcdef.5678";
 
 let appleKey: CryptoKey;
-// What Apple's token endpoint answers the code exchange with.
 let exchange: () => Response | Promise<Response>;
 const exchanges: URLSearchParams[] = [];
 const revocations: URLSearchParams[] = [];
@@ -106,7 +102,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// The .p8 key the deployment signs Apple client secrets with.
 async function configureRevocation() {
   const pair = await crypto.subtle.generateKey(
     { name: "ECDSA", namedCurve: "P-256" },
@@ -184,7 +179,6 @@ describe("keeping Apple's refresh token from the native sheet", () => {
 
   it("drops a token whose code belongs to another Apple account", async () => {
     await configureRevocation();
-    // Someone sends their own valid sign-in with another account's code.
     const theirs = await identityToken({
       sub: "000999.other",
       nonce: undefined,
@@ -261,8 +255,6 @@ describe("keeping Apple's refresh token from the native sheet", () => {
     async (ownerState, outcome) => {
       await configureRevocation();
       const backend = newConvexTest();
-      // The account exists before the sign-in under test, with enough rows that
-      // the first deletion pass leaves the owner row behind, marked.
       await signIn(backend, {
         identityToken: await identityToken(),
         nonce: NONCE,
@@ -277,8 +269,6 @@ describe("keeping Apple's refresh token from the native sheet", () => {
         }),
       );
 
-      // Hold Apple's answer: the user was verified and created before the
-      // exchange, so deletion landing here is the race under test.
       const owned = await identityToken({ nonce: undefined });
       const exchangeGate = gate();
       exchange = () =>
@@ -312,7 +302,6 @@ describe("keeping Apple's refresh token from the native sheet", () => {
       await signingIn;
       expect(exchanges).toHaveLength(1);
       expect(await appleTokens(backend)).toEqual([]);
-      // Assert scalar facts, never dump a request body containing credentials.
       expect(revocations).toHaveLength(1);
       expect(revocations[0].get("client_id")).toBe("app.shelvr.save");
       expect(revocations[0].get("token") === "r.native").toBe(true);
@@ -391,8 +380,6 @@ describe("native Sign in with Apple", () => {
       name: "Ada Lovelace",
     });
 
-    // Apple hands over the name only once, and a later token may carry no
-    // email either.
     const result = await signIn(backend, {
       identityToken: await identityToken({ email: undefined }),
       nonce: NONCE,

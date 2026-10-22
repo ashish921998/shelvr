@@ -7,7 +7,6 @@ import { arrivalCampaign } from "@/lib/appStore";
 
 const inputId = "android-waitlist-email";
 
-// Classes for the dark closing panel and for a light page such as /p/<token>.
 const tones = {
   dark: {
     label: "text-dark-muted",
@@ -27,7 +26,6 @@ const tones = {
 };
 
 type AndroidWaitlistProps = {
-  // The closing panel's events and route still call it "footer".
   source?: "footer" | "plan" | "bio";
   tone?: keyof typeof tones;
 };
@@ -43,7 +41,6 @@ export default function AndroidWaitlist({
   >("idle");
   const [message, setMessage] = useState("");
 
-  // The visit's `?ct=` campaign, so a bio link's signups split by account.
   function track(event: string) {
     const campaign = arrivalCampaign(window.location.search);
     captureWebAnalyticsEvent(event, {
@@ -52,7 +49,6 @@ export default function AndroidWaitlist({
     });
   }
 
-  // The form is always visible now, so "opened" means the first focus.
   function open() {
     if (opened) return;
     setOpened(true);
@@ -147,7 +143,6 @@ export default function AndroidWaitlist({
           </button>
         </form>
       )}
-      {/* Always mounted, so screen readers announce the success. */}
       <div role="status">
         {status === "success" ? (
           <p

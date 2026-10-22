@@ -88,7 +88,6 @@ describe("isGrounded", () => {
     expect(
       isGrounded("Lilia", source({ content: "Dinner at @eatatlilia" })),
     ).toBe(true);
-    // A short word must start the handle: "@toronto_eats" is not "Oro".
     expect(isGrounded("Oro", source({ author: "@toronto_eats" }))).toBe(false);
   });
 
@@ -349,7 +348,6 @@ describe("sanitizePlan", () => {
       sources,
     );
     expect(pick.name).toBe("The Palomar");
-    // A comma that is part of the name stays.
     const [kept] = sanitizePlan(
       [{ saveNumber: 1, name: "The Palomar, Soho", area: "", why: "Go" }],
       sources,

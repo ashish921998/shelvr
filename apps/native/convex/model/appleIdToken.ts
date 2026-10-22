@@ -1,15 +1,3 @@
-/**
- * Verifies the identity token the native Sign in with Apple sheet returns.
- *
- * A token is trusted only when Apple's published keys signed it, it names
- * Apple as issuer and one of this deployment's bundle ids as audience, it has
- * not expired, and it answers the nonce this sign-in was started with.
- *
- * The app hands Apple the SHA-256 of a random value and sends the value
- * itself here. Apple copies what it was given into the `nonce` claim
- * unchanged, so the claim must equal the hash of the value received. A token
- * that leaks on its own cannot be replayed without the value behind it.
- */
 import {
   createLocalJWKSet,
   errors,
@@ -22,7 +10,6 @@ import { sha256Hex } from "./captureTokens";
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys";
 
-/** Bounded, so a rejection can be logged without any token content. */
 type AppleIdTokenFailure =
   | "keys_unavailable"
   | "bad_signature"
@@ -41,8 +28,6 @@ export class AppleIdTokenError extends Error {
 
 type AppleKeySource = () => Promise<JSONWebKeySet>;
 
-// ponytail: fetched on every sign-in, with no cache. Cache the set by its
-// Cache-Control lifetime if sign-in volume ever makes the extra request matter.
 const fetchAppleKeys: AppleKeySource = async () => {
   const response = await fetch(APPLE_KEYS_URL);
   if (!response.ok) throw new AppleIdTokenError("keys_unavailable");
@@ -64,7 +49,6 @@ function failureOf(error: unknown): AppleIdTokenFailure {
   return "invalid";
 }
 
-/** Checks Apple's signature, issuer, audience and expiry, and nothing else. */
 async function signedClaims(
   identityToken: string,
   audiences: string[],
@@ -84,11 +68,6 @@ async function signedClaims(
   return { ...payload, sub: payload.sub };
 }
 
-/**
- * The Apple account an identity token from Apple's own token endpoint names.
- * That token answers a code exchange, not a sign-in the app started, so there
- * is no nonce of ours to hold it to; the signature and audience still are.
- */
 export async function appleTokenSubject({
   identityToken,
   audience,
@@ -108,7 +87,6 @@ export async function verifyAppleIdToken({
   keys = fetchAppleKeys,
 }: {
   identityToken: string;
-  /** The raw value whose SHA-256 the app gave Apple. */
   nonce: string;
   audiences: string[];
   keys?: AppleKeySource;
@@ -116,12 +94,8 @@ export async function verifyAppleIdToken({
   const payload = await signedClaims(identityToken, audiences, keys);
   if (payload.nonce !== (await sha256Hex(nonce)))
     throw new AppleIdTokenError("wrong_nonce");
-  // Apple sends `email_verified` as a boolean or the string "true". A new
-  // account links to an existing user by email, so an unverified one is
-  // dropped rather than trusted.
   const verified =
     payload.email_verified === true || payload.email_verified === "true";
-  // jose has already required one of `audiences`; name the one it matched.
   const claimed = [payload.aud ?? []].flat();
   const audience = audiences.find((allowed) => claimed.includes(allowed));
   if (audience === undefined) throw new AppleIdTokenError("invalid");

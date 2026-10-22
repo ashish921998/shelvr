@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// A lapsed user sharing into Shelvr must reach exactly one paywall per share
-// session, however many times the save effect re-runs before they decide, and
-// the save must still start once the purchase lands.
 import {
   act,
   fireEvent,
@@ -38,9 +35,6 @@ const mock = vi.hoisted(() => ({
   sharedPayloads: [] as RawPayload[],
   resolvedSharedPayloads: [] as unknown[],
   isResolving: false,
-  // When set, the hook mock behaves like the real one: the raw batch is there
-  // on the first render with isResolving false, and resolution starts in a
-  // mount effect and settles when this promise does.
   resolution: null as Promise<unknown[]> | null,
   openPaywall: vi.fn(),
   createLinkItem: vi.fn(),
@@ -49,8 +43,6 @@ const mock = vi.hoisted(() => ({
   clearSharedPayloads: vi.fn(),
   router: { replace: vi.fn(), push: vi.fn() },
   store: new Map<string, string>(),
-  // SecureStore: the pending flag and the discard record run through the real
-  // pending-share rules and the real device binding.
   secure: new Map<string, string>(),
   uuid: 0,
   platform: "android",
@@ -140,8 +132,6 @@ vi.mock("expo-sharing", async () => {
         clearSharedPayloads: mock.clearSharedPayloads,
       };
     },
-    // The native store the resume path reads. Clears are mocked, so it keeps
-    // whatever batch the test put there.
     getSharedPayloads: () => mock.sharedPayloads,
   };
 });
@@ -202,8 +192,6 @@ const resolvedLink = {
   contentMimeType: link.mimeType,
 };
 
-// The effect defers runSave to a microtask; a macrotask tick lets it settle
-// before a negative assertion.
 const settle = () => act(() => new Promise((r) => setTimeout(r, 0)));
 
 beforeEach(() => {
@@ -228,8 +216,6 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   expect(mock.openPaywall).toHaveBeenCalledWith(mock.router, "share");
   expect(screen.getByText("pro.unlockShelvr")).toBeDefined();
 
-  // Native resolution completes after mount: the processor payload list
-  // changes identity and the save effect re-runs for the same session.
   mock.resolvedSharedPayloads = [resolvedLink];
   view.rerender(<ShareScreen />);
   await settle();
@@ -249,9 +235,6 @@ it("presents one paywall per session across effect re-runs and saves once entitl
 });
 
 it("waits for the first resolution before saving a shared image", async () => {
-  // The hook hands over the raw batch before it has started resolving. With
-  // auth and Pro already cached, a save that starts then sees no resolved
-  // URI and marks the image failed for good.
   mock.entitled = true;
   mock.saveImages.mockResolvedValue([{ status: "saved", itemId: "item-1" }]);
   const image: RawPayload = {
@@ -304,7 +287,6 @@ it("gates a retry again when the entitlement lapses after a locked session ran",
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
 });
 
-/** Records the tombstone the real completion path writes for `link`. */
 const seedGhostTombstone = () =>
   recordCompletedShare(
     {
@@ -321,15 +303,12 @@ const seedGhostTombstone = () =>
   );
 
 it("skips a replayed batch that matches the last completed one", async () => {
-  // The Android task-restore ghost: no session record, but the payload is the
-  // batch that already completed. It must not save again, and must not ask.
   mock.entitled = true;
   seedGhostTombstone();
   const view = render(<ShareScreen />);
   await waitFor(() =>
     expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
   );
-  // Resolution settling re-runs the reconcile effect; the skip runs once.
   mock.resolvedSharedPayloads = [resolvedLink];
   view.rerender(<ShareScreen />);
   await settle();
@@ -341,14 +320,10 @@ it("skips a replayed batch that matches the last completed one", async () => {
       .mocked(analytics.capture)
       .mock.calls.filter(([event]) => event === "share_ghost_skipped"),
   ).toHaveLength(1);
-  // The tombstone survives, so the next replay is skipped too.
   expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(true);
 });
 
 it("keeps the tombstone when the native clear fails and the user cancels", async () => {
-  // Every entry saved, the native clear throws, the user leaves via Cancel
-  // (which deletes the completed session). The Android replay must still be
-  // caught, or it saves the whole batch a second time.
   mock.entitled = true;
   mock.clearSharedPayloads.mockImplementationOnce(() => {
     throw new Error("clear failed");
@@ -383,10 +358,6 @@ it("never records a tombstone on iOS, which does not replay shares", async () =>
 });
 
 it("records the discard when Cancel's native clear throws, so the leftover is not resumable", async () => {
-  // A deferred share landed here (the flag +native-intent sets), the user is
-  // not Pro and cancels at the gate, and the native clear throws. The batch
-  // stays in the native store, so without the discard record the resume path
-  // would route it straight back and re-save it.
   markPendingShareOnDevice();
   mock.clearSharedPayloads.mockImplementationOnce(() => {
     throw new Error("clear failed");
@@ -439,7 +410,6 @@ it("still resumes and saves a different batch after a discard", async () => {
   expect(hasResumableSharedPayloads()).toBe(false);
   first.unmount();
 
-  // A new share replaced the leftover in the native store.
   const other: RawPayload = {
     value: "https://example.com/b",
     shareType: "url",

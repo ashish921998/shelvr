@@ -14,19 +14,11 @@ type Action = {
 type Props = {
   title: string;
   description?: string;
-  /** A control that sits beside the copy, such as a Switch. */
   accessory?: ReactNode;
-  /** A text action under the copy. */
   action?: Action;
-  /** A status line under the action, announced when it changes. */
   note?: string | null;
 };
 
-/**
- * The settings row on Profile: a bordered card with a bold title, a muted
- * description, and either an inline control or a text action below. Settings
- * use this instead of the capsule Button, which is for a screen's main action.
- */
 export function SettingCard({
   title,
   description,
@@ -125,7 +117,6 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: theme.control.minHeight,
     justifyContent: "center",
   },
-  // primaryText, not primary: the amber fill fails AA as text on the surface.
   actionLabel: {
     color: theme.colors.primaryText,
   },

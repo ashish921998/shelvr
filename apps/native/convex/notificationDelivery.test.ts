@@ -80,8 +80,6 @@ describe("durable digest delivery", () => {
       title: translations.ja.title,
       body: translations.ja.namedSingle.replace("%{title}", "A note"),
     });
-    // A device with no stored locale still names the save; only a shelf with
-    // nothing nameable falls back to the pre-locale count copy.
     expect(
       payloads.find((p: { to: string }) => p.to === "token-b"),
     ).toMatchObject({
@@ -134,7 +132,7 @@ describe("durable digest delivery", () => {
         digestId,
         attempt: 1,
         recipients: [
-          // @ts-expect-error Exercise runtime validation of an invalid caller payload.
+          // @ts-expect-error
           { token: "token-a", state: "receipt" },
         ],
       }),
@@ -219,8 +217,6 @@ describe("durable digest delivery", () => {
   it("targets enabled devices when many disabled rows precede them", async () => {
     const { t, digestId } = await seed([]);
     await t.run(async (ctx) => {
-      // Older, disabled rows sort first in every user index. They must neither
-      // fill the recipient page nor appear as recipients.
       for (let i = 0; i < 30; i++)
         await ctx.db.insert("notificationDevices", {
           userId: "user-a",
@@ -236,7 +232,6 @@ describe("durable digest delivery", () => {
         platform: "ios",
         lastSeenAt: Date.now(),
       });
-      // Another user's enabled device is never a recipient.
       await ctx.db.insert("notificationDevices", {
         userId: "user-b",
         token: "live-b",
@@ -275,8 +270,6 @@ describe("durable digest delivery", () => {
   });
 
   it("counts a ticket Expo accepted but never confirmed as delivered at the limit", async () => {
-    // Expo answers getReceipts with nothing for a while after accepting a
-    // ticket, so a recipient can sit in "receipt" through every attempt.
     const { t, digestId, advance, digest } = await seed();
     vi.stubGlobal(
       "fetch",
@@ -289,8 +282,6 @@ describe("durable digest delivery", () => {
       await t.action(internal.notificationDelivery.send, { digestId });
       await advance();
     }
-    // The same pairing `closeBetweenAttempts` writes: the retries ran out,
-    // and the push most likely reached the phone all the same.
     expect(await digest()).toMatchObject({
       deliveryStatus: "complete",
       deliveryError: "retry_limit_reached",
@@ -387,8 +378,6 @@ describe("durable digest delivery", () => {
     const { t, digestId } = await seed();
     await t.run(async (ctx) => {
       const digest = (await ctx.db.get(digestId))!;
-      // A `partial` item is classified from the URL alone because the page
-      // could not be read, so its title is a guess.
       const guessed = await ctx.db.insert("items", {
         userId: "user-a",
         type: "link",
@@ -433,7 +422,6 @@ describe("durable digest delivery", () => {
           ctx.db.system.query("_scheduled_functions").collect(),
         )
       ).filter((job) => job.name.includes("captureNotification"));
-    // Still awaiting a receipt, so nothing is terminal yet.
     expect(await telemetry()).toHaveLength(0);
     await advance();
     vi.setSystemTime(firstSendAt + 45 * 60 * 1000);
@@ -451,7 +439,6 @@ describe("durable digest delivery", () => {
     expect(await t.run((ctx) => ctx.db.get(digestId))).toMatchObject({
       deliverySentAt: firstSendAt,
     });
-    // A further run must not mint a second event for the same digest.
     await t.action(internal.notificationDelivery.send, { digestId });
     expect(await telemetry()).toHaveLength(1);
   });

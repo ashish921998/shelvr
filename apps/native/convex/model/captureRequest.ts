@@ -1,10 +1,5 @@
-// Narrowing for the untrusted JSON bodies the iOS App Intents post to the
-// `/app-intents/*` routes (http.ts). Pure, so it is unit tested directly.
-
 export class BodyTooLargeError extends Error {}
 
-/** Bound bytes as they arrive, including requests with a missing or false
- * Content-Length. Cancel rather than buffering the remainder. */
 export async function readBoundedText(
   req: Request,
   maxBytes: number,
@@ -52,13 +47,9 @@ export async function readBoundedBlob(
   }
 }
 
-/** Upper bound on a captured note, in characters. */
 export const MAX_CAPTURE_NOTE_LENGTH = 20_000;
-/** Upper bound on a captured URL before normalization. */
 export const MAX_CAPTURE_URL_LENGTH = 8192;
-/** Upper bound on the advisory context sent with an image. Cut, not refused. */
 export const MAX_CAPTURE_CONTEXT_INPUT = 8000;
-/** Convex ids and client operation ids are far shorter than this. */
 const MAX_ID_LENGTH = 200;
 
 export type ImageBeginRequest = { operationId: string };
@@ -90,8 +81,6 @@ function id(value: unknown): string | undefined {
     : undefined;
 }
 
-/** An optional id: absent, null, or empty reads as none; anything else must
- * be a well-sized string. Returns `false` for a malformed value. */
 function optionalId(value: unknown): string | undefined | false {
   if (value === undefined || value === null || value === "") return undefined;
   return id(value) ?? false;

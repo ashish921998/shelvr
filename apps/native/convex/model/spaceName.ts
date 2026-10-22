@@ -1,19 +1,10 @@
 import { ConvexError } from "convex/values";
 
-// The one rule for a user-typed space name, shared by createSpace,
-// updateSpace, and the onboarding demo's destination pick. The client reads
-// the constant for its input's maxLength; this is the server-side backstop.
-// No server-runtime imports, so the app can load it as `@convex/model/spaceName`.
-
-/** Long enough for "Apartment shopping list", short enough for a card title. */
 export const MAX_SPACE_NAME_LENGTH = 60;
 
 export const SPACE_NAME_EMPTY_MESSAGE = "Give the space a name.";
 export const SPACE_NAME_TOO_LONG_MESSAGE = `Space names can be up to ${MAX_SPACE_NAME_LENGTH} characters.`;
 
-/** Trims a space name and rejects an empty or over-long one. ConvexError, not
- * Error: production redacts a plain Error's message to "Server Error", and
- * these sentences are meant for the user. */
 export function validateSpaceName(raw: string): string {
   const name = raw.trim();
   if (name === "") {
@@ -25,14 +16,10 @@ export function validateSpaceName(raw: string): string {
   return name;
 }
 
-/** A space's description goes into the recommendation prompt and the space
- * embedding, so it gets a bound too. No client sends one yet; this keeps a
- * hand-built call from storing a megabyte and paying to send it. */
 export const MAX_SPACE_DESCRIPTION_LENGTH = 500;
 
 export const SPACE_DESCRIPTION_TOO_LONG_MESSAGE = `Space descriptions can be up to ${MAX_SPACE_DESCRIPTION_LENGTH} characters.`;
 
-/** Rejects an over-long description; undefined passes through. */
 export function validateSpaceDescription(
   raw: string | undefined,
 ): string | undefined {

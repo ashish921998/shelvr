@@ -27,9 +27,6 @@ import {
 } from "@/lib/feedback";
 import { SUPPORT_URL } from "@/lib/legal";
 
-/** Bounded app context for the support reply, supplied as bounded values the
- * backend re-validates (platform is a closed union; the version strings are
- * capped server-side). Never user content. */
 function submissionContext() {
   const version = Constants.expoConfig?.version;
   const variant = Constants.expoConfig?.extra?.variant;
@@ -46,16 +43,6 @@ function submissionContext() {
   };
 }
 
-/**
- * The one feedback form, reused by the Home invitation and the permanent
- * Profile entry. Callers conditionally mount it (open = mounted), so compose
- * state resets naturally on close. Nothing is sent until the user taps Send;
- * the typed message goes to Convex (never PostHog) and is masked in session
- * replays via the global posthog config (maskAllTextInputs in lib/posthog.ts).
- * Success is reported honestly: "accepted" means Convex persisted the row.
- * Inbox delivery is a server-side projection the client never claims as sent.
- * A failed send keeps the draft on screen with the support channel offered.
- */
 export function FeedbackModal({
   surface,
   onClose,
@@ -71,14 +58,9 @@ export function FeedbackModal({
   const [flow, setFlow] = useState<"idle" | "sending" | "failed" | "sent">(
     "idle",
   );
-  // Mirror of `flow` that survives the async submit gap, so a double-tap
-  // cannot start two sends before the state update lands.
   const sendingRef = useRef(false);
   const openedRef = useRef(false);
 
-  // A resolved-but-null user has no account to submit against, so the form
-  // offers the support channel instead of a Send that does nothing. Analytics
-  // availability is irrelevant here: feedback goes to Convex, not PostHog.
   const available = user !== null;
 
   useEffect(() => {
@@ -87,15 +69,8 @@ export function FeedbackModal({
     feedbackAnalytics.feedbackOpened(surface);
   }, [surface]);
 
-  // Wait for the user id so a send is always recorded against the account.
   const canSend = flow !== "sending" && !!user && message.trim().length > 0;
 
-  /** Send through Convex. "accepted" means ONLY that Convex persisted the
-   * submission: the support inbox email is a server-side projection the
-   * client never claims as sent. Any failure (offline, validation, rate
-   * limit) returns "failed" so the draft stays editable and the support
-   * channel is offered; nothing is captured beyond the bounded shape
-   * metadata, and the invitation is only marked submitted on success. */
   const sendFeedback = useCallback(
     async (rawMessage: string): Promise<"accepted" | "failed"> => {
       const message = sanitizeFeedbackMessage(rawMessage);
@@ -106,9 +81,6 @@ export function FeedbackModal({
           surface,
           ...submissionContext(),
         });
-        // Capture the content-free projection state only after Convex
-        // acknowledges the row is durable: surface, char count, and the
-        // delivery category, never the message.
         analytics.capture("feedback_submitted", {
           surface,
           char_count: message.length,
@@ -116,9 +88,6 @@ export function FeedbackModal({
         });
         return "accepted";
       } catch {
-        // A raw Convex error can carry server text in its stack, and
-        // captureError ships the stack to PostHog. The stable event name is
-        // the triage signal; the failure details stay client-side.
         analytics.captureError(
           "feedback_submit_failed",
           new Error("Feedback submission failed"),
@@ -141,9 +110,6 @@ export function FeedbackModal({
       markFeedbackSubmitted(user._id);
       setFlow("sent");
     } else {
-      // The draft stays on screen, editable and re-sendable, with the
-      // support channel offered, and the invitation is not marked
-      // submitted, so nothing pretends the feedback landed.
       setFlow("failed");
     }
   };
@@ -271,9 +237,6 @@ export function FeedbackModal({
   );
 }
 
-/** The Contact Support fallback row, shared by the no-account and
- * failed-send states: direct email is the channel that works when the
- * in-app form cannot serve the user. */
 function SupportLink() {
   const { theme } = useUnistyles();
   return (

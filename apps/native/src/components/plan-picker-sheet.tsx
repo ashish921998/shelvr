@@ -4,11 +4,6 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/**
- * What the space's one Plan button asks: one place to go, or the days of a
- * trip. Split by what the user is deciding, so a home city's space never
- * gets guessed into a trip.
- */
 export function PlanPickerSheet({
   visible,
   onClose,

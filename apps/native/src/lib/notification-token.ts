@@ -19,9 +19,6 @@ function canReceiveNotifications(
   );
 }
 
-/** What the user just chose, flattened across the two platforms. Ephemeral
- * authorization counts as granted: it delivers, and no Shelvr build asks for
- * it. */
 function permissionOutcome(
   permission: Notifications.NotificationPermissionsStatus,
 ): "granted" | "provisional" | "denied" {
@@ -61,7 +58,6 @@ async function askForPermission(
   return canReceiveNotifications(answer);
 }
 
-/** Whether a screen asking for notifications has anything left to ask. */
 export async function notificationPermissionState(): Promise<
   "granted" | "ask" | "blocked"
 > {
@@ -70,7 +66,6 @@ export async function notificationPermissionState(): Promise<
   return permission.canAskAgain === false ? "blocked" : "ask";
 }
 
-/** Shows the OS prompt when it can still appear. Needs no account. */
 export async function requestNotificationPermission(): Promise<boolean> {
   await ensureChannels();
   return askForPermission(await Notifications.getPermissionsAsync());
@@ -91,8 +86,6 @@ export async function getExpoPushToken(
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
   if (!projectId) throw new Error("Expo project ID is unavailable");
-  // Denied permission is the only no-token result. Native configuration and
-  // network failures must remain retryable errors, not a false settings prompt.
   return (
     await Notifications.getExpoPushTokenAsync({ projectId, devicePushToken })
   ).data;

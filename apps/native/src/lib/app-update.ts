@@ -2,11 +2,6 @@ import * as Updates from "expo-updates";
 import { useCallback, useRef, useState } from "react";
 import { analytics } from "@/lib/analytics";
 
-/**
- * One state for the manual EAS Update check in Profile. Everything the card
- * shows is a function of this value, so contradictory copy ("ready" beside
- * "couldn't restart", or "latest" beside "ready") cannot be rendered.
- */
 export type UpdateState =
   | { kind: "unsupported"; reason: "development" | "disabled" }
   | { kind: "idle" }
@@ -17,11 +12,9 @@ export type UpdateState =
   | { kind: "restarting" }
   | { kind: "failed"; at: "check" | "restart" };
 
-/** What the last user action ended in. Cleared when the next one starts. */
 type UpdateOutcome = "upToDate" | "checkFailed" | "restartFailed" | null;
 
 export type UpdateSignals = {
-  /** Why manual updates can't run here, or null when they can. */
   unsupported: "development" | "disabled" | null;
   acting: "check" | "restart" | null;
   isChecking: boolean;
@@ -30,7 +23,6 @@ export type UpdateSignals = {
   outcome: UpdateOutcome;
 };
 
-/** Pure: the native flags and the last outcome, folded into one state. */
 export function deriveUpdateState(signals: UpdateSignals): UpdateState {
   if (signals.unsupported) {
     return { kind: "unsupported", reason: signals.unsupported };
@@ -41,13 +33,10 @@ export function deriveUpdateState(signals: UpdateSignals): UpdateState {
     return { kind: "checking" };
   }
   if (signals.isUpdatePending) {
-    // A failed reload leaves the update pending; say what failed, once.
     return signals.outcome === "restartFailed"
       ? { kind: "failed", at: "restart" }
       : { kind: "ready" };
   }
-  // A background download that lands after "latest" wins above, so the
-  // up-to-date note can never sit beside "ready".
   if (signals.outcome === "checkFailed") return { kind: "failed", at: "check" };
   if (signals.outcome === "upToDate") return { kind: "upToDate" };
   return { kind: "idle" };
@@ -81,14 +70,11 @@ const unsupported: UpdateSignals["unsupported"] = __DEV__
     ? null
     : "disabled";
 
-/** The reload screen's colors, so a restart doesn't flash the default white. */
 export function useAppUpdate(backgroundColor: string, spinnerColor: string) {
   const { currentlyRunning, isChecking, isDownloading, isUpdatePending } =
     Updates.useUpdates();
   const [acting, setActing] = useState<"check" | "restart" | null>(null);
   const [outcome, setOutcome] = useState<UpdateOutcome>(null);
-  // The native flags and React state land a render late, so two taps in one
-  // frame would both pass a state check. The ref makes the second a no-op.
   const lock = useRef(false);
 
   const state = deriveUpdateState({
@@ -113,8 +99,6 @@ export function useAppUpdate(backgroundColor: string, spinnerColor: string) {
             spinner: { color: spinnerColor },
           },
         });
-        // Success reloads the JS runtime; nothing below runs, and the lock
-        // stays held so the reload is never requested twice.
       } catch (error) {
         analytics.captureError("update_restart_failed", error);
         setOutcome("restartFailed");

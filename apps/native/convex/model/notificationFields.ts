@@ -2,16 +2,6 @@ import { v, type Infer } from "convex/values";
 import translations from "./notificationTranslations.json";
 import { pluralRules } from "./localization";
 
-/**
- * The non-function half of push delivery (weekly shelf and save reminders):
- * the per-recipient delivery-state
- * validator `schema.ts` stores and `notificationDelivery.ts` advances, plus the
- * localized title/body that goes into the notification payload. Named for the
- * fields rather than the machine so it is not confused with
- * `convex/notificationDelivery.ts`, which holds the claim/finish/recover
- * Convex functions.
- */
-
 const fields = {
   token: v.string(),
   error: v.optional(v.string()),
@@ -39,16 +29,9 @@ export const recipientValidator = v.union(
 
 export type Recipient = Infer<typeof recipientValidator>;
 
-/**
- * The push most likely reached the phone: Expo confirmed it with a receipt,
- * or accepted the ticket and never reported a fault. Anything that counts a
- * notification as delivered, for the reminder budget and for telemetry, asks
- * this, so the two places a delivery closes cannot disagree.
- */
 export const reachedDevice = (recipient: Recipient): boolean =>
   recipient.state === "delivered" || recipient.state === "receipt";
 
-/** Still has a send or a receipt check ahead of it. */
 export const awaitingOutcome = (recipient: Recipient): boolean =>
   recipient.state === "pending" || recipient.state === "receipt";
 
@@ -74,15 +57,8 @@ export function notificationLocale(
   return Object.hasOwn(translations, locale) ? locale : "en";
 }
 
-/** A weekly shelf's own week: saves made within this long of the shelf being
- * prepared are "this week's"; anything older came back from the archive. */
 export const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * The longest item title a notification body carries. Past this the system
- * truncates for us, and it does so mid-word; trimming here keeps the ellipsis
- * on a word boundary whenever one sits close to the limit.
- */
 const MAX_TITLE_LENGTH = 60;
 
 export function truncateTitle(title: string): string | undefined {
@@ -91,9 +67,6 @@ export function truncateTitle(title: string): string | undefined {
   if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
   const clipped = trimmed.slice(0, MAX_TITLE_LENGTH);
   const boundary = clipped.lastIndexOf(" ");
-  // A title with no space near the end (a long slug, or a script that does
-  // not space-separate) keeps the hard clip instead of losing most of its
-  // characters to a boundary early in the string.
   const body =
     boundary > MAX_TITLE_LENGTH / 2 ? clipped.slice(0, boundary) : clipped;
   return `${body.replace(/[\s,;:.!?-]+$/u, "")}\u2026`;
@@ -112,18 +85,6 @@ const catalogs: Record<
   }
 > = translations;
 
-/**
- * `count` is how many saves the shelf holds and `featuredTitle` is the one the
- * body names. Naming a save is the whole point of this copy: a count tells the
- * user they have unread things, which they already knew. `olderIncluded` says
- * the shelf also carries saves from before this week, so the copy must not
- * claim they were all saved this week.
- *
- * Without a usable title it falls back to counting, which is what every build
- * before this one sent. The title is user content, so it is substituted
- * through a replacer function: a plain string replacement would let `$&` and
- * its siblings inside a title expand into the surrounding copy.
- */
 export function digestCopy(
   locale: string | undefined,
   count: number,
@@ -138,7 +99,6 @@ export function digestCopy(
     new Intl.NumberFormat(selected).format(value);
 
   if (title === undefined) {
-    // Keep the established payload for devices registered by older clients.
     if (locale === undefined)
       return {
         title: "Your weekly shelf is ready",
@@ -161,8 +121,6 @@ export function digestCopy(
         () => title,
       ),
     };
-  // The plural agrees with the *other* saves, not the shelf total: "and 1
-  // more" alongside the named one, never "and 0 more".
   const others = count - 1;
   return {
     title: copy.title,
@@ -174,12 +132,6 @@ export function digestCopy(
   };
 }
 
-/**
- * A save reminder names one save and the thing it was saved for. `subject` is
- * user content (a dish or an article title), substituted through a replacer
- * for the same reason as the digest's. The caller only builds a reminder for
- * a save with a non-blank subject, so there is always something to name.
- */
 export function reminderCopy(
   locale: string | undefined,
   kind: "read" | "cook",

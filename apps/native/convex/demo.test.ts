@@ -36,8 +36,6 @@ describe("onboarding demo allowance", () => {
     );
     const runs = jobs.filter((job) => job.name === "ai:processItem");
     expect(runs).toHaveLength(1);
-    // Run-fenced like every other save: the item carries a run id and the
-    // scheduled action was handed the same one.
     expect(item?.processingRunId).toBeDefined();
     expect(item?.processingStartedAt).toBeDefined();
     expect(runs[0].args[0]).toMatchObject({
@@ -51,7 +49,6 @@ describe("onboarding demo allowance", () => {
     const first = await t.mutation(api.demo.createDemoItem, { url: URL });
     const second = await t.mutation(api.demo.createDemoItem, {
       url: "https://example.com/other",
-      // A different destination on the repeat must not silently move the save.
       spaceName: "Recipes",
     });
 
@@ -60,8 +57,6 @@ describe("onboarding demo allowance", () => {
     expect(second.urlMatchesRequest).toBe(false);
     expect(second.reused).toBe(true);
 
-    // Client honesty: the original save (original URL and its real current
-    // destinations) is what comes back, never the newly typed input.
     const item = await t.query(api.items.getItem, { id: second.itemId });
     expect(item?.url).toBe(URL);
     expect(second.savedSpaceNames).toEqual([]);
@@ -162,7 +157,6 @@ describe("onboarding demo allowance", () => {
     const { t: b } = await signedInUser(backend, { pro: true });
     const first = await a.mutation(api.demo.createDemoItem, { url: URL });
 
-    // User B still has their own allowance; A's row is never returned to B.
     const second = await b.mutation(api.demo.createDemoItem, { url: URL });
     expect(second.itemId).not.toBe(first.itemId);
     expect(second.reused).toBe(false);
@@ -201,8 +195,6 @@ describe("onboarding demo allowance", () => {
         .collect();
       expect(spaces).toHaveLength(1);
       expect(spaces[0]).toMatchObject({ name: "Travel", dynamic: true });
-      // The join went through insertMembership, so the space's denormalized
-      // summary already reflects the save and listSpaces needs no scan.
       expect(spaces[0]).toMatchObject({
         savedCount: 1,
         suggestedCount: 0,
@@ -216,8 +208,6 @@ describe("onboarding demo allowance", () => {
       expect(joins.every((j) => j.status === "saved")).toBe(true);
     });
 
-    // Replay safety: the same destination (whitespace differences included)
-    // reuses the existing space instead of creating a duplicate.
     const again = await t.mutation(api.demo.createDemoItem, {
       url: URL,
       spaceName: "Travel",
@@ -259,7 +249,6 @@ describe("onboarding demo allowance", () => {
         spaceName: "x".repeat(61),
       }),
     ).rejects.toThrow();
-    // Nothing was written: no item, no space, no demo row.
     await t.run(async (ctx) => {
       const demos = await ctx.db.query("onboardingDemos").collect();
       expect(demos).toHaveLength(0);
@@ -274,8 +263,7 @@ describe("onboarding demo allowance", () => {
     const { t } = await signedInUser(newConvexTest(), { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await t.mutation(api.items.deleteItem, { id: itemId });
-    // ConvexError, not Error: production redacts a plain Error's message to
-    // "Server Error", so the client can only branch on `data`.
+    // ConvexError, not Error: production redacts a plain Error's message to "Server Error".
     const error = await t.mutation(api.demo.createDemoItem, { url: URL }).then(
       () => null,
       (e: unknown) => e,
@@ -347,8 +335,6 @@ describe("retryDemoItem", () => {
 
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("processing");
-    // A retry is a new run: fresh id so the old action cannot overwrite it,
-    // fresh start time so the stale sweeper measures from the retry.
     expect(item?.processingRunId).toBeDefined();
     expect(item?.processingRunId).not.toBe(before?.processingRunId);
     const jobs = await t.run((ctx) =>
@@ -419,7 +405,6 @@ describe("retryDemoItem", () => {
     });
 
     await backend.run(async (ctx) => {
-      // Nothing changed: still failed, still terminal, no run scheduled.
       const item = await ctx.db.get(itemId);
       expect(item).toMatchObject({
         status: "failed",
@@ -436,8 +421,6 @@ describe("retryDemoItem", () => {
       );
     });
 
-    // The bucket was not drawn from: a following retryable failure still gets
-    // the full capacity (3) before the limiter refuses.
     for (let i = 0; i < 3; i++) {
       await backend.run(async (ctx) => {
         await ctx.db.patch(itemId, {
@@ -455,7 +438,6 @@ describe("retryDemoItem", () => {
     const { t } = await signedInUser(backend, { pro: true });
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
 
-    // Exhaust the bounded retry bucket (capacity 3), then the next attempt throws.
     for (let i = 0; i < 3; i++) {
       await backend.run(async (ctx) => {
         await ctx.db.patch(itemId, { status: "failed" });

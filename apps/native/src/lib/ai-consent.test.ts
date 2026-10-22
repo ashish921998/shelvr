@@ -79,7 +79,6 @@ it("records a yes, with no card, for someone who just signed in past the disclos
   );
   expect(mocks.setConsent).toHaveBeenCalledExactlyOnceWith({ granted: true });
 
-  // A later sign-out and an already signed-in session start from scratch.
   mocks.data = { status: "granted", version: 1 };
   rerender();
   mocks.data = { status: "unset", version: 1 };
@@ -108,8 +107,6 @@ it("shows the card on every screen when the sign-in yes could not be saved", asy
   mocks.setConsent.mockRejectedValue(new Error("offline"));
   markAiDisclosedAtSignIn();
   mocks.data = { status: "unset", version: 1 };
-  // The first hook to mount makes the attempt. The second stands in for the
-  // layout that draws the card, and only hears about the failure.
   renderHook(() => useAiConsent());
   const layout = renderHook(() => useAiConsent());
   expect(layout.result.current.asking).toBe(false);

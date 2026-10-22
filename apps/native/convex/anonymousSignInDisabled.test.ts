@@ -9,9 +9,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-// convex/auth.ts pins its provider list at module load, so the enabled
-// branch lives in anonymousSignIn.test.ts. The second test proves a flag
-// flip after first load still sees the pinned list.
 describe("anonymous sign-in with AUTH_ENABLE_ANONYMOUS unset", () => {
   it("is rejected by the server before any account is created", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", undefined);

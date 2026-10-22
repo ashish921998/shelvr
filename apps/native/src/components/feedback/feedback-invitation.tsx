@@ -3,11 +3,6 @@ import { Text, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { InlineCard } from "@/components/ui/inline-card";
 
-/**
- * The dismissible inline feedback invitation shown on Home once per account
- * (at most twice with a 14-day gap, capped in lib/feedback.ts). Purely
- * presentational; state and analytics live in the hook that mounts it.
- */
 export function FeedbackInvitation({
   onSendFeedback,
   onDismiss,

@@ -101,7 +101,6 @@ describe("fakeNoteAnalysis", () => {
   });
 });
 
-// The shape of analyzeNoteItem's prompt in ai.ts.
 function notePrompt(note: string): string {
   return [
     "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title.",
@@ -130,7 +129,6 @@ describe("noteFromPrompt", () => {
   });
 });
 
-// The keys of itemAnalysisSchema in ai.ts.
 const noteSchema = z.object({
   title: z.string(),
   description: z.string(),
@@ -165,7 +163,6 @@ describe("FAKE_MODEL", () => {
   });
 });
 
-// The shape of linkAnalysisPrompt in ai.ts for a plain web page.
 function linkPrompt(content: string): string {
   return [
     "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title.",
@@ -248,7 +245,6 @@ describe("FAKE_MODEL on a link", () => {
   });
 });
 
-// The shape of the recommendation prompt in aiRecommendForSpace.ts.
 function recommendPrompt(spaceName: string, description = "Bowls"): string {
   return [
     "You are helping organize a save-it-for-later app. The user just created a space (a themed collection).",

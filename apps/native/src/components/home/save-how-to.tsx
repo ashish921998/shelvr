@@ -11,7 +11,6 @@ const STEPS: { titleKey: TextMessageKey; helpKey?: TextMessageKey }[] = [
   { titleKey: "home.howToMore", helpKey: "home.howToMoreHelp" },
 ];
 
-/** Shown on Home until the first share-sheet save lands. */
 export function SaveHowTo() {
   useAppLocale();
   const router = useRouter();

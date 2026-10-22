@@ -8,19 +8,11 @@ type SharePreview = {
   imageUrl?: string;
   sourceUrl?: string;
   noteText?: string;
-  /** The sharer's first name, when their account has one. */
   senderName?: string;
 };
 
-/** `missing` is an unknown or revoked token; `unavailable` is a
- * configuration, network or backend failure, not the link's fault. */
 export type SharePreviewOutcome = "found" | "missing" | "unavailable";
 
-/**
- * Fetches the public preview for a branded item share link, with why it is
- * absent when it is. Uncached, so a deleted item or revoked link stops
- * rendering at once.
- */
 export async function loadSharePreview(
   token: string,
 ): Promise<{ outcome: SharePreviewOutcome; preview?: SharePreview }> {
@@ -49,10 +41,6 @@ export async function loadSharePreview(
   }
 }
 
-/**
- * The preview alone: `undefined` in every case the page renders as a generic
- * Shelvr promo rather than an error.
- */
 export async function fetchSharePreview(
   token: string,
 ): Promise<SharePreview | undefined> {

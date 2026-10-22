@@ -9,8 +9,6 @@ import {
   scheduleCaptureRetry,
 } from "./model/posthogCapture";
 
-// A signup is the top of every funnel, so it is worth holding onto for as long
-// as payment capture does before the failure is surfaced.
 const MAX_ACCOUNT_ATTEMPTS = 5;
 
 export const capture = internalAction({

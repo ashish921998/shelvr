@@ -1,24 +1,6 @@
-/**
- * Verifies a JWS the App Store signed and returns its payload.
- *
- * Apple puts a three-certificate chain in the `x5c` header: a leaf that signed
- * the JWS, an intermediate, and Apple Root CA - G3. A payload is trusted only
- * when the chain ends in the pinned root, each certificate is signed by the
- * next and is inside its validity window, and the leaf and intermediate carry
- * Apple's marker extensions. Anyone can mint a self-consistent chain, so the
- * root comparison is what makes the payload Apple's.
- *
- * This runs in the default Convex V8 runtime, which has Web Crypto but no
- * X.509 parser, so the few DER fields the checks need are read by hand.
- * ponytail: no OCSP revocation check; add one if Apple ever revokes a signing
- * certificate.
- */
-
-/** Apple Root CA - G3, SHA-256 63343abf…653e9179, valid until 2039-04-30. */
 export const APPLE_ROOT_CA_G3 =
   "MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtfTjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySrMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gAMGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM6BgD56KyKA==";
 
-// DER-encoded OIDs, tag and length included.
 const OID_P256 = [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
 const OID_P384 = [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22];
 const OID_ECDSA_SHA256 = [
@@ -27,16 +9,13 @@ const OID_ECDSA_SHA256 = [
 const OID_ECDSA_SHA384 = [
   0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x03,
 ];
-// 1.2.840.113635.100.6.11.1: App Store receipt signing leaf.
 const OID_APPLE_LEAF = [
   0x06, 0x0a, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x06, 0x0b, 0x01,
 ];
-// 1.2.840.113635.100.6.2.1: Apple Worldwide Developer Relations intermediate.
 const OID_APPLE_INTERMEDIATE = [
   0x06, 0x0a, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x06, 0x02, 0x01,
 ];
 
-// Web Crypto rejects views that might sit on a SharedArrayBuffer.
 type Bytes = Uint8Array<ArrayBuffer>;
 type Curve = "P-256" | "P-384";
 type Hash = "SHA-256" | "SHA-384";
@@ -100,7 +79,6 @@ function sameBytes(a: Bytes, b: Bytes): boolean {
   return a.length === b.length && a.every((byte, i) => byte === b[i]);
 }
 
-/** UTCTime (YYMMDDHHMMSSZ) or GeneralizedTime (YYYYMMDDHHMMSSZ). */
 function readTime(der: Bytes, node: Node): number {
   const text = String.fromCharCode(...der.subarray(node.body, node.end));
   const match = /^(\d{2}|\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(
@@ -120,7 +98,6 @@ function parseCertificate(der: Bytes): Certificate {
   );
   if (!tbs || !algorithm || !signature || signature.tag !== 0x03)
     fail("cert_shape");
-  // version [0] is optional in X.509; every Apple certificate carries it.
   const fields = children(der, tbs);
   if (fields[0]?.tag !== 0xa0 || fields.length < 7) fail("cert_shape");
   const [, , , issuer, validity, subject, spki] = fields;
@@ -145,14 +122,12 @@ function parseCertificate(der: Bytes): Certificate {
       : contains(algorithmBytes, OID_ECDSA_SHA384)
         ? "SHA-384"
         : fail("cert_algorithm"),
-    // A BIT STRING body starts with its unused-bit count.
     signature: der.subarray(signature.body + 1, signature.end),
     notBefore: readTime(der, notBefore),
     notAfter: readTime(der, notAfter),
   };
 }
 
-/** DER `SEQUENCE { r, s }` to the fixed-width `r || s` Web Crypto verifies. */
 function rawSignature(der: Bytes, curve: Curve): Bytes {
   const size = curve === "P-256" ? 32 : 48;
   const parts = children(der, readNode(der, 0, der.length));
@@ -218,11 +193,6 @@ function decodeJson(segment: string): unknown {
   }
 }
 
-/**
- * Returns the payload of `jws` once its signature and certificate chain check
- * out against `root`, and throws otherwise. `root` is a parameter so tests can
- * anchor a fixture chain; production callers pass `APPLE_ROOT_CA_G3`.
- */
 export async function verifyAppleJws(
   jws: string,
   root: string,

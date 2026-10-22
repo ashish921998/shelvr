@@ -15,13 +15,11 @@ import { TidyHints } from "./tidy-hints";
 import { useDeckAnimation } from "@/lib/tidy/deck-animation";
 import type { TidyPhoto } from "@/lib/tidy/use-photo-batch";
 
-/** How many cards below the top one keep their image decoded. */
 const MOUNT_WINDOW = 3;
 
 type Props = {
   photo: TidyPhoto;
   index: number;
-  /** Top-card index when the batch mounts (batch length - 1). */
   topStart: number;
 };
 
@@ -44,16 +42,10 @@ const HintOverlay = () => {
 const TidyCardComponent: FC<Props> = ({ photo, index, topStart }) => {
   const { currentIndex } = useDeckAnimation();
 
-  // Only cards near the top decode their image, keeping memory flat across a
-  // batch of full-screen photos. Membership is derived from the shared
-  // currentIndex on the UI thread, so advancing the deck re-renders only the
-  // one or two cards whose visibility actually flips, not the whole stack.
   const [mounted, setMounted] = useState(() => inWindow(index, topStart));
 
   useAnimatedReaction(
     () => {
-      // Inline the window check so it runs entirely on the UI thread. Calling
-      // an external helper here would break worklet compilation.
       const top = currentIndex.get();
       return index >= top - MOUNT_WINDOW && index <= top + 1;
     },

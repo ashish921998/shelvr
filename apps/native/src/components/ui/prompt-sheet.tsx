@@ -4,11 +4,6 @@ import { Modal, Pressable, Text, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-/**
- * The bottom sheet Home uses for one-off prompts: a scrim that closes it, a
- * title and body, optional content, then the actions. The caller owns when
- * it shows and what closing means.
- */
 export function PromptSheet({
   visible,
   onClose,

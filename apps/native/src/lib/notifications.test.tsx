@@ -107,7 +107,6 @@ vi.mock("expo-notifications", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The plan is known unless a test says otherwise, so taps open at once.
   releaseSheetLink(false);
   mock.authenticated = true;
   mock.locale = "en";
@@ -167,7 +166,6 @@ describe("notification session lifecycle", () => {
       await act(async () => {
         await result.current.session[action]();
       });
-      // Deleting also signs out, so the clear can run twice; it is idempotent.
       expect(mock.clearTrial).toHaveBeenCalled();
     },
   );
@@ -339,14 +337,11 @@ describe("notification opens", () => {
     releaseSheetLink(true);
     mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
     renderHook(() => useNotificationObserver());
-    // Expo Router opens /item/B itself; the waiting tap must not override it.
     rememberSheetLink("shelvr://item/b");
     expect(releaseSheetLink(false)).toBeNull();
     expect(mock.push).not.toHaveBeenCalled();
   });
 
-  // Installed builds keep receiving payloads from the currently deployed
-  // backend until it ships, and those carry a url and nothing else.
   it("still records an open for a payload that predates the kind field", () => {
     mock.lastResponse = opened({ url: "/digest/abc" });
     renderHook(() => useNotificationObserver());
@@ -371,7 +366,6 @@ describe("notification opens", () => {
   });
 
   it("opens a second, distinct notification to the same screen", () => {
-    // Two trial nudges both point at /add; the second tap is its own open.
     renderHook(() => useNotificationObserver());
     act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "a")));
     act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "b")));

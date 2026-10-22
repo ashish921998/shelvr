@@ -34,15 +34,8 @@ module.exports = async ({ github, context, core }) => {
     core.setOutput("deployable", "false");
     return;
   }
-  // A CI run can be re-run at any time, including long after main moved on, and
-  // it succeeds again because it succeeded before. Deploying what it points at
-  // would put an older backend behind clients already running against a newer
-  // one, which is the one ordering apps/native/convex must never see. So the
-  // tip of main deploys, from its own run, and nothing else does.
   const tip = await mainTip({ github, context });
   if (tip !== sha) {
-    // Superseded, not broken. The tip deploys from its own run, so there is
-    // nothing here to fix and nothing to approve.
     core.notice(
       `Skipping: ${sha} is behind the tip of main (${tip}), which deploys from its own run.`,
     );
@@ -52,8 +45,6 @@ module.exports = async ({ github, context, core }) => {
   core.setOutput("deployable", "true");
 };
 
-// main can advance while a deploy waits in the shared concurrency queue.
-// Recheck inside the acting job so a stale commit cannot roll back the backend.
 module.exports.requireTip = async ({ github, context, core }) => {
   const sha = selectedSha(context);
   const tip = await mainTip({ github, context });

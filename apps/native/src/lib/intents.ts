@@ -8,17 +8,8 @@ import { Platform } from "react-native";
 import { openLink } from "@/lib/open-link";
 import type { IntentKind } from "@convex/model/itemFields";
 
-// The closed set of action kinds the AI can attach to an item, derived from
-// the same INTENT_KINDS tuple the Convex validators use so the exhaustive
-// switch below fails to compile when the backend learns a new kind.
 export type { IntentKind };
 
-/**
- * Execute an intent. Each kind maps to a guaranteed-installed Expo primitive.
- * Links go through Linking, so an https URL hands off to the matching native
- * app via universal links (an x.com URL opens the X app if installed) and
- * otherwise opens in the system browser.
- */
 export async function runIntent(
   kind: IntentKind,
   value: string,
@@ -53,8 +44,6 @@ export async function runIntent(
       await Linking.openURL(`mailto:${value}`);
       break;
     case "add_event":
-      // Presents the system "Add Event" sheet prefilled with the title; the
-      // user picks the date/time. Requires calendar permission.
       await createEventInCalendarAsync({ title: value });
       break;
   }

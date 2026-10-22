@@ -13,8 +13,6 @@ type HistoryEntry = {
   index: number;
   photo: TidyPhoto;
   action: TidyAction;
-  /** For saves: resolves to the created item id (null if the upload failed),
-   * so undo can delete the item even while the upload is still in flight. */
   itemId?: Promise<Id<"items"> | null>;
 };
 
@@ -34,16 +32,9 @@ const mimeFromUri = (uri: string): string => {
 
 type Params = {
   batch: TidyPhoto[];
-  /** Deletion shifts media-store offsets; the batch pager compensates. */
   noteDeleted: (count: number) => void;
 };
 
-/**
- * JS-side handling of swipe decisions. Keeps are marked reviewed instantly;
- * deletes queue locally (one system dialog per commit, not per swipe); saves
- * resolve the asset's file uri and reuse the shared upload path. A small
- * history stack backs the undo button until deletes are committed.
- */
 export function useTidyActions({ batch, noteDeleted }: Params) {
   const saveImages = useSaveImages();
   const deleteItem = useMutation(api.items.deleteItem);
@@ -65,8 +56,6 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       (async () => {
         const asset = new Asset(photo.id);
         const uri = await asset.getUri();
-        // Best-effort: Android needs ACCESS_MEDIA_LOCATION, and not every
-        // photo has a GPS fix: a save must never fail over its location.
         const location = await asset.getLocation().catch(() => null);
         const [result] = await saveImages(
           [
@@ -87,10 +76,6 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         if (result.status === "saved") {
           return result.itemId;
         }
-        // A settled failure no longer rejects (the hook returns a failed
-        // result instead), so restore the prior behavior explicitly: unmark the
-        // photo so it resurfaces in a future batch, and resolve to null so undo
-        // no-ops. The result carries the stable operation id for recovery.
         console.warn("Tidy save failed", result.stage, result.operationId);
         unmarkReviewed(photo.id);
         return null;
@@ -132,8 +117,6 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
     [batch, startSave],
   );
 
-  /** Reverts the most recent decision; returns the card index to re-insert
-   * (for the undo animation) or null if there is nothing to undo. */
   const undo = useCallback((): number | null => {
     const entry = historyRef.current.pop();
     if (!entry) return null;
@@ -148,7 +131,6 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         setPendingDeleteCount(pendingDeletesRef.current.length);
         break;
       case "save":
-        // The upload may still be running: chain the revert onto it.
         if (isReviewed(entry.photo.id)) {
           unmarkReviewed(entry.photo.id);
         }
@@ -164,28 +146,13 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
     return entry.index;
   }, [deleteItem]);
 
-  /** Commits the queued deletions in ONE system dialog. If the user cancels,
-   * the photos stay unreviewed and resurface in a later batch. Undo history is
-   * trimmed only after the delete succeeds, so canceling preserves the ability
-   * to undo prior keep/save decisions. */
   const commitDeletes = useCallback(async () => {
     const queue = pendingDeletesRef.current;
     if (queue.length === 0) return;
 
-    // Detach the queue immediately so a concurrent onDecision can't push into
-    // a batch we're about to delete.
     pendingDeletesRef.current = [];
     setPendingDeleteCount(0);
 
-    // Only after a successful commit are deletes (and their history) final.
-    // The deck re-inserts cards one position at a time, so a decision made
-    // before a committed delete can no longer be walked back to: its card
-    // sits above photos that are gone. Keep only the decisions made after
-    // the last committed delete, which still sit right under the top card.
-    // The cutoff comes from the queue just committed, not from every delete
-    // in history: a delete decided during the dialog is still pending and
-    // must stay undoable. It is read now, before the dialog, so an undo
-    // that pops a queued entry meanwhile cannot move it.
     const committed = new Set(queue.map((photo) => photo.id));
     const lastDeleted = Math.min(
       ...historyRef.current
@@ -203,9 +170,6 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       );
       setCanUndo(historyRef.current.length > 0);
     } catch (error) {
-      // User canceled the system dialog (or deletion failed): restore the
-      // queue so the photos stay unreviewed and resurface in a future batch.
-      // Prior undo history is preserved.
       console.warn("Tidy delete commit skipped", error);
       pendingDeletesRef.current = queue;
       setPendingDeleteCount(queue.length);

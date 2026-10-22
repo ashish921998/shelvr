@@ -1,34 +1,9 @@
-/**
- * The canonical entitlement gate, shared by the server-side mutation guard
- * (`requireProEntitlement`) and the client-side `useEntitlement` hook so both
- * agree on what "entitled" means. Pure: no Convex imports, so it bundles
- * safely into the React Native client via the `@convex/model/entitlement`
- * alias.
- *
- * `"none"` is a client-facing sentinel (no subscription row exists) included
- * here so the hook can pass the query status straight through; the stored DB
- * status is never `"none"`.
- */
 export type SubscriptionStatus = "trialing" | "pro" | "lapsed" | "lifetime";
 
-/**
- * True when the stored status alone says entitled, ignoring `expiresAt`.
- * The clock-free fallback for callers that predate the client-supplied
- * `now` argument: the RevenueCat webhook marks the row `lapsed` when a
- * subscription actually expires, so the status is the best clock-free
- * signal a query can read. Listed positively so a future status can never
- * grant access by accident.
- */
 export function isEntitledStatus(status: SubscriptionStatus | "none"): boolean {
   return status === "trialing" || status === "pro" || status === "lifetime";
 }
 
-/**
- * True when the user has active access. `lifetime` is permanently entitled;
- * `lapsed`/`none` are not; `trialing`/`pro` are entitled until `expiresAt`.
- * `now` is passed in (never read here) so the server can use `Date.now()`
- * inside a mutation and the client can seed/tick its own clock.
- */
 export function isEntitled(
   status: SubscriptionStatus | "none",
   expiresAt: number | undefined,

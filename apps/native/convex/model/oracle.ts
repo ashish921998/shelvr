@@ -4,8 +4,6 @@ import { z } from "zod";
 const ORACLE_MAX_URLS = 3;
 const ORACLE_MAX_TITLES = 5;
 const ORACLE_MAX_ROWS = 40;
-// Node actions take at most 5 MiB of arguments, so a screenshot is capped at
-// 3 MiB of image, which is 4 MiB once base64 encoded.
 const ORACLE_MAX_IMAGE_BASE64_CHARS = 4 * 1024 * 1024;
 const MAX_TEXT_CHARS = 300;
 const MAX_URL_CHARS = 2048;
@@ -27,7 +25,6 @@ export const oracleInputValidator = v.union(
   }),
   v.object({
     kind: v.literal("library"),
-    // savedAt and oldestAt are epoch milliseconds.
     rows: v.array(
       v.object({
         label: v.string(),
@@ -48,10 +45,7 @@ export const oracleVerdictValidator = v.object({
   tagline: v.string(),
   spaces: v.array(v.object({ name: v.string(), reason: v.string() })),
   guesses: v.array(v.object({ label: v.string(), why: v.string() })),
-  // 0-100: how much of what they showed is saved for a someday that never
-  // comes.
   score: v.number(),
-  // Space names the page keeps locked until the visitor shares the verdict.
   moreSpaces: v.array(v.string()),
 });
 
@@ -105,8 +99,6 @@ export const oracleVerdictSchema = z.object({
 
 const MAX_MORE_SPACES = 3;
 
-/** Holds the model to the ranges the page draws: a whole score from 0 to 100,
- * and at most 3 named extra spaces. */
 export function settleVerdict(verdict: OracleVerdict): OracleVerdict {
   const score = Number.isFinite(verdict.score)
     ? Math.min(100, Math.max(0, Math.round(verdict.score)))
@@ -126,8 +118,6 @@ function boundedString(value: unknown, max = MAX_TEXT_CHARS) {
     : undefined;
 }
 
-// Epoch milliseconds between 1990 and 2100. Anything outside is a malformed
-// export, and a date outside JavaScript's range would make formatting throw.
 const ORACLE_MIN_SAVED_AT = Date.UTC(1990, 0, 1);
 const ORACLE_MAX_SAVED_AT = Date.UTC(2100, 0, 1);
 
@@ -192,8 +182,6 @@ function libraryStats(value: unknown) {
   };
 }
 
-// One parser per kind. Each builds a fresh object from known fields, so an
-// extra property on the wire never reaches the action's argument validator.
 const inputParsers: {
   [K in OracleKind]: (body: Fields) => OracleInputOf<K> | undefined;
 } = {

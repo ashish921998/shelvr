@@ -1,10 +1,4 @@
 // @vitest-environment jsdom
-// Tests for the Recent Saves widget sync. The file system, nitro image module,
-// widget runtime, and query layer are all stubbed, so the tests exercise the
-// observable contract: one snapshot per changed widget-visible set, mapped
-// titles/subtitles, downsized thumbnails that never block the sync on
-// failure, key-based dedupe, stale-thumbnail cleanup, and the key reset that
-// lets a later render retry after a failed sync.
 import { act, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,8 +24,6 @@ const fsx = vi.hoisted(() => ({
   snapshotFailuresRemaining: 0,
   snapshotAttempts: 0,
   onImageSaved: null as (() => void) | null,
-  // When set, a thumbnail decode blocks on this gate so a test can interleave a
-  // session-boundary clear with an in-flight sync.
   imageGate: null as Promise<void> | null,
   files: new Map<string, boolean>(),
   listed: [] as unknown[],
@@ -280,8 +272,6 @@ describe("RecentSavesWidgetSync", () => {
     });
   });
 
-  // Locking a week past the stored period end keeps a renewal the app has not
-  // seen yet from flashing the Pro lock at a paying subscriber.
   it("schedules a locked entry a week after a finite Pro expiry", async () => {
     fsx.expiresAt = Date.now() + 86_400_000;
     const lockAt = fsx.expiresAt + 7 * 86_400_000;
@@ -298,9 +288,6 @@ describe("RecentSavesWidgetSync", () => {
     expect(lock.props).toMatchObject({ items: [], locked: true });
   });
 
-  // A lifetime row keeps a stored expiresAt (0 from RevenueCat, or the period
-  // end it had before going sticky). Treating it as a lock date would lock a
-  // lifetime user's widget immediately.
   it("never schedules a lock for a lifetime entitlement", async () => {
     fsx.entitlementStatus = "lifetime";
     fsx.expiresAt = 0;
@@ -315,7 +302,6 @@ describe("RecentSavesWidgetSync", () => {
     renderSync(undefined);
     fsx.platformOs = "web";
     renderSync([link]);
-    // Let any (incorrectly scheduled) sync settle.
     await act(async () => {});
     expect(fsx.snapshots).toHaveLength(0);
     expect(fsx.androidSnapshots).toHaveLength(0);
@@ -343,8 +329,6 @@ describe("RecentSavesWidgetSync", () => {
     });
   });
 
-  // Android has no timeline: the widget locks itself at `validUntil` and
-  // needs the Pro copy for that state up front.
   it("sends the Android widget its expiry and the Pro copy for it", async () => {
     fsx.platformOs = "android";
     fsx.expiresAt = Date.now() + 86_400_000;
@@ -368,12 +352,6 @@ describe("RecentSavesWidgetSync", () => {
     expect(fsx.downloads).toHaveLength(0);
   });
 
-  // The Convex subscription outlives the component: the adapter opens it on the
-  // query cache's "added" event and only drops it on "removed", which waits out
-  // gcTime (24h here). TanStack's `enabled` never reaches that layer, so a
-  // subscription held open across sign-out is re-evaluated without an identity
-  // and the server throws "Not authenticated". The "skip" sentinel is the only
-  // guard the adapter honours, because it changes the query key.
   it("opens no Convex subscription while the shelf is locked", () => {
     fsx.entitled = false;
     renderSync([link]);
@@ -386,9 +364,6 @@ describe("RecentSavesWidgetSync", () => {
     expect(tanstack.args).toBe("skip");
   });
 
-  // The entitlement clock ticks every minute while a subscription has an
-  // expiry. In the query key that was a new subscription per tick, each held
-  // for gcTime.
   it("keeps one query key regardless of the entitlement clock", () => {
     renderSync([link]);
     expect(tanstack.args).toEqual({ limit: 5 });
@@ -460,7 +435,6 @@ describe("RecentSavesWidgetSync", () => {
         imageUri: undefined,
       },
     ]);
-    // The image was downloaded into the cache before resizing.
     expect(fsx.downloads).toEqual(["https://cdn.example/a.jpg"]);
   });
 
@@ -514,7 +488,6 @@ describe("RecentSavesWidgetSync", () => {
     const snapshot = fsx.snapshots[0] as {
       items: { id: string; imageUri?: string }[];
     };
-    // The failing image degrades to the text tile; its sibling still syncs.
     expect(snapshot.items[0].imageUri).toBeUndefined();
     expect(snapshot.items[1].id).toBe("i2");
     expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
@@ -525,11 +498,8 @@ describe("RecentSavesWidgetSync", () => {
   it("degrades a stalled thumbnail to the text tile after the timeout", async () => {
     vi.useFakeTimers();
     try {
-      // The decode never settles, so only the deadline can end the thumbnail.
       fsx.imageGate = new Promise<void>(() => {});
       renderSync([link, note]);
-      // Advance past the 30s deadline: the stalled thumbnail is abandoned and
-      // the sync still lands with the failing item on its text tile.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(30_000);
       });
@@ -548,9 +518,6 @@ describe("RecentSavesWidgetSync", () => {
     }
   });
 
-  // The abandoned build has no abort API, so it can finish after a sign-out
-  // clear. It must never write the previous account's thumbnail into the
-  // shared widget container.
   it("keeps an abandoned thumbnail out of the widget container after a clear", async () => {
     vi.useFakeTimers();
     try {
@@ -572,7 +539,6 @@ describe("RecentSavesWidgetSync", () => {
       await act(async () => {
         await vi.runAllTimersAsync();
       });
-      // The late decode finished, but only into the private cache.
       expect(fsx.saved).toHaveLength(1);
       expect(fsx.saved[0]).toMatch(/^\/cache\/widget-download-/);
       expect(fsx.moves).toEqual([]);
@@ -599,8 +565,6 @@ describe("RecentSavesWidgetSync", () => {
     const { rerender } = renderSync([link]);
     await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
 
-    // A changed widget set fails mid-sync: the snapshot never lands and the
-    // failure clears the dedupe key.
     fsx.failSnapshot = true;
     tanstack.data = [{ ...link, title: "Renamed" }];
     rerender(<RecentSavesWidgetSync />);
@@ -611,8 +575,6 @@ describe("RecentSavesWidgetSync", () => {
       expect.anything(),
     );
 
-    // The original set arrives again as a new instance; without the reset
-    // its unchanged key would be skipped as an already-synced snapshot.
     fsx.failSnapshot = false;
     tanstack.data = [link];
     rerender(<RecentSavesWidgetSync />);
@@ -624,18 +586,14 @@ describe("RecentSavesWidgetSync", () => {
     let release!: () => void;
     fsx.imageGate = new Promise<void>((r) => (release = r));
     renderSync([link]);
-    // The sync starts and blocks decoding the thumbnail.
     await act(async () => {});
     expect(fsx.downloads).toEqual(["https://cdn.example/a.jpg"]);
     expect(fsx.snapshots).toHaveLength(0);
 
-    // A session boundary clears the widget while the sync is blocked.
     const clearing = clearRecentSavesWidget();
     await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
     expect(fsx.snapshots[0]).toMatchObject({ items: [], locked: true });
 
-    // The stale sync unblocks but must not republish the previous account's
-    // content over the cleared snapshot.
     release();
     expect(await clearing).toBe(true);
     await act(async () => {});

@@ -9,8 +9,6 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Zones with DST in each hemisphere, half-hour and 45-minute offsets, and
-// both sides of the date line.
 const ZONES = [
   "UTC",
   "Asia/Kolkata",
@@ -29,8 +27,6 @@ const ZONES = [
 ];
 
 const zone = fc.constantFrom(...ZONES);
-// 2024 through 2030, plus the eight days before each 2026 DST change (US, EU,
-// southern hemisphere), where a schedule is most likely to slip an hour.
 const DST_CHANGES_2026 = [
   "2026-03-08",
   "2026-03-29",
@@ -58,7 +54,6 @@ describe("weekly shelf schedule", () => {
       fc.property(instant, zone, (now, tz) => {
         const at = nextWeeklyDigestAt(now, tz);
         expect(at).toBeGreaterThan(now);
-        // A week plus the longest DST shift.
         expect(at - now).toBeLessThanOrEqual(7 * DAY_MS + 2 * 60 * 60 * 1000);
         expect(localHour(at, tz)).toBe(9);
         expect(weekday(at, tz)).toBe("Sun");

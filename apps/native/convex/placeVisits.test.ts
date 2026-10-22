@@ -39,7 +39,6 @@ describe("setVisited", () => {
       name: "Caffé  Dante",
       visited: true,
     });
-    // The same place written differently is the same visit.
     await t.mutation(api.placeVisits.setVisited, {
       itemId,
       name: "caffe dante",

@@ -16,10 +16,7 @@ import {
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-// convex-test runs `runAfter(0, ...)` jobs via a real `setTimeout`, so the AI
-// action would fire during worker teardown. Fake timers keep the jobs queued:
-// `_scheduled_functions` rows are still written and assertable, but nothing
-// executes. Leave Date and other clocks real.
+// convex-test runs runAfter(0) jobs on a real setTimeout; fake timers keep them queued.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
@@ -32,12 +29,10 @@ async function entitledUser(): Promise<{ t: TestCtx; userId: string }> {
   return await signedInUser(newConvexTest(), { pro: true });
 }
 
-/** A user with no subscription row at all: the not-entitled path. */
 async function freeUser(): Promise<{ t: TestCtx; userId: string }> {
   return await signedInUser(newConvexTest());
 }
 
-/** Insert a ready link with a stored cover for previews. */
 async function seedItem(
   t: TestCtx,
   userId: string,
@@ -158,8 +153,7 @@ describe("space creation", () => {
     const atLimit = "x".repeat(MAX_SPACE_NAME_LENGTH);
     const overLimit = atLimit + "x";
 
-    // ConvexError, not Error: production redacts a plain Error to "Server
-    // Error", so the sentence has to travel in `data`.
+    // ConvexError, not Error: production redacts a plain Error to "Server Error".
     const tooLong = await t
       .mutation(api.spaces.createSpace, { name: overLimit })
       .then(
@@ -180,7 +174,6 @@ describe("space creation", () => {
     expect(empty).toBeInstanceOf(ConvexError);
     expect((empty as ConvexError<string>).data).toBe(SPACE_NAME_EMPTY_MESSAGE);
 
-    // Exactly the limit is fine, and the same rule guards a rename.
     const id = await t.mutation(api.spaces.createSpace, { name: atLimit });
     const renamed = await t
       .mutation(api.spaces.updateSpace, { id, name: overLimit })
@@ -208,14 +201,10 @@ describe("space creation", () => {
         }),
     );
 
-    // Onboarding replay keys on the trimmed name; the lookup must win over
-    // validation or recovery of a persisted legacy space fails.
     expect(
       await t.mutation(api.spaces.createSpace, { name: ` ${legacyName} ` }),
     ).toBe(legacyId);
 
-    // The edit form always submits the current name. Unchanged, it is not
-    // re-validated, so the other settings can still be edited.
     await t.mutation(api.spaces.updateSpace, {
       id: legacyId,
       name: legacyName,
@@ -224,7 +213,6 @@ describe("space creation", () => {
     const row = await t.run(async (ctx) => await ctx.db.get(legacyId));
     expect(row).toMatchObject({ name: legacyName, dynamic: true });
 
-    // A changed name is held to the limit like any other.
     const renamed = await t
       .mutation(api.spaces.updateSpace, {
         id: legacyId,
@@ -375,14 +363,12 @@ describe("denormalized space summary", () => {
     for (const itemId of [a, b, c, d]) {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
-    // Most recently added first, capped at three; the fourth stays counted.
     expect(await readSpace(t, spaceId)).toMatchObject({
       savedCount: 4,
       suggestedCount: 0,
       previewItemIds: [d, c, b],
     });
 
-    // A suggestion is counted in its own bucket and previewed separately.
     const s = await seedItem(t, userId, "s");
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId,
@@ -395,7 +381,6 @@ describe("denormalized space summary", () => {
       suggestedPreviewItemIds: [s],
     });
 
-    // Accepting moves it across buckets and to the front of the saved covers.
     expect(
       await t.mutation(api.spaces.acceptSuggestion, { itemId: s, spaceId }),
     ).toBe(true);
@@ -406,24 +391,20 @@ describe("denormalized space summary", () => {
       suggestedPreviewItemIds: [],
     });
 
-    // Removing a cover item refills the list from the remaining members.
     await t.mutation(api.spaces.removeItemFromSpace, { itemId: s, spaceId });
     expect(await readSpace(t, spaceId)).toMatchObject({
       savedCount: 4,
       suggestedCount: 0,
       previewItemIds: [d, c, b],
     });
-    // Removing a non-cover item only touches the count.
     await t.mutation(api.spaces.removeItemFromSpace, { itemId: a, spaceId });
     expect(await readSpace(t, spaceId)).toMatchObject({
       savedCount: 3,
       previewItemIds: [d, c, b],
     });
-    // A second remove is a no-op (already dismissed).
     await t.mutation(api.spaces.removeItemFromSpace, { itemId: a, spaceId });
     expect(await readSpace(t, spaceId)).toMatchObject({ savedCount: 3 });
 
-    // Deleting an item drops it from every space it was in.
     const other = await t.mutation(api.spaces.createSpace, { name: "Other" });
     await t.mutation(api.spaces.addItemToSpace, { itemId: d, spaceId: other });
     await t.mutation(api.items.deleteItem, { id: d });
@@ -479,7 +460,6 @@ describe("denormalized space summary", () => {
       suggestedCount: 1,
       suggestedPreviewItemIds: [y],
     });
-    // The classifier withdrawing its suggestion deletes the row and the count.
     await t.mutation(internal.items.setSpacesForItem, {
       itemId: y,
       spaceIds: [],
@@ -538,7 +518,6 @@ describe("denormalized space summary", () => {
       savedCount: 1,
       previewItemIds: [a],
     });
-    // Items themselves survive a space delete.
     expect(await t.run((ctx) => ctx.db.get(b))).not.toBeNull();
   });
 
@@ -555,7 +534,6 @@ describe("denormalized space summary", () => {
     let [listed] = await t.query(api.spaces.listSpaces, {});
     expect(listed.itemCount).toBe(2);
     expect(listed.suggestionCount).toBe(0);
-    // The newest member has no imagery and is skipped; the older one covers.
     expect(listed.previews).toEqual([
       {
         url: expect.stringContaining("/api/storage/"),
@@ -564,8 +542,6 @@ describe("denormalized space summary", () => {
       },
     ]);
 
-    // Forge the summary: if the query walked spaceItems it would report 2/0
-    // and a saved cover. It must report exactly what the row says.
     await t.run((ctx) =>
       ctx.db.patch(spaceId, {
         savedCount: 7,
@@ -588,7 +564,6 @@ describe("denormalized space summary", () => {
 
   it("lists legacy rows without a summary from a bounded fallback, and backfills them", async () => {
     const { t, userId } = await entitledUser();
-    // Written the old way: no summary fields at all.
     const legacy = await t.run((ctx) =>
       ctx.db.insert("spaces", { userId, name: "Legacy" }),
     );
@@ -596,7 +571,6 @@ describe("denormalized space summary", () => {
     const b = await seedItem(t, userId, "b");
     const s = await seedItem(t, userId, "s");
     await t.run(async (ctx) => {
-      // A legacy status-less row reads as saved.
       await ctx.db.insert("spaceItems", {
         userId,
         spaceId: legacy,
@@ -629,10 +603,8 @@ describe("denormalized space summary", () => {
       ),
     );
     expect(listed.previews.map((p) => p.url)).toEqual(covers);
-    // A query never writes: the row is still legacy.
     expect(await readSpace(t, legacy)).not.toHaveProperty("savedCount");
 
-    // A second legacy space, empty, so the backfill needs two batches of one.
     const empty = await t.run((ctx) =>
       ctx.db.insert("spaces", { userId, name: "Empty legacy" }),
     );
@@ -646,7 +618,6 @@ describe("denormalized space summary", () => {
       done: false,
     });
     expect(result.cursor).not.toBeNull();
-    // Ordering inside the backfill follows join creation, newest first.
     expect(await readSpace(t, legacy)).toMatchObject({
       savedCount: 2,
       suggestedCount: 1,
@@ -654,8 +625,6 @@ describe("denormalized space summary", () => {
       suggestedPreviewItemIds: [s],
     });
     expect(await readSpace(t, empty)).not.toHaveProperty("savedCount");
-    // The continuation was scheduled with the cursor; driving it by hand
-    // reaches the end and a second pass over a filled row changes nothing.
     const jobs = await t.run((ctx) =>
       ctx.db.system.query("_scheduled_functions").collect(),
     );
@@ -694,8 +663,6 @@ describe("denormalized space summary", () => {
     for (const itemId of [a, b, c, d]) {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
-    // Sixty dismissals, all newer than the saved joins. Dismissed rows are not
-    // counted, so writing them directly leaves the summary truthful.
     await t.run(async (ctx) => {
       for (let i = 0; i < 60; i++) {
         const itemId = await ctx.db.insert("items", {
@@ -718,8 +685,6 @@ describe("denormalized space summary", () => {
       previewItemIds: [d, c, b],
     });
 
-    // Removing a cover leaves two covers for three saved rows, which forces a
-    // refill. It must find the saved rows behind sixty newer dismissed ones.
     await t.mutation(api.spaces.removeItemFromSpace, { itemId: d, spaceId });
     expect(await readSpace(t, spaceId)).toMatchObject({
       savedCount: 3,
@@ -740,8 +705,6 @@ describe("denormalized space summary", () => {
         itemId: legacy,
       }),
     );
-    // The direct insert bypassed the summary; heal the count by hand so the
-    // refill condition (count > list length) holds.
     await t.run((ctx) => ctx.db.patch(spaceId, { savedCount: 1 }));
     const a = await seedItem(t, userId, "a");
     const b = await seedItem(t, userId, "b");
@@ -793,11 +756,6 @@ describe("denormalized space summary", () => {
         .map((row) => row._id);
     };
 
-    // Budget 8: the first space scans to a 7-row limit and reads 5 rows,
-    // leaving 3, so the second space can only be scanned to a 2-row limit and
-    // comes back incomplete. That is a budget stop, not an oversize space:
-    // nothing is skipped and the cursor points at the first space so the
-    // second is retried with a full budget.
     const first = await t.mutation(internal.spaces.backfillSpaceCounters, {
       readBudget: 8,
     });
@@ -846,9 +804,6 @@ describe("denormalized space summary", () => {
       expect((await readSpace(t, spaceId)).previewItemIds).toHaveLength(3);
     }
 
-    // Budget 4: the first scan is capped at 3 rows and a 5-row space comes
-    // back incomplete. The budget is never exceeded, the space is skipped as
-    // oversize, and the cursor moves past it, so the run cannot stall on it.
     await t.run((ctx) =>
       ctx.db.patch(spaces[0], {
         savedCount: undefined,
@@ -870,8 +825,6 @@ describe("denormalized space summary", () => {
     });
     expect((await readSpace(t, spaces[0])).savedCount).toBeUndefined();
 
-    // With the default budget the three small spaces fit one transaction, and
-    // `force` recomputes rows that already carry a summary.
     await t.run((ctx) => ctx.db.patch(spaces[0], { savedCount: 99 }));
     const forced = await t.mutation(internal.spaces.backfillSpaceCounters, {
       force: true,
@@ -879,8 +832,6 @@ describe("denormalized space summary", () => {
     expect(forced).toMatchObject({ processed: 3, updated: 3, done: true });
     expect(await readSpace(t, spaces[0])).toMatchObject({ savedCount: 5 });
 
-    // Knobs below their floor fall back to the defaults instead of stalling:
-    // batchSize 0 would otherwise reschedule forever without moving the cursor.
     const before = (
       await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),
@@ -932,8 +883,6 @@ describe("denormalized space summary", () => {
 
 describe("steering spend controls", () => {
   it("blocks a burst of addItemToSpace past the steerItem capacity and rolls the add back", async () => {
-    // steerItem capacity is 40; the 41st add in a tight loop must be rejected
-    // so a leaked/shared Pro account can't loop and burn LLM spend.
     const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
     for (let i = 0; i < 40; i++) {
@@ -944,7 +893,6 @@ describe("steering spend controls", () => {
     await expect(
       t.mutation(api.spaces.addItemToSpace, { itemId: over, spaceId }),
     ).rejects.toThrow();
-    // The whole mutation rolled back: no join, no count, no job.
     expect((await readSpace(t, spaceId)).savedCount).toBe(40);
     expect(await steeringJobs(t)).toHaveLength(40);
     const joins = await t.run((ctx) =>
@@ -974,7 +922,6 @@ describe("steering spend controls", () => {
       savedCount: 42,
       suggestedCount: 0,
     });
-    // Only the budget's worth of steering passes were scheduled.
     expect(await steeringJobs(t)).toHaveLength(40);
   });
 
@@ -1020,7 +967,6 @@ describe("steering spend controls", () => {
       itemIds: [s, s2],
     });
 
-    // The core organization actions all succeed without Pro.
     await t.mutation(api.spaces.addItemToSpace, { itemId: a, spaceId });
     expect(
       await t.mutation(api.spaces.acceptSuggestion, { itemId: s, spaceId }),
@@ -1032,17 +978,14 @@ describe("steering spend controls", () => {
       savedCount: 3,
       suggestedCount: 0,
     });
-    // ...but the paid steering pass follows createSpace's Pro rule.
     expect(await steeringJobs(t)).toHaveLength(0);
 
-    // Space creation itself stays Pro-gated, as before.
     await expect(
       t.mutation(api.spaces.createSpace, { name: "New" }),
     ).rejects.toThrow("Pro required");
   });
 
   it("rate-limits the recommendation pass on createSpace and on enabling dynamic", async () => {
-    // recommendSpace capacity is 10. Retries of an existing name never spend.
     const { t, userId } = await entitledUser();
     for (let i = 0; i < 10; i++) {
       await t.mutation(api.spaces.createSpace, { name: `Space ${i}` });
@@ -1061,12 +1004,10 @@ describe("steering spend controls", () => {
         .collect(),
     );
     expect(spaces).toHaveLength(10);
-    // Enabling dynamic draws from the same bucket and is rejected whole.
     await expect(
       t.mutation(api.spaces.updateSpace, { id: spaces[0]._id, dynamic: true }),
     ).rejects.toThrow();
     expect((await readSpace(t, spaces[0]._id)).dynamic).toBe(false);
-    // A rename does not touch the recommendation budget.
     await t.mutation(api.spaces.updateSpace, {
       id: spaces[0]._id,
       name: "Renamed",

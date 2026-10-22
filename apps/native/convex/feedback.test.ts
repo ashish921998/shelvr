@@ -22,7 +22,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Inbox env stubbed + a fresh test instance. */
 function setup() {
   vi.stubEnv("RESEND_API_KEY", "re_test_key");
   vi.stubEnv("RESEND_FEEDBACK_INBOX_EMAIL", INBOX);
@@ -30,8 +29,6 @@ function setup() {
   return newConvexTest();
 }
 
-/** A signed-in user whose account carries `email`; claimDelivery reads the
- * address from the users row, so it must be a real row. */
 async function signedInWithEmail(
   t: ReturnType<typeof newConvexTest>,
   email?: string,
@@ -119,8 +116,6 @@ describe("submitFeedback", () => {
       appVersion: "1.2.3",
       buildVariant: "production",
       status: "delivered",
-      // The attempt is spent at claim time, so a first-try delivery shows
-      // attempts already advanced.
       attempts: 1,
     });
     expect(row?.deliveredAt).toBeGreaterThan(0);
@@ -136,8 +131,6 @@ describe("submitFeedback", () => {
     const body = JSON.parse(String(init.body));
     expect(body).toMatchObject({ to: INBOX, from: SENDER });
     expect(body.reply_to).toBe("person@example.com");
-    // The message is authorized in the email body, but the subject stays
-    // content-free so notification previews cannot leak it.
     expect(body.text).toContain("Love the app");
     expect(body.subject).toBe("Shelvr feedback (home)");
     expect(body.subject).not.toContain("Love the app");
@@ -161,8 +154,6 @@ describe("submitFeedback", () => {
   });
 
   it("bounds the context strings it stores", async () => {
-    // No inbox env: nothing is scheduled, so the row can be inspected without
-    // a delivery action pending behind the test.
     const t = newConvexTest();
     const { t: signedIn } = await signedInWithEmail(t);
     const result = await signedIn.mutation(api.feedback.submitFeedback, {
@@ -189,7 +180,6 @@ describe("submitFeedback", () => {
   });
 
   it("keeps the row for retry when the inbox is not configured", async () => {
-    // No env stubs: nothing is configured, so nothing is scheduled.
     const t = newConvexTest();
     const fetchMock = okFetch();
     vi.stubGlobal("fetch", fetchMock);
@@ -206,9 +196,6 @@ describe("submitFeedback", () => {
     const row = await getSubmission(t, result.submissionId);
     expect(row).toMatchObject({ status: "unconfigured", attempts: 0 });
 
-    // The operator configures the inbox; the retry worker schedules one
-    // delivery action per waiting row, and it delivers without ever having
-    // spent an attempt on the unconfigured window.
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("RESEND_FEEDBACK_INBOX_EMAIL", INBOX);
     vi.stubEnv("RESEND_FEEDBACK_FROM_EMAIL", SENDER);
@@ -238,15 +225,12 @@ describe("delivery retries", () => {
     });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    // The row survives the outage, ready for the retry worker.
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "failed",
       attempts: 1,
       deliveryError: "provider_error:500",
     });
 
-    // The log line carries category/status/attempt only, never the message
-    // or the account email.
     const logged = errorSpy.mock.calls
       .map((call) => String(call[0]))
       .join("\n");
@@ -255,8 +239,6 @@ describe("delivery retries", () => {
     expect(logged).not.toContain("secret words");
     expect(logged).not.toContain("person@example.com");
 
-    // The provider recovers; the retry worker delivers the same row (the
-    // second claim spends the second attempt).
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     await t.action(internal.feedback.retryFailedDeliveries, {});
     await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -337,9 +319,6 @@ describe("delivery retries", () => {
     vi.stubGlobal("fetch", fetchMock);
     const id = await insertSubmission(t, { status: "pending" });
 
-    // Claim exactly as the delivery action would, then "crash" before the
-    // send or finishDelivery: the attempt must already be persisted, or
-    // repeated crashes could duplicate emails for free forever.
     const claimed = await t.mutation(internal.feedback.claimDelivery, {
       submissionId: id,
     });

@@ -41,7 +41,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** A processing note (notes never touch the network) owned by `runId`. */
 async function note(
   t: ReturnType<typeof newConvexTest>,
   runId: string,
@@ -84,18 +83,12 @@ describe("model call deadlines", () => {
         t.action(internal.ai.processItem, { itemId, runId: "run-1" }),
       ).resolves.toBeNull();
 
-      // Retryable: the client renders `error` with a Try again button, and
-      // reprocessItem accepts it.
       expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
         status: "failed",
         failureReason: "error",
       });
-      // Provider slowness is an expected condition: warned, never paged as an
-      // action fault.
       expect(console.error).not.toHaveBeenCalled();
       expect(console.warn).toHaveBeenCalledTimes(1);
-      // The outcome event still fires, with a stable category and nothing
-      // from the request in it.
       const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
       expect(body.event).toBe("ai_categorization_failed");
       expect(body.properties.error_category).toBe("model_timeout");
@@ -157,7 +150,6 @@ describe("categorization telemetry delivery", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     expect(jobs).toHaveLength(0);
-    // A lost telemetry row is warned about, never paged as an action fault.
     expect(console.error).not.toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledTimes(1);
   });
@@ -166,8 +158,6 @@ describe("categorization telemetry delivery", () => {
 describe("run fencing in processItem", () => {
   it("discards a superseded run's result instead of overwriting the current run", async () => {
     const t = newConvexTest();
-    // The user retried while run-old was awaiting the model: the item now
-    // belongs to run-new, whose action has not finished yet.
     const itemId = await note(t, "run-new");
 
     await expect(
@@ -180,7 +170,6 @@ describe("run fencing in processItem", () => {
       processingRunId: "run-new",
     });
     expect(item?.title).toBeUndefined();
-    // No steering jobs were queued for a result nobody will see.
     const scheduled = await t.run((ctx) =>
       ctx.db.system.query("_scheduled_functions").collect(),
     );
@@ -189,8 +178,6 @@ describe("run fencing in processItem", () => {
   });
 
   it("does not fail an item a newer run owns when a superseded run errors", async () => {
-    // Telemetry is live so the assertion below proves the fence also covers
-    // the outcome event, not only the status write.
     vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
     vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 200 }));
     generateObject.mockRejectedValue(
@@ -207,7 +194,6 @@ describe("run fencing in processItem", () => {
       status: "processing",
       processingRunId: "run-new",
     });
-    // The newer run owns the outcome; this one records nothing.
     expect(fetch).not.toHaveBeenCalled();
   });
 

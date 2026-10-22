@@ -108,7 +108,6 @@ describe("transfer webhook reconciliation", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(Response.json(f.empty));
     vi.stubGlobal("fetch", fetchMock);
     expect((await f.send()).status).toBe(200);
-    // Only the live source account was looked up.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain(
       encodeURIComponent(f.ids.from),
@@ -135,8 +134,6 @@ describe("transfer webhook reconciliation", () => {
         }),
       );
 
-      // Owner selection has already passed when the second lookup (the
-      // receiving account) is held here.
       const lookupGate = gate();
       vi.stubGlobal(
         "fetch",

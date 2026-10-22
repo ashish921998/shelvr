@@ -77,7 +77,6 @@ vi.mock("expo-router", () => ({
     getState: () => ({ routes: [{ name: mocks.stackRoot }] }),
   }),
 }));
-// The screen's own flows are under test; its child settings have their own.
 vi.mock("@/components/ai-consent", () => ({
   AiConsentSetting: vi.fn(() => null),
 }));
@@ -211,7 +210,6 @@ it.each(["trialing", "pro"])(
 
     buttons[1].onPress?.();
     expect(mocks.deleteAccount).not.toHaveBeenCalled();
-    // Both sheets go before Customer Center can present.
     const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
     dismiss();
     expect(mocks.dismissAll).toHaveBeenCalledTimes(1);

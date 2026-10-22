@@ -17,13 +17,8 @@ import {
   type FeedbackFeedItem,
 } from "@/lib/feedback";
 
-/** Minimum settle time before showing, and the poll interval while a paywall is up. */
 const INVITATION_RECHECK_MS = 2000;
 
-/** `defer` suspends new invitations without touching state. Home sets it
- * while the cancel-survey card owns the Home moment, so the one-shot claim
- * (shownCount + 14-day gate) is never burned for an invitation that is
- * rendered behind the survey and never actually seen. */
 export function useFeedbackInvitation(
   items: FeedbackFeedItem[] | undefined,
   opts: { defer?: boolean } = {},
@@ -41,8 +36,6 @@ export function useFeedbackInvitation(
     return () => subscription.remove();
   }, []);
 
-  // A save that interrupts a visible invitation ends it. The next one has to
-  // pass the gate again instead of reappearing the moment the save settles.
   if (busy && invitedUser !== null) setInvitedUser(null);
 
   useEffect(() => {

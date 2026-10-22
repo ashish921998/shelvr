@@ -5,19 +5,12 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// Sharing and the reminder each had their own step, so the promise names
-// neither.
 const LINES: TextMessageKey[] = ["promise.comeBack", "promise.use"];
 
-/**
- * The last step before the paywall: two habits the person promises
- * themselves, taken with one tap. Nothing is stored or sent.
- */
 export function PromiseStep({
   leaving,
   onCommit,
 }: {
-  /** `onCommit` ran and the paywall is on its way. */
   leaving: boolean;
   onCommit: () => void;
 }) {

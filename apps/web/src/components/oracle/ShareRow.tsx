@@ -11,9 +11,6 @@ const IMAGE_NAME = "shelvr-oracle.png";
 const buttonClass =
   "min-h-12 w-full rounded-xl border border-line-strong bg-white px-5 text-base font-semibold text-ink transition hover:border-ember-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto";
 
-/** Shares the verdict as its story card image where the browser can attach
- * files, and as a link to its share page otherwise. `onShared` fires once the
- * visitor has shared, copied, or saved it. */
 export default function ShareRow({
   mode,
   verdict,

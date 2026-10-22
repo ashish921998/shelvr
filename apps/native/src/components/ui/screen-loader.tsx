@@ -9,8 +9,6 @@ export function ScreenLoader({
   label?: string;
 }) {
   useAppLocale();
-  // Re-render on a theme change, as this screen did before it drew the S,
-  // so the background follows a light/dark switch while it is up.
   useUnistyles();
   return (
     <View
