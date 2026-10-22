@@ -89,6 +89,7 @@ export function TripMap({
               bottom: rt.insets.bottom,
               left:
                 rt.insets.left + TRIP_SIDE_PANEL_MARGIN + TRIP_SIDE_PANEL_WIDTH,
+              right: rt.insets.right,
             }
           : { bottom: height * TRIP_PANEL_SHARE }),
         ...(process.env.EXPO_OS === "ios"
@@ -108,6 +109,7 @@ export function TripMap({
     side,
     rt.insets.bottom,
     rt.insets.left,
+    rt.insets.right,
   ]);
 
   // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.

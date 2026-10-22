@@ -103,8 +103,9 @@ type MapView = {
   height: number;
   top: number;
   bottom: number;
-  /** Points covered by a side panel; the pins center in the rest. */
+  /** Points covered at each side (a side panel, safe areas); the pins center in the rest. */
   left?: number;
+  right?: number;
   worldWidth: number;
   centerY: number;
 };
@@ -128,8 +129,9 @@ export function fitCamera(
   const cos = Math.cos((midLat * Math.PI) / 180);
   const visible = Math.max(view.height - view.top - view.bottom, 1);
   const left = view.left ?? 0;
+  const right = view.right ?? 0;
   const byWidth = Math.log2(
-    (360 * FIT_FILL * Math.max(view.width - left, 1)) /
+    (360 * FIT_FILL * Math.max(view.width - left - right, 1)) /
       (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
   );
   const byHeight = Math.log2(
@@ -142,10 +144,10 @@ export function fitCamera(
   return {
     coordinates: {
       latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
-      // The camera centers on the whole view; shift it so the pins center right of the panel.
+      // The camera centers on the whole view; shift it so the pins center between the covered sides.
       longitude:
         (minLng + maxLng) / 2 -
-        (left / 2) * (360 / (view.worldWidth * 2 ** zoom)),
+        ((left - right) / 2) * (360 / (view.worldWidth * 2 ** zoom)),
     },
     zoom,
   };

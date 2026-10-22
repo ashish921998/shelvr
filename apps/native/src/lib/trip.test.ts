@@ -168,13 +168,14 @@ describe("fitCamera", () => {
     );
   });
 
-  it("centers the pins right of a side panel", () => {
+  it("centers the pins between a side panel and the right inset", () => {
     const side = {
       width: 951,
       height: 669,
       top: 100,
       bottom: 20,
       left: 372,
+      right: 40,
       worldWidth: 951,
       centerY: 100 + (669 - 100 - 20) / 2,
     };
@@ -192,10 +193,10 @@ describe("fitCamera", () => {
     );
     for (const x of xs) {
       expect(x).toBeGreaterThan(side.left);
-      expect(x).toBeLessThan(side.width);
+      expect(x).toBeLessThan(side.width - side.right);
     }
     expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(
-      side.left + (side.width - side.left) / 2,
+      side.left + (side.width - side.left - side.right) / 2,
       0,
     );
   });
