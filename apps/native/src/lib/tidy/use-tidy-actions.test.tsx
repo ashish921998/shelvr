@@ -8,6 +8,10 @@ import { useTidyActions } from "./use-tidy-actions";
 const mocks = vi.hoisted(() => ({
   deleteAssets: vi.fn(async (_assets: unknown[]) => undefined),
   store: new Map<string, unknown>(),
+  saveImages: vi.fn(),
+  deleteItem: vi.fn(),
+  alert: vi.fn(),
+  captureError: vi.fn(),
 }));
 
 vi.mock("expo-media-library", () => {
@@ -19,8 +23,15 @@ vi.mock("expo-media-library", () => {
   }
   return { Asset };
 });
-vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
-vi.mock("@/lib/use-save-image", () => ({ useSaveImages: () => vi.fn() }));
+vi.mock("convex/react", () => ({ useMutation: () => mocks.deleteItem }));
+vi.mock("@/lib/use-save-image", () => ({
+  useSaveImages: () => mocks.saveImages,
+}));
+vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: mocks.captureError },
+}));
+vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native-mmkv", () => ({
   createMMKV: () => ({
     contains: (key: string) => mocks.store.has(key),
@@ -46,6 +57,58 @@ function setup() {
 beforeEach(() => {
   mocks.store.clear();
   mocks.deleteAssets.mockReset().mockResolvedValue(undefined);
+  mocks.saveImages.mockReset();
+  mocks.deleteItem.mockReset().mockResolvedValue(null);
+  mocks.alert.mockReset();
+  mocks.captureError.mockReset();
+});
+
+describe("saving from Tidy", () => {
+  it("takes a save that failed back out of the saved count", async () => {
+    mocks.saveImages.mockResolvedValue([
+      { status: "failed", stage: "upload", operationId: "op" },
+    ]);
+    const { result } = setup();
+    await act(async () => result.current.onDecision(23, "save"));
+    expect(result.current.counts.saved).toBe(0);
+  });
+
+  it("counts a failed save that was also undone only once", async () => {
+    let fail!: () => void;
+    mocks.saveImages.mockReturnValue(
+      new Promise((resolve) => {
+        fail = () => resolve([{ status: "failed", stage: "upload" }]);
+      }),
+    );
+    const { result } = setup();
+    await act(async () => result.current.onDecision(23, "save"));
+    act(() => {
+      result.current.undo();
+    });
+    expect(result.current.counts.saved).toBe(0);
+    await act(async () => fail());
+    expect(result.current.counts.saved).toBe(0);
+  });
+
+  it("says so when undoing a save can't remove it from Shelvr", async () => {
+    mocks.saveImages.mockResolvedValue([{ status: "saved", itemId: "item-1" }]);
+    mocks.deleteItem.mockRejectedValue(new Error("offline"));
+    const { result } = setup();
+    await act(async () => result.current.onDecision(23, "save"));
+    await act(async () => {
+      result.current.undo();
+    });
+    expect(mocks.deleteItem).toHaveBeenCalledWith({ id: "item-1" });
+    expect(result.current.counts.saved).toBe(0);
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "tidy_undo_save_failed",
+      expect.any(Error),
+    );
+    expect(mocks.alert).toHaveBeenCalledWith(
+      "item.deleteFailed",
+      "errors.retrySoon",
+    );
+  });
 });
 
 describe("undo after a committed delete", () => {
