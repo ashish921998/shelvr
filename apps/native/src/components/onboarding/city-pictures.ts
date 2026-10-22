@@ -1,6 +1,6 @@
 import type { SampleCityId } from "@/lib/sample-cities";
 
-// The city-*.jpg photos are from Unsplash, under its free licence.
+// The city-*.jpg photos are from Unsplash, under its free licence; prague.jpg was generated for the app.
 export const CITY_PICTURES: Record<
   SampleCityId,
   Record<"food" | "view", number>
