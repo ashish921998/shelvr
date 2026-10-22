@@ -1,2 +1,3 @@
 apps/native/assets/world/*.json
 apps/native/convex/testdata/settlement/rows.json
+apps/native/convex/testdata/settlement/failure-rows.json
