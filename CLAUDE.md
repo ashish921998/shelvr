@@ -267,7 +267,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
   reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
-  per user, tracked in `onboardingDemos`.
+  per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
+  app still calls `createDemoItem` for a first save an older build queued before sign-in.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
 - **`oracle.ts`**, **`oracleLimits.ts`**: the web Oracle. The internal `consult` action reads

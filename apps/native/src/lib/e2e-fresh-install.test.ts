@@ -6,9 +6,16 @@ const mock = vi.hoisted(() => ({
   os: "ios",
   argument: undefined as unknown,
   devSignIn: true,
-  forgetStoredSession: vi.fn(),
-  forgetOnboarded: vi.fn(),
-  clearSharedPayloads: vi.fn(),
+  resets: {
+    forgetStoredSession: vi.fn(),
+    forgetOnboarded: vi.fn(),
+    clearPending: vi.fn(),
+    clearPurchaseBeforeSignIn: vi.fn(),
+    clearQueued: vi.fn(),
+    clearPendingShareOnDevice: vi.fn(),
+    clearShareDiscardedOnDevice: vi.fn(),
+    clearSharedPayloads: vi.fn(),
+  },
 }));
 
 vi.mock("react-native", () => ({
@@ -24,21 +31,27 @@ vi.mock("react-native", () => ({
 vi.mock("@/lib/anonymous-auth", () => ({
   isAnonymousAuthEnabled: () => mock.devSignIn,
 }));
-vi.mock("@/lib/auth-storage", () => ({
-  forgetStoredSession: mock.forgetStoredSession,
-}));
-vi.mock("@/lib/onboarding", () => ({ forgetOnboarded: mock.forgetOnboarded }));
-vi.mock("@/lib/pending-onboarding", () => ({ clearPending: vi.fn() }));
-vi.mock("@/lib/purchase-before-sign-in", () => ({
-  clearPurchaseBeforeSignIn: vi.fn(),
-}));
-vi.mock("@/lib/queued-first-save", () => ({ clearQueued: vi.fn() }));
 vi.mock("expo-sharing", () => ({
-  clearSharedPayloads: mock.clearSharedPayloads,
+  clearSharedPayloads: mock.resets.clearSharedPayloads,
+}));
+vi.mock("@/lib/auth-storage", () => ({
+  forgetStoredSession: mock.resets.forgetStoredSession,
+}));
+vi.mock("@/lib/onboarding", () => ({
+  forgetOnboarded: mock.resets.forgetOnboarded,
+}));
+vi.mock("@/lib/pending-onboarding", () => ({
+  clearPending: mock.resets.clearPending,
+}));
+vi.mock("@/lib/purchase-before-sign-in", () => ({
+  clearPurchaseBeforeSignIn: mock.resets.clearPurchaseBeforeSignIn,
+}));
+vi.mock("@/lib/queued-first-save", () => ({
+  clearQueued: mock.resets.clearQueued,
 }));
 vi.mock("@/lib/share/pending-share-store", () => ({
-  clearPendingShareOnDevice: vi.fn(),
-  clearShareDiscardedOnDevice: vi.fn(),
+  clearPendingShareOnDevice: mock.resets.clearPendingShareOnDevice,
+  clearShareDiscardedOnDevice: mock.resets.clearShareDiscardedOnDevice,
 }));
 
 describe("startFreshForE2E", () => {
@@ -49,14 +62,13 @@ describe("startFreshForE2E", () => {
     vi.clearAllMocks();
   });
 
-  const signedOut = () =>
-    mock.forgetStoredSession.mock.calls.length > 0 &&
-    mock.forgetOnboarded.mock.calls.length > 0;
+  const called = () =>
+    Object.values(mock.resets).filter((reset) => reset.mock.calls.length > 0)
+      .length;
 
-  it("signs out and forgets onboarding on a development build launched with the argument", () => {
+  it("runs every reset on a development build launched with the argument", () => {
     startFreshForE2E();
-    expect(signedOut()).toBe(true);
-    expect(mock.clearSharedPayloads).toHaveBeenCalled();
+    expect(called()).toBe(Object.keys(mock.resets).length);
   });
 
   it("does nothing without the argument", () => {
@@ -64,18 +76,18 @@ describe("startFreshForE2E", () => {
       mock.argument = value;
       startFreshForE2E();
     }
-    expect(mock.forgetStoredSession).not.toHaveBeenCalled();
+    expect(called()).toBe(0);
   });
 
   it("does nothing on a build without dev sign-in, whatever it is launched with", () => {
     mock.devSignIn = false;
     startFreshForE2E();
-    expect(mock.forgetStoredSession).not.toHaveBeenCalled();
+    expect(called()).toBe(0);
   });
 
   it("does nothing off iOS", () => {
     mock.os = "android";
     startFreshForE2E();
-    expect(mock.forgetStoredSession).not.toHaveBeenCalled();
+    expect(called()).toBe(0);
   });
 });

@@ -1,41 +1,125 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton } from "@/components/onboarding/parts";
-import type { TextMessageKey } from "@/locales/message-types";
+import { AppSymbolIcon } from "@/components/symbol";
+import type { Goal } from "@/lib/onboarding-goals";
+import type { EveningAfter } from "@/lib/sample-trip";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const LINES: TextMessageKey[] = ["promise.comeBack", "promise.use"];
+const DATE_PICKS = {
+  walk: "promise.datePickWalk",
+  drinks: "promise.datePickDrinks",
+  dessert: "promise.datePickDessert",
+} as const;
+
+/** The headline and the three promises for each answer to "What do you save?". */
+function promiseCopy(goal: Goal, city: string | null, after: EveningAfter) {
+  switch (goal) {
+    case "travel":
+      return {
+        title:
+          city === null
+            ? t("promise.travelTitleAnywhere")
+            : t("promise.travelTitle", { city }),
+        accent: t("promise.travelAccent"),
+        lines: [
+          city === null
+            ? t("promise.travelSaveAnywhere")
+            : t("promise.travelSave", { city }),
+          t("promise.travelPick"),
+          t("promise.travelGo"),
+        ],
+      };
+    case "food":
+      return {
+        title: t("promise.noMore"),
+        accent: t("promise.foodAccent"),
+        lines: [
+          city === null
+            ? t("promise.foodSaveAnywhere")
+            : t("promise.foodSave", { city }),
+          t("promise.foodPick"),
+          t("promise.foodGo"),
+        ],
+      };
+    case "date":
+      return {
+        title: t("promise.noMore"),
+        accent: t("promise.dateAccent"),
+        lines: [
+          t("promise.dateSave"),
+          t(DATE_PICKS[after]),
+          t("promise.dateGo"),
+        ],
+      };
+    case "recipes":
+      return {
+        title: t("promise.noMore"),
+        accent: t("promise.recipesAccent"),
+        lines: [
+          t("promise.recipesSave"),
+          t("promise.recipesPick"),
+          t("promise.recipesGo"),
+        ],
+      };
+    case "other":
+      return {
+        title: t("promise.noMore"),
+        accent: t("promise.otherAccent"),
+        lines: [
+          t("promise.otherSave"),
+          t("promise.otherPick"),
+          t("promise.otherGo"),
+        ],
+      };
+  }
+}
 
 export function PromiseStep({
+  goal,
+  city,
+  after = "walk",
   leaving,
   onCommit,
 }: {
+  goal: Goal;
+  /** null when the person picked no city we cover. */
+  city: string | null;
+  /** What follows dinner on the date night they picked. */
+  after?: EveningAfter;
   leaving: boolean;
   onCommit: () => void;
 }) {
   useAppLocale();
+  const { theme } = useUnistyles();
+  const copy = promiseCopy(goal, city, after);
   return (
     <View style={styles.wrap}>
-      <View style={styles.head}>
-        <Text
-          style={styles.headline}
-          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-        >
-          {t("promise.title")}{" "}
-          <Text style={styles.headlineAccent}>{t("promise.titleAccent")}</Text>
-        </Text>
-        <Text style={styles.support}>{t("promise.body")}</Text>
-      </View>
+      <Text style={styles.headline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+        {copy.title} <Text style={styles.headlineAccent}>{copy.accent}</Text>
+      </Text>
 
       <View style={styles.card}>
         <Text style={styles.eyebrow}>{t("promise.eyebrow")}</Text>
-        {LINES.map((line, index) => (
-          <View key={line} style={styles.line}>
+        {copy.lines.map((line, index) => (
+          <View
+            key={index}
+            style={[styles.line, index > 0 && styles.lineDivided]}
+          >
             <Text style={styles.number}>{index + 1}</Text>
-            <Text style={styles.lineText}>{t(line)}</Text>
+            <Text style={styles.lineText}>{line}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.reminder}>
+        <AppSymbolIcon
+          name="bell"
+          size={15}
+          tintColor={theme.colors.primaryText}
+        />
+        <Text style={styles.reminderText}>{t("promise.reminder")}</Text>
       </View>
 
       <View style={styles.foot}>
@@ -49,29 +133,21 @@ export function PromiseStep({
 const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
-    gap: theme.gap(3),
-  },
-  head: {
-    gap: theme.gap(1),
+    gap: theme.gap(2.5),
   },
   headline: {
     fontFamily: theme.fonts.display,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 30,
+    lineHeight: 36,
     color: theme.colors.foreground,
   },
   headlineAccent: {
     color: theme.colors.primaryText,
   },
-  support: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
-    color: theme.colors.muted,
-  },
   card: {
-    gap: theme.gap(1.75),
-    padding: theme.gap(2.5),
+    paddingHorizontal: theme.gap(2.5),
+    paddingTop: theme.gap(2.25),
+    paddingBottom: theme.gap(1),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
     borderWidth: 1,
@@ -88,6 +164,11 @@ const styles = StyleSheet.create((theme) => ({
   line: {
     flexDirection: "row",
     gap: theme.gap(1.5),
+    paddingVertical: theme.gap(1.75),
+  },
+  lineDivided: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   number: {
     width: 14,
@@ -99,8 +180,25 @@ const styles = StyleSheet.create((theme) => ({
   lineText: {
     flex: 1,
     fontFamily: theme.fonts.display,
-    fontSize: 21,
-    lineHeight: 27,
+    fontSize: 20,
+    lineHeight: 25,
+    color: theme.colors.foreground,
+  },
+  reminder: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.25),
+    paddingVertical: theme.gap(1.5),
+    paddingHorizontal: theme.gap(1.75),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  reminderText: {
+    flex: 1,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 19,
     color: theme.colors.foreground,
   },
   foot: {

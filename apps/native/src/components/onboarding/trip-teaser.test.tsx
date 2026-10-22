@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sampleTrip } from "@/lib/sample-trip";
-import { TripBuildStep, TripLockedStep, TripRevealStep } from "./trip-teaser";
+import { TripBuildStep, TripRevealStep } from "./trip-teaser";
 
 const TRIP = sampleTrip("prague");
 
@@ -15,8 +15,8 @@ const mock = vi.hoisted(() => ({
   icon: ({ name }: { name: string }) => <i data-testid={`icon-${name}`} />,
   ring: () => <i data-testid="ring" />,
   image: () => <i data-testid="image" />,
-  card: ({ locked }: { locked: boolean }) => (
-    <div data-testid="card" data-locked={String(locked)} />
+  card: ({ trip }: { trip: { kind: string } }) => (
+    <div data-testid="card" data-kind={trip.kind} />
   ),
   button: ({
     label,
@@ -33,7 +33,11 @@ const mock = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock("react-native", () => ({ View: mock.view, Text: mock.text }));
+vi.mock("react-native", () => ({
+  View: mock.view,
+  Text: mock.text,
+  ScrollView: mock.view,
+}));
 vi.mock("react-native-reanimated", () => ({ default: { View: mock.view } }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
@@ -138,50 +142,45 @@ describe("TripBuildStep", () => {
   });
 });
 
-describe("TripLockedStep", () => {
-  it("shows the locked sample trip and says what the button leads to", () => {
-    render(<TripLockedStep trip={TRIP} leaving={false} onUnlock={vi.fn()} />);
-    expect(screen.getByTestId("card").dataset.locked).toBe("true");
-    expect(screen.getByText("tripTeaser.lockedTitleAccent")).toBeTruthy();
-    expect(
-      screen.getByText('tripTeaser.sampleBody:{"saves":"3"}'),
-    ).toBeTruthy();
-    expect(screen.getByText("tripTeaser.unlockNote")).toBeTruthy();
-  });
-
-  it("opens the paywall with one tap", () => {
-    const onUnlock = vi.fn();
-    render(<TripLockedStep trip={TRIP} leaving={false} onUnlock={onUnlock} />);
-    fireEvent.click(screen.getByText("tripTeaser.unlock"));
-    expect(onUnlock).toHaveBeenCalledOnce();
-  });
-
-  it("takes no taps while the paywall is on its way", () => {
-    const onUnlock = vi.fn();
-    render(<TripLockedStep trip={TRIP} leaving onUnlock={onUnlock} />);
-    fireEvent.click(screen.getByText("tripTeaser.unlock"));
-    expect(onUnlock).not.toHaveBeenCalled();
-  });
-});
-
 describe("TripRevealStep", () => {
   it("shows the open sample trip and says it is a sample", () => {
-    render(<TripRevealStep trip={TRIP} onContinue={vi.fn()} />);
-    expect(screen.getByTestId("card").dataset.locked).toBe("false");
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("card").dataset.kind).toBe("trip");
     expect(screen.getByText("tripTeaser.revealTitle")).toBeTruthy();
     expect(screen.getByText("tripTeaser.revealBody")).toBeTruthy();
   });
 
   it("continues with one tap", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
   it("continues once when it is tapped twice before the screen redraws", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
     const button = screen.getByText("common.continue");
     act(() => {
       fireEvent.click(button);
@@ -192,7 +191,14 @@ describe("TripRevealStep", () => {
 
   it("takes no more taps once it has continued", () => {
     const onContinue = vi.fn();
-    render(<TripRevealStep trip={TRIP} onContinue={onContinue} />);
+    render(
+      <TripRevealStep
+        trip={TRIP}
+        after="walk"
+        onAfter={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
     fireEvent.click(screen.getByText("common.continue"));
     fireEvent.click(screen.getByText("common.continue"));
     expect(onContinue).toHaveBeenCalledOnce();

@@ -14,6 +14,7 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   markPending: vi.fn(),
   haptic: vi.fn(),
+  announce: vi.fn(),
   view: ({ children }: Children) => <div>{children}</div>,
   text: ({ children }: Children) => <span>{children}</span>,
   button: ({ label, onPress }: { label: string; onPress: () => void }) => (
@@ -34,6 +35,7 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({
+  AccessibilityInfo: { announceForAccessibility: mock.announce },
   Platform: { OS: "ios" },
   View: mock.view,
   Text: mock.text,
@@ -287,6 +289,9 @@ describe("share practice", () => {
     expect(received()).toHaveLength(1);
     expect(screen.getByText("sharePractice.savedTitle")).toBeTruthy();
     expect(screen.getByText(DEMO_SAMPLES[1].pageHeading)).toBeTruthy();
+    expect(mock.announce).toHaveBeenCalledWith(
+      "sharePractice.savedTitle sharePractice.savedBody",
+    );
   });
 
   it("counts one share once when the listener and the sheet both see it", async () => {

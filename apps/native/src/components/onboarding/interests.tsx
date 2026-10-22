@@ -1,41 +1,25 @@
 import { CtaButton } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ActionMenu } from "@/components/ui/action-menu";
 import { withAlpha } from "@/lib/color";
 import { t, useAppLocale } from "@/lib/i18n";
 import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
-import {
-  SAMPLE_CITIES,
-  SAMPLE_CITY_IDS,
-  type SampleCityId,
-} from "@/lib/sample-cities";
-import {
-  TRAVEL_VIBES,
-  TRAVEL_INTEREST,
-  type TravelVibe,
-} from "@/lib/travel-vibes";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const FADE_HEIGHT = 32;
 
+/** Travel is its own goal now, so the topics offer everything else. */
+const TOPICS = INTERESTS.filter((interest) => interest !== "Travel");
+
 export function InterestsStep({
   picked,
-  vibes,
-  city,
   onToggle,
-  onToggleVibe,
-  onPickCity,
   onAdvance,
 }: {
   picked: readonly Interest[];
-  vibes: readonly TravelVibe[];
-  city: SampleCityId | null;
   onToggle: (interest: Interest) => void;
-  onToggleVibe: (vibe: TravelVibe) => void;
-  onPickCity: (city: SampleCityId | null) => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -58,7 +42,7 @@ export function InterestsStep({
           </View>
 
           <View style={styles.chips}>
-            {INTERESTS.map((interest) => (
+            {TOPICS.map((interest) => (
               <Chip
                 key={interest}
                 label={onboardingLabel(interest)}
@@ -67,91 +51,17 @@ export function InterestsStep({
               />
             ))}
           </View>
-
-          {picked.includes(TRAVEL_INTEREST) ? (
-            <View style={styles.card}>
-              <View style={styles.cardHead}>
-                <Text style={styles.eyebrow}>
-                  {onboardingLabel(TRAVEL_INTEREST)}
-                </Text>
-                <Text style={styles.cardTitle}>
-                  {t("interests.vibesTitle")}
-                </Text>
-              </View>
-              <View style={styles.chips}>
-                {TRAVEL_VIBES.map((vibe) => (
-                  <Chip
-                    key={vibe}
-                    label={onboardingLabel(vibe)}
-                    active={vibes.includes(vibe)}
-                    small
-                    onPress={() => onToggleVibe(vibe)}
-                  />
-                ))}
-              </View>
-              <CityField city={city} onPick={onPickCity} />
-            </View>
-          ) : null}
         </ScrollView>
         <View pointerEvents="none" style={styles.fade} />
       </View>
 
       <View style={styles.foot}>
-        <CtaButton label={t("common.continue")} onPress={onAdvance} />
+        <CtaButton
+          label={t("common.continue")}
+          onPress={onAdvance}
+          disabled={picked.length === 0}
+        />
       </View>
-    </View>
-  );
-}
-
-function CityField({
-  city,
-  onPick,
-}: {
-  city: SampleCityId | null;
-  onPick: (city: SampleCityId | null) => void;
-}) {
-  const { theme } = useUnistyles();
-  const notSure = t("interests.cityNotSure");
-  const cities = SAMPLE_CITY_IDS.map((id) => ({
-    id,
-    name: t(SAMPLE_CITIES[id].name),
-  })).sort((a, b) => a.name.localeCompare(b.name));
-  const value = city === null ? notSure : t(SAMPLE_CITIES[city].name);
-  return (
-    <View style={styles.city}>
-      <View style={styles.cardHead}>
-        <Text style={styles.cardTitle}>{t("interests.cityTitle")}</Text>
-        <Text style={styles.cityHelp}>{t("interests.cityHelp")}</Text>
-      </View>
-      <ActionMenu
-        label={`${t("interests.cityTitle")} ${value}`}
-        title={t("interests.cityTitle")}
-        actions={[
-          {
-            id: "none",
-            label: notSure,
-            selected: city === null,
-            onPress: () => onPick(null),
-          },
-          ...cities.map(({ id, name }) => ({
-            id,
-            label: name,
-            selected: city === id,
-            onPress: () => onPick(id),
-          })),
-        ]}
-      >
-        <View style={styles.cityField}>
-          <Text style={styles.cityValue} numberOfLines={1}>
-            {value}
-          </Text>
-          <AppSymbolIcon
-            name="chevron.up.chevron.down"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </View>
-      </ActionMenu>
     </View>
   );
 }
@@ -159,12 +69,10 @@ function CityField({
 function Chip({
   label,
   active,
-  small = false,
   onPress,
 }: {
   label: string;
   active: boolean;
-  small?: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -175,18 +83,11 @@ function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
-        small && styles.chipSmall,
         active && styles.chipActive,
         pressed && { opacity: 0.85 },
       ]}
     >
-      <Text
-        style={[
-          styles.chipLabel,
-          small && styles.chipLabelSmall,
-          active && styles.chipLabelActive,
-        ]}
-      >
+      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
         {label}
       </Text>
       {active ? (
@@ -254,11 +155,6 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
-  chipSmall: {
-    minHeight: 44,
-    paddingVertical: theme.gap(1),
-    backgroundColor: theme.colors.background,
-  },
   chipActive: {
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primarySoft,
@@ -268,66 +164,8 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 16,
     color: theme.colors.foreground,
   },
-  chipLabelSmall: {
-    fontSize: 15,
-  },
   chipLabelActive: {
     color: theme.colors.primaryText,
-  },
-  card: {
-    gap: theme.gap(1.5),
-    padding: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  cardHead: {
-    gap: theme.gap(0.5),
-  },
-  eyebrow: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    color: theme.colors.primaryText,
-  },
-  cardTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    lineHeight: 22,
-    color: theme.colors.foreground,
-  },
-  city: {
-    gap: theme.gap(1.5),
-    paddingTop: theme.gap(2),
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  cityHelp: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 19,
-    color: theme.colors.muted,
-  },
-  cityField: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
-    paddingHorizontal: theme.gap(2),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
-  },
-  cityValue: {
-    flex: 1,
-    fontFamily: theme.fonts.medium,
-    fontSize: 16,
-    color: theme.colors.foreground,
   },
   foot: {
     paddingTop: theme.gap(1),

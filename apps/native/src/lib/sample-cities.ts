@@ -1,21 +1,41 @@
 import type { TextMessageKey } from "@/locales/message-types";
 
 export const SAMPLE_CITY_IDS = [
+  "amsterdam",
+  "austin",
   "barcelona",
+  "berlin",
+  "chicago",
+  "copenhagen",
+  "dallas",
+  "florence",
+  "las-vegas",
   "lisbon",
   "london",
   "los-angeles",
+  "madrid",
+  "milan",
+  "montreal",
   "new-york",
   "paris",
   "prague",
+  "rome",
   "san-francisco",
+  "seattle",
   "seoul",
   "tokyo",
   "toronto",
+  "vancouver",
 ] as const;
 export type SampleCityId = (typeof SAMPLE_CITY_IDS)[number];
 const DAY_SLOTS = ["morning", "lunch", "afternoon", "dinner"] as const;
-export type SampleSlot = (typeof DAY_SLOTS)[number];
+export type SampleSlot =
+  | (typeof DAY_SLOTS)[number]
+  | "drinks"
+  | "dessert"
+  | "walk"
+  | "brunch"
+  | "coffee";
 export type LatLng = { lat: number; lng: number };
 type CityStop = {
   name: string;
@@ -460,6 +480,340 @@ export const SAMPLE_CITIES = {
         stop("Seven Lives Tacos y Mariscos", 43.6544, -79.4005),
         stop("Chinatown", 43.6529, -79.398),
         stop("Grey Gardens", 43.6553, -79.4016),
+      ]),
+    ],
+  },
+  chicago: {
+    name: "tripTeaser.cityChicago",
+    water: [],
+    saves: [
+      save("Where to eat in Chicago", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Chicago", "tripTeaser.sourceArticle", 3, "view"),
+      save("Chicago Architecture Center", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.chicagoDayOne", [
+        stop("Chicago Architecture Center", 41.888, -87.6235),
+        stop("Pizzeria Portofino", 41.888, -87.6308),
+        stop("Museum of Illusions Chicago", 41.883, -87.6268),
+        stop("Sushi-san", 41.8914, -87.6305),
+      ]),
+      day("tripTeaser.chicagoDayTwo", [
+        stop("Peggy Notebaert Nature Museum", 41.9266, -87.6349),
+        stop("Mon Ami Gabi", 41.924, -87.6368),
+        stop("International Museum of Surgical Science", 41.9103, -87.6266),
+        stop("3 Arts Club Cafe at RH Chicago", 41.906, -87.6304),
+      ]),
+    ],
+  },
+  seattle: {
+    name: "tripTeaser.citySeattle",
+    water: [],
+    saves: [],
+    days: [],
+  },
+  austin: {
+    name: "tripTeaser.cityAustin",
+    water: [],
+    saves: [
+      save("Where to eat in Austin", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Austin", "tripTeaser.sourceArticle", 3, "view"),
+      save("Blanton Museum of Art", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.austinDayOne", [
+        stop("Blanton Museum of Art", 30.2808, -97.7377),
+        stop("Truluck's Ocean's Finest Seafood and Crab", 30.266, -97.7453),
+        stop("Bullock Texas State History Museum", 30.2803, -97.7391),
+        stop("Gabrielas Downtown", 30.2666, -97.733),
+      ]),
+      day("tripTeaser.austinDayTwo", [
+        stop("Lora Reynolds Gallery", 30.2728, -97.7567),
+        stop("TLC Austin", 30.2558, -97.7631),
+        stop("French Legation State Historic Site", 30.2673, -97.7318),
+        stop("Suerte", 30.2623, -97.7233),
+      ]),
+    ],
+  },
+  dallas: {
+    name: "tripTeaser.cityDallas",
+    water: [],
+    saves: [
+      save("Where to eat in Dallas", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Dallas", "tripTeaser.sourceArticle", 3, "view"),
+      save(
+        "The Sixth Floor Museum at Dealey Plaza",
+        "tripTeaser.sourcePlace",
+        1,
+        "place",
+      ),
+    ],
+    days: [
+      day("tripTeaser.dallasDayOne", [
+        stop("The Sixth Floor Museum at Dealey Plaza", 32.7798, -96.8085),
+        stop("Meso Maya Comida y Copas", 32.7878, -96.8047),
+        stop("Dallas Museum of Art", 32.7877, -96.801),
+        stop("Miriam Cocina Latina", 32.7899, -96.8025),
+      ]),
+      day("tripTeaser.dallasDayTwo", [
+        stop("Meadows Museum", 32.8384, -96.7843),
+        stop("Anchor Sushi Bar", 32.8233, -96.7885),
+        stop("Connor Park", 32.8215, -96.8),
+        stop("Namo", 32.8081, -96.7979),
+      ]),
+    ],
+  },
+  "las-vegas": {
+    name: "tripTeaser.cityLasVegas",
+    water: [],
+    saves: [
+      save("Where to eat in Las Vegas", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Las Vegas", "tripTeaser.sourceArticle", 3, "view"),
+      save(
+        "Meow Wolf Las Vegas' Omega Mart",
+        "tripTeaser.sourcePlace",
+        1,
+        "place",
+      ),
+    ],
+    days: [
+      day("tripTeaser.lasVegasDayOne", [
+        stop("Meow Wolf Las Vegas' Omega Mart", 36.1325, -115.1819),
+        stop("Partage", 36.1262, -115.1909),
+        stop("Real Bodies Las Vegas", 36.1142, -115.1687),
+        stop("Le Cirque", 36.1135, -115.175),
+      ]),
+      day("tripTeaser.lasVegasDayTwo", [
+        stop("Arte Museum Las Vegas", 36.1088, -115.1742),
+        stop("Vanderpump à Paris", 36.1123, -115.1707),
+        stop("Atomic Museum", 36.1141, -115.1484),
+        stop("Primal Steakhouse", 36.1246, -115.136),
+      ]),
+    ],
+  },
+  vancouver: {
+    name: "tripTeaser.cityVancouver",
+    water: [],
+    saves: [
+      save("Where to eat in Vancouver", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Vancouver", "tripTeaser.sourceArticle", 3, "view"),
+      save("Museum of Vancouver", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.vancouverDayOne", [
+        stop("Museum of Vancouver", 49.2763, -123.1444),
+        stop("Café Salade de Fruits", 49.2655, -123.14),
+        stop("Vancouver Art Gallery", 49.283, -123.1205),
+        stop(
+          "Ban Bu Xian Szechuan Cuisine Vancouver Downtown",
+          49.2867,
+          -123.1283,
+        ),
+      ]),
+      day("tripTeaser.vancouverDayTwo", [
+        stop("Chinese Cultural Centre Museum", 49.2798, -123.1026),
+        stop("Jollibee", 49.2811, -123.1206),
+        stop("Chinese Canadian Museum", 49.2807, -123.1031),
+        stop("The Poke Guy", 49.2811, -123.1221),
+      ]),
+    ],
+  },
+  montreal: {
+    name: "tripTeaser.cityMontreal",
+    water: [],
+    saves: [
+      save("Where to eat in Montreal", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Montreal", "tripTeaser.sourceArticle", 3, "view"),
+      save(
+        "Saint Joseph's Oratory of Mount Royal",
+        "tripTeaser.sourcePlace",
+        1,
+        "place",
+      ),
+    ],
+    days: [
+      day("tripTeaser.montrealDayOne", [
+        stop("Saint Joseph's Oratory of Mount Royal", 45.4921, -73.6191),
+        stop("Tropical Paradise", 45.4845, -73.632),
+        stop("Beaver Lake", 45.4988, -73.5974),
+        stop("Monteiro Guy Concordia", 45.4958, -73.5798),
+      ]),
+      day("tripTeaser.montrealDayTwo", [
+        stop("Notre-Dame Basilica of Montreal", 45.5045, -73.5561),
+        stop("Ferreira Café", 45.5004, -73.5741),
+        stop("Mary, Queen of the World Cathedral", 45.4993, -73.5683),
+        stop("Campo", 45.5005, -73.5748),
+      ]),
+    ],
+  },
+  madrid: {
+    name: "tripTeaser.cityMadrid",
+    water: [],
+    saves: [
+      save("Where to eat in Madrid", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Madrid", "tripTeaser.sourceArticle", 3, "view"),
+      save(
+        "Museo Nacional Centro de Arte Reina Sofía",
+        "tripTeaser.sourcePlace",
+        1,
+        "place",
+      ),
+    ],
+    days: [
+      day("tripTeaser.madridDayOne", [
+        stop("Museo Nacional Centro de Arte Reina Sofía", 40.4079, -3.6946),
+        stop("El Madroño", 40.4137, -3.7089),
+        stop("Matadero Madrid", 40.3919, -3.6979),
+        stop("Kuili Korean BBQ Usera 奎梨", 40.3862, -3.7069),
+      ]),
+      day("tripTeaser.madridDayTwo", [
+        stop("Lázaro Galdiano Museum", 40.4369, -3.6858),
+        stop("Warehouse@TheHClub", 40.4379, -3.6839),
+        stop("Fernán Gómez Centro Cultural de la Villa", 40.4249, -3.6899),
+        stop("La Paella de la Reina", 40.4197, -3.6975),
+      ]),
+    ],
+  },
+  berlin: {
+    name: "tripTeaser.cityBerlin",
+    water: [],
+    saves: [
+      save("Where to eat in Berlin", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Berlin", "tripTeaser.sourceArticle", 3, "view"),
+      save("German Spy Museum", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.berlinDayOne", [
+        stop("German Spy Museum", 52.5089, 13.3793),
+        stop("LIU 成都味道面馆 Nudelhaus", 52.5112, 13.3876),
+        stop("Jewish Museum Berlin", 52.5023, 13.3954),
+        stop("Mustafa's Gemüse Kebap", 52.4935, 13.3886),
+      ]),
+      day("tripTeaser.berlinDayTwo", [
+        stop("The Wall Museum", 52.5027, 13.4453),
+        stop("Silo Coffee", 52.5101, 13.4584),
+        stop("Görlitzer Park", 52.4966, 13.4374),
+        stop("Gazzo", 52.4912, 13.4259),
+      ]),
+    ],
+  },
+  florence: {
+    name: "tripTeaser.cityFlorence",
+    water: [],
+    saves: [
+      save("Where to eat in Florence", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Florence", "tripTeaser.sourceArticle", 3, "view"),
+      save(
+        "Basilica of Santa Maria Novella",
+        "tripTeaser.sourcePlace",
+        1,
+        "place",
+      ),
+    ],
+    days: [
+      day("tripTeaser.florenceDayOne", [
+        stop("Basilica of Santa Maria Novella", 43.7746, 11.2494),
+        stop("Koto Ramen Via Verdi", 43.7706, 11.262),
+        stop("Chiesa di Santa Maria del Carmine", 43.7681, 11.2439),
+        stop("Sushinami Florence", 43.7706, 11.2607),
+      ]),
+      day("tripTeaser.florenceDayTwo", [
+        stop("Piazzale Michelangelo", 43.7629, 11.2651),
+        stop("NIMA Sushi", 43.7723, 11.2531),
+        stop("Basilica di Santo Spirito", 43.7671, 11.248),
+        stop("Aji Tei", 43.7833, 11.2582),
+      ]),
+    ],
+  },
+  amsterdam: {
+    name: "tripTeaser.cityAmsterdam",
+    water: [],
+    saves: [
+      save("Where to eat in Amsterdam", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Amsterdam", "tripTeaser.sourceArticle", 3, "view"),
+      save("Rijksmuseum", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.amsterdamDayOne", [
+        stop("Rijksmuseum", 52.36, 4.8852),
+        stop("Fiaschetteria “Pistoia”", 52.3617, 4.8998),
+        stop("Van Gogh Museum", 52.3581, 4.8812),
+        stop("Chun Café Berenstraat", 52.3705, 4.8839),
+      ]),
+      day("tripTeaser.amsterdamDayTwo", [
+        stop("Banksy Museum Amsterdam", 52.3847, 4.864),
+        stop("Oficina", 52.3744, 4.8571),
+        stop("Museum Villa", 52.3861, 4.8753),
+        stop("Winkel 43", 52.3791, 4.8863),
+      ]),
+    ],
+  },
+  rome: {
+    name: "tripTeaser.cityRome",
+    water: [],
+    saves: [
+      save("Where to eat in Rome", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Rome", "tripTeaser.sourceArticle", 3, "view"),
+      save("Capitoline Museums", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.romeDayOne", [
+        stop("Capitoline Museums", 41.8929, 12.4826),
+        stop("Glass Hostaria", 41.8905, 12.4692),
+        stop("Colle Oppio and Terme di Traiano Park", 41.8919, 12.4961),
+        stop("Trattoria Vecchia Roma", 41.8937, 12.5024),
+      ]),
+      day("tripTeaser.romeDayTwo", [
+        stop("Casina delle civette", 41.9142, 12.5129),
+        stop("Ristorante Gainn", 41.9038, 12.5033),
+        stop("Galleria Borghese", 41.9142, 12.4921),
+        stop("Ristorante Il Fellini-Tradizione in Cucina-", 41.9094, 12.4936),
+      ]),
+    ],
+  },
+  copenhagen: {
+    name: "tripTeaser.cityCopenhagen",
+    water: [],
+    saves: [
+      save("Where to eat in Copenhagen", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Copenhagen", "tripTeaser.sourceArticle", 3, "view"),
+      save("Nikolaj Art Gallery", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.copenhagenDayOne", [
+        stop("Nikolaj Art Gallery", 55.6786, 12.5816),
+        stop("District Tonkin", 55.685, 12.5882),
+        stop("Kunsthal Charlottenborg", 55.6799, 12.5883),
+        stop("La Tre Street Kitchen", 55.6789, 12.5704),
+      ]),
+      day("tripTeaser.copenhagenDayTwo", [
+        stop("Cisterns in Søndermarken", 55.6695, 12.5242),
+        stop("Banh Mi Cph", 55.6675, 12.5463),
+        stop("Frederiksberg Have", 55.6748, 12.5255),
+        stop("Pho Saigon", 55.6722, 12.5484),
+      ]),
+    ],
+  },
+  milan: {
+    name: "tripTeaser.cityMilan",
+    water: [],
+    saves: [
+      save("Where to eat in Milan", "tripTeaser.sourceReel", 4, "food"),
+      save("Three days in Milan", "tripTeaser.sourceArticle", 3, "view"),
+      save("Basilica of Sant'Ambrogio", "tripTeaser.sourcePlace", 1, "place"),
+    ],
+    days: [
+      day("tripTeaser.milanDayOne", [
+        stop("Basilica of Sant'Ambrogio", 45.4623, 9.1755),
+        stop("Pescaria (Milano - Via Solari)", 45.4557, 9.1636),
+        stop("Basilica di Santa Maria delle Grazie", 45.466, 9.171),
+        stop("Zio Pesce", 45.4572, 9.1768),
+      ]),
+      day("tripTeaser.milanDayTwo", [
+        stop("Casa museo Boschi di Stefano", 45.4789, 9.2115),
+        stop("Terrazza Gallia", 45.4855, 9.2015),
+        stop("Fondazione Luigi Rovati", 45.4734, 9.2042),
+        stop("Il Ristorante - Niko Romito", 45.4701, 9.1894),
       ]),
     ],
   },
