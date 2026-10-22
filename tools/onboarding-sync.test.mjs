@@ -74,7 +74,7 @@ function quotedCopy(markdown) {
     for (const [, boldText, quoted] of source.matchAll(pattern)) {
       const text = normalize(boldText ?? quoted);
       // "Opener:" labels a step and "not" is emphasis; neither is on screen.
-      if (!text.endsWith(":") && !/^[a-z]/.test(text)) {
+      if (!text.endsWith(":") && text !== "not") {
         quotes.push({ line, text });
       }
     }
@@ -123,6 +123,13 @@ test("a quote wrapped over two lines is read, and list items stay apart", () => 
     [{ line: 1, text: "Save this post the way you will in any app." }],
   );
   assert.deepEqual(quotedCopy('- a "Start yours\n- b Continue"'), []);
+});
+
+test('a lowercase quote is checked; only the emphasis "not" is skipped', () => {
+  assert.deepEqual(
+    quotedCopy('Tap "unlock the full trip", never "not" or "Opener:".'),
+    [{ line: 1, text: "unlock the full trip" }],
+  );
 });
 
 test("the App Review notes quote only text the app shows", () => {

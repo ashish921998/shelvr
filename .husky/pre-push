@@ -3,8 +3,9 @@
 for name in $(git rev-parse --local-env-vars); do unset "$name"; done
 
 # Only a push of branch commits needs the gate: not a delete, a tag or a no-op.
+# The remote ref names the branch; the local one can be a bare commit ID.
 gate=
-while read -r ref sha _; do
+while read -r _ sha ref _; do
   case $ref in refs/heads/*) case $sha in *[!0]*) gate=1 ;; esac ;; esac
 done
 [ -n "$gate" ] || exit 0
