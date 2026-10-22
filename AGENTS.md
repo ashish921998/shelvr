@@ -118,9 +118,10 @@ use `expo lint`, which silently skips the `convex/` backend.
 `pnpm run check` is `check:code` (lint, typecheck, codegen and agent-docs drift,
 tooling tests, coverage thresholds, Knip, Syncpack) followed by the dependency
 audit (`pnpm run audit`, blocks on high/critical). CI and the pre-push hook
-both run `check:code`, the hook before a push leaves the machine;
-`pnpm --filter <app> check` runs it too, so no narrower script passes where the
-gate would fail. The audit is left out of both: CI
+both run `check:code`, the hook before a push leaves the machine. The app-level
+`check` scripts stop at lint, typecheck and tests, so run the root one; they stay
+that way because a script change in `apps/native/package.json` moves the native
+fingerprint. The audit is left out of both: CI
 audits a pull request only when it changes a `package.json`, the lockfile or
 `pnpm-workspace.yaml`, and `audit.yml` runs it daily, where a failed run is the
 alert for a new advisory. Knip's
@@ -218,7 +219,7 @@ cannot happen.
 | File and identifier naming                                 | ESLint `check-file`, `naming-convention`                              | `lint`                               |
 | Complexity limits, zero lint warnings                      | ESLint `complexity`, `max-*`, `--max-warnings 0`                      | `lint`                               |
 | No `console.*` outside the loggers                         | ESLint `no-console`                                                   | `lint`                               |
-| One gate, run before a push and in CI                      | `check:code` via `.husky/pre-push`, the CI `Gate` step, `check`       | pre-push, CI                         |
+| One gate, run before a push and in CI                      | `check:code` via `.husky/pre-push` and the CI `Gate` step             | pre-push, CI                         |
 | Generated Convex files are current                         | `tools/verify-convex-codegen.mjs`                                     | `check:code`                         |
 | Copy lives in `en.json`; generated catalogs untouched      | `localization-source.test.ts`, `localization-catalogs.test.ts`        | `check:code`                         |
 | `CLAUDE.md` names every table, module and route            | `tools/verify-agent-docs.mjs`                                         | `check:code`                         |

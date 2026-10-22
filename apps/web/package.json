@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "check": "pnpm --workspace-root run check:code"
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
