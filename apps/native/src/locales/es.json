@@ -586,7 +586,7 @@
   "pro.notFoundBody": "No se ha encontrado ninguna compra activa de Shelvr Pro para esta cuenta de %{store}.",
   "pro.restoreFailedBody": "Comprueba tu conexión y vuelve a intentarlo. También puedes gestionar tu plan en %{store}.",
   "profile.appearanceLabel": "Apariencia: %{appearance}",
-  "profile.photoUsage": "Fotos: %{count} / %{limit}",
+  "profile.photoUsage": "%{count} de %{limit} fotos guardadas",
   "share.progress": "Guardados %{saved} de %{total}…",
   "share.failureCount": {
     "one": "No se pudo guardar %{formattedCount} elemento",
