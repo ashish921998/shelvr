@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, useWindowDimensions, View } from "react-native";
+import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -39,6 +39,8 @@ const REDUCED_FADE_MS = 240;
 
 const FINISH_FALLBACK_MS = 300;
 
+const SKIP_FADE_MS = 180;
+
 const KEEP_TIMING = { reduceMotion: ReduceMotion.Never } as const;
 
 export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
@@ -53,6 +55,8 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
 
   const clock = useSharedValue(0);
   const reducedProgress = useSharedValue(0);
+  const skipFade = useSharedValue(1);
+  const finishRef = useRef<() => void>(() => {});
 
   const onFinishRef = useRef(onFinish);
   useEffect(() => {
@@ -66,6 +70,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
       finished = true;
       onFinishRef.current?.();
     };
+    finishRef.current = finish;
 
     if (reducedMotion) {
       reducedProgress.set(
@@ -148,8 +153,22 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   });
 
   const screenStyle = useAnimatedStyle(() => ({
-    opacity: 1 - span(clock.get(), SPLASH_EXIT_FROM, SPLASH_DURATION),
+    opacity:
+      (1 - span(clock.get(), SPLASH_EXIT_FROM, SPLASH_DURATION)) *
+      skipFade.get(),
   }));
+
+  // A tap fades the splash out from wherever it is and hands over at once.
+  const skip = () => {
+    if (exiting) return;
+    setExiting(true);
+    skipFade.set(
+      withTiming(0, { duration: SKIP_FADE_MS, ...KEEP_TIMING }, (completed) => {
+        "worklet";
+        if (completed) scheduleOnRN(finishRef.current);
+      }),
+    );
+  };
 
   return (
     <Animated.View
@@ -214,6 +233,13 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
       <Animated.Text style={[styles.footer, footerStyle]}>
         {t("splash.tagline")}
       </Animated.Text>
+
+      <Pressable
+        testID="splash-skip"
+        style={styles.skipLayer}
+        onPress={skip}
+        accessible={false}
+      />
     </Animated.View>
   );
 }
@@ -226,6 +252,9 @@ const styles = StyleSheet.create((theme, rt) => {
       backgroundColor: splash.ground,
     },
     canvasLayer: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    skipLayer: {
       ...StyleSheet.absoluteFillObject,
     },
     lockupLayer: {
