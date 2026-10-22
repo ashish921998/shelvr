@@ -235,7 +235,7 @@ export function evidenceProblems(body, changedFiles, labels = []) {
     const more = uiFiles.length > 5 ? ` and ${uiFiles.length - 5} more` : "";
     problems.push(
       `This pull request changes UI files (${list}${more}) but "### Evidence" has no screenshot or recording. ` +
-        `Add one. If nothing a person sees changed, say why in Evidence and ask the owner to add the "${WAIVER_LABEL}" label.`,
+        `Add one. If nothing a person sees changed, say why in Evidence and add the "${WAIVER_LABEL}" label (gh pr edit --add-label ${WAIVER_LABEL}).`,
     );
   }
 

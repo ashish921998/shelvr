@@ -106,11 +106,13 @@ test("a screenshot outside the Evidence section does not count", () => {
   assert.equal(evidenceProblems(body, [SCREEN]).length, 1);
 });
 
-test("the owner's waiver label passes a UI change; a sentence alone does not", () => {
+test("the waiver label passes a UI change; a sentence alone does not", () => {
   const body = filled({
     evidence: "No UI change: renames a prop, the screen is identical.",
   });
-  assert.equal(evidenceProblems(body, [SCREEN]).length, 1);
+  const problems = evidenceProblems(body, [SCREEN]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /gh pr edit --add-label no-ui-change/);
   assert.deepEqual(evidenceProblems(body, [SCREEN], [WAIVER_LABEL]), []);
 });
 

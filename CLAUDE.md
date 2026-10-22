@@ -531,8 +531,10 @@ needed at runtime by the features that use them:
   the evidence, and what was not verified. Never call work "done" or "verified" without evidence
   a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
   assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
-  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
-  never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
+  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. When those files
+  changed but nothing on screen did, the author (an agent included) says why under Evidence and
+  adds the `no-ui-change` label when opening the pull request (`gh pr create --label no-ui-change`);
+  a visible change never takes the label. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
   branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
