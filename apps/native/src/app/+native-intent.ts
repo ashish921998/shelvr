@@ -32,13 +32,17 @@ export function redirectSystemPath({
 
     if (url.hostname === "expo-sharing") {
       if (!onboardedOrUnknown()) return "/onboarding";
-      try {
-        markPendingShareOnDevice();
-      } catch {}
+      markPendingShareQuietly();
       return "/share";
     }
   } catch {}
   return path;
+}
+
+function markPendingShareQuietly(): void {
+  try {
+    markPendingShareOnDevice();
+  } catch {}
 }
 
 function onboardedOrUnknown(): boolean {
