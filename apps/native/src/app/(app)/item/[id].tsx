@@ -399,10 +399,10 @@ function ItemScreenContent() {
 
   const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
-    convexQuery(api.spaces.getSpace, spaceQueryArg(from, spaceId)),
+    convexQuery(api.spaces.getSpaceCards, spaceQueryArg(from, spaceId)),
   );
   const searchQ = useQuery(
-    convexQuery(api.items.searchItems, searchQueryArg(from, q)),
+    convexQuery(api.items.searchItemCards, searchQueryArg(from, q)),
   );
 
   const { data: single } = useQuery(

@@ -29,7 +29,13 @@ import {
   toSummaryPatch,
   type MembershipSummary,
 } from "./model/memberships";
-import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import {
+  enrichItem,
+  enrichedItemValidator,
+  intentValidator,
+  itemCardValidator,
+  toItemCard,
+} from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
@@ -93,13 +99,9 @@ async function loadItems(
   ctx: QueryCtx,
   joins: Doc<"spaceItems">[],
 ): Promise<Doc<"items">[]> {
-  const items: Doc<"items">[] = [];
-  for (const join of joins) {
-    const item = await ctx.db.get(join.itemId);
-    if (item !== null) {
-      items.push(item);
-    }
-  }
+  // One read per join, issued together rather than one after another.
+  const rows = await Promise.all(joins.map((join) => ctx.db.get(join.itemId)));
+  const items = rows.filter((item): item is Doc<"items"> => item !== null);
   items.sort((a, b) => b._creationTime - a._creationTime);
   return items;
 }
@@ -196,6 +198,38 @@ export const listSpaces = query({
   },
 });
 
+async function readOwnSpace(
+  ctx: QueryCtx,
+  id: Id<"spaces">,
+): Promise<{
+  space: Doc<"spaces">;
+  items: { item: Doc<"items">; spaceIntents: Doc<"spaceItems">["intents"] }[];
+  suggestions: Doc<"items">[];
+} | null> {
+  const userId = await requireUserId(ctx);
+  const space = await ctx.db.get(id);
+  if (space === null || space.userId !== userId) {
+    return null;
+  }
+  const { saved, suggested } = await splitJoins(ctx, space._id);
+  const intentsByItem = new Map(
+    saved.map((join) => [join.itemId, join.intents]),
+  );
+  const [items, suggestions] = await Promise.all([
+    loadItems(ctx, saved),
+    loadItems(ctx, suggested),
+  ]);
+  return {
+    space,
+    items: items.map((item) => ({
+      item,
+      spaceIntents: intentsByItem.get(item._id),
+    })),
+    suggestions,
+  };
+}
+
+/** Full rows, article body included, for builds that open a save from the row. */
 export const getSpace = query({
   args: { id: v.id("spaces") },
   returns: v.union(
@@ -212,29 +246,57 @@ export const getSpace = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
-    const space = await ctx.db.get(args.id);
-    if (space === null || space.userId !== userId) {
+    const read = await readOwnSpace(ctx, args.id);
+    if (read === null) {
       return null;
     }
-    const { saved, suggested } = await splitJoins(ctx, space._id);
-    const intentsByItem = new Map(
-      saved.map((join) => [join.itemId, join.intents]),
-    );
     const [items, suggestions] = await Promise.all([
-      loadItems(ctx, saved).then((rows) =>
-        Promise.all(
-          rows.map(async (item) => ({
-            ...(await enrichItem(ctx, item)),
-            spaceIntents: intentsByItem.get(item._id),
-          })),
-        ),
+      Promise.all(
+        read.items.map(async ({ item, spaceIntents }) => ({
+          ...(await enrichItem(ctx, item)),
+          spaceIntents,
+        })),
       ),
-      loadItems(ctx, suggested).then((rows) =>
-        Promise.all(rows.map((item) => enrichItem(ctx, item))),
-      ),
+      Promise.all(read.suggestions.map((item) => enrichItem(ctx, item))),
     ]);
-    return { ...space, items, suggestions };
+    return { ...read.space, items, suggestions };
+  },
+});
+
+/**
+ * Card rows: what the space grid, plan and trip screens draw. The detail page
+ * reads a save's body itself, so the space no longer ships every article body
+ * on each change to any of its saves.
+ */
+export const getSpaceCards = query({
+  args: { id: v.id("spaces") },
+  returns: v.union(
+    v.object({
+      ...spaceFields,
+      items: v.array(
+        itemCardValidator.extend({
+          spaceIntents: v.optional(v.array(intentValidator)),
+        }),
+      ),
+      suggestions: v.array(itemCardValidator),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const read = await readOwnSpace(ctx, args.id);
+    if (read === null) {
+      return null;
+    }
+    const [items, suggestions] = await Promise.all([
+      Promise.all(
+        read.items.map(async ({ item, spaceIntents }) => ({
+          ...(await toItemCard(ctx, item)),
+          spaceIntents,
+        })),
+      ),
+      Promise.all(read.suggestions.map((item) => toItemCard(ctx, item))),
+    ]);
+    return { ...read.space, items, suggestions };
   },
 });
 

@@ -119,9 +119,13 @@ vi.mock("@shopify/flash-list", () => ({
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
-    items: { deleteItem: "delete", searchItems: "search", getItem: "single" },
+    items: {
+      deleteItem: "delete",
+      searchItemCards: "search",
+      getItem: "single",
+    },
     spaces: {
-      getSpace: "space",
+      getSpaceCards: "space",
       dismissSuggestion: "dismiss",
       acceptSuggestion: "accept",
       undoAcceptSuggestion: "undo",
