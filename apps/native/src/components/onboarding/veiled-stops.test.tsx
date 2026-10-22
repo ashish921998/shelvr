@@ -219,7 +219,6 @@ describe("VeiledStops", () => {
     const tops = screen
       .getAllByTestId("divider")
       .map((divider) => num(divider, "y"));
-    // Three stops of 44, a day header of 64, then four more stops.
     expect(tops).toEqual([0, 44, 88, 132, 196, 240, 284, 328]);
   });
 

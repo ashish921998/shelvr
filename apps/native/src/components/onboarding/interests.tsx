@@ -32,7 +32,6 @@ export function InterestsStep({
 }: {
   picked: readonly Interest[];
   vibes: readonly TravelVibe[];
-  /** The city picked for the sample trip; null for "Not sure yet". */
   city: SampleCityId | null;
   onToggle: (interest: Interest) => void;
   onToggleVibe: (vibe: TravelVibe) => void;

@@ -1,7 +1,6 @@
 import type { SampleCityId } from "@/lib/sample-cities";
 
-// Each city's covers: a dish for the reel, a view for the article. Unsplash,
-// under its free licence; credits are kept with the onboarding notes.
+// The city-*.jpg photos are from Unsplash, under its free licence; prague.jpg was generated for the app.
 export const CITY_PICTURES: Record<
   SampleCityId,
   Record<"food" | "view", number>

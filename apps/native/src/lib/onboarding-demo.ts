@@ -14,7 +14,6 @@ export type DemoKind = Extract<
 export type DemoSample = {
   kind: DemoKind;
   interest?: Interest;
-  /** Set on a travel sample for a city picked on the interests step. */
   city?: SampleCityId;
   url: string;
   pageHeading: string;

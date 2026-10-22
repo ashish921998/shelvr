@@ -119,7 +119,6 @@ describe.each(SAMPLE_CITY_IDS)("the %s sample trip", (city) => {
           .map((stop) => stop.name),
       ),
     );
-    // Half the drawn width, plus most of a 22 wide pin.
     const room = trip.waterWidth / 2 + 7.5;
     for (const { stop } of sampleStops(trip)) {
       if (onWater.has(stop.name)) continue;

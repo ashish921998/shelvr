@@ -196,8 +196,6 @@ export type AnalyticsEventProperties = {
     save_types: string[];
     interests: string[];
     travel_vibes: string[];
-    // The city picked for the sample trip under Travel (flow 12 on), one of
-    // the fixed sample cities; null for "Not sure yet" or no Travel.
     sample_city: string | null;
     space_count: number;
     space_names: string[];

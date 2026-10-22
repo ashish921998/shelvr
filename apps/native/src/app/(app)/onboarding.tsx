@@ -147,8 +147,6 @@ export default function OnboardingScreen() {
   const interests = spaces.filter(isInterest);
   const vibes = spaces.filter(isTravelVibe);
   const teaser = showTripTeaser(kinds, interests);
-  // The city is asked under the Travel topic, so it counts only while that is
-  // picked; Travel as a kind of save alone gets the default city.
   const pickedCity = interests.includes(VIBES_INTEREST) ? travelCity : null;
   const trip = sampleTrip(pickedCity);
 
@@ -218,7 +216,6 @@ export default function OnboardingScreen() {
     );
 
   const toggleInterest = (interest: Interest) => {
-    // The city leaves with Travel, as its kinds of spots do.
     if (interest === VIBES_INTEREST && interests.includes(interest)) {
       setTravelCity(null);
     }
