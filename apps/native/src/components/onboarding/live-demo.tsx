@@ -2,7 +2,6 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
   findSample,
-  isDemoSample,
   type DemoKind,
   type DemoSample,
 } from "@/lib/onboarding-demo";
@@ -11,27 +10,29 @@ import type { PendingDemo } from "@/lib/pending-onboarding";
 import { displayHost } from "@/lib/url";
 import { useDemoSave, linkFromText, type DemoSaved } from "@/lib/use-demo-save";
 import { useIncomingShareUrl } from "@/lib/use-incoming-share-url";
-import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import {
-  DemoLinkRow,
   DemoPreviewView,
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
 import { SampleCard, SampleRow } from "@/components/onboarding/sample-card";
-import { SampleSignIn } from "@/components/onboarding/sample-sign-in";
+import { SaveLater } from "@/components/onboarding/save-later";
 import { SubmissionRecovery } from "@/components/onboarding/submission-recovery";
-import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Modal, Pressable, Text, TextInput, View } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+// The first save is a pasted, typed or ready-made link; a link shared from
+// another app still arrives through expo-sharing. The save pipeline lives in
+// useDemoSave, share intake in useIncomingShareUrl.
 
 export type { DemoSaved };
 
+// The headline names what the leading sample is, so a person who said they
+// save videos is asked to save a video.
 const TITLES: Record<DemoKind, TextMessageKey> = {
   Articles: "demo.titleArticles",
   Recipes: "demo.titleRecipes",
@@ -52,14 +53,21 @@ export function LiveDemoStep({
   onExit,
   onAdvance,
 }: {
+  /** Ready-made links, the picked kinds first. */
   samples: DemoSample[];
+  /** The leading sample's kind when setup picked it, else null. */
   titleKind: DemoKind | null;
+  /** Stable preset identities kept in setup. */
   spaces: string[];
+  /** A save captured before an earlier sign-in or relaunch. */
   resume: PendingDemo | null;
+  /** Came back from the reveal: the first save exists, so offer the way on. */
   alreadySaved: boolean;
   onSaved: (saved: DemoSaved) => void;
   onReadingChange: (reading: boolean) => void;
+  /** Hands the screen's back button what to do here, or null to hide it. */
   onBackChange: (back: (() => void) | null) => void;
+  /** Back from the picker: leave this step for the one before it. */
   onExit: () => void;
   onAdvance: () => void;
 }) {
@@ -72,6 +80,8 @@ export function LiveDemoStep({
     onAdvance,
   });
   useIncomingShareUrl({
+    // The one demo save is spent once a first save exists. Coming back to
+    // this step must not consume a share it can no longer save.
     canAccept: () => !alreadySaved && demo.canAcceptShare(),
     readOnMount: resume === null,
     onSharedUrl: demo.submitSharedUrl,
@@ -83,30 +93,28 @@ export function LiveDemoStep({
     onReadingChange(view === "reading" || view === "preview");
   }, [view, onReadingChange]);
 
+  // The save-later screen goes back to the picker, and the picker goes back
+  // a step unless a save is on its way. The preview and the reading view
+  // have no way back: they move on by themselves.
   const cancelAuthRef = useRef(demo.cancelAuth);
   useEffect(() => {
     cancelAuthRef.current = demo.cancelAuth;
   });
-  const signInAsk =
-    view === "auth" && !demo.isAuthenticated && isDemoSample(demo.authUrl);
+  const saveLaterAsk = view === "auth" && !demo.isAuthenticated;
   const picking = view === "share" && !demo.submitting;
   useEffect(() => {
-    if (signInAsk) {
-      onBackChange(() => {
-        analytics.capture("onboarding_signin_prompt", {
-          surface: "sample_preview",
-          action: "dismissed",
-        });
-        cancelAuthRef.current();
-      });
+    if (saveLaterAsk) {
+      onBackChange(() => cancelAuthRef.current());
     } else if (picking) {
       onBackChange(onExit);
     } else {
       return;
     }
     return () => onBackChange(null);
-  }, [signInAsk, picking, onBackChange, onExit]);
+  }, [saveLaterAsk, picking, onBackChange, onExit]);
 
+  // A paste saves at once when it holds a link and shows just that link.
+  // Otherwise the text stays in the field so the user sees what was pasted.
   const savePasted = (text: string) => {
     const url = linkFromText(text);
     setDraft(url ?? text.trim());
@@ -146,13 +154,17 @@ export function LiveDemoStep({
     );
   }
 
-  const authSample = view === "auth" ? findSample(demo.authUrl) : undefined;
-  if (authSample !== undefined) {
+  // Signed out, a picked or pasted link waits for the account: the screen
+  // shows it as it will be filed, and Continue queues it for after sign-in.
+  // Signed in (a relaunch that resumes it), the screen stays up while the
+  // save lands, then the save reads here like any other.
+  if (view === "auth") {
     return (
-      <SampleSignIn
-        sample={authSample}
+      <QueuedSave
+        url={demo.authUrl}
         space={demo.authRequest?.destination ?? null}
         saving={demo.isAuthenticated}
+        onContinue={demo.saveLater}
       />
     );
   }
@@ -181,6 +193,8 @@ export function LiveDemoStep({
     demo.error === null ? null : (
       <Text style={styles.error}>{t(demo.error)}</Text>
     );
+  // An error about the link field sits under the field; everything else
+  // (a failed save) stays by the control it came from.
   const inputError =
     demo.error === "demo.clipboardNoLink" || demo.error === "demo.notALink";
 
@@ -248,6 +262,8 @@ export function LiveDemoStep({
     demo.demoUsed || alreadySaved ? (
       <GhostButton label={t("common.continue")} onPress={demo.advance} />
     ) : (
+      // Always a way on: after a failed save it reads as carrying on, before
+      // one as skipping the first save.
       <GhostButton
         label={t(demo.canSkip ? "common.continue" : "demo.skip")}
         onPress={demo.skip}
@@ -267,12 +283,6 @@ export function LiveDemoStep({
       />
 
       <View style={styles.foot}>{footer}</View>
-
-      <DemoAuthSheet
-        visible={view === "auth" && !demo.isAuthenticated}
-        url={demo.authUrl}
-        onCancel={demo.cancelAuth}
-      />
     </View>
   );
 }
@@ -285,6 +295,9 @@ type PickerProps = {
   pasteRow: ReactNode;
 };
 
+/** The first save is one tap on a sample matched to the kinds picked in
+ * setup. The share sheet is taught after it, once the first save has landed
+ * (see share-practice.tsx). */
 function SamplePicker({
   samples,
   titleKind,
@@ -340,63 +353,31 @@ function SamplePicker({
   );
 }
 
-function DemoAuthSheet({
-  visible,
+function QueuedSave({
   url,
-  onCancel,
+  space,
+  saving,
+  onContinue,
 }: {
-  visible: boolean;
   url: string;
-  onCancel: () => void;
+  space: string | null;
+  saving: boolean;
+  onContinue: () => void;
 }) {
-  useAppLocale();
-  const oauth = useOAuthSignIn("demo_sheet");
-  const reducedMotion = useReducedMotion();
-  const busy = oauth.pendingProvider !== null;
-
-  useEffect(() => {
-    if (!visible) return;
-    analytics.capture("onboarding_signin_prompt", {
-      surface: "demo_sheet",
-      action: "shown",
-    });
-  }, [visible]);
-
-  const dismiss = () => {
-    analytics.capture("onboarding_signin_prompt", {
-      surface: "demo_sheet",
-      action: "dismissed",
-    });
-    onCancel();
-  };
-  const pageHeading = findSample(url)?.pageHeading ?? displayHost(url);
-
+  const sample = findSample(url);
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType={reducedMotion ? "fade" : "slide"}
-      onRequestClose={busy ? undefined : dismiss}
-    >
-      <Pressable
-        style={styles.scrim}
-        onPress={busy ? undefined : dismiss}
-        accessibilityRole="button"
-        accessibilityLabel={t("common.back")}
-      />
-      <View style={styles.authSheet}>
-        <View style={styles.grabber} />
-        <Text style={styles.sheetHeadline}>{t("demo.signInTitle")}</Text>
-        <Text style={styles.support}>{t("demo.signInHelp")}</Text>
-
-        <DemoLinkRow title={pageHeading} url={url} />
-
-        <SignInButtons oauth={oauth} />
-      </View>
-    </Modal>
+    <SaveLater
+      title={sample?.pageHeading ?? displayHost(url)}
+      meta={sample?.domain ?? url}
+      previewed={sample !== undefined}
+      space={space}
+      saving={saving}
+      onContinue={onContinue}
+    />
   );
 }
-const styles = StyleSheet.create((theme, rt) => ({
+
+const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
     gap: theme.gap(2),
@@ -472,33 +453,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     color: theme.colors.muted,
-  },
-  scrim: {
-    flex: 1,
-    backgroundColor: theme.colors.overlay,
-  },
-  authSheet: {
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    paddingHorizontal: theme.gap(3),
-    paddingTop: theme.gap(1),
-    paddingBottom: rt.insets.bottom + theme.gap(2),
-    gap: theme.gap(1.5),
-  },
-  grabber: {
-    alignSelf: "center",
-    width: 36,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: theme.colors.border,
-    marginBottom: theme.gap(1),
-  },
-  sheetHeadline: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    color: theme.colors.foreground,
   },
 }));

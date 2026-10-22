@@ -19,7 +19,7 @@ notifications. Map them when a change touches them.
 `tests/smoke.e2e.ts` is the Doctor, not a feature. The `e2e ios` workflow
 (`.github/workflows/e2e-ios.yml`) runs search, search-no-results,
 create-space, the paywall, save-note, save-link-fixture and
-space-suggestions on pull requests
-that touch the app, against a local Convex backend that runs the fake model
+space-suggestions on main and on pull requests
+that touch the app and carry the `run-e2e` label, split over two runners, against a local Convex backend that runs the fake model
 in `apps/native/convex/model/fakeAi.ts`. The real-page link save and the
 photo save need the model and run by hand.

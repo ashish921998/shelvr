@@ -9,7 +9,9 @@ import {
   fillField,
 } from "./seeded-home.ts";
 
-startOnSeededHome();
+// The one CI flow that still resets through Settings, so that path stays
+// covered while the rest reset from the backend.
+startOnSeededHome({ reset: "settings" });
 
 test("creates a space", async ({ screen }) => {
   const name = `Pilot ${Date.now()}`;

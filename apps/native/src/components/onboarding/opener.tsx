@@ -1,114 +1,126 @@
+import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
-import type { TextMessageKey } from "@/locales/message-types";
-import { CtaButton } from "@/components/onboarding/parts";
+import { fadeIn, fadeOut, motion, motionCSS } from "@/lib/motion";
 import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
-import { withAlpha } from "@/lib/color";
-import { Image } from "expo-image";
-import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import type { TextMessageKey } from "@/locales/message-types";
+import { PhoneFrame } from "@/components/onboarding/opener-phone";
+import {
+  FiledToast,
+  FileScene,
+  PlanScene,
+  ShareScene,
+  type SceneProps,
+} from "@/components/onboarding/opener-scenes";
+import { CtaButton } from "@/components/onboarding/parts";
+import { useEffect, useState, type ComponentType } from "react";
+import {
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-const COLLAGE_MIN_HEIGHT = 220;
+// The opener: three pages to swipe through, each a phone showing one thing
+// Shelvr does, with "Start yours" under all of them. The pain first (losing
+// the places you save), then the filing, then the trip.
 
-const SCROLL_MIN_HEIGHT = 160;
+type Page = {
+  key: "save" | "file" | "plan";
+  title: TextMessageKey;
+  accent: TextMessageKey;
+  body: TextMessageKey;
+  Scene: ComponentType<SceneProps>;
+  /** Drawn over the phone's edge, outside its screen. */
+  Overlay?: ComponentType;
+};
 
-type Tile =
-  | {
-      kind: "link";
-      titleKey: TextMessageKey;
-      domain: string;
-      height: number;
-      image: number;
-    }
-  | { kind: "note"; titleKey: TextMessageKey };
-
-const COLUMNS: Tile[][] = [
-  [
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleTee",
-      domain: "everlane.com",
-      height: 188,
-      image: require("../../../assets/onboarding/tee.jpg"),
-    },
-    { kind: "note", titleKey: "onboarding.sampleNote" },
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleEspresso",
-      domain: "ebay.co.uk",
-      height: 86,
-      image: require("../../../assets/onboarding/espresso.jpg"),
-    },
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleFinishBook",
-      domain: "theatlantic.com",
-      height: 110,
-      image: require("../../../assets/onboarding/book.jpg"),
-    },
-  ],
-  [
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleOneThing",
-      domain: "nytimes.com",
-      height: 122,
-      image: require("../../../assets/onboarding/reading.jpg"),
-    },
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleRamen",
-      domain: "bbcgoodfood.com",
-      height: 94,
-      image: require("../../../assets/onboarding/ramen.jpg"),
-    },
-    {
-      kind: "link",
-      titleKey: "onboarding.samplePrague",
-      domain: "cntraveler.com",
-      height: 130,
-      image: require("../../../assets/onboarding/prague.jpg"),
-    },
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleSofa",
-      domain: "article.com",
-      height: 108,
-      image: require("../../../assets/onboarding/sofa.jpg"),
-    },
-    {
-      kind: "link",
-      titleKey: "onboarding.sampleDiner",
-      domain: "eater.com",
-      height: 100,
-      image: require("../../../assets/onboarding/diner.jpg"),
-    },
-  ],
+const PAGES: Page[] = [
+  {
+    key: "save",
+    title: "onboarding.openerSaveTitle",
+    accent: "onboarding.openerSaveAccent",
+    body: "onboarding.openerSaveBody",
+    Scene: ShareScene,
+  },
+  {
+    key: "file",
+    title: "onboarding.openerFileTitle",
+    accent: "onboarding.openerFileAccent",
+    body: "onboarding.openerFileBody",
+    Scene: FileScene,
+    Overlay: FiledToast,
+  },
+  {
+    key: "plan",
+    title: "onboarding.openerPlanTitle",
+    accent: "onboarding.openerPlanAccent",
+    body: "onboarding.openerPlanBody",
+    Scene: PlanScene,
+  },
 ];
+
+// Two headline lines and three body lines. Every page's copy gets at least
+// this, so the headline sits at the same height on each page and the phone
+// above it does not change size as the pages go by.
+const COPY_MIN_HEIGHT = 150;
 
 export function OpenerStep({
   onStart,
   onSignIn,
+  viewedPages,
 }: {
   onStart: () => void;
   onSignIn: () => void;
+  /** Pages already reported in this onboarding mount. The screen owns it,
+   * so a remount (back from interests, a text-size change) reports nothing
+   * new. */
+  viewedPages: Set<number>;
 }) {
   useAppLocale();
+  // At the accessibility sizes the sign-in link joins the first page's copy
+  // instead of taking footer height from every page.
   const largeText = useLargeText();
-  const [height, setHeight] = useState(0);
-  const [footHeight, setFootHeight] = useState(0);
-  const [viewport, setViewport] = useState(0);
-  const [collageTop, setCollageTop] = useState(0);
-  const footScrolls =
-    height > 0 && footHeight > 0 && height - footHeight < SCROLL_MIN_HEIGHT;
-  const overflows =
-    footScrolls || (viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [page, setPage] = useState(0);
+  // The furthest page reached. A page's entrance (the share sheet, the
+  // toast) plays when the page is first reached, not offscreen on mount.
+  const [reached, setReached] = useState(0);
+
+  useEffect(() => {
+    // Swiping back to a page says nothing new; the funnel counts first views.
+    if (viewedPages.has(page)) return;
+    viewedPages.add(page);
+    analytics.capture("onboarding_opener_page_viewed", { page_index: page });
+  }, [page, viewedPages]);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setSize((current) =>
+      current.width === width && current.height === height
+        ? current
+        : { width, height },
+    );
+  };
+
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement } = event.nativeEvent;
+    if (layoutMeasurement.width <= 0) return;
+    const nearest = Math.round(contentOffset.x / layoutMeasurement.width);
+    const next = Math.min(PAGES.length - 1, Math.max(0, nearest));
+    setPage(next);
+    setReached((current) => Math.max(current, next));
+  };
 
   const signIn = (
     <Pressable
       accessibilityRole="button"
       onPress={onSignIn}
-      style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
     >
       <Text style={styles.signInText}>
         {t("onboarding.haveAccount")}{" "}
@@ -117,79 +129,93 @@ export function OpenerStep({
     </Pressable>
   );
 
-  const foot = (
-    <View
-      style={styles.foot}
-      onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
-    >
-      <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-      {largeText ? null : signIn}
-    </View>
-  );
-
   return (
-    <View
-      style={styles.wrap}
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
-    >
-      {/* At the largest text sizes the headline alone can fill most of the
-          screen, so the headline and collage scroll. "Start yours" stays
-          pinned below unless the footer itself is too tall to pin. */}
+    <View style={styles.wrap}>
+      {/* The pager runs edge to edge, past the onboarding screen's gutter,
+          so a page slides across the whole screen; its content keeps the
+          gutter. The pages wait for the pager's size, since each page is
+          exactly one pager wide. */}
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.body, overflows && styles.bodyScrolls]}
-        scrollEnabled={overflows}
-        showsVerticalScrollIndicator={false}
-        onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+        onLayout={onLayout}
+        style={styles.pager}
       >
-        <View style={styles.head}>
-          <Text
-            style={styles.headline}
-            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-          >
-            {t("onboarding.openerTitle")}
-          </Text>
-          <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
-        </View>
-        {largeText ? signIn : null}
-
-        <View
-          style={[styles.collage, overflows && styles.collageScrolls]}
-          onLayout={(event) => setCollageTop(event.nativeEvent.layout.y)}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        >
-          {COLUMNS.map((column, index) => (
-            <View key={index} style={styles.column}>
-              {column.map((tile) =>
-                tile.kind === "note" ? (
-                  <View key={tile.titleKey} style={[styles.tile, styles.note]}>
-                    <Text style={styles.noteText}>{t(tile.titleKey)}</Text>
-                  </View>
-                ) : (
-                  <View key={tile.titleKey} style={styles.tile}>
-                    <Image
-                      source={tile.image}
-                      contentFit="cover"
-                      style={[styles.thumb, { height: tile.height }]}
-                    />
-                    <View style={styles.meta}>
-                      <Text style={styles.tileTitle} numberOfLines={2}>
-                        {t(tile.titleKey)}
-                      </Text>
-                      <Text style={styles.domain}>{tile.domain}</Text>
-                    </View>
-                  </View>
-                ),
-              )}
-            </View>
-          ))}
-          <View pointerEvents="none" style={styles.fade} />
-        </View>
-        {footScrolls ? foot : null}
+        {size.width > 0
+          ? PAGES.map((item, index) => (
+              <ScrollView
+                key={item.key}
+                style={{ width: size.width, height: size.height }}
+                contentContainerStyle={styles.page}
+                // A page scrolls only when its copy outgrows it: a small
+                // phone, a long translation or a large text size. Copy that
+                // fits neither moves nor bounces.
+                alwaysBounceVertical={false}
+                showsVerticalScrollIndicator={false}
+              >
+                <PhoneFrame
+                  overlay={
+                    item.Overlay && index <= reached ? <item.Overlay /> : null
+                  }
+                >
+                  <item.Scene shown={index <= reached} />
+                </PhoneFrame>
+                <View style={styles.copy}>
+                  <Text
+                    style={styles.headline}
+                    maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+                  >
+                    {t(item.title)}{" "}
+                    <Text style={styles.headlineAccent}>{t(item.accent)}</Text>
+                  </Text>
+                  <Text style={styles.support}>{t(item.body)}</Text>
+                </View>
+                {largeText && index === 0 ? signIn : null}
+              </ScrollView>
+            ))
+          : null}
       </ScrollView>
 
-      {footScrolls ? null : foot}
+      <View
+        style={styles.dots}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {PAGES.map((item, index) => (
+          <Animated.View
+            key={item.key}
+            testID={`opener-dot-${index}`}
+            style={[
+              styles.dot,
+              index === page && styles.dotOn,
+              // The dots change in place, so they take the state budget.
+              {
+                transitionProperty: ["width", "backgroundColor"],
+                transitionDuration: motion.duration.state,
+                transitionTimingFunction: motionCSS.out,
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <View style={styles.foot}>
+        <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
+        {/* The slot keeps the link's height on every page, so the button
+            above it never moves when the link goes. */}
+        {largeText ? null : (
+          <View style={styles.signInSlot}>
+            {page === 0 ? (
+              <Animated.View entering={fadeIn} exiting={fadeOut}>
+                {signIn}
+              </Animated.View>
+            ) : null}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -199,18 +225,18 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     gap: theme.gap(2),
   },
-  scroll: {
+  pager: {
     flex: 1,
+    // The onboarding screen's horizontal gutter, given back here.
+    marginHorizontal: -theme.gap(3),
   },
-  body: {
-    flex: 1,
-    gap: theme.gap(2),
-  },
-  bodyScrolls: {
-    flex: 0,
+  page: {
     flexGrow: 1,
+    gap: theme.gap(2),
+    paddingHorizontal: theme.gap(3),
   },
-  head: {
+  copy: {
+    minHeight: COPY_MIN_HEIGHT,
     gap: theme.gap(1),
   },
   headline: {
@@ -219,84 +245,47 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 38,
     color: theme.colors.foreground,
   },
+  headlineAccent: {
+    color: theme.colors.primaryText,
+  },
   support: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
+    ...theme.type.body,
+    lineHeight: 22,
     color: theme.colors.muted,
   },
-  collage: {
-    flex: 1,
-    minHeight: COLLAGE_MIN_HEIGHT,
+  dots: {
     flexDirection: "row",
-    gap: theme.gap(1),
-    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: theme.gap(0.75),
   },
-  collageScrolls: {
-    flex: 0,
-    height: COLLAGE_MIN_HEIGHT,
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: theme.colors.border,
   },
-  fade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 72,
-    experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(
-      theme.colors.background,
-      0,
-    )} 0%, ${theme.colors.background} 100%)`,
-  },
-  column: {
-    flex: 1,
-    gap: theme.gap(1),
-  },
-  tile: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: "hidden",
-  },
-  thumb: {
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  meta: {
-    padding: theme.gap(1),
-    gap: 2,
-  },
-  tileTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 12,
-    lineHeight: 15,
-    color: theme.colors.foreground,
-  },
-  domain: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 11,
-    color: theme.colors.faint,
-  },
-  note: {
-    padding: theme.gap(1.25),
-  },
-  noteText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.foreground,
+  dotOn: {
+    width: 20,
+    backgroundColor: theme.colors.primary,
   },
   foot: {
     gap: theme.gap(1.5),
+  },
+  signInSlot: {
+    minHeight: 44,
+    justifyContent: "center",
   },
   signIn: {
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
   },
+  pressed: {
+    opacity: theme.opacity.pressed,
+  },
   signInText: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
+    ...theme.type.subhead,
     color: theme.colors.muted,
   },
   signInLink: {

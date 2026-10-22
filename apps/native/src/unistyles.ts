@@ -76,6 +76,14 @@ const lightTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#8a5a0b",
+    // The body of a phone drawn in the app (the onboarding opener). A device
+    // is dark in every theme, so this never flips with the foreground; the
+    // dark themes go a step past their background so the edge still reads.
+    bezel: "#2b2418",
+    // Trip Reveal's globe: sea, land, and the coast and border lines.
+    globeOcean: "#e9eef0",
+    globeLand: "#e4d6bb",
+    globeLandEdge: "#cdbb98",
   },
 } as const;
 
@@ -102,6 +110,10 @@ const darkTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#e6a23c",
+    bezel: "#0e0b07",
+    globeOcean: "#1f2a2e",
+    globeLand: "#3b3427",
+    globeLandEdge: "#54493a",
   },
 } as const;
 
@@ -128,6 +140,10 @@ const darkNeutralTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#e6a23c",
+    bezel: "#07090b",
+    globeOcean: "#1a2530",
+    globeLand: "#30363d",
+    globeLandEdge: "#48505a",
   },
 } as const;
 

@@ -180,6 +180,30 @@ describe("makeTrip", () => {
     ]);
   });
 
+  it("plans up to 15 days, and holds a longer ask to 15", async () => {
+    const { t, spaceId } = await setup(LISBON_SAVES);
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          {
+            saveNumber: 3,
+            name: "Pastéis de Belém",
+            area: "Belém",
+            why: "The custard tarts",
+            slot: "morning",
+          },
+        ],
+      },
+    });
+
+    await t.action(api.trips.makeTrip, { spaceId, days: 12, pace: "easy" });
+    expect(promptOf(0)).toContain("12 days in Lisbon");
+    await t.action(api.trips.makeTrip, { spaceId, days: 40, pace: "easy" });
+    expect(promptOf(1)).toContain("15 days in Lisbon");
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(trip?.days).toHaveLength(15);
+  });
+
   it("pins stops with Apple Maps when the key is set", async () => {
     vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
     vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");

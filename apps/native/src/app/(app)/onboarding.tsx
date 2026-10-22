@@ -3,7 +3,11 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
-import { isInterest } from "@/lib/onboarding-interests";
+import { showTripTeaser } from "@/lib/sample-trip";
+import { getQueuedFirstSaveUrl } from "@/lib/queued-first-save";
+import { isInterest, type Interest } from "@/lib/onboarding-interests";
+import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
+import { isTravelVibe, spacesAfterInterestToggle } from "@/lib/travel-vibes";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -25,7 +29,6 @@ import {
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import {
-  isPresetSpace,
   isSaveKind,
   spacesAfterKindToggle,
   type SaveKind,
@@ -45,6 +48,11 @@ import { OpenerStep } from "@/components/onboarding/opener";
 import { PromiseStep } from "@/components/onboarding/promise";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
+import {
+  TripBuildStep,
+  TripLockedStep,
+  TripRevealStep,
+} from "@/components/onboarding/trip-teaser";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
@@ -62,6 +70,9 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   notifications: 0.7,
   share: 0.85,
   promise: 1,
+  tripBuild: 1,
+  tripLocked: 1,
+  tripReveal: 1,
 };
 const READING_PROGRESS = 0.625;
 
@@ -119,10 +130,16 @@ export default function OnboardingScreen() {
   }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
+  // Mutated in place by the opener; the state only keeps one set per mount.
+  const [viewedOpenerPages] = useState(() => new Set<number>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const interests = spaces.filter(isInterest);
+  // So are the kinds of spots picked under Travel; they leave with it.
+  const vibes = spaces.filter(isTravelVibe);
+  // People who save travel see a sample trip build and lock before the paywall.
+  const teaser = showTripTeaser(kinds, interests);
 
   useEffect(() => {
     setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
@@ -183,6 +200,9 @@ export default function OnboardingScreen() {
         : [...current, name],
     );
 
+  const toggleInterest = (interest: Interest) =>
+    setSpaces((current) => spacesAfterInterestToggle(current, interest));
+
   const addSpace = (name: string) =>
     setSpaces((current) =>
       current.includes(name) ? current : [...current, name],
@@ -192,15 +212,10 @@ export default function OnboardingScreen() {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    analytics.capture("onboarding_completed", {
-      save_pileup: [],
-      save_types: kinds,
-      interests,
-      space_count: spaces.length,
-      space_names: spaces.filter(isPresetSpace),
-      custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
-      $set: { save_pileup: [], save_types: kinds },
-    });
+    analytics.capture(
+      "onboarding_completed",
+      onboardingCompletedProperties(kinds, spaces),
+    );
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
@@ -209,10 +224,11 @@ export default function OnboardingScreen() {
 
   const practiceSample = practiceShareSample(
     kinds,
-    getOnboardingProgress().demo?.url ?? null,
+    getOnboardingProgress().demo?.url ?? getQueuedFirstSaveUrl(),
   );
   const paywall = useOnboardingPaywall({
-    onPro: finish,
+    // A purchase opens the sample trip; with no trip, onboarding is done.
+    onPro: teaser ? () => setStep("tripReveal") : finish,
     onDecline: () => {
       dropPracticeShare(practiceSample?.url);
       finish();
@@ -285,6 +301,25 @@ export default function OnboardingScreen() {
             key={fontScale}
             onStart={advance}
             onSignIn={() => setShowSignIn(true)}
+            viewedPages={viewedOpenerPages}
+          />
+        </View>
+      ) : step === "interests" ? (
+        // Also a static frame: the step scrolls its picks and pins Continue,
+        // so the travel card opening never pushes it off screen.
+        <View
+          style={[
+            styles.content,
+            styles.scroll,
+            { paddingBottom: insets.bottom + theme.gap(3) },
+          ]}
+        >
+          <InterestsStep
+            picked={interests}
+            vibes={vibes}
+            onToggle={toggleInterest}
+            onToggleVibe={toggleSpace}
+            onAdvance={advance}
           />
         </View>
       ) : (
@@ -306,14 +341,6 @@ export default function OnboardingScreen() {
               onToggleKind={toggleKind}
               onToggleSpace={toggleSpace}
               onAddSpace={addSpace}
-              onAdvance={advance}
-            />
-          )}
-
-          {step === "interests" && (
-            <InterestsStep
-              picked={interests}
-              onToggle={toggleSpace}
               onAdvance={advance}
             />
           )}
@@ -349,8 +376,25 @@ export default function OnboardingScreen() {
           )}
 
           {step === "promise" && (
-            <PromiseStep leaving={paywall.asked} onCommit={paywall.ask} />
+            <PromiseStep
+              leaving={paywall.asked}
+              onCommit={teaser ? advance : paywall.ask}
+            />
           )}
+
+          {step === "tripBuild" && <TripBuildStep onDone={advance} />}
+
+          {step === "tripLocked" && (
+            <TripLockedStep
+              leaving={paywall.asked}
+              onUnlock={() => {
+                recordCurrentStep();
+                paywall.ask();
+              }}
+            />
+          )}
+
+          {step === "tripReveal" && <TripRevealStep onContinue={finish} />}
         </ScrollView>
       )}
     </View>

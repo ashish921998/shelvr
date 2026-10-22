@@ -4,8 +4,11 @@ import { newConvexTest, signedInUser } from "./test.setup";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
 import { ConvexError, type Value } from "convex/values";
-import { MAX_DEMO_RETRIES } from "./demo";
-import { DEMO_ERROR_MESSAGES, demoErrorCode } from "./model/demoErrors";
+import {
+  DEMO_ERROR_MESSAGES,
+  MAX_DEMO_RETRIES,
+  demoErrorCode,
+} from "./model/demoErrors";
 
 const URL = "https://www.bbcgoodfood.com/recipes/classic-lasagne";
 
@@ -474,5 +477,57 @@ describe("retryDemoItem", () => {
         1,
       );
     });
+  });
+});
+
+describe("free retry of the demo save from the item page", () => {
+  async function failedDemo() {
+    const backend = newConvexTest();
+    const { t, userId } = await signedInUser(backend);
+    const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
+    await backend.run(async (ctx) => {
+      await ctx.db.patch(itemId, { status: "failed", failureReason: "error" });
+    });
+    const demoRow = () =>
+      backend.run(
+        async (ctx) =>
+          await ctx.db
+            .query("onboardingDemos")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .unique(),
+      );
+    return { backend, t, itemId, demoRow };
+  }
+
+  it("retries a failed demo save without Pro, counting against the demo's cap", async () => {
+    const { backend, t, itemId, demoRow } = await failedDemo();
+    expect(await t.mutation(api.items.reprocessItem, { id: itemId })).toBe(
+      true,
+    );
+    const item = await backend.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("processing");
+    expect((await demoRow())?.retryCount).toBe(1);
+  });
+
+  it("asks for Pro once the demo's retries are spent", async () => {
+    const { backend, t, itemId, demoRow } = await failedDemo();
+    const demo = await demoRow();
+    await backend.run(async (ctx) => {
+      await ctx.db.patch(demo!._id, { retryCount: MAX_DEMO_RETRIES });
+    });
+    await expect(
+      t.mutation(api.items.reprocessItem, { id: itemId }),
+    ).rejects.toThrow(/pro_required|Pro/i);
+  });
+
+  it("asks for Pro for a save that is not the demo", async () => {
+    const { backend, t, itemId, demoRow } = await failedDemo();
+    const demo = await demoRow();
+    await backend.run(async (ctx) => {
+      await ctx.db.delete(demo!._id);
+    });
+    await expect(
+      t.mutation(api.items.reprocessItem, { id: itemId }),
+    ).rejects.toThrow(/pro_required|Pro/i);
   });
 });

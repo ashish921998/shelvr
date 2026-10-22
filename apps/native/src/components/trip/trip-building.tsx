@@ -13,8 +13,8 @@ const STEPS: TextMessageKey[] = [
   "trip.buildingGroup",
 ];
 
-export function TripBuilding() {
-  useAppLocale();
+/** The build step to show: advances on a timer and holds on the last one. */
+export function useBuildStep(): TextMessageKey {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -25,6 +25,15 @@ export function TripBuilding() {
     return () => clearInterval(timer);
   }, []);
 
+  return STEPS[step];
+}
+
+/** What the trip screen shows while the trip is being made: the app's loader
+ * over the build step. */
+export function TripBuilding() {
+  useAppLocale();
+  const step = useBuildStep();
+
   return (
     <View style={styles.wrap}>
       <StitchRing size={28} />
@@ -33,7 +42,7 @@ export function TripBuilding() {
         style={styles.muted}
         accessibilityLiveRegion="polite"
       >
-        {t(STEPS[step])}
+        {t(step)}
       </ThemedText>
     </View>
   );

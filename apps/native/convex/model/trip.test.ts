@@ -6,6 +6,7 @@ import {
   clusterPlaces,
   keepNearby,
   swapStop,
+  tripPlaceCap,
   type TripCandidate,
   type TripStop,
 } from "./trip";
@@ -113,6 +114,15 @@ describe("buildTrip", () => {
     const belem = trip.days.find((day) => day.areas[0] === "Belém");
     expect(belem?.stops.map((s) => s.name)).toEqual(["Place 2", "Place 3"]);
     expect(trip.days[0].areas).toEqual(["Alfama"]);
+  });
+});
+
+describe("tripPlaceCap", () => {
+  it("scales with the days, never below a packed 5-day trip", () => {
+    expect(tripPlaceCap(1)).toBe(35);
+    expect(tripPlaceCap(5)).toBe(35);
+    expect(tripPlaceCap(10)).toBe(70);
+    expect(tripPlaceCap(15)).toBe(105);
   });
 });
 

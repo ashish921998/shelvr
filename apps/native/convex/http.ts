@@ -96,7 +96,9 @@ async function receiveImageUpload(
       return response;
     }
     if (result.kind === "stored") {
-      // Do not parse or cancel a retry body: cancellation resets HTTP/2.
+      // This capability already has its immutable receipt. Do not parse or
+      // cancel the irrelevant retry body: cancellation resets HTTP/2, and
+      // revalidation could incorrectly refuse an upload already accepted.
       return json({ storageId: result.storageId }, 200);
     }
     claim = result;
@@ -126,8 +128,23 @@ async function receiveImageUpload(
   }
 }
 
+// Convex Auth: JWT verification, JWKS, and OAuth callback HTTP actions.
 auth.addHttpRoutes(http);
 
+/**
+ * RevenueCat webhook receiver. RevenueCat posts server-to-server events here
+ * for every subscription lifecycle change (trial start, conversion, renewal,
+ * cancellation, expiration). We authenticate with a shared bearer secret set
+ * in the RevenueCat dashboard and stored in the `REVENUECAT_WEBHOOK_SECRET`
+ * Convex deployment env var, then map the event to an entitlement row.
+ *
+ * The Convex Auth user id is configured as the RevenueCat app user id (the
+ * client calls `Purchases.logIn(convexUserId)` on sign-in), so the event's
+ * current `app_user_id` is the same `userId` every other table keys on. An
+ * event still keyed to the anonymous id of a purchase made before sign-in
+ * resolves to the account it was aliased to (`parseRevenueCatEvent`). No
+ * client-supplied id is trusted.
+ */
 http.route({
   path: "/webhooks/revenuecat",
   method: "POST",
@@ -136,6 +153,8 @@ http.route({
     if (!secret) {
       return new Response("Webhook secret not configured", { status: 500 });
     }
+    // Constant-time compare: a plain `!==` returns as soon as one byte
+    // differs, which lets a caller time their way to the secret byte by byte.
     const authHeader = req.headers.get("authorization") ?? "";
     if (!(await secureCompare(`Bearer ${secret}`, authHeader))) {
       return new Response("Unauthorized", { status: 401 });
@@ -145,10 +164,12 @@ http.route({
     try {
       body = await req.json();
     } catch {
+      // Unreadable/non-JSON body: RevenueCat should not retry these.
       return new Response("Bad payload", { status: 400 });
     }
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
+      // Body was not a readable object: reject so RevenueCat doesn't retry.
       return new Response("Bad payload", { status: 400 });
     }
 
@@ -167,6 +188,7 @@ http.route({
           event.eventTimestampMs,
         );
       } catch {
+        // Do not acknowledge a failed lookup: RevenueCat retries non-2xx deliveries.
         return new Response("Transfer reconciliation unavailable", {
           status: 503,
         });
@@ -174,6 +196,9 @@ http.route({
       return new Response(null, { status: 200 });
     }
 
+    // A readable event missing required identity or ordering fields is
+    // malformed but acknowledged: return 200 so RevenueCat stops retrying a
+    // non-actionable event rather than hammering the endpoint.
     if (
       event.type === undefined ||
       event.userId === undefined ||
@@ -236,6 +261,13 @@ function json(body: unknown, status: number): Response {
   });
 }
 
+/**
+ * Apple's Get Retention Message endpoint. The App Store posts a signed request
+ * while a subscriber views the page where they can cancel, and the reply picks
+ * the message shown on the cancel sheet. The request is authenticated by its
+ * signature alone, so there is no shared secret. Apple allows 700 ms, which is
+ * why this reads no database: offers come from deployment variables.
+ */
 http.route({
   path: "/retention-messaging",
   method: "POST",
@@ -277,6 +309,8 @@ http.route({
   }),
 });
 
+/** The marketing server claims a bounded parsing budget before reading the
+ * visitor's request. No visitor body is accepted by this endpoint. */
 http.route({
   path: "/request-body",
   method: "POST",
@@ -309,9 +343,22 @@ http.route({
   }),
 });
 
+/**
+ * Header the web server uses to pass the visitor's IP along. A dedicated name
+ * (rather than `x-forwarded-for`) means the value cannot be confused with
+ * hops Convex's own edge adds, and it is only honoured after the shared
+ * secret check below has proven the caller is our server.
+ */
 export const WAITLIST_CLIENT_IP_HEADER = "x-shelvr-client-ip";
 export const WAITLIST_SECRET_HEADER = "x-waitlist-secret";
 
+/**
+ * Waitlist signup receiver for the marketing site. The Next.js route is the
+ * only intended caller: it proves itself with `WAITLIST_SHARED_SECRET` and
+ * forwards the real visitor IP, so the per-IP limiter inside `upsertSignup`
+ * cannot be skipped by omitting or forging the address. The old public
+ * `waitlist:join` action let any Convex client do exactly that.
+ */
 http.route({
   path: "/waitlist/join",
   method: "POST",
@@ -360,7 +407,8 @@ http.route({
       if (isRateLimitError(error)) {
         return json({ message: "Too many attempts." }, 429);
       }
-      // Convex argument errors print the failing args (the address); log the error class only.
+      // Convex argument errors print the failing args, which include the
+      // address. Log the error class only.
       logEvent("error", "waitlist_join_failed", {
         error_name: errorName(error),
       });
@@ -369,6 +417,12 @@ http.route({
   }),
 });
 
+/**
+ * The marketing site's no-login oracle. Same caller and trust model as
+ * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
+ * and forwards the visitor IP for the per-IP limiter. The body is narrowed
+ * before a token is spent, so a malformed request costs the visitor nothing.
+ */
 http.route({
   path: "/oracle",
   method: "POST",
@@ -412,6 +466,12 @@ http.route({
   }),
 });
 
+/**
+ * Public preview for a branded share link (`shelvr-web.vercel.app/i/:token`).
+ * The marketing site's `/i/[token]` route calls this to build the page's OG
+ * tags. No secret: the random share token is the capability, and the
+ * response is a narrow preview shape (see `getSharePreview`).
+ */
 http.route({
   pathPrefix: "/share/links/",
   method: "GET",
@@ -425,6 +485,11 @@ http.route({
   }),
 });
 
+/**
+ * Public read of a plan vote link (`shelvr-web.vercel.app/p/:token`). Same
+ * trust model as `/share/links/`: the random token is the capability and the
+ * response is the narrow shape `getPublicPlanShare` returns.
+ */
 http.route({
   pathPrefix: "/plan/shares/",
   method: "GET",
@@ -438,6 +503,11 @@ http.route({
   }),
 });
 
+/**
+ * Votes from the plan vote page. Same caller and trust model as
+ * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
+ * and forwards the visitor IP for the per-IP limiter.
+ */
 http.route({
   path: "/plan/votes",
   method: "POST",
@@ -480,6 +550,18 @@ http.route({
   }),
 });
 
+// ---------------------------------------------------------------------------
+// iOS App Intents (Siri, Shortcuts)
+// ---------------------------------------------------------------------------
+//
+// The Swift intents in `apps/native/app-intents/` save without launching the
+// JavaScript app, authenticated by a per-device capture token rather than a
+// Convex Auth JWT (see appIntents.ts). Every route answers JSON with an `error`
+// code the Swift side maps to what Siri says: `unauthorized` (sign in again),
+// `pro_required` (open Shelvr to subscribe), `rate_limited`, a save refusal
+// code (`photo_limit`, `image_too_large`, `image_empty`), `bad_request`, or
+// `failed`.
+
 type CaptureRoute = "image_begin" | "image_finish" | "link" | "note";
 
 function captureUnauthorized(): Response {
@@ -496,6 +578,7 @@ function isSavableUrl(url: string): boolean {
   }
 }
 
+/** Maps a refused capture to its response. Never logs content or URLs. */
 function captureFailure(route: CaptureRoute, error: unknown): Response {
   const code = saveErrorCode(error);
   if (code === "pro_required") return json({ error: code }, 402);
@@ -508,6 +591,7 @@ function captureFailure(route: CaptureRoute, error: unknown): Response {
   return json({ error: "failed" }, 500);
 }
 
+/** The caller's token hash and JSON body, or the response that ends it. */
 async function readCapture(
   ctx: ActionCtx,
   req: Request,
@@ -612,6 +696,8 @@ http.route({
     if (read instanceof Response) return read;
     const request = parseLinkOrNote(read.body);
     if (!request) return json({ error: "bad_request" }, 400);
+    // A link the URL policy refuses is the caller's to report, not a server
+    // failure the app would queue and retry forever.
     if (request.kind === "link" && !isSavableUrl(request.url)) {
       return json({ error: "invalid_url" }, 422);
     }

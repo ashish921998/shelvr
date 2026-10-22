@@ -2,10 +2,15 @@ import { internal } from "../_generated/api";
 import { env, type ActionCtx } from "../_generated/server";
 import { parseRevenueCatSnapshot } from "./revenuecat";
 
+/** Authoritative events (transfer, refund, billing issue) replace local access
+ * with the current Pro entitlement. With `grantOnly`, a snapshot applies only
+ * where it gives more access than the stored row (see `applySnapshots`), so a
+ * caller-triggered sync can add access but never take or shorten it. */
 export async function reconcileRevenueCatCustomers(
   ctx: ActionCtx,
   userIds: string[],
   eventTimestampMs: number,
+  { grantOnly = false }: { grantOnly?: boolean } = {},
 ): Promise<void> {
   const owners = await ctx.runQuery(internal.subscriptions.liveOwners, {
     userIds: [...new Set(userIds)],
@@ -24,16 +29,15 @@ export async function reconcileRevenueCatCustomers(
     );
     if (!response.ok) throw new Error("RevenueCat customer lookup failed");
     const body: unknown = await response.json();
-    snapshots.push({
-      userId,
-      ...parseRevenueCatSnapshot(
-        body,
-        env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro",
-      ),
-    });
+    const snapshot = parseRevenueCatSnapshot(
+      body,
+      env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro",
+    );
+    snapshots.push({ userId, ...snapshot });
   }
   await ctx.runMutation(internal.subscriptions.applySnapshots, {
     snapshots,
     eventTimestampMs,
+    ...(grantOnly ? { grantOnly } : {}),
   });
 }

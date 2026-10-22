@@ -16,26 +16,14 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
 // Each topic's picture. The topic photos are from Unsplash, under its free
 // licence.
 const INTEREST_IMAGES: Record<Interest, number> = {
-  AI: require("../../../assets/onboarding/topic-ai.jpg"),
-  Tech: require("../../../assets/onboarding/topic-tech.jpg"),
-  Startups: require("../../../assets/onboarding/topic-startups.jpg"),
-  Business: require("../../../assets/onboarding/topic-business.jpg"),
-  Money: require("../../../assets/onboarding/topic-money.jpg"),
-  Productivity: require("../../../assets/onboarding/topic-productivity.jpg"),
-  Design: require("../../../assets/onboarding/topic-design.jpg"),
-  "Interior design": require("../../../assets/onboarding/sofa.jpg"),
-  Architecture: require("../../../assets/onboarding/topic-architecture.jpg"),
-  Photography: require("../../../assets/onboarding/topic-photography.jpg"),
-  Films: require("../../../assets/onboarding/videos.jpg"),
-  Anime: require("../../../assets/onboarding/topic-anime.jpg"),
-  Music: require("../../../assets/onboarding/topic-music.jpg"),
-  Gaming: require("../../../assets/onboarding/topic-gaming.jpg"),
-  Books: require("../../../assets/onboarding/book.jpg"),
-  Science: require("../../../assets/onboarding/topic-science.jpg"),
-  Coffee: require("../../../assets/onboarding/espresso.jpg"),
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
-  Fitness: require("../../../assets/onboarding/fitness.jpg"),
-  Wellness: require("../../../assets/onboarding/topic-wellness.jpg"),
+  "Food & recipes": require("../../../assets/onboarding/demo-recipe.jpg"),
+  "Home & design": require("../../../assets/onboarding/sofa.jpg"),
+  "Style & shopping": require("../../../assets/onboarding/demo-product.jpg"),
+  "Fitness & wellness": require("../../../assets/onboarding/fitness.jpg"),
+  "AI & tech": require("../../../assets/onboarding/topic-ai.jpg"),
+  "Business & productivity": require("../../../assets/onboarding/topic-business.jpg"),
+  "Films, books & music": require("../../../assets/onboarding/book.jpg"),
 };
 
 export function sampleImage(sample: DemoSample): number {
