@@ -196,26 +196,7 @@ jobs:
         run: |
           node node_modules/agent-device/bin/agent-device.mjs prepare ios-runner \
             --platform ios --udid "$E2E_DEVICE" --timeout 900000 --json
-          # stop refuses a daemon whose info file has no start time (run
-          # 39049617284) and fails the job though the runner is ready, so it
-          # is then stopped by the pid it recorded.
-          if ! node node_modules/agent-device/bin/agent-device.mjs daemon stop; then
-            echo "::warning::agent-device would not stop its daemon; stopping it by pid"
-            for info in $(find "$HOME/.agent-device" -name daemon.json 2>/dev/null); do
-              pid=$(node -p "require('$info').pid") || continue
-              # Signal it only if that pid is still an agent-device process.
-              if ps -p "$pid" -o command= 2>/dev/null | grep -q agent-device; then
-                kill "$pid" 2>/dev/null || true
-                # Wait for it to exit, so the runner cache saved next does not
-                # catch its state files mid-shutdown.
-                for _ in $(seq 30); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
-                kill -9 "$pid" 2>/dev/null || true
-              fi
-              # The runner cache saves all of ~/.agent-device; keep the stopped
-              # daemon's state files out of it.
-              rm -f "$info" "$(dirname "$info")/daemon.lock"
-            done
-          fi
+          tools/e2e/stop-agent-device.sh
 
       - name: Save the agent-device runner
         if: ${{ !cancelled() && steps.prepare-runner.outcome == 'success' && steps.runner-cache.outputs.cache-hit != 'true' }}
@@ -303,7 +284,10 @@ jobs:
           echo "::error::Metro on 8091 did not stop; the run could not start its own"
           exit 1
 
+      # A failure here is decided by the next step, which can rerun the flows.
       - name: Run the flows
+        id: flows
+        continue-on-error: true
         working-directory: tools/e2e
         # Tells the flows that need the fake (save-link-fixture,
         # space-suggestions) that the backend runs it. E2E_FIXTURE_RESET has
@@ -315,6 +299,37 @@ jobs:
           E2E_FIXTURE_RESET: backend
           CONVEX_AGENT_MODE: anonymous
         run: pnpm exec e2e run ${{ matrix.shard.tests }} --reporter list,junit
+
+      # The test tool's daemon can wedge for good: every read then answers
+      # "Daemon request timed out" until the test gives up (main after #431,
+      # #446's first run), and a test retry meets the same daemon. When a
+      # failure reads like that, stop the daemon, reboot the simulator, which
+      # ends its XCTest runner, and run the tests that did not pass once more.
+      # A real failure should fail again; one the tool caused gets a fresh daemon.
+      - name: Rerun flows the test tool dropped
+        id: rerun
+        if: ${{ steps.flows.outcome == 'failure' }}
+        working-directory: tools/e2e
+        env:
+          E2E_FAKE_AI: local-v1
+          E2E_FIXTURE_RESET: backend
+          CONVEX_AGENT_MODE: anonymous
+        run: |
+          test -f .e2e/report.json || exit 1
+          grep -qE "Daemon request timed out|test tool stopped answering|overran its watchdog|runner is wedged" .e2e/report.json || exit 1
+          echo "::warning title=Test tool wedged::restarting the daemon and simulator, then rerunning the tests that did not pass"
+          # The rerun writes its own report; keep the first run's for the artifact.
+          first="$RUNNER_TEMP/first-run"
+          mkdir -p "$first"
+          cp .e2e/report.json "$first/"
+          cp ~/.agent-device/daemon.log "$first/" 2>/dev/null || true
+          ./stop-agent-device.sh
+          xcrun simctl shutdown "$E2E_DEVICE" || true
+          xcrun simctl bootstatus "$E2E_DEVICE" -b
+          status=0
+          pnpm exec e2e run ${{ matrix.shard.tests }} --last-failed --reporter list,junit || status=$?
+          mkdir -p .e2e/first-run && cp "$first"/* .e2e/first-run/
+          exit $status
 
       # tapUntilVisible taps again when a tap was lost. The run still passes
       # then, so a recovered tap is surfaced here as a warning on the pull
@@ -359,9 +374,15 @@ jobs:
             | grep -iE "devlauncher|manifest|NSURLError|bundle|error" | tail -150 || true
           echo "::endgroup::"
 
-      - name: Copy the backend log
+      # The backend's log, and the test tool's: its daemon's lifecycle log and
+      # the XCTest runner's, which say why a read timed out.
+      - name: Copy the backend and test tool logs
         if: ${{ !cancelled() }}
-        run: cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
+        run: |
+          cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
+          cp ~/.agent-device/daemon.log tools/e2e/.e2e/ 2>/dev/null || true
+          mkdir -p tools/e2e/.e2e/runner-logs
+          cp "${TMPDIR:-/tmp}"/agent-device/apple-runner/logs/*.log tools/e2e/.e2e/runner-logs/ 2>/dev/null || true
 
       - name: Upload the run
         if: ${{ !cancelled() }}
