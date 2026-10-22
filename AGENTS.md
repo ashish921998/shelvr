@@ -60,6 +60,17 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   per-host readers in `convex/model/readers/`, on top of
   `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
+- **Domain language:** `GLOSSARY.md` at the repo root defines the terms to use in
+  copy and docs (save, reading, classification, settlement). Tables and
+  functions keep `items` and `finalizeItem`.
+- **Finished-save rules:** `convex/model/settlement.ts` (`completionPatch`)
+  decides what a processing run writes to a save; `finalizeItem` in
+  `convex/items.ts` is its adapter. `convex/finalizeItem.grid.test.ts` pins the
+  rules with the recorded rows in `convex/testdata/settlement/rows.json`.
+  `failurePatch` in the same module is the rule for a failed run;
+  `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
+  Re-record only for a change you intend, with the command in the test header,
+  and review the row diff.
 - **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
   and `convex/model/pageReadCore.ts` (about 550). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
@@ -76,6 +87,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   paywall.
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
+- **Proving account deletion:** `.agents/skills/account-deletion` runs
+  `convex/accountDeletion.test.ts` and says how to read a failure. Use it before
+  changing the deletion drain in `convex/users.ts`, a table with a user key, an
+  owner check, or a function that writes rows for a user.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
@@ -115,9 +130,16 @@ use `expo lint`, which silently skips the `convex/` backend.
 4. Run the narrowest relevant check, then run `pnpm run check` before finishing.
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
-The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
-the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
-same steps, so the pre-commit hook and the remote gate cannot drift. Knip's
+`pnpm run check` is `check:code` (lint, typecheck, codegen and agent-docs drift,
+tooling tests, coverage thresholds, Knip, Syncpack) followed by the dependency
+audit (`pnpm run audit`, blocks on high/critical). CI and the pre-push hook
+both run `check:code`, the hook before a push leaves the machine. The app-level
+`check` scripts stop at lint, typecheck and tests, so run the root one; they stay
+that way because a script change in `apps/native/package.json` moves the native
+fingerprint. The audit is left out of both: CI
+audits a pull request only when it changes a `package.json`, the lockfile or
+`pnpm-workspace.yaml`, and `audit.yml` runs it daily, where a failed run is the
+alert for a new advisory. Knip's
 Convex entries are the top-level `convex/*.ts` modules and their co-located
 tests; every other file under `convex/` is a project file whose exports are
 reported as unused unless another module imports them. The Convex CLI registers
@@ -197,3 +219,38 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 - Keep secrets and user content out of source, logs, tests, and reports.
 - Do not reintroduce the retired notes-app domain or edit generated Convex files
   unless the Convex workflow explicitly requires regeneration.
+
+## Rules and what enforces them
+
+The rules here and in `CLAUDE.md`, and what fails when one is broken. When you
+are corrected for a rule already listed, fix the mistake and move the rule up
+in the same change: remove the way to get it wrong, then types, then a lint or
+CI check whose message names the fix, then a test. Docs come last. A row that
+fails "nowhere" is a repeat waiting to happen. Drop a row once its mistake
+cannot happen.
+
+| Rule                                                                               | Enforced by                                                                                                      | Fails in                             |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| File and identifier naming                                                         | ESLint `check-file`, `naming-convention`                                                                         | `lint`                               |
+| Complexity limits, zero lint warnings                                              | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
+| No `console.*` in app code outside the loggers                                     | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
+| `check:code` is the one gate                                                       | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
+| The pre-push hook gates a push of branch commits, not deletes or tags              | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
+| `_generated/api.d.ts` lists every Convex module                                    | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
+| Copy lives in `en.json`; generated catalogs untouched                              | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |
+| `CLAUDE.md` names every table, module and route                                    | `tools/verify-agent-docs.mjs`                                                                                    | `check:code`                         |
+| No dead code; one version per dependency                                           | Knip, Syncpack                                                                                                   | `check:code`                         |
+| `tools/*.test.mjs` that run git use `createRepo()`                                 | `tools/temp-repo.test.mjs`                                                                                       | `check:code`                         |
+| App Review notes quote only text in `en.json`, the App Intents or the paywall list | `tools/onboarding-sync.test.mjs` (bold is read only under Onboarding)                                            | `check:code`                         |
+| Notes and e2e helpers are walked when the onboarding flow version moves            | The same test checks their numbers in `tools/onboarding-walks.json`, not the walk                                | `check:code`, number only            |
+| e2e helpers use the app's current labels                                           | `e2e ios` workflow, on the `run-e2e` label, not required                                                         | nowhere blocking                     |
+| Public Convex `args` and `returns` stay compatible                                 | `tools/verify-convex-api.mjs` from the fork point; one trailer acknowledges the whole range                      | CI `convex api contract`             |
+| OTA reaches only builds with the same native fingerprint                           | `tools/verify-ota-compatibility.mjs` blocks the publish; `tools/verify-native-fingerprint.mjs` only warns on PRs | OTA `before_update`; CI warns        |
+| A PR shows how it was verified; UI shows a screenshot                              | `tools/verify-pr-evidence.mjs`                                                                                   | CI `PR evidence`                     |
+| No high or critical advisories                                                     | `pnpm run audit`                                                                                                 | `check`, CI on dependency PRs, daily |
+| `requireUserId`, no client `userId`, `liveOwner`                                   | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| `requireProEntitlement`; `aiAllowed` before content leaves                         | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| AI passes touch only `suggested` memberships                                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| No database `.filter((q) => ...)` in `convex/` outside tests                       | ESLint `no-restricted-syntax` (name an index instead)                                                            | `lint`                               |
+| `logEvent` scalars; `safeFetch`                                                    | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| `newConvexTest()`; `captureError`; no test in `src/app`                            | Review against `REVIEW.md`                                                                                       | nowhere                              |

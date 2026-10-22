@@ -10,15 +10,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// A quiet acknowledgement: the check settles into place while one thin ring
-// breathes out of it and fades. It plays once. With Reduce Motion on, the
-// timing jumps to its end, so the badge is simply there.
-
 const BADGE = 72;
 const SETTLE_MS = 1400;
 
-/** A check badge that settles in. Decorative: the headline beside it carries
- * the meaning for a screen reader. */
 export function CelebrationBadge() {
   const { theme } = useUnistyles();
   const progress = useSharedValue(0);

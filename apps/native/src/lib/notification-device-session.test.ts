@@ -10,14 +10,21 @@ function deferred() {
   return { promise, resolve };
 }
 
-function setup(initial: string[] = [], getLocale?: () => string) {
+function setup(
+  initial: string[] = [],
+  getLocale?: () => string,
+  getTimezone?: () => string | undefined,
+) {
   let tokens = initial;
   const deps = {
     getLocale,
+    getTimezone,
     getToken: vi.fn(
       async (_requestPermission: boolean): Promise<string | null> => "token-a",
     ),
-    saveToken: vi.fn(async (_token: string, _locale?: string) => {}),
+    saveToken: vi.fn(
+      async (_token: string, _locale?: string, _timezone?: string) => {},
+    ),
     revokeToken: vi.fn(async (_token: string) => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
@@ -50,7 +57,6 @@ describe("notification device session", () => {
     await expect(session.register()).rejects.toThrow();
     expect(session.isRegistered()).toBe(false);
     expect(session.shouldRetryRegistration()).toBe(false);
-    // A token-rotation event can still attempt a different token.
     await session.register(async () => "token-b");
     expect(session.isRegistered()).toBe(true);
     deps.saveToken.mockRejectedValueOnce(conflict);
@@ -153,6 +159,92 @@ describe("notification device session", () => {
       ["token-a", "de"],
       ["token-a", "ja"],
     ]);
+  });
+
+  it("updates a stable token and language when only the timezone changes", async () => {
+    let timezone = "Asia/Kolkata";
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => timezone,
+    );
+    await session.register();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    timezone = "Europe/Paris";
+    expect(session.isRegistered()).toBe(false);
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    await session.register();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    expect(deps.saveToken.mock.calls).toEqual([
+      ["token-a", "en", "Asia/Kolkata"],
+      ["token-a", "en", "Europe/Paris"],
+    ]);
+  });
+
+  it("acknowledges the timezone it sent when the timezone moves during the write", async () => {
+    let timezone = "Asia/Kolkata";
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => timezone,
+    );
+    const writing = deferred();
+    deps.saveToken.mockImplementationOnce(async () => writing.promise);
+    const first = session.register();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(1));
+    timezone = "Europe/Paris";
+    writing.resolve();
+    await first;
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(deps.saveToken.mock.calls).toEqual([
+      ["token-a", "en", "Asia/Kolkata"],
+      ["token-a", "en", "Europe/Paris"],
+    ]);
+    expect(session.isRegistered()).toBe(true);
+  });
+
+  it("keeps an ownership rejection blocked across a timezone change, and a transient failure retryable", async () => {
+    let timezone = "Asia/Kolkata";
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => timezone,
+    );
+    deps.saveToken.mockRejectedValueOnce(
+      new ConvexError({ code: "notification_token_owned_by_another_account" }),
+    );
+    await expect(session.register()).rejects.toThrow();
+    timezone = "Europe/Paris";
+    expect(session.shouldRetryRegistration()).toBe(false);
+
+    session.stop();
+    session.start();
+    await session.register();
+    deps.saveToken.mockRejectedValueOnce(new Error("offline"));
+    timezone = "America/New_York";
+    await expect(session.register()).rejects.toThrow("offline");
+    expect(session.shouldRetryRegistration()).toBe(true);
+  });
+
+  it("does not let a write that finishes after sign-out mark the new timezone fresh", async () => {
+    let timezone = "Asia/Kolkata";
+    const { session, deps } = setup(
+      [],
+      () => "en",
+      () => timezone,
+    );
+    const writing = deferred();
+    deps.saveToken.mockImplementationOnce(async () => writing.promise);
+    const first = session.register();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(1));
+    session.stop();
+    timezone = "Europe/Paris";
+    writing.resolve();
+    expect(await first).toBe(false);
+    session.start();
+    expect(session.isRegistered()).toBe(false);
   });
 
   it("deduplicates overlapping boot and token-event registrations", async () => {
@@ -312,8 +404,6 @@ describe("notification device session", () => {
     expect(deps.clearWidget).toHaveBeenCalledOnce();
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
     expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);
-    // signOut failed after a successful deletion, so no auth edge will fire
-    // promptly: the fallback must have cleared the identity itself.
     expect(deps.resetAnalytics).toHaveBeenCalledOnce();
     expect(deps.reportError).toHaveBeenCalledOnce();
     expect(await session.register()).toBe(false);

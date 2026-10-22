@@ -21,19 +21,6 @@ type RecallFeedItem = {
   status: "processing" | "ready" | "failed";
 };
 
-/**
- * Drives the save recall card on Home. The card is about the newest save: it
- * shows once that save is ready and some of its similar items are old enough
- * to be worth bringing back, and stays until the person opens one or
- * dismisses it. A save with no such matches is marked handled so its similar
- * items are not read again. `defer` holds evaluation while another Home card
- * owns the moment. Nothing is evaluated, recorded, or marked handled while
- * another route covers Home, matching the feedback and review prompts, and
- * nothing is recorded while the app is in the background. `pending` is true
- * while the newest save's similar items are still loading, so the caller can
- * hold a competing Home card until the recall card has had its chance.
- * `saved` is that newest save, so the card can name it.
- */
 export function useSaveRecall<Item extends RecallFeedItem>(
   items: readonly Item[] | undefined,
   opts: { defer?: boolean } = {},
@@ -47,11 +34,6 @@ export function useSaveRecall<Item extends RecallFeedItem>(
     return () => subscription.remove();
   }, []);
   const active = appState === "active";
-  // Freshness is measured against the current time, refreshed whenever Home
-  // gains focus and every minute while it stays focused. Home can stay
-  // mounted underneath a stacked screen (share, item detail); a timestamp
-  // captured once at mount would let a save keep qualifying indefinitely
-  // instead of aging out after RECALL_FRESH_MS.
   const [now, setNow] = useState(() => Date.now());
   useFocusEffect(
     useCallback(() => {
@@ -60,7 +42,6 @@ export function useSaveRecall<Item extends RecallFeedItem>(
       return () => clearInterval(interval);
     }, []),
   );
-  // Bumped when the person acts on the card, so the handled ids are re-read.
   const [, setHandledVersion] = useState(0);
 
   const candidate =
@@ -71,8 +52,6 @@ export function useSaveRecall<Item extends RecallFeedItem>(
         })
       : null;
 
-  // gcTime ends the subscription soon after the card goes, like the similar
-  // strip on item detail.
   const { data: similar, isError } = useQuery({
     ...convexQuery(
       api.items.similarItems,
@@ -98,8 +77,6 @@ export function useSaveRecall<Item extends RecallFeedItem>(
   useEffect(() => {
     if (!userId || !candidateId || !loaded || !active) return;
     if (matches.length === 0) {
-      // No rerender needed: every render re-reads the handled ids, so the
-      // next one (including a late match arriving) drops this candidate.
       writeHandledRecall(userId, candidateId);
       return;
     }

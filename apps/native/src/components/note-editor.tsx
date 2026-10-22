@@ -15,7 +15,6 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, TextInput, View, type TextInputInstance } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Idle time after the last keystroke before the note saves. */
 const SAVE_DELAY_MS = 800;
 const PAYWALL_PLACEMENT = "item_detail";
 
@@ -66,7 +65,6 @@ export function NoteEditor({ item }: { item: DetailItem }) {
   };
   const textInput = useRef<TextInputInstance>(null);
   const [queue] = useState(() => {
-    // The component is keyed by note id: one queue and edit event per visit.
     let reportedEdit = false;
     let alerted = false;
     return createNoteSaveQueue(
@@ -127,7 +125,6 @@ export function NoteEditor({ item }: { item: DetailItem }) {
     if (entitled) void queue.flush();
   }, [entitled, queue]);
 
-  // Leaving the page, or swiping to another save, keeps what was typed.
   useEffect(() => () => void queue.flush(), [queue]);
 
   return (

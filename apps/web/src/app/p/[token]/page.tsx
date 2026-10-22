@@ -25,7 +25,6 @@ export async function generateMetadata({
   return {
     title: `${title} — Shelvr`,
     description,
-    // A vote link is for the person it was sent to, not for search results.
     robots: { index: false, follow: false },
     openGraph: { title, description, siteName: "Shelvr", type: "website" },
     twitter: { card: "summary", title, description },
@@ -35,7 +34,6 @@ export async function generateMetadata({
 export default async function PlanVotePage({ params }: PageProps) {
   const { token } = await params;
   const { outcome, share } = await loadPlanShare(token);
-  // Shelvr is not on Google Play yet, so Android visitors get the waitlist.
   const android = /android/i.test((await headers()).get("user-agent") ?? "");
 
   return (

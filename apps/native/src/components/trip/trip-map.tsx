@@ -12,8 +12,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The open day's pins appear 80ms apart, and its route line extends with
-// them.
 const PIN_STAGGER_MS = 80;
 
 export type StopRef = { day: number; stop: number };
@@ -25,8 +23,6 @@ function parsePin(id: string | undefined): StopRef | null {
   return Number.isInteger(day) && Number.isInteger(stop) ? { day, stop } : null;
 }
 
-/** Hex alpha suffix (about 35%) for other days' gray pins, so the whole trip
- * stays visible behind the open day's amber. */
 const FADED_ALPHA = "59";
 
 type Props = {
@@ -37,10 +33,6 @@ type Props = {
   onMapPress: () => void;
 };
 
-/**
- * The trip on Apple Maps (iOS) or Google Maps: numbered pins colored by day,
- * the open day's route, and a camera that flies to each day.
- */
 export function TripMap({
   trip,
   activeDay,
@@ -56,8 +48,6 @@ export function TripMap({
     [trip.days],
   );
   const active = useMemo(() => days[activeDay] ?? [], [days, activeDay]);
-  // How many of the open day's pins are out, for the trip and day it was
-  // counted for; any other day starts from none.
   const revealKey = `${trip._id}:${activeDay}`;
   const [reveal, setReveal] = useState({ key: "", count: 0 });
 
@@ -79,7 +69,6 @@ export function TripMap({
       : 0;
 
   const { width, height } = rt.screen;
-  // The header covers the top of the map and the day list its lower half.
   const top = rt.insets.top + theme.gap(7);
   const camera = useMemo(() => {
     const points: LatLng[] = active.map((s) => s.coordinates);
@@ -91,24 +80,17 @@ export function TripMap({
         top,
         bottom: height * TRIP_PANEL_SHARE,
         ...(process.env.EXPO_OS === "ios"
-          ? // expo-maps sets a region whose longitude spans the map's
-            // width; Apple centers it between the header and the home
-            // indicator (measured on an iPhone 17 Pro simulator).
-            {
+          ? {
               worldWidth: width,
               centerY: top + (height - top - rt.insets.bottom) / 2,
             }
-          : // Google Maps: 256 dp span the world at zoom 0, and the camera's
-            // center is the map's.
-            { worldWidth: 256, centerY: height / 2 }),
+          : { worldWidth: 256, centerY: height / 2 }),
       },
     );
   }, [active, days, width, height, top, rt.insets.bottom]);
 
-  // On iOS the effect moves the camera, so day switches fly: the prop holds
-  // the first camera only (expo-maps also applies every prop change, without
-  // animation). Moving it imperatively goes through the native view, which is
-  // not registered yet on mount, so the first camera is left to the prop.
+  // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
+  // setCameraPosition goes through the native view, which is not registered yet on mount.
   const [firstCamera, setFirstCamera] = useState(camera);
   if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
   useEffect(() => {
@@ -122,9 +104,6 @@ export function TripMap({
 
   const pins = days.flatMap((stops, day) =>
     stops
-      // `revealed` counts located stops, so compare each pin's place among
-      // them, not its place in the day: a stop Apple could not place has no
-      // pin and must not hold back the ones after it.
       .filter((_, located) => day !== activeDay || located < revealed)
       .map((s) => {
         const at: StopRef = { day, stop: s.index };

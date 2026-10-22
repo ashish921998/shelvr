@@ -21,15 +21,7 @@ async function consentRow(ctx: QueryCtx, userId: string) {
     .unique();
 }
 
-/**
- * Whether this user's content may be sent to third-party AI (Gemini, SerpAPI).
- * Every path that sends it asks here first.
- *
- * Only an explicit decline blocks. A user who has not answered stays allowed,
- * because installed builds (1.0.8) cannot show the consent card and must keep
- * working. A decline holds across disclosure versions until the user answers
- * again, even though `getStatus` reports it as `unset` to re-ask.
- */
+/** Only an explicit decline blocks; unset stays allowed so builds without the consent card keep working. */
 export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
@@ -38,10 +30,6 @@ export async function aiAllowed(
   return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
-/** The action-side check answers no once that save is
- * gone: a deleted save, or a deleted account, whose content a run still
- * holds in memory, must not be sent after the fact. Deleting the account
- * removes the consent row too, which on its own would read as "not asked". */
 export const isAllowed = internalQuery({
   args: { userId: v.string(), itemId: v.id("items") },
   returns: v.boolean(),
@@ -52,10 +40,6 @@ export const isAllowed = internalQuery({
   },
 });
 
-/** One snapshot for the whole page, immediately before provider inputs are built.
- * Deleting or missing owners read as declined: their rows are stamped without
- * sending any text, so they cannot wedge the sweep. Only a save that is itself
- * gone is skipped, and it has already left the range. */
 export const revalidateEmbeddingBatch = internalQuery({
   args: {
     entries: v.array(v.object({ itemId: v.id("items"), userId: v.string() })),
@@ -140,8 +124,6 @@ export const setConsent = mutation({
     } else {
       await ctx.db.patch(row._id, values);
     }
-    // Stored vectors follow the answer: a decline drops them, and a grant
-    // after a decline hands the items back to the embedding sweep.
     if ((row?.status === "declined") !== !args.granted) {
       await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
         userId,
@@ -154,15 +136,6 @@ export const setConsent = mutation({
 
 const SYNC_BATCH = 50;
 
-/**
- * Brings one page of a user's stored vectors in line with their consent, then
- * continues. It reads the answer again on every page, so two runs started by
- * a quick change of mind both converge on the latest one.
- *
- * Declined: the vector is removed and the row is stamped as current, which
- * keeps it out of the embedding sweep. Allowed: a row without a vector loses
- * its stamp, so the sweep embeds it.
- */
 export const syncEmbeddings = internalMutation({
   args: { userId: v.string(), cursor: v.union(v.string(), v.null()) },
   returns: v.null(),

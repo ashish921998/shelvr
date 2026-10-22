@@ -18,8 +18,6 @@ const mocks = vi.hoisted(() => ({
   openURL: vi.fn(),
 }));
 
-// The modal owns the submit path directly (the single-caller hook was
-// inlined), so the mutation is mocked the way the hook's return used to be.
 vi.mock("convex/react", () => ({
   useMutation: () => mocks.submit,
 }));
@@ -29,8 +27,6 @@ vi.mock("expo-constants", () => ({
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: mocks.user }),
 }));
-// The real lib/feedback drives the invitation; only the submission mark is
-// observed so a test cannot leak into another's MMKV state.
 vi.mock("@/lib/feedback", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback")>()),
   markFeedbackSubmitted: mocks.markSubmitted,
@@ -138,7 +134,6 @@ describe("FeedbackModal", () => {
     );
     expect(mocks.markSubmitted).toHaveBeenCalledWith("user-1");
     expect(mocks.submit).toHaveBeenCalledOnce();
-    // Only bounded shape metadata reaches analytics, never the message.
     expect(mocks.capture).toHaveBeenCalledWith("feedback_submitted", {
       surface: "home",
       char_count: 12,
@@ -158,16 +153,12 @@ describe("FeedbackModal", () => {
     await waitFor(() =>
       expect(screen.getByText("feedback.sendFailedContact")).toBeTruthy(),
     );
-    // The draft is preserved, editable, and re-sendable...
     expect(screen.getByLabelText("feedback.messageLabel")).toHaveProperty(
       "value",
       "The thing I typed",
     );
-    // ...and Contact Support is still offered. The invitation is NOT marked.
     expect(screen.getByLabelText("support.email")).toBeTruthy();
     expect(mocks.markSubmitted).not.toHaveBeenCalled();
-    // The failure reaches error tracking as the fixed, content-free Error,
-    // exactly the sanitized message, never the raw reject reason ("boom").
     expect(mocks.captureError).toHaveBeenCalledWith(
       "feedback_submit_failed",
       expect.objectContaining({ message: "Feedback submission failed" }),

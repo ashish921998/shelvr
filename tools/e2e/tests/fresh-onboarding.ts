@@ -5,13 +5,6 @@ import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 import { tapUntilVisible } from "./seeded-home.ts";
 
-/**
- * Starts the app as a first-time user on the onboarding opener. Onboarding
- * is gated by a keychain flag and the dev sign-in token lives in the
- * keychain too, so clearing it signs out and forgets onboarding together
- * (docs/architecture/local-qa.md). The next dev sign-in is a new anonymous
- * user with an unused demo save.
- */
 export async function startFreshOnboarding({
   device,
   screen,
@@ -19,62 +12,54 @@ export async function startFreshOnboarding({
   device: Device;
   screen: Screen;
 }): Promise<void> {
-  await device.closeApp().catch(() => undefined);
-  await device.clearKeychain();
   const start = screen.getByRole("button", "Start yours");
-  await relaunchWith(device, screen, LAUNCH_ARGUMENTS, () => start.isVisible());
+  await relaunchWith(device, screen, FRESH_INSTALL_ARGUMENTS, () =>
+    start.isVisible(),
+  );
 }
 
-/**
- * Walks the opener, interests and setup steps, picking one kind of save
- * (Articles unless told otherwise), which seeds and picks a space of its own
- * so Continue enables. Ends on the first-save step.
- */
-export async function walkToFirstSave(
+// The app forgets its sign-in and onboarding state on this launch
+// (src/lib/e2e-fresh-install.ts). Resetting the simulator keychain instead
+// restarts the test runner, which takes minutes on CI.
+const FRESH_INSTALL_ARGUMENTS = [
+  ...LAUNCH_ARGUMENTS,
+  "-E2EFreshInstall",
+  "YES",
+];
+
+export async function walkToSharePractice(
   screen: Screen,
-  kind: "Articles" | "Travel" = "Articles",
+  goal: "Something else" | "Travel ideas" = "Something else",
 ): Promise<void> {
-  // The opener can drop its first tap while the splash is still fading out
-  // (CI run 39388506914 stayed on the opener), so Start yours is tapped again
-  // only if the interests step has not come up. Right after a cold relaunch a
-  // slow runner can spend most of 30 s on one tap (CI run 39601672631), so
-  // the wait leaves room for a second one.
   await tapUntilVisible(
     screen.getByRole("button", "Start yours"),
-    screen.getByText("What are you into?"),
+    screen.getByText("What do you save?"),
     { waitMs: 5_000, timeout: 60_000 },
   );
-  await screen.getByRole("button", "Continue").tap();
-  await expect(screen.getByText("What do you save?")).toBeVisible({
-    timeout: 30_000,
-  });
-  await screen.getByRole("checkbox", new RegExp(`^${kind}`)).tap();
-  const next = screen.getByRole("button", "Continue");
-  await expect(next).toBeEnabled({ timeout: 10_000 });
-  await next.tap();
-  await expect(screen.getByText(/^Save your first/)).toBeVisible({
+  await screen.getByRole("button", new RegExp(`^${goal}`)).tap();
+  if (goal === "Travel ideas") {
+    // The last option, below the city list on an iPhone 17 screen.
+    const notSure = screen.getByRole("button", /^Not sure yet/);
+    await expect(screen.getByText("Where are you going next?")).toBeVisible({
+      timeout: 30_000,
+    });
+    await screen.scrollUntilVisible(notSure);
+    await notSure.tap();
+  } else {
+    await screen.getByRole("checkbox", /^AI & tech/).tap({ timeout: 30_000 });
+    const next = screen.getByRole("button", "Continue");
+    await expect(next).toBeEnabled({ timeout: 10_000 });
+    await next.tap();
+  }
+  await expect(screen.getByRole("button", SHARE_LATER)).toBeVisible({
     timeout: 30_000,
   });
 }
 
-/**
- * A launch still on the splash after this long has lost its bundle request
- * (seen on CI: the request to Metro hung and the splash stayed up), so the
- * app is launched again.
- */
 const STALLED_LAUNCH_MS = 75_000;
 
-/**
- * The dev launcher's server list flashes briefly on a normal launch too, so
- * seeing it only counts as a failed launch once this long has passed.
- */
 const LAUNCHER_GRACE_MS = 15_000;
 
-/**
- * Relaunches the app with `launchArguments` and waits until `ready`. Like
- * `openApp`, it opens the app again when the dev launcher shows its server
- * list instead of the bundle, and also when a launch stalls on the splash.
- */
 export async function relaunchWith(
   device: Device,
   screen: Screen,
@@ -104,19 +89,4 @@ export async function relaunchWith(
   });
 }
 
-/**
- * Picks the featured sample while signed out. Its preview plays, then the
- * step shows the save as it will be filed, with Continue, which queues it
- * for after sign-in. The reminder step has no save to remind about and lets
- * the flow straight on, so this ends on the share practice.
- */
-export async function queueFirstSave(screen: Screen): Promise<void> {
-  await screen.getByRole("button", /^Save it, /).tap();
-  await screen.getByRole("button", "Continue").tap({ timeout: 60_000 });
-  await expect(screen.getByRole("button", SHARE_LATER)).toBeVisible({
-    timeout: 30_000,
-  });
-}
-
-/** The share practice's way on without sharing (`sharePractice.later`). */
 export const SHARE_LATER = "I'll try it later";

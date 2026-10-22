@@ -145,7 +145,6 @@ describe("fitCamera", () => {
       { latitude: 38.7121, longitude: -9.1394 },
     ];
     const camera = fitCamera(points, map)!;
-    // Project each point to screen points the way the map does.
     const lngPerPoint = 360 / (map.worldWidth * 2 ** camera.zoom);
     const cos = Math.cos((camera.coordinates.latitude * Math.PI) / 180);
     const ys: number[] = [];
@@ -162,7 +161,6 @@ describe("fitCamera", () => {
       expect(y).toBeGreaterThan(view.top);
       expect(y).toBeLessThan(view.height - view.bottom);
     }
-    // Centered in the band between the header and the panel.
     const visible = view.height - view.top - view.bottom;
     expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(
       view.top + visible / 2,

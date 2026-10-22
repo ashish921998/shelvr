@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-// The boundary holds the loader while a deleted account signs out, and hands
-// every other render error to the root boundary unchanged.
 import { render, screen } from "@testing-library/react";
 import { Component, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -53,7 +51,6 @@ function renderFailingTree() {
 describe("AccountGoneBoundary", () => {
   beforeEach(() => {
     mock.useQuery.mockImplementation(() => mock.currentUser);
-    // React logs every caught render error; the throws here are the subject.
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
   afterEach(() => vi.restoreAllMocks());

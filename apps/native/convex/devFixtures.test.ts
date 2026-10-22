@@ -363,7 +363,6 @@ describe("resetAnonymousUsersForE2e", () => {
     await expect(
       backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {}),
     ).resolves.toBe(1);
-    // A second run replaces the fixtures instead of adding to them.
     await backend.mutation(internal.devFixtures.resetAnonymousUsersForE2e, {});
 
     const counts = await backend.run(async (ctx) => {

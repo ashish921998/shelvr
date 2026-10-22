@@ -10,21 +10,14 @@ export type PlanSharePlace = {
 };
 
 type PlanShare = {
-  /** The sender's first name, when their account has one. */
   senderName?: string;
   city?: string;
   expiresAt: number;
   places: PlanSharePlace[];
 };
 
-/** `missing` is an unknown, expired or emptied link; `unavailable` is a
- * configuration, network or backend failure, not the link's fault. */
 type PlanShareOutcome = "found" | "missing" | "unavailable";
 
-/**
- * Fetches a plan vote link's places. Uncached, so a deleted space or an
- * expired link stops rendering at once.
- */
 export async function loadPlanShare(
   token: string,
 ): Promise<{ outcome: PlanShareOutcome; share?: PlanShare }> {
@@ -50,7 +43,6 @@ export async function loadPlanShare(
   }
 }
 
-/** "Ashish's shortlist for Goa", degrading without a name or a city. */
 export function planTitle(share: PlanShare | undefined): string {
   const owner = share?.senderName
     ? `${share.senderName}’s shortlist`

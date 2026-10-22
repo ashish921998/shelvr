@@ -10,9 +10,6 @@ export function isProbablyUrl(text: string) {
 
 const TRAILING_PUNCTUATION = /[.,;:!?'"]/;
 
-/** A closing bracket only ends the URL when the text never opened it: a caption
- * like "(see https://example.com/a)" borrows the paren, whereas
- * "https://en.wikipedia.org/wiki/Function_(mathematics)" needs its own. */
 function closesMoreThanItOpens(url: string, open: string, close: string) {
   let depth = 0;
   for (const char of url) {
@@ -36,23 +33,12 @@ function trimTrailingPunctuation(url: string) {
   return trimmed;
 }
 
-/** Extracts the first http(s) URL embedded in a block of text, or null.
- * Share-sheet payloads from real apps (TikTok, Instagram, X) usually wrap the
- * URL in template caption text ("Check out this video! https://...") rather
- * than sending a bare URL, so link detection has to look INSIDE the text.
- * Trailing sentence punctuation is stripped so the extracted link saves
- * cleanly. Returns null when the text contains no http(s) URL. */
 export function extractFirstUrl(text: string): string | null {
   const match = text.trim().match(/https?:\/\/[^\s<>"]+/i);
   if (!match) return null;
   return trimTrailingPunctuation(match[0]);
 }
 
-/** The link in text typed into the article composer, or null when it holds
- * none. A single token is passed through untouched (trailing punctuation,
- * internationalized hosts and all) so the server's URL policy stays the judge
- * of anything that could be an address; only text that plainly is not one, a
- * word without a dot or a sentence without a link, is refused here. */
 export function typedLink(text: string): string | null {
   const trimmed = text.trim();
   if (trimmed === "") return null;
@@ -71,7 +57,6 @@ export function displayHost(url: string | undefined) {
   }
 }
 
-// Labels a country's domain files its sites under (bbc.co.uk, abc.net.au).
 const REGISTRY_LABELS = new Set([
   "ac",
   "co",
@@ -82,10 +67,7 @@ const REGISTRY_LABELS = new Set([
   "org",
 ]);
 
-/** The label that names the site: ikea in www.ikea.com, wikipedia in
- * en.wikipedia.org, bbc in bbc.co.uk. */
 function siteLabel(host: string): string {
-  // A fully qualified host (ikea.com.) ends in an empty root label.
   const labels = host.replace(/\.$/, "").split(".");
   if (labels.length < 2) return host;
   const second = labels[labels.length - 2];
@@ -94,19 +76,12 @@ function siteLabel(host: string): string {
     : second;
 }
 
-/** A site's first letter, like a book spine: what a save with no picture shows
- * in place of one. Array.from keeps an emoji or other astral first character
- * whole. Undefined when there is no host to take it from, or when the host is
- * punycode, whose first letter would be a meaningless X. */
 export function siteMonogram(url: string | undefined): string | undefined {
   const label = siteLabel(displayHost(url));
   if (label.startsWith("xn--")) return undefined;
   return Array.from(label)[0]?.toLocaleUpperCase();
 }
 
-/** What a YouTube link plays: a "short" for a Shorts page, a "video" for a
- * watch, live, clip or embed page or a youtu.be link, and undefined for a
- * channel, playlist or search page, or any other site. */
 export function youTubeVideo(
   url: string | undefined,
 ): "video" | "short" | undefined {
@@ -126,7 +101,6 @@ export function youTubeVideo(
   }
 }
 
-/** A YouTube link that plays something, a Short included. */
 export function isYouTubeVideoUrl(url: string | undefined): boolean {
   return youTubeVideo(url) !== undefined;
 }

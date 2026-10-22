@@ -34,8 +34,6 @@ it("starts messy and files itself on click", () => {
 
   const stage = container.querySelector("[data-tidy]")!;
   expect(stage.getAttribute("data-tidy")).toBe("false");
-  // Every card has a position in every layout; a missing column or row
-  // would render translate(NaNpx) and that card would never file itself.
   expect(container.innerHTML).not.toContain("NaN");
 
   act(() => container.querySelector<HTMLButtonElement>("button")!.click());

@@ -12,6 +12,7 @@ import {
 const mock = vi.hoisted(() => ({
   authenticated: true,
   locale: "en",
+  timezone: "Asia/Kolkata",
   token: vi.fn(),
   register: vi.fn(),
   otherMutation: vi.fn(),
@@ -31,6 +32,9 @@ const mock = vi.hoisted(() => ({
 vi.mock("@/lib/i18n", () => ({
   currentLocale: () => mock.locale,
   useAppLocale: () => mock.locale,
+}));
+vi.mock("expo-localization", () => ({
+  getCalendars: () => [{ timeZone: mock.timezone }],
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
@@ -107,10 +111,10 @@ vi.mock("expo-notifications", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The plan is known unless a test says otherwise, so taps open at once.
   releaseSheetLink(false);
   mock.authenticated = true;
   mock.locale = "en";
+  mock.timezone = "Asia/Kolkata";
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
@@ -167,7 +171,6 @@ describe("notification session lifecycle", () => {
       await act(async () => {
         await result.current.session[action]();
       });
-      // Deleting also signs out, so the clear can run twice; it is idempotent.
       expect(mock.clearTrial).toHaveBeenCalled();
     },
   );
@@ -241,6 +244,27 @@ describe("notification session lifecycle", () => {
     expect(mock.register).toHaveBeenLastCalledWith(
       expect.objectContaining({ locale: "ja" }),
     );
+  });
+
+  it("updates the timezone once on foreground after the device changes zones", async () => {
+    renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Asia/Kolkata" }),
+    );
+    mock.timezone = "Europe/Paris";
+    act(() => mock.appState?.("active"));
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(2));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Europe/Paris" }),
+    );
+    await act(async () => {
+      mock.appState?.("active");
+      mock.appState?.("active");
+    });
+    expect(mock.token).toHaveBeenCalledTimes(2);
+    expect(mock.token).not.toHaveBeenCalledWith(true);
+    expect(mock.register).toHaveBeenCalledTimes(2);
   });
 
   it("reports a startup failure once and retries on foreground", async () => {
@@ -339,14 +363,11 @@ describe("notification opens", () => {
     releaseSheetLink(true);
     mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
     renderHook(() => useNotificationObserver());
-    // Expo Router opens /item/B itself; the waiting tap must not override it.
     rememberSheetLink("shelvr://item/b");
     expect(releaseSheetLink(false)).toBeNull();
     expect(mock.push).not.toHaveBeenCalled();
   });
 
-  // Installed builds keep receiving payloads from the currently deployed
-  // backend until it ships, and those carry a url and nothing else.
   it("still records an open for a payload that predates the kind field", () => {
     mock.lastResponse = opened({ url: "/digest/abc" });
     renderHook(() => useNotificationObserver());
@@ -371,7 +392,6 @@ describe("notification opens", () => {
   });
 
   it("opens a second, distinct notification to the same screen", () => {
-    // Two trial nudges both point at /add; the second tap is its own open.
     renderHook(() => useNotificationObserver());
     act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "a")));
     act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "b")));

@@ -31,7 +31,6 @@ vi.mock("react-native-reanimated", () => ({
 beforeEach(() => mocks.entering.mockClear());
 
 describe("EmptyState", () => {
-  // The shared opacity-only fade uses ReduceMotion.Never, independent of preference.
   it("uses the shared entrance by default and preserves copy", () => {
     render(<EmptyState title="Nothing yet" message="Save something" />);
     expect(screen.getByText("Nothing yet")).toBeTruthy();

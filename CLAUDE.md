@@ -48,7 +48,8 @@ separate `shelvr-notes` repo. Do not add them here.
 - `pnpm --filter web-app dev`: Next.js dev server
 - `pnpm --filter web-app lint`: ESLint
 - `pnpm --filter native-app test`: Vitest suite (`vitest run`)
-- `pnpm --filter native-app check`: lint, then typecheck, then test
+- `pnpm run check`: the whole gate, from the repo root. `check:code` is the part CI runs on
+  every push and the pre-push hook runs; `check` adds the dependency audit
 
 Tests live next to the code as `*.test.ts` under `apps/native/convex/` and `apps/native/src/`.
 `apps/native/vitest.config.ts` includes both trees and runs Node as the default environment.
@@ -266,7 +267,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
   reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
-  per user, tracked in `onboardingDemos`.
+  per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
+  app still calls `createDemoItem` for a first save an older build queued before sign-in.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
 - **`oracle.ts`**, **`oracleLimits.ts`**: the web Oracle. The internal `consult` action reads
@@ -280,6 +282,24 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
+- **`model/settlement.ts`**: `completionPatch(item, run, aiAllowed)`, the pure rule for what a
+  finished processing run writes to a save. `run` holds the run's `reading` (what Shelvr read
+  itself) and, when the model was consulted, its `classification`; `runFields` are
+  `finalizeItem`'s arguments. With AI declined, whether the owner
+  declined before the run asked or while it ran, the classification is ignored and the save settles
+  from the reading alone: the page's title, description and recipe, or a note's first line, plus the
+  save's own tags, intents and cities. A recipe the save already has stays when the page offers none.
+  A typed or refreshed title wins. A vector lands only while AI is allowed (consent not declined)
+  and only if the text it was computed from is the text the save settles to (`embeddingText`);
+  otherwise the stamp and attempts clear and the sweep embeds the save again. `finalizeItem` is its
+  adapter (run fence, consent read, poster cleanup, telemetry).
+  `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
+  `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
+  Re-record that file only for a change you intend, and review its diff.
+  A run that fails writes `failurePatch(reason)` from the same module: only the status and
+  reason, so the save keeps what earlier runs gave it. A save the run already settled ready
+  stays ready, and `failItem` answers `settled`. `failItem` and the stale-processing cron are
+  its adapters, and `failItem.test.ts` tests them directly.
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
 (auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var, an AI Studio API key).
@@ -449,7 +469,8 @@ needed at runtime by the features that use them:
 ## Working conventions
 
 - Do not reintroduce the old notes-app domain (`notes` table, OpenAI summary action, `/notes`
-  routes). The product domain is **items + spaces**.
+  routes). The product domain is **items + spaces**. `GLOSSARY.md` names the domain's terms: say
+  "save" in copy and docs while tables and code keep `items`.
 - Never pass `userId` from the client into Convex public functions.
 - Keep `returns:` validators accurate. Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
@@ -511,8 +532,10 @@ needed at runtime by the features that use them:
   the evidence, and what was not verified. Never call work "done" or "verified" without evidence
   a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
   assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
-  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
-  never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
+  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. When those files
+  changed but nothing on screen did, the author (an agent included) says why under Evidence and
+  adds the `no-ui-change` label when opening the pull request (`gh pr create --label no-ui-change`);
+  a visible change never takes the label. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
   branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.

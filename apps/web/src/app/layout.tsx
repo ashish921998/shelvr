@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import PageViewTracker from "@/components/PageViewTracker";
+import PageShell from "@/components/PageShell";
 import { APP_STORE_ID } from "@/lib/appStore";
 import "./globals.css";
 
@@ -34,10 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        {/* After the page, so its effects run first: a share or oracle
-            verdict page sets the visit's campaign before this counts it. */}
-        <PageViewTracker />
+        <PageShell>{children}</PageShell>
       </body>
     </html>
   );

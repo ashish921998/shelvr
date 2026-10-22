@@ -37,13 +37,13 @@ replacing one with the other.
 
 ## Phase 0: index the article body (implemented)
 
-`buildSearchText` (`items.ts:224`) gains a bounded slice of `content`:
+`buildSearchText` (`model/searchText.ts`) gains a bounded slice of `content`:
 
 ```ts
 const MAX_SEARCH_CONTENT_CHARS = 8000; // mirrors MAX_SEARCH_NOTE_CHARS
 ```
 
-Both `buildSearchText` call sites (`items.ts:1504`, `items.ts:1783`) pass it.
+Every `buildSearchText` call site passes it.
 No schema change, no client change, no new dependency. Existing rows pick it up
 on their next classification; a backfill is optional (Phase 1's sweeper can
 rewrite `searchText` in the same pass).
@@ -142,9 +142,17 @@ descriptive text.
 ### Where the call goes
 
 In `processItem` (`ai.ts`), after `generateObject`, before `finalizeItem`.
-`embedding` becomes a new optional arg on `finalizeItem` (`items.ts:1733`) so it
-lands in the **same run-fenced transaction** as the rest of the classification.
+The vector travels inside the run's classification as `embedding: { text, vector }`,
+so it lands in the **same run-fenced transaction** as the rest of the classification.
 A separate mutation could commit after a superseding run and defeat `ownsRun`.
+
+`text` is what `embeddingText` (`model/settlement.ts`) returns for the save the run
+expects to leave behind: the title, description, tags, site name and body it will show.
+`finalizeItem` lands the vector only when `text` is still the text the save settles to
+at commit. They differ when the owner changes the save while the run is out. Typing a
+title on a note does it. The run keeps the typed title, and `updateNoteItem` has already
+cleared the stamp. A vector for other text is dropped. The row keeps its old vector, loses
+its stamp and attempt count, and the sweep embeds it again.
 
 Follows the file's existing deadline convention:
 
@@ -156,7 +164,7 @@ The per-action budget comment (`model/aiProvider.ts`) gains one line; ~100 s wor
 is unchanged in practice.
 
 **Embedding failure must never fail the item.** Wrap the call; on error log via
-`logEvent` and call `finalizeItem` without `embedding`. The item goes `ready`
+`logEvent` and call `finalizeItem` without an `embedding`. The item goes `ready`
 and the sweeper picks it up. By construction, the failure only degrades the item.
 
 `finalizeItem` re-validates the vector before writing even though the action
@@ -416,6 +424,9 @@ Harnesses go through `newConvexTest()` (`convex/test.setup.ts`), never bare
 
 - `toItemCard` / card validators reject a row carrying `embedding`. That is the
   regression that would ship 6 KB per feed row.
+- `finalizeItem` drops a vector whose `text` is not the text the save settles to
+  (the `embedding/allowed/otherText` rows in `finalizeItem.grid.test.ts`), and
+  `aiEmbedding.test.ts` covers a title typed while the run is out.
 - `finalizeItem` writes `embedding` under a matching `runId` and returns
   `stale_run` under a superseded one.
 - Embedding failure still produces a `ready` item with no `embedding`.

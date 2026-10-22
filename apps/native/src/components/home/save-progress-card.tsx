@@ -11,7 +11,6 @@ import { useCallback, useState } from "react";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Funnel placement for a save the server refuses for Pro. */
 const PAYWALL_PLACEMENT = "home_progress";
 
 function Way({
@@ -77,12 +76,6 @@ function Way({
   );
 }
 
-/**
- * The "save your next two" card on Home: how far a new shelf is from its
- * first three real saves, and the real ways to get there. Sharing is shown
- * as a how-to (it starts in another app); Photos and a note start right here.
- * Home decides when it shows.
- */
 export function SaveProgressCard({
   saved,
   goal,
@@ -92,7 +85,6 @@ export function SaveProgressCard({
   saved: number;
   goal: number;
   onDismiss: () => void;
-  /** Fires each time Home is focused with the card on screen. */
   onShown: () => void;
 }) {
   useAppLocale();
@@ -109,8 +101,6 @@ export function SaveProgressCard({
       if (results.length > 0) {
         analytics.capture("images_saved", { image_count: results.length });
       }
-      // The batch leaves busy set on success (Add closes instead), and this
-      // card stays up until the goal, so release it here.
       setBusy(false);
     },
     onDismiss: () => {},
@@ -120,8 +110,6 @@ export function SaveProgressCard({
     },
   });
 
-  // The card only shows while Pro reads active, but Pro can lapse between
-  // render and tap, so the picker waits behind the same guard as Add.
   const { guard } = usePaywallGuard(PAYWALL_PLACEMENT);
   const pickPhotos = () => {
     analytics.capture("save_progress_card_action", { action: "photos", saved });

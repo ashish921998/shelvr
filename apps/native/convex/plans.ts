@@ -20,8 +20,6 @@ import {
   type PlanSource,
 } from "./model/plan";
 
-// Up to 60 short saves in, 5 short lines out. The user is watching a spinner,
-// so this sits under the recommendation pass's deadline.
 const PLAN_TIMEOUT_MS = 30_000;
 
 const planSchema = z.object({
@@ -51,15 +49,7 @@ const planSchema = z.object({
     .describe(`At most ${MAX_PLAN_PLACES} places, best first.`),
 });
 
-/**
- * Turn a space's saves into a shortlist of real places to go: one model call,
- * nothing stored. Pro, AI consent and the rate limit are claimed in one
- * mutation first. Returns `considered`, the number of saves read, so the
- * client can tell "nothing named a place" from "the space is empty".
- */
 export const makePlan = action({
-  // `locale` is the app's catalog locale (e.g. "ja"), for the reasons'
-  // language. Optional: an unknown or missing one gets English.
   args: { spaceId: v.id("spaces"), locale: v.optional(v.string()) },
   returns: v.object({
     places: v.array(planPlaceValidator),
@@ -69,7 +59,6 @@ export const makePlan = action({
     ctx,
     args,
   ): Promise<{ places: PlanPlace[]; considered: number }> => {
-    // Annotated: inferring through `internal` is circular for an action.
     const {
       spaceName,
       sources,
@@ -106,7 +95,6 @@ export const makePlan = action({
         new Set(been.map(placeKey)),
       );
     } catch (error) {
-      // Sanitized: a category, never the raw error.
       logEvent("error", "make_plan_failed", {
         space_id: args.spaceId,
         error_category: summarizeError(error),

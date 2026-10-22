@@ -1,10 +1,4 @@
 // @vitest-environment jsdom
-// Covers the one-sheet-at-a-time latch shared by presentPaywall and
-// presentCustomerCenter. iOS presents a single sheet, so a second presentation
-// raced against a live one leaves both RevenueCat promises unsettled and the
-// attempt is never reported. The suite drives RevenueCat identity sync to
-// ready through the real useEntitlementSync hook so every call reaches the
-// fake native sheet; only the module boundary is stubbed.
 import { act, renderHook } from "@testing-library/react";
 import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,9 +48,7 @@ vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
 }));
 
-// The RevenueCat modules are loaded through a bare `require()` thunk, which
-// vi.mock does not intercept, so the fakes are seeded into Node's module
-// cache under the ids that thunk resolves.
+// vi.mock does not intercept the bare require() thunk the RevenueCat modules load through, so seed Node's module cache.
 const req = createRequire(import.meta.url);
 function seedRequire(name: string, exports: unknown) {
   const id = req.resolve(name);
@@ -73,9 +65,6 @@ seedRequire("react-native-purchases", {
     getOfferings: mock.getOfferings,
     checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
     getCustomerInfo: mock.getCustomerInfo,
-    // The SDK exposes its intro-eligibility enum as a static on the default
-    // export; the paywall context read uses it directly, so the fake mirrors
-    // the real member names and values.
     INTRO_ELIGIBILITY_STATUS: {
       INTRO_ELIGIBILITY_STATUS_UNKNOWN: 0,
       INTRO_ELIGIBILITY_STATUS_INELIGIBLE: 1,
@@ -148,8 +137,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-// Fresh module state per test, with identity sync already ready so
-// presentPaywall reaches the native sheet instead of the identity gate.
 async function loadReady() {
   vi.resetModules();
   const mod = await import("./entitlement");
@@ -218,8 +205,6 @@ describe("selling before sign-in", () => {
   });
 
   it("leaves a signed-out account's customer alone until the onboarding paywall", async () => {
-    // A renewal posted by an anonymous customer would move the subscription
-    // off the account that owns it.
     mock.auth = { isAuthenticated: false, isLoading: false };
     mock.isAnonymous.mockResolvedValue(false);
     await loadReady();
@@ -360,7 +345,6 @@ describe("selling before sign-in", () => {
     first.hook.unmount();
     expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
 
-    // A relaunch: fresh modules, the same SecureStore.
     mock.syncPurchase.mockReset().mockResolvedValue(true);
     await loadReady();
     await vi.waitFor(() =>
@@ -440,8 +424,6 @@ describe("useEntitlementSync on a build with RevenueCat disabled", () => {
     mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = true;
     const { openPaywall } = await loadReady();
     expect(mock.captureError).not.toHaveBeenCalled();
-    // Readiness was never recorded, so the paywall degrades to the fallback
-    // route instead of opening a sheet under an unsynced identity.
     await expect(openPaywall(router, "share")).resolves.toBe(false);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith("/(app)/paywall");
@@ -468,8 +450,6 @@ describe("presentPaywall concurrency", () => {
     const sheet = deferred<string>();
     mock.presentPaywall.mockReturnValue(sheet.promise);
 
-    // Both calls are made before either awaits, reproducing the share screen's
-    // two openPaywall calls 80ms apart.
     const first = openPaywall(router, "share");
     const second = openPaywall(router, "share");
     sheet.resolve("CANCELLED");
@@ -498,7 +478,6 @@ describe("presentPaywall concurrency", () => {
 
     const first = openPaywall(router, "share");
     const second = openPaywall(router, "share");
-    // ERROR maps to `unavailable`, the only outcome that opens the fallback.
     sheet.resolve("ERROR");
 
     expect(await Promise.all([first, second])).toEqual([false, false]);
@@ -530,9 +509,6 @@ describe("presentPaywall concurrency", () => {
   });
 });
 
-// UIKit can refuse a presentation mid-transition without RevenueCat ever
-// settling its promise. A reviewer's Create space and View Pro plans taps then
-// joined that dead sheet and did nothing.
 describe("a paywall that never came up", () => {
   async function hungSheet() {
     const mod = await loadReady();
@@ -551,8 +527,6 @@ describe("a paywall that never came up", () => {
     noteAppTouch();
     await openPaywall(router, "new_space");
 
-    // The onboarding replay waiting on it keeps its work, and no fallback
-    // screen opens for a tap it never made.
     await expect(first).resolves.toBe(false);
     expect(push).not.toHaveBeenCalled();
   });
@@ -585,7 +559,6 @@ describe("a paywall that never came up", () => {
     slow.resolve("CANCELLED");
     await vi.advanceTimersByTimeAsync(5000);
 
-    // The late settle cannot release the newer sheet.
     expect(isPaywallPending()).toBe(true);
   });
 
@@ -661,7 +634,6 @@ describe("restore from the paywall", () => {
     mock.presentPaywall.mockResolvedValue("RESTORED");
 
     await expect(openPaywall(router, "share")).resolves.toBe(false);
-    // Telemetry sees the close too, not a restore.
     expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
   });
 
@@ -800,7 +772,6 @@ describe("paywall outcome", () => {
     const first = openPaywall(router, "plan_gate");
     await vi.waitFor(() => expect(mock.presentPaywall).toHaveBeenCalled());
     endPurchaseLandingSession();
-    // The next account joins the same sheet before it settles.
     const joined = openPaywall(router, "plan_gate");
     finish("PURCHASED");
 
@@ -874,8 +845,6 @@ describe("paywall offering", () => {
       current,
       all: { weekly_annual_draft: noTrial },
     });
-    // A cold sign-in: the read started before identity sync fails, and the
-    // one made after it answers.
     mock.checkEligibility
       .mockRejectedValueOnce(new Error("not configured"))
       .mockResolvedValueOnce({ annual: { status: 2 } });

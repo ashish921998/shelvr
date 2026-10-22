@@ -2,8 +2,6 @@ import * as fc from "fast-check";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { trialLastDayAt } from "./trial-reminder";
 
-// Local dates follow process.env.TZ, so each case below picks a zone that
-// changes its clocks and restores the original zone after.
 const originalTz = process.env.TZ;
 afterAll(() => {
   // Assigning undefined would set the string "undefined".
@@ -44,7 +42,6 @@ const lastDay = (expiresAt: number) =>
 describe("last-day reminder across a clock change", () => {
   it("still reminds a trial ending at 11:30 the day clocks spring forward", () => {
     process.env.TZ = "America/New_York";
-    // 2 am on 14 March 2027 skips to 3 am.
     const expiresAt = new Date(2027, 2, 14, 11, 30).getTime();
     const fireAt = lastDay(expiresAt);
     expect(fireAt).toBe(expiresAt - RENEWAL_WINDOW);
@@ -58,7 +55,6 @@ describe("last-day reminder across a clock change", () => {
       fc.assert(
         fc.property(
           fc.integer({ min: 2026, max: 2028 }),
-          // The months around the clock changes, north and south.
           fc.constantFrom(2, 3, 9, 10),
           fc.integer({ min: 1, max: 28 }),
           fc.integer({ min: 0, max: 23 }),

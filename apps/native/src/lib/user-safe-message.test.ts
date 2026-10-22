@@ -1,6 +1,3 @@
-// The single sanitizer both the image save path and the share path render
-// through. Merged from the two near-identical copies that used to live in
-// use-save-image.ts and share/process-share.ts.
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 
@@ -18,14 +15,12 @@ describe("userSafeMessage", () => {
   });
 
   it("unwraps the sentence the structured refusal nests under data.message", () => {
-    // The share path used to render the prefixed transport string here.
     expect(userSafeMessage(saveError("photo_limit"), FALLBACK)).toBe(
       PHOTO_LIMIT_MESSAGE,
     );
   });
 
   it("redacts URLs and Convex ids leaked through a plain Error", () => {
-    // Realistic Convex ids: long unbroken lowercase-alphanumeric tokens.
     const storageId = "kg2e5gqf40sy8kdqxcm3vp7hn96wtxyz";
     const error = new Error(
       `POST https://upload.convex.cloud/abc failed for ${storageId}`,

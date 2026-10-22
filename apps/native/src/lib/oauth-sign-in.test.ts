@@ -57,8 +57,6 @@ beforeEach(() => {
   vi.spyOn(Date, "now").mockImplementation(() => mock.now);
 });
 
-/** The next web session ends with `result` after `ms` on screen. The default
- * is a person's pace; the automatic retry only follows a much faster end. */
 function endSession(result: object, ms = 5_000) {
   mock.openAuthSessionAsync.mockImplementationOnce(async () => {
     mock.now += ms;
@@ -66,11 +64,8 @@ function endSession(result: object, ms = 5_000) {
   });
 }
 
-async function run(
-  provider: "apple" | "google" | "anonymous",
-  surface: "sign_in_view" | "demo_sheet" = "sign_in_view",
-) {
-  const hook = renderHook(() => useOAuthSignIn(surface));
+async function run(provider: "apple" | "google" | "anonymous") {
+  const hook = renderHook(() => useOAuthSignIn("sign_in_view"));
   let outcome: string | undefined;
   await act(async () => {
     outcome = await hook.result.current.signInWith(provider);
@@ -118,10 +113,10 @@ describe("useOAuthSignIn", () => {
         "(com.apple.AuthenticationServices.WebAuthenticationSession error 3.)",
     });
 
-    await run("google", "demo_sheet");
+    await run("google");
 
     expect(captured("auth_cancelled")).toMatchObject({
-      surface: "demo_sheet",
+      surface: "sign_in_view",
       result: "cancel",
       native_error_domain:
         "com.apple.AuthenticationServices.WebAuthenticationSession",
@@ -299,8 +294,6 @@ describe("useOAuthSignIn", () => {
       .filter(([name]) => name === "auth_started")
       .map(([, properties]) => properties);
     expect(started).toHaveLength(2);
-    // A funnel pairs each start with the outcome that ended it through the
-    // shared id, and tells repeat starts by one person apart by the new one.
     expect(started[0].auth_attempt_id).toBe("attempt-1");
     expect(started[1].auth_attempt_id).toBe("attempt-2");
     expect(captured("auth_succeeded")).toMatchObject({
@@ -384,7 +377,6 @@ describe("useOAuthSignIn", () => {
 
       expect(outcome).toBe("completed");
       expect(mock.openAuthSessionAsync).not.toHaveBeenCalled();
-      // Apple is given the hash of the value the backend receives.
       const { nonce } = mock.signIn.mock.calls[0][1];
       expect(mock.appleSignIn).toHaveBeenCalledWith({
         requestedScopes: [0, 1],
@@ -394,7 +386,6 @@ describe("useOAuthSignIn", () => {
         identityToken: "apple.identity.token",
         nonce,
         name: "Ada Lovelace",
-        // The backend trades this for the token it revokes on deletion.
         authorizationCode: "apple.code",
       });
       expect(captured("auth_started")).toMatchObject({ method: "native" });
@@ -451,7 +442,6 @@ describe("useOAuthSignIn", () => {
       expect(outcome).toBe("completed");
       expect(mock.signIn).toHaveBeenLastCalledWith("apple", { code: "abc" });
       expect(hook.result.current.lastError).toBeNull();
-      // Two attempts, each with its own id and its own outcome.
       expect(events("auth_started").map((e) => e.method)).toEqual([
         "native",
         "web",

@@ -5,17 +5,6 @@ import MarkdownIt from "markdown-it";
 
 import { isMainModule } from "./main-module.mjs";
 
-/**
- * Files a person sees when they change: screens, components, styling and
- * motion, visible copy (app, widget, and push notification text), images,
- * native view modules, and the app config. A change here needs a screenshot or
- * recording in the pull request, because "the tests pass" says nothing about
- * what the screen looks like.
- *
- * Out of reach of any pattern: the paywall, which RevenueCat's dashboard
- * controls. A paywall change still owes a screenshot under the rule in
- * CLAUDE.md; this check cannot see it.
- */
 const UI_PATTERNS = [
   /^apps\/native\/src\/.+\.(tsx|jsx)$/,
   /^apps\/native\/src\/(components|widgets)\/.+\.ts$/,
@@ -42,13 +31,8 @@ export function isUiFile(path) {
   );
 }
 
-/** The label only the repository owner adds to waive the screenshot. */
 export const WAIVER_LABEL = "no-ui-change";
 
-// One CommonMark parse decides what the description renders as, the way
-// GitHub does: a fence, an indented code block, a quoted fence, or an HTML
-// comment is one node, and whatever it holds is never read as a heading,
-// content, or media.
 const markdown = new MarkdownIt({ html: true, linkify: true });
 
 const parse = (body) => markdown.parse(body ?? "", {});
@@ -61,12 +45,6 @@ const normalizeTitle = (title) =>
 
 const headingLevel = (token) => Number(token.tag.slice(1));
 
-/**
- * The tokens under the top-level heading titled exactly `title`
- * (case-insensitive, a trailing colon allowed), up to the next top-level
- * heading of the same or a higher level. Null when there is no such heading.
- * A heading inside a list or quote is part of the content, not a boundary.
- */
 function sectionTokens(tokens, title) {
   const want = normalizeTitle(title);
   const start = tokens.findIndex(
@@ -91,7 +69,6 @@ function sectionTokens(tokens, title) {
   return tokens.slice(start + 3, end);
 }
 
-/** The source text of section `title` in `body`, or null. */
 export function section(body, title) {
   const tokens = sectionTokens(parse(body), title);
   if (tokens === null) return null;
@@ -103,14 +80,9 @@ export function section(body, title) {
     .join("\n");
 }
 
-// Raw HTML, read left to right: a comment runs to its "-->" (or, as on
-// GitHub, to the end), so a tag inside one is never seen. Markup itself is
-// not text; only what lies between tags is. A quoted attribute value may
-// hold a ">" without closing its tag.
 const HTML_PIECES =
   /<!--[\s\S]*?(?:-->|$)|<\/?([a-zA-Z][\w-]*)\b(?:"[^"]*"|'[^']*'|[^"'>])*>|[^<]+|</g;
 
-// The attribute that opens each tag's target: media embeds and links.
 const SOURCE_ATTRIBUTE = { img: "src", video: "src", source: "src", a: "href" };
 
 const attribute = (tag, name) =>
@@ -122,10 +94,6 @@ const attribute = (tag, name) =>
     ?.slice(1)
     .find((value) => value !== undefined);
 
-/**
- * What raw HTML shows: its text outside comments and tags, and the targets
- * its media embeds and links open.
- */
 function readHtml(html) {
   let text = "";
   const sources = [];
@@ -142,14 +110,11 @@ function readHtml(html) {
   return { text, sources };
 }
 
-/** Whether raw HTML shows anything: text, an embed, or a link. */
 const htmlHasContent = (html) => {
   const { text, sources } = readHtml(html);
   return text.trim().length > 0 || sources.length > 0;
 };
 
-// A line that only restates the template's shape, or promises content later,
-// is not content: empty bullets and boxes, nested headings, placeholders.
 const PLACEHOLDER = /^((todo|tbd|tbc|wip)\b.*|pending|n\/?a|-+|\.+)$/i;
 
 const isContentLine = (raw) => {
@@ -157,7 +122,6 @@ const isContentLine = (raw) => {
   return line.length > 0 && !PLACEHOLDER.test(line);
 };
 
-/** The visible text of an inline token; an embedded image counts as text. */
 function inlineText(token) {
   return token.children
     .map((child) => {
@@ -189,7 +153,6 @@ function tokensHaveContent(tokens) {
       case "html_block":
         return htmlHasContent(token.content);
       case "inline":
-        // A heading is not content, even inside a list or quote.
         if (tokens[i - 1]?.type === "heading_open") return false;
         return inlineText(token).split("\n").some(isContentLine);
       default:
@@ -198,7 +161,6 @@ function tokensHaveContent(tokens) {
   });
 }
 
-/** Whether `text` holds anything beyond template shape and placeholders. */
 export function hasContent(text) {
   return text !== null && tokensHaveContent(parse(text));
 }
@@ -210,13 +172,11 @@ const ATTACHMENT_URL =
 
 const isMediaUrl = (url) => MEDIA_URL.test(url) || ATTACHMENT_URL.test(url);
 
-/** Every URL a reader can open as media from these tokens. */
 function* mediaSources(tokens) {
   for (const token of tokens) {
     if (token.type === "html_block") yield* readHtml(token.content).sources;
     if (token.type !== "inline") continue;
     for (const child of token.children) {
-      // An embed, or a link (written or bare) to a recording: both open it.
       if (child.type === "image") yield child.attrGet("src");
       if (child.type === "link_open") yield child.attrGet("href");
       if (child.type === "html_inline") {
@@ -239,10 +199,6 @@ export function hasVisualEvidence(text) {
   return tokensShowMedia(parse(text));
 }
 
-/**
- * Every reason this pull request fails the evidence rule, given its body, the
- * files it changes, and its labels. An empty list means it passes.
- */
 export function evidenceProblems(body, changedFiles, labels = []) {
   const problems = [];
   const tokens = parse(body);
@@ -279,7 +235,7 @@ export function evidenceProblems(body, changedFiles, labels = []) {
     const more = uiFiles.length > 5 ? ` and ${uiFiles.length - 5} more` : "";
     problems.push(
       `This pull request changes UI files (${list}${more}) but "### Evidence" has no screenshot or recording. ` +
-        `Add one. If nothing a person sees changed, say why in Evidence and ask the owner to add the "${WAIVER_LABEL}" label.`,
+        `Add one. If nothing a person sees changed, say why in Evidence and add the "${WAIVER_LABEL}" label (gh pr edit --add-label ${WAIVER_LABEL}).`,
     );
   }
 

@@ -1,15 +1,4 @@
 import { t, useAppLocale } from "@/lib/i18n";
-/**
- * Paywall fallback screen. In production, the paywall is presented natively by
- * RevenueCat's `presentPaywall()` SDK (designed in the RevenueCat dashboard).
- * This screen only appears on real unavailability (SDK not linked, identity
- * sync timeout, network/config error). User cancellation returns to the
- * previous screen without routing here.
- *
- * It deliberately avoids pricing copy because RevenueCat remains the source of
- * truth for current offerings. Restore Purchases is available via the native
- * paywall and Customer Center once the SDK is reachable again.
- */
 import { openPaywall } from "@/lib/entitlement";
 import { LEGAL_URLS } from "@/lib/legal";
 import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
@@ -21,8 +10,6 @@ import { StyleSheet } from "react-native-unistyles";
 export default function PaywallScreen() {
   useAppLocale();
   const router = useRouter();
-  // Typed to the one event used here: the native stack's transitionEnd isn't
-  // in expo-router's generic navigation type.
   const navigation = useNavigation() as ClosingScreen;
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
@@ -32,9 +19,6 @@ export default function PaywallScreen() {
         style={({ pressed }) => [styles.button, pressed && { opacity: 0.8 }]}
         onPress={() => {
           void (async () => {
-            // This screen is a formSheet: UIKit refuses to present RC's
-            // paywall while the dismissal is still animating, which would
-            // map to 'unavailable' and bounce right back here.
             await closeScreen(navigation, () => router.back());
             await openPaywall(router, "retry");
           })();

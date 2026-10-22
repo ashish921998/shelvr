@@ -6,6 +6,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { liveOwner } from "./model/auth";
 import {
   awaitingOutcome,
   recipientValidator,
@@ -23,8 +24,6 @@ import {
   saveRemindersLive,
 } from "./model/saveReminders";
 
-/** Each kind rides in the payload and in telemetry, so an open is attributed
- * to what was sent. */
 const NOTIFICATION_KIND = "weekly_shelf";
 const reminderNotificationKind = (kind: "read" | "cook") => `${kind}_reminder`;
 
@@ -32,8 +31,6 @@ const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-/** A reminder says "today", so one that could not go out within a few hours
- * is dropped rather than delivered late with the wrong day in it. */
 const REMINDER_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const MAX_DEVICES_PER_NOTIFICATION = 20;
 const resultSchema = z.object({
@@ -48,7 +45,6 @@ export const recover = internalMutation({
   returns: v.null(),
   handler: async (ctx) => {
     const now = Date.now();
-    // Upgrade pre-retry rows in bounded batches, including failed legacy sends.
     const legacy = await ctx.db
       .query("weeklyDigests")
       .withIndex("by_delivery_status_and_attempt", (q) =>
@@ -94,19 +90,11 @@ export const recover = internalMutation({
   },
 });
 
-/**
- * The user's live devices, reconciled with the recipients of an earlier
- * attempt: a device disabled since then is failed out instead of retried, and
- * a device's current locale wins over the one stored with the attempt.
- */
 async function liveRecipients(
   ctx: MutationCtx,
   userId: string,
   stored: Recipient[] | undefined,
 ): Promise<Recipient[]> {
-  // Read enabled devices straight from the index. A user who has cycled many
-  // tokens keeps every disabled row, and those rows must not count against
-  // the page of live recipients or be scanned on every attempt.
   const devices = await ctx.db
     .query("notificationDevices")
     .withIndex("by_user_and_enabled", (q) =>
@@ -137,7 +125,6 @@ async function liveRecipients(
   });
 }
 
-/** Disables the user's devices that Expo reports as no longer registered. */
 async function releaseUnregistered(
   ctx: MutationCtx,
   userId: string,
@@ -154,7 +141,6 @@ async function releaseUnregistered(
   }
 }
 
-/** The delivery fields an attempt's outcome writes, and its status. */
 function settle(
   recipients: Recipient[],
   attempt: number,
@@ -165,10 +151,6 @@ function settle(
   const pending = recipients.some(awaitingOutcome);
   const exhausted = attempt >= MAX_ATTEMPTS || age >= maxAge;
   const retry = pending && !exhausted;
-  // A device the push reached makes the notification delivered, even when
-  // another device's outcome is still unknown at the limit: the user most
-  // likely saw it, so budgets and telemetry must count it. The same rule
-  // closes a delivery between attempts, in `closeBetweenAttempts`.
   const status: "pending" | "complete" | "failed" = retry
     ? "pending"
     : recipients.some(reachedDevice)
@@ -182,7 +164,6 @@ function settle(
       deliveryNextAttemptAt: retry
         ? now + Math.min(RECEIPT_DELAY_MS * 2 ** (attempt - 1), 60 * 60 * 1000)
         : undefined,
-      // When Expo confirmed or accepted the push, not when the user read it.
       deliveredAt: status === "complete" ? now : undefined,
       deliveryError:
         pending && exhausted
@@ -200,14 +181,15 @@ type Closed = {
   deliverySentAt?: number;
 };
 
-/** The first-send time `notification_sent` telemetry reports and the row
- * stamps: the row's recorded first-send time when it has one, else the first
- * recipient that shows Expo accepted a push stamps `now`, the first moment
- * this code can observe a send, not the later receipt check that runs a delay
- * after the push went out. Without the stamp, a notification open can precede
- * the notification's own "sent" event. Undefined when no recipient shows
- * provider acceptance, so the event falls back to the terminal time. For a
- * legacy row without a stamp, that observation is the only timestamp left. */
+const OWNER_UNAVAILABLE: Pick<
+  Closed,
+  "deliveryStatus" | "deliveryNextAttemptAt" | "deliveryError"
+> = {
+  deliveryStatus: "failed",
+  deliveryNextAttemptAt: undefined,
+  deliveryError: "owner_unavailable",
+};
+
 function firstSendAt(
   recorded: number | undefined,
   recipients: Recipient[],
@@ -216,15 +198,6 @@ function firstSendAt(
   return recorded ?? (recipients.some(reachedDevice) ? now : undefined);
 }
 
-/**
- * Ends delivery before the next attempt: the user or the server turned it
- * off, attempts or age ran out, or there is nothing left to send or nowhere
- * to send it. A device that confirmed delivery, or whose ticket Expo accepted
- * and never faulted, makes the whole notification delivered: that push most
- * likely reached the phone, so it counts against the reminder budget rather
- * than freeing a slot. Once an attempt has been made, this is the terminal
- * transition `finish` will never see, so the one send event is recorded here.
- */
 async function closeBetweenAttempts(
   ctx: MutationCtx,
   close: (fields: Closed) => Promise<void>,
@@ -235,7 +208,6 @@ async function closeBetweenAttempts(
     notificationId: string;
     kind: string;
     itemCount: number;
-    /** The row's recorded first-send time, when a send ever happened. */
     sentAt?: number;
   },
 ) {
@@ -283,6 +255,10 @@ export const claim = internalMutation({
       (digest.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
+    if ((await liveOwner(ctx, digest.userId)) === null) {
+      await ctx.db.patch(digestId, OWNER_UNAVAILABLE);
+      return null;
+    }
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", digest.userId))
@@ -322,16 +298,11 @@ export const claim = internalMutation({
         : [],
     );
     const itemCount = ready.length;
-    // The save the body names. A `partial` enrichment means the title was
-    // guessed from the URL alone because the page could not be read, so one is
-    // only named when nothing better is on the shelf. Resolved at claim time,
-    // not at creation, so a retry names whatever is still there.
     const featuredTitle = (
       ready.find(
         (item) => item.title !== undefined && item.enrichment === undefined,
       ) ?? ready.find((item) => item.title !== undefined)
     )?.title;
-    // An archive save on the shelf rules out "saved this week" copy.
     const olderIncluded = ready.some(
       (item) => item._creationTime < digest.createdAt - DIGEST_WINDOW_MS,
     );
@@ -379,10 +350,7 @@ export const finish = internalMutation({
       ...fields,
       ...(sentAt !== undefined && { deliverySentAt: sentAt }),
     });
-    // Exactly one event per digest: `finish` bails above unless it is the
-    // attempt that owns the lease, and a non-pending status is terminal, so
-    // this transition happens once however many times delivery is retried.
-    if (status !== "pending")
+    if (status !== "pending" && (await liveOwner(ctx, digest.userId)) !== null)
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: digest.userId,
         notificationId: digest._id,
@@ -414,17 +382,11 @@ async function post(path: string, body: unknown): Promise<unknown> {
   return await response.json();
 }
 
-/**
- * One delivery attempt against Expo: collect receipts for tickets from the
- * previous attempt, then send `message` to every recipient still pending.
- * Returns the recipients' new states for the caller's `finish` to settle.
- */
 async function exchange(
   initial: Recipient[],
   message: (recipient: Recipient) => Record<string, unknown>,
 ): Promise<Recipient[]> {
   let recipients = initial;
-  // Check old tickets before sending pending tokens; newly accepted tickets wait for the next run.
   const awaiting = recipients.filter(
     (recipient) => recipient.state === "receipt",
   );
@@ -558,6 +520,10 @@ export const claimReminder = internalMutation({
       (reminder.deliveryNextAttemptAt ?? 0) > now
     )
       return null;
+    if ((await liveOwner(ctx, reminder.userId)) === null) {
+      await ctx.db.patch(reminderId, OWNER_UNAVAILABLE);
+      return null;
+    }
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", reminder.userId))
@@ -596,8 +562,6 @@ export const claimReminder = internalMutation({
       );
       return null;
     }
-    // Resolved on every attempt, so a save deleted or renamed since the
-    // reminder was chosen is never named.
     const item = await ctx.db.get(reminder.itemId);
     const subject =
       item !== null &&
@@ -611,9 +575,6 @@ export const claimReminder = internalMutation({
         q.eq("userId", reminder.userId).eq("itemId", reminder.itemId),
       )
       .unique();
-    // A retry must not tell someone they haven't read what they opened since
-    // the reminder was chosen. Unsent devices are dropped; tickets already
-    // accepted still finish their receipt check.
     const opened = openedTooRecently(reminder.kind, read?.lastOpenedAt, now);
     const recipients = (
       await liveRecipients(ctx, reminder.userId, reminder.deliveryRecipients)
@@ -677,8 +638,10 @@ export const finishReminder = internalMutation({
       ...fields,
       ...(sentAt !== undefined && { deliverySentAt: sentAt }),
     });
-    // One event per reminder, for the same reason as the digest's.
-    if (status !== "pending")
+    if (
+      status !== "pending" &&
+      (await liveOwner(ctx, reminder.userId)) !== null
+    )
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: reminder.userId,
         notificationId: reminder._id,
@@ -702,7 +665,6 @@ export const sendReminder = internalAction({
     if (!delivery) return null;
     const recipients = await exchange(delivery.recipients, (recipient) => ({
       ...reminderCopy(recipient.locale, delivery.kind, delivery.subject),
-      // Straight to the save: the notification already said which one.
       data: {
         url: `/item/${delivery.itemId}`,
         kind: reminderNotificationKind(delivery.kind),

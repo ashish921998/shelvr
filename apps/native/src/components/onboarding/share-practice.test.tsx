@@ -14,6 +14,7 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   markPending: vi.fn(),
   haptic: vi.fn(),
+  announce: vi.fn(),
   view: ({ children }: Children) => <div>{children}</div>,
   text: ({ children }: Children) => <span>{children}</span>,
   button: ({ label, onPress }: { label: string; onPress: () => void }) => (
@@ -34,6 +35,7 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({
+  AccessibilityInfo: { announceForAccessibility: mock.announce },
   Platform: { OS: "ios" },
   View: mock.view,
   Text: mock.text,
@@ -156,11 +158,9 @@ describe("share practice", () => {
       />,
     );
     fireEvent.click(screen.getByText("share-sample"));
-    // A double tap while the sheet slides up asks for nothing more.
     now.mockReturnValue(2_500);
     fireEvent.click(screen.getByText("share-sample"));
     expect(mock.present).toHaveBeenCalledTimes(1);
-    // Later, a tap on the post proves the first sheet never came up.
     now.mockReturnValue(3_500);
     await act(async () => {
       fireEvent.click(screen.getByText("share-sample"));
@@ -192,7 +192,6 @@ describe("share practice", () => {
       />,
     );
     fireEvent.click(screen.getByText("share-sample"));
-    // The sheet was up for a while, closed, and its result is on its way.
     now.mockReturnValue(9_000);
     settle();
     fireEvent.click(screen.getByText("share-sample"));
@@ -289,8 +288,10 @@ describe("share practice", () => {
     act(() => mock.arrive?.());
     expect(received()).toHaveLength(1);
     expect(screen.getByText("sharePractice.savedTitle")).toBeTruthy();
-    // The done screen names the link that was just shared.
     expect(screen.getByText(DEMO_SAMPLES[1].pageHeading)).toBeTruthy();
+    expect(mock.announce).toHaveBeenCalledWith(
+      "sharePractice.savedTitle sharePractice.savedBody",
+    );
   });
 
   it("counts one share once when the listener and the sheet both see it", async () => {

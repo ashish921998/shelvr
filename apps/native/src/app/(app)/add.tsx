@@ -35,8 +35,6 @@ import { typedLink } from "@/lib/url";
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
 
-/** Shared by the up-front guard and by the server's `pro_required` refusal, so
- * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
 
 function ActionButton({
@@ -137,8 +135,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
   useAppLocale();
   const { theme } = useUnistyles();
   const router = useRouter();
-  // Opened from inside a space: everything saved here is pre-pinned to it.
-  // `mode=note` opens straight into the note composer (Home's save card).
   const { spaceId, mode: startMode } = useLocalSearchParams<{
     spaceId?: string;
     mode?: string;
@@ -152,12 +148,9 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro: route to the paywall before composing if not entitled.
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
 
-  // A composer opened straight from a link opens only once the Pro guard
-  // passes, so nothing is typed into a composer the paywall then closes.
   const startChecked = useRef(false);
   useEffect(() => {
     if (startMode !== "note" || entitlementLoading || startChecked.current) {
@@ -172,8 +165,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
 
-  // Android's Material sheet resizes to the composer over ~300ms, and a
-  // keyboard opened mid-resize can land behind it, so focus once it settles.
   useEffect(() => {
     if (Platform.OS !== "android" || mode === "menu") return;
     focusTimer.current = setTimeout(() => inputRef.current?.focus(), 350);
@@ -182,9 +173,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
     };
   }, [mode]);
 
-  // The sheet keeps this content mounted through its hide animation, so a
-  // pending focus must be dropped when dismissal starts, or the keyboard
-  // would come back up mid-close.
   const dismiss = () => {
     if (focusTimer.current) clearTimeout(focusTimer.current);
     close();
@@ -204,16 +192,12 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const save = async () => {
     if (!canSave) return;
-    // Checked here so typed text that is not a link never reaches the server,
-    // whose refusal would only surface as the generic failure alert.
     const link = mode === "article" ? typedLink(trimmed) : null;
     if (mode === "article" && link === null) {
       Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
       return;
     }
     setSaving(true);
-    // The first-save funnel: the submission's attempt event, with the entry
-    // source the server's `item_saved` will carry too.
     const saveSource = mode === "article" ? "manual_link" : "note";
     const saveKind = mode === "article" ? "link" : "note";
     const operationId = `${saveKind}:${Crypto.randomUUID()}`;
@@ -242,8 +226,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
       analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
     } catch (error) {
-      // The bounded stage: the server's structured refusal code when it sent
-      // one, `other` for a network failure or a redacted error.
       analytics.capture("save_failed", {
         save_source: saveSource,
         save_kind: saveKind,
@@ -251,8 +233,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
         operation_id: operationId,
       });
       setSaving(false);
-      // Pro can lapse while the composer is open. The paywall is the only
-      // useful next step, so show it instead of a generic failure alert.
       if (saveErrorCode(error) === "pro_required") {
         await openPaywall(router, PAYWALL_PLACEMENT);
         return;
@@ -261,17 +241,12 @@ function AddContent({ close, openCamera }: AddContentProps) {
     }
   };
 
-  // Runs a batch of image requests, closing on success or reporting a partial
-  // outcome. The hook owns the retry (which replays each failed request's
-  // operation id rather than minting a new one), the `pro_required` paywall
-  // route, and the partial-failure alert.
   const runImageRequests = useSaveImageBatch({
     spaceId: pinnedSpaceId,
     saveSource: "photo_import",
     paywallPlacement: PAYWALL_PLACEMENT,
     setBusy: setSaving,
     onAllSaved: (results) => {
-      // Empty when there was nothing to save, which is not a save event.
       if (results.length > 0) {
         analytics.capture("images_saved", { image_count: results.length });
       }
@@ -303,8 +278,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
           headerStyle: { backgroundColor: theme.colors.background },
         }}
       />
-      {/* Each platform mounts exactly one persistent title so changes cascade
-          between "Save something" / "New note" / "Save a link". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
           <AnimatedText text={title} style={styles.heading} truncate />
@@ -522,9 +495,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 18,
     color: theme.colors.foreground,
     minHeight: 120,
-    // The Android sheet sizes to its content above the keyboard. An uncapped
-    // note would grow the sheet until the header and its Save button leave
-    // the screen, so long notes scroll inside the field instead.
     maxHeight: Platform.OS === "android" ? 240 : undefined,
     padding: theme.gap(1.5),
     borderRadius: theme.radius.lg,

@@ -1,44 +1,25 @@
-/**
- * Apple's Retention Messaging API: the App Store posts here while a subscriber
- * looks at the page where they can cancel, and the reply names which
- * pre-uploaded, Apple-approved message to show them.
- *
- * https://developer.apple.com/documentation/retentionmessaging
- */
 import { verifyAppleJws } from "./appleJws";
 import { signEs256Jwt } from "./appleSigning";
 
-/** Shelvr's App Store id, `ascAppId` in eas.json. */
 const SHELVR_APP_APPLE_ID = 6798143550;
-/** The production bundle id; dev and preview builds never reach this sheet. */
 const SHELVR_BUNDLE_ID = "app.shelvr.save";
 
-// Apple's body is three certificates and a short payload, about 5 KB.
 export const RETENTION_MAX_BODY_BYTES = 32 * 1024;
 
 export type RetentionReply = {
   status: 200 | 400;
   body: object;
-  /** Why the request was refused (400), or why a 200 carries no offer. */
   reason?: string;
 };
 
-/** A promotional offer to attach on the cancel sheet for one product. */
 type RetentionOffer = { offerIdentifier: string; messageIdentifier: string };
 
-/** The Apple In-App Purchase key that signs promotional offers. */
 export type OfferSigningKey = {
   keyId: string;
   issuerId: string;
   privateKey: string;
 };
 
-/**
- * Reads `APPLE_RETENTION_OFFERS`: a JSON object from product id to the
- * App Store Connect offer id and the approved, image-free message id shown
- * with it. A product left out gets the plain message. Anything malformed is
- * dropped, so a bad paste falls back to the message instead of failing.
- */
 export function parseRetentionOffers(
   raw: string | undefined,
 ): Record<string, RetentionOffer> {
@@ -67,7 +48,6 @@ export function parseRetentionOffers(
   return offers;
 }
 
-/** Apple's promotional offer signature, V2: an ES256 JWS over the offer. */
 export async function signPromotionalOffer(
   key: OfferSigningKey,
   offer: { productId: string; offerIdentifier: string; transactionId: string },
@@ -87,15 +67,6 @@ export async function signPromotionalOffer(
   );
 }
 
-/**
- * Answers one Get Retention Message request. A reply with no `message` leaves
- * Apple on the default message configured for the product and locale, so an
- * unset `messageId` is a working state, not an error.
- *
- * A product with a configured offer gets that offer, signed for the
- * subscriber's original transaction, when the signing key is set. Signing
- * failures fall back to the plain message, never to an error.
- */
 export async function answerRetentionRequest(
   body: string,
   options: {
@@ -130,8 +101,6 @@ export async function answerRetentionRequest(
       options.now,
     )) as typeof payload;
   } catch (error) {
-    // AppleJwsError messages are fixed codes. Anything else is the runtime
-    // refusing a crypto call, which must not hide behind a parsing code.
     return reject(
       error instanceof Error && error.name === "AppleJwsError"
         ? error.message
@@ -146,7 +115,6 @@ export async function answerRetentionRequest(
       : {},
   };
   const { productId, originalTransactionId } = payload;
-  // Own keys only, so a product id like "constructor" is never an offer.
   const offer =
     typeof productId === "string" &&
     options.offers &&

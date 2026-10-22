@@ -2,38 +2,47 @@ import {
   PinBadge,
   SampleTripMap,
 } from "@/components/onboarding/sample-trip-map";
-import { VeiledStops } from "@/components/onboarding/veiled-stops";
-import { AppSymbolIcon } from "@/components/symbol";
+import { SampleAppleMap } from "@/components/onboarding/sample-apple-map";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   SAMPLE_CROPS,
   SAMPLE_SLOT_LABELS,
-  SAMPLE_TRIP,
   sampleRows,
   type NumberedStop,
   type SampleRow,
+  type SampleTrip,
 } from "@/lib/sample-trip";
+import type { TextMessageKey } from "@/locales/message-types";
 import { Text, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 
-// The sample trip as a card: the map, then each day's stops. Locked, the card
-// shows the first stop clearly and veils the rest behind a lock.
+const SAMPLE_BADGES: Record<SampleTrip["kind"], TextMessageKey> = {
+  trip: "tripTeaser.sampleBadge",
+  date: "plan.sampleDateBadge",
+  weekend: "plan.sampleWeekendBadge",
+};
 
-/** Rows shown clearly on the locked card: day one's header and first stop. */
-const CLEAR_ROWS = 2;
-
-function DayHeader({ day, divider }: { day: number; divider: boolean }) {
-  const { title, stops } = SAMPLE_TRIP.days[day];
+function DayHeader({
+  row: { day, title, places },
+  divider,
+  numbered,
+}: {
+  row: Extract<SampleRow, { kind: "day" }>;
+  divider: boolean;
+  numbered: boolean;
+}) {
   return (
     <View style={[styles.dayHeader, divider && styles.divider]}>
       <View style={styles.dayText}>
-        <Text style={styles.dayEyebrow}>
-          {t("trip.dayTab", { day: String(day + 1) })}
-        </Text>
+        {numbered ? (
+          <Text style={styles.dayEyebrow}>
+            {t("trip.dayTab", { day: String(day + 1) })}
+          </Text>
+        ) : null}
         <Text style={styles.dayTitle}>{t(title)}</Text>
       </View>
       <Text style={styles.dayCount}>
-        {t("tripTeaser.placeCount", { count: stops.length })}
+        {t("tripTeaser.placeCount", { count: places })}
       </Text>
     </View>
   );
@@ -59,66 +68,45 @@ function StopRow({
   );
 }
 
-function CardRow({ row, divider }: { row: SampleRow; divider: boolean }) {
+function CardRow({
+  row,
+  divider,
+  numbered,
+}: {
+  row: SampleRow;
+  divider: boolean;
+  numbered: boolean;
+}) {
   return row.kind === "day" ? (
-    <DayHeader day={row.day} divider={divider} />
+    <DayHeader row={row} divider={divider} numbered={numbered} />
   ) : (
     <StopRow entry={row.entry} divider={divider} />
   );
 }
 
-/** Rows behind a lock: the same rows, blurred and hidden from screen readers,
- * with one lock over their middle. */
-function VeiledRows({ rows }: { rows: SampleRow[] }) {
-  const { theme } = useUnistyles();
-  return (
-    <View>
-      <View
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        <VeiledStops rows={rows} />
-      </View>
-      <View
-        style={styles.lock}
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={t("tripTeaser.lockedLabel")}
-      >
-        <AppSymbolIcon
-          name="lock"
-          size={18}
-          weight="medium"
-          tintColor={theme.colors.foreground}
-        />
-      </View>
-    </View>
-  );
-}
-
-/**
- * The sample trip. With `locked`, only the first stop is clear; the rest is
- * veiled behind a lock.
- */
-export function SampleTripCard({ locked }: { locked: boolean }) {
+export function SampleTripCard({ trip }: { trip: SampleTrip }) {
   useAppLocale();
-  const rows = sampleRows();
-  const clear = locked ? rows.slice(0, CLEAR_ROWS) : rows;
-  const veiled = locked ? rows.slice(CLEAR_ROWS) : [];
+  const rows = sampleRows(trip);
   return (
     <View style={styles.card}>
       <View>
-        <SampleTripMap
-          crop={locked ? SAMPLE_CROPS.locked : SAMPLE_CROPS.reveal}
-        />
+        {process.env.EXPO_OS === "ios" ? (
+          <SampleAppleMap trip={trip} />
+        ) : (
+          <SampleTripMap trip={trip} crop={SAMPLE_CROPS.reveal} />
+        )}
         <View style={styles.badge} pointerEvents="none">
-          <Text style={styles.badgeText}>{t("tripTeaser.sampleBadge")}</Text>
+          <Text style={styles.badgeText}>{t(SAMPLE_BADGES[trip.kind])}</Text>
         </View>
       </View>
-      {clear.map((row, index) => (
-        <CardRow key={index} row={row} divider={index > 0} />
+      {rows.map((row, index) => (
+        <CardRow
+          key={index}
+          row={row}
+          divider={index > 0}
+          numbered={trip.kind === "trip"}
+        />
       ))}
-      {veiled.length > 0 ? <VeiledRows rows={veiled} /> : null}
     </View>
   );
 }
@@ -205,25 +193,5 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 16,
     lineHeight: 21,
     color: theme.colors.foreground,
-  },
-  lock: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: 44,
-    height: 44,
-    marginTop: -22,
-    marginLeft: -22,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: theme.colors.foreground,
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
 }));

@@ -164,7 +164,7 @@ pnpm --filter native-app exec convex dev
 pnpm --filter native-app test    # vitest run
 pnpm --filter web-app test       # vitest run
 pnpm run coverage                 # native and web Vitest coverage gates
-pnpm --filter native-app check   # lint, then typecheck, then test
+pnpm run check                    # the whole gate: what CI runs, plus the dependency audit
 ```
 
 Tests are `*.test.ts` files next to the code under `apps/native/convex/`,

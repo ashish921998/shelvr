@@ -18,6 +18,7 @@ const SCREEN = { width: 393, height: 852 };
 const LISBON = { lng: -9.139, lat: 38.722 };
 const TOKYO = { lng: 139.7, lat: 35.7 };
 const DEG = 180 / Math.PI;
+const TOKYO_FAR_SIDE_AT = 18515;
 
 const project = (
   camera: ReturnType<typeof globeCamera>,
@@ -27,6 +28,21 @@ const project = (
     .rotate(camera.rotate)
     .scale(camera.scale)
     .translate([camera.x, camera.y])([point.lng, point.lat]);
+
+describe("the spin the dive tests start from", () => {
+  it("has Tokyo on the far side of the globe", () => {
+    const { rotate } = globeCamera({
+      t: TOKYO_FAR_SIDE_AT,
+      diveAt: null,
+      ...SCREEN,
+      target: null,
+    });
+    const facing: [number, number] = [-rotate[0], -rotate[1]];
+    expect(geoDistance(facing, [TOKYO.lng, TOKYO.lat])).toBeGreaterThan(
+      Math.PI / 2,
+    );
+  });
+});
 
 describe("tripCenter", () => {
   it("takes the median of the pinned stops", () => {
@@ -125,7 +141,6 @@ describe("globeRegion", () => {
     const ids = globeRegion({ lng: 178.4, lat: -18.1 }).nearby.features.map(
       (country) => country.id,
     );
-    // Fiji spans it; Samoa sits on the other side.
     expect(ids).toEqual(expect.arrayContaining(["242", "882"]));
   });
 
@@ -138,8 +153,7 @@ describe("closeUp", () => {
   it("keeps the whole world's land until the close-up fills the screen", () => {
     const tokyo = { lng: 139.7, lat: 35.7 };
     const region = globeRegion(tokyo);
-    // The spin has the far side of the globe facing the screen.
-    const diveAt = 18515;
+    const diveAt = TOKYO_FAR_SIDE_AT;
     let closed = false;
     for (let t = diveAt; t <= diveAt + GLOBE_DIVE_MS; t += 25) {
       const camera = globeCamera({ t, diveAt, ...SCREEN, target: tokyo });
@@ -248,9 +262,8 @@ describe("globePin", () => {
   });
 
   it("holds the target on the globe's edge while it is on the far side", () => {
-    // The spin has the far side of the globe facing Tokyo.
     const camera = globeCamera({
-      t: 18515,
+      t: TOKYO_FAR_SIDE_AT,
       diveAt: null,
       ...SCREEN,
       target: null,
@@ -263,13 +276,18 @@ describe("globePin", () => {
 
   it("moves without a jump as the target comes round", () => {
     let last = globePin(
-      globeCamera({ t: 18515, diveAt: 18515, ...SCREEN, target: TOKYO }),
+      globeCamera({
+        t: TOKYO_FAR_SIDE_AT,
+        diveAt: TOKYO_FAR_SIDE_AT,
+        ...SCREEN,
+        target: TOKYO,
+      }),
       TOKYO,
     );
     for (let step = 1; step <= 200; step++) {
-      const t = 18515 + (GLOBE_DIVE_MS * step) / 200;
+      const t = TOKYO_FAR_SIDE_AT + (GLOBE_DIVE_MS * step) / 200;
       const next = globePin(
-        globeCamera({ t, diveAt: 18515, ...SCREEN, target: TOKYO }),
+        globeCamera({ t, diveAt: TOKYO_FAR_SIDE_AT, ...SCREEN, target: TOKYO }),
         TOKYO,
       );
       expect(Math.hypot(next.x - last.x, next.y - last.y)).toBeLessThan(60);

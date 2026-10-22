@@ -51,7 +51,6 @@ function haptic(kind: "tick" | "done") {
   }
 }
 
-/** The space's saves fanned out and shuffling while the model reads them. */
 function PlanLoading({ images }: { images: string[] }) {
   useAppLocale();
   const reducedMotion = useReducedMotion();
@@ -96,7 +95,6 @@ function PlanLoading({ images }: { images: string[] }) {
   );
 }
 
-/** Maps and "We went" for the card on top, once the deck has dealt one. */
 function TonightActions({
   place,
   visited,
@@ -150,7 +148,6 @@ function TonightActions({
   );
 }
 
-/** "Ask someone": the vote link, as an outlined capsule beside the deal. */
 function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
   const { theme } = useUnistyles();
   return (
@@ -176,10 +173,6 @@ function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
   );
 }
 
-/**
- * The line under the deck: how to use it, the link's votes while one is
- * open, or where a just-marked "We went" place goes next time.
- */
 function deckHint(
   been: PlanPlace | null,
   votes: { voters: number; expiresAt: number } | null | undefined,
@@ -193,11 +186,6 @@ function deckHint(
   return t("plan.deckHint");
 }
 
-/**
- * Pinned under the list so the pick and its result stay on screen however
- * long the shortlist is: Deal me tonight and Ask someone, then once dealt
- * the card's actions, Ask someone and Deal again.
- */
 function PlanFooter({
   dealt,
   place,
@@ -209,7 +197,6 @@ function PlanFooter({
   onDeal,
 }: {
   dealt: boolean;
-  /** The card on top once dealt. */
   place: PlanPlace | null;
   visited: boolean;
   spinning: boolean;
@@ -269,7 +256,6 @@ export default function PlanScreen() {
   const { data: latestLink, isError: linkFailed } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
   );
-  // A failed link read must not hold the plan back: make a fresh one instead.
   const { state, retry } = useMakePlan(
     spaceId,
     locale,
@@ -277,7 +263,6 @@ export default function PlanScreen() {
   );
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
-  // Votes show only while the open link holds the shortlist on screen.
   const votes = linkForPlan(latestLink, places);
   const { ask, asking } = usePlanAsk(spaceId, places, votes);
   const planId = state.status === "ready" ? state.planId : null;
@@ -301,8 +286,6 @@ export default function PlanScreen() {
     },
   );
   const { isVisited, toggle: toggleVisited } = usePlaceVisits();
-  // While dealing, the deck shuffles through its cards; then the card on top
-  // is the one the actions below act on.
   const front = isSpinning && highlight !== null ? highlight : deck.front;
   const frontPlace = places[front] ?? null;
   const hasPlaces = state.status === "ready" && places.length > 0;
@@ -320,7 +303,6 @@ export default function PlanScreen() {
     return { imageById: images, titleById: titles };
   }, [space]);
 
-  // A new plan replaces the old one, its pick and any spin still running.
   const again = () => void retry();
 
   const share = async () => {
@@ -461,7 +443,6 @@ export default function PlanScreen() {
               title={t("profile.settings")}
               onPress={() => router.push("/settings")}
             />
-            {/* Back from Settings with AI on, the screen is still mounted. */}
             <Pressable
               accessibilityRole="button"
               onPress={again}
@@ -486,8 +467,6 @@ export default function PlanScreen() {
         ) : null}
       </ScrollView>
       {hasPlaces ? (
-        // Pinned under the list so the pick and its result stay on screen
-        // however long the shortlist is.
         <PlanFooter
           dealt={dealt}
           place={dealt ? frontPlace : null}
@@ -528,7 +507,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: "space-between",
     gap: theme.gap(1),
   },
-  // Sits on the title's last line, not centred against the whole heading.
   shuffle: {
     paddingBottom: theme.gap(0.75),
   },
@@ -596,7 +574,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   actionBusy: {
     opacity: theme.opacity.disabled,
   },
-  // Deal me tonight keeps its capsule, but shares the row with Ask someone.
   deal: {
     flex: 1,
   },
@@ -608,7 +585,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   hint: {
     textAlign: "center",
-    // Two lines held, so the We went hint replacing it moves nothing.
     minHeight: 36,
     paddingHorizontal: theme.gap(2),
   },

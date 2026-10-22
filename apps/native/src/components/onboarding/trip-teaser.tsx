@@ -1,29 +1,66 @@
+import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
+import { EveningChips } from "@/components/onboarding/evening-chips";
 import { CtaButton } from "@/components/onboarding/parts";
+import { withAlpha } from "@/lib/color";
 import { SampleTripCard } from "@/components/onboarding/trip-teaser-card";
 import { AppSymbolIcon } from "@/components/symbol";
 import { StitchRing } from "@/components/ui/stitch-loader";
 import { t, useAppLocale } from "@/lib/i18n";
 import { settleIn } from "@/lib/motion";
-import { SAMPLE_TRIP } from "@/lib/sample-trip";
+import type { SampleCityId, SampleSave } from "@/lib/sample-cities";
+import {
+  eveningWith,
+  type EveningAfter,
+  type SampleTrip,
+} from "@/lib/sample-trip";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
+import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
-import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The sample trip steps of onboarding, for people who save travel: the trip
-// builds from three sample saves, shows locked, and opens up after the
-// paywall. Each screen says the trip is a sample.
-
-const PICTURES = {
-  oldTown: require("../../../assets/onboarding/demo-travel.jpg"),
-  rooftops: require("../../../assets/onboarding/prague.jpg"),
-} as const;
-
-// Each build step takes this long, and the finished list holds a beat before
-// the trip shows.
 const BUILD_STEP_COUNT = 4;
+
+const KIND_COPY: Record<
+  SampleTrip["kind"],
+  {
+    title: TextMessageKey;
+    accent:
+      | "tripTeaser.buildTitleAccent"
+      | "plan.buildAccentDate"
+      | "plan.buildAccentWeekend";
+    plan: TextMessageKey;
+    reveal: TextMessageKey;
+    revealAccent:
+      | "tripTeaser.revealAccent"
+      | "plan.revealAccentDate"
+      | "plan.revealAccentWeekend";
+  }
+> = {
+  trip: {
+    title: "tripTeaser.buildTitle",
+    accent: "tripTeaser.buildTitleAccent",
+    plan: "tripTeaser.stepPlan",
+    reveal: "tripTeaser.revealBody",
+    revealAccent: "tripTeaser.revealAccent",
+  },
+  date: {
+    title: "plan.buildTitleDate",
+    accent: "plan.buildAccentDate",
+    plan: "plan.stepPlanDate",
+    reveal: "plan.revealBodyDate",
+    revealAccent: "plan.revealAccentDate",
+  },
+  weekend: {
+    title: "plan.buildTitleWeekend",
+    accent: "plan.buildAccentWeekend",
+    plan: "plan.stepPlanWeekend",
+    reveal: "plan.revealBodyWeekend",
+    revealAccent: "plan.revealAccentWeekend",
+  },
+};
 const STEP_MS = 750;
 const HOLD_MS = 500;
 
@@ -31,7 +68,7 @@ const SETTLE_HEAD = settleIn(150);
 const SETTLE_CARD = settleIn(450);
 const SETTLE_FOOT = settleIn(700);
 
-function Head({
+export function Head({
   title,
   accent,
   body,
@@ -57,27 +94,28 @@ function Head({
 }
 
 function SaveRow({
+  city,
   save,
   divider,
 }: {
-  save: (typeof SAMPLE_TRIP.saves)[number];
+  city: SampleCityId;
+  save: SampleSave;
   divider: boolean;
 }) {
   const { theme } = useUnistyles();
-  const source =
-    "host" in save.source ? save.source.host : t(save.source.label);
+  const source = t(save.source);
   return (
     <View style={[styles.saveRow, divider && styles.divider]}>
       <View style={styles.thumb}>
         {save.picture === "place" ? (
           <AppSymbolIcon
-            name="fork.knife"
+            name="mappin"
             size={22}
             tintColor={theme.colors.primaryText}
           />
         ) : (
           <Image
-            source={PICTURES[save.picture]}
+            source={CITY_PICTURES[city][save.picture]}
             contentFit="cover"
             style={styles.thumbImage}
           />
@@ -139,18 +177,20 @@ function BuildStepRow({
   );
 }
 
-/**
- * The trip builds from three sample saves, one step at a time, then moves on
- * by itself. Nothing is made or fetched; the steps show what a real trip does.
- */
-export function TripBuildStep({ onDone }: { onDone: () => void }) {
+export function TripBuildStep({
+  trip,
+  onDone,
+}: {
+  trip: SampleTrip;
+  onDone: () => void;
+}) {
   useAppLocale();
-  const saves = String(SAMPLE_TRIP.saves.length);
+  const saves = String(trip.saves.length);
   const steps = [
     t("tripTeaser.stepRead", { saves }),
     t("tripTeaser.stepFind"),
     t("tripTeaser.stepPin"),
-    t("tripTeaser.stepPlan"),
+    t(KIND_COPY[trip.kind].plan),
   ];
   const [finished, setFinished] = useState(0);
   const doneRef = useRef(onDone);
@@ -170,15 +210,18 @@ export function TripBuildStep({ onDone }: { onDone: () => void }) {
   return (
     <View style={styles.wrap}>
       <Head
-        title={t("tripTeaser.buildTitle")}
-        accent={t("tripTeaser.buildTitleAccent", {
-          city: t("tripTeaser.city"),
-        })}
+        title={t(KIND_COPY[trip.kind].title)}
+        accent={t(KIND_COPY[trip.kind].accent, { city: t(trip.name) })}
         body={t("tripTeaser.buildBody", { saves })}
       />
       <View style={styles.card}>
-        {SAMPLE_TRIP.saves.map((save, index) => (
-          <SaveRow key={save.name} save={save} divider={index > 0} />
+        {trip.saves.map((save, index) => (
+          <SaveRow
+            key={save.name}
+            city={trip.city}
+            save={save}
+            divider={index > 0}
+          />
         ))}
       </View>
       <View style={styles.buildList} accessibilityLiveRegion="polite">
@@ -203,53 +246,25 @@ export function TripBuildStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/**
- * The finished sample trip, locked: its first stop is clear and the rest is
- * veiled. One button opens the paywall.
- */
-export function TripLockedStep({
-  leaving,
-  onUnlock,
+export function TripRevealStep({
+  trip,
+  standIn = false,
+  after,
+  onAfter,
+  onContinue,
 }: {
-  /** `onUnlock` ran and the paywall is on its way. */
-  leaving: boolean;
-  onUnlock: () => void;
+  trip: SampleTrip;
+  /** The person's own city has no sample, so this one stands in for it. */
+  standIn?: boolean;
+  after: EveningAfter;
+  onAfter: (after: EveningAfter) => void;
+  onContinue: () => void;
 }) {
   useAppLocale();
-  const city = t("tripTeaser.city");
-  return (
-    <View style={styles.wrap}>
-      <Animated.View entering={SETTLE_HEAD}>
-        <Head
-          title={t("tripTeaser.lockedTitle", { city })}
-          accent={t("tripTeaser.lockedTitleAccent")}
-          body={t("tripTeaser.sampleBody", {
-            saves: String(SAMPLE_TRIP.saves.length),
-          })}
-        />
-      </Animated.View>
-      <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard locked />
-      </Animated.View>
-      <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
-        <CtaButton
-          label={t("tripTeaser.unlock")}
-          onPress={onUnlock}
-          busy={leaving}
-        />
-        <Text style={styles.note}>{t("tripTeaser.unlockNote")}</Text>
-      </Animated.View>
-    </View>
-  );
-}
-
-/** The sample trip, open, after the purchase. */
-export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
-  useAppLocale();
+  const city = t(trip.name);
+  const shown = useMemo(() => eveningWith(trip, after), [trip, after]);
   const [leaving, setLeaving] = useState(false);
   const leftRef = useRef(false);
-  // Continuing ends onboarding, and the screen takes a moment to go. A second
-  // tap in that moment must not end it twice.
   const leave = () => {
     if (leftRef.current) return;
     leftRef.current = true;
@@ -258,16 +273,33 @@ export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
   };
   return (
     <View style={styles.wrap}>
-      <Animated.View entering={SETTLE_HEAD}>
-        <Head
-          title={t("tripTeaser.revealTitle")}
-          body={t("tripTeaser.revealBody")}
-        />
-      </Animated.View>
-      <Animated.View entering={SETTLE_CARD}>
-        <SampleTripCard locked={false} />
-      </Animated.View>
-      <Animated.View style={styles.foot} entering={SETTLE_FOOT}>
+      <View style={styles.scroll}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollBody}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={SETTLE_HEAD}>
+            <Head
+              title={t("tripTeaser.revealTitle")}
+              accent={t(KIND_COPY[trip.kind].revealAccent, { city })}
+              body={
+                standIn
+                  ? t("plan.revealBodyStandIn", { city })
+                  : t(KIND_COPY[trip.kind].reveal)
+              }
+            />
+          </Animated.View>
+          <Animated.View entering={SETTLE_CARD} style={styles.revealBody}>
+            {trip.kind === "date" ? (
+              <EveningChips picked={after} onPick={onAfter} />
+            ) : null}
+            <SampleTripCard trip={shown} />
+          </Animated.View>
+        </ScrollView>
+        <View pointerEvents="none" style={styles.fade} />
+      </View>
+      <Animated.View style={styles.revealFoot} entering={SETTLE_FOOT}>
         <CtaButton
           label={t("common.continue")}
           onPress={leave}
@@ -278,7 +310,33 @@ export function TripRevealStep({ onContinue }: { onContinue: () => void }) {
   );
 }
 
+const FADE_HEIGHT = 32;
+
 const styles = StyleSheet.create((theme) => ({
+  scroll: {
+    flex: 1,
+  },
+  scrollBody: {
+    gap: theme.gap(3),
+    paddingBottom: FADE_HEIGHT,
+  },
+  fade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: FADE_HEIGHT,
+    experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(
+      theme.colors.background,
+      0,
+    )} 0%, ${theme.colors.background} 100%)`,
+  },
+  revealBody: {
+    gap: theme.gap(2),
+  },
+  revealFoot: {
+    paddingTop: theme.gap(1),
+  },
   wrap: {
     flex: 1,
     gap: theme.gap(3),

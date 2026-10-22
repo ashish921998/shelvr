@@ -1,18 +1,3 @@
-/**
- * Records that an incoming Share Sheet payload was deferred because the user
- * still needs to finish onboarding and/or sign in. The native share payloads
- * themselves live in the expo-sharing app group; this flag only records that
- * Shelvr should resume the share flow instead of landing on Home.
- *
- * A second record guards the opposite extreme: a share the user explicitly
- * discarded whose native payload could not be cleared. The resume path treats
- * an unread payload batch as owed, so that leftover needs a marker saying
- * "this one was thrown away on purpose".
- *
- * The adapter is injected so the rules stay pure and unit-testable without
- * SecureStore or React Native.
- */
-
 export const PENDING_SHARE_KEY = "shelvr.pending.share";
 
 export interface PendingShareStore {
@@ -20,37 +5,21 @@ export interface PendingShareStore {
   setItem(key: string, value: string): void;
 }
 
-/** Marks that a share is waiting to be resumed after onboarding/auth. */
 export function markPendingShareInStore(store: PendingShareStore): void {
   store.setItem(PENDING_SHARE_KEY, "1");
 }
 
-/** True when a share was deferred and has not yet been consumed. */
 export function hasPendingShareInStore(store: PendingShareStore): boolean {
   const value = store.getItem(PENDING_SHARE_KEY);
   return value === "1";
 }
 
-/** Drops any pending share flag without resuming (e.g. user cancelled). */
 export function clearPendingShareInStore(store: PendingShareStore): void {
   store.setItem(PENDING_SHARE_KEY, "");
 }
 
 export const DISCARDED_SHARE_KEY = "shelvr.discarded.share";
 
-/**
- * Records the fingerprint of a share batch the user explicitly discarded
- * whose native clear threw, leaving the payload in the store. Without this
- * marker the resume path would route the leftover straight back to the share
- * screen, and with the session record already deleted it would re-save the
- * discarded batch under brand-new operation ids, duplicating entries that
- * the clearFailed window may already have saved.
- *
- * The record is fingerprint-scoped: a new, different batch never matches it
- * and resumes normally. The share screen drops the record on any successful
- * native clear, so once the leftover is finally gone a later deliberate
- * re-share of the same content is fresh again.
- */
 export function markShareDiscardedInStore(
   store: PendingShareStore,
   fingerprint: string,
@@ -58,10 +27,6 @@ export function markShareDiscardedInStore(
   store.setItem(DISCARDED_SHARE_KEY, fingerprint);
 }
 
-/**
- * True when `fingerprint` is exactly the batch the user explicitly discarded
- * and whose native payload is still pending. An empty record matches nothing.
- */
 export function shareWasDiscardedInStore(
   store: PendingShareStore,
   fingerprint: string,
@@ -69,26 +34,10 @@ export function shareWasDiscardedInStore(
   return store.getItem(DISCARDED_SHARE_KEY) === fingerprint;
 }
 
-/**
- * Drops the discard record. Called once the native store is confirmed empty,
- * so the marker can never outlive the leftover it describes.
- */
 export function clearShareDiscardedInStore(store: PendingShareStore): void {
   store.setItem(DISCARDED_SHARE_KEY, "");
 }
 
-/**
- * After onboarding completes and/or the user signs in, choose the next route.
- * `hasOwedShare` merges the two signals that both mean "a share is waiting":
- * the deferred flag (the launch routed but sign-in/onboarding was not done)
- * and a resumable payload batch (the launch URL was lost to Expo Router's
- * Android initial-URL race, or a relaunch after a mid-share process death
- * found the batch still in the native store). An owed share wins over the
- * default home landing; its session reconciliation then decides whether the
- * batch is a new save, a resume of an interrupted one, or a stale completed
- * record to clear. A batch whose explicit discard left it behind is not
- * resumable (see the discard record), so it is not owed anything.
- */
 export function decidePostAuthRoute(state: {
   hasOwedShare: boolean;
 }): "/" | "/share" {

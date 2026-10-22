@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import AndroidWaitlist from "@/components/home/AndroidWaitlist";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { arrivalCampaign } from "@/lib/appStore";
-import { useAppStoreLink } from "@/lib/appStoreLink";
+import { useAppStoreLink, useArrivalCampaign } from "@/lib/appStoreLink";
+import { useBrowserValue } from "@/lib/browserValue";
 import {
   CHROME_TRIED_PARAM,
   PLAY_STORE_LIVE,
@@ -27,20 +28,17 @@ type BioLinkProps = {
   platform: Platform;
 };
 
-/** The link in a social bio: out of the in-app browser, then to the store. */
 export default function BioLink({
   inApp,
   platform: serverPlatform,
 }: BioLinkProps) {
-  const [platform, setPlatform] = useState(serverPlatform);
-  useEffect(() => {
-    // iPad Safari asks for desktop sites with a Mac user agent, which only
-    // the browser can tell apart, by its touch screen.
-    if (isIPadDesktop(navigator.userAgent, navigator.maxTouchPoints)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPlatform("ios");
-    }
-  }, []);
+  const platform = useBrowserValue<Platform>(
+    () =>
+      isIPadDesktop(navigator.userAgent, navigator.maxTouchPoints)
+        ? "ios"
+        : serverPlatform,
+    serverPlatform,
+  );
   const action = bioAction(inApp, platform);
 
   useEffect(() => {
@@ -118,8 +116,6 @@ export default function BioLink({
   );
 }
 
-/** Sends an Android visitor on to Chrome once per visit. If Chrome cannot
- * take it, the page comes back marked, and the overlay's steps take over. */
 function tryChrome(inApp: InAppBrowser, campaign: string) {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -233,12 +229,7 @@ function InAppOverlay({
 }
 
 function PlayStoreButton() {
-  const [campaign, setCampaign] = useState("web_bio");
-  useEffect(() => {
-    // The search string only exists in the browser, after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCampaign(arrivalCampaign(window.location.search) ?? "web_bio");
-  }, []);
+  const campaign = useArrivalCampaign("web_bio");
   return (
     <a
       href={playStoreUrl(campaign)}

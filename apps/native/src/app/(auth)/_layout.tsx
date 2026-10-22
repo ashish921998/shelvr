@@ -6,7 +6,6 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 
 export default function AuthRoutesLayout() {
   useAppLocale();
-  // Fade instead of slide under Reduce Motion.
   const reducedMotion = useReducedMotion();
   const { isLoading, isAuthenticated } = useConvexAuth();
 

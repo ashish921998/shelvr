@@ -11,18 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ENTITLEMENT_WAIT_MS = 5000;
 
-/**
- * The paywall at the end of onboarding, after the promise step (after the
- * locked sample trip for people who save travel). `ask` waits
- * for the entitlement to load, then lets a Pro account through and shows
- * everyone else the paywall once. Signed out, the purchase is anonymous and
- * the sign-in that follows onboarding attaches it to the new account, and a
- * close leaves the person on the step that asked (the promise, or the locked
- * sample trip): sign-in comes only after a purchase or restore. A relaunch
- * lands back on that step and asks again. A paywall that could not show (RevenueCat not ready, offline)
- * was never declined: `onUnavailable` finishes without saying so, and the
- * app asks again once Home is up.
- */
+/** Signed out, closing the paywall re-arms `ask`; an unavailable paywall is not a decline. */
 export function useOnboardingPaywall({
   onPro,
   onDecline,
@@ -36,8 +25,6 @@ export function useOnboardingPaywall({
   const { isAuthenticated } = useConvexAuth();
   const { entitled, loading } = useEntitlement();
   const [asked, setAsked] = useState(false);
-  // Offline the entitlement never loads. Past this wait the account is
-  // treated as not Pro, so the step cannot hang on a spinner.
   const [waitedOut, setWaitedOut] = useState(false);
   useEffect(() => {
     if (!asked || !loading) return;
@@ -66,8 +53,6 @@ export function useOnboardingPaywall({
         if (outcome === "unavailable") return handlers.current.onUnavailable();
         if (outcome === "cancelled") {
           if (isAuthenticated) return decline();
-          // Signed out, closing is not a way in: the account is made only
-          // after a purchase, so the promise step stays and asks again.
           started.current = false;
           setWaitedOut(false);
           setAsked(false);

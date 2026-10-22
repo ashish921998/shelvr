@@ -1,10 +1,5 @@
 import { appStoreUrl, sanitizeCampaign } from "./appStore";
 
-/**
- * The App Store custom product page the bio link opens, as its `ppid`. Set it
- * once the travel and food page is live in App Store Connect; until then the
- * bio link opens the default product page.
- */
 const BIO_PRODUCT_PAGE_ID: string | undefined = undefined;
 
 export type InAppBrowser = "tiktok" | "instagram" | "facebook";
@@ -34,8 +29,6 @@ export function isIPadDesktop(userAgent: string, maxTouchPoints: number) {
   return /Macintosh/.test(userAgent) && maxTouchPoints > 1;
 }
 
-/** The App Store link for a bio visit: campaign-tagged, and on the custom
- * product page once one is set. */
 export function bioAppStoreUrl(
   campaign: string | undefined,
   productPageId: string | undefined = BIO_PRODUCT_PAGE_ID,
@@ -47,8 +40,6 @@ export function bioAppStoreUrl(
   return url.toString();
 }
 
-/** Marks a page the Chrome hand-off already sent back, so it is not tried
- * again in a loop. */
 export const CHROME_TRIED_PARAM = "chrome";
 
 /**
@@ -62,14 +53,10 @@ export function chromeIntentUrl(href: string): string {
   return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(fallback.toString())};end`;
 }
 
-/** Flip to true once Shelvr is public on Google Play. Until then Android
- * visitors get the waitlist, which works inside an in-app browser too, so
- * they are not sent to Chrome first. */
 export const PLAY_STORE_LIVE = false;
 const PLAY_STORE_URL =
   "https://play.google.com/store/apps/details?id=app.shelvr.save";
 
-/** The Play listing, with the campaign as the install referrer. */
 export function playStoreUrl(campaign: string | undefined): string {
   const ct = sanitizeCampaign(campaign);
   if (!ct) return PLAY_STORE_URL;
@@ -79,7 +66,6 @@ export function playStoreUrl(campaign: string | undefined): string {
 
 type BioAction = "overlay" | "app_store" | "play_store" | "stay";
 
-/** What the bio link does for this visitor on arrival. */
 export function bioAction(
   inApp: InAppBrowser | undefined,
   device: Platform,

@@ -86,12 +86,13 @@ export function NotificationSessionProvider({
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
-        saveToken: (token, locale) =>
+        getTimezone: getNotificationTimezone,
+        saveToken: (token, locale, timezone) =>
           registerDevice({
             token,
             locale,
             platform: Platform.OS === "ios" ? "ios" : "android",
-            timezone: getNotificationTimezone(),
+            timezone,
           }),
         revokeToken: (token) => unregisterDevice({ token }),
         setWeeklyShelf: (enabled) =>
@@ -104,12 +105,9 @@ export function NotificationSessionProvider({
             enabled,
             timezone: getNotificationTimezone(),
           });
-          // The onboarding reminder is a save reminder too, so the switch
-          // turns it off with the rest.
           if (!enabled) await clearFirstSaveReminder();
         },
         signOut: async () => {
-          // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
           await clearFirstSaveReminder();
@@ -121,8 +119,6 @@ export function NotificationSessionProvider({
           await clearTrialReminder();
         },
         clearWidget: clearRecentSavesWidget,
-        // Fallback for a failed post-deletion sign-out: no auth edge may fire
-        // promptly, so clear the identity here (idempotent with the hook's).
         resetAnalytics: () => void analytics.resetIfIdentified(),
         reportError: (error) => {
           const event =
@@ -184,8 +180,6 @@ export function NotificationSessionProvider({
         .register()
         .catch((error) => analytics.captureError(event, error));
     };
-    // One initial registration also carries the locale. Retry after returning
-    // from Settings or an offline launch without requiring an app restart.
     register(
       localeChanged
         ? "notification_locale_sync_failed"
@@ -215,11 +209,6 @@ function notificationField(
   return typeof value === "string" ? value : null;
 }
 
-/**
- * The route a notification carries, if any. Exported because the splash gate
- * decides whether to stand down from the same rule this navigates by. A push
- * with no `url` goes nowhere, so it is not a reason to skip the animation.
- */
 export function getNotificationUrl(
   notification: Notifications.Notification,
 ): string | null {
@@ -230,10 +219,6 @@ export function useNotificationObserver(): void {
   const nav = useRouter();
 
   useEffect(() => {
-    // Keyed by the notification's own id, not its destination: at launch the
-    // same tap can arrive both as the last response and through the listener,
-    // but a later push to the same screen (two trial nudges to /add) is a new
-    // open and must navigate and be recorded again.
     const handled = new Set<string>();
     const redirect = (notification: Notifications.Notification) => {
       const url = getNotificationUrl(notification);
@@ -243,23 +228,17 @@ export function useNotificationObserver(): void {
         if (handled.has(id)) return;
         handled.add(id);
       }
-      // Recorded before navigating: a push that throws must not lose the one
-      // signal V1 exists to collect.
       analytics.capture("notification_opened", {
         notification_kind: notificationField(notification, "kind") ?? "unknown",
         notification_id:
           notificationField(notification, "notificationId") ?? "",
       });
       const href = resolveRootHref(url);
-      // While the plan loads it waits, sharing one pending destination with
-      // deep links so the newest wins (deferred-sheet-link.ts).
       if (!deferLink(href)) nav.push(href as never);
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this
     // observer would otherwise navigate and record the same open again.
-    // Cleared after handling, never before: the splash gate reads it once
-    // per process during the first render, ahead of this effect.
     const handle = (response: Notifications.NotificationResponse) => {
       redirect(response.notification);
       Notifications.clearLastNotificationResponse();

@@ -11,7 +11,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type NextUp = NonNullable<FunctionReturnType<typeof api.items.nextUp>>;
 
-/** Why the save is offered, and the glyph shown when it has no picture. */
 const KINDS = {
   read: { reason: "home.nextUpRead", symbol: "doc.text" },
   cook: { reason: "home.nextUpCook", symbol: "fork.knife" },
@@ -19,12 +18,6 @@ const KINDS = {
   open: { reason: "home.nextUpOpen", symbol: "rectangle.stack" },
 } as const satisfies Record<NextUp["kind"], object>;
 
-/**
- * The "Open this next" card on Home: one save worth going back to, as a
- * single tappable row on the warm tint, set apart from the feed below it.
- * Purely presentational; lib/next-up.ts picks the save and owns its
- * analytics.
- */
 export function NextUpCard({
   next,
   onShown,
@@ -39,7 +32,6 @@ export function NextUpCard({
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  // Counted while Home is on screen, not while another screen covers it.
   useFocusEffect(useCallback(() => onShown(), [onShown]));
   const { item } = next;
   const imageUri = item.imageUrl ?? item.heroImageUrl;
@@ -124,7 +116,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.gap(1.5),
     padding: theme.gap(1.5),
-    // Room for the dismiss button in the top corner.
     paddingRight: theme.gap(5),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
@@ -163,7 +154,6 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.caption,
     color: theme.colors.muted,
   },
-  // A full-size tap target around the small visible circle.
   dismiss: {
     position: "absolute",
     top: 0,

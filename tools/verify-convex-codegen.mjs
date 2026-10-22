@@ -1,33 +1,4 @@
 #!/usr/bin/env node
-/**
- * Fail when `convex/_generated/api.d.ts` no longer lists every Convex module on
- * disk.
- *
- * Convex writes that file, and this repo commits it, but nothing regenerates it
- * in CI: the `check` job installs, lints, typechecks and tests, and `convex
- * codegen` is the only thing that rewrites it. So a branch that adds a module
- * without running `convex dev` merges with a stale inventory. PR #82 did, and it
- * surfaced a day later when a production deploy ran codegen as one of its steps
- * and dirtied the working tree.
- *
- * `tsc` cannot catch it. Convex builds the generated API type through
- * `ApiFromModules`, which only reaches registered queries, mutations and
- * actions, so a module of plain helpers (`model/recipeMarkup`) is invisible to
- * the type graph and typechecking passes either way.
- *
- * Running real codegen here is not an option: it authenticates and checks
- * project access ("You don't have access to the selected project"), so it would
- * need deployment credentials in every pull-request job, which fork PRs cannot
- * have anyway. Comparing the committed inventory against the filesystem needs
- * no credentials, no network, and runs in milliseconds.
- *
- * What it does need is Convex's own idea of which files are modules, mirrored
- * exactly. Guessing that set gets it wrong in both directions: a `types.d.ts`
- * is not a module, so demanding an entry for it fails a branch that regenerating
- * cannot fix, and a `.js` module is one, so ignoring it lets the drift this
- * exists to catch straight through. {@link isEntryPoint} is a transcription of
- * `entryPoints()` in `convex/dist/esm/bundler/index.js`, pinned at 1.43.0.
- */
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, relative, basename } from "node:path";
 
@@ -36,9 +7,6 @@ import { isMainModule } from "./main-module.mjs";
 const CONVEX_DIR = "apps/native/convex";
 const API_FILE = `${CONVEX_DIR}/_generated/api.d.ts`;
 
-/** Extensions esbuild can take as an entry point, as Convex lists them. Note
- * `.js` and friends: a Convex module does not have to be TypeScript, and a
- * guard that only walks `.ts` misses one entirely. */
 const ENTRY_POINT_EXTENSIONS = [
   ".js",
   ".mjs",
@@ -69,10 +37,6 @@ export function isEntryPoint(relPath, readSource) {
   if (base === "schema.ts" || base === "schema.js") return false;
   if ((base.match(/\./g) || []).length > 1) return false;
   if (relPath.includes(" ")) return false;
-  // A TypeScript file with no top-level import or export is not a module, so
-  // Convex drops it after the path rules rather than during them. `readSource`
-  // is a thunk because every rule above decides on the path alone, and most
-  // files never get this far: no reason to read them off disk.
   if (
     (relPath.endsWith(".ts") || relPath.endsWith(".tsx")) &&
     !/^\s{0,100}(import|export)/m.test(readSource())
@@ -82,8 +46,6 @@ export function isEntryPoint(relPath, readSource) {
   return true;
 }
 
-/** The module paths `api.d.ts` declares, e.g. `ai` and `model/recipeMarkup`.
- * Keys are bare identifiers unless the path needs quoting. */
 export function declaredModules(source) {
   const block = source.slice(source.indexOf("declare const fullApi"));
   return new Set(
@@ -93,7 +55,6 @@ export function declaredModules(source) {
   );
 }
 
-/** Every module path Convex would bundle out of `dir`, extension stripped. */
 export function discoverModules(
   dir,
   readFile = readFileSync,

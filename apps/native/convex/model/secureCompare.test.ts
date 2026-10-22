@@ -1,6 +1,4 @@
 // @vitest-environment edge-runtime
-// Runs under edge-runtime so `crypto.subtle` behaves like the default Convex
-// V8 runtime that http.ts executes in.
 import { describe, expect, it } from "vitest";
 
 import { constantTimeBytesEqual, secureCompare } from "./secureCompare";
@@ -24,7 +22,6 @@ describe("secureCompare", () => {
   });
 
   it("is not fooled by unicode that renders alike", async () => {
-    // Different code points, same visual glyph on many fonts.
     expect(await secureCompare("token-é", "token-é")).toBe(false);
   });
 });

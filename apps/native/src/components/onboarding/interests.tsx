@@ -4,36 +4,22 @@ import { withAlpha } from "@/lib/color";
 import { t, useAppLocale } from "@/lib/i18n";
 import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
-import {
-  TRAVEL_VIBES,
-  VIBES_INTEREST,
-  type TravelVibe,
-} from "@/lib/travel-vibes";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Softens the picks where they pass under Continue, so a cut-off row reads as
-// more to scroll. The picks end this far up, so the last row clears it.
 const FADE_HEIGHT = 32;
 
-/** "What are you into?": each picked topic becomes a space and leads the
- * first-save picker. Picking none is fine; the step never blocks. Picking
- * Travel asks one thing more, what kind of spots, in a card under the topics;
- * each of those picks is a space too (travel-vibes.ts). The picks scroll on
- * their own and Continue stays pinned under them, so the card opening never
- * pushes it off screen. */
+/** Travel is its own goal now, so the topics offer everything else. */
+const TOPICS = INTERESTS.filter((interest) => interest !== "Travel");
+
 export function InterestsStep({
   picked,
-  vibes,
   onToggle,
-  onToggleVibe,
   onAdvance,
 }: {
   picked: readonly Interest[];
-  vibes: readonly TravelVibe[];
   onToggle: (interest: Interest) => void;
-  onToggleVibe: (vibe: TravelVibe) => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -56,7 +42,7 @@ export function InterestsStep({
           </View>
 
           <View style={styles.chips}>
-            {INTERESTS.map((interest) => (
+            {TOPICS.map((interest) => (
               <Chip
                 key={interest}
                 label={onboardingLabel(interest)}
@@ -65,52 +51,28 @@ export function InterestsStep({
               />
             ))}
           </View>
-
-          {picked.includes(VIBES_INTEREST) ? (
-            <View style={styles.card}>
-              <View style={styles.cardHead}>
-                <Text style={styles.eyebrow}>
-                  {onboardingLabel(VIBES_INTEREST)}
-                </Text>
-                <Text style={styles.cardTitle}>
-                  {t("interests.vibesTitle")}
-                </Text>
-              </View>
-              <View style={styles.chips}>
-                {TRAVEL_VIBES.map((vibe) => (
-                  <Chip
-                    key={vibe}
-                    label={onboardingLabel(vibe)}
-                    active={vibes.includes(vibe)}
-                    small
-                    onPress={() => onToggleVibe(vibe)}
-                  />
-                ))}
-              </View>
-            </View>
-          ) : null}
         </ScrollView>
         <View pointerEvents="none" style={styles.fade} />
       </View>
 
       <View style={styles.foot}>
-        <CtaButton label={t("common.continue")} onPress={onAdvance} />
+        <CtaButton
+          label={t("common.continue")}
+          onPress={onAdvance}
+          disabled={picked.length === 0}
+        />
       </View>
     </View>
   );
 }
 
-/** One pick. The card's chips are a size down and take the page's background,
- * so they read as sitting inside the card rather than beside the topics. */
 function Chip({
   label,
   active,
-  small = false,
   onPress,
 }: {
   label: string;
   active: boolean;
-  small?: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -121,18 +83,11 @@ function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
-        small && styles.chipSmall,
         active && styles.chipActive,
         pressed && { opacity: 0.85 },
       ]}
     >
-      <Text
-        style={[
-          styles.chipLabel,
-          small && styles.chipLabelSmall,
-          active && styles.chipLabelActive,
-        ]}
-      >
+      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
         {label}
       </Text>
       {active ? (
@@ -200,11 +155,6 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
-  chipSmall: {
-    minHeight: 44,
-    paddingVertical: theme.gap(1),
-    backgroundColor: theme.colors.background,
-  },
   chipActive: {
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primarySoft,
@@ -214,36 +164,8 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 16,
     color: theme.colors.foreground,
   },
-  chipLabelSmall: {
-    fontSize: 15,
-  },
   chipLabelActive: {
     color: theme.colors.primaryText,
-  },
-  card: {
-    gap: theme.gap(1.5),
-    padding: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  cardHead: {
-    gap: theme.gap(0.5),
-  },
-  eyebrow: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    color: theme.colors.primaryText,
-  },
-  cardTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    lineHeight: 22,
-    color: theme.colors.foreground,
   },
   foot: {
     paddingTop: theme.gap(1),

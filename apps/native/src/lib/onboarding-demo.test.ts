@@ -1,125 +1,53 @@
 import { describe, expect, it } from "vitest";
-import {
-  demoDestination,
-  featuredDemoKind,
-  orderDemoSamples,
-  practiceShareSample,
-} from "./onboarding-demo";
+import { INTERESTS } from "./onboarding-interests";
+import { findSample, practiceShareSample } from "./onboarding-demo";
+import { SAMPLE_CITY_IDS } from "./sample-cities";
 
-describe("orderDemoSamples", () => {
-  it("puts the picked kinds' samples first", () => {
-    expect(
-      orderDemoSamples(["Fitness", "Articles", "Travel"]).map((s) => s.domain),
-    ).toEqual(["fs.blog", "prague.eu", "bbcgoodfood.com"]);
+describe("practiceShareSample", () => {
+  it.each([
+    ["Travel", "prague.eu"],
+    ["Food & recipes", "bbcgoodfood.com"],
+    ["Style & shopping", "apple.com"],
+    ["AI & tech", "anthropic.com"],
+    ["Films, books & music", "jamesclear.com"],
+  ] as const)("offers %s's page for that topic", (interest, domain) => {
+    expect(practiceShareSample([interest])?.domain).toBe(domain);
   });
 
-  it("offers three samples when no picked kind has one", () => {
-    expect(orderDemoSamples(["Fitness"]).map((s) => s.domain)).toEqual([
-      "bbcgoodfood.com",
-      "apple.com",
-      "prague.eu",
-    ]);
+  it("follows the first picked topic", () => {
+    expect(practiceShareSample(["AI & tech", "Travel"])?.domain).toBe(
+      "anthropic.com",
+    );
+  });
+
+  it("offers the reading article when no topic was picked", () => {
+    expect(practiceShareSample([])?.domain).toBe("fs.blog");
+  });
+
+  it.each(INTERESTS)("finds %s's post by its link", (interest) => {
+    const sample = practiceShareSample([interest]);
+    expect(sample?.url).toMatch(/^https:\/\//);
+    expect(findSample(sample!.url)?.pageHeading).toBe(sample?.pageHeading);
   });
 });
 
-describe("samples for picked topics", () => {
-  it("follows the first picked kind's sample with the topics' samples", () => {
-    expect(
-      orderDemoSamples(
-        ["Recipes", "Travel"],
-        ["AI & tech", "Films, books & music"],
-      ).map((s) => s.domain),
-    ).toEqual(["bbcgoodfood.com", "anthropic.com", "jamesclear.com"]);
+describe("the picked city's travel post", () => {
+  it("is Prague's page when no city, or Prague, was picked", () => {
+    expect(practiceShareSample(["Travel"], null)?.domain).toBe("prague.eu");
+    expect(practiceShareSample(["Travel"], "prague")?.domain).toBe("prague.eu");
   });
 
-  it("leads with a topic when no picked kind has a sample", () => {
-    expect(orderDemoSamples(["Fitness"], ["AI & tech"])[0]?.domain).toBe(
-      "anthropic.com",
-    );
-    expect(featuredDemoKind(["Fitness"], ["AI & tech"])).toBe("Articles");
-  });
-
-  it.each([
-    ["Food & recipes", "bbcgoodfood.com", "Recipes"],
-    ["Style & shopping", "apple.com", "Products"],
-  ] as const)(
-    "names %s's shared sample by its kind when it leads",
-    (interest, domain, kind) => {
-      expect(orderDemoSamples(["Fitness"], [interest])[0]?.domain).toBe(domain);
-      expect(featuredDemoKind(["Fitness"], [interest])).toBe(kind);
+  it.each(SAMPLE_CITY_IDS.filter((city) => city !== "prague"))(
+    "is a page of its own for %s, found by its link",
+    (city) => {
+      const sample = practiceShareSample(["Travel"], city);
+      expect(sample?.city).toBe(city);
+      expect(sample?.url).not.toContain("prague");
+      expect(findSample(sample!.url)?.pageHeading).toBe(sample?.pageHeading);
     },
   );
 
-  it("shows a page once when a kind and a topic both offer it", () => {
-    const domains = orderDemoSamples(
-      ["Travel"],
-      ["Travel", "Food & recipes"],
-    ).map((s) => s.domain);
-    expect(domains).toEqual(["prague.eu", "bbcgoodfood.com", "apple.com"]);
-  });
-
-  it("files a topic's sample into that topic's space when it was kept", () => {
-    const url = "https://www.anthropic.com/research/building-effective-agents";
-    expect(demoDestination(url, ["AI & tech", "Articles"])).toBe("AI & tech");
-    expect(demoDestination(url, ["Articles"])).toBe("Articles");
-    expect(demoDestination(url, [])).toBeNull();
-  });
-
-  it("files a page a topic shares with a kind into the topic's space", () => {
-    const url = "https://www.bbcgoodfood.com/recipes/classic-lasagne";
-    expect(demoDestination(url, ["Food & recipes", "Recipes"])).toBe(
-      "Food & recipes",
-    );
-    expect(demoDestination(url, ["Recipes"])).toBe("Recipes");
-  });
-});
-
-describe("featuredDemoKind", () => {
-  it("names the leading sample's kind when setup picked it", () => {
-    expect(featuredDemoKind(["Fitness", "Videos", "Recipes"])).toBe("Videos");
-  });
-
-  it("is null when nothing picked has a sample", () => {
-    expect(featuredDemoKind(["Fitness"])).toBeNull();
-    expect(featuredDemoKind([])).toBeNull();
-  });
-});
-
-describe("practiceShareSample", () => {
-  it("uses the reading article when the demo saved something else", () => {
-    expect(
-      practiceShareSample(
-        ["Recipes"],
-        "https://www.bbcgoodfood.com/recipes/classic-lasagne",
-      )?.domain,
-    ).toBe("fs.blog");
-  });
-
-  it("uses the reading article when nothing was saved", () => {
-    expect(practiceShareSample(["Travel"], null)?.domain).toBe("fs.blog");
-  });
-
-  it("falls back to a picked kind when the article was the demo save", () => {
-    expect(
-      practiceShareSample(["Travel", "Recipes"], "https://fs.blog/reading/")
-        ?.domain,
-    ).toBe("prague.eu");
-  });
-});
-
-describe("demoDestination", () => {
-  const travelUrl =
-    "https://www.prague.eu/en/objevujte/old-town-square-staromestske-namesti/";
-
-  it("files a sample into its kind's first preset when kept", () => {
-    expect(demoDestination(travelUrl, ["Trip ideas", "Travel"])).toBe("Travel");
-  });
-
-  it("leaves the sample unfiled when the preset was removed", () => {
-    expect(demoDestination(travelUrl, ["Trip ideas"])).toBeNull();
-  });
-
-  it("never files an arbitrary shared link", () => {
-    expect(demoDestination("https://example.com/post", ["Travel"])).toBeNull();
+  it("leaves another topic's post alone", () => {
+    expect(practiceShareSample(["AI & tech"], "tokyo")?.city).toBeUndefined();
   });
 });

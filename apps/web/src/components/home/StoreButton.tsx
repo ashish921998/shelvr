@@ -10,7 +10,6 @@ const VARIANTS = {
     "h-11 gap-2.5 pr-5 pl-4 text-[15px] bg-ember text-ink hover:bg-ember-light [&>svg]:h-5 [&>svg]:w-4",
 };
 
-/** The landing page's App Store link: campaign-tagged, fires `app_store_clicked`. */
 export default function StoreButton({
   source,
 }: {

@@ -9,11 +9,6 @@ import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import { FIXTURE_ORIGIN } from "./model/fakeAi";
 import { newConvexTest, signedInUser } from "./test.setup";
 
-// The e2e backend's settings, in place before ai.ts and its model load. Unlike
-// fakeAi.test.ts, nothing here hands the fake a prompt: the actions build their
-// own and send them through the real generateObject, so a change to a prompt or
-// a schema that the fake no longer recognizes fails here, not on the
-// simulator.
 vi.hoisted(() => {
   vi.stubEnv("E2E_FAKE_AI", "local-v1");
   vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
@@ -21,7 +16,6 @@ vi.hoisted(() => {
   vi.stubEnv("CONVEX_CLOUD_URL", "http://127.0.0.1:3210");
 });
 
-// Embeddings are a separate provider the fake does not stand in for.
 const embedMany = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (original) => ({
   ...(await original<typeof import("ai")>()),
@@ -38,7 +32,6 @@ beforeEach(() => {
       Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => (i === 0 ? 1 : 0)),
     ),
   }));
-  // Every page read and model call is answered locally.
   vi.stubGlobal(
     "fetch",
     vi.fn(() => {
@@ -128,8 +121,6 @@ describe("the e2e fake model behind processItem", () => {
 
 describe("the e2e fake model behind recommendForSpace", () => {
   it("suggests the saves that share a word with the new space's name", async () => {
-    // On the e2e backend the placeholder key fails the embedding call, so
-    // the candidates are the newest saves.
     embedMany.mockRejectedValue(new Error("no embedding provider"));
     const { t, userId } = await signedInUser(newConvexTest());
     const spaceId = await t.run(async (ctx) => {

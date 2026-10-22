@@ -4,24 +4,19 @@ import { onboardingCompletedProperties } from "./onboarding-completed";
 describe("onboardingCompletedProperties", () => {
   it("lists the travel vibes apart from the topics, and counts them as spaces", () => {
     expect(
-      onboardingCompletedProperties(
-        ["Travel"],
-        [
-          "Travel",
-          "Good food",
-          "Date nights",
-          "AI & tech",
-          "Read later",
-          "Prague",
-        ],
-      ),
+      onboardingCompletedProperties([
+        "Travel",
+        "Good food",
+        "Date nights",
+        "AI & tech",
+        "Read later",
+        "Prague",
+      ]),
     ).toEqual({
       save_pileup: [],
-      save_types: ["Travel"],
       interests: ["Travel", "AI & tech"],
       travel_vibes: ["Good food", "Date nights"],
       space_count: 6,
-      // Vibes are preset identities, so they are named; only "Prague" is typed.
       space_names: [
         "Travel",
         "Good food",
@@ -30,17 +25,31 @@ describe("onboardingCompletedProperties", () => {
         "Read later",
       ],
       custom_space_count: 1,
-      $set: { save_pileup: [], save_types: ["Travel"] },
+      sample_city: null,
+      goal: null,
+      $set: { save_pileup: [] },
     });
   });
 
   it("sends empty lists when nothing was picked", () => {
-    expect(onboardingCompletedProperties([], [])).toMatchObject({
+    expect(onboardingCompletedProperties([])).toMatchObject({
       interests: [],
       travel_vibes: [],
       space_count: 0,
       space_names: [],
       custom_space_count: 0,
+    });
+  });
+
+  it("names the goal picked first", () => {
+    expect(
+      onboardingCompletedProperties(["Date nights"], "paris", "date"),
+    ).toMatchObject({ goal: "date", sample_city: "paris" });
+  });
+
+  it("names the sample trip's city when one was picked", () => {
+    expect(onboardingCompletedProperties(["Travel"], "tokyo")).toMatchObject({
+      sample_city: "tokyo",
     });
   });
 });

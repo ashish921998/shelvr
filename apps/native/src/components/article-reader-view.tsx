@@ -39,10 +39,6 @@ type Props = {
   paragraphs: string[];
 };
 
-// Compact reading layout for link saves with extracted article content. Keeps
-// metadata (thumbnail, source, description, tags) in a single summary row so
-// the full article begins in the first quarter of the screen. Extracted from
-// ItemDetail to keep each render path independently scannable.
 export function ArticleReaderView({
   item,
   isZoomTarget,
@@ -56,12 +52,9 @@ export function ArticleReaderView({
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
-  // A picture that fails to load falls back to the monogram too. Keyed by
-  // URL, so a recycled page with a new picture tries it.
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const window = useWindowDimensions();
 
-  // Media after the last stored paragraph shows at the end.
   const mediaByParagraph = useMemo(() => {
     const byParagraph = new Map<number, ArticleMedia[]>();
     for (const media of item.articleMedia ?? []) {
@@ -71,7 +64,6 @@ export function ArticleReaderView({
     return byParagraph;
   }, [item.articleMedia, paragraphs.length]);
 
-  // A recycled reader instance must open at the top of its article.
   const scrollRef = useRef<ScrollViewInstance>(null);
   const scrolledItemRef = useRef(item._id);
   useLayoutEffect(() => {
@@ -83,7 +75,6 @@ export function ArticleReaderView({
 
   const openSource = () => openItemSource(item);
 
-  // Full body width, but a tall video poster stops at 60% of the screen.
   const mediaFrame = (aspectRatio: number) => {
     const width = Math.min(
       window.width - theme.gap(2.5) * 2,
@@ -130,7 +121,6 @@ export function ArticleReaderView({
     .filter(Boolean)
     .join(" · ");
 
-  // A save with no picture shows its site's first letter, like a book spine.
   const monogram = siteMonogram(item.url);
   const thumbnail =
     heroUri && heroUri !== failedUri ? (
@@ -142,8 +132,6 @@ export function ArticleReaderView({
         onError={() => setFailedUri(heroUri)}
       />
     ) : (
-      // Not collapsable: the zoom target flattens a plain view, which drew
-      // the fallback as an empty box.
       <View collapsable={false} style={styles.thumbnailFallback}>
         {monogram ? (
           <Text
@@ -207,8 +195,6 @@ export function ArticleReaderView({
               ) : null}
             </View>
 
-            {/* A recipe page goes straight to its tabs: the summary only
-                restates the dish the title already names. */}
             {item.description && !item.recipe ? (
               <Text numberOfLines={2} style={styles.description}>
                 {item.description}
@@ -253,10 +239,6 @@ export function ArticleReaderView({
           <ItemSpaces itemId={item._id} spaces={spaces} />
         ) : null}
 
-        {/* A recipe page replaces the article body: the classifier already
-            lifted the ingredients and steps out of the story around them. The
-            article's own images go with that story, since their positions are
-            paragraph-relative and the paragraphs are gone. */}
         {item.recipe ? (
           <RecipeSection key={item._id} recipe={item.recipe} />
         ) : (

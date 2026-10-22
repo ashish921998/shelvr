@@ -15,21 +15,14 @@ import { settleIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { AccessibilityInfo, Platform, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// The done screen arrives in beats: the badge settles, then the words, then the
-// shared link lands, then the way on.
 const SETTLE_TITLE = settleIn(200);
 const SETTLE_BODY = settleIn(350);
 const SETTLE_ROW = settleIn(600);
-const SETTLE_CTA = settleIn(850);
 
-/** "received" means the share reached Shelvr and waits for the share
- * screen, which saves it after onboarding; nothing is saved here.
- * "sheet_stuck" means a tap reached the step while an earlier sheet was
- * still unanswered, so that sheet never came up. */
 type Outcome =
   | "received"
   | "other_app"
@@ -56,22 +49,15 @@ function heldShares(): string {
   }
 }
 
-/**
- * After the first save and before the paywall: one save through the real share
- * sheet, so the Shelvr tile is found once while help is on screen. The
- * shared link is not saved here. It stays in expo-sharing, flagged for the
- * share screen, which saves it the normal way once onboarding finishes.
- */
 export function SharePracticeStep({
+  title,
   sample,
   leaving,
   onFinish,
 }: {
-  /** A sample other than the one saved in the demo. */
+  title?: string;
   sample: DemoSample | undefined;
-  /** `onFinish` ran and the paywall is on its way: nothing here takes taps. */
   leaving: boolean;
-  /** Leaves onboarding; the screen puts the paywall in front of the app. */
   onFinish: () => void;
 }) {
   useAppLocale();
@@ -80,9 +66,6 @@ export function SharePracticeStep({
   const [wrongApp, setWrongApp] = useState(false);
   const reported = useRef(false);
   const receivedRef = useRef(false);
-  // A share held from before this step (one the demo left for the share
-  // screen). The practice only runs when there is none, so any share that
-  // shows up during it is the practice share.
   const [waiting] = useState(heldShares);
   const hasIncomingShare = useCallback(() => heldShares() !== "", []);
 
@@ -98,7 +81,6 @@ export function SharePracticeStep({
     analytics.capture("onboarding_share_practice", { outcome });
   }, []);
 
-  // The foreground listener and the share result can both see one share.
   const markReceived = useCallback(() => {
     if (receivedRef.current) return;
     receivedRef.current = true;
@@ -112,6 +94,9 @@ export function SharePracticeStep({
     }
     setWrongApp(false);
     setReceived(true);
+    AccessibilityInfo.announceForAccessibility(
+      `${t("sharePractice.savedTitle")} ${t("sharePractice.savedBody")}`,
+    );
     report("received");
   }, [report]);
 
@@ -124,11 +109,7 @@ export function SharePracticeStep({
     false,
   );
 
-  // When the share sheet was asked for, while iOS has not answered; null
-  // when no sheet is pending. A sheet iOS refuses to show never answers, so
-  // nothing here may wait on it: the post and "later" stay tappable.
   const pendingSince = useRef<number | null>(null);
-  // The sheet answered and its result is on its way (the dismiss wait).
   const settling = useRef(false);
   const attempt = useRef(0);
 
@@ -142,18 +123,11 @@ export function SharePracticeStep({
     pendingSince.current = Date.now();
     setWrongApp(false);
     setSheetOpen(true);
-    const result = await presentShareSheet(
-      sample.url,
-      hasIncomingShare,
-      // The sheet answered, so it was up: a tap during the dismiss wait
-      // after it is not a stuck sheet.
-      () => {
-        if (current !== attempt.current) return;
-        pendingSince.current = null;
-        settling.current = true;
-      },
-    );
-    // A newer tap took over from a sheet that never came up.
+    const result = await presentShareSheet(sample.url, hasIncomingShare, () => {
+      if (current !== attempt.current) return;
+      pendingSince.current = null;
+      settling.current = true;
+    });
     if (current !== attempt.current) return;
     pendingSince.current = null;
     settling.current = false;
@@ -172,8 +146,6 @@ export function SharePracticeStep({
   };
 
   const skip = () => {
-    // A sheet still pending answers into nothing: its result must not
-    // finish the step a second time or log after "skipped".
     attempt.current += 1;
     pendingSince.current = null;
     settling.current = false;
@@ -181,8 +153,6 @@ export function SharePracticeStep({
     onFinish();
   };
 
-  // A share is already held for the share screen, and a practice share would
-  // replace it. Someone who shared to Shelvr on their own needs no practice.
   const finishRef = useRef(onFinish);
   useEffect(() => {
     finishRef.current = onFinish;
@@ -212,8 +182,6 @@ export function SharePracticeStep({
           >
             {t("sharePractice.savedBody")}
           </Animated.Text>
-          {/* The link they just shared, landing: "on your shelf" has
-              something to point at. */}
           {sample === undefined ? null : (
             <Animated.View
               entering={SETTLE_ROW}
@@ -224,14 +192,11 @@ export function SharePracticeStep({
             </Animated.View>
           )}
         </View>
-        <Animated.View entering={SETTLE_CTA}>
-          {/* The promise step comes next, and the paywall after it. */}
-          <CtaButton
-            label={t("common.continue")}
-            onPress={onFinish}
-            busy={leaving}
-          />
-        </Animated.View>
+        <CtaButton
+          label={t("common.continue")}
+          onPress={onFinish}
+          busy={leaving}
+        />
       </View>
     );
   }
@@ -244,12 +209,11 @@ export function SharePracticeStep({
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         >
-          {t("sharePractice.title")}
+          {title ?? t("sharePractice.title")}
         </Text>
         <Text style={styles.support}>{t("sharePractice.subtitle")}</Text>
       </View>
 
-      {/* Above the post, so the sheet never covers it while it is open. */}
       <ShareSteps active={sheetOpen ? 2 : 1} />
       {sample === undefined ? null : (
         <PracticePost
@@ -262,8 +226,6 @@ export function SharePracticeStep({
         <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
       ) : null}
 
-      {/* The step's one button, like every other onboarding step: the post
-          alone did not read as the thing to tap. */}
       <View style={styles.foot}>
         <Text style={[styles.tip, styles.center]}>
           {t(

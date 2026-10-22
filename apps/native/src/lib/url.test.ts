@@ -88,7 +88,6 @@ describe("siteMonogram", () => {
   });
 
   it("keeps an astral first character whole", () => {
-    // An unparseable URL falls back to the raw text, emoji and all.
     expect(siteMonogram("😀 saved thing")).toBe("😀");
   });
 

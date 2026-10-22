@@ -16,17 +16,9 @@ import {
   scheduleCaptureRetry,
 } from "./model/posthogCapture";
 
-// Revenue is the one signal worth surfacing when it cannot be delivered, so
-// payment capture keeps the longest budget and throws once it is spent.
 const MAX_PAYMENT_ATTEMPTS = 5;
-// A save is already committed by the time this runs; a lost event costs the
-// funnel one row, so it retries briefly and then warns.
 const MAX_SAVE_ATTEMPTS = 3;
-// The notification is already out by the time this runs, so a lost event costs
-// the funnel one row and nothing else. Same budget as a save.
 const MAX_NOTIFICATION_ATTEMPTS = 3;
-// A processing outcome is already written to the item row; the event only
-// feeds the funnel. Same budget as a save.
 const MAX_ITEM_PROCESSED_ATTEMPTS = 3;
 
 export const capturePayment = internalAction({
@@ -46,8 +38,6 @@ export const capturePayment = internalAction({
       timestamp: payment.timestamp,
       properties: {
         $process_person_profile: false,
-        // Production keeps the store's own environment so sandbox purchases
-        // stay separable there; every other deployment is development.
         environment:
           env.OBSERVABILITY_ENV === "production"
             ? payment.environment
@@ -59,8 +49,6 @@ export const capturePayment = internalAction({
         payment_kind: payment.payment_kind,
         country_code: payment.country_code,
         revenue_usd: payment.revenue_usd,
-        // Cancellation events only; dropped from the body when absent,
-        // so purchase payloads are unchanged.
         cancel_reason: payment.cancel_reason,
         cancel_category: payment.cancel_category,
       },
@@ -69,8 +57,6 @@ export const capturePayment = internalAction({
     if (delivery.status === "rejected") {
       throw new Error(`Payment analytics HTTP ${delivery.httpStatus}`);
     }
-    // A missing token is retried too: the deployment may still be mid-setup,
-    // and the event is worth holding onto until it is.
     const attempt = args.attempt ?? 0;
     const retried = await scheduleCaptureRetry(
       attempt,
@@ -100,11 +86,7 @@ export const captureSave = internalAction({
     savedAt: v.number(),
     sessionId: v.optional(v.string()),
     saveSource: v.optional(saveSourceValidator),
-    // The import operation the save went through, when it used the
-    // `itemOperations` ledger. Joins this event to the client-side
-    // `save_attempt_started`/`save_failed` attempts that minted the same id.
     operationId: v.optional(v.string()),
-    // Image saves only: photos held after this save, and the stored file size.
     photoCount: v.optional(v.number()),
     storedBytes: v.optional(v.number()),
     attempt: v.optional(v.number()),
@@ -139,7 +121,6 @@ export const captureSave = internalAction({
       });
       return null;
     }
-    // A delivery failure cannot affect the already committed save.
     const attempt = args.attempt ?? 0;
     const retried = await scheduleCaptureRetry(
       attempt,
@@ -165,13 +146,9 @@ export const captureItemProcessed = internalAction({
     itemId: v.id("items"),
     userId: v.string(),
     itemType: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
-    // `ready` includes `partial`/`no_article` enrichment, which is a usable
-    // item the user can act on; `failed` carries the bounded reason below.
     outcome: v.union(v.literal("ready"), v.literal("failed")),
     failureReason: v.optional(failureReasonValidator),
     enrichment: v.optional(enrichmentValidator),
-    // How long the run that produced this outcome took, from its own start
-    // (not `_creationTime`, so a `reprocessItem` retry is measured alone).
     processingMs: v.number(),
     finishedAt: v.number(),
     attempt: v.optional(v.number()),
@@ -188,8 +165,6 @@ export const captureItemProcessed = internalAction({
       timestamp: args.finishedAt,
       properties: {
         $process_person_profile: false,
-        // Joins to `item_saved` by id, so the save funnel's last leg
-        // (did the persisted item become usable) is one query.
         item_id: args.itemId,
         item_type: args.itemType,
         outcome: args.outcome,
@@ -233,12 +208,9 @@ export const captureItemProcessed = internalAction({
 export const captureNotification = internalAction({
   args: {
     userId: v.string(),
-    /** The weekly digest or save reminder id; also the payload's `notificationId`. */
     notificationId: v.string(),
     kind: v.string(),
     itemCount: v.number(),
-    /** Provider acceptance, not a device read. Expo reports that APNs or FCM
-     * took the message; nothing here knows whether it was shown or seen. */
     delivered: v.boolean(),
     sentAt: v.number(),
     attempt: v.optional(v.number()),
@@ -255,8 +227,6 @@ export const captureNotification = internalAction({
       timestamp: args.sentAt,
       properties: {
         $process_person_profile: false,
-        // The payload carries the same id, so an open recorded by the client
-        // joins to this row without a second identifier.
         notification_id: args.notificationId,
         notification_kind: args.kind,
         item_count: args.itemCount,

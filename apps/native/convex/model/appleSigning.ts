@@ -1,9 +1,3 @@
-/**
- * ES256 JWTs signed with an Apple .p8 key, shared by the Sign in with Apple
- * client secret and the retention offer signature. WebCrypto's ECDSA
- * signature is already the raw r||s form a JWT wants. Runtime-neutral.
- */
-
 function base64Url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, "-")

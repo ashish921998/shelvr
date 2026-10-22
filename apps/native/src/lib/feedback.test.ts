@@ -33,7 +33,6 @@ vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));
 
-// In-memory MMKV so the storage boundary is exercised without a native runtime.
 const kv = vi.hoisted(() => new Map<string, string>());
 vi.mock("react-native-mmkv", () => ({
   createMMKV: () => ({

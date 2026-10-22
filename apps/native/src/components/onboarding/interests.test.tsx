@@ -1,14 +1,9 @@
 // @vitest-environment jsdom
-// The interests step: topics as checkboxes and, once Travel is picked, one
-// card more asking what kind of spots. Every pick is handed back to the
-// screen, which keeps topics and spots alike as spaces; the screen's wiring
-// is tested in src/lib/interests-screen.test.tsx.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { INTERESTS, type Interest } from "@/lib/onboarding-interests";
 import { onboardingLabel } from "@/lib/onboarding-labels";
-import { TRAVEL_VIBES, type TravelVibe } from "@/lib/travel-vibes";
 import { InterestsStep } from "./interests";
 
 type Children = { children?: ReactNode };
@@ -62,65 +57,37 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/use-large-text", () => ({ HEADLINE_MAX_SCALE: 1.5 }));
 vi.mock("@/components/onboarding/parts", () => ({ CtaButton: mock.button }));
 
-// With t() returning its key, every label is its catalog key.
-const SPOTS_TITLE = "interests.vibesTitle";
 const chip = (id: string, checked?: boolean) =>
   screen.getByRole("checkbox", { name: onboardingLabel(id), checked });
 
-function renderStep(picked: Interest[] = [], vibes: TravelVibe[] = []) {
+function renderStep(picked: Interest[] = []) {
   const onToggle = vi.fn();
-  const onToggleVibe = vi.fn();
   render(
-    <InterestsStep
-      picked={picked}
-      vibes={vibes}
-      onToggle={onToggle}
-      onToggleVibe={onToggleVibe}
-      onAdvance={vi.fn()}
-    />,
+    <InterestsStep picked={picked} onToggle={onToggle} onAdvance={vi.fn()} />,
   );
-  return { onToggle, onToggleVibe };
+  return { onToggle };
 }
 
 describe("InterestsStep", () => {
-  it("asks nothing more while Travel is not picked", () => {
-    renderStep(["AI & tech"]);
-    expect(screen.queryByText(SPOTS_TITLE)).toBeNull();
-    expect(screen.getAllByRole("checkbox")).toHaveLength(INTERESTS.length);
+  it("offers every topic but Travel, which is its own goal", () => {
+    renderStep();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(INTERESTS.length - 1);
+    expect(
+      screen.queryByRole("checkbox", { name: onboardingLabel("Travel") }),
+    ).toBeNull();
+  });
+
+  it("shows a picked topic checked and hands a tapped one back", () => {
+    const { onToggle } = renderStep(["AI & tech"]);
     expect(chip("AI & tech", true)).toBeTruthy();
-  });
-
-  it("asks what kind of spots once Travel is picked", () => {
-    renderStep(["Travel"]);
-    expect(screen.getByText(SPOTS_TITLE)).toBeTruthy();
-    for (const vibe of TRAVEL_VIBES) expect(chip(vibe, false)).toBeTruthy();
-    expect(screen.getAllByRole("checkbox")).toHaveLength(
-      INTERESTS.length + TRAVEL_VIBES.length,
-    );
-    // The card's eyebrow names the topic it follows, under the Travel chip.
-    expect(screen.getAllByText(onboardingLabel("Travel"))).toHaveLength(2);
-  });
-
-  it("hands a tapped spot back and shows a picked one checked", () => {
-    const { onToggle, onToggleVibe } = renderStep(["Travel"], ["Hidden gems"]);
-    expect(chip("Hidden gems", true)).toBeTruthy();
-    fireEvent.click(chip("Good food", false));
-    expect(onToggleVibe).toHaveBeenCalledExactlyOnceWith("Good food");
-    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(chip("Home & design", false));
+    expect(onToggle).toHaveBeenCalledExactlyOnceWith("Home & design");
   });
 
   it("keeps Continue out of the scrolling picks, so it stays on screen", () => {
-    renderStep(["Travel"]);
+    renderStep(["AI & tech"]);
     const picks = screen.getByTestId("picks");
-    expect(picks.contains(chip("Travel"))).toBe(true);
-    expect(picks.contains(chip("Good food"))).toBe(true);
+    expect(picks.contains(chip("AI & tech"))).toBe(true);
     expect(picks.contains(screen.getByText("common.continue"))).toBe(false);
-  });
-
-  it("hands a tapped topic back, Travel included", () => {
-    const { onToggle, onToggleVibe } = renderStep(["Travel"]);
-    fireEvent.click(chip("Travel", true));
-    expect(onToggle).toHaveBeenCalledExactlyOnceWith("Travel");
-    expect(onToggleVibe).not.toHaveBeenCalled();
   });
 });

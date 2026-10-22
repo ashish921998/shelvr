@@ -20,8 +20,6 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** End index of the JSX opening tag starting at `start`, skipping `>` inside
- * `{...}` expressions such as arrow functions. */
 function openingTagEnd(source: string, start: number): number {
   let depth = 0;
   for (let i = start; i < source.length; i++) {
@@ -33,7 +31,6 @@ function openingTagEnd(source: string, start: number): number {
   return source.length;
 }
 
-/** Line numbers of style functions inside a `<Link asChild>` block. */
 function slottedStyleFunctions(source: string): number[] {
   const lines: number[] = [];
   const linkOpen = /<Link\b/g;

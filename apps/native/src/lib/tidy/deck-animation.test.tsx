@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from "vitest";
 import { DeckAnimationProvider, useDeckAnimation } from "./deck-animation";
 
 const shared = vi.hoisted(() => ({
-  // Minimal SharedValue stand-in; the real one lives on the UI thread.
   make: (initial: unknown) => ({
     value: initial,
     get() {

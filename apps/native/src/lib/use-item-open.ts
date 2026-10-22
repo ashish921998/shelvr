@@ -21,7 +21,6 @@ export function useItemOpen(
       const record = () => {
         if (recorded || AppState.currentState !== "active") return;
         recorded = true;
-        // Only the focused pager's active item calls this, never preloaded pages.
         analytics.itemOpened(
           { _id: id, _creationTime: savedAt, type, fixtureKey },
           source,

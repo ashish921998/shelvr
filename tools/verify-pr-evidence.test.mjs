@@ -106,11 +106,13 @@ test("a screenshot outside the Evidence section does not count", () => {
   assert.equal(evidenceProblems(body, [SCREEN]).length, 1);
 });
 
-test("the owner's waiver label passes a UI change; a sentence alone does not", () => {
+test("the waiver label passes a UI change; a sentence alone does not", () => {
   const body = filled({
     evidence: "No UI change: renames a prop, the screen is identical.",
   });
-  assert.equal(evidenceProblems(body, [SCREEN]).length, 1);
+  const problems = evidenceProblems(body, [SCREEN]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /gh pr edit --add-label no-ui-change/);
   assert.deepEqual(evidenceProblems(body, [SCREEN], [WAIVER_LABEL]), []);
 });
 
@@ -167,11 +169,9 @@ test("a comment marker inside a code fence hides nothing after it", () => {
 });
 
 test("what GitHub renders around a comment still counts", () => {
-  // The comment closes before the image, so a reader sees the image.
   assert.ok(
     hasVisualEvidence("<!<!-- x -->-- ![shot](https://x.dev/a.png) -->"),
   );
-  // GitHub autolinks a URL after "(", so a broken embed still links the image.
   assert.ok(hasVisualEvidence("![badge](https://x.dev/a.png"));
 });
 
@@ -272,8 +272,6 @@ test("which files count as UI", () => {
 
 test("a waiver line cannot swallow the next heading", () => {
   const body = filled({ evidence: "No UI change:" });
-  // "No UI change:" alone is content-free reasoning but still text; the UI rule
-  // is what must hold, and it does not read past the line.
   assert.equal(evidenceProblems(body, [SCREEN]).length, 1);
 });
 

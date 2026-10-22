@@ -77,11 +77,16 @@ describe("weekly nudge timing", () => {
 
   it("treats the launch that first sees an account as its first session", () => {
     expect(isFirstSession("user_a")).toBe(true);
-    // Same launch, asked again.
     expect(isFirstSession("user_a")).toBe(true);
-    // A later launch stored a different id first.
     store.set("shelvr.firstLaunch.user_b", "an-earlier-launch");
     expect(isFirstSession("user_b")).toBe(false);
+  });
+
+  it("gives every launch its own id", async () => {
+    expect(isFirstSession("user_a")).toBe(true);
+    vi.resetModules();
+    const laterLaunch = await import("./first-share");
+    expect(laterLaunch.isFirstSession("user_a")).toBe(false);
   });
 
   it("waits for three real saves outside the first session", () => {

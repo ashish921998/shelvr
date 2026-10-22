@@ -14,11 +14,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// One save, drawn the way the feed draws it, turning from what arrived (a
-// bare address, a note, a photo with no name) into what the shelf shows: a
-// title and tags. It plays once, then rests on the finished save. With
-// Reduce Motion on, only the finished save is drawn.
-
 type HeroSave = {
   type: "image" | "link" | "note";
   title: string;
@@ -29,7 +24,6 @@ type HeroSave = {
 
 const HERO_TAGS = 3;
 const TOTAL_MS = 3200;
-// Beats as fractions of the whole, so one timing drives every part.
 export const HERO_BEATS = {
   scan: [700 / TOTAL_MS, 1500 / TOTAL_MS],
   reveal: [1400 / TOTAL_MS, 1900 / TOTAL_MS],
@@ -38,7 +32,6 @@ export const HERO_BEATS = {
 } as const;
 const SCAN_WIDTH = 56;
 
-/** Eased progress of one beat, 0 before it starts and 1 once it is over. */
 export function beat(progress: number, from: number, to: number): number {
   "worklet";
   const x = Math.min(1, Math.max(0, (progress - from) / (to - from)));
@@ -51,8 +44,6 @@ const RAW_ICON: Record<HeroSave["type"], AppSymbolName> = {
   image: "photo.on.rectangle",
 };
 
-/** The example shown to someone with no titled save yet. The address is
- * made up to match the sample title onboarding already uses. */
 export function builtInSave(): HeroSave {
   return {
     type: "link",
@@ -66,14 +57,7 @@ export function builtInSave(): HeroSave {
   };
 }
 
-export function AiConsentHero({
-  save,
-  own,
-}: {
-  save: HeroSave;
-  /** The save is the person's own, so the hero says where it came from. */
-  own: boolean;
-}) {
+export function AiConsentHero({ save, own }: { save: HeroSave; own: boolean }) {
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const progress = useSharedValue(reducedMotion ? 1 : 0);
@@ -267,8 +251,6 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 5,
     backgroundColor: theme.colors.surfaceMuted,
   },
-  // The title before it exists: a bar over the slot the words will land in,
-  // centred so Dynamic Type never puts it off the text.
   ghostTitle: {
     position: "absolute",
     top: "50%",

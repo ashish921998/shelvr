@@ -43,7 +43,6 @@ describe("POST /api/plan-vote", () => {
       "x-waitlist-secret": "secret",
       "x-shelvr-client-ip": "203.0.113.7",
     });
-    // Passed on as it came: Convex reads the ballot's shape, once.
     expect(init.body).toBe(JSON.stringify(vote));
   });
 

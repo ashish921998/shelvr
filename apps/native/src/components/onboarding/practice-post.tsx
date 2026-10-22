@@ -2,18 +2,18 @@ import { t, useAppLocale } from "@/lib/i18n";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { AppSymbolIcon } from "@/components/symbol";
 import { sampleImage } from "@/components/onboarding/sample-card";
+import {
+  PlatformMark,
+  platformOf,
+} from "@/components/onboarding/platform-mark";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The share practice: a pretend post, styled like one in a social app, and the
-// two steps the real sheet takes. The step's own button opens the sheet.
-
 const APP_ICON = require("../../../assets/icon.png");
 const SHARE_SIZE = 40;
+const HANDLES = { instagram: "city.notes", tiktok: "weekend.eats" } as const;
 
-/** The pretend post. The whole card opens the real share sheet too; its Share
- * button shows what to look for in any app. */
 export function PracticePost({
   sample,
   disabled,
@@ -25,6 +25,7 @@ export function PracticePost({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const platform = platformOf(sample);
   return (
     <Pressable
       accessibilityRole="button"
@@ -45,16 +46,15 @@ export function PracticePost({
           style={styles.avatar}
         />
         <Text style={styles.author} numberOfLines={1}>
-          {sample.domain}
+          {HANDLES[platform]}
         </Text>
+        <PlatformMark platform={platform} size={24} />
       </View>
       <Image
         source={sampleImage(sample)}
         contentFit="cover"
         style={styles.image}
       />
-      {/* Title and Share on one row: Share is the icon to look for in any
-          app, so nothing else on the post competes with it. */}
       <View style={styles.footer}>
         <Text style={styles.title} numberOfLines={2}>
           {sample.pageHeading}
@@ -71,9 +71,6 @@ export function PracticePost({
   );
 }
 
-/** The two taps, in order. The first is lit until the share sheet opens,
- * then the second, so the step that matters shows while the sheet covers the
- * post. Shelvr's own icon shows what to look for in the sheet. */
 export function ShareSteps({ active }: { active: 1 | 2 }) {
   useAppLocale();
   return (
@@ -121,7 +118,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   image: {
     width: "100%",
-    aspectRatio: 2,
+    aspectRatio: 1.4,
     backgroundColor: theme.colors.primarySoft,
   },
   footer: {

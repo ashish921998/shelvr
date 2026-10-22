@@ -55,7 +55,6 @@ describe("which saves get a reminder", () => {
   });
 
   it("leaves alone anything it cannot name an action for", () => {
-    // A social post, a page it could not read, a page with no body, a note.
     expect(
       reminderKind(
         article({
@@ -132,9 +131,7 @@ describe("the budget", () => {
       nextAt: NOW + hours * 60 * 60 * 1000,
       sentThisWeek: false,
     });
-    // Saturday 18:00 before a Sunday 09:00 shelf.
     expect(reminderBlocked(NOW, [], [], shelf(15))).toBe("too_soon");
-    // An overdue shelf is about to go out too.
     expect(reminderBlocked(NOW, [], [], shelf(-1))).toBe("too_soon");
     expect(reminderBlocked(NOW, [], [], shelf(21))).toBeUndefined();
   });
@@ -148,7 +145,6 @@ describe("the budget", () => {
         sentThisWeek: false,
       }),
     ).toBe("weekly_limit");
-    // Once this week's shelf is among the three, it needs no second slot.
     expect(
       reminderBlocked(NOW, three, [], { nextAt: nextWeek, sentThisWeek: true }),
     ).toBeUndefined();

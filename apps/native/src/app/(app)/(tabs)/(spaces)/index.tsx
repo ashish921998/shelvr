@@ -21,12 +21,8 @@ import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Standard OpenGraph image shape (1200×630), the default when a link's real
-// hero dimensions weren't captured. Mirrors item-card so covers match the feed.
 const OG_RATIO = 1.91;
 
-// Stable pseudo-random in [-1, 1) derived from a seed string (FNV-1a), so each
-// card's jitter is fixed per space and doesn't reshuffle on every re-render.
 function seededUnit(seed: string) {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
@@ -36,14 +32,8 @@ function seededUnit(seed: string) {
   return ((h >>> 0) / 0xffffffff) * 2 - 1;
 }
 
-// The cover fills this fraction of the stack area on each axis. The stack area
-// itself already carries the cover's aspect ratio, so the same fraction on both
-// axes keeps every card at that ratio; the leftover margin lets the tilted cards
-// behind peek out and keeps rotated corners from clipping the cell edge.
 const COVER_SCALE = 0.82;
 
-// Centering + size for a card that fills COVER_SCALE of the stack area. The free
-// space on each axis is (1 - scale); half of it is the offset that centers it.
 const CARD_POSITION = {
   position: "absolute" as const,
   left: `${((1 - COVER_SCALE) / 2) * 100}%` as const,
@@ -52,17 +42,11 @@ const CARD_POSITION = {
   height: `${COVER_SCALE * 100}%` as const,
 };
 
-// The two cards behind the cover: a base tilt + shove, jittered per space so no
-// two piles land the same. The cover (drawn last) sits nearly upright on top.
 const BACKS = [
   { rot: -4.5, tx: -6, ty: 5 },
   { rot: 4, tx: 7, ty: -3 },
 ];
 
-// A hand-dropped pile of three same-size cards: two tilted blanks behind and the
-// real cover, barely rotated, on top. The pile's box takes the cover's aspect
-// ratio so the masonry feed packs spaces at their true proportions, exactly like
-// the home cards. An empty space shows a designed starter cover.
 function CoverStack({
   cover,
   seed,
@@ -124,7 +108,6 @@ function CoverStack({
             style={styles.coverImage}
             contentFit="cover"
           />
-          {/* A pile fronted by a not-yet-accepted pick wears the sparkle. */}
           {cover.suggested ? (
             <View style={styles.coverBadge}>
               <SuggestedBadge size={22} />
@@ -162,7 +145,6 @@ function CoverStack({
 }
 
 function emptySpaceIcon(name: string) {
-  // Best-effort English heuristic; names outside these hints use the generic stack.
   const normalized = name.toLowerCase();
   if (normalized.includes("wish") || normalized.includes("gift"))
     return "heart";
@@ -175,18 +157,11 @@ function emptySpaceIcon(name: string) {
   return "rectangle.stack";
 }
 
-/**
- * Spaces that hold nothing yet, as one line of name chips instead of grid
- * cards. Each joins the grid once a save lands in it, and a tap still opens
- * it, and a long press deletes it. Plain Pressables with router.push: no
- * Link asChild style trap (#197).
- */
 function EmptySpaces({
   spaces,
   onDelete,
 }: {
   spaces: { _id: Id<"spaces">; name: string }[];
-  /** Long-press deletes, like the grid cards' menu. */
   onDelete: (id: Id<"spaces">) => void;
 }) {
   useAppLocale();
@@ -224,7 +199,6 @@ function EmptySpaces({
 
 type SpaceSummary = FunctionReturnType<typeof api.spaces.listSpaces>[number];
 
-/** One pile in the spaces grid; a tap opens the space. */
 function SpaceCard({
   space,
   reducedMotion,
@@ -237,9 +211,6 @@ function SpaceCard({
   const { theme } = useUnistyles();
   const router = useRouter();
   const href = `/space/${space._id}` as const;
-  // `previews` can be briefly absent when the offline cache rehydrates an
-  // older query shape before the live refetch lands. The newest item is
-  // the cover; the rest of the pile is intentionally blank.
   const cover = (space.previews ?? [])[0];
   // As in item-card: on iOS expo-router hosts the trigger inside zero-size
   // native views, and iOS drops every accessibility element under them, so
@@ -247,12 +218,8 @@ function SpaceCard({
   // Pressable.
   const cardA11y = {
     accessible: true,
-    // `role`, not `accessibilityRole`, which Link's role="link" would shadow.
     role: "button" as const,
     accessibilityLabel: space.name,
-    // The cell stands in for the card, so it also carries the count the
-    // empty cover shows, as a value: the name stays the label tests and
-    // Voice Control match on.
     accessibilityValue: {
       text:
         space.itemCount > 0
@@ -276,7 +243,6 @@ function SpaceCard({
     <Animated.View style={styles.cell} {...(a11yOnCell ? cardA11y : {})}>
       <Link href={href} asChild>
         <Link.Trigger withAppleZoom={!reducedMotion}>
-          {/* The whole card is the pressable that routes to the space. */}
           <Pressable {...(a11yOnCell ? {} : cardA11y)}>
             {/* Link.Trigger's Slot drops a Pressable style function,
                 so press feedback lives on this inner View. */}
@@ -351,9 +317,6 @@ export default function SpacesScreen() {
     ]);
   };
 
-  // Staggered entrances replay on recycled cells and jank the masonry list,
-  // so spaces render without them. The zoom handoff stays, but not under
-  // Reduce Motion.
   const reducedMotion = useReducedMotion();
 
   if (spaces === undefined) {
@@ -371,8 +334,6 @@ export default function SpacesScreen() {
     );
   }
 
-  // Empty spaces stay out of the masonry grid: a pile with no cover read as
-  // a bare label under the header, so they wait in a chip row below it.
   const filled = spaces.filter((space) => !isEmptySpace(space));
   const empty = spaces.filter(isEmptySpace);
   const emptySpaces =
@@ -425,8 +386,6 @@ const styles = StyleSheet.create((theme) => ({
   content: {
     padding: theme.gap(1),
   },
-  // Grid cell, no panel of its own (like the home feed); the stacked covers are
-  // the visual. The margin creates the gutters between the two columns and rows.
   cell: {
     flex: 1,
     margin: theme.gap(1),
@@ -434,22 +393,15 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.85,
   },
-  // Square area the pile is centered within. Fixed so every cell in the
-  // 2-column grid has the same height regardless of cover shape; the covers
-  // scale themselves to fit.
   stack: {
     width: "100%",
     aspectRatio: 1,
   },
-  // Shared frame for all three cards: same radius/shadow so the pile reads as
-  // one photo restacked. width/height/position/transform come from CoverStack.
   card: {
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     boxShadow: `0 6px 14px rgba(0,0,0,0.22), inset 0 0 0 1px ${theme.colors.imageBorder}`,
   },
-  // The cover: a matte with a little padding around the photo, the home feed's
-  // item frame, so a save looks the same fanned into a space.
   coverFrame: {
     backgroundColor: theme.colors.frame,
     padding: theme.gap(0.5),
@@ -464,12 +416,8 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
-    // The matte's colour (not surfaceMuted) so a transparent die-cut sticker
-    // cover shows the matte behind it instead of a grey block.
     backgroundColor: theme.colors.frame,
   },
-  // The blank cards behind, the same stock as the cover matte so the pile
-  // reads as a stack of identical cards.
   cardBlank: {
     backgroundColor: theme.colors.frame,
     zIndex: 1,
@@ -479,8 +427,6 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  // A new space gets an intentional cover until its first saved item becomes
-  // the thumbnail. Avoid a blank white card, which reads as a loading failure.
   cardEmpty: {
     alignItems: "center",
     justifyContent: "center",
@@ -503,7 +449,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 11,
     color: theme.colors.primaryText,
   },
-  // Name + ellipsis row below the pile, mirroring the home feed's caption.
   caption: {
     flexDirection: "row",
     alignItems: "center",

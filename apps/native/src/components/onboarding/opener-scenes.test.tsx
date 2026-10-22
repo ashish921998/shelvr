@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-// The opener phone's three screens draw their copy from the catalog, and the
-// share sheet waits for its page to be reached.
 import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +10,6 @@ const mock = vi.hoisted(() => {
   return {
     layouts,
     view: ({ children }: Children) => <div>{children}</div>,
-    // The map asks for its size; the test answers through `layouts`.
     measuredView: ({
       children,
       onLayout,
