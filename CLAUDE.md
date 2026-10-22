@@ -48,7 +48,8 @@ separate `shelvr-notes` repo. Do not add them here.
 - `pnpm --filter web-app dev`: Next.js dev server
 - `pnpm --filter web-app lint`: ESLint
 - `pnpm --filter native-app test`: Vitest suite (`vitest run`)
-- `pnpm --filter native-app check`: lint, then typecheck, then test
+- `pnpm run check`: the whole gate, from the repo root. `check:code` is the part CI runs on
+  every push and the pre-push hook runs; `check` adds the dependency audit
 
 Tests live next to the code as `*.test.ts` under `apps/native/convex/` and `apps/native/src/`.
 `apps/native/vitest.config.ts` includes both trees and runs Node as the default environment.

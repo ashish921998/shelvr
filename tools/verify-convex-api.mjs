@@ -326,6 +326,19 @@ export function formatReport({ baseRef, headRef, diff, acknowledged }) {
   return lines.join("\n");
 }
 
+function forkPoint(baseRef, headRef) {
+  try {
+    return execFileSync("git", ["merge-base", baseRef, headRef], {
+      encoding: "utf8",
+    }).trim();
+  } catch (error) {
+    if (error.status !== 1) throw error;
+    throw new Error(
+      `${baseRef} and ${headRef} share no history. Fetch it all (actions/checkout fetch-depth: 0).`,
+    );
+  }
+}
+
 function main(argv) {
   const [baseRef, headRef = "HEAD"] = argv.filter(
     (argument) => !argument.startsWith("--"),
@@ -337,15 +350,21 @@ function main(argv) {
     return 2;
   }
 
+  const fork = forkPoint(baseRef, headRef);
   const diff = diffSignatures(
-    signatures(treeAt(baseRef)),
+    signatures(treeAt(fork)),
     signatures(treeAt(headRef)),
   );
   const acknowledged = isAcknowledged(
-    trailerValues(".", `${baseRef}..${headRef}`, TRAILER_KEY),
+    trailerValues(".", `${fork}..${headRef}`, TRAILER_KEY),
   );
   process.stdout.write(
-    `${formatReport({ baseRef, headRef, diff, acknowledged })}\n`,
+    `${formatReport({
+      baseRef: `${baseRef} (fork ${fork.slice(0, 9)})`,
+      headRef,
+      diff,
+      acknowledged,
+    })}\n`,
   );
   return isBreaking(diff) && !acknowledged ? 1 : 0;
 }

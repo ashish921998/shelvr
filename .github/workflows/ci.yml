@@ -40,23 +40,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Typecheck
-        run: pnpm turbo run typecheck
-
-      - name: Convex codegen drift
-        run: pnpm run verify:codegen
-
-      - name: Agent docs drift
-        run: pnpm run verify:agent-docs
-
-      - name: Tooling tests
-        run: pnpm run test:tools
-
-      - name: Dead code
-        run: pnpm run knip
+      # The command .husky/pre-push runs, so a check added to it reaches CI.
+      - name: Gate
+        run: pnpm run check:code
 
       # A new advisory appears in the registry, not in anyone's diff, so a
       # required audit turns every open pull request red for a cause none of
@@ -81,12 +67,6 @@ jobs:
       - name: Security audit
         if: github.event_name == 'workflow_dispatch' || steps.deps.outputs.changed == 'true'
         run: pnpm run audit
-
-      - name: Version drift
-        run: pnpm run syncpack:lint
-
-      - name: Test coverage
-        run: pnpm run coverage
 
   # A Convex deploy reaches every installed build at once, so a public
   # function's args and returns are a contract with apps already in the wild.
@@ -120,14 +100,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The base commit this pull request was opened against, not the branch
-      # tip. Main can move while a run waits, and comparing against a newer tip
-      # reports its functions as removed by this pull request, failing a
-      # blocking check over a change it does not contain.
+      # The base branch, not the pull request's base.sha: the checked-out merge
+      # commit already carries whatever main gained since that sha, and the
+      # script compares from the point the head left the base, so only this
+      # pull request's own changes are measured.
       - name: Public Convex contract
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node tools/verify-convex-api.mjs "$BASE_SHA" HEAD
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/verify-convex-api.mjs "origin/$BASE_REF" HEAD
 
   # An OTA update only reaches installs whose store build shares the native
   # fingerprint. This job reports a pull request that moves it and never fails,

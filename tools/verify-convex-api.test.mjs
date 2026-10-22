@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { spawnSync } from "node:child_process";
+import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
 
+import { createRepo } from "./temp-repo.mjs";
 import {
   ACKNOWLEDGEMENT,
   diffSignatures,
@@ -369,4 +372,89 @@ export const listTags = query({ ...contract, handler: async () => null });
     signatures(tree({ api: spread("number") })),
   );
   assert.deepEqual(diff.changed, ["api:listTags"]);
+});
+
+const checkScript = fileURLToPath(
+  new URL("./verify-convex-api.mjs", import.meta.url),
+);
+const { dir: repo, git, commit, remove } = createRepo("convex-api-");
+after(() => remove());
+
+const check = (base, head) =>
+  spawnSync(process.execPath, [checkScript, base, head], {
+    cwd: repo,
+    encoding: "utf8",
+  });
+
+commit("root", { [path("items")]: items, [path("model/items")]: shared });
+
+const withoutDelete = items.replace(
+  /export const deleteItem[\s\S]*?\n\}\);\n/,
+  "",
+);
+const branchFromMain = (name, message, files) => {
+  git("checkout", "--quiet", "-b", name, "main");
+  commit(message, files);
+  git("checkout", "--quiet", "main");
+};
+branchFromMain("unrelated", "feat: unrelated", {
+  "apps/native/src/other.ts": "export {};\n",
+});
+branchFromMain("narrows", "refactor: drop deleteItem", {
+  [path("items")]: withoutDelete,
+});
+branchFromMain(
+  "acknowledged",
+  "refactor: drop deleteItem\n\nConvex-Api: changed",
+  { [path("items")]: withoutDelete },
+);
+git("checkout", "--quiet", "--orphan", "elsewhere");
+commit("unrelated history");
+git("checkout", "--quiet", "main");
+
+// Squash-merged: the trailer sits mid-message, where git reads none.
+commit(
+  "feat: ask why (#1)\n\n* feat: ask why\n\nConvex-Api: changed\n\n* fix: review",
+  {
+    [path("items")]: items.replace(
+      'args: { itemId: v.id("items") }',
+      'args: { itemId: v.id("items"), reason: v.string() }',
+    ),
+  },
+);
+
+test("a branch is not charged for what main changed after it left", () => {
+  const result = check("main", "unrelated");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /No public contract was narrowed/);
+});
+
+test("a branch's own narrowing still fails once main has moved", () => {
+  const result = check("main", "narrows");
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /items:deleteItem/);
+});
+
+test("the branch's own trailer acknowledges its own change", () => {
+  const result = check("main", "acknowledged");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Acknowledged/);
+});
+
+test("a trailer on a commit main gained after the fork acknowledges nothing", () => {
+  git("checkout", "--quiet", "-b", "pr", "main");
+  commit("refactor: drop deleteItem", { [path("items")]: withoutDelete });
+  git("checkout", "--quiet", "-b", "moved", "main");
+  commit("chore: elsewhere\n\nConvex-Api: changed");
+  git("checkout", "--quiet", "-b", "synthetic", "moved");
+  git("merge", "--quiet", "--no-ff", "-m", "Merge pr into moved", "pr");
+  git("checkout", "--quiet", "main");
+  const result = check("moved", "synthetic");
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+});
+
+test("refs with no common history are refused, not compared", () => {
+  const result = check("main", "elsewhere");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /share no history/);
 });
