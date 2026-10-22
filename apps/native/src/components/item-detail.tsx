@@ -796,7 +796,7 @@ function SaveStatusNotice({
               styles.deleteChip,
               pressed && { opacity: 0.7 },
             ]}
-            onPress={deleteSave}
+            onPress={() => deleteSave(item._id)}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
           >
             <AppSymbolIcon

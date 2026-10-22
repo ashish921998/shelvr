@@ -287,6 +287,75 @@ function usePagerPages({
   return { renderItem, onListLayout, sheetsUnder };
 }
 
+function useDeleteSave({
+  items,
+  activeItem,
+  listRef,
+  reducedMotion,
+  goTo,
+  writeParams,
+  cancelParamWrite,
+}: {
+  items: DetailItem[] | undefined;
+  activeItem: DetailItem | undefined;
+  listRef: RefObject<FlashListRef<DetailItem> | null>;
+  reducedMotion: boolean;
+  goTo: (id: string) => void;
+  writeParams: (id: string) => void;
+  cancelParamWrite: () => void;
+}) {
+  const router = useRouter();
+  const deleteItem = useMutation(api.items.deleteItem);
+  const deleting = useRef(false);
+  const deleteSave = useCallback(
+    async (target: DetailItem | undefined) => {
+      if (!target || !items || deleting.current) return;
+      deleting.current = true;
+      cancelParamWrite();
+      const idx = items.findIndex((item) => item._id === target._id);
+      const neighbor = items[idx + 1] ?? items[idx - 1];
+      try {
+        await deleteItem({ id: target._id });
+        forgetDeletedSharedItem(target._id);
+        analytics.itemDeleted(target, "item_detail");
+        if (neighbor) {
+          goTo(neighbor._id);
+          writeParams(neighbor._id);
+          listRef.current?.scrollToIndex({
+            index: Math.min(idx, items.length - 2),
+            animated: !reducedMotion,
+          });
+        } else if (router.canGoBack()) router.back();
+        else router.replace("/(app)/(tabs)/(home)");
+      } catch {
+        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+      } finally {
+        deleting.current = false;
+      }
+    },
+    [
+      items,
+      deleteItem,
+      router,
+      goTo,
+      writeParams,
+      cancelParamWrite,
+      listRef,
+      reducedMotion,
+    ],
+  );
+  const onDelete = useCallback(
+    () => void deleteSave(activeItem),
+    [deleteSave, activeItem],
+  );
+  const deletePage = useCallback(
+    (id: Id<"items">) =>
+      void deleteSave(items?.find((item) => item._id === id)),
+    [deleteSave, items],
+  );
+  return { onDelete, deletePage };
+}
+
 function useRemoveFromSpace({
   from,
   spaceId,
@@ -385,7 +454,6 @@ function ItemScreenContent() {
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const deleteItem = useMutation(api.items.deleteItem);
   const markItemOpened = useMutation(api.notifications.markItemOpened);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
@@ -606,38 +674,15 @@ function ItemScreenContent() {
     reducedMotion,
   ]);
 
-  const onDelete = useCallback(async () => {
-    if (!activeItem || !items) return;
-    cancelParamWrite();
-    const idx = items.findIndex((item) => item._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    try {
-      await deleteItem({ id: activeItem._id });
-      forgetDeletedSharedItem(activeItem._id);
-      analytics.itemDeleted(activeItem, "item_detail");
-      if (neighbor) {
-        goTo(neighbor._id);
-        writeParams(neighbor._id);
-        listRef.current?.scrollToIndex({
-          index: Math.min(idx, items.length - 2),
-          animated: !reducedMotion,
-        });
-      } else if (router.canGoBack()) router.back();
-      else router.replace("/(app)/(tabs)/(home)");
-    } catch {
-      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-    }
-  }, [
-    activeItem,
+  const { onDelete, deletePage } = useDeleteSave({
     items,
-    deleteItem,
-    router,
+    activeItem,
+    listRef,
+    reducedMotion,
     goTo,
     writeParams,
     cancelParamWrite,
-    listRef,
-    reducedMotion,
-  ]);
+  });
 
   const removeFromSpace = useRemoveFromSpace({
     from,
@@ -765,7 +810,7 @@ function ItemScreenContent() {
         </Stack.Toolbar>
       ) : null}
 
-      <DeleteActiveSaveContext value={onDelete}>
+      <DeleteActiveSaveContext value={deletePage}>
         <FlashList
           ref={listRef}
           style={styles.container}

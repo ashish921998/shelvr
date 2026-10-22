@@ -298,7 +298,7 @@ describe("a plain link's page", () => {
     expect(screen.queryByText(/item\.(view|watch)OnSite/)).toBeNull();
     expect(ItemSourceLink).toHaveBeenCalled();
     fireEvent.click(screen.getByText("common.delete"));
-    expect(deleteSave).toHaveBeenCalledOnce();
+    expect(deleteSave).toHaveBeenCalledExactlyOnceWith(product._id);
   });
 
   it("keeps the retry for a page that read only partly", () => {
