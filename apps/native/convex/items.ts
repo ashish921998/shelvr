@@ -192,6 +192,7 @@ export function beginProcessingRun(): {
 const runWriteOutcomeValidator = v.union(
   v.literal("applied"),
   v.literal("stale_run"),
+  v.literal("settled"),
   v.literal("missing"),
 );
 
@@ -2327,7 +2328,11 @@ export const failItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    await ctx.db.patch(args.itemId, failurePatch(args.reason));
+    const patch = failurePatch(item, args.reason);
+    if (patch === null) {
+      return "settled";
+    }
+    await ctx.db.patch(args.itemId, patch);
     await scheduleProcessedTelemetry(ctx, item, {
       status: "failed",
       failureReason: args.reason,
@@ -2352,10 +2357,11 @@ export const failStaleProcessingItems = internalMutation({
       .take(STALE_PROCESSING_PAGE_SIZE);
     let failed = 0;
     for (const item of candidates) {
-      if (!isStaleProcessing(item, now)) {
+      const patch = failurePatch(item, "error");
+      if (!isStaleProcessing(item, now) || patch === null) {
         continue;
       }
-      await ctx.db.patch(item._id, failurePatch("error"));
+      await ctx.db.patch(item._id, patch);
       await scheduleProcessedTelemetry(ctx, item, {
         status: "failed",
         failureReason: "error",
