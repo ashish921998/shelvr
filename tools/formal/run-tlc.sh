@@ -16,6 +16,8 @@ fi
 
 spec="$1"
 shift
+states="$(mktemp -d "${TMPDIR:-/tmp}/tlc-states.XXXXXX")"
+trap 'rm -rf "$states"' EXIT
 cd "$(dirname "$spec")"
-exec java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC -workers auto -deadlock \
-  -metadir "${TMPDIR:-/tmp}/tlc-states" "$(basename "$spec")" "$@"
+java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC -workers auto -deadlock \
+  -metadir "$states" "$(basename "$spec")" "$@"
