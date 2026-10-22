@@ -198,7 +198,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
 
   const pillWidth = windowWidth - BAR_SIDE * 2 - BAR_GAP - BAR_HEIGHT;
   const slotWidth = (pillWidth - PILL_INSET * 2) / PILL_TABS.length;
-  const returnTab = PILL_TABS[returnIndex];
+  const returnTab = PILL_TABS[returnIndex] ?? PILL_TABS[0];
 
   const morph = useSharedValue(searchFocused ? 1 : 0);
   const selection = useSharedValue<TabSelection>({
@@ -295,8 +295,9 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     .onTouchesMove((event) => {
       let touch = null;
       for (let i = 0; i < event.changedTouches.length; i++) {
-        if (event.changedTouches[i].id === touchId.get()) {
-          touch = event.changedTouches[i];
+        const changed = event.changedTouches[i];
+        if (changed?.id === touchId.get()) {
+          touch = changed;
         }
       }
       if (!touch) return;
@@ -326,7 +327,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     })
     .onTouchesUp((event, manager) => {
       for (let i = 0; i < event.changedTouches.length; i++) {
-        if (event.changedTouches[i].id === touchId.get()) {
+        if (event.changedTouches[i]?.id === touchId.get()) {
           manager.end();
         }
       }

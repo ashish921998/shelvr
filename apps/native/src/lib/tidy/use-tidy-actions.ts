@@ -7,6 +7,7 @@ import { useCallback, useRef, useState } from "react";
 import type { TidyAction } from "./card-animation";
 import { isReviewed, markReviewed, unmarkReviewed } from "./storage";
 import type { TidyPhoto } from "./use-photo-batch";
+import { onlyResult } from "@/lib/image-save-result";
 import { useSaveImages } from "@/lib/use-save-image";
 
 type HistoryEntry = {
@@ -57,21 +58,23 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         const asset = new Asset(photo.id);
         const uri = await asset.getUri();
         const location = await asset.getLocation().catch(() => null);
-        const [result] = await saveImages(
-          [
-            {
-              image: {
-                uri,
-                width: photo.width ?? undefined,
-                height: photo.height ?? undefined,
-                mimeType: mimeFromUri(uri),
-                capturedAt: photo.creationTime ?? undefined,
-                latitude: location?.latitude,
-                longitude: location?.longitude,
+        const result = onlyResult(
+          await saveImages(
+            [
+              {
+                image: {
+                  uri,
+                  width: photo.width ?? undefined,
+                  height: photo.height ?? undefined,
+                  mimeType: mimeFromUri(uri),
+                  capturedAt: photo.creationTime ?? undefined,
+                  latitude: location?.latitude,
+                  longitude: location?.longitude,
+                },
               },
-            },
-          ],
-          { saveSource: "photo_import" },
+            ],
+            { saveSource: "photo_import" },
+          ),
         );
         if (result.status === "saved") {
           return result.itemId;

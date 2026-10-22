@@ -17,9 +17,10 @@ const ALL_PHOTOS: TidySource = {
   album: null,
 };
 
-export function useAlbums(enabled: boolean): TidySource[] {
+/** All Photos first, then the named albums by title. */
+export function useAlbums(enabled: boolean): [TidySource, ...TidySource[]] {
   const locale = useAppLocale();
-  const [sources, setSources] = useState<TidySource[]>([ALL_PHOTOS]);
+  const [albums, setAlbums] = useState<TidySource[]>([]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -42,7 +43,7 @@ export function useAlbums(enabled: boolean): TidySource[] {
           const sorted = named
             .filter((s) => s.title)
             .sort((a, b) => a.title.localeCompare(b.title));
-          setSources([ALL_PHOTOS, ...sorted]);
+          setAlbums(sorted);
         }
       } catch (error) {
         console.warn("Tidy: failed to load albums", error);
@@ -54,13 +55,11 @@ export function useAlbums(enabled: boolean): TidySource[] {
     };
   }, [enabled]);
 
-  return useMemo(
-    () =>
-      sources.map((source) =>
-        source.id === ALL_PHOTOS_ID
-          ? { ...source, title: translate(locale, "albums.allPhotos") }
-          : source,
-      ),
-    [sources, locale],
+  return useMemo<[TidySource, ...TidySource[]]>(
+    () => [
+      { ...ALL_PHOTOS, title: translate(locale, "albums.allPhotos") },
+      ...albums,
+    ],
+    [albums, locale],
   );
 }

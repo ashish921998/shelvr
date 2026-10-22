@@ -14,7 +14,7 @@ const translations = Object.fromEntries(
       Record<string, string | Record<string, string>>
     > = {};
     for (const [key, message] of Object.entries(messages)) {
-      const [namespace, name] = key.split(".");
+      const [namespace = "", name = ""] = key.split(".");
       (namespaces[namespace] ??= {})[name] = message;
     }
     return [locale, namespaces];
@@ -31,7 +31,8 @@ for (const [locale, rule] of Object.entries(pluralRules)) {
 export function canonicalizeTag(tag: string) {
   try {
     const canonical = Intl.getCanonicalLocales(tag.replaceAll("_", "-"))[0];
-    return { canonical, baseName: canonical.split(/-[ux]-/i)[0] };
+    if (canonical === undefined) return undefined;
+    return { canonical, baseName: canonical.split(/-[ux]-/i)[0] ?? canonical };
   } catch {
     return undefined;
   }
@@ -44,7 +45,7 @@ export function resolveLocale(
     const normalized = canonicalizeTag(tag);
     if (!normalized) continue;
     const { baseName } = normalized;
-    const language = baseName.split("-")[0];
+    const language = baseName.split("-")[0] ?? baseName;
     if (isSupportedLocale(baseName)) return baseName;
     if (isSupportedLocale(language)) return language;
     const regionalFallback = Object.keys(catalogs)

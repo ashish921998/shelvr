@@ -77,7 +77,11 @@ function stop(
 function day(title: TextMessageKey, stops: readonly DayStop[]): SampleDay {
   return {
     title,
-    stops: stops.map((place, index) => ({ ...place, slot: DAY_SLOTS[index] })),
+    // A sample day has at most one stop per slot.
+    stops: stops.map((place, index) => ({
+      ...place,
+      slot: DAY_SLOTS[index] ?? "dinner",
+    })),
   };
 }
 

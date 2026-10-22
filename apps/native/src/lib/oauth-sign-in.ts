@@ -19,11 +19,13 @@ const oauthScheme =
     : Constants.expoConfig?.extra?.variant === "preview"
       ? "shelvr-preview"
       : "shelvr-dev";
-const iosVersion = String(Platform.Version).split(".").map(Number);
+const [iosMajor = 0, iosMinor = 0] = String(Platform.Version)
+  .split(".")
+  .map(Number);
 const preferUniversalLinks =
   Platform.OS === "ios" &&
   Constants.expoConfig?.extra?.variant === "production" &&
-  (iosVersion[0] > 17 || (iosVersion[0] === 17 && (iosVersion[1] ?? 0) >= 4));
+  (iosMajor > 17 || (iosMajor === 17 && iosMinor >= 4));
 const oauthRedirectTo = preferUniversalLinks
   ? "https://shelvr-web.vercel.app/auth/callback"
   : makeRedirectUri({

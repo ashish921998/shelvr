@@ -308,8 +308,9 @@ export function ThreadCanvas({
     () => buildThreadPath(composition.threadBelow),
     [composition],
   );
-  const glyphPaths = useMemo(
-    () => composition.marks.map((mark) => buildGlyphPaths(mark)),
+  const sketchedMarks = useMemo(
+    () =>
+      composition.marks.map((mark) => ({ mark, paths: buildGlyphPaths(mark) })),
     [composition],
   );
 
@@ -381,11 +382,11 @@ export function ThreadCanvas({
 
           <Burst color={palette.thread} clock={clock} />
 
-          {composition.marks.map((mark, index) => (
+          {sketchedMarks.map(({ mark, paths }, index) => (
             <SketchedMark
               key={`mark-${index}`}
               mark={mark}
-              paths={glyphPaths[index]}
+              paths={paths}
               color={palette[mark.tone]}
               clock={clock}
             />

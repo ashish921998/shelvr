@@ -39,7 +39,7 @@ export function itemTitle(item: CatalogItem): string {
   if (title) return title;
   if (item.type === "note" && item.note)
     return (
-      item.note.trim().split("\n")[0].slice(0, NOTE_TITLE_LIMIT) ||
+      (item.note.trim().split("\n", 1)[0] ?? "").slice(0, NOTE_TITLE_LIMIT) ||
       t("item.note")
     );
   if (item.type === "link") return displayHost(item.url) || t("item.link");

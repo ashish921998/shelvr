@@ -105,7 +105,7 @@ export default function TidyScreen() {
 
 type DeckViewProps = {
   batch: TidyPhoto[];
-  sources: TidySource[];
+  sources: [TidySource, ...TidySource[]];
   selectedId: string;
   selectSource: (id: string) => void;
   limitedAccess: boolean;

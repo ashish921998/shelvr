@@ -35,6 +35,7 @@ import {
   clearShareDiscardedOnDevice,
   markShareDiscardedOnDevice,
 } from "@/lib/share/pending-share-store";
+import { onlyResult } from "@/lib/image-save-result";
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
@@ -153,7 +154,7 @@ export default function ShareScreen() {
       saveImage: ({ image, operationId }) =>
         saveImages([{ image, operationId }], {
           saveSource: "share_extension",
-        }).then((results) => results[0]),
+        }).then(onlyResult),
     }),
     [createLinkItem, createNoteItem, saveImages],
   );

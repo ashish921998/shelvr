@@ -9,7 +9,7 @@ import { StyleSheet } from "react-native-unistyles";
 
 export function SimilarGrid({ items }: { items: DetailItem[] }) {
   const columns: [DetailItem[], DetailItem[]] = [[], []];
-  const heights = [0, 0];
+  const heights: [number, number] = [0, 0];
   for (const item of items) {
     const ratio = similarRatio(item);
     const column = heights[0] <= heights[1] ? 0 : 1;

@@ -94,7 +94,7 @@ type Nearest = { near: Point; distance: number; side: 1 | -1; normal: Point };
 
 function nearestOnLine(pin: Point, line: readonly Point[]): Nearest {
   let best: Nearest = {
-    near: line[0],
+    near: line[0] ?? pin,
     distance: Infinity,
     side: 1,
     normal: { x: 0, y: -1 },
@@ -102,6 +102,7 @@ function nearestOnLine(pin: Point, line: readonly Point[]): Nearest {
   for (let index = 1; index < line.length; index += 1) {
     const a = line[index - 1];
     const b = line[index];
+    if (a === undefined || b === undefined) continue;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const length = Math.hypot(dx, dy) || 1;
@@ -152,22 +153,26 @@ function spreadPins(
     let moved = false;
     for (let a = 0; a < spread.length; a += 1) {
       for (let b = a + 1; b < spread.length; b += 1) {
-        const dx = spread[b].x - spread[a].x;
-        const dy = spread[b].y - spread[a].y;
+        const first = spread[a];
+        const second = spread[b];
+        if (first === undefined || second === undefined) continue;
+        const dx = second.x - first.x;
+        const dy = second.y - first.y;
         const distance = Math.hypot(dx, dy);
         if (distance >= PIN_GAP) continue;
         moved = true;
         const [ux, uy] =
           distance === 0 ? SAME_SPOT_SLANT : [dx / distance, dy / distance];
         const push = (PIN_GAP - distance) / 2;
-        spread[a].x -= ux * push;
-        spread[a].y -= uy * push;
-        spread[b].x += ux * push;
-        spread[b].y += uy * push;
+        first.x -= ux * push;
+        first.y -= uy * push;
+        second.x += ux * push;
+        second.y += uy * push;
       }
     }
     spread.forEach((pin, index) => {
-      if (!onWater[index] && keepOffWater(pin, homes[index], water)) {
+      const home = homes[index];
+      if (!onWater[index] && home && keepOffWater(pin, home, water)) {
         moved = true;
       }
       pin.x = clamp(pin.x, PIN_BOX.left, PIN_BOX.right);
@@ -206,7 +211,8 @@ function buildTrip(
     days: city.days.map((day) => ({
       title: day.title,
       stops: day.stops.map((stop) => {
-        const pin = pins[next];
+        // spreadPins keeps one pin per stop, in order.
+        const pin = pins[next] ?? place(stop.at);
         next += 1;
         return { name: stop.name, slot: stop.slot, pin, at: stop.at };
       }),

@@ -31,6 +31,13 @@ import Animated, { LinearTransition } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PACES: TripPace[] = ["easy", "balanced", "packed"];
+
+/** Applies the choice a control picked by index, ignoring an index outside
+ * the list. */
+function selectAt<T>(choices: T[], index: number, apply: (choice: T) => void) {
+  const choice = choices[index];
+  if (choice !== undefined) apply(choice);
+}
 const DAY_CHOICES = Array.from(
   { length: MAX_TRIP_DAYS - MIN_TRIP_DAYS + 1 },
   (_, index) => MIN_TRIP_DAYS + index,
@@ -125,7 +132,7 @@ function Days({
             scroll
             labels={DAY_CHOICES.map(String)}
             selected={DAY_CHOICES.indexOf(days)}
-            onSelect={(index) => onChange(DAY_CHOICES[index])}
+            onSelect={(index) => selectAt(DAY_CHOICES, index, onChange)}
             tinted
             accessibilityLabel={t("trip.howManyDays")}
           />
@@ -140,7 +147,9 @@ function Days({
         <Host matchContents ignoreSafeArea="all">
           <Picker
             selection={DAY_CHOICES.indexOf(days)}
-            onSelectionChange={(index) => onChange(DAY_CHOICES[index])}
+            onSelectionChange={(index) =>
+              selectAt(DAY_CHOICES, index, onChange)
+            }
             modifiers={[
               pickerStyle("menu"),
               tint(theme.colors.primaryText),
@@ -309,7 +318,7 @@ export function TripPlanForm({
           label={t("trip.pace")}
           values={PACES.map(paceLabel)}
           selected={PACES.indexOf(pace)}
-          onSelect={(index) => setPace(PACES[index])}
+          onSelect={(index) => selectAt(PACES, index, setPace)}
         />
         <View style={styles.divider} />
         <Row label={t("trip.starting")}>

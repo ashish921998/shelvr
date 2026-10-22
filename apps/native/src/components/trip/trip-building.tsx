@@ -7,8 +7,9 @@ import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 const STEP_MS = 1800;
+const FIRST_STEP: TextMessageKey = "trip.buildingRead";
 const STEPS: TextMessageKey[] = [
-  "trip.buildingRead",
+  FIRST_STEP,
   "trip.buildingFind",
   "trip.buildingGroup",
 ];
@@ -24,7 +25,7 @@ export function useBuildStep(): TextMessageKey {
     return () => clearInterval(timer);
   }, []);
 
-  return STEPS[step];
+  return STEPS[step] ?? FIRST_STEP;
 }
 
 export function TripBuilding() {

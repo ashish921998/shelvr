@@ -58,7 +58,8 @@ const easeOut = (k: number) => 1 - Math.pow(1 - k, 4);
 const nearestTurn = (from: number, to: number) =>
   from + ((((to - from) % 360) + 540) % 360) - 180;
 
-let world: { land: Feature; countries: Feature[]; bounds: number[][][] };
+type Bounds = ReturnType<typeof geoBounds>;
+let world: { land: Feature; countries: Feature[]; bounds: Bounds[] };
 function loadWorld() {
   if (!world) {
     const land = landData as unknown as Topology<{ land: GeometryCollection }>;
@@ -84,15 +85,17 @@ export function tripCenter(
       (stop): stop is { lat: number; lng: number } =>
         stop.lat !== undefined && stop.lng !== undefined,
     );
-  if (pins.length === 0) return null;
+  const [first] = pins;
+  if (first === undefined) return null;
   const median = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
     const middle = Math.floor(sorted.length / 2);
+    const upper = sorted[middle] ?? 0;
     return sorted.length % 2
-      ? sorted[middle]
-      : (sorted[middle - 1] + sorted[middle]) / 2;
+      ? upper
+      : ((sorted[middle - 1] ?? upper) + upper) / 2;
   };
-  const lng = median(pins.map((pin) => nearestTurn(pins[0].lng, pin.lng)));
+  const lng = median(pins.map((pin) => nearestTurn(first.lng, pin.lng)));
   return {
     lng: ((((lng + 180) % 360) + 360) % 360) - 180,
     lat: median(pins.map((pin) => pin.lat)),
@@ -152,7 +155,7 @@ export function globeRegion(target: GlobeTarget): GlobeRegion {
   const point: [number, number] = [target.lng, target.lat];
   const edge = Math.min(89, Math.abs(target.lat) + NEARBY) / DEGREES;
   const span = Math.min(180, NEARBY / Math.cos(edge));
-  const near = ([[west, south], [east, north]]: number[][]) => {
+  const near = ([[west, south], [east, north]]: Bounds) => {
     if (north < target.lat - NEARBY || south > target.lat + NEARBY) {
       return false;
     }
@@ -167,7 +170,10 @@ export function globeRegion(target: GlobeTarget): GlobeRegion {
     center: target,
     nearby: {
       type: "FeatureCollection",
-      features: countries.filter((_, index) => near(bounds[index])),
+      features: countries.filter((_, index) => {
+        const box = bounds[index];
+        return box !== undefined && near(box);
+      }),
     },
     country:
       countries.find((country) => geoContains(country, point)) ??
@@ -181,7 +187,9 @@ function coastalCountry(point: [number, number]): Feature | null {
   let best: Feature | null = null;
   let nearest = NEAR_COAST;
   countries.forEach((country, index) => {
-    const [[west, south], [east, north]] = bounds[index];
+    const box = bounds[index];
+    if (box === undefined) return;
+    const [[west, south], [east, north]] = box;
     if (point[1] < south - 1 || point[1] > north + 1) return;
     if (west <= east && (point[0] < west - 1 || point[0] > east + 1)) return;
     const geometry = country.geometry;

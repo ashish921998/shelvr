@@ -8,7 +8,7 @@ function keepPng(image: LocalImage): boolean {
   return (
     image.isSticker === true ||
     image.mimeType?.toLowerCase() === "image/png" ||
-    /\.png$/i.test(image.uri.split("?")[0])
+    /\.png$/i.test(image.uri.split("?", 1)[0] ?? "")
   );
 }
 
