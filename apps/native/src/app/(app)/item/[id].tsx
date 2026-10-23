@@ -5,6 +5,7 @@ import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ItemDetail, type DetailItem } from "@/components/item-detail";
+import { DeleteActiveSaveContext } from "@/lib/delete-active-save";
 import { ItemHeader } from "@/components/item-header";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
@@ -286,6 +287,76 @@ function usePagerPages({
   return { renderItem, onListLayout, sheetsUnder };
 }
 
+function useDeleteSave({
+  items,
+  activeItem,
+  listRef,
+  reducedMotion,
+  goTo,
+  writeParams,
+  cancelParamWrite,
+}: {
+  items: DetailItem[] | undefined;
+  activeItem: DetailItem | undefined;
+  listRef: RefObject<FlashListRef<DetailItem> | null>;
+  reducedMotion: boolean;
+  goTo: (id: string) => void;
+  writeParams: (id: string) => void;
+  cancelParamWrite: () => void;
+}) {
+  const router = useRouter();
+  const deleteItem = useMutation(api.items.deleteItem);
+  const deleting = useRef(false);
+  const deleteSave = useCallback(
+    async (target: DetailItem | undefined) => {
+      if (!target || !items || deleting.current) return;
+      deleting.current = true;
+      cancelParamWrite();
+      const idx = items.findIndex((item) => item._id === target._id);
+      const neighbor = items[idx + 1] ?? items[idx - 1];
+      try {
+        await deleteItem({ id: target._id });
+        forgetDeletedSharedItem(target._id);
+        analytics.itemDeleted(target, "item_detail");
+        if (neighbor) {
+          cancelParamWrite();
+          goTo(neighbor._id);
+          writeParams(neighbor._id);
+          listRef.current?.scrollToIndex({
+            index: Math.min(idx, items.length - 2),
+            animated: !reducedMotion,
+          });
+        } else if (router.canGoBack()) router.back();
+        else router.replace("/(app)/(tabs)/(home)");
+      } catch {
+        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+      } finally {
+        deleting.current = false;
+      }
+    },
+    [
+      items,
+      deleteItem,
+      router,
+      goTo,
+      writeParams,
+      cancelParamWrite,
+      listRef,
+      reducedMotion,
+    ],
+  );
+  const onDelete = useCallback(
+    () => void deleteSave(activeItem),
+    [deleteSave, activeItem],
+  );
+  const deletePage = useCallback(
+    (id: Id<"items">) =>
+      void deleteSave(items?.find((item) => item._id === id)),
+    [deleteSave, items],
+  );
+  return { onDelete, deletePage };
+}
+
 function useRemoveFromSpace({
   from,
   spaceId,
@@ -309,10 +380,19 @@ function useRemoveFromSpace({
 }) {
   const router = useRouter();
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
-  const available =
-    from === "space" &&
-    !!spaceId &&
-    !!space?.items.some((item) => item._id === activeId);
+  const inSpace = useCallback(
+    (itemId: string) =>
+      from === "space" &&
+      !!spaceId &&
+      !!space?.items.some((item) => item._id === itemId),
+    [from, spaceId, space],
+  );
+  const available = inSpace(activeId);
+  const deleteLabelFor = useCallback(
+    (itemId: string) =>
+      inSpace(itemId) ? t("item.deleteEverywhere") : t("common.delete"),
+    [inSpace],
+  );
   const pending = useRef(false);
   const remove = useCallback(async () => {
     if (!spaceId || !activeId || !items || pending.current) return;
@@ -360,7 +440,8 @@ function useRemoveFromSpace({
   return {
     available,
     remove,
-    deleteLabel: available ? t("item.deleteEverywhere") : t("common.delete"),
+    deleteLabel: deleteLabelFor(activeId),
+    deleteLabelFor,
     menuActions: available
       ? [{ label: t("spaces.removeFromSpace"), onPress: remove }]
       : [],
@@ -384,7 +465,6 @@ function ItemScreenContent() {
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const deleteItem = useMutation(api.items.deleteItem);
   const markItemOpened = useMutation(api.notifications.markItemOpened);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
@@ -605,38 +685,15 @@ function ItemScreenContent() {
     reducedMotion,
   ]);
 
-  const onDelete = useCallback(async () => {
-    if (!activeItem || !items) return;
-    cancelParamWrite();
-    const idx = items.findIndex((item) => item._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    try {
-      await deleteItem({ id: activeItem._id });
-      forgetDeletedSharedItem(activeItem._id);
-      analytics.itemDeleted(activeItem, "item_detail");
-      if (neighbor) {
-        goTo(neighbor._id);
-        writeParams(neighbor._id);
-        listRef.current?.scrollToIndex({
-          index: Math.min(idx, items.length - 2),
-          animated: !reducedMotion,
-        });
-      } else if (router.canGoBack()) router.back();
-      else router.replace("/(app)/(tabs)/(home)");
-    } catch {
-      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-    }
-  }, [
-    activeItem,
+  const { onDelete, deletePage } = useDeleteSave({
     items,
-    deleteItem,
-    router,
+    activeItem,
+    listRef,
+    reducedMotion,
     goTo,
     writeParams,
     cancelParamWrite,
-    listRef,
-    reducedMotion,
-  ]);
+  });
 
   const removeFromSpace = useRemoveFromSpace({
     from,
@@ -649,6 +706,10 @@ function ItemScreenContent() {
     writeParams,
     cancelParamWrite,
   });
+  const deleteFromPage = useMemo(
+    () => ({ label: removeFromSpace.deleteLabelFor, remove: deletePage }),
+    [removeFromSpace.deleteLabelFor, deletePage],
+  );
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
@@ -764,22 +825,24 @@ function ItemScreenContent() {
         </Stack.Toolbar>
       ) : null}
 
-      <FlashList
-        ref={listRef}
-        style={styles.container}
-        onLayout={onListLayout}
-        data={items}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={pagerKey}
-        initialScrollIndex={startIndex >= 0 ? startIndex : 0}
-        renderItem={renderItem}
-        onViewableItemsChanged={onViewable}
-        viewabilityConfig={VIEWABILITY_CONFIG}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={2}
-      />
+      <DeleteActiveSaveContext value={deleteFromPage}>
+        <FlashList
+          ref={listRef}
+          style={styles.container}
+          onLayout={onListLayout}
+          data={items}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={pagerKey}
+          initialScrollIndex={startIndex >= 0 ? startIndex : 0}
+          renderItem={renderItem}
+          onViewableItemsChanged={onViewable}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={2}
+        />
+      </DeleteActiveSaveContext>
 
       <PagerHeaderBackdrop onMedia={media.onMedia} />
 
