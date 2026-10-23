@@ -104,6 +104,60 @@ describe("posthog before_send", () => {
     expect(list[0].value).toBe("ERR_UNAVAILABLE");
   });
 
+  it.each([
+    ["an empty frame list", { type: "raw", frames: [] }],
+    ["no stack trace", undefined],
+  ])(
+    "groups and names a handled error with %s by its failure code",
+    (_shape, stacktrace) => {
+      const sent = sentBeforeSend()({
+        event: "$exception",
+        properties: {
+          error_event: "sample_map_camera_failed",
+          $exception_list: [{ type: "Error", value: "Error", stacktrace }],
+        },
+      });
+      expect(sent.properties).toMatchObject({
+        $exception_fingerprint: "sample_map_camera_failed",
+        $issue_name: "sample_map_camera_failed",
+      });
+    },
+  );
+
+  it("leaves a handled error that has stack frames to PostHog's grouping", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "render_error",
+        $exception_list: [
+          {
+            type: "TypeError",
+            value: "TypeError",
+            stacktrace: { type: "raw", frames: [{ filename: "app.js" }] },
+          },
+        ],
+      },
+    });
+    expect(sent.properties).not.toHaveProperty("$exception_fingerprint");
+    expect(sent.properties).not.toHaveProperty("$issue_name");
+  });
+
+  it("leaves an autocaptured exception with no failure code to PostHog", () => {
+    const sent = sentBeforeSend()(
+      exceptionEvent({
+        list: [
+          {
+            type: "Error",
+            value: "Error",
+            stacktrace: { type: "raw", frames: [] },
+          },
+        ],
+      }),
+    );
+    expect(sent.properties).not.toHaveProperty("$exception_fingerprint");
+    expect(sent.properties).not.toHaveProperty("$issue_name");
+  });
+
   it("redacts an all-caps message that is not a bare code token", () => {
     const beforeSend = sentBeforeSend();
     const sent = beforeSend(
