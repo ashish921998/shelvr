@@ -5,6 +5,8 @@ import {
 } from "@/lib/pending-onboarding";
 import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
+import { GOAL_PLANS } from "@/lib/onboarding-goals";
+import { SAMPLE_SLOT_LABELS, samplePlan } from "@/lib/sample-trip";
 
 export type GoalProgress = Pick<
   ReturnType<typeof getOnboardingProgress>,
@@ -118,6 +120,93 @@ const GOAL_COPY: Record<Goal, GoalCopy> = {
   },
 };
 
+type OutcomeRow = { name: string; meta: string };
+type Outcome = {
+  headline: string;
+  sub: string;
+  title: string;
+  meta: string;
+  rows: OutcomeRow[];
+};
+
+const RECIPE_STEPS: readonly OutcomeRow[] = [
+  {
+    name: t("paywallGoal.recipesOutcomeStepOne"),
+    meta: t("paywallGoal.recipesOutcomeTimeOne"),
+  },
+  {
+    name: t("paywallGoal.recipesOutcomeStepTwo"),
+    meta: t("paywallGoal.recipesOutcomeTimeTwo"),
+  },
+  {
+    name: t("paywallGoal.recipesOutcomeStepThree"),
+    meta: t("paywallGoal.recipesOutcomeTimeThree"),
+  },
+];
+
+/** The sample plan onboarding showed, so the paywall's outcome card matches it. */
+function placesOutcome(
+  goal: "travel" | "food" | "date",
+  travelCity: GoalProgress["travelCity"],
+  city: string | null,
+): Outcome {
+  const plan = GOAL_PLANS[goal];
+  const day = samplePlan(plan ?? "trip", travelCity).days[0];
+  const headlines = {
+    travel:
+      city === null
+        ? t("paywallGoal.travelOutcomeHeadlineNoCity")
+        : t("paywallGoal.travelOutcomeHeadline", { city }),
+    food: t("paywallGoal.foodOutcomeHeadline"),
+    date: t("paywallGoal.dateOutcomeHeadline"),
+  };
+  const subs = {
+    travel: t("paywallGoal.travelOutcomeSub"),
+    food: t("paywallGoal.foodOutcomeSub"),
+    date: t("paywallGoal.dateOutcomeSub"),
+  };
+  return {
+    headline: headlines[goal],
+    sub: subs[goal],
+    title: t(day.title),
+    meta: t("paywallGoal.outcomeMeta", { count: day.stops.length }),
+    rows: day.stops.slice(0, 3).map((stop) => ({
+      name: stop.name,
+      meta: t(SAMPLE_SLOT_LABELS[stop.slot]),
+    })),
+  };
+}
+
+function outcome(
+  progress: GoalProgress,
+  city: string | null,
+  interests: string[],
+): Outcome {
+  const { goal, travelCity } = progress;
+  if (goal === "travel" || goal === "food" || goal === "date") {
+    return placesOutcome(goal, travelCity, city);
+  }
+  if (goal === "recipes") {
+    return {
+      headline: t("paywallGoal.recipesOutcomeHeadline"),
+      sub: t("paywallGoal.recipesOutcomeSub"),
+      title: t("paywallGoal.recipesOutcomeTitle"),
+      meta: t("paywallGoal.recipesOutcomeMeta"),
+      rows: [...RECIPE_STEPS],
+    };
+  }
+  return {
+    headline: t("paywallGoal.otherOutcomeHeadline"),
+    sub: t("paywallGoal.otherOutcomeSub"),
+    title: t("paywallGoal.otherOutcomeTitle"),
+    meta: t("paywallGoal.otherOutcomeMeta"),
+    rows: interests.slice(0, 3).map((name) => ({
+      name,
+      meta: t("paywallGoal.otherOutcomeRowMeta"),
+    })),
+  };
+}
+
 const string = (value: string) => ({ type: "string" as const, value });
 
 /**
@@ -138,6 +227,8 @@ export function goalPaywallVariables(
     interests:
       goal === "other" ? progress.spaces.map(resolveOnboardingSpaceName) : [],
   };
+  const result = outcome(progress, answers.city, answers.interests);
+  const row = (index: number) => result.rows[index] ?? { name: "", meta: "" };
   return {
     goal: string(goal),
     goal_headline: string(copy.headline(answers)),
@@ -149,5 +240,15 @@ export function goalPaywallVariables(
     goal_plan_title: string(copy.planTitle(answers)),
     goal_benefit_title: string(copy.benefitTitle(answers)),
     goal_benefit_body: string(copy.benefitBody(answers)),
+    goal_outcome_headline: string(result.headline),
+    goal_outcome_sub: string(result.sub),
+    goal_outcome_title: string(result.title),
+    goal_outcome_meta: string(result.meta),
+    goal_outcome_1: string(row(0).name),
+    goal_outcome_1_meta: string(row(0).meta),
+    goal_outcome_2: string(row(1).name),
+    goal_outcome_2_meta: string(row(1).meta),
+    goal_outcome_3: string(row(2).name),
+    goal_outcome_3_meta: string(row(2).meta),
   };
 }
