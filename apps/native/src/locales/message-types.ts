@@ -269,6 +269,7 @@ export type MessageParams = {
   "tidy.continue": undefined;
   "tidy.keep": undefined;
   "tidy.save": undefined;
+  "tidy.swipeHint": undefined;
   "common.loading": undefined;
   "navigation.home": undefined;
   "navigation.tidy": undefined;

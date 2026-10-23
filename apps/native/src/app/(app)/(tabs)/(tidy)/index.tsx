@@ -278,6 +278,9 @@ const TidyDeckView: FC<DeckViewProps> = ({
         <Text style={styles.progressText}>
           {Math.min(reviewedCount, batch.length)} / {batch.length}
         </Text>
+        {batchDone ? null : (
+          <Text style={styles.hintText}>{t("tidy.swipeHint")}</Text>
+        )}
       </View>
 
       <View style={styles.deckArea}>
@@ -349,6 +352,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   progressRow: {
     alignItems: "center",
+    gap: 2,
     justifyContent: "center",
     paddingTop: rt.insets.top + theme.gap(6),
     paddingBottom: theme.gap(1),
@@ -357,6 +361,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.muted,
+  },
+  hintText: {
+    ...theme.type.caption,
+    color: theme.colors.muted,
+    textAlign: "center",
+    paddingHorizontal: theme.gap(3),
   },
   deckArea: {
     flex: 1,
