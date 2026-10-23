@@ -149,6 +149,7 @@ function Deck({ places }: { places: PlanPlace[] }) {
       imageFor={() => undefined}
       titleFor={() => undefined}
       isVisited={() => false}
+      tallyFor={() => null}
       onFlip={deck.flip}
       onNext={deck.next}
       onOpenMaps={() => undefined}
