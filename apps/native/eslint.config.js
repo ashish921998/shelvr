@@ -99,7 +99,7 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ["src/app/**/*.{test,spec}.{ts,tsx}"],
+    files: ["src/app/**/*.{test,spec}.{js,jsx,ts,tsx}"],
     rules: {
       "no-restricted-syntax": [
         "error",
