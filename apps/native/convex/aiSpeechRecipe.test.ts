@@ -386,4 +386,71 @@ describe("processItem places from a video's speech", () => {
     expect(item?.places).toEqual(["Antiga"]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  describe("on a rerun of a save whose speech was read", () => {
+    async function rerun(prepare: () => void) {
+      const t = newConvexTest();
+      placesModel(["Santelmo", "Intenso"], { caption: ["Antiga"] });
+      transcript("Antiga, then Santelmo, then Intenso.");
+      const first = await process(t);
+      expect(first?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
+      fetchMock.mockReset();
+      generateObject.mockReset();
+      prepare();
+      await t.run((ctx) =>
+        ctx.db.patch(first!._id, {
+          status: "processing",
+          processingRunId: "run-2",
+          processingStartedAt: Date.now(),
+        }),
+      );
+      await t.action(internal.ai.processItem, {
+        itemId: first!._id,
+        runId: "run-2",
+      });
+      return await t.run((ctx) => ctx.db.get(first!._id));
+    }
+
+    it("keeps the spoken places without reading the transcript again", async () => {
+      const item = await rerun(() =>
+        placesModel(["Santelmo"], { caption: ["Antiga"] }),
+      );
+
+      expect(item?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(speechPlacesPrompt()).toBeUndefined();
+    });
+
+    it("keeps the spoken places while the switch is off", async () => {
+      const item = await rerun(() => {
+        vi.stubEnv("VIDEO_TRANSCRIPTS_ENABLED", "false");
+        placesModel(["Santelmo"], { caption: ["Antiga"] });
+      });
+
+      expect(item?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
+    });
+
+    it("reads the speech again when only the caption's places were stored", async () => {
+      const t = newConvexTest();
+      placesModel(["Santelmo"], { caption: ["Antiga"] });
+      fetchMock.mockRejectedValue(new TypeError("network"));
+      const first = await process(t);
+      expect(first?.places).toEqual(["Antiga"]);
+
+      transcript("Antiga, then Santelmo.");
+      await t.run((ctx) =>
+        ctx.db.patch(first!._id, {
+          status: "processing",
+          processingRunId: "run-2",
+        }),
+      );
+      await t.action(internal.ai.processItem, {
+        itemId: first!._id,
+        runId: "run-2",
+      });
+      const item = await t.run((ctx) => ctx.db.get(first!._id));
+
+      expect(item?.places).toEqual(["Antiga", "Santelmo"]);
+    });
+  });
 });

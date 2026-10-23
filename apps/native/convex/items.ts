@@ -1813,12 +1813,18 @@ function isShareable(item: Doc<"items">): boolean {
   return item.status === "ready" && item.type !== "image";
 }
 
+/** The save as a processing run reads it: with its places, which a rerun keeps. */
 export const getItemInternal = internalQuery({
   args: { itemId: v.id("items") },
-  returns: v.union(v.object(itemFields), v.null()),
+  returns: v.union(
+    v.object({ ...itemFields, places: v.optional(v.array(v.string())) }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    return item === null ? null : stripEmbedding(item);
+    if (item === null) return null;
+    const { places } = item;
+    return { ...stripEmbedding(item), ...(places ? { places } : {}) };
   },
 });
 

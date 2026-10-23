@@ -568,7 +568,21 @@ async function classifyLink(
 
 type SpeechWants = { recipe: boolean; places: boolean };
 
-function speechWants(read: LinkRead, result: LinkAnalysis): SpeechWants {
+/** True once an earlier run stored a place this caption does not name, so its speech was already read. */
+function heardBefore(item: Doc<"items">, result: LinkAnalysis): boolean {
+  const caption = new Set(
+    normalizePlaces(result.places).map((place) => place.toLowerCase()),
+  );
+  return normalizePlaces(item.places).some(
+    (place) => !caption.has(place.toLowerCase()),
+  );
+}
+
+function speechWants(
+  item: Doc<"items">,
+  read: LinkRead,
+  result: LinkAnalysis,
+): SpeechWants {
   if (read.status !== "ok" || read.shortForm?.video !== true) {
     return { recipe: false, places: false };
   }
@@ -577,7 +591,7 @@ function speechWants(read: LinkRead, result: LinkAnalysis): SpeechWants {
       result.cookingVideo === true &&
       read.page.recipe === undefined &&
       sanitizeRecipe(result.recipe) === undefined,
-    places: result.placesVideo === true,
+    places: result.placesVideo === true && !heardBefore(item, result),
   };
 }
 
@@ -617,7 +631,10 @@ type Spoken = Partial<Pick<LinkAnalysis, "recipe" | "places" | "cities">>;
 
 type SpeechEvent = "speech_recipe" | "speech_places";
 
-/** Reads a short video's speech once, for a recipe its caption lacks and for the places it names. */
+/**
+ * Reads a short video's speech once, for a recipe its caption lacks and for the places it names.
+ * A run that gets no spoken places keeps the ones an earlier run stored.
+ */
 async function fromSpeech(
   ctx: ActionCtx,
   item: Doc<"items">,
@@ -625,7 +642,24 @@ async function fromSpeech(
   result: LinkAnalysis,
   aiAllowed: boolean,
 ): Promise<Spoken> {
-  const wants = speechWants(read, result);
+  const spoken = await readSpeech(ctx, item, read, result, aiAllowed);
+  if (result.placesVideo !== true || spoken.places !== undefined) {
+    return spoken;
+  }
+  return {
+    ...spoken,
+    places: normalizePlaces([...(result.places ?? []), ...(item.places ?? [])]),
+  };
+}
+
+async function readSpeech(
+  ctx: ActionCtx,
+  item: Doc<"items">,
+  read: LinkRead,
+  result: LinkAnalysis,
+  aiAllowed: boolean,
+): Promise<Spoken> {
+  const wants = speechWants(item, read, result);
   const token = transcriptToken();
   const site = read.status === "ok" ? read.shortForm?.site : undefined;
   const url =
