@@ -109,3 +109,21 @@ describe("REVENUECAT_API_KEY", () => {
     await expect(loadKey("web")).resolves.toBeUndefined();
   });
 });
+
+describe("REVENUECAT_PRO_ENTITLEMENT", () => {
+  it("names the production project's entitlement on production builds", async () => {
+    setVariant("production");
+    const prod = await loadModule("ios");
+    expect(prod.REVENUECAT_PRO_ENTITLEMENT).toBe("Shelvr Pro");
+  });
+
+  it.each(["development", "preview", undefined])(
+    "names the Development project's entitlement on a %s build",
+    async (variant) => {
+      setVariant(variant);
+      vi.stubGlobal("__DEV__", true);
+      const other = await loadModule("ios");
+      expect(other.REVENUECAT_PRO_ENTITLEMENT).toBe("shelvr_pro");
+    },
+  );
+});

@@ -89,6 +89,14 @@ describe("paywall exposure and outcomes", () => {
     },
   );
 
+  it("reports a paywall skipped for existing Pro as already entitled", async () => {
+    await observePaywallPresentation(properties, async () => "NOT_PRESENTED");
+    expect(analytics.capture).toHaveBeenCalledWith(
+      "paywall_failed",
+      expect.objectContaining({ reason: "already_entitled" }),
+    );
+  });
+
   it("preserves SDK failure behavior and excludes raw error contents", async () => {
     const error = new Error("private store error");
     await expect(

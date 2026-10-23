@@ -16,6 +16,8 @@ let pendingAccess: { source: "purchase" | "restore"; at: number } | null = null;
 
 let activeEntitlementStatus: ActiveEntitlementStatus | null = null;
 
+let customerInfoReadAt = 0;
+
 function captureEntitlementActivation(
   source: "purchase" | "restore",
   at: number,
@@ -55,6 +57,7 @@ export function useEntitlementActivation(
 
 export function forgetPaywallFunnel(): void {
   pendingAccess = null;
+  customerInfoReadAt = 0;
   blockedAction = null;
   activeEntitlementStatus = null;
 }
@@ -268,6 +271,29 @@ export async function activeProductId(): Promise<{ product_id?: string }> {
       : {};
   };
   return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
+}
+
+const CUSTOMER_INFO_TIMEOUT_MS = 10_000;
+const CUSTOMER_INFO_FRESH_MS = 60_000;
+
+/**
+ * True once RevenueCat answers a fresh customer info read. presentPaywallIfNeeded
+ * then checks Pro against current data, not a cache from before a lapse, and it
+ * never settles when its own read fails, so a failed read here keeps it closed.
+ * A read that landed within the last minute, even after its caller gave up, is
+ * kept, so a retry on a slow connection does not throw it away.
+ */
+export async function refreshCustomerInfo(): Promise<boolean> {
+  const rc = getPurchases();
+  if (!rc) return false;
+  const read = async (): Promise<{ read?: true }> => {
+    const stale = Date.now() - customerInfoReadAt >= CUSTOMER_INFO_FRESH_MS;
+    if (stale) await rc.invalidateCustomerInfoCache();
+    await rc.getCustomerInfo();
+    if (stale) customerInfoReadAt = Date.now();
+    return { read: true };
+  };
+  return (await withTimeout(read(), CUSTOMER_INFO_TIMEOUT_MS)).read === true;
 }
 
 /**
