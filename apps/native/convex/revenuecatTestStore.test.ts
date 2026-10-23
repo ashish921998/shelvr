@@ -44,6 +44,10 @@ async function fixture() {
 }
 
 describe("Test Store purchases outside the dev deployment", () => {
+  beforeEach(() => {
+    vi.stubEnv("CONVEX_SITE_URL", "https://amiable-setter-120.convex.site");
+  });
+
   it("ignores a Test Store purchase webhook", async () => {
     const f = await fixture();
     expect((await f.purchase({ store: "TEST_STORE" })).status).toBe(200);

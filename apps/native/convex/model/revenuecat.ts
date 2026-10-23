@@ -189,9 +189,11 @@ function fromTestStore(
   );
   if (subscription) return isTestStore(subscription.store);
   const purchases = readRecord(subscriber?.non_subscriptions)?.[productId];
+  // One real purchase under the same id is paid for, so every purchase must come from the Test Store.
   return (
     Array.isArray(purchases) &&
-    purchases.some((purchase) => isTestStore(readRecord(purchase)?.store))
+    purchases.length > 0 &&
+    purchases.every((purchase) => isTestStore(readRecord(purchase)?.store))
   );
 }
 

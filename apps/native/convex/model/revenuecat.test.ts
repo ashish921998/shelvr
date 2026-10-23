@@ -458,6 +458,22 @@ describe("Test Store purchases", () => {
     expect(parseRevenueCatSnapshot(yearly("app_store")).status).toBe("pro");
   });
 
+  it("keeps a lifetime purchase that a real store also sold under the same id", () => {
+    const mixed = {
+      ...lifetime,
+      subscriber: {
+        ...lifetime.subscriber,
+        non_subscriptions: {
+          lifetime: [
+            { id: "a", store: "test_store" },
+            { id: "b", store: "app_store" },
+          ],
+        },
+      },
+    };
+    expect(parseRevenueCatSnapshot(mixed).status).toBe("lifetime");
+  });
+
   it("grants nothing for a Test Store lifetime purchase unless told to accept it", () => {
     expect(parseRevenueCatSnapshot(lifetime)).toEqual({
       status: "lapsed",
