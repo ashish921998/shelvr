@@ -277,12 +277,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/auth.ts`**: `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.** A public query or mutation gets it through `authedQuery` or `authedMutation`, which
-  run `requireUserId` before the handler and pass the id as `ctx.userId`. The functions that skip
-  the builders are listed in `model/publicFunctions.ts`: `PUBLIC_ON_PURPOSE` names each one that
-  must answer a caller with no live account, with a reason, and `NOT_MOVED_YET` names the rest
-  until they move over. `model/publicFunctions.test.ts` fails on any public query or mutation
-  that is neither built nor listed, and on a `NOT_MOVED_YET` entry that does not refuse a
-  signed-out or deleting caller first. `.github/CODEOWNERS` names the owner for the lists.
+  run `requireUserId` before the handler and pass the id as `ctx.userId`. The few that must answer
+  a caller with no live account skip the builders and are listed, each with a reason, in
+  `PUBLIC_ON_PURPOSE` (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails on any
+  public query or mutation that is neither built nor listed, and calls every built one as a
+  signed-out caller and as a deleting account, failing unless it throws "Not authenticated"
+  before the handler runs. So a function moved onto the builders adds no refusal test of its own.
+  `.github/CODEOWNERS` names the owner for the list.
   Public actions have no builder yet; an action derives the caller through the internal
   mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`), so
   authorization and the write stay in one transaction.
@@ -483,7 +484,7 @@ needed at runtime by the features that use them:
 - Never pass `userId` from the client into Convex public functions. Build a public query or
   mutation with `authedQuery` or `authedMutation` from `model/auth.ts` and read `ctx.userId`. A
   function that must answer a signed-out or deleting caller goes in `PUBLIC_ON_PURPOSE` in
-  `model/publicFunctions.ts` with a reason. `NOT_MOVED_YET` only shrinks.
+  `model/publicFunctions.ts` with a reason.
 - Keep `returns:` validators accurate. Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
 - Public Convex functions are contracts with every app build in the wild, and the backend

@@ -21,11 +21,11 @@ finding twice across reruns, and do not count two reviewers agreeing as proof: c
 Backend (`apps/native/convex`):
 
 - [ ] A public query or mutation is built with `authedQuery` / `authedMutation`
-      (`model/auth.ts`) and reads `ctx.userId`, or is listed in `model/publicFunctions.ts`.
-      `model/publicFunctions.test.ts` fails an unlisted one, and a `NOT_MOVED_YET` entry
-      that does not refuse a signed-out or deleting caller before anything else. That list
-      only shrinks, so a new entry there is wrong. A `PUBLIC_ON_PURPOSE` entry's reason is
-      yours to check against its handler. A public action still derives the user with
+      (`model/auth.ts`) and reads `ctx.userId`, or is listed in `PUBLIC_ON_PURPOSE`
+      (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails an unlisted one,
+      and a built one that does not refuse a signed-out or deleting caller before its
+      handler runs. A `PUBLIC_ON_PURPOSE` entry's reason is yours to check against its
+      handler. A public action still derives the user with
       `requireUserId(ctx)` inside the internal function it runs. No `userId` argument from
       the client. Code that acts for an account checks it is still live (`liveOwner`), not
       mid-deletion.
