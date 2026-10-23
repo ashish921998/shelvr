@@ -13,6 +13,7 @@ import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
 import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
 import { useNotificationSession } from "@/lib/notifications";
+import { useNotificationPermission } from "@/lib/use-notification-permission";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -48,6 +49,11 @@ export default function SettingsScreen() {
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
+  // A preference left on without the device's permission delivers nothing, so
+  // it shows off; turning it on asks for the permission or opens Settings.
+  const permission = useNotificationPermission();
+  const notificationsAllowed =
+    permission === undefined || permission === "granted";
   const { status: entitlementStatus } = useEntitlement();
   const hasLiveSubscription =
     entitlementStatus === "trialing" || entitlementStatus === "pro";
@@ -221,7 +227,10 @@ export default function SettingsScreen() {
         accessory={
           <Switch
             accessibilityLabel={t("notifications.toggleLabel")}
-            value={notificationPreferences?.weeklyShelfEnabled ?? false}
+            value={
+              notificationsAllowed &&
+              (notificationPreferences?.weeklyShelfEnabled ?? false)
+            }
             disabled={notificationPreferences === undefined || busy}
             onValueChange={(value) =>
               void toggleNotifications("weekly_shelf", value)
@@ -241,7 +250,10 @@ export default function SettingsScreen() {
         accessory={
           <Switch
             accessibilityLabel={t("notifications.remindersToggle")}
-            value={notificationPreferences?.remindersEnabled ?? false}
+            value={
+              notificationsAllowed &&
+              (notificationPreferences?.remindersEnabled ?? false)
+            }
             disabled={notificationPreferences === undefined || busy}
             onValueChange={(value) =>
               void toggleNotifications("save_reminders", value)
