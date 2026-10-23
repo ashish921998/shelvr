@@ -23,8 +23,11 @@ export default function Error({
           Something went wrong
         </h1>
         <p className="mt-3 text-[15px] leading-7 text-ink/90">
-          The page hit an unexpected error. You can try again, or email
-          {SUPPORT_EMAIL} if it keeps happening.
+          The page hit an unexpected error. You can try again, or email{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">
+            {SUPPORT_EMAIL}
+          </a>{" "}
+          if it keeps happening.
         </p>
         <button
           className="mt-8 inline-flex rounded-full bg-ink px-6 py-3 font-semibold text-paper transition-opacity hover:opacity-80"
