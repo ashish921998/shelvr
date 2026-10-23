@@ -79,6 +79,39 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["convex/**/*.ts"],
+    ignores: ["convex/test.setup.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "convex-test",
+              importNames: ["convexTest"],
+              allowTypeImports: true,
+              message:
+                "Build the harness with newConvexTest() from convex/test.setup.ts. It registers the rate-limiter component, without which any mutation that calls rateLimiter.limit fails.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/app/**/*.{test,spec}.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Program",
+          message:
+            "Expo Router bundles every file under src/app into the app. Move this test next to the code it tests under src/lib or src/components.",
+        },
+      ],
+    },
+  },
+  {
     files: [
       "convex/model/log.ts",
       "src/lib/analytics.ts",
