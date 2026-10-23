@@ -6,8 +6,11 @@ import type { OracleInputProps } from "@/lib/oracle";
 
 import { FieldHint, SubmitButton } from "./OracleFields";
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
+// The picked file is shrunk to a JPEG before it is sent, so this only keeps decoding bounded.
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_EDGE_PX = 2000;
+// Matches ORACLE_MAX_IMAGE_BASE64_CHARS in apps/native/convex/model/oracle.ts.
+const MAX_IMAGE_BASE64_CHARS = 4 * 1024 * 1024;
 
 async function encodeImage(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
@@ -47,7 +50,7 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     if (picked.size > MAX_FILE_BYTES) {
       setFile(undefined);
       setPreview(undefined);
-      setError("That one is over 4 MB. Try a smaller screenshot.");
+      setError("That one is over 20 MB. Try a smaller screenshot.");
       return;
     }
     setFile(picked);
@@ -60,6 +63,12 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     setPreparing(true);
     try {
       const imageBase64 = await encodeImage(file);
+      if (imageBase64.length > MAX_IMAGE_BASE64_CHARS) {
+        setError(
+          "That one is too big for the oracle. Try a smaller screenshot.",
+        );
+        return;
+      }
       onSubmit({ kind: "screenshot", imageBase64, mediaType: "image/jpeg" });
     } catch {
       setError("Couldn’t read that image. Try a JPEG or PNG.");
@@ -84,7 +93,7 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
           </span>
         )}
         <span className="text-sm text-muted">
-          {preview ? "Tap to pick another" : "JPEG, PNG, or WebP, up to 4 MB"}
+          {preview ? "Tap to pick another" : "JPEG, PNG, or WebP, up to 20 MB"}
         </span>
         <input
           type="file"
