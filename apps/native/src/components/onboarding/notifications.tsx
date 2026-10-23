@@ -1,7 +1,11 @@
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { requestNotificationPermission } from "@/lib/notification-token";
-import { queueWeeklyShelf } from "@/lib/pending-weekly-shelf";
+import { useNotificationSession } from "@/lib/notifications";
+import {
+  applyQueuedWeeklyShelf,
+  queueWeeklyShelf,
+} from "@/lib/pending-weekly-shelf";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
@@ -9,6 +13,7 @@ import { DEMO_SAMPLES } from "@/lib/onboarding-demo";
 import type { Goal } from "@/lib/onboarding-goals";
 import { type SampleTrip, sampleStops } from "@/lib/sample-trip";
 import type { TextMessageKey } from "@/locales/message-types";
+import { useConvexAuth } from "convex/react";
 import { Image } from "expo-image";
 import { useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -153,7 +158,11 @@ export function NotificationsStep({
   useAppLocale();
   const goal = picked ?? "other";
   const copy = COPY[goal];
+  const { isAuthenticated } = useConvexAuth();
+  const { session } = useNotificationSession();
   const [asking, setAsking] = useState(false);
+  // State updates too late to stop a second tap before the next render.
+  const inFlight = useRef(false);
   const reported = useRef(false);
 
   // Not latched: a closed paywall leaves them here to move on again.
@@ -166,15 +175,25 @@ export function NotificationsStep({
   };
 
   const allow = async () => {
-    if (asking) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setAsking(true);
     let granted = false;
     try {
       granted = await requestNotificationPermission();
-      if (granted && SHELF_GOALS.has(goal)) queueWeeklyShelf();
+      if (granted && SHELF_GOALS.has(goal)) {
+        queueWeeklyShelf();
+        // Already signed in, so no sign-in is coming to apply it.
+        if (isAuthenticated) {
+          await applyQueuedWeeklyShelf((enabled) =>
+            session.setWeeklyShelf(enabled),
+          );
+        }
+      }
     } catch (error) {
       analytics.captureError("onboarding_notifications_failed", error);
     }
+    inFlight.current = false;
     setAsking(false);
     finish("allow", granted);
   };

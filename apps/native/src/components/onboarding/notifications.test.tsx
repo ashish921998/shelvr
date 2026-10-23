@@ -30,6 +30,9 @@ const mock = vi.hoisted(() => ({
   ),
   request: vi.fn<() => Promise<boolean>>(),
   queueWeeklyShelf: vi.fn(),
+  applyQueuedWeeklyShelf: vi.fn(async () => {}),
+  setWeeklyShelf: vi.fn(),
+  authenticated: false,
   capture: vi.fn(),
 }));
 
@@ -54,6 +57,15 @@ vi.mock("@/lib/notification-token", () => ({
 }));
 vi.mock("@/lib/pending-weekly-shelf", () => ({
   queueWeeklyShelf: mock.queueWeeklyShelf,
+  applyQueuedWeeklyShelf: mock.applyQueuedWeeklyShelf,
+}));
+vi.mock("@/lib/notifications", () => ({
+  useNotificationSession: () => ({
+    session: { setWeeklyShelf: mock.setWeeklyShelf },
+  }),
+}));
+vi.mock("convex/react", () => ({
+  useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: vi.fn() },
@@ -64,6 +76,8 @@ const barcelona = samplePlan("trip", "barcelona");
 beforeEach(() => {
   mock.request.mockReset();
   mock.queueWeeklyShelf.mockReset();
+  mock.applyQueuedWeeklyShelf.mockReset().mockResolvedValue(undefined);
+  mock.authenticated = false;
   mock.capture.mockReset();
 });
 
@@ -133,6 +147,66 @@ describe("NotificationsStep", () => {
       action: "allow",
       granted: true,
     });
+  });
+
+  it("asks iOS once however fast the button is tapped twice", async () => {
+    let answer: (granted: boolean) => void = () => {};
+    mock.request.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const onDone = vi.fn();
+    render(
+      <NotificationsStep
+        goal="travel"
+        trip={barcelona}
+        leaving={false}
+        onDone={onDone}
+      />,
+    );
+    const allow = screen.getByText("onboardingNotify.allow");
+    fireEvent.click(allow);
+    fireEvent.click(allow);
+    answer(true);
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mock.request).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns the shelf on right away for someone already signed in", async () => {
+    mock.authenticated = true;
+    mock.request.mockResolvedValue(true);
+    const onDone = vi.fn();
+    render(
+      <NotificationsStep
+        goal="date"
+        trip={barcelona}
+        leaving={false}
+        onDone={onDone}
+      />,
+    );
+    fireEvent.click(screen.getByText("onboardingNotify.allow"));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mock.queueWeeklyShelf).toHaveBeenCalledTimes(1);
+    expect(mock.applyQueuedWeeklyShelf).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the queued shelf to sign-in when signed out", async () => {
+    mock.request.mockResolvedValue(true);
+    const onDone = vi.fn();
+    render(
+      <NotificationsStep
+        goal="travel"
+        trip={barcelona}
+        leaving={false}
+        onDone={onDone}
+      />,
+    );
+    fireEvent.click(screen.getByText("onboardingNotify.allow"));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mock.queueWeeklyShelf).toHaveBeenCalledTimes(1);
+    expect(mock.applyQueuedWeeklyShelf).not.toHaveBeenCalled();
   });
 
   it("does not queue a shelf it never promised", async () => {
