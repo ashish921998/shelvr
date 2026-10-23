@@ -83,6 +83,8 @@
   "permissions.allowCamera": "Allow camera",
   "capture.photoMode": "PHOTO",
   "capture.stickerMode": "STICKER",
+  "capture.flipCamera": "Flip camera",
+  "capture.takePhoto": "Take photo",
   "spaces.changeFailed": "Couldn't change space",
   "spaces.changeFailedBody": "Your previous choice is still saved. Please try again.",
   "navigation.spaces": "Spaces",

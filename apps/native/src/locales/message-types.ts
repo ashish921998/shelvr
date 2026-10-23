@@ -84,6 +84,8 @@ export type MessageParams = {
   "permissions.allowCamera": undefined;
   "capture.photoMode": undefined;
   "capture.stickerMode": undefined;
+  "capture.flipCamera": undefined;
+  "capture.takePhoto": undefined;
   "spaces.changeFailed": undefined;
   "spaces.changeFailedBody": undefined;
   "navigation.spaces": undefined;

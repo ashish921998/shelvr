@@ -83,6 +83,8 @@
   "permissions.allowCamera": "Kamera erlauben",
   "capture.photoMode": "FOTO",
   "capture.stickerMode": "STICKER",
+  "capture.flipCamera": "Kamera wechseln",
+  "capture.takePhoto": "Foto aufnehmen",
   "spaces.changeFailed": "Sammlung konnte nicht geändert werden",
   "spaces.changeFailedBody": "Deine vorherige Auswahl ist noch gespeichert. Bitte versuche es erneut.",
   "navigation.spaces": "Sammlungen",
