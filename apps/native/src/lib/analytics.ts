@@ -191,6 +191,8 @@ export type AnalyticsEventProperties = {
     made: boolean;
   };
   trip_failed: { reason: "ai_consent" | "error" };
+  city_opened: { count: number };
+  city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };
@@ -229,7 +231,6 @@ export type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
-  home_mode_changed: { mode: "dates" | "trips" };
   next_up_shown: { kind: NextUpKind };
   next_up_opened: { kind: NextUpKind };
   next_up_dismissed: { kind: NextUpKind };

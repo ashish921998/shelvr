@@ -10,7 +10,7 @@ import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
-import { DateTripHome } from "@/components/home/date-trip-home";
+import { HomePlaces } from "@/components/home/home-places";
 import { NextUpCard } from "@/components/home/next-up-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
@@ -244,14 +244,14 @@ export default function HomeScreen() {
         // header on iOS.
         ListHeaderComponent={
           <View>
-            <DateTripHome />
+            <HomePlaces />
             {cancelSurveyCard ??
               howToHeader ??
               progressCard ??
               recallCard ??
               lastHeader(feedback, busySaving, nextUpCard)}
             <Text style={[styles.shelfLabel, styles.feedLabel]}>
-              {t("homePlans.everythingSaved")}
+              {t("homePlaces.everythingSaved")}
             </Text>
           </View>
         }
