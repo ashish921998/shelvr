@@ -91,6 +91,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/accountDeletion.test.ts` and says how to read a failure. Use it before
   changing the deletion drain in `convex/users.ts`, a table with a user key, an
   owner check, or a function that writes rows for a user.
+- **Proving photo saves keep their image:** `.agents/skills/image-import-storage`
+  model-checks the image import and upload receiver in TLA+
+  (`tools/formal/image-import`). Use it before changing those functions, the
+  storage cleanup crons, or any code that deletes a `_storage` blob.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
