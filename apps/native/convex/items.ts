@@ -21,7 +21,6 @@ import {
 } from "./subscriptions";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
-import { RECALL_MIN_AGE_MS } from "./model/recallAge";
 import { takeWithinBytes } from "./model/readBudget";
 import {
   deleteMembership,
@@ -30,12 +29,7 @@ import {
   getMembership,
   insertMembership,
 } from "./model/memberships";
-import {
-  isYouTubeUrl,
-  linkSource,
-  normalizeExternalUrl,
-  shortFormSource,
-} from "./model/externalUrl";
+import { normalizeExternalUrl } from "./model/externalUrl";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -69,16 +63,15 @@ import { saveError } from "./model/saveErrors";
 import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
-import {
-  COOK_MIN_AGE_MS,
-  openedTooRecently,
-  READ_MAX_AGE_MS,
-  READ_MIN_AGE_MS,
-  reminderKind,
-  reminderSubject,
-} from "./model/saveReminders";
+import { nextUpKind } from "./model/nextUp";
+import { openedTooRecently, reminderSubject } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { buildSearchText } from "./model/searchText";
+import {
+  hasSimilarSignal,
+  rankSimilar,
+  similarSearchTerms,
+} from "./model/similarity";
 import { completionPatch, failurePatch, runFields } from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -94,23 +87,6 @@ export const RECENT_ITEMS_MAX = 20;
 const NEXT_UP_SCAN_ROWS = 100;
 const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
 export const NEXT_UP_SKIP_MAX = 50;
-
-type NextUpKind = "read" | "cook" | "watch" | "open";
-
-function nextUpKind(item: Doc<"items">, now: number): NextUpKind | undefined {
-  const age = now - item._creationTime;
-  const reminder = reminderKind(item);
-  if (reminder === "cook") return age >= COOK_MIN_AGE_MS ? "cook" : undefined;
-  if (age < READ_MIN_AGE_MS || age > READ_MAX_AGE_MS) return undefined;
-  if (
-    isYouTubeUrl(item.url) ||
-    shortFormSource(item.url)?.video ||
-    item.media?.some((media) => media.kind === "video")
-  )
-    return "watch";
-  if (reminder === "read" && linkSource(item.url) === undefined) return "read";
-  return "open";
-}
 
 const itemTypeValidator = v.union(
   v.literal("image"),
@@ -477,17 +453,18 @@ export const getItem = query({
       .query("spaceItems")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
       .collect();
-    const spaces: { _id: Id<"spaces">; name: string }[] = [];
-    for (const join of joins) {
-      if (effectiveStatus(join) !== "saved") {
-        continue;
-      }
-      const space = await ctx.db.get(join.spaceId);
-      if (space !== null) {
-        spaces.push({ _id: space._id, name: space.name });
-      }
-    }
-    const enriched = await enrichItem(ctx, item);
+    // The space reads and the image URL go out together.
+    const [rows, enriched] = await Promise.all([
+      Promise.all(
+        joins
+          .filter((join) => effectiveStatus(join) === "saved")
+          .map((join) => ctx.db.get(join.spaceId)),
+      ),
+      enrichItem(ctx, item),
+    ]);
+    const spaces = rows
+      .filter((space): space is Doc<"spaces"> => space !== null)
+      .map((space) => ({ _id: space._id, name: space.name }));
     return { ...enriched, spaces };
   },
 });
@@ -517,72 +494,6 @@ const SIMILAR_SEARCH_CANDIDATES = 100;
 const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
 const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
 const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
-// Convex caps a full-text query at 16 terms.
-const SIMILAR_SEARCH_TERMS = 16;
-const SIMILAR_LIMIT = 10;
-const SIMILAR_MIN_SCORE = 3;
-const SIMILAR_RESERVED_OLD = 3;
-
-function significantWords(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(
-      (word) =>
-        word.length >= (/^[\p{Script=Latin}\p{N}]*$/u.test(word) ? 4 : 2),
-    );
-}
-
-function summaryText(item: Doc<"items">): string {
-  return buildSearchText({
-    title: item.title,
-    description: item.description,
-    tags: item.tags,
-    siteName: item.siteName,
-    note: item.note,
-  });
-}
-
-function searchTokens(text: string): Set<string> {
-  return new Set(significantWords(text));
-}
-
-const TAG_STOPWORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "at",
-  "for",
-  "how",
-  "in",
-  "of",
-  "on",
-  "or",
-  "the",
-  "to",
-]);
-
-export function tagSearchWords(tag: string): string[] {
-  return tag
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length >= 2 && !TAG_STOPWORDS.has(word));
-}
-
-function similarSearchTerms(item: Doc<"items">): string[] {
-  const terms = new Set<string>();
-  const words = [
-    ...item.tags.flatMap(tagSearchWords),
-    ...significantWords(item.title ?? ""),
-  ];
-  for (const word of words) {
-    terms.add(word);
-    if (terms.size >= SIMILAR_SEARCH_TERMS) {
-      break;
-    }
-  }
-  return [...terms];
-}
 
 export const similarItems = query({
   args: { id: v.id("items") },
@@ -593,9 +504,7 @@ export const similarItems = query({
     if (item === null || item.userId !== userId || item.status !== "ready") {
       return [];
     }
-    const tags = new Set(item.tags);
-    const tokens = searchTokens(summaryText(item));
-    if (tags.size === 0 && tokens.size === 0) {
+    if (!hasSimilarSignal(item)) {
       return [];
     }
 
@@ -634,40 +543,10 @@ export const similarItems = query({
       candidates.set(candidate._id, candidate);
     }
 
-    const scored: { item: Doc<"items">; score: number }[] = [];
-    for (const candidate of candidates.values()) {
-      if (candidate._id === item._id || candidate.status !== "ready") {
-        continue;
-      }
-      let score = 0;
-      for (const tag of candidate.tags) {
-        if (tags.has(tag)) {
-          score += 3;
-        }
-      }
-      for (const token of searchTokens(summaryText(candidate))) {
-        if (tokens.has(token)) {
-          score += 1;
-        }
-      }
-      if (score >= SIMILAR_MIN_SCORE) {
-        scored.push({ item: candidate, score });
-      }
-    }
-    scored.sort((a, b) => b.score - a.score);
-
-    const oldCutoff = item._creationTime - RECALL_MIN_AGE_MS;
-    const reservedOld = scored
-      .filter((candidate) => candidate.item._creationTime <= oldCutoff)
-      .slice(0, SIMILAR_RESERVED_OLD);
-    const reservedIds = new Set(reservedOld.map((s) => s.item._id));
-    const rest = scored
-      .filter((candidate) => !reservedIds.has(candidate.item._id))
-      .slice(0, SIMILAR_LIMIT - reservedOld.length);
-    const final = [...reservedOld, ...rest].sort((a, b) => b.score - a.score);
-
     return await Promise.all(
-      final.map(({ item: match }) => toItemCard(ctx, match)),
+      rankSimilar(item, candidates.values()).map((match) =>
+        toItemCard(ctx, match),
+      ),
     );
   },
 });
@@ -1369,7 +1248,10 @@ async function createLinkOrNote(
     ...(kind === "link" && "url" in payload ? { url: payload.url } : {}),
     ...(kind === "note" && "note" in payload ? { note: payload.note } : {}),
     tags: [],
-    searchText: "",
+    searchText:
+      kind === "note" && "note" in payload
+        ? buildSearchText({ tags: [], note: payload.note })
+        : "",
   });
   if (options.spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, options.spaceId);

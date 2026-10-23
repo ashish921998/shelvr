@@ -881,8 +881,57 @@ describe("denormalized space summary", () => {
   });
 });
 
+describe("reads that fan out", () => {
+  it("listSpaces keeps newest-first order and each space's own covers", async () => {
+    const { t, userId } = await entitledUser();
+    const names = ["Older", "Middle", "Newest"];
+    for (const name of names) {
+      const spaceId = await t.mutation(api.spaces.createSpace, { name });
+      const itemId = await seedItem(t, userId, `${name} save`);
+      await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
+    }
+
+    const listed = await t.query(api.spaces.listSpaces, {});
+    expect(listed.map((space) => [space.name, space.itemCount])).toEqual([
+      ["Newest", 1],
+      ["Middle", 1],
+      ["Older", 1],
+    ]);
+    expect(listed.map((space) => space.previews.length)).toEqual([1, 1, 1]);
+  });
+
+  it("getItem names only the spaces a save is filed in", async () => {
+    const { t, userId } = await entitledUser();
+    const itemId = await seedItem(t, userId, "lamp");
+    const kept = await t.mutation(api.spaces.createSpace, { name: "Home" });
+    const alsoKept = await t.mutation(api.spaces.createSpace, {
+      name: "Gifts",
+    });
+    const dismissed = await t.mutation(api.spaces.createSpace, {
+      name: "Office",
+    });
+    await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId: kept });
+    await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId: alsoKept });
+    await t.mutation(internal.items.setSpacesForItem, {
+      itemId,
+      spaceIds: [dismissed],
+    });
+    await t.mutation(api.spaces.dismissSuggestion, {
+      itemId,
+      spaceId: dismissed,
+    });
+
+    const item = await t.query(api.items.getItem, { id: itemId });
+    expect(item?.spaces.map((space) => space.name).sort()).toEqual([
+      "Gifts",
+      "Home",
+    ]);
+    expect(item?.imageUrl).toEqual(expect.any(String));
+  });
+});
+
 describe("steering spend controls", () => {
-  it("blocks a burst of addItemToSpace past the steerItem capacity and rolls the add back", async () => {
+  it("keeps filing past the steerItem capacity and only skips the steering", async () => {
     const { t, userId } = await entitledUser();
     const spaceId = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
     for (let i = 0; i < 40; i++) {
@@ -890,18 +939,40 @@ describe("steering spend controls", () => {
       await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
     }
     const over = await seedItem(t, userId, "over", false);
-    await expect(
-      t.mutation(api.spaces.addItemToSpace, { itemId: over, spaceId }),
-    ).rejects.toThrow();
-    expect((await readSpace(t, spaceId)).savedCount).toBe(40);
+    await t.mutation(api.spaces.addItemToSpace, { itemId: over, spaceId });
+    expect((await readSpace(t, spaceId)).savedCount).toBe(41);
     expect(await steeringJobs(t)).toHaveLength(40);
-    const joins = await t.run((ctx) =>
-      ctx.db
-        .query("spaceItems")
-        .withIndex("by_item", (q) => q.eq("itemId", over))
-        .collect(),
-    );
-    expect(joins).toHaveLength(0);
+  });
+
+  it("accepts a suggestion after Add all spent the steering budget", async () => {
+    const { t, userId } = await entitledUser();
+    const bulk = await t.mutation(api.spaces.createSpace, { name: "Bulk" });
+    const other = await t.mutation(api.spaces.createSpace, { name: "Other" });
+    const ids: Id<"items">[] = [];
+    for (let i = 0; i < 41; i++) {
+      ids.push(await seedItem(t, userId, `i${i}`, false));
+    }
+    await t.mutation(internal.items.suggestItemsForSpace, {
+      spaceId: bulk,
+      itemIds: ids,
+    });
+    await t.mutation(internal.items.suggestItemsForSpace, {
+      spaceId: other,
+      itemIds: [ids[0]],
+    });
+    await t.mutation(api.spaces.acceptAllSuggestions, { spaceId: bulk });
+
+    expect(
+      await t.mutation(api.spaces.acceptSuggestion, {
+        itemId: ids[0],
+        spaceId: other,
+      }),
+    ).toBe(true);
+    expect(await readSpace(t, other)).toMatchObject({
+      savedCount: 1,
+      suggestedCount: 0,
+    });
+    expect(await steeringJobs(t)).toHaveLength(40);
   });
 
   it("acceptAllSuggestions keeps accepting once the steering budget is spent", async () => {

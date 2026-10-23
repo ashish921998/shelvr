@@ -4,9 +4,9 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsLookup,
-  distanceKm,
   firstPlace,
 } from "./appleMaps";
+import { distanceKm } from "./trip";
 
 async function testKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey(

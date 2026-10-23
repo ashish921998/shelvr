@@ -182,17 +182,18 @@ export const listSpaces = query({
       .order("desc")
       .collect();
 
-    const results = [];
-    for (const space of spaces) {
-      const summary = await readSummary(ctx, space);
-      results.push({
-        ...space,
-        itemCount: summary.savedCount,
-        suggestionCount: summary.suggestedCount,
-        previews: await loadPreviews(ctx, summary),
-      });
-    }
-    return results;
+    // Each space's reads go out together rather than one space after another.
+    return await Promise.all(
+      spaces.map(async (space) => {
+        const summary = await readSummary(ctx, space);
+        return {
+          ...space,
+          itemCount: summary.savedCount,
+          suggestionCount: summary.suggestedCount,
+          previews: await loadPreviews(ctx, summary),
+        };
+      }),
+    );
   },
 });
 
@@ -420,7 +421,6 @@ async function scheduleSteering(
   userId: Id<"users">,
   item: Doc<"items">,
   spaceId: Id<"spaces">,
-  options: { throws: boolean },
 ): Promise<boolean> {
   if (item.status !== "ready") {
     return false;
@@ -433,7 +433,6 @@ async function scheduleSteering(
   }
   const { ok } = await rateLimiter.limit(ctx, "steerItem", {
     key: userId,
-    throws: options.throws,
   });
   if (!ok) {
     return false;
@@ -470,7 +469,7 @@ export const addItemToSpace = mutation({
     } else {
       return null;
     }
-    await scheduleSteering(ctx, userId, item, args.spaceId, { throws: true });
+    await scheduleSteering(ctx, userId, item, args.spaceId);
     return null;
   },
 });
@@ -505,7 +504,7 @@ export const acceptSuggestion = mutation({
       return false;
     }
     await setMembershipStatus(ctx, row, "saved");
-    await scheduleSteering(ctx, userId, item, args.spaceId, { throws: true });
+    await scheduleSteering(ctx, userId, item, args.spaceId);
     return true;
   },
 });
@@ -558,9 +557,7 @@ export const acceptAllSuggestions = mutation({
       }
       const item = await ctx.db.get(row.itemId);
       if (item !== null && item.status === "ready") {
-        steeringAllowed = await scheduleSteering(ctx, userId, item, space._id, {
-          throws: false,
-        });
+        steeringAllowed = await scheduleSteering(ctx, userId, item, space._id);
       }
     }
     return suggested.length;
