@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
+import { safeExceptionValue, superProperties } from "./posthog";
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
@@ -139,6 +139,19 @@ describe("posthog before_send", () => {
     );
   });
 
+  it("never puts a raw message into a stackless fingerprint", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "auth_failed",
+        $exception_list: [
+          { type: "Error", value: "Failed for https://private.example/note" },
+        ],
+      },
+    });
+    expect(sent.properties?.$exception_fingerprint).toBe("auth_failed:Error");
+  });
+
   it("leaves a handled error that has stack frames to PostHog's grouping", () => {
     const sent = sentBeforeSend()({
       event: "$exception",
@@ -256,8 +269,12 @@ describe("posthog before_send", () => {
     expect(sent.properties?.$exception_list).toBe("not-a-list");
   });
 
-  it("exports the shared allowlist used by analytics.captureError", () => {
-    expect(SAFE_ERROR_MESSAGES.has("Network request failed")).toBe(true);
+  it("shares one safe-value rule with analytics.captureError", () => {
+    expect(safeExceptionValue("Network request failed")).toBe(
+      "Network request failed",
+    );
+    expect(safeExceptionValue("ERR_CANCELED")).toBe("ERR_CANCELED");
+    expect(safeExceptionValue("Failed for https://x.test")).toBeUndefined();
   });
 });
 

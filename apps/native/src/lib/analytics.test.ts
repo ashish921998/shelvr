@@ -190,6 +190,12 @@ describe("captureError", () => {
     expect(reported.name).toBe("Error");
   });
 
+  it("keeps a message that is already a bare code", () => {
+    const error = new Error("AI_CONSENT_REQUIRED");
+    analytics.captureError("plan_failed", error);
+    expect(mock.captureException.mock.calls[0][0]).toBe(error);
+  });
+
   it("reduces non-Error throws to their type", () => {
     analytics.captureError("sign_out_failed", "boom");
     const reported = mock.captureException.mock.calls[0][0] as Error;
