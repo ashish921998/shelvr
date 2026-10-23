@@ -13,7 +13,6 @@ import {
   cityProgress,
   daysUntil,
   goalSpaceIds,
-  greetingKey,
   spotRows,
   weekStrip,
 } from "@/lib/home-plans";
@@ -254,7 +253,6 @@ export function DateTripHome() {
   useAppLocale();
   const { entitled } = useEntitlement();
   const [mode, setMode] = useState<HomeMode>("dates");
-  const [hour] = useState(() => new Date().getHours());
   const spaces = useQuery(
     convexQuery(api.spaces.listSpaces, entitled ? {} : "skip"),
   );
@@ -296,10 +294,6 @@ export function DateTripHome() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.heading}>
-        <Text style={styles.greeting}>{t(greetingKey(hour))}</Text>
-        <Text style={styles.headline}>{t("homePlans.headline")}</Text>
-      </View>
       <ModeSwitch mode={mode} onChange={change} />
       {panel}
     </View>
@@ -312,9 +306,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(1.5),
   },
-  heading: { gap: theme.gap(0.25) },
-  greeting: { ...theme.type.footnote, color: theme.colors.muted },
-  headline: { ...theme.type.largeTitle, color: theme.colors.foreground },
   switch: {
     flexDirection: "row",
     padding: theme.gap(0.5),

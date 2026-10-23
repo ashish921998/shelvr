@@ -79,17 +79,6 @@ export function daysUntil(
   return days >= 0 ? days : null;
 }
 
-export function greetingKey(
-  hour: number,
-):
-  | "homePlans.greetingMorning"
-  | "homePlans.greetingAfternoon"
-  | "homePlans.greetingEvening" {
-  if (hour < 12) return "homePlans.greetingMorning";
-  if (hour < 18) return "homePlans.greetingAfternoon";
-  return "homePlans.greetingEvening";
-}
-
 type Spot = { status: string; _creationTime: number };
 
 /** Up to `limit` saves, ready ones first, newest first within each group. */

@@ -882,10 +882,6 @@ export type MessageParams = {
   "recipeReveal.stepBake": undefined;
   "plan.buildTitleDate": undefined;
   "plan.buildTitleWeekend": undefined;
-  "homePlans.greetingMorning": undefined;
-  "homePlans.greetingAfternoon": undefined;
-  "homePlans.greetingEvening": undefined;
-  "homePlans.headline": undefined;
   "homePlans.dateNights": undefined;
   "homePlans.trips": undefined;
   "homePlans.fridayNight": undefined;

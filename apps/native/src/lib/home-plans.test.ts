@@ -4,7 +4,6 @@ import {
   cityProgress,
   daysUntil,
   goalSpaceIds,
-  greetingKey,
   spotRows,
   weekStrip,
 } from "./home-plans";
@@ -129,19 +128,6 @@ describe("daysUntil", () => {
     expect(daysUntil("2026-10-22", now)).toBeNull();
     expect(daysUntil(undefined, now)).toBeNull();
     expect(daysUntil("soon", now)).toBeNull();
-  });
-});
-
-describe("greetingKey", () => {
-  it.each([
-    [0, "homePlans.greetingMorning"],
-    [11, "homePlans.greetingMorning"],
-    [12, "homePlans.greetingAfternoon"],
-    [17, "homePlans.greetingAfternoon"],
-    [18, "homePlans.greetingEvening"],
-    [23, "homePlans.greetingEvening"],
-  ] as const)("hour %i is %s", (hour, key) => {
-    expect(greetingKey(hour)).toBe(key);
   });
 });
 
