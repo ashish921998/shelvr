@@ -8,6 +8,7 @@ import { trialTimelineVariables, type TrialPeriod } from "@/lib/date";
 import { formattingLocale, t } from "@/lib/i18n";
 import { getPurchases } from "@/lib/revenuecat-module";
 import { restoreFoundAccess } from "@/lib/paywall-result";
+import { goalPaywallVariables, type GoalProgress } from "@/lib/paywall-goal";
 
 type ActiveEntitlementStatus = "trialing" | "pro" | "lifetime";
 
@@ -183,10 +184,12 @@ export function paywallVariables(
   trial: TrialPeriod | undefined,
   products: TrialOfferProduct[],
   eligibility: TrialEligibility | undefined,
+  onboarding?: GoalProgress,
 ) {
   const variables = {
     ...(trial && trialTimelineVariables(now, trial)),
     ...trialOfferVariables(products, eligibility),
+    ...(onboarding && goalPaywallVariables(onboarding)),
   };
   return Object.keys(variables).length > 0 ? variables : undefined;
 }

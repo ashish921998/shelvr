@@ -1,0 +1,153 @@
+import type { Goal } from "@/lib/onboarding-goals";
+import {
+  resolveOnboardingSpaceName,
+  type getOnboardingProgress,
+} from "@/lib/pending-onboarding";
+import { t } from "@/lib/i18n";
+import { SAMPLE_CITIES } from "@/lib/sample-cities";
+
+export type GoalProgress = Pick<
+  ReturnType<typeof getOnboardingProgress>,
+  "goal" | "travelCity" | "spaces"
+>;
+
+/** What a slot's copy can depend on: the city the user picked (null for "not sure") and, for "other", the interests. */
+type Answers = { city: string | null; interests: string[] };
+type Copy = (answers: Answers) => string;
+
+const NO_ANSWER: Copy = () => "";
+const withCity =
+  (named: (city: string) => string, plain: () => string): Copy =>
+  ({ city }) =>
+    city === null ? plain() : named(city);
+
+type GoalCopy = {
+  headline: Copy;
+  subline: Copy;
+  photoTag: Copy;
+  answer1: Copy;
+  answer2: Copy;
+  today: Copy;
+  planTitle: Copy;
+  benefitTitle: Copy;
+  benefitBody: Copy;
+};
+
+const GOAL_COPY: Record<Goal, GoalCopy> = {
+  travel: {
+    headline: withCity(
+      (city) => t("paywallGoal.travelHeadline", { city }),
+      () => t("paywallGoal.travelHeadlineNoCity"),
+    ),
+    subline: () => t("paywallGoal.travelSubline"),
+    photoTag: () => t("paywallGoal.travelPhotoTag"),
+    answer1: () => t("paywallGoal.travelAnswerOne"),
+    answer2: withCity(
+      (city) => t("paywallGoal.travelAnswerTwo", { city }),
+      () => "",
+    ),
+    today: withCity(
+      (city) => t("paywallGoal.travelToday", { city }),
+      () => t("paywallGoal.travelTodayNoCity"),
+    ),
+    planTitle: withCity(
+      (city) => t("paywallGoal.travelPlanTitle", { city }),
+      () => t("paywallGoal.travelPlanTitleNoCity"),
+    ),
+    benefitTitle: () => t("paywallGoal.travelBenefitTitle"),
+    benefitBody: () => t("paywallGoal.travelBenefitBody"),
+  },
+  food: {
+    headline: withCity(
+      (city) => t("paywallGoal.foodHeadline", { city }),
+      () => t("paywallGoal.foodHeadlineNoCity"),
+    ),
+    subline: () => t("paywallGoal.foodSubline"),
+    photoTag: () => t("paywallGoal.foodPhotoTag"),
+    answer1: () => t("paywallGoal.foodAnswerOne"),
+    answer2: withCity(
+      (city) => t("paywallGoal.foodAnswerTwo", { city }),
+      () => "",
+    ),
+    today: withCity(
+      (city) => t("paywallGoal.foodToday", { city }),
+      () => t("paywallGoal.foodTodayNoCity"),
+    ),
+    planTitle: withCity(
+      (city) => t("paywallGoal.foodPlanTitle", { city }),
+      () => t("paywallGoal.foodPlanTitleNoCity"),
+    ),
+    benefitTitle: () => t("paywallGoal.foodBenefitTitle"),
+    benefitBody: () => t("paywallGoal.foodBenefitBody"),
+  },
+  date: {
+    headline: () => t("paywallGoal.dateHeadline"),
+    subline: () => t("paywallGoal.dateSubline"),
+    photoTag: () => t("paywallGoal.datePhotoTag"),
+    answer1: () => t("paywallGoal.dateAnswerOne"),
+    answer2: withCity(
+      (city) => t("paywallGoal.dateAnswerTwo", { city }),
+      () => "",
+    ),
+    today: () => t("paywallGoal.dateToday"),
+    planTitle: () => t("paywallGoal.datePlanTitle"),
+    benefitTitle: () => t("paywallGoal.dateBenefitTitle"),
+    benefitBody: () => t("paywallGoal.dateBenefitBody"),
+  },
+  recipes: {
+    headline: () => t("paywallGoal.recipesHeadline"),
+    subline: () => t("paywallGoal.recipesSubline"),
+    photoTag: () => t("paywallGoal.recipesPhotoTag"),
+    answer1: () => t("paywallGoal.recipesAnswerOne"),
+    answer2: NO_ANSWER,
+    today: () => t("paywallGoal.recipesToday"),
+    planTitle: () => t("paywallGoal.recipesPlanTitle"),
+    benefitTitle: () => t("paywallGoal.recipesBenefitTitle"),
+    benefitBody: () => t("paywallGoal.recipesBenefitBody"),
+  },
+  other: {
+    headline: () => t("paywallGoal.otherHeadline"),
+    subline: () => t("paywallGoal.otherSubline"),
+    photoTag: () => t("paywallGoal.otherPhotoTag"),
+    answer1: () => t("paywallGoal.otherAnswerOne"),
+    answer2: ({ interests }) => interests.slice(0, 2).join(", "),
+    today: () => t("paywallGoal.otherToday"),
+    planTitle: () => t("paywallGoal.otherPlanTitle"),
+    benefitTitle: () => t("paywallGoal.otherBenefitTitle"),
+    benefitBody: () => t("paywallGoal.otherBenefitBody"),
+  },
+};
+
+const string = (value: string) => ({ type: "string" as const, value });
+
+/**
+ * Custom variables that let the paywall echo the onboarding answers. A skipped
+ * city ("Not sure yet", "Somewhere else") is stored as null and reads as no city.
+ */
+export function goalPaywallVariables(
+  progress: GoalProgress,
+): Record<string, { type: "string"; value: string }> {
+  const { goal } = progress;
+  if (goal === null) return {};
+  const copy = GOAL_COPY[goal];
+  const answers: Answers = {
+    city:
+      progress.travelCity === null
+        ? null
+        : t(SAMPLE_CITIES[progress.travelCity].name),
+    interests:
+      goal === "other" ? progress.spaces.map(resolveOnboardingSpaceName) : [],
+  };
+  return {
+    goal: string(goal),
+    goal_headline: string(copy.headline(answers)),
+    goal_subline: string(copy.subline(answers)),
+    goal_photo_tag: string(copy.photoTag(answers)),
+    goal_answer_1: string(copy.answer1(answers)),
+    goal_answer_2: string(copy.answer2(answers)),
+    goal_today: string(copy.today(answers)),
+    goal_plan_title: string(copy.planTitle(answers)),
+    goal_benefit_title: string(copy.benefitTitle(answers)),
+    goal_benefit_body: string(copy.benefitBody(answers)),
+  };
+}
