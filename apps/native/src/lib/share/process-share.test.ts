@@ -11,7 +11,11 @@ import {
   type ResolvedPayload,
   type ShareSaveDeps,
 } from "./process-share";
-import { countPartial, countProgress } from "./session-view";
+import {
+  countPartial,
+  countProgress,
+  hasRetryableEntries,
+} from "./session-view";
 import {
   operationIdFor,
   type RawSharePayload,
@@ -148,12 +152,14 @@ describe("classifyPayload", () => {
     expect(classifyPayload(urlPayload("   "))).toEqual({
       kind: "link",
       reason: "Shared link was not a valid URL",
+      final: true,
     });
   });
   it("fails a website value that is not a URL", () => {
     expect(classifyPayload(urlPayload("not a url"))).toEqual({
       kind: "link",
       reason: "Shared link was not a valid URL",
+      final: true,
     });
   });
   it("marks unsupported content types as unsupported, never a note", () => {
@@ -193,6 +199,7 @@ describe("classifyPayload", () => {
     expect(classifyPayload(textPayload("   "))).toEqual({
       kind: "note",
       reason: "Shared text was empty",
+      final: true,
     });
   });
 });
@@ -602,7 +609,14 @@ describe("processSession", () => {
     const session = makeSession(2);
     const resolved = [urlPayload("   "), textPayload("   ")];
     const classified = classifyEntries(session, resolved);
-    expect(classified.map((e) => e.status)).toEqual(["failed", "failed"]);
+    // Settled, so the share screen offers no Retry that could only fail again.
+    expect(classified.map((e) => e.status)).toEqual([
+      "unsupported",
+      "unsupported",
+    ]);
+    expect(hasRetryableEntries({ ...session, entries: classified })).toBe(
+      false,
+    );
     const saveLink = vi.fn(async () => "should-not-be-called" as Id<"items">);
     const saveNote = vi.fn(async () => "should-not-be-called" as Id<"items">);
     const deps = makeDeps({ saveLink, saveNote });
@@ -612,7 +626,10 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+    expect(result.entries.map((e) => e.status)).toEqual([
+      "unsupported",
+      "unsupported",
+    ]);
     expect(saveLink).not.toHaveBeenCalled();
     expect(saveNote).not.toHaveBeenCalled();
     expect(result.entries[0].message).toBe("Shared link was not a valid URL");

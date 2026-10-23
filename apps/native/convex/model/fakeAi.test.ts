@@ -83,6 +83,7 @@ describe("fakeNoteAnalysis", () => {
       spaceNames: [],
       intents: [],
       cities: [],
+      places: [],
     });
   });
 
@@ -136,6 +137,7 @@ const noteSchema = z.object({
   spaceNames: z.array(z.string()),
   intents: z.array(z.object({ kind: z.string() })),
   cities: z.array(z.string()),
+  places: z.array(z.string()),
 });
 
 describe("FAKE_MODEL", () => {
@@ -205,6 +207,7 @@ describe("fakeLinkAnalysis", () => {
       spaceNames: [],
       intents: [],
       cities: [],
+      places: [],
     });
   });
 

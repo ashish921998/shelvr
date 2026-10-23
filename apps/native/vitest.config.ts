@@ -12,6 +12,9 @@ export default defineConfig({
       "recent-saves-widget": fileURLToPath(
         new URL("./modules/recent-saves-widget", import.meta.url),
       ),
+      "subject-lift": fileURLToPath(
+        new URL("./modules/subject-lift", import.meta.url),
+      ),
     },
   },
   test: {

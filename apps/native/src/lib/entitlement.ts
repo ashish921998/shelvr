@@ -6,6 +6,7 @@ import { useAction, useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
+import { getOnboardingProgress } from "@/lib/pending-onboarding";
 import {
   activeProductId,
   forgetPaywallFunnel,
@@ -13,6 +14,7 @@ import {
   paywallVariables,
   readPaywallContext,
   readPaywallOffering,
+  refreshCustomerInfo,
   recordAccess,
   recordBlockedAction,
   restoreCameBackEmpty,
@@ -34,6 +36,7 @@ import {
 import {
   REVENUECAT_API_KEY,
   REVENUECAT_DISABLED_BY_BUILD,
+  REVENUECAT_PRO_ENTITLEMENT,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { useRouter } from "expo-router";
@@ -95,11 +98,15 @@ function isRcSyncReady() {
   return _rcTargetUserId !== null && _rcSyncedUserId === _rcTargetUserId;
 }
 
+function rcReadyFor(anonymous: boolean) {
+  return anonymous
+    ? _rcTargetUserId === null && _rcAnonymousReady
+    : isRcSyncReady();
+}
+
 // Before logIn, RevenueCat attributes purchases to an anonymous user the webhook cannot map.
 async function awaitRcSyncReady(anonymous = false): Promise<boolean> {
-  const ready = anonymous
-    ? () => _rcTargetUserId === null && _rcAnonymousReady
-    : isRcSyncReady;
+  const ready = () => rcReadyFor(anonymous);
   if (ready()) return true;
   return Promise.race([
     _rcIdentitySync.then(ready),
@@ -342,7 +349,14 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const { offering, trial, eligibility } = await readPaywallOffering();
+    const [{ offering, trial, eligibility }, customerRead] = await Promise.all([
+      readPaywallOffering(),
+      refreshCustomerInfo(),
+    ]);
+    if (!customerRead) {
+      failed("customer_info_unavailable");
+      return "unavailable";
+    }
     const enriched = {
       ...properties,
       ...(await context),
@@ -354,13 +368,24 @@ async function presentPaywallImpl(
       trial,
       offering?.availablePackages.map((pkg) => pkg.product) ?? [],
       enriched.trial_eligible,
+      getOnboardingProgress(),
     );
+    // A sign-out during those reads must not open a paywall that cannot close.
+    if (!rcReadyFor(anonymous)) {
+      failed("identity_not_ready");
+      return "unavailable";
+    }
+    // The paywall has no close button, and only presentPaywallIfNeeded closes
+    // it after a restore that found Pro.
+    const present = () =>
+      rcui.presentPaywallIfNeeded({
+        requiredEntitlementIdentifier: REVENUECAT_PRO_ENTITLEMENT,
+        offering,
+        customVariables,
+      });
     const result = await observePaywallPresentation(
       enriched,
-      () =>
-        nativePresentation(owner, () =>
-          rcui.presentPaywall({ offering, customVariables }),
-        ).then(confirmRestore),
+      () => nativePresentation(owner, present).then(confirmRestore),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {

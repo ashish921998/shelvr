@@ -296,16 +296,19 @@ publication pin `APP_VARIANT=production`.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it makes new updates invisible to binaries built from the
-old fingerprint. That includes a native dependency added or removed, a native
-config change, or the `version` in `app.json`. Cut a fresh store build before
-resuming OTA publishes.
+old fingerprint. That includes a native dependency added or removed, or a
+native config change. Cut a fresh store build before resuming OTA publishes.
 
-The app version is the surprising input. Bumping 1.0.3 to 1.0.4 moved the
-iOS fingerprint from `d2537f3a` to `890e5366`, measured across two local
-production builds of the same commit differing only in that field. So a
-version bump has to land on `main` before any OTA aimed at the build that
-carries it, or every publish is invisible to the app it was meant for. The
-build number is not an input.
+The app `version` and the build number are not inputs. `@expo/fingerprint`
+0.21 (Expo SDK 58) defaults to its `balanced` preset, which skips them, so
+bumping `version` alone leaves the fingerprint where it was and an OTA from the
+bumped tree still reaches the previous build. Through SDK 57 the version was an
+input: bumping 1.0.3 to 1.0.4 moved the iOS fingerprint. To re-check after an
+Expo upgrade, edit `version` and run `APP_VARIANT=production node
+tools/verify-ota-compatibility.mjs --profile production --platform ios` before
+and after: the hash it prints for this tree (after "this tree is", or "shared
+runtime" on a match) must not change. A `fingerprint.config.js` in `apps/native`
+that sets `preset: "strict"` would make the version an input again.
 
 **Building outside the workflow.** `eas build --local` runs on your own
 machine when EAS cloud minutes run out, but it is not guaranteed to produce

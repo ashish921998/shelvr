@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { pageMetadata } from "@/lib/siteMetadata";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — Shelvr",
-  description: "How Shelvr collects, uses, and protects your data.",
-};
+export const metadata: Metadata = pageMetadata(
+  "/privacy",
+  "Privacy Policy — Shelvr",
+  "How Shelvr collects, uses, and protects your data.",
+);
 
 export default function PrivacyPage() {
   return (

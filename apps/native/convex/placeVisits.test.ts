@@ -1,9 +1,11 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import type { FunctionReference } from "convex/server";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { newConvexTest, signedInUser } from "./test.setup";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 async function setup(options: { pro?: boolean } = {}) {
   const backend = newConvexTest();
@@ -31,6 +33,17 @@ async function setup(options: { pro?: boolean } = {}) {
 }
 
 describe("setVisited", () => {
+  it("keeps the api reference installed apps compiled against", () => {
+    expectTypeOf(api.placeVisits.setVisited).toEqualTypeOf<
+      FunctionReference<
+        "mutation",
+        "public",
+        { itemId: Id<"items">; name: string; visited: boolean },
+        null
+      >
+    >();
+  });
+
   it("marks a place once and takes the mark back", async () => {
     const { t, itemId, visits } = await setup();
 

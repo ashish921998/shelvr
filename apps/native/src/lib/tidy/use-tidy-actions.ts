@@ -3,10 +3,13 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { Asset } from "expo-media-library";
 import { useCallback, useRef, useState } from "react";
+import { Alert } from "react-native";
 
 import type { TidyAction } from "./card-animation";
 import { isReviewed, markReviewed, unmarkReviewed } from "./storage";
 import type { TidyPhoto } from "./use-photo-batch";
+import { analytics } from "@/lib/analytics";
+import { t } from "@/lib/i18n";
 import { useSaveImages } from "@/lib/use-save-image";
 
 type HistoryEntry = {
@@ -14,6 +17,8 @@ type HistoryEntry = {
   photo: TidyPhoto;
   action: TidyAction;
   itemId?: Promise<Id<"items"> | null>;
+  // A save is counted once: whichever of a failed save or an undo comes first takes it back.
+  uncounted?: boolean;
 };
 
 export type TidyCounts = {
@@ -107,6 +112,11 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
           markReviewed([photo.id]);
           setCounts((c) => ({ ...c, saved: c.saved + 1 }));
           entry.itemId = startSave(photo);
+          void entry.itemId.then((itemId) => {
+            if (itemId !== null || entry.uncounted) return;
+            entry.uncounted = true;
+            setCounts((c) => ({ ...c, saved: c.saved - 1 }));
+          });
           break;
       }
 
@@ -134,10 +144,16 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         if (isReviewed(entry.photo.id)) {
           unmarkReviewed(entry.photo.id);
         }
-        setCounts((c) => ({ ...c, saved: c.saved - 1 }));
-        entry.itemId?.then((itemId) => {
-          if (itemId) deleteItem({ id: itemId });
-        });
+        if (!entry.uncounted) {
+          entry.uncounted = true;
+          setCounts((c) => ({ ...c, saved: c.saved - 1 }));
+        }
+        entry.itemId
+          ?.then((itemId) => (itemId ? deleteItem({ id: itemId }) : null))
+          .catch((error: unknown) => {
+            analytics.captureError("tidy_undo_save_failed", error);
+            Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+          });
         break;
     }
 

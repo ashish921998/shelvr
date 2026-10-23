@@ -19,6 +19,7 @@ type Save = {
   content?: string;
   cities?: string[];
   author?: string;
+  places?: string[];
 };
 
 async function setup(
@@ -59,6 +60,7 @@ async function setup(
         content: save.content,
         cities: save.cities,
         author: save.author,
+        places: save.places,
         url: "https://www.tiktok.com/@someone/video/1",
         tags: [],
         searchText: save.title,
@@ -178,6 +180,49 @@ describe("makeTrip", () => {
         slot: "dinner",
       },
     ]);
+  });
+
+  it("plans the places a save only says out loud", async () => {
+    const { t, spaceId, itemIds } = await setup([
+      {
+        title: "8 places to eat in Lisbon",
+        content: "Save this list of hidden gems #lisbonfood",
+        cities: ["Lisbon"],
+        places: ["Gelataria Lado Verde", "Confeitaria Nacional"],
+      },
+    ]);
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          {
+            saveNumber: 1,
+            name: "Confeitaria Nacional",
+            area: "",
+            why: "Pastries",
+            slot: "morning",
+          },
+          {
+            saveNumber: 1,
+            name: "Pastéis de Belém",
+            area: "",
+            why: "Not in this save",
+            slot: "morning",
+          },
+        ],
+      },
+    });
+
+    await t.action(api.trips.makeTrip, { spaceId, days: 1, pace: "easy" });
+
+    expect(promptOf()).toContain(
+      "Places: Gelataria Lado Verde; Confeitaria Nacional",
+    );
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(trip?.days[0].stops.map((stop) => stop.name)).toEqual([
+      "Confeitaria Nacional",
+    ]);
+    const item = await t.query(api.items.getItem, { id: itemIds[0] });
+    expect(item).not.toHaveProperty("places");
   });
 
   it("plans up to 15 days, and holds a longer ask to 15", async () => {

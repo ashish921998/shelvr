@@ -4,6 +4,7 @@ export type RevenueCatEvent = {
   expiresAt?: number;
   productId?: string;
   periodType?: string;
+  testStore?: boolean;
   cancelReason?: string;
   expirationReason?: string;
   eventTimestampMs?: number;
@@ -33,6 +34,10 @@ export function parseRevenueCatEvent(
     expiresAt,
     productId,
     periodType,
+    testStore: isTestStoreEvent(
+      readString(event.store),
+      readString(event.app_id),
+    ),
     cancelReason: readString(event.cancel_reason),
     expirationReason: readString(event.expiration_reason),
     eventTimestampMs,
@@ -43,6 +48,23 @@ export function parseRevenueCatEvent(
         }
       : {}),
   };
+}
+
+const PRODUCTION_TEST_STORE_APP_ID = "app20ea108057";
+
+/** RevenueCat may leave `store` out of an event, but not `app_id`. A named store wins, since a promotional grant can carry the id of any app the customer used. */
+function isTestStoreEvent(
+  store: string | undefined,
+  appId: string | undefined,
+): boolean {
+  return store === undefined
+    ? appId === PRODUCTION_TEST_STORE_APP_ID
+    : isTestStore(store);
+}
+
+/** Webhook events spell it TEST_STORE, the REST API test_store. */
+function isTestStore(store: unknown): boolean {
+  return readString(store)?.toLowerCase() === "test_store";
 }
 
 const ANONYMOUS_PREFIX = "$RCAnonymousID:";
@@ -157,6 +179,29 @@ export function parseRevenueCatSnapshot(
     expiresAt: effectiveExpiry,
     productId,
   };
+}
+
+/** One real purchase of a one-time product means it was paid for, so every purchase must come from the Test Store. */
+export function grantedByTestStore(
+  body: unknown,
+  entitlementIdentifier: string,
+): boolean {
+  const subscriber = readRecord(readRecord(body)?.subscriber);
+  const entitlement = readRecord(
+    readRecord(subscriber?.entitlements)?.[entitlementIdentifier],
+  );
+  const productId = readString(entitlement?.product_identifier);
+  if (productId === undefined) return false;
+  const subscription = readRecord(
+    readRecord(subscriber?.subscriptions)?.[productId],
+  );
+  if (subscription) return isTestStore(subscription.store);
+  const purchases = readRecord(subscriber?.non_subscriptions)?.[productId];
+  return (
+    Array.isArray(purchases) &&
+    purchases.length > 0 &&
+    purchases.every((purchase) => isTestStore(readRecord(purchase)?.store))
+  );
 }
 
 function parseDate(value: unknown): number {
