@@ -283,7 +283,6 @@ export type MessageParams = {
   "digest.title": undefined;
   "digest.unopenedFragment": undefined;
   "digest.waitingFragment": undefined;
-  "digest.openNext": undefined;
   "spaces.addFailed": undefined;
   "errors.pleaseRetry": undefined;
   "spaces.undoFailed": undefined;
