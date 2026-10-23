@@ -11,6 +11,7 @@ import ptBR from "@/locales/pt-BR.json";
 import { GOALS, type Goal } from "@/lib/onboarding-goals";
 import { goalPaywallVariables } from "@/lib/paywall-goal";
 import { paywallVariables } from "@/lib/paywall-funnel";
+import { planCities } from "@/lib/sample-plans";
 
 vi.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: "en-US" }],
@@ -40,6 +41,7 @@ describe("goalPaywallVariables", () => {
   it("names the city in travel copy, and reads without it when none was picked", () => {
     expect(values(progress("travel", "lisbon"))).toEqual({
       goal: "travel",
+      goal_city: "lisbon",
       goal_headline: "Let’s plan Lisbon\nfrom your saves.",
       goal_subline: "Every place you save, on one map, day by day.",
       goal_photo_tag: "Your sample trip",
@@ -51,6 +53,7 @@ describe("goalPaywallVariables", () => {
       goal_benefit_body: "Saved places become a day-by-day plan.",
     });
     expect(values(progress("travel"))).toMatchObject({
+      goal_city: "",
       goal_headline: "Let’s plan your next trip\nfrom your saves.",
       goal_answer_2: "",
       goal_today: "Your saves become a day-by-day plan.",
@@ -91,9 +94,10 @@ describe("goalPaywallVariables", () => {
     expect(values(progress("date")).goal_answer_2).toBe("");
   });
 
-  it("writes recipes out, with no second answer", () => {
+  it("writes recipes out, with no second answer and no stale city", () => {
     expect(values(progress("recipes", "rome"))).toEqual({
       goal: "recipes",
+      goal_city: "",
       goal_headline: "Let’s get dinner\nout of your saves.",
       goal_subline: "Every recipe written out, even from a video.",
       goal_photo_tag: "Your sample recipe",
@@ -110,6 +114,7 @@ describe("goalPaywallVariables", () => {
   it("lists the first two picked interests for other", () => {
     expect(values(progress("other", null, ["Gear", "Books", "Art"]))).toEqual({
       goal: "other",
+      goal_city: "",
       goal_headline: "Let’s make your saves\nworth keeping.",
       goal_subline: "Find anything again by what you remember.",
       goal_photo_tag: "Your first save",
@@ -130,6 +135,38 @@ describe("goalPaywallVariables", () => {
         value: goal,
       });
     }
+  });
+
+  it("offers only trip cities the goal paywall has a photo for", () => {
+    expect(
+      planCities("trip"),
+      "A new trip city needs its own 'Goal photo travel <City>' layer in the RevenueCat goal paywall's Travel photos group, or travel users who pick it see Prague",
+    ).toEqual([
+      "amsterdam",
+      "austin",
+      "barcelona",
+      "berlin",
+      "chicago",
+      "copenhagen",
+      "dallas",
+      "florence",
+      "las-vegas",
+      "lisbon",
+      "london",
+      "los-angeles",
+      "madrid",
+      "milan",
+      "montreal",
+      "new-york",
+      "paris",
+      "prague",
+      "rome",
+      "san-francisco",
+      "seoul",
+      "tokyo",
+      "toronto",
+      "vancouver",
+    ]);
   });
 });
 
@@ -152,6 +189,7 @@ describe("paywallVariables", () => {
     expect(variables).toMatchObject({
       trial_end_day: { type: "string", value: "7" },
       goal: { type: "string", value: "recipes" },
+      goal_city: { type: "string", value: "" },
     });
     expect(
       paywallVariables(0, undefined, [], undefined, progress("recipes")),
