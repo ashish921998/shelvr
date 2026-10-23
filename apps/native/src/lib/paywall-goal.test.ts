@@ -94,10 +94,10 @@ describe("goalPaywallVariables", () => {
     expect(values(progress("date")).goal_answer_2).toBe("");
   });
 
-  it("writes recipes out, with no second answer", () => {
+  it("writes recipes out, with no second answer and no stale city", () => {
     expect(values(progress("recipes", "rome"))).toEqual({
       goal: "recipes",
-      goal_city: "rome",
+      goal_city: "",
       goal_headline: "Let’s get dinner\nout of your saves.",
       goal_subline: "Every recipe written out, even from a video.",
       goal_photo_tag: "Your sample recipe",

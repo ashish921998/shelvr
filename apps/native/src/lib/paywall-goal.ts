@@ -1,4 +1,4 @@
-import type { Goal } from "@/lib/onboarding-goals";
+import { isPlacesGoal, type Goal } from "@/lib/onboarding-goals";
 import {
   resolveOnboardingSpaceName,
   type getOnboardingProgress,
@@ -124,6 +124,7 @@ const string = (value: string) => ({ type: "string" as const, value });
  * Custom variables that let the paywall echo the onboarding answers. A skipped
  * city ("Not sure yet", "Somewhere else") is stored as null and reads as no city.
  * `goal_city` is the unlocalized city id, which the paywall uses to pick the city's photo.
+ * Goals that never ask for a city send none, even if an earlier answer left one stored.
  */
 export function goalPaywallVariables(
   progress: GoalProgress,
@@ -131,17 +132,15 @@ export function goalPaywallVariables(
   const { goal } = progress;
   if (goal === null) return {};
   const copy = GOAL_COPY[goal];
+  const city = isPlacesGoal(goal) ? progress.travelCity : null;
   const answers: Answers = {
-    city:
-      progress.travelCity === null
-        ? null
-        : t(SAMPLE_CITIES[progress.travelCity].name),
+    city: city === null ? null : t(SAMPLE_CITIES[city].name),
     interests:
       goal === "other" ? progress.spaces.map(resolveOnboardingSpaceName) : [],
   };
   return {
     goal: string(goal),
-    goal_city: string(progress.travelCity ?? ""),
+    goal_city: string(city ?? ""),
     goal_headline: string(copy.headline(answers)),
     goal_subline: string(copy.subline(answers)),
     goal_photo_tag: string(copy.photoTag(answers)),
