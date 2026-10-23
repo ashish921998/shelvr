@@ -762,7 +762,10 @@ async function speechPlaces(
     );
     return {
       places,
-      cities: result.cities?.length ? result.cities : object.cities,
+      cities:
+        normalizeCities(result.cities).length > 0
+          ? result.cities
+          : object.cities,
     };
   } catch (error) {
     log(modelFailure(error));

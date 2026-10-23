@@ -341,6 +341,13 @@ describe("processItem places from a video's speech", () => {
 
     placesModel(["Santelmo"], { cities: ["Porto"], spokenCities: ["Lisbon"] });
     expect((await process(newConvexTest()))?.cities).toEqual(["Porto"]);
+
+    transcript("Santelmo in Lisbon.");
+    placesModel(["Santelmo"], {
+      cities: ["Unknown"],
+      spokenCities: ["Lisbon"],
+    });
+    expect((await process(newConvexTest()))?.cities).toEqual(["Lisbon"]);
   });
 
   it("reads one transcript for a cooking video that also names places", async () => {
