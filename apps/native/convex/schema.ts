@@ -113,6 +113,8 @@ export default defineSchema({
     intents: v.optional(v.array(intentValidator)),
     cities: v.optional(v.array(v.string())),
     places: v.optional(v.array(v.string())),
+    /** True once a run has read the video's speech for places; a rerun then reads it no more. */
+    placesHeard: v.optional(v.boolean()),
     products: v.optional(
       v.array(
         v.object({

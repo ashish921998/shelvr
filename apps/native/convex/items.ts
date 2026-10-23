@@ -213,9 +213,11 @@ function stripEmbedding(
   | "embeddingAttempts"
   | "productsSearchStartedAt"
   | "places"
+  | "placesHeard"
 > {
   const {
     places: _places,
+    placesHeard: _placesHeard,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -1817,14 +1819,22 @@ function isShareable(item: Doc<"items">): boolean {
 export const getItemInternal = internalQuery({
   args: { itemId: v.id("items") },
   returns: v.union(
-    v.object({ ...itemFields, places: v.optional(v.array(v.string())) }),
+    v.object({
+      ...itemFields,
+      places: v.optional(v.array(v.string())),
+      placesHeard: v.optional(v.boolean()),
+    }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places } = item;
-    return { ...stripEmbedding(item), ...(places ? { places } : {}) };
+    const { places, placesHeard } = item;
+    return {
+      ...stripEmbedding(item),
+      ...(places ? { places } : {}),
+      ...(placesHeard !== undefined ? { placesHeard } : {}),
+    };
   },
 });
 

@@ -430,13 +430,15 @@ describe("processItem places from a video's speech", () => {
       expect(item?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
     });
 
-    it("reads the speech again when only the caption's places were stored", async () => {
+    it("reads the speech again when the first read failed", async () => {
       const t = newConvexTest();
       placesModel(["Santelmo"], { caption: ["Antiga"] });
       fetchMock.mockRejectedValue(new TypeError("network"));
       const first = await process(t);
       expect(first?.places).toEqual(["Antiga"]);
+      expect(first?.placesHeard).toBeUndefined();
 
+      placesModel(["Santelmo"], { caption: [] });
       transcript("Antiga, then Santelmo.");
       await t.run((ctx) =>
         ctx.db.patch(first!._id, {
@@ -450,7 +452,10 @@ describe("processItem places from a video's speech", () => {
       });
       const item = await t.run((ctx) => ctx.db.get(first!._id));
 
-      expect(item?.places).toEqual(["Antiga", "Santelmo"]);
+      expect(item).toMatchObject({
+        places: ["Santelmo", "Antiga"],
+        placesHeard: true,
+      });
     });
   });
 });

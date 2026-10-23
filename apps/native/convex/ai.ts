@@ -359,6 +359,7 @@ function spacesPromptBlock(
 type ModelResult = Omit<z.infer<typeof itemAnalysisSchema>, "title"> & {
   title?: string;
   recipe?: z.infer<typeof recipeSchema>;
+  placesHeard?: boolean;
 };
 
 type Analysis = {
@@ -423,6 +424,9 @@ function classificationOf(model: ModelResult): Classification {
     intents: sanitizeIntents(model.intents),
     cities: normalizeCities(model.cities),
     places: normalizePlaces(model.places),
+    ...(model.placesHeard !== undefined
+      ? { placesHeard: model.placesHeard }
+      : {}),
     recipe: sanitizeRecipe(model.recipe),
   };
 }
@@ -568,16 +572,6 @@ async function classifyLink(
 
 type SpeechWants = { recipe: boolean; places: boolean };
 
-/** True once an earlier run stored a place this caption does not name, so its speech was already read. */
-function heardBefore(item: Doc<"items">, result: LinkAnalysis): boolean {
-  const caption = new Set(
-    normalizePlaces(result.places).map((place) => place.toLowerCase()),
-  );
-  return normalizePlaces(item.places).some(
-    (place) => !caption.has(place.toLowerCase()),
-  );
-}
-
 function speechWants(
   item: Doc<"items">,
   read: LinkRead,
@@ -591,7 +585,7 @@ function speechWants(
       result.cookingVideo === true &&
       read.page.recipe === undefined &&
       sanitizeRecipe(result.recipe) === undefined,
-    places: result.placesVideo === true && !heardBefore(item, result),
+    places: result.placesVideo === true && item.placesHeard !== true,
   };
 }
 
@@ -627,13 +621,15 @@ function speechPlacesPrompt(page: PageData, transcript: string): string {
   ].join("\n\n");
 }
 
-type Spoken = Partial<Pick<LinkAnalysis, "recipe" | "places" | "cities">>;
+type Spoken = Partial<
+  Pick<LinkAnalysis, "recipe" | "places" | "cities" | "placesHeard">
+>;
 
 type SpeechEvent = "speech_recipe" | "speech_places";
 
 /**
  * Reads a short video's speech once, for a recipe its caption lacks and for the places it names.
- * A run that gets no spoken places keeps the ones an earlier run stored.
+ * A rerun keeps the places an earlier run stored, after this run's, and whether speech was heard.
  */
 async function fromSpeech(
   ctx: ActionCtx,
@@ -643,12 +639,16 @@ async function fromSpeech(
   aiAllowed: boolean,
 ): Promise<Spoken> {
   const spoken = await readSpeech(ctx, item, read, result, aiAllowed);
-  if (result.placesVideo !== true || spoken.places !== undefined) {
+  if (!item.places?.length) {
     return spoken;
   }
   return {
     ...spoken,
-    places: normalizePlaces([...(result.places ?? []), ...(item.places ?? [])]),
+    places: normalizePlaces([
+      ...(spoken.places ?? result.places ?? []),
+      ...item.places,
+    ]),
+    placesHeard: spoken.placesHeard ?? item.placesHeard,
   };
 }
 
@@ -776,7 +776,9 @@ async function speechPlaces(
   transcript: string,
   result: LinkAnalysis,
   log: (outcome: string) => void,
-): Promise<Pick<LinkAnalysis, "places" | "cities"> | undefined> {
+): Promise<
+  Pick<LinkAnalysis, "places" | "cities" | "placesHeard"> | undefined
+> {
   try {
     const { object } = await generateObject({
       model: MODEL,
@@ -796,6 +798,7 @@ async function speechPlaces(
     );
     return {
       places,
+      placesHeard: true,
       cities:
         normalizeCities(result.cities).length > 0
           ? result.cities
