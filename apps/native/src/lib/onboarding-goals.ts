@@ -52,6 +52,7 @@ const PLACES_FLOW: readonly OnboardingStep[] = [
   "tripBuild",
   "tripReveal",
   "promise",
+  "notifications",
 ];
 const TOPICS_FLOW: readonly OnboardingStep[] = [
   "opener",
@@ -59,6 +60,7 @@ const TOPICS_FLOW: readonly OnboardingStep[] = [
   "interests",
   "share",
   "promise",
+  "notifications",
 ];
 
 const RECIPES_FLOW: readonly OnboardingStep[] = [
@@ -67,6 +69,7 @@ const RECIPES_FLOW: readonly OnboardingStep[] = [
   "share",
   "recipeReveal",
   "promise",
+  "notifications",
 ];
 
 export function goalFlow(goal: Goal | null): readonly OnboardingStep[] {
