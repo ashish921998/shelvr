@@ -950,43 +950,21 @@
   "recipeReveal.stepBake": "Bake at 190°C for 40 minutes, until golden and bubbling.",
   "plan.buildTitleDate": "Building a sample",
   "plan.buildTitleWeekend": "Building a sample",
-  "homePlans.dateNights": "Date nights",
-  "homePlans.trips": "Trips",
-  "homePlans.fridayNight": "Friday night",
-  "homePlans.seePlan": "See the plan",
-  "homePlans.saveMoreDates": "Save a few more date spots to get a plan",
-  "homePlans.yourDateSpots": "Your date spots",
-  "homePlans.dateEmptyTitle": "Save date spots from TikTok or Instagram",
-  "homePlans.dateEmptyBody": "Share a reel to Shelvr and it lands here.",
-  "homePlans.addSpot": "Add a spot",
-  "homePlans.untitled": "Untitled save",
-  "homePlans.today": "Today",
-  "homePlans.tomorrow": "Tomorrow",
-  "homePlans.yourTrip": "Your trip",
-  "homePlans.openDayByDay": "Open day by day",
-  "homePlans.citiesSaved": "Cities you've saved",
-  "homePlans.justSaved": "Just saved",
-  "homePlans.tripEmptyTitle": "Save places for your next trip",
-  "homePlans.tripEmptyBody": "Share travel reels to Shelvr and we'll turn them into a day-by-day trip.",
-  "homePlans.everythingSaved": "Everything you saved",
-  "homePlans.dateSpotCount": {
-    "one": "%{formattedCount} date spot to choose from",
-    "other": "%{formattedCount} date spots to choose from"
+  "homePlaces.yourCities": "Your cities",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} spot",
+    "other": "%{formattedCount} spots"
   },
-  "homePlans.inDays": {
-    "one": "In %{formattedCount} day",
-    "other": "In %{formattedCount} days"
-  },
-  "homePlans.tripSummary": {
-    "one": "%{days}-day trip · %{formattedCount} spot from your saves",
-    "other": "%{days}-day trip · %{formattedCount} spots from your saves"
-  },
-  "homePlans.cityReady": {
-    "one": "%{formattedCount} spot · ready to plan",
-    "other": "%{formattedCount} spots · ready to plan"
-  },
-  "homePlans.cityMore": {
-    "one": "%{formattedCount} spot · save %{remaining} more to plan",
-    "other": "%{formattedCount} spots · save %{remaining} more to plan"
-  }
+  "homePlaces.moreCities": "+ %{n} more",
+  "homePlaces.yourSpaces": "Your spaces",
+  "homePlaces.seeAll": "See all",
+  "homePlaces.emptyTitle": "Save places from TikTok or Instagram",
+  "homePlaces.emptyBody": "Share a reel to Shelvr and it lands under its city.",
+  "homePlaces.addSpot": "Add a spot",
+  "homePlaces.everythingSaved": "Everything you saved",
+  "homePlaces.untitled": "Untitled save",
+  "homePlaces.planDate": "Plan a date",
+  "homePlaces.planDateHint": "One evening, a few stops",
+  "homePlaces.planTrip": "Plan a trip",
+  "homePlaces.planTripHint": "Day by day"
 }

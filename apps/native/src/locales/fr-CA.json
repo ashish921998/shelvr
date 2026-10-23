@@ -973,48 +973,22 @@
   "recipeReveal.stepSauce": "Faites dorer le bœuf avec l’oignon et l’ail. Ajoutez le coulis et laissez mijoter 20 minutes.",
   "recipeReveal.stepLayer": "Alternez trois fois sauce à la viande, pâtes et béchamel. Finissez par la mozzarella.",
   "recipeReveal.stepBake": "Faites cuire 40 minutes au four à 190 °C, jusqu’à ce que ce soit doré et bouillonnant.",
-  "homePlans.dateNights": "Soirées à deux",
-  "homePlans.trips": "Voyages",
-  "homePlans.fridayNight": "Vendredi soir",
-  "homePlans.seePlan": "Voir le plan",
-  "homePlans.saveMoreDates": "Enregistrez quelques adresses de plus pour obtenir un plan",
-  "homePlans.yourDateSpots": "Vos adresses pour sortir à deux",
-  "homePlans.dateEmptyTitle": "Enregistrez des adresses depuis TikTok ou Instagram",
-  "homePlans.dateEmptyBody": "Partagez un reel avec Shelvr et il apparaîtra ici.",
-  "homePlans.addSpot": "Ajouter une adresse",
-  "homePlans.untitled": "Sans titre",
-  "homePlans.today": "Aujourd’hui",
-  "homePlans.tomorrow": "Demain",
-  "homePlans.yourTrip": "Votre voyage",
-  "homePlans.openDayByDay": "Ouvrir jour par jour",
-  "homePlans.citiesSaved": "Villes enregistrées",
-  "homePlans.justSaved": "Enregistré récemment",
-  "homePlans.tripEmptyTitle": "Enregistrez des lieux pour votre prochain voyage",
-  "homePlans.tripEmptyBody": "Partagez des reels de voyage avec Shelvr et nous en ferons un voyage jour par jour.",
-  "homePlans.everythingSaved": "Tout ce que vous avez enregistré",
-  "homePlans.dateSpotCount": {
-    "one": "%{formattedCount} adresse à choisir pour sortir à deux",
-    "many": "%{formattedCount} adresses à choisir pour sortir à deux",
-    "other": "%{formattedCount} adresses à choisir pour sortir à deux"
+  "homePlaces.yourCities": "Vos villes",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} adresse",
+    "many": "%{formattedCount} adresses",
+    "other": "%{formattedCount} adresses"
   },
-  "homePlans.inDays": {
-    "one": "Dans %{formattedCount} jour",
-    "many": "Dans %{formattedCount} jours",
-    "other": "Dans %{formattedCount} jours"
-  },
-  "homePlans.tripSummary": {
-    "one": "Voyage de %{days} j · %{formattedCount} adresse de vos contenus enregistrés",
-    "many": "Voyage de %{days} j · %{formattedCount} adresses de vos contenus enregistrés",
-    "other": "Voyage de %{days} j · %{formattedCount} adresses de vos contenus enregistrés"
-  },
-  "homePlans.cityReady": {
-    "one": "%{formattedCount} adresse · prête à planifier",
-    "many": "%{formattedCount} adresses · prêtes à planifier",
-    "other": "%{formattedCount} adresses · prêtes à planifier"
-  },
-  "homePlans.cityMore": {
-    "one": "%{formattedCount} adresse · encore %{remaining} à enregistrer pour planifier",
-    "many": "%{formattedCount} adresses · encore %{remaining} à enregistrer pour planifier",
-    "other": "%{formattedCount} adresses · encore %{remaining} à enregistrer pour planifier"
-  }
+  "homePlaces.moreCities": "+ %{n} de plus",
+  "homePlaces.yourSpaces": "Vos collections",
+  "homePlaces.seeAll": "Tout voir",
+  "homePlaces.emptyTitle": "Enregistrez des lieux depuis TikTok ou Instagram",
+  "homePlaces.emptyBody": "Partagez un reel avec Shelvr et il rejoint sa ville.",
+  "homePlaces.addSpot": "Ajouter une adresse",
+  "homePlaces.everythingSaved": "Tout ce que vous avez enregistré",
+  "homePlaces.untitled": "Sans titre",
+  "homePlaces.planDate": "Planifier une sortie à deux",
+  "homePlaces.planDateHint": "Une soirée, quelques arrêts",
+  "homePlaces.planTrip": "Planifier un voyage",
+  "homePlaces.planTripHint": "Jour par jour"
 }

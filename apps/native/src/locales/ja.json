@@ -927,38 +927,20 @@
   "recipeReveal.stepSauce": "ひき肉を玉ねぎ、にんにくと炒める。トマトピューレを加えて20分煮込む。",
   "recipeReveal.stepLayer": "ミートソース、パスタ、ホワイトソースを3回重ねる。上にモッツァレラをのせる。",
   "recipeReveal.stepBake": "190℃のオーブンで40分、こんがりグツグツするまで焼く。",
-  "homePlans.dateNights": "デートの夜",
-  "homePlans.trips": "旅行",
-  "homePlans.fridayNight": "金曜の夜",
-  "homePlans.seePlan": "プランを見る",
-  "homePlans.saveMoreDates": "プランを作るには、デートスポットをもう少し保存してください",
-  "homePlans.yourDateSpots": "あなたのデートスポット",
-  "homePlans.dateEmptyTitle": "TikTokやInstagramからデートスポットを保存",
-  "homePlans.dateEmptyBody": "リールをShelvrに共有すると、ここに表示されます。",
-  "homePlans.addSpot": "スポットを追加",
-  "homePlans.untitled": "無題",
-  "homePlans.today": "今日",
-  "homePlans.tomorrow": "明日",
-  "homePlans.yourTrip": "あなたの旅",
-  "homePlans.openDayByDay": "日ごとに開く",
-  "homePlans.citiesSaved": "保存した都市",
-  "homePlans.justSaved": "最近保存",
-  "homePlans.tripEmptyTitle": "次の旅行の場所を保存",
-  "homePlans.tripEmptyBody": "旅行のリールをShelvrに共有すると、日ごとの旅程にします。",
-  "homePlans.everythingSaved": "保存したものすべて",
-  "homePlans.dateSpotCount": {
-    "other": "選べるデートスポット%{formattedCount}件"
+  "homePlaces.yourCities": "あなたの都市",
+  "homePlaces.spotCount": {
+    "other": "%{formattedCount}スポット"
   },
-  "homePlans.inDays": {
-    "other": "あと%{formattedCount}日"
-  },
-  "homePlans.tripSummary": {
-    "other": "%{days}日間の旅 · 保存から%{formattedCount}スポット"
-  },
-  "homePlans.cityReady": {
-    "other": "%{formattedCount}スポット · プラン作成の準備OK"
-  },
-  "homePlans.cityMore": {
-    "other": "%{formattedCount}スポット · あと%{remaining}件保存するとプランを作成できます"
-  }
+  "homePlaces.moreCities": "ほか%{n}件",
+  "homePlaces.yourSpaces": "あなたのスペース",
+  "homePlaces.seeAll": "すべて見る",
+  "homePlaces.emptyTitle": "TikTokやInstagramから場所を保存",
+  "homePlaces.emptyBody": "リールをShelvrに共有すると、その都市に入ります。",
+  "homePlaces.addSpot": "スポットを追加",
+  "homePlaces.everythingSaved": "保存したものすべて",
+  "homePlaces.untitled": "無題",
+  "homePlaces.planDate": "デートを計画",
+  "homePlaces.planDateHint": "ある夜、いくつかのスポット",
+  "homePlaces.planTrip": "旅行を計画",
+  "homePlaces.planTripHint": "日ごとに"
 }

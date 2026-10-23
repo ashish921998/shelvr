@@ -973,48 +973,22 @@
   "recipeReveal.stepSauce": "Dora la carne con la cebolla y el ajo. Agrega el puré de tomate y deja hervir a fuego bajo 20 minutos.",
   "recipeReveal.stepLayer": "Alterna tres capas de salsa de carne, láminas y bechamel. Cubre con la mozzarella.",
   "recipeReveal.stepBake": "Hornea a 190 °C durante 40 minutos, hasta que esté dorada y burbujee.",
-  "homePlans.dateNights": "Noches de cita",
-  "homePlans.trips": "Viajes",
-  "homePlans.fridayNight": "Noche de viernes",
-  "homePlans.seePlan": "Ver el plan",
-  "homePlans.saveMoreDates": "Guarda algunos lugares más para citas y obtén un plan",
-  "homePlans.yourDateSpots": "Tus lugares para citas",
-  "homePlans.dateEmptyTitle": "Guarda lugares para citas de TikTok o Instagram",
-  "homePlans.dateEmptyBody": "Comparte un reel con Shelvr y aparecerá aquí.",
-  "homePlans.addSpot": "Agregar un lugar",
-  "homePlans.untitled": "Sin título",
-  "homePlans.today": "Hoy",
-  "homePlans.tomorrow": "Mañana",
-  "homePlans.yourTrip": "Tu viaje",
-  "homePlans.openDayByDay": "Abrir día a día",
-  "homePlans.citiesSaved": "Ciudades que has guardado",
-  "homePlans.justSaved": "Guardado hace poco",
-  "homePlans.tripEmptyTitle": "Guarda lugares para tu próximo viaje",
-  "homePlans.tripEmptyBody": "Comparte reels de viajes con Shelvr y los convertiremos en un viaje día a día.",
-  "homePlans.everythingSaved": "Todo lo que has guardado",
-  "homePlans.dateSpotCount": {
-    "one": "%{formattedCount} lugar para citas entre los que elegir",
-    "many": "%{formattedCount} lugares para citas entre los que elegir",
-    "other": "%{formattedCount} lugares para citas entre los que elegir"
+  "homePlaces.yourCities": "Tus ciudades",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
   },
-  "homePlans.inDays": {
-    "one": "En %{formattedCount} día",
-    "many": "En %{formattedCount} días",
-    "other": "En %{formattedCount} días"
-  },
-  "homePlans.tripSummary": {
-    "one": "Viaje de %{days} d · %{formattedCount} lugar de tus guardados",
-    "many": "Viaje de %{days} d · %{formattedCount} lugares de tus guardados",
-    "other": "Viaje de %{days} d · %{formattedCount} lugares de tus guardados"
-  },
-  "homePlans.cityReady": {
-    "one": "%{formattedCount} lugar · listo para planear",
-    "many": "%{formattedCount} lugares · listo para planear",
-    "other": "%{formattedCount} lugares · listo para planear"
-  },
-  "homePlans.cityMore": {
-    "one": "%{formattedCount} lugar · guarda %{remaining} más para planear",
-    "many": "%{formattedCount} lugares · guarda %{remaining} más para planear",
-    "other": "%{formattedCount} lugares · guarda %{remaining} más para planear"
-  }
+  "homePlaces.moreCities": "+ %{n} más",
+  "homePlaces.yourSpaces": "Tus colecciones",
+  "homePlaces.seeAll": "Ver todo",
+  "homePlaces.emptyTitle": "Guarda lugares de TikTok o Instagram",
+  "homePlaces.emptyBody": "Comparte un reel con Shelvr y aparecerá en su ciudad.",
+  "homePlaces.addSpot": "Agregar un lugar",
+  "homePlaces.everythingSaved": "Todo lo que has guardado",
+  "homePlaces.untitled": "Sin título",
+  "homePlaces.planDate": "Planear una cita",
+  "homePlaces.planDateHint": "Una noche, unas cuantas paradas",
+  "homePlaces.planTrip": "Planear un viaje",
+  "homePlaces.planTripHint": "Día por día"
 }
