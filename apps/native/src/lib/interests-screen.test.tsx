@@ -108,6 +108,12 @@ vi.mock("@/components/sign-in-view", () => ({ SignInView: vi.fn(() => null) }));
 vi.mock("@/components/onboarding/opener", () => ({
   OpenerStep: vi.fn(() => null),
 }));
+vi.mock("@/components/onboarding/notifications", () => ({
+  NotificationsStep: vi.fn(() => null),
+}));
+vi.mock("@/lib/notification-token", () => ({
+  notificationPermissionState: vi.fn(async () => "granted"),
+}));
 vi.mock("@/components/onboarding/promise", () => ({
   PromiseStep: mocks.promise,
 }));

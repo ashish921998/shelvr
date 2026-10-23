@@ -21,13 +21,13 @@ export function weekStart(now: number): number {
 
 export function shelfCandidates<Item extends ShelfItem>(
   items: readonly Item[],
-  previouslyIncluded: ReadonlySet<string>,
+  skipped: ReadonlySet<string>,
   now: number,
 ): { recent: Item[]; archive: Item[] } {
   const recent: Item[] = [];
   const archive: Item[] = [];
   for (const item of items) {
-    if (item.status !== "ready" || previouslyIncluded.has(item._id)) continue;
+    if (item.status !== "ready" || skipped.has(item._id)) continue;
     if (item._creationTime >= now - DIGEST_WINDOW_MS) recent.push(item);
     else archive.push(item);
   }

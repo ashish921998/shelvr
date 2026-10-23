@@ -1,5 +1,5 @@
 import type { Doc } from "../_generated/dataModel";
-import { isYouTubeUrl, linkSource, shortFormSource } from "./externalUrl";
+import { isYouTubeUrl, shortFormSource } from "./externalUrl";
 import {
   COOK_MIN_AGE_MS,
   READ_MAX_AGE_MS,
@@ -29,6 +29,6 @@ export function nextUpKind(
     item.media?.some((media) => media.kind === "video")
   )
     return "watch";
-  if (reminder === "read" && linkSource(item.url) === undefined) return "read";
+  if (reminder === "read") return "read";
   return "open";
 }

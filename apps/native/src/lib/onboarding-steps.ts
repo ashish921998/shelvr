@@ -8,8 +8,9 @@ export const ONBOARDING_STEPS = [
   "tripReveal",
   "promise",
   "recipeReveal",
+  "notifications",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 14;
+export const ONBOARDING_FLOW_VERSION = 15;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -23,6 +24,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   tripBuild: "trip_build",
   tripReveal: "trip_reveal",
   recipeReveal: "recipe_reveal",
+  notifications: "notification_ask",
 };
 
 const NO_BACK: readonly OnboardingStep[] = [
@@ -31,6 +33,7 @@ const NO_BACK: readonly OnboardingStep[] = [
   "tripReveal",
   "recipeReveal",
   "promise",
+  "notifications",
 ];
 
 /** The step before `step` in `flow`; none once the sample is being built, so the build never replays. */
