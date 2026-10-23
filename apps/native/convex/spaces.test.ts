@@ -881,6 +881,55 @@ describe("denormalized space summary", () => {
   });
 });
 
+describe("reads that fan out", () => {
+  it("listSpaces keeps newest-first order and each space's own covers", async () => {
+    const { t, userId } = await entitledUser();
+    const names = ["Older", "Middle", "Newest"];
+    for (const name of names) {
+      const spaceId = await t.mutation(api.spaces.createSpace, { name });
+      const itemId = await seedItem(t, userId, `${name} save`);
+      await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
+    }
+
+    const listed = await t.query(api.spaces.listSpaces, {});
+    expect(listed.map((space) => [space.name, space.itemCount])).toEqual([
+      ["Newest", 1],
+      ["Middle", 1],
+      ["Older", 1],
+    ]);
+    expect(listed.map((space) => space.previews.length)).toEqual([1, 1, 1]);
+  });
+
+  it("getItem names only the spaces a save is filed in", async () => {
+    const { t, userId } = await entitledUser();
+    const itemId = await seedItem(t, userId, "lamp");
+    const kept = await t.mutation(api.spaces.createSpace, { name: "Home" });
+    const alsoKept = await t.mutation(api.spaces.createSpace, {
+      name: "Gifts",
+    });
+    const dismissed = await t.mutation(api.spaces.createSpace, {
+      name: "Office",
+    });
+    await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId: kept });
+    await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId: alsoKept });
+    await t.mutation(internal.items.setSpacesForItem, {
+      itemId,
+      spaceIds: [dismissed],
+    });
+    await t.mutation(api.spaces.dismissSuggestion, {
+      itemId,
+      spaceId: dismissed,
+    });
+
+    const item = await t.query(api.items.getItem, { id: itemId });
+    expect(item?.spaces.map((space) => space.name).sort()).toEqual([
+      "Gifts",
+      "Home",
+    ]);
+    expect(item?.imageUrl).toEqual(expect.any(String));
+  });
+});
+
 describe("steering spend controls", () => {
   it("blocks a burst of addItemToSpace past the steerItem capacity and rolls the add back", async () => {
     const { t, userId } = await entitledUser();

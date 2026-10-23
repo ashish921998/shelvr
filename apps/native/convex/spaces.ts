@@ -182,17 +182,18 @@ export const listSpaces = query({
       .order("desc")
       .collect();
 
-    const results = [];
-    for (const space of spaces) {
-      const summary = await readSummary(ctx, space);
-      results.push({
-        ...space,
-        itemCount: summary.savedCount,
-        suggestionCount: summary.suggestedCount,
-        previews: await loadPreviews(ctx, summary),
-      });
-    }
-    return results;
+    // Each space's reads go out together rather than one space after another.
+    return await Promise.all(
+      spaces.map(async (space) => {
+        const summary = await readSummary(ctx, space);
+        return {
+          ...space,
+          itemCount: summary.savedCount,
+          suggestionCount: summary.suggestedCount,
+          previews: await loadPreviews(ctx, summary),
+        };
+      }),
+    );
   },
 });
 
