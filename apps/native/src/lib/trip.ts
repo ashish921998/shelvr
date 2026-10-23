@@ -42,7 +42,7 @@ export function daysSavesFill(saveCount: number, pace: TripPace): number {
   return Math.max(1, Math.ceil(saveCount / STOPS_PER_DAY[pace]));
 }
 
-const TRIP_MIN_CITY_SAVES = 3;
+export const TRIP_MIN_CITY_SAVES = 3;
 
 export function canPlanTrip(
   items: { status: string; cities?: string[] }[],
