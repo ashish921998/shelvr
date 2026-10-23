@@ -781,6 +781,29 @@ describe("readPage for Instagram posts", () => {
   });
 });
 
+describe("readPage for TikTok videos", () => {
+  it("titles the save with the caption's first line and keeps the rest as content", async () => {
+    const videoUrl = "https://www.tiktok.com/@cook/video/7350000000000000000";
+    const caption = `${"Crispy chilli oil noodles ".repeat(6)}\n\n#noodles #recipe`;
+    serve({
+      [`https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`]: {
+        ok: true,
+        finalUrl: videoUrl,
+        status: 200,
+        contentType: "application/json",
+        bytes: new TextEncoder().encode(
+          JSON.stringify({ title: caption, author_unique_id: "cook" }),
+        ),
+      },
+    });
+    const read = await readPage(videoUrl);
+    expect(read.status === "ok" && read.page.title).toBe(
+      "Crispy chilli oil noodles ".repeat(6).slice(0, 100),
+    );
+    expect(read.status === "ok" && read.page.content).toBe(caption);
+  });
+});
+
 describe("readPage for YouTube videos", () => {
   const videoUrl = "https://youtu.be/dQw4w9WgXcQ";
   const oEmbedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(videoUrl)}`;
