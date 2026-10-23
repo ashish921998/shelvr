@@ -315,7 +315,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 
 ### Native (`apps/native`)
 
-- UI localization uses `expo-localization` and i18n-js. Read
+- UI localization uses `expo-localization` and the in-house `translate` in `src/lib/i18n-core.ts`,
+  which falls back from the locale to its language to English, fills `%{name}` placeholders, and
+  picks plural forms with the CLDR rules in `convex/model/localization.ts`. Read
   [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
   update all catalogs and run `pnpm localization:generate` after translation changes. It is a
   root script, so run it from the repo root. It writes `src/locales/catalogs.ts`,

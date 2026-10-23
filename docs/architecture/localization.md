@@ -23,8 +23,11 @@ reach installs with the new fingerprint.
 
 `src/locales/en.json` is the source catalog. Stable semantic identifiers such as
 `spaces.saveCount` are lookup keys; English copy is a value and can change without
-renaming a key. The runtime expands these identifiers into the normal i18n-js
-namespace tree. The generator emits `src/locales/message-types.ts` from English:
+renaming a key. The in-house `translate` in `src/lib/i18n-core.ts` looks these
+identifiers up directly, trying the locale, then its language, then English; it
+fills `%{name}` placeholders and picks plural forms with the CLDR rules in
+`convex/model/localization.ts`. The generator emits
+`src/locales/message-types.ts` from English:
 `t()` accepts only known keys and requires their named interpolation parameters.
 Arrays and maps of dynamic UI keys must use `TextMessageKey` or literal types;
 never cast an arbitrary string into a key.
