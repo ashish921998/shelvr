@@ -123,7 +123,8 @@ export function normalizePlaces(raw: readonly string[] | undefined): string[] {
     const place = entry
       .replace(/\s+/g, " ")
       .trim()
-      .replace(/[.,;:!?]+$/, "");
+      .replace(/[.,;:!?]+$/, "")
+      .trim();
     const key = place.toLowerCase();
     if (place === "" || place.length > MAX_PLACE_CHARS || seen.has(key)) {
       continue;

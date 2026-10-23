@@ -55,6 +55,12 @@ describe("normalizePlaces", () => {
     expect(normalizePlaces(many)).toHaveLength(MAX_ITEM_PLACES);
   });
 
+  it("trims the space left behind by trailing punctuation", () => {
+    expect(normalizePlaces(["Café de Flore .", "café de flore"])).toEqual([
+      "Café de Flore",
+    ]);
+  });
+
   it("reads a missing list as none", () => {
     expect(normalizePlaces(undefined)).toEqual([]);
   });
