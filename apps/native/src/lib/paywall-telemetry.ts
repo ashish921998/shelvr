@@ -37,7 +37,7 @@ export async function observePaywallPresentation(
     } else {
       analytics.capture("paywall_failed", {
         ...outcome(),
-        reason: result === "NOT_PRESENTED" ? "not_presented" : "sdk_error",
+        reason: result === "NOT_PRESENTED" ? "already_entitled" : "sdk_error",
       });
     }
     return result;

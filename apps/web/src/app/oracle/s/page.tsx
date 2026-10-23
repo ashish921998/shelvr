@@ -33,6 +33,8 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     openGraph: {
       title,
       description,
+      // The verdict's own address, so a preview that follows og:url keeps this verdict, not the generic /oracle card.
+      url: verdict ? `/oracle/s?c=${encodeURIComponent(code)}` : "/oracle",
       siteName: "Shelvr",
       type: "website",
       images: image ? [{ url: image, width: 1200, height: 630 }] : undefined,

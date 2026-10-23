@@ -221,9 +221,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships (`saved` in a space set to auto-file). A cooking
-  TikTok or reel whose caption and linked page gave no recipe has its speech read through Treg
-  (`model/videoTranscript.ts`) for a second, recipe-only call. The file also holds
+  matches become `suggested` memberships (`saved` in a space set to auto-file). The model
+  also lists every place a save names into `items.places` (server-only: `enrichItem` strips
+  it; plans and trips read it through `toPlanSource`). A short video's speech is read once
+  through Treg (`model/videoTranscript.ts`) when the model flags it as a cooking video whose
+  caption and linked page gave no recipe, or as a video that recommends or visits places;
+  a second call then lifts the recipe, the spoken places, or both. The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
@@ -315,7 +318,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 
 ### Native (`apps/native`)
 
-- UI localization uses `expo-localization` and i18n-js. Read
+- UI localization uses `expo-localization` and the in-house `translate` in `src/lib/i18n-core.ts`,
+  which falls back from the locale to its language to English, fills `%{name}` placeholders, and
+  picks plural forms with the CLDR rules in `convex/model/localization.ts`. Read
   [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
   update all catalogs and run `pnpm localization:generate` after translation changes. It is a
   root script, so run it from the repo root. It writes `src/locales/catalogs.ts`,
@@ -451,7 +456,8 @@ needed at runtime by the features that use them:
   Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
   oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
 - `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
-  cooking TikTok or reel whose caption has no recipe (`model/videoTranscript.ts`, about $0.002
+  cooking TikTok or reel whose caption has no recipe, or one that recommends or visits places
+  (`model/videoTranscript.ts`, about $0.002
   each, rate limited per user and globally). Transcripts are fetched only while the switch is
   `"true"` and the key is set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
@@ -509,9 +515,12 @@ needed at runtime by the features that use them:
   expand/contract: deploy the tolerant version first, tighten once old
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A
-  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
+  change that moves the fingerprint (a new native module, a config plugin, `app.json`
+  other than its version fields (`version`, `ios.buildNumber`, `android.versionCode`),
   `app.config.js`) strands every later OTA until a store build ships, and the diff does
-  not say so. Two layers cover it. On a pull request CI runs
+  not say so. The default `balanced` preset skips the version fields; a
+  `fingerprint.config.js` that sets `preset: "strict"` would hash them again. Two layers
+  cover it. On a pull request CI runs
   `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
   and never fails the check; acknowledge an intended move with the
   `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA

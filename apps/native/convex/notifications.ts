@@ -12,6 +12,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
+import { tripStopItemIds } from "./tripData";
 import { liveOwner, requireUserId } from "./model/auth";
 import {
   localHour,
@@ -24,6 +25,7 @@ import {
 import { takeWithinBytes } from "./model/readBudget";
 import {
   SHELF_HISTORY,
+  SHELF_SCAN_BYTES,
   SHELF_SCAN_ITEMS,
   SHELF_SIZE,
   archiveCheckOrder,
@@ -464,20 +466,36 @@ export const prepareWeeklyDigest = internalMutation({
       return null;
     }
 
-    const items = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .order("desc")
-      .take(SHELF_SCAN_ITEMS);
+    const { rows: items } = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user_and_status", (q) =>
+          q.eq("userId", args.userId).eq("status", "ready"),
+        )
+        .order("desc"),
+      { maxRows: SHELF_SCAN_ITEMS, maxBytes: SHELF_SCAN_BYTES },
+    );
     const recentDigests = await ctx.db
       .query("weeklyDigests")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(SHELF_HISTORY);
+    // A shelf that never reached a device has not shown its saves to anyone.
     const previouslyIncluded = new Set<string>(
-      recentDigests.flatMap((digest) => digest.itemIds),
+      recentDigests
+        .filter(
+          (digest) =>
+            digest.deliveryStatus !== "failed" ||
+            digest.deliverySentAt !== undefined,
+        )
+        .flatMap((digest) => digest.itemIds),
     );
-    const candidates = shelfCandidates(items, previouslyIncluded, args.now);
+    const planned = await tripStopItemIds(ctx, args.userId);
+    const candidates = shelfCandidates(
+      items,
+      new Set([...previouslyIncluded, ...planned]),
+      args.now,
+    );
 
     const recentOpened = await Promise.all(
       candidates.recent.map((item) => wasOpened(ctx, args.userId, item._id)),
@@ -699,6 +717,7 @@ export const prepareSaveReminder = internalMutation({
       items,
       now,
       reminders[0]?.kind,
+      await tripStopItemIds(ctx, userId),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

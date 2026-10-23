@@ -71,6 +71,26 @@ describe("which saves get a reminder", () => {
     expect(reminderKind(article({ status: "processing" }))).toBeUndefined();
   });
 
+  it("never asks to read a social post, but still cooks its recipe", () => {
+    const tiktok = "https://www.tiktok.com/@lisboa/video/7300000000000000000";
+    for (const url of [
+      tiktok,
+      "https://www.instagram.com/reel/Cabc123/",
+      "https://x.com/eater/status/1",
+      "https://www.pinterest.com/pin/1/",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    ])
+      expect(
+        reminderKind(
+          article({ url, content: "Best pastel de nata in Lisbon #lisbon" }),
+        ),
+      ).toBeUndefined();
+    expect(reminderKind(recipe({ url: tiktok }))).toBe("cook");
+    expect(
+      reminderKind(article({ url: "https://blog.example.com/bread" })),
+    ).toBe("read");
+  });
+
   it("calls a recipe by its dish, not its page title", () => {
     expect(reminderSubject(recipe(), "cook")).toBe("Lasagna");
     expect(
@@ -94,15 +114,27 @@ describe("candidate order", () => {
       [fresh, ready, newRecipe, stale, oldRecipe],
       NOW,
       undefined,
+      new Set(),
     ).map((candidate) => candidate.item._id);
     expect(ids).toEqual([ready._id, oldRecipe._id]);
+  });
+
+  it("leaves an article that is a trip stop to the trip", () => {
+    const [stop, unplanned] = [article(), article()];
+    const ids = reminderCandidates(
+      [stop, unplanned],
+      NOW,
+      undefined,
+      new Set([stop._id]),
+    ).map((candidate) => candidate.item._id);
+    expect(ids).toEqual([unplanned._id]);
   });
 
   it("takes turns between kinds and keeps each newest first", () => {
     const [a1, a2] = [article(), article()];
     const [r1, r2] = [recipe(), recipe()];
     const order = (previous?: "read" | "cook") =>
-      reminderCandidates([a1, r1, a2, r2], NOW, previous).map(
+      reminderCandidates([a1, r1, a2, r2], NOW, previous, new Set()).map(
         (candidate) => candidate.item._id,
       );
     expect(order()).toEqual([a1._id, a2._id, r1._id, r2._id]);
