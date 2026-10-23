@@ -5,7 +5,6 @@ import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { isDevDeployment } from "./model/deployment";
 import {
-  isTestStoreEvent,
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   requiresAuthoritativeReconciliation,
@@ -154,7 +153,7 @@ http.route({
       return new Response("Bad payload", { status: 400 });
     }
     // Test Store purchases cost nothing, so only the dev deployment may grant Pro for one.
-    if (isTestStoreEvent(event) && !isDevDeployment()) {
+    if (event.testStore && !isDevDeployment()) {
       logEvent("warn", "revenuecat_test_store_ignored", {
         event_type: event.type ?? "unknown",
       });

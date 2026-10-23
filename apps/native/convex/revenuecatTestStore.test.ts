@@ -21,26 +21,27 @@ afterEach(() => {
 async function fixture() {
   const backend = newConvexTest();
   const user = await signedInUser(backend);
-  const purchase = (from: { store?: string; app_id?: string }) =>
+  const send = (event: Record<string, unknown>) =>
     backend.fetch("/webhooks/revenuecat", {
       method: "POST",
       headers: { Authorization: "Bearer test-secret" },
       body: JSON.stringify({
         event: {
-          id: "purchase",
-          type: "INITIAL_PURCHASE",
-          ...from,
+          id: `event-${String(event.type)}`,
           period_type: "NORMAL",
           product_id: "yearly",
           app_user_id: user.userId,
           expiration_at_ms: Date.now() + 86_400_000,
           event_timestamp_ms: Date.now(),
+          ...event,
         },
       }),
     });
+  const purchase = (from: { store?: string; app_id?: string }) =>
+    send({ type: "INITIAL_PURCHASE", ...from });
   const rows = () =>
     backend.run(async (ctx) => await ctx.db.query("subscriptions").collect());
-  return { ...user, purchase, rows };
+  return { ...user, send, purchase, rows };
 }
 
 describe("Test Store purchases outside the dev deployment", () => {
@@ -66,6 +67,36 @@ describe("Test Store purchases outside the dev deployment", () => {
     expect(await f.rows()).toMatchObject([
       { userId: f.userId, status: "pro", productId: "yearly" },
     ]);
+  });
+
+  it("ignores a Test Store event that would push out a paying user's expiry", async () => {
+    const f = await fixture();
+    await f.purchase({ store: "APP_STORE" });
+    const paid = await f.rows();
+    const extension = await f.send({
+      type: "SUBSCRIPTION_EXTENDED",
+      store: "TEST_STORE",
+      expiration_at_ms: Date.now() + 365 * 86_400_000,
+      event_timestamp_ms: Date.now() + 1_000,
+    });
+    expect(extension.status).toBe(200);
+    expect(await f.rows()).toEqual(paid);
+  });
+
+  it("leaves a paying user's row alone when a Test Store purchase backs the entitlement", async () => {
+    const f = await fixture();
+    await f.purchase({ store: "APP_STORE" });
+    const paid = await f.rows();
+    stubRevenueCatFetch(
+      revenuecatSnapshot({ productId: "yearly", store: "test_store" }),
+    );
+    const billingIssue = await f.send({
+      type: "BILLING_ISSUE",
+      store: "APP_STORE",
+      event_timestamp_ms: Date.now() + 1_000,
+    });
+    expect(billingIssue.status).toBe(200);
+    expect(await f.rows()).toEqual(paid);
   });
 
   it("does not grant Pro from a Test Store subscription on purchase sync", async () => {

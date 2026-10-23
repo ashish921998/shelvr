@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  isTestStoreEvent,
+  grantedByTestStore,
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   parseRevenueCatSnapshot,
@@ -24,6 +24,7 @@ describe("parseRevenueCatEvent", () => {
       expiresAt: undefined,
       productId: "monthly",
       periodType: undefined,
+      testStore: false,
       eventTimestampMs: undefined,
     });
   });
@@ -43,6 +44,7 @@ describe("parseRevenueCatEvent", () => {
       expiresAt: undefined,
       productId: undefined,
       periodType: undefined,
+      testStore: false,
       eventTimestampMs: undefined,
     });
   });
@@ -337,6 +339,7 @@ describe("RevenueCat parsing edge cases", () => {
       expiresAt: undefined,
       productId: undefined,
       periodType: undefined,
+      testStore: false,
       eventTimestampMs: undefined,
     });
   });
@@ -408,80 +411,50 @@ describe("RevenueCat parsing edge cases", () => {
 });
 
 describe("Test Store purchases", () => {
-  const now = Date.parse("2026-10-23T12:00:00Z");
+  const event = (fields: Record<string, string>) =>
+    parseRevenueCatEvent({ event: { type: "INITIAL_PURCHASE", ...fields } });
   const yearly = (store: string) => ({
-    request_date_ms: now,
     subscriber: {
-      entitlements: {
-        "Shelvr Pro": {
-          product_identifier: "yearly",
-          expires_date: "2026-11-23T12:00:00Z",
-        },
-      },
-      subscriptions: { yearly: { period_type: "normal", store } },
+      entitlements: { "Shelvr Pro": { product_identifier: "yearly" } },
+      subscriptions: { yearly: { store } },
     },
   });
-  const lifetime = {
-    request_date_ms: now,
+  const lifetime = (...stores: string[]) => ({
     subscriber: {
-      entitlements: {
-        "Shelvr Pro": { product_identifier: "lifetime", expires_date: null },
-      },
+      entitlements: { "Shelvr Pro": { product_identifier: "lifetime" } },
       subscriptions: {},
-      non_subscriptions: { lifetime: [{ id: "a", store: "test_store" }] },
-    },
-  };
-
-  it("knows a Test Store event by its store, or by its app when the store is left out", () => {
-    const event = (fields: Record<string, string>) =>
-      parseRevenueCatEvent({
-        event: { type: "INITIAL_PURCHASE", ...fields },
-      }) ?? {};
-    expect(isTestStoreEvent(event({ store: "TEST_STORE" }))).toBe(true);
-    expect(isTestStoreEvent(event({ app_id: "app20ea108057" }))).toBe(true);
-    expect(
-      isTestStoreEvent(event({ store: "APP_STORE", app_id: "app8c34b380e7" })),
-    ).toBe(false);
-    expect(isTestStoreEvent(event({}))).toBe(false);
-  });
-
-  it("grants nothing for a Test Store subscription unless told to accept it", () => {
-    expect(parseRevenueCatSnapshot(yearly("test_store"))).toEqual({
-      status: "lapsed",
-      expiresAt: 0,
-    });
-    expect(
-      parseRevenueCatSnapshot(yearly("test_store"), "Shelvr Pro", {
-        acceptTestStore: true,
-      }).status,
-    ).toBe("pro");
-    expect(parseRevenueCatSnapshot(yearly("app_store")).status).toBe("pro");
-  });
-
-  it("keeps a lifetime purchase that a real store also sold under the same id", () => {
-    const mixed = {
-      ...lifetime,
-      subscriber: {
-        ...lifetime.subscriber,
-        non_subscriptions: {
-          lifetime: [
-            { id: "a", store: "test_store" },
-            { id: "b", store: "app_store" },
-          ],
-        },
+      non_subscriptions: {
+        lifetime: stores.map((store, index) => ({ id: String(index), store })),
       },
-    };
-    expect(parseRevenueCatSnapshot(mixed).status).toBe("lifetime");
+    },
   });
 
-  it("grants nothing for a Test Store lifetime purchase unless told to accept it", () => {
-    expect(parseRevenueCatSnapshot(lifetime)).toEqual({
-      status: "lapsed",
-      expiresAt: 0,
-    });
+  it("knows a Test Store event by its store, or by its app when it leaves the store out", () => {
+    expect(event({ store: "TEST_STORE" })?.testStore).toBe(true);
+    expect(event({ app_id: "app20ea108057" })?.testStore).toBe(true);
     expect(
-      parseRevenueCatSnapshot(lifetime, "Shelvr Pro", { acceptTestStore: true })
-        .status,
-    ).toBe("lifetime");
+      event({ store: "APP_STORE", app_id: "app8c34b380e7" })?.testStore,
+    ).toBe(false);
+    expect(event({})?.testStore).toBe(false);
+  });
+
+  it("trusts a named store over the app a promotional grant is filed under", () => {
+    expect(
+      event({ store: "PROMOTIONAL", app_id: "app20ea108057" })?.testStore,
+    ).toBe(false);
+  });
+
+  it("knows an entitlement granted by a Test Store subscription", () => {
+    expect(grantedByTestStore(yearly("test_store"), "Shelvr Pro")).toBe(true);
+    expect(grantedByTestStore(yearly("app_store"), "Shelvr Pro")).toBe(false);
+    expect(grantedByTestStore(yearly("test_store"), "shelvr_pro")).toBe(false);
+  });
+
+  it("counts a one-time product as Test Store only when every purchase came from it", () => {
+    expect(grantedByTestStore(lifetime("test_store"), "Shelvr Pro")).toBe(true);
+    expect(
+      grantedByTestStore(lifetime("test_store", "app_store"), "Shelvr Pro"),
+    ).toBe(false);
+    expect(grantedByTestStore(lifetime(), "Shelvr Pro")).toBe(false);
   });
 });

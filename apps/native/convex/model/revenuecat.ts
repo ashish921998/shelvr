@@ -4,8 +4,7 @@ export type RevenueCatEvent = {
   expiresAt?: number;
   productId?: string;
   periodType?: string;
-  store?: string;
-  appId?: string;
+  testStore?: boolean;
   cancelReason?: string;
   expirationReason?: string;
   eventTimestampMs?: number;
@@ -35,8 +34,10 @@ export function parseRevenueCatEvent(
     expiresAt,
     productId,
     periodType,
-    store: readString(event.store),
-    appId: readString(event.app_id),
+    testStore: isTestStoreEvent(
+      readString(event.store),
+      readString(event.app_id),
+    ),
     cancelReason: readString(event.cancel_reason),
     expirationReason: readString(event.expiration_reason),
     eventTimestampMs,
@@ -49,18 +50,21 @@ export function parseRevenueCatEvent(
   };
 }
 
-/** The production project's Test Store app. RevenueCat may leave `store` out of an event, but not `app_id`. */
 const PRODUCTION_TEST_STORE_APP_ID = "app20ea108057";
 
-export function isTestStoreEvent(event: RevenueCatEvent): boolean {
-  return (
-    isTestStore(event.store) || event.appId === PRODUCTION_TEST_STORE_APP_ID
-  );
+/** RevenueCat may leave `store` out of an event, but not `app_id`. A named store wins, since a promotional grant can carry the id of any app the customer used. */
+function isTestStoreEvent(
+  store: string | undefined,
+  appId: string | undefined,
+): boolean {
+  return store === undefined
+    ? appId === PRODUCTION_TEST_STORE_APP_ID
+    : isTestStore(store);
 }
 
 /** Webhook events spell it TEST_STORE, the REST API test_store. */
 function isTestStore(store: unknown): boolean {
-  return typeof store === "string" && store.toLowerCase() === "test_store";
+  return readString(store)?.toLowerCase() === "test_store";
 }
 
 const ANONYMOUS_PREFIX = "$RCAnonymousID:";
@@ -143,7 +147,6 @@ type RevenueCatSnapshot = {
 export function parseRevenueCatSnapshot(
   body: unknown,
   entitlementIdentifier = "Shelvr Pro",
-  { acceptTestStore = false }: { acceptTestStore?: boolean } = {},
 ): RevenueCatSnapshot {
   const response = readRecord(body);
   const subscriber = readRecord(response?.subscriber);
@@ -159,8 +162,6 @@ export function parseRevenueCatSnapshot(
   const productId = readString(entitlement?.product_identifier);
   if (!entitlement || !productId)
     throw new Error("Invalid RevenueCat entitlement");
-  if (!acceptTestStore && fromTestStore(subscriber, productId))
-    return { status: "lapsed", expiresAt: 0 };
   if (entitlement.expires_date === null)
     return { status: "lifetime", expiresAt: 0, productId };
   const expiresAt = parseDate(entitlement.expires_date);
@@ -180,16 +181,22 @@ export function parseRevenueCatSnapshot(
   };
 }
 
-function fromTestStore(
-  subscriber: Record<string, unknown> | undefined,
-  productId: string,
+/** One real purchase of a one-time product means it was paid for, so every purchase must come from the Test Store. */
+export function grantedByTestStore(
+  body: unknown,
+  entitlementIdentifier: string,
 ): boolean {
+  const subscriber = readRecord(readRecord(body)?.subscriber);
+  const entitlement = readRecord(
+    readRecord(subscriber?.entitlements)?.[entitlementIdentifier],
+  );
+  const productId = readString(entitlement?.product_identifier);
+  if (productId === undefined) return false;
   const subscription = readRecord(
     readRecord(subscriber?.subscriptions)?.[productId],
   );
   if (subscription) return isTestStore(subscription.store);
   const purchases = readRecord(subscriber?.non_subscriptions)?.[productId];
-  // One real purchase under the same id is paid for, so every purchase must come from the Test Store.
   return (
     Array.isArray(purchases) &&
     purchases.length > 0 &&
