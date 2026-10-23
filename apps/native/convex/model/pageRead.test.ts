@@ -608,6 +608,40 @@ describe("readPage for Instagram posts", () => {
       }
     },
   );
+  it("keeps the embed's caption when Instagram refuses the post page", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: { ok: false, code: "http_error", status: 429 },
+      [`${reelUrl}embed/captioned/`]: html(
+        reelUrl,
+        '<div class="Caption"><a class="CaptionUsername">cook</a>Garlic noodles\nBoil, toss, eat.<div class="CaptionComments"></div></div>',
+      ),
+    });
+    const read = await readPage(reelUrl);
+    expect(read).toMatchObject({
+      status: "ok",
+      page: {
+        title: "Garlic noodles",
+        author: "@cook",
+        caption: true,
+        incomplete: true,
+      },
+    });
+  });
+
+  it("still fails when Instagram refuses the post page and the embed has no post", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: { ok: false, code: "http_error", status: 429 },
+      [`${reelUrl}embed/captioned/`]: html(
+        reelUrl,
+        "<html><body></body></html>",
+      ),
+    });
+    const read = await readPage(reelUrl);
+    expect(read.status).not.toBe("ok");
+  });
+
   it("fails a deleted reel as gone instead of saving it blank", async () => {
     const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
     serve({
