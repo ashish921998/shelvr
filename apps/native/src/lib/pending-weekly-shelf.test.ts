@@ -1,5 +1,5 @@
 // The weekly shelf onboarding promised is turned on at the first signed-in
-// launch, once, and only while notifications are still allowed.
+// launch, in one attempt, and only while notifications are still allowed.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
@@ -15,8 +15,6 @@ vi.mock("expo-secure-store", () => ({
 vi.mock("@/lib/notification-token", () => ({
   notificationPermissionState: mock.permission,
 }));
-vi.mock("@/lib/notifications", () => ({ useNotificationSession: vi.fn() }));
-vi.mock("convex/react", () => ({ useConvexAuth: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError },
 }));
@@ -56,15 +54,12 @@ describe("applyQueuedWeeklyShelf", () => {
     expect(set).not.toHaveBeenCalled();
   });
 
-  it("keeps the request for the next launch when the session is busy", async () => {
+  it("tries once, so a failed attempt cannot later undo a choice made in Settings", async () => {
     queueWeeklyShelf();
-    const set = vi
-      .fn()
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(true);
+    const set = vi.fn().mockResolvedValue(undefined);
     await applyQueuedWeeklyShelf(set);
     await applyQueuedWeeklyShelf(set);
-    expect(set).toHaveBeenCalledTimes(2);
+    expect(set).toHaveBeenCalledTimes(1);
     expect(mock.captureError).toHaveBeenCalledTimes(1);
   });
 });

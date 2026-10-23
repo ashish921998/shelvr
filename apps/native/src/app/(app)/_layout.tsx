@@ -11,7 +11,6 @@ import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
-import { usePendingWeeklyShelf } from "@/lib/pending-weekly-shelf";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import {
   useAwaitingOnboardingPurchase,
@@ -92,7 +91,6 @@ function AppStack() {
   useQueuedFirstSave();
   useResumePendingShare(gated || planUnknown);
   useTrialReminder();
-  usePendingWeeklyShelf();
   useWelcomeSaveTracker();
   useForgetExitOffer();
 
