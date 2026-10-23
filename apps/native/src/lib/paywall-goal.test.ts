@@ -11,6 +11,7 @@ import ptBR from "@/locales/pt-BR.json";
 import { GOALS, type Goal } from "@/lib/onboarding-goals";
 import { goalPaywallVariables } from "@/lib/paywall-goal";
 import { paywallVariables } from "@/lib/paywall-funnel";
+import { planCities } from "@/lib/sample-plans";
 
 vi.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: "en-US" }],
@@ -135,6 +136,38 @@ describe("goalPaywallVariables", () => {
       });
     }
   });
+
+  it("offers only trip cities the goal paywall has a photo for", () => {
+    expect(
+      planCities("trip"),
+      "A new trip city needs its own 'Goal photo travel <City>' layer in the RevenueCat goal paywall's Travel photos group, or travel users who pick it see Prague",
+    ).toEqual([
+      "amsterdam",
+      "austin",
+      "barcelona",
+      "berlin",
+      "chicago",
+      "copenhagen",
+      "dallas",
+      "florence",
+      "las-vegas",
+      "lisbon",
+      "london",
+      "los-angeles",
+      "madrid",
+      "milan",
+      "montreal",
+      "new-york",
+      "paris",
+      "prague",
+      "rome",
+      "san-francisco",
+      "seoul",
+      "tokyo",
+      "toronto",
+      "vancouver",
+    ]);
+  });
 });
 
 describe("paywallVariables", () => {
@@ -156,6 +189,7 @@ describe("paywallVariables", () => {
     expect(variables).toMatchObject({
       trial_end_day: { type: "string", value: "7" },
       goal: { type: "string", value: "recipes" },
+      goal_city: { type: "string", value: "" },
     });
     expect(
       paywallVariables(0, undefined, [], undefined, progress("recipes")),
