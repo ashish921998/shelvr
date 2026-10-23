@@ -412,6 +412,17 @@ test("changing authedQuery to authedMutation is a change", () => {
   assert.equal(isBreaking(diff), true);
 });
 
+test("a function built by a registrar the scanner does not know fails the scan", () => {
+  const head = tree({
+    "model/items": shared,
+    items: authedItems.replaceAll("authedQuery", "authedAction"),
+  });
+  assert.throws(
+    () => signatures(head),
+    /items\.ts: listItems is registered by authedAction, which tools\/verify-convex-api\.mjs does not know/,
+  );
+});
+
 const checkScript = fileURLToPath(
   new URL("./verify-convex-api.mjs", import.meta.url),
 );

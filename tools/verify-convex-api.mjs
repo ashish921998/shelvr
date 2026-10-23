@@ -23,6 +23,11 @@ const REGISTRAR_KINDS = new Map([
   ["authedQuery", "query"],
   ["authedMutation", "mutation"],
 ]);
+const INTERNAL_REGISTRARS = new Set([
+  "internalQuery",
+  "internalMutation",
+  "internalAction",
+]);
 const CONTRACT_PROPERTIES = new Set(["args", "returns"]);
 
 function convexFiles(ref) {
@@ -61,6 +66,16 @@ export function moduleName(path) {
 function resolveImport(fromPath, specifier) {
   if (!specifier.startsWith(".")) return null;
   return `${posix.normalize(posix.join(posix.dirname(fromPath), specifier))}.ts`;
+}
+
+// An unknown registrar with a handler fails the scan rather than hiding its
+// functions, so a renamed or new builder cannot slip a narrowed contract past it.
+function registrarKind(path, name, { registrar, hasHandler }) {
+  const kind = REGISTRAR_KINDS.get(registrar);
+  if (kind || INTERNAL_REGISTRARS.has(registrar) || !hasHandler) return kind;
+  throw new Error(
+    `${path}: ${name} is registered by ${registrar}, which tools/verify-convex-api.mjs does not know. Add it to REGISTRAR_KINDS or INTERNAL_REGISTRARS.`,
+  );
 }
 
 function parseModule(path, source) {
@@ -154,7 +169,17 @@ function parseModule(path, source) {
             ts.isIdentifier(property.name) &&
             CONTRACT_PROPERTIES.has(property.name.text)),
       );
-      candidates.set(name, { registrar: call.expression.text, contract });
+      const hasHandler = config.properties.some(
+        (property) =>
+          property.name &&
+          ts.isIdentifier(property.name) &&
+          property.name.text === "handler",
+      );
+      candidates.set(name, {
+        registrar: call.expression.text,
+        contract,
+        hasHandler,
+      });
     }
   }
 
@@ -177,9 +202,10 @@ function parseModule(path, source) {
     }
     const candidate = candidates.get(local);
     if (!candidate) continue;
-    const registrar = REGISTRAR_KINDS.get(
-      imports.get(candidate.registrar)?.name ?? candidate.registrar,
-    );
+    const registrar = registrarKind(path, name, {
+      ...candidate,
+      registrar: imports.get(candidate.registrar)?.name ?? candidate.registrar,
+    });
     if (!registrar) continue;
     publics.set(name, { registrar, contract: candidate.contract });
   }
