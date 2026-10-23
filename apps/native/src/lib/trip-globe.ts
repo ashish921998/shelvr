@@ -69,7 +69,7 @@ function thinRing(ring: Position[], step: number): Position[] {
     }
   }
   kept.push(ring[ring.length - 1]);
-  return kept.length >= 4 ? kept : ring;
+  return kept.length >= Math.min(8, ring.length) ? kept : ring;
 }
 
 export function thinLand(land: FeatureCollection, step: number): Feature {

@@ -1,4 +1,4 @@
-import { geoContains, geoDistance, geoOrthographic } from "d3-geo";
+import { geoArea, geoContains, geoDistance, geoOrthographic } from "d3-geo";
 import type { Feature, MultiPolygon } from "geojson";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
@@ -241,6 +241,20 @@ describe("thinLand", () => {
         ]),
       ),
     ).toBe(true);
+  });
+
+  it("keeps the shape of every island", () => {
+    const thin = thinLand(outline, 1.5);
+    const islands = outline.features.flatMap((shape) =>
+      shape.geometry.type === "Polygon"
+        ? [shape.geometry.coordinates]
+        : (shape.geometry as MultiPolygon).coordinates,
+    );
+    (thin.geometry as MultiPolygon).coordinates.forEach((polygon, index) => {
+      const kept = geoArea({ type: "Polygon", coordinates: polygon });
+      const whole = geoArea({ type: "Polygon", coordinates: islands[index] });
+      expect(kept / whole).toBeGreaterThan(0.7);
+    });
   });
 
   it("keeps a ring too small to thin as it is", () => {
