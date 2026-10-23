@@ -16,7 +16,7 @@ import type { Infer } from "convex/values";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { Text, View } from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useReducedMotion, ZoomOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
@@ -136,6 +136,20 @@ function afterOwnHeading(
       heading.size === named.size &&
       [...heading].every((word) => named.has(word)));
   return same ? rest.join("\n").trim() || undefined : note;
+}
+
+/**
+ * A text face with nothing to caption carries its menu in its top corner, so
+ * the card does not end in a row holding only the ellipsis.
+ */
+export function menuSitsOnFace(item: FeedItem, suggested?: boolean): boolean {
+  return (
+    !(item.imageUrl ?? item.heroImageUrl) &&
+    textFaceCopy(item, failureLabel(item)).captionTitle === undefined &&
+    !(item.type === "link" && item.url) &&
+    !suggested &&
+    item.status === "ready"
+  );
 }
 
 const FACE_SYMBOL = {
@@ -270,19 +284,37 @@ function CardCaption({
           </View>
         ) : null}
       </View>
-      <ActionMenu
-        label={t("item.actions")}
-        title={t("item.actions")}
-        actions={menuActions}
+      <CardMenu
+        menuActions={menuActions}
+        theme={theme}
         style={[styles.menuButton, !hostRow && styles.menuOnTitle]}
-      >
-        <AppSymbolIcon
-          name="ellipsis"
-          size={15}
-          tintColor={theme.colors.foreground}
-        />
-      </ActionMenu>
+      />
     </View>
+  );
+}
+
+function CardMenu({
+  menuActions,
+  theme,
+  style,
+}: {
+  menuActions: ActionMenuItem[];
+  theme: UnistylesTheme;
+  style: StyleProp<ViewStyle>;
+}) {
+  return (
+    <ActionMenu
+      label={t("item.actions")}
+      title={t("item.actions")}
+      actions={menuActions}
+      style={style}
+    >
+      <AppSymbolIcon
+        name="ellipsis"
+        size={15}
+        tintColor={theme.colors.foreground}
+      />
+    </ActionMenu>
   );
 }
 
@@ -333,6 +365,7 @@ export function ItemCardFace({
   const captionTitle = hasMedia
     ? cardTitles(item).find((title) => title !== undefined)
     : textFaceCopy(item, failedLabel).captionTitle;
+  const menuOnFace = menuSitsOnFace(item, suggested);
   return (
     <View
       style={[
@@ -342,12 +375,22 @@ export function ItemCardFace({
       ]}
     >
       <CardMedia item={item} failedLabel={failedLabel} theme={theme} />
-      <CardCaption
-        item={item}
-        captionTitle={captionTitle}
-        menuActions={menuActions}
-        theme={theme}
-      />
+      {menuOnFace ? (
+        <View style={styles.menuOnFace}>
+          <CardMenu
+            menuActions={menuActions}
+            theme={theme}
+            style={styles.menuButton}
+          />
+        </View>
+      ) : (
+        <CardCaption
+          item={item}
+          captionTitle={captionTitle}
+          menuActions={menuActions}
+          theme={theme}
+        />
+      )}
 
       {suggested && (
         <Animated.View
@@ -497,6 +540,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   menuOnTitle: {
     paddingBottom: 25,
+  },
+  menuOnFace: {
+    position: "absolute",
+    top: 2,
+    right: 2,
   },
   suggestedBadge: {
     position: "absolute",
