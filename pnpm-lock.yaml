@@ -25,6 +25,9 @@ patchedDependencies:
   expo-dev-launcher@58.0.14:
     hash: 850b017fc29e958842926cc60edb897d51faf32c7b49cfcc8d71267d45572b44
     path: patches/expo-dev-launcher@58.0.14.patch
+  react-native-purchases-ui@10.14.0:
+    hash: 9b33a89c8b8d3f0f86fbf98e4d815a502471559d71157cbd6da5161455646d09
+    path: patches/react-native-purchases-ui@10.14.0.patch
 
 importers:
 
@@ -251,7 +254,7 @@ importers:
         version: 10.14.0(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       react-native-purchases-ui:
         specifier: ^10.10.2
-        version: 10.14.0(react-native-purchases@10.14.0(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+        version: 10.14.0(patch_hash=9b33a89c8b8d3f0f86fbf98e4d815a502471559d71157cbd6da5161455646d09)(react-native-purchases@10.14.0(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       react-native-reanimated:
         specifier: 4.7.1
         version: 4.7.1(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
@@ -12650,7 +12653,7 @@ snapshots:
       react: 19.3.0
       react-native: 0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
 
-  react-native-purchases-ui@10.14.0(react-native-purchases@10.14.0(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
+  react-native-purchases-ui@10.14.0(patch_hash=9b33a89c8b8d3f0f86fbf98e4d815a502471559d71157cbd6da5161455646d09)(react-native-purchases@10.14.0(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
     dependencies:
       '@revenuecat/purchases-typescript-internal': 19.12.0
       react: 19.3.0

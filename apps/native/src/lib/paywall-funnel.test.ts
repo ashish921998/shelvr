@@ -132,6 +132,90 @@ describe("activeProductId", () => {
   });
 });
 
+describe("refreshCustomerInfo", () => {
+  async function loadWith(rc: object) {
+    vi.doMock("@/lib/revenuecat-module", () => ({ getPurchases: () => rc }));
+    const funnel = await loadFunnel();
+    vi.doUnmock("@/lib/revenuecat-module");
+    return funnel;
+  }
+
+  it("drops the cached customer before reading it", async () => {
+    const calls: string[] = [];
+    const funnel = await loadWith({
+      invalidateCustomerInfoCache: async () => void calls.push("invalidate"),
+      getCustomerInfo: async () => void calls.push("read"),
+    });
+    await expect(funnel.refreshCustomerInfo()).resolves.toBe(true);
+    expect(calls).toEqual(["invalidate", "read"]);
+  });
+
+  it("answers false when the read fails", async () => {
+    const funnel = await loadWith({
+      invalidateCustomerInfoCache: async () => {},
+      getCustomerInfo: async () => Promise.reject(new Error("offline")),
+    });
+    await expect(funnel.refreshCustomerInfo()).resolves.toBe(false);
+  });
+
+  it("answers false after 10s when the read stalls", async () => {
+    vi.useFakeTimers();
+    const funnel = await loadWith({
+      invalidateCustomerInfoCache: async () => {},
+      getCustomerInfo: () => new Promise(() => {}),
+    });
+    const read = funnel.refreshCustomerInfo();
+    await vi.advanceTimersByTimeAsync(9_999);
+    let settled = false;
+    void read.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(read).resolves.toBe(false);
+  });
+
+  it("keeps a read that landed after the budget, so a retry does not throw it away", async () => {
+    vi.useFakeTimers();
+    const invalidate = vi.fn(async () => {});
+    let reads = 0;
+    const funnel = await loadWith({
+      invalidateCustomerInfoCache: invalidate,
+      getCustomerInfo: () =>
+        ++reads === 1
+          ? new Promise((resolve) => setTimeout(resolve, 12_000))
+          : Promise.resolve({}),
+    });
+    const first = funnel.refreshCustomerInfo();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expect(first).resolves.toBe(false);
+    await vi.advanceTimersByTimeAsync(4_000);
+
+    await expect(funnel.refreshCustomerInfo()).resolves.toBe(true);
+    expect(invalidate).toHaveBeenCalledOnce();
+  });
+
+  it("drops the cache again once the last read is a minute old or the account signs out", async () => {
+    vi.useFakeTimers();
+    const invalidate = vi.fn(async () => {});
+    const funnel = await loadWith({
+      invalidateCustomerInfoCache: invalidate,
+      getCustomerInfo: async () => ({}),
+    });
+    await funnel.refreshCustomerInfo();
+    vi.setSystemTime(Date.now() + 30_000);
+    await funnel.refreshCustomerInfo();
+    expect(invalidate).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(Date.now() + 30_000);
+    await funnel.refreshCustomerInfo();
+    expect(invalidate).toHaveBeenCalledTimes(2);
+
+    funnel.forgetPaywallFunnel();
+    await funnel.refreshCustomerInfo();
+    expect(invalidate).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe("paywall offering reads", () => {
   const trial = (periodUnit: string, periodNumberOfUnits: number) => ({
     price: 0,
