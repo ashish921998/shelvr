@@ -3,8 +3,12 @@
 // sheet settlement, each supplied by the test.
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useCurrentUser } from "@/lib/current-user";
+import { useEntitlement } from "@/lib/entitlement";
 import {
   justStartedPro,
+  noteOnboardingFinished,
+  useWelcomeSaveTracker,
   useWelcomeSheetVisible,
   welcomeSave,
 } from "./welcome-save";
@@ -77,6 +81,37 @@ describe("justStartedPro", () => {
     expect(justStartedPro("lifetime", "pro")).toBe(false);
     expect(justStartedPro("trialing", "lapsed")).toBe(false);
     expect(justStartedPro("none", "none")).toBe(false);
+  });
+});
+
+describe("useWelcomeSaveTracker", () => {
+  beforeEach(() => mock.store.clear());
+
+  function signIn(userId: string, status: string) {
+    vi.mocked(useCurrentUser).mockReturnValue({
+      data: { _id: userId },
+    } as never);
+    vi.mocked(useEntitlement).mockReturnValue({
+      status,
+      loading: false,
+    } as never);
+  }
+
+  it("queues the letter for the account that signs in after onboarding on this device, once", () => {
+    noteOnboardingFinished();
+    signIn("u1", "trialing");
+    renderHook(() => useWelcomeSaveTracker());
+    expect(welcomeSave.isPending("u1")).toBe(true);
+
+    signIn("u2", "trialing");
+    renderHook(() => useWelcomeSaveTracker());
+    expect(welcomeSave.isPending("u2")).toBe(false);
+  });
+
+  it("leaves a returning sign-in alone", () => {
+    signIn("u3", "pro");
+    renderHook(() => useWelcomeSaveTracker());
+    expect(welcomeSave.isPending("u3")).toBe(false);
   });
 });
 

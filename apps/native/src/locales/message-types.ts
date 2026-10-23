@@ -634,16 +634,6 @@ export type MessageParams = {
   "weekly.nudgeTitle": undefined;
   "weekly.nudgeBody": undefined;
   "weekly.remindMe": undefined;
-  "home.progressTitleFirst": undefined;
-  "home.progressTitleNext": undefined;
-  "home.progressTitleLast": undefined;
-  "home.progressBody": undefined;
-  "home.progressCount": { saved: number; total: number };
-  "home.progressShare": undefined;
-  "home.progressShareAndroid": undefined;
-  "home.progressShareHelp": undefined;
-  "home.progressPhotos": undefined;
-  "home.progressNote": undefined;
   "home.recallBody": { count: number };
   "home.recallKicker": undefined;
   "home.recallStackTitle": { count: number; title: string };

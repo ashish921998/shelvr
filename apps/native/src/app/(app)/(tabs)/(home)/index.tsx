@@ -1,7 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { ProCard } from "@/components/home/pro-card";
-import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { SetupChecklist } from "@/components/home/setup-checklist";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
@@ -170,8 +169,8 @@ export default function HomeScreen() {
     return <ScreenLoader label={t("loading.home")} />;
   }
 
-  const progressCard = saveProgressCard(progress);
   const setup = setupProgress(items);
+  const progressCard = saveProgressCard(progress, setup);
   const showHowTo =
     !progress.deferLater && shouldShowSetup(setup, items.length);
   const nudge = user ? (
@@ -311,14 +310,19 @@ function emptyFeedStarter(
   );
 }
 
-function saveProgressCard(progress: ReturnType<typeof useSaveProgress>) {
+/** A new account's first card: the setup checklist, with the save-goal card's dismiss and tracking. */
+function saveProgressCard(
+  progress: ReturnType<typeof useSaveProgress>,
+  setup: ReturnType<typeof setupProgress>,
+) {
   return progress.card ? (
-    <SaveProgressCard
-      saved={progress.card.saved}
-      goal={progress.card.goal}
-      onDismiss={progress.dismiss}
-      onShown={progress.markShown}
-    />
+    <View style={styles.setupCard}>
+      <SetupChecklist
+        progress={setup}
+        onDismiss={progress.dismiss}
+        onShown={progress.markShown}
+      />
+    </View>
   ) : null;
 }
 
@@ -328,6 +332,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   howToOnly: {
     padding: theme.gap(2),
+  },
+  setupCard: {
+    paddingHorizontal: theme.gap(2),
+    paddingBottom: theme.gap(1.5),
   },
   progressOnly: {
     paddingVertical: theme.gap(1),

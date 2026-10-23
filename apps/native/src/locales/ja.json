@@ -675,16 +675,6 @@
   "weekly.nudgeTitle": "保存したものを埋もれさせない",
   "weekly.nudgeBody": "毎週日曜日、保存したまま開いていないものをShelvrがお届けします。保存したものが埋もれません。通知は週に1回、保存したものについてお届けします。設定でいつでも変更できます。",
   "weekly.remindMe": "毎週お知らせする",
-  "home.progressTitleFirst": "あとで見返したいものを3つ保存しましょう",
-  "home.progressTitleNext": "あと2つ保存しましょう",
-  "home.progressTitleLast": "あと1つです",
-  "home.progressBody": "Shelvr が一つずつ読んで、合うスペースがあれば提案します。",
-  "home.progressCount": "%{total}件中%{saved}件保存済み",
-  "home.progressShare": "Safari や Instagram から共有",
-  "home.progressShareAndroid": "Chrome や Instagram から共有",
-  "home.progressShareHelp": "共有をタップして Shelvr を選びます。見つからなければ「その他」をタップ。",
-  "home.progressPhotos": "写真からスクリーンショットを追加",
-  "home.progressNote": "さっとメモを書く",
   "home.recallBody": {
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
   },

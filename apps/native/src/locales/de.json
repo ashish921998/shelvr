@@ -696,16 +696,6 @@
   "weekly.nudgeTitle": "Verliere nicht, was du gespeichert hast",
   "weekly.nudgeBody": "Jeden Sonntag holt Shelvr die gespeicherten Dinge zurück, die du noch nicht geöffnet hast, damit nichts untergeht. Eine Mitteilung pro Woche zu deinen gespeicherten Inhalten. Du kannst das jederzeit in den Einstellungen ändern.",
   "weekly.remindMe": "Wöchentlich erinnern",
-  "home.progressTitleFirst": "Speichere drei Dinge, die du wiederfinden willst",
-  "home.progressTitleNext": "Speichere die nächsten zwei",
-  "home.progressTitleLast": "Noch ein Inhalt",
-  "home.progressBody": "Shelvr liest jeden Inhalt und schlägt einen passenden Bereich vor, wenn es einen gibt.",
-  "home.progressCount": "%{saved} von %{total} gespeichert",
-  "home.progressShare": "Aus Safari oder Instagram teilen",
-  "home.progressShareAndroid": "Aus Chrome oder Instagram teilen",
-  "home.progressShareHelp": "Tippe auf Teilen, dann auf Shelvr. Nicht in der App-Reihe? Tippe auf Mehr.",
-  "home.progressPhotos": "Screenshot aus deinen Fotos hinzufügen",
-  "home.progressNote": "Schnell eine Notiz schreiben",
   "home.recallBody": {
     "one": "%{formattedCount} früher gespeicherter Inhalt passt zu dem, was du gerade hinzugefügt hast.",
     "other": "%{formattedCount} früher gespeicherte Inhalte passen zu dem, was du gerade hinzugefügt hast."

@@ -696,16 +696,6 @@
   "weekly.nudgeTitle": "Don't lose what you saved",
   "weekly.nudgeBody": "Every Sunday, Shelvr brings back the saves you haven't opened yet, so nothing you kept gets buried. One weekly notification about your shelf. Change it anytime in Settings.",
   "weekly.remindMe": "Remind me weekly",
-  "home.progressTitleFirst": "Save three things you'll want back",
-  "home.progressTitleNext": "Save your next two",
-  "home.progressTitleLast": "One more save to go",
-  "home.progressBody": "Shelvr reads each one and suggests a space when one fits.",
-  "home.progressCount": "%{saved} of %{total} saved",
-  "home.progressShare": "Share from Safari or Instagram",
-  "home.progressShareAndroid": "Share from Chrome or Instagram",
-  "home.progressShareHelp": "Tap Share, then Shelvr. Not in the row? Tap More.",
-  "home.progressPhotos": "Add a screenshot from your photos",
-  "home.progressNote": "Jot a quick note",
   "home.recallBody": {
     "one": "%{formattedCount} earlier save goes with what you just added.",
     "other": "%{formattedCount} earlier saves go with what you just added."

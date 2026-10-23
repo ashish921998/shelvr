@@ -2,7 +2,9 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import { SETUP_STEPS, type SetupStep } from "@/lib/setup-checklist";
 import type { TextMessageKey } from "@/locales/message-types";
+import { GhostButton } from "@/components/onboarding/parts";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -73,11 +75,18 @@ function StepRow({
 /** "Get set up": the three ways to save, ticked off from the saves on Home. */
 export function SetupChecklist({
   progress,
+  onDismiss,
+  onShown,
 }: {
   progress: Record<SetupStep, boolean>;
+  onDismiss?: () => void;
+  onShown?: () => void;
 }) {
   useAppLocale();
   const router = useRouter();
+  useEffect(() => {
+    onShown?.();
+  }, [onShown]);
   const done = SETUP_STEPS.filter((step) => progress[step]).length;
   return (
     <View style={styles.card}>
@@ -110,6 +119,9 @@ export function SetupChecklist({
           }
         />
       ))}
+      {onDismiss ? (
+        <GhostButton label={t("common.notNow")} onPress={onDismiss} />
+      ) : null}
     </View>
   );
 }

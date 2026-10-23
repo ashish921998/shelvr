@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { ahaSample } from "@/lib/aha-sample";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
+import { noteOnboardingFinished } from "@/lib/welcome-save";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import type { SampleCityId } from "@/lib/sample-cities";
 import { notificationPermissionState } from "@/lib/notification-token";
@@ -248,6 +249,7 @@ export default function OnboardingScreen() {
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
+    noteOnboardingFinished();
     completeOnboarding();
   };
 

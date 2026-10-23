@@ -675,16 +675,6 @@
   "weekly.nudgeTitle": "저장한 것을 잊지 마세요",
   "weekly.nudgeBody": "매주 일요일, 저장하고 아직 열어 보지 않은 것을 Shelvr가 다시 가져다 드려요. 저장한 것이 묻히지 않아요. 저장한 것에 대한 알림을 일주일에 한 번 보내 드려요. 설정에서 언제든 바꿀 수 있어요.",
   "weekly.remindMe": "매주 알림 받기",
-  "home.progressTitleFirst": "다시 보고 싶은 것 3개를 저장해 보세요",
-  "home.progressTitleNext": "다음 2개를 저장해 보세요",
-  "home.progressTitleLast": "하나만 더 저장하면 돼요",
-  "home.progressBody": "Shelvr가 하나씩 읽고 맞는 스페이스가 있으면 제안해 드려요.",
-  "home.progressCount": "%{total}개 중 %{saved}개 저장됨",
-  "home.progressShare": "Safari나 Instagram에서 공유",
-  "home.progressShareAndroid": "Chrome이나 Instagram에서 공유",
-  "home.progressShareHelp": "공유를 탭한 다음 Shelvr를 고르세요. 안 보이면 더 보기를 탭하세요.",
-  "home.progressPhotos": "사진에서 스크린샷 추가",
-  "home.progressNote": "간단한 메모 쓰기",
   "home.recallBody": {
     "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."
   },

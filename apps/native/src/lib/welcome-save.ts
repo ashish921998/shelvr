@@ -7,10 +7,28 @@ import {
 } from "@/lib/entitlement";
 import { oncePerAccount } from "@/lib/once-per-account";
 import { whenTrialPrimerDone } from "@/lib/trial-reminder";
+import * as SecureStore from "expo-secure-store";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export const welcomeSave = oncePerAccount("welcomeSave");
+
+const ONBOARDED_HERE_KEY = "shelvr.welcomeAfterOnboarding";
+
+/** Onboarding finished on this device, usually before sign-in, so the account that signs in next gets the welcome letter. */
+export function noteOnboardingFinished(): void {
+  try {
+    SecureStore.setItem(ONBOARDED_HERE_KEY, "true");
+  } catch (error) {
+    analytics.captureError("welcome_save_flag_failed", error);
+  }
+}
+
+function claimOnboardingWelcome(userId: string): void {
+  if (SecureStore.getItem(ONBOARDED_HERE_KEY) !== "true") return;
+  welcomeSave.mark(userId);
+  SecureStore.setItem(ONBOARDED_HERE_KEY, "");
+}
 
 export function justStartedPro(
   before: EntitlementStatus | null,
@@ -41,9 +59,9 @@ export function useWelcomeSaveTracker(): void {
     const before =
       previous.current?.userId === userId ? previous.current.status : null;
     previous.current = { userId, status };
-    if (!justStartedPro(before, status)) return;
     try {
-      welcomeSave.mark(userId);
+      claimOnboardingWelcome(userId);
+      if (justStartedPro(before, status)) welcomeSave.mark(userId);
     } catch (error) {
       analytics.captureError("welcome_save_flag_failed", error);
     }
