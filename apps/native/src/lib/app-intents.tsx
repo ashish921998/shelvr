@@ -206,7 +206,10 @@ export async function revokeSiriCapture(
 ): Promise<void> {
   try {
     const token = await setup?.captureToken();
-    if (token) await revoke({ token });
+    if (token) {
+      await revoke({ token });
+      store.remove(CAPTURE_OWNER_KEY);
+    }
   } catch (error) {
     analytics.captureError("app_intents_revoke_failed", error);
   }
