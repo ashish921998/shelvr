@@ -21,15 +21,15 @@ afterEach(() => {
 async function fixture() {
   const backend = newConvexTest();
   const user = await signedInUser(backend);
-  const purchase = (store: string) =>
+  const purchase = (from: { store?: string; app_id?: string }) =>
     backend.fetch("/webhooks/revenuecat", {
       method: "POST",
       headers: { Authorization: "Bearer test-secret" },
       body: JSON.stringify({
         event: {
-          id: `purchase-${store}`,
+          id: "purchase",
           type: "INITIAL_PURCHASE",
-          store,
+          ...from,
           period_type: "NORMAL",
           product_id: "yearly",
           app_user_id: user.userId,
@@ -46,13 +46,19 @@ async function fixture() {
 describe("Test Store purchases outside the dev deployment", () => {
   it("ignores a Test Store purchase webhook", async () => {
     const f = await fixture();
-    expect((await f.purchase("TEST_STORE")).status).toBe(200);
+    expect((await f.purchase({ store: "TEST_STORE" })).status).toBe(200);
+    expect(await f.rows()).toEqual([]);
+  });
+
+  it("ignores a purchase from the Test Store app that leaves out its store", async () => {
+    const f = await fixture();
+    expect((await f.purchase({ app_id: "app20ea108057" })).status).toBe(200);
     expect(await f.rows()).toEqual([]);
   });
 
   it("still records a real store purchase", async () => {
     const f = await fixture();
-    expect((await f.purchase("APP_STORE")).status).toBe(200);
+    expect((await f.purchase({ store: "APP_STORE" })).status).toBe(200);
     expect(await f.rows()).toMatchObject([
       { userId: f.userId, status: "pro", productId: "yearly" },
     ]);
@@ -75,7 +81,7 @@ describe("Test Store purchases on the dev deployment", () => {
 
   it("records a Test Store purchase webhook", async () => {
     const f = await fixture();
-    expect((await f.purchase("TEST_STORE")).status).toBe(200);
+    expect((await f.purchase({ store: "TEST_STORE" })).status).toBe(200);
     expect(await f.rows()).toMatchObject([
       { userId: f.userId, status: "pro", productId: "yearly" },
     ]);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  isTestStore,
+  isTestStoreEvent,
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   parseRevenueCatSnapshot,
@@ -432,20 +432,17 @@ describe("Test Store purchases", () => {
     },
   };
 
-  it("reads the store a webhook event names", () => {
-    expect(
+  it("knows a Test Store event by its store, or by its app when the store is left out", () => {
+    const event = (fields: Record<string, string>) =>
       parseRevenueCatEvent({
-        event: { type: "INITIAL_PURCHASE", store: "TEST_STORE" },
-      })?.store,
-    ).toBe("TEST_STORE");
-  });
-
-  it("recognizes the Test Store in the webhook and REST spellings", () => {
-    expect(isTestStore("TEST_STORE")).toBe(true);
-    expect(isTestStore("test_store")).toBe(true);
-    expect(isTestStore("APP_STORE")).toBe(false);
-    expect(isTestStore("app_store")).toBe(false);
-    expect(isTestStore(undefined)).toBe(false);
+        event: { type: "INITIAL_PURCHASE", ...fields },
+      }) ?? {};
+    expect(isTestStoreEvent(event({ store: "TEST_STORE" }))).toBe(true);
+    expect(isTestStoreEvent(event({ app_id: "app20ea108057" }))).toBe(true);
+    expect(
+      isTestStoreEvent(event({ store: "APP_STORE", app_id: "app8c34b380e7" })),
+    ).toBe(false);
+    expect(isTestStoreEvent(event({}))).toBe(false);
   });
 
   it("grants nothing for a Test Store subscription unless told to accept it", () => {

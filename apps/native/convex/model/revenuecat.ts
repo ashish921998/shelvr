@@ -5,6 +5,7 @@ export type RevenueCatEvent = {
   productId?: string;
   periodType?: string;
   store?: string;
+  appId?: string;
   cancelReason?: string;
   expirationReason?: string;
   eventTimestampMs?: number;
@@ -35,6 +36,7 @@ export function parseRevenueCatEvent(
     productId,
     periodType,
     store: readString(event.store),
+    appId: readString(event.app_id),
     cancelReason: readString(event.cancel_reason),
     expirationReason: readString(event.expiration_reason),
     eventTimestampMs,
@@ -47,8 +49,17 @@ export function parseRevenueCatEvent(
   };
 }
 
+/** The production project's Test Store app. RevenueCat may leave `store` out of an event, but not `app_id`. */
+const PRODUCTION_TEST_STORE_APP_ID = "app20ea108057";
+
+export function isTestStoreEvent(event: RevenueCatEvent): boolean {
+  return (
+    isTestStore(event.store) || event.appId === PRODUCTION_TEST_STORE_APP_ID
+  );
+}
+
 /** Webhook events spell it TEST_STORE, the REST API test_store. */
-export function isTestStore(store: unknown): boolean {
+function isTestStore(store: unknown): boolean {
   return typeof store === "string" && store.toLowerCase() === "test_store";
 }
 
