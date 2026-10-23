@@ -10,6 +10,7 @@ import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { tidyCity } from "./model/trip";
 import {
   deleteMembershipsForSpace,
   effectiveStatus,
@@ -24,7 +25,12 @@ import {
   toSummaryPatch,
   type MembershipSummary,
 } from "./model/memberships";
-import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import {
+  enrichItem,
+  enrichedItemValidator,
+  intentValidator,
+  readyCitySaves,
+} from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
@@ -280,6 +286,44 @@ export const createSpace = authedMutation({
         spaceId,
       },
     );
+    return spaceId;
+  },
+});
+
+export const ensureCitySpace = authedMutation({
+  args: { city: v.string() },
+  returns: v.id("spaces"),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const name = validateSpaceName(tidyCity(args.city));
+    await requireProEntitlement(ctx, userId);
+    const saves = await readyCitySaves(ctx, userId, args.city);
+
+    const existing = await ctx.db
+      .query("spaces")
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("userId", userId).eq("name", name),
+      )
+      .first();
+    const spaceId =
+      existing?._id ??
+      (await ctx.db.insert("spaces", {
+        userId,
+        name,
+        dynamic: false,
+        autoFile: false,
+        ...emptySummary(),
+      }));
+    for (const item of saves) {
+      if ((await getMembership(ctx, item._id, spaceId)) === null) {
+        await insertMembership(ctx, {
+          userId,
+          spaceId,
+          itemId: item._id,
+          status: "saved",
+        });
+      }
+    }
     return spaceId;
   },
 });
