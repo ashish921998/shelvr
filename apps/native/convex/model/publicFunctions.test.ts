@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { isAuthedFunction } from "./auth";
 import { NOT_MOVED_YET, PUBLIC_ON_PURPOSE } from "./publicFunctions";
 
-const modules = import.meta.glob("../**/*.ts");
+const modules = import.meta.glob("../**/*.{ts,tsx,mts,cts,js,mjs,cjs,jsx}");
 
 const FIX =
-  "use authedQuery or authedMutation from model/auth.ts. If it must answer a signed-out or deleting caller, add it to PUBLIC_ON_PURPOSE in model/publicFunctions.ts with a reason, which needs the owner's review.";
+  "use authedQuery or authedMutation from model/auth.ts. If it must answer a signed-out or deleting caller, add it to PUBLIC_ON_PURPOSE in model/publicFunctions.ts with a reason.";
 
 /** Convex registers a file under convex/ as a module unless it is generated or its name has two dots (tests, configs). */
 function moduleName(path: string): string | null {
@@ -15,7 +15,7 @@ function moduleName(path: string): string | null {
   if (relative.startsWith("_generated/")) return null;
   const file = relative.slice(relative.lastIndexOf("/") + 1);
   if (file.split(".").length > 2) return null;
-  return relative.replace(/\.ts$/, "");
+  return relative.replace(/\.(ts|tsx|mts|cts|js|mjs|cjs|jsx)$/, "");
 }
 
 type Flags = { isPublic?: unknown; isQuery?: unknown; isMutation?: unknown };
@@ -47,6 +47,52 @@ async function publicQueriesAndMutations(): Promise<Map<string, unknown>> {
   return found;
 }
 
+/** A ctx with only what `requireUserId` reads; any other read throws, so a handler that reaches the database before refusing the caller fails. */
+function ctxStub(members: object): object {
+  return new Proxy(members, {
+    get(target, property) {
+      if (typeof property === "symbol" || property in target) {
+        return Reflect.get(target, property);
+      }
+      throw new Error(`read ctx.${property} before requireUserId`);
+    },
+  });
+}
+
+const REFUSED_CALLERS: readonly [string, object][] = [
+  [
+    "a signed-out caller",
+    ctxStub({ auth: { getUserIdentity: async () => null } }),
+  ],
+  [
+    "a deleting account",
+    ctxStub({
+      auth: { getUserIdentity: async () => ({ subject: "user|session" }) },
+      db: { normalizeId: () => "user", get: async () => ({ deleting: true }) },
+    }),
+  ],
+];
+
+type Handler = (ctx: unknown, args: unknown) => unknown;
+
+/** Why `fn` does not open with `await requireUserId(ctx)`, or null when it refuses both callers first. */
+async function skipsHandAuth(fn: unknown): Promise<string | null> {
+  const handler = (fn as { _handler?: Handler })._handler;
+  if (typeof handler !== "function") return "has no handler to call";
+  for (const [caller, ctx] of REFUSED_CALLERS) {
+    try {
+      await handler(ctx, {});
+      return `answered ${caller}`;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== "Not authenticated") {
+        return `did not refuse ${caller} first (${message})`;
+      }
+    }
+  }
+  return null;
+}
+
 function listViolations(): {
   listed: Map<string, string>;
   violations: string[];
@@ -73,7 +119,7 @@ function listViolations(): {
 }
 
 describe("public queries and mutations", () => {
-  it("are built by authedQuery or authedMutation, or listed once with the owner's review", async () => {
+  it("are built by authedQuery or authedMutation, or listed once", async () => {
     const found = await publicQueriesAndMutations();
     expect(found.size).toBeGreaterThan(0);
 
@@ -88,6 +134,13 @@ describe("public queries and mutations", () => {
         }
       } else if (list === undefined) {
         violations.push(`${key}: ${FIX}`);
+      } else if (list === "NOT_MOVED_YET") {
+        const problem = await skipsHandAuth(fn);
+        if (problem !== null) {
+          violations.push(
+            `${key} ${problem}. NOT_MOVED_YET only shrinks; ${FIX}`,
+          );
+        }
       }
     }
     for (const key of listed.keys()) {
