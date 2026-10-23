@@ -417,6 +417,8 @@ function ItemScreenContent() {
         : undefined;
     }
     if (from === "search") return searchQ.data;
+    // On Android a deep start index in the home pager drew an empty page.
+    if (from === "next-up") return undefined;
     return homeFeed.items;
   }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
