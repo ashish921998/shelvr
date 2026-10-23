@@ -70,41 +70,53 @@ export function stripTags(html: string): string {
   }
 }
 
-// An attribute value runs to the quote that opened it, so "Sally's" keeps its apostrophe.
-const QUOTED_VALUE = `(?:"([^"]*)"|'([^']*)')`;
+const ATTRIBUTE_OR_TAG_END =
+  /[\s/]*(?:>|(?<name>[^\s/>][^\s/>=]*)\s*(?:=\s*(?:"(?<doubleQuoted>[^"]*)"|'(?<singleQuoted>[^']*)'|[^\s>]*))?)/y;
 
-function attributeValue(
-  match: RegExpMatchArray | null | undefined,
-): string | undefined {
-  return match ? (match[1] ?? match[2]) : undefined;
+function* tagAttributes(html: string, tagName: string) {
+  const tagStart = new RegExp(`<${tagName}(?=[\\s/>])`, "gi");
+  const step = new RegExp(ATTRIBUTE_OR_TAG_END);
+  while (tagStart.exec(html) !== null) {
+    const attributes = new Map<string, string | undefined>();
+    step.lastIndex = tagStart.lastIndex;
+    for (;;) {
+      const match = step.exec(html);
+      if (match === null) return;
+      const { name, doubleQuoted, singleQuoted } = match.groups ?? {};
+      if (name === undefined) break;
+      const key = name.toLowerCase();
+      if (!attributes.has(key))
+        attributes.set(key, doubleQuoted ?? singleQuoted);
+    }
+    tagStart.lastIndex = step.lastIndex;
+    yield attributes;
+  }
 }
 
 export function extractCanonical(html: string): string | undefined {
-  const tag = html.match(/<link[^>]*rel\s*=\s*["']canonical["'][^>]*>/i)?.[0];
-  const href = attributeValue(
-    tag?.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i),
-  )?.trim();
-  return href ? decodeEntities(href) : undefined;
+  for (const link of tagAttributes(html, "link")) {
+    const href = decodeEntities(link.get("href") ?? "").trim();
+    if (href && link.get("rel")?.toLowerCase() === "canonical") {
+      return href;
+    }
+  }
+  return undefined;
 }
 
 export function extractMetaContent(
   html: string,
   key: string,
 ): string | undefined {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
-    new RegExp(
-      `<meta[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*${QUOTED_VALUE}[^>]*>`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]*content\\s*=\\s*${QUOTED_VALUE}[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
-      "i",
-    ),
-  ];
-  for (const pattern of patterns) {
-    const value = attributeValue(html.match(pattern))?.trim();
-    if (value) return decodeEntities(value);
+  const wanted = key.toLowerCase();
+  for (const meta of tagAttributes(html, "meta")) {
+    const content = decodeEntities(meta.get("content") ?? "").trim();
+    if (
+      content &&
+      (meta.get("property")?.toLowerCase() === wanted ||
+        meta.get("name")?.toLowerCase() === wanted)
+    ) {
+      return content;
+    }
   }
   return undefined;
 }
@@ -140,14 +152,24 @@ export async function fetchImageAspectRatio(
   return undefined;
 }
 
-function extractTitle(html: string): string | undefined {
+function firstTitleText(html: string): string | undefined {
+  const open = html.search(/<title/i);
+  const tagEnd = open === -1 ? -1 : html.indexOf(">", open);
+  if (tagEnd === -1) return undefined;
+  const close = /<\/title>/gi;
+  close.lastIndex = tagEnd + 1;
+  const textEnd = close.exec(html)?.index;
+  return textEnd === undefined ? undefined : html.slice(tagEnd + 1, textEnd);
+}
+
+export function extractTitle(html: string): string | undefined {
   const ogTitle = extractMetaContent(html, "og:title");
   if (ogTitle) {
     return ogTitle;
   }
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (match) {
-    const title = decodeEntities(match[1]).replace(/\s+/g, " ").trim();
+  const text = firstTitleText(html);
+  if (text !== undefined) {
+    const title = decodeEntities(text).replace(/\s+/g, " ").trim();
     if (title !== "") {
       return title;
     }
