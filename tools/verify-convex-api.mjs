@@ -14,7 +14,15 @@ const TRAILER_KEY = "Convex-Api";
 const TRAILER_VALUE = "changed";
 const ACKNOWLEDGEMENT = `${TRAILER_KEY}: ${TRAILER_VALUE}`;
 
-const PUBLIC_REGISTRARS = new Set(["query", "mutation", "action"]);
+// authedQuery and authedMutation (model/auth.ts) register the same kind of
+// function as query and mutation, so a move onto one keeps the hash.
+const REGISTRAR_KINDS = new Map([
+  ["query", "query"],
+  ["mutation", "mutation"],
+  ["action", "action"],
+  ["authedQuery", "query"],
+  ["authedMutation", "mutation"],
+]);
 const CONTRACT_PROPERTIES = new Set(["args", "returns"]);
 
 function convexFiles(ref) {
@@ -56,12 +64,7 @@ function resolveImport(fromPath, specifier) {
 }
 
 function parseModule(path, source) {
-  const file = ts.createSourceFile(
-    path,
-    source,
-    ts.ScriptTarget.Latest,
- true,
-  );
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
   const declarations = new Map();
   const imports = new Map();
   const candidates = new Map();
@@ -174,9 +177,10 @@ function parseModule(path, source) {
     }
     const candidate = candidates.get(local);
     if (!candidate) continue;
-    const registrar =
-      imports.get(candidate.registrar)?.name ?? candidate.registrar;
-    if (!PUBLIC_REGISTRARS.has(registrar)) continue;
+    const registrar = REGISTRAR_KINDS.get(
+      imports.get(candidate.registrar)?.name ?? candidate.registrar,
+    );
+    if (!registrar) continue;
     publics.set(name, { registrar, contract: candidate.contract });
   }
 
