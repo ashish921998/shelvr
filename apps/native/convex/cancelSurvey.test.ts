@@ -1,9 +1,48 @@
 // @vitest-environment edge-runtime
-import { describe, expect, it } from "vitest";
-import { newConvexTest, signedInUser } from "./test.setup";
+import type { FunctionReference } from "convex/server";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
 import { api } from "./_generated/api";
 
+type Caller = Pick<TestBackend, "query" | "mutation">;
+
+const calls = {
+  getStatus: (t: Caller) => t.query(api.cancelSurvey.getStatus, {}),
+  markShown: (t: Caller) => t.mutation(api.cancelSurvey.markShown, {}),
+  respond: (t: Caller) =>
+    t.mutation(api.cancelSurvey.respond, { outcome: "dismissed" }),
+};
+
 describe("cancelSurvey", () => {
+  it("keeps the api reference installed apps compiled against", () => {
+    expectTypeOf(api.cancelSurvey.getStatus).toEqualTypeOf<
+      FunctionReference<
+        "query",
+        "public",
+        Record<never, never>,
+        { asked: boolean }
+      >
+    >();
+  });
+
+  it.each(Object.entries(calls))(
+    "%s refuses a signed-out caller",
+    async (_name, call) => {
+      const t = newConvexTest();
+      await expect(call(t)).rejects.toThrow("Not authenticated");
+    },
+  );
+
+  it.each(Object.entries(calls))(
+    "%s refuses an account marked deleting",
+    async (_name, call) => {
+      const t = newConvexTest();
+      const { t: user, userId } = await signedInUser(t);
+      await t.run(async (ctx) => ctx.db.patch(userId, { deleting: true }));
+      await expect(call(user)).rejects.toThrow("Not authenticated");
+    },
+  );
+
   it("reports unasked, then asked, after markShown", async () => {
     const t = newConvexTest();
     const { t: user } = await signedInUser(t);

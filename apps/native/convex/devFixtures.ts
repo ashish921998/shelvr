@@ -4,14 +4,13 @@ import type { Id } from "./_generated/dataModel";
 import {
   env,
   internalMutation,
-  mutation,
   query,
   type MutationCtx,
 } from "./_generated/server";
 import {
   isDevelopmentAnonymousUser,
   liveOwner,
-  requireUserId,
+  authedMutation,
 } from "./model/auth";
 import { fakeAiLocks } from "./model/fakeAi";
 import { insertMembership } from "./model/memberships";
@@ -51,11 +50,11 @@ async function requireDevelopmentAnonymousUser(
   }
 }
 
-export const resetCurrentUser = mutation({
+export const resetCurrentUser = authedMutation({
   args: {},
   returns: resetResultValidator,
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireDevelopmentAnonymousUser(ctx, userId);
     return await seedFixtures(ctx, userId);
   },
