@@ -219,4 +219,28 @@ describe.each(["ios", "android"])("%s search input", (platform) => {
     await debounce();
     expectImmediate("errors.searchTitle");
   });
+
+  it("starts blank after the field is cleared", async () => {
+    mocks.results.set("pas", ["a", "b"]);
+    const { change } = renderSearch(platform);
+    change("pas");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("2");
+    change("");
+    await debounce();
+    expectImmediate("search.emptyTitle");
+
+    change("tacos");
+    await debounce();
+    expect(mocks.query).toHaveBeenLastCalledWith({ query: "tacos" });
+    expect(screen.getByTestId("feed").textContent).toBe("0");
+
+    mocks.results.set("tacos", ["t"]);
+    change("tacos ");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("1");
+    change("tacos al");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("1");
+  });
 });

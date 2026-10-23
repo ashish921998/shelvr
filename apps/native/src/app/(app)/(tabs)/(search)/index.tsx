@@ -47,13 +47,25 @@ export default function SearchScreen() {
   // 'skip', not `enabled`: a disabled React Query still subscribes through
   // the Convex adapter (see the pager), so an empty query would hold a live
   // server subscription that answers [] on every push.
+  // Results carry over only from one query to the next, never across a
+  // cleared field: after a clear, the next query starts blank.
+  const [cleared, setCleared] = useState(query.length === 0);
+  if (query.length === 0 && !cleared) setCleared(true);
   const results = useQuery({
     ...convexQuery(
       api.items.searchItems,
       query.length > 0 ? { query } : "skip",
     ),
-    placeholderData: keepPreviousData,
+    placeholderData: cleared ? undefined : keepPreviousData,
   });
+  if (
+    cleared &&
+    query.length > 0 &&
+    results.data !== undefined &&
+    !results.isPlaceholderData
+  ) {
+    setCleared(false);
+  }
   const view = searchView(query, results);
 
   return (
