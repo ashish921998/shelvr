@@ -1,9 +1,11 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import type { FunctionReference } from "convex/server";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { newConvexTest, signedInUser } from "./test.setup";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 async function setup(options: { pro?: boolean } = {}) {
   const backend = newConvexTest();
@@ -31,6 +33,57 @@ async function setup(options: { pro?: boolean } = {}) {
 }
 
 describe("setVisited", () => {
+  it("keeps the api reference installed apps compiled against", () => {
+    expectTypeOf(api.placeVisits.setVisited).toEqualTypeOf<
+      FunctionReference<
+        "mutation",
+        "public",
+        { itemId: Id<"items">; name: string; visited: boolean },
+        null
+      >
+    >();
+  });
+
+  it("refuses a signed-out caller and writes nothing", async () => {
+    const { backend, itemId, visits } = await setup();
+    await expect(
+      backend.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    ).rejects.toThrow("Not authenticated");
+    expect(await visits()).toHaveLength(0);
+  });
+
+  it("refuses an account marked deleting and writes nothing", async () => {
+    const { backend, t, userId, itemId, visits } = await setup();
+    await backend.run(async (ctx) => ctx.db.patch(userId, { deleting: true }));
+    await expect(
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    ).rejects.toThrow("Not authenticated");
+    expect(await visits()).toHaveLength(0);
+  });
+
+  it("writes nothing for another user's save", async () => {
+    const { backend, itemId } = await setup();
+    const other = await signedInUser(backend, { pro: true });
+    await expect(
+      other.t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    ).rejects.toThrow("Item not found");
+    expect(
+      await backend.run(async (ctx) => ctx.db.query("placeVisits").collect()),
+    ).toHaveLength(0);
+  });
+
   it("marks a place once and takes the mark back", async () => {
     const { t, itemId, visits } = await setup();
 
