@@ -161,9 +161,8 @@ const styles = StyleSheet.create((theme) => ({
   similarCardTitle: {
     paddingHorizontal: theme.gap(0.5),
     paddingTop: theme.gap(0.75),
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    ...theme.type.captionStrong,
+    lineHeight: 16,
     color: theme.colors.foreground,
   },
 }));
