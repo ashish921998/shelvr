@@ -24,6 +24,8 @@ const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
 const SAFE_EXCEPTION_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 
+const ERROR_CLASS_NAME = /^[A-Z][A-Za-z0-9]{0,60}$/;
+
 type ExceptionEntry = {
   type?: unknown;
   value?: unknown;
@@ -81,9 +83,13 @@ function groupStacklessFailure(properties: unknown): void {
   const list = record.$exception_list as (ExceptionEntry | null)[] | undefined;
   if (typeof code !== "string" || !Array.isArray(list)) return;
   if (list.some(hasStackFrames)) return;
-  const cause = sanitizeExceptionValue(list[0]?.value, list[0]?.type);
-  record.$exception_fingerprint =
-    typeof cause === "string" ? `${code}:${cause}` : code;
+  const type = list[0]?.type;
+  const cause =
+    safeExceptionValue(list[0]?.value) ??
+    (typeof type === "string" && ERROR_CLASS_NAME.test(type)
+      ? type
+      : undefined);
+  record.$exception_fingerprint = cause ? `${code}:${cause}` : code;
   record.$issue_name = code;
 }
 

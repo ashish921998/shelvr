@@ -152,6 +152,17 @@ describe("posthog before_send", () => {
     expect(sent.properties?.$exception_fingerprint).toBe("auth_failed:Error");
   });
 
+  it("never puts a type that is not a class name into a stackless fingerprint", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "auth_failed",
+        $exception_list: [{ type: "Bearer private-token", value: "x y" }],
+      },
+    });
+    expect(sent.properties?.$exception_fingerprint).toBe("auth_failed");
+  });
+
   it("leaves a handled error that has stack frames to PostHog's grouping", () => {
     const sent = sentBeforeSend()({
       event: "$exception",
