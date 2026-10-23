@@ -155,14 +155,17 @@ function ItemCardView({
 
   const accept = () => {
     if (spaceId === undefined) return;
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
     void acceptSuggestion({ itemId: item._id, spaceId }).then(
       (changed) => {
+        if (process.env.EXPO_OS === "ios") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         if (changed) analytics.capture("suggestion_accepted");
       },
-      (err) => analytics.captureError("suggestion_accept_failed", err),
+      (err) => {
+        analytics.captureError("suggestion_accept_failed", err);
+        Alert.alert(t("spaces.addFailed"), t("errors.pleaseRetry"));
+      },
     );
   };
 
@@ -172,7 +175,10 @@ function ItemCardView({
       (changed) => {
         if (changed) analytics.capture("suggestion_dismissed");
       },
-      (err) => analytics.captureError("suggestion_dismiss_failed", err),
+      (err) => {
+        analytics.captureError("suggestion_dismiss_failed", err);
+        Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+      },
     );
   };
 
@@ -197,14 +203,20 @@ function ItemCardView({
         text: t("common.delete"),
         style: "destructive",
         onPress: () =>
-          deleteItem({ id: item._id }).then(() => {
-            forgetDeletedSharedItem(item._id);
-            if (item._creationTime !== undefined)
-              analytics.itemDeleted(
-                { ...item, _creationTime: item._creationTime },
-                "feed",
-              );
-          }),
+          deleteItem({ id: item._id }).then(
+            () => {
+              forgetDeletedSharedItem(item._id);
+              if (item._creationTime !== undefined)
+                analytics.itemDeleted(
+                  { ...item, _creationTime: item._creationTime },
+                  "feed",
+                );
+            },
+            (err) => {
+              analytics.captureError("feed_item_delete_failed", err);
+              Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+            },
+          ),
       },
     ]);
   };

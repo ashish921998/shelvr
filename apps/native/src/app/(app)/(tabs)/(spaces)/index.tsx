@@ -310,7 +310,10 @@ export default function SpacesScreen() {
         onPress: () => {
           void deleteSpace({ id }).then(
             () => analytics.capture("space_deleted"),
-            (err) => analytics.captureError("space_delete_failed", err),
+            (err) => {
+              analytics.captureError("space_delete_failed", err);
+              Alert.alert(t("errors.unexpectedTitle"), t("errors.connection"));
+            },
           );
         },
       },
