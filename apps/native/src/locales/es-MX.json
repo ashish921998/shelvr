@@ -263,14 +263,8 @@
   "feedback.cancel": "Cancelar comentarios",
   "feedback.sending": "Enviando…",
   "feedback.send": "Enviar",
-  "tidy.completeTitle": "Todo ordenado",
-  "tidy.batchTitle": "Lote ordenado",
-  "tidy.continue": "Seguir",
-  "tidy.keep": "Conservar",
-  "tidy.save": "Guardar en Shelvr",
   "common.loading": "Cargando",
   "navigation.home": "Inicio",
-  "navigation.tidy": "Ordenar",
   "navigation.map": "Mapa",
   "navigation.search": "Buscar",
   "digest.loadFailed": "No se ha podido cargar tu estantería semanal",
@@ -542,20 +536,7 @@
   "loading.spaces": "Abriendo tus colecciones",
   "spaces.listEmptyTitle": "Crear una colección",
   "spaces.listEmptyBody": "Las colecciones agrupan un tema — inspiración de diseño,\nrecetas o ideas de regalos. Shelvr sugiere contenidos adecuados;\ntú eliges cuáles se quedan.",
-  "navigation.tidyHeader": "ordenar",
-  "tidy.confirmDelete": "Eliminar fotos revisadas",
-  "albums.chooseLimited": "Elegir álbum de fotos. Acceso limitado a fotos.",
-  "albums.choose": "Elegir álbum de fotos",
-  "albums.source": "Origen de las fotos",
-  "albums.manageAccessAction": "Administrar acceso a fotos…",
-  "albums.manageAccessTitle": "Administrar acceso a fotos",
-  "tidy.introTitle": "Ordena tu carrete",
-  "tidy.introBody": "Permite el acceso a las fotos para deslizar por tu carrete una a una.\nConsérvalas, elimínalas o guárdalas en Shelvr, y libera espacio de paso.",
-  "permissions.allowPhotos": "Permitir acceso a fotos",
   "permissions.openSettings": "Abrir configuración",
-  "loading.tidy": "Abriendo Ordenar",
-  "tidy.proTitle": "Ordenar es una función Pro",
-  "tidy.proBody": "Recorre tu fototeca y despeja el desorden. Consulta los planes de Shelvr Pro para desbloquear Ordenar y todas las demás funciones Pro.",
   "errors.photoTooLargeTitle": "Foto demasiado grande",
   "errors.photoUnavailableTitle": "Foto no disponible",
   "errors.pageNotFoundTitle": "Página no encontrada",
@@ -606,7 +587,6 @@
   "interests.vibeDateNights": "Noches de pareja",
   "interests.vibeHiddenGems": "Joyas escondidas",
   "interests.vibeGoingOut": "Salir de noche",
-  "albums.allPhotos": "Todas las fotos",
   "appearance.system": "Sistema",
   "appearance.light": "Claro",
   "appearance.warmDark": "Oscuro cálido",
@@ -657,27 +637,6 @@
     "one": "%{formattedCount} sugerencia",
     "many": "%{formattedCount} sugerencias",
     "other": "%{formattedCount} sugerencias"
-  },
-  "tidy.keptCount": {
-    "one": "%{formattedCount} foto conservada",
-    "many": "%{formattedCount} fotos conservadas",
-    "other": "%{formattedCount} fotos conservadas"
-  },
-  "tidy.savedCount": {
-    "one": "%{formattedCount} foto guardada en Shelvr",
-    "many": "%{formattedCount} fotos guardadas en Shelvr",
-    "other": "%{formattedCount} fotos guardadas en Shelvr"
-  },
-  "tidy.deletedCount": {
-    "one": "%{formattedCount} foto eliminada",
-    "many": "%{formattedCount} fotos eliminadas",
-    "other": "%{formattedCount} fotos eliminadas"
-  },
-  "tidy.emptyBody": "No queda nada por ordenar en %{source}. Elige otro origen arriba.",
-  "tidy.pendingDeleteCount": {
-    "one": "%{formattedCount} eliminación por confirmar",
-    "many": "%{formattedCount} eliminaciones por confirmar",
-    "other": "%{formattedCount} eliminaciones por confirmar"
   },
   "digest.waitingCount": {
     "one": "%{formattedCount} contenido guardado te espera",

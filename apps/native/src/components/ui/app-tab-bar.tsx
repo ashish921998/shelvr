@@ -67,13 +67,6 @@ const PILL_TABS = [
     testID: "tab-spaces",
   },
   {
-    name: "(tidy)",
-    href: "/(app)/(tabs)/(tidy)",
-    label: "navigation.tidy",
-    icon: "photo.stack",
-    testID: "tab-tidy",
-  },
-  {
     name: "(map)",
     href: "/(app)/(tabs)/(map)",
     label: "navigation.map",
@@ -185,10 +178,9 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
 
   const home = useTabTrigger({ name: PILL_TABS[0].name });
   const spaces = useTabTrigger({ name: PILL_TABS[1].name });
-  const tidy = useTabTrigger({ name: PILL_TABS[2].name });
-  const map = useTabTrigger({ name: PILL_TABS[3].name });
+  const map = useTabTrigger({ name: PILL_TABS[2].name });
   const search = useTabTrigger({ name: SEARCH_TAB.name });
-  const pillTriggers = [home, spaces, tidy, map];
+  const pillTriggers = [home, spaces, map];
 
   const focusedIndex = pillTriggers.findIndex(
     (trigger) => trigger.triggerProps.isFocused,

@@ -39,14 +39,6 @@ export default function TabsLayout() {
             {t("navigation.spaces")}
           </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="(tidy)">
-          <NativeTabs.Trigger.Icon
-            sf={{ default: "photo.stack", selected: "photo.stack.fill" }}
-          />
-          <NativeTabs.Trigger.Label>
-            {t("navigation.tidy")}
-          </NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
         <NativeTabs.Trigger name="(map)">
           <NativeTabs.Trigger.Icon
             sf={{ default: "map", selected: "map.fill" }}

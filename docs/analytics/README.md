@@ -6,7 +6,7 @@ The app records behavior; this dashboard is for the product team. It does not ad
 
 ## Metric contract
 
-- A save is an item successfully created in Convex, timed by `_creationTime`, not a photo's original `capturedAt`. Link, note, share-sheet, onboarding, camera, and Tidy imports all converge on the instrumented creation paths.
+- A save is an item successfully created in Convex, timed by `_creationTime`, not a photo's original `capturedAt`. Link, note, share-sheet, onboarding, and camera imports all converge on the instrumented creation paths.
 - A reopen is a focused, foreground item view in a nonempty PostHog session different from the original save session, within seven days of creation. Preloaded adjacent pages do not generate opens. Repeated opens count once per item in the report.
 - A useful return is a reopen followed by `copy` or a platform-confirmed `share` of the same item in that return session, also within seven days of creation. This is an observable action signal, not proof that someone read an article or cooked a recipe.
 - Session matching is intentionally strict: if PostHog rotates the session ID between the open and the action, that action does not qualify unless another open is recorded in the new session. This can undercount long or interrupted engagements. A rotated session can also qualify as a reopen; sessions are an operational proxy for a return, not proof of a separate visit. Do not compare this metric directly with a day-based return rate.

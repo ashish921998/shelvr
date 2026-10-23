@@ -263,14 +263,8 @@
   "feedback.cancel": "Cancel feedback",
   "feedback.sending": "Sending…",
   "feedback.send": "Send",
-  "tidy.completeTitle": "All tidied",
-  "tidy.batchTitle": "Batch tidied",
-  "tidy.continue": "Keep going",
-  "tidy.keep": "Keep",
-  "tidy.save": "Save to Shelvr",
   "common.loading": "Loading",
   "navigation.home": "Home",
-  "navigation.tidy": "Tidy",
   "navigation.map": "Map",
   "navigation.search": "Search",
   "digest.loadFailed": "Couldn’t load your weekly shelf",
@@ -533,20 +527,7 @@
   "loading.spaces": "Opening your spaces",
   "spaces.listEmptyTitle": "Make a space",
   "spaces.listEmptyBody": "Spaces are shelves for a theme — design inspiration,\nrecipes, gift ideas. Shelvr suggests saves that fit;\nyou choose what sticks.",
-  "navigation.tidyHeader": "tidy",
-  "tidy.confirmDelete": "Delete reviewed photos",
-  "albums.chooseLimited": "Choose photo album. Limited photo access.",
-  "albums.choose": "Choose photo album",
-  "albums.source": "Photo source",
-  "albums.manageAccessAction": "Manage photo access…",
-  "albums.manageAccessTitle": "Manage Photo Access",
-  "tidy.introTitle": "Tidy your camera roll",
-  "tidy.introBody": "Allow photo access to swipe through your camera roll one photo at a time.\nKeep, delete, or save them to Shelvr, and free up space as you go.",
-  "permissions.allowPhotos": "Allow photo access",
   "permissions.openSettings": "Open Settings",
-  "loading.tidy": "Opening Tidy",
-  "tidy.proTitle": "Tidy is a Pro feature",
-  "tidy.proBody": "Sweep through your photo library and clear out the clutter. View Shelvr Pro plans to unlock Tidy and every other Pro feature.",
   "errors.photoTooLargeTitle": "Photo too large",
   "errors.photoUnavailableTitle": "Photo unavailable",
   "errors.pageNotFoundTitle": "Page not found",
@@ -596,7 +577,6 @@
   "interests.vibeDateNights": "Date nights",
   "interests.vibeHiddenGems": "Hidden gems",
   "interests.vibeGoingOut": "Going out",
-  "albums.allPhotos": "All Photos",
   "appearance.system": "System",
   "appearance.light": "Light",
   "appearance.warmDark": "Warm dark",
@@ -643,23 +623,6 @@
   "spaces.suggestionCount": {
     "one": "%{formattedCount} suggestion",
     "other": "%{formattedCount} suggestions"
-  },
-  "tidy.keptCount": {
-    "one": "%{formattedCount} photo kept",
-    "other": "%{formattedCount} photos kept"
-  },
-  "tidy.savedCount": {
-    "one": "%{formattedCount} photo saved to Shelvr",
-    "other": "%{formattedCount} photos saved to Shelvr"
-  },
-  "tidy.deletedCount": {
-    "one": "%{formattedCount} photo deleted",
-    "other": "%{formattedCount} photos deleted"
-  },
-  "tidy.emptyBody": "Nothing left to sort in %{source}. Pick another source above.",
-  "tidy.pendingDeleteCount": {
-    "one": "%{formattedCount} deletion to confirm",
-    "other": "%{formattedCount} deletions to confirm"
   },
   "digest.waitingCount": {
     "one": "%{formattedCount} save waiting for you",

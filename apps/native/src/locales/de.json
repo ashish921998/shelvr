@@ -263,14 +263,8 @@
   "feedback.cancel": "Feedback abbrechen",
   "feedback.sending": "Senden…",
   "feedback.send": "Senden",
-  "tidy.completeTitle": "Alles aufgeräumt",
-  "tidy.batchTitle": "Stapel aufgeräumt",
-  "tidy.continue": "Weitermachen",
-  "tidy.keep": "Behalten",
-  "tidy.save": "In Shelvr speichern",
   "common.loading": "Laden",
   "navigation.home": "Start",
-  "navigation.tidy": "Aufräumen",
   "navigation.map": "Karte",
   "navigation.search": "Suche",
   "digest.loadFailed": "Dein Wochenregal konnte nicht geladen werden",
@@ -533,20 +527,7 @@
   "loading.spaces": "Deine Sammlungen werden geöffnet",
   "spaces.listEmptyTitle": "Sammlung anlegen",
   "spaces.listEmptyBody": "Sammlungen sind Regale für ein Thema — Designinspiration,\nRezepte oder Geschenkideen. Shelvr schlägt passende Inhalte vor;\ndu entscheidest, was bleibt.",
-  "navigation.tidyHeader": "aufräumen",
-  "tidy.confirmDelete": "Geprüfte Fotos löschen",
-  "albums.chooseLimited": "Fotoalbum auswählen. Eingeschränkter Fotozugriff.",
-  "albums.choose": "Fotoalbum auswählen",
-  "albums.source": "Fotoquelle",
-  "albums.manageAccessAction": "Fotozugriff verwalten…",
-  "albums.manageAccessTitle": "Fotozugriff verwalten",
-  "tidy.introTitle": "Räume deine Fotos auf",
-  "tidy.introBody": "Erlaube den Fotozugriff, um einzeln durch deine Fotos zu wischen.\nBehalte sie, lösche sie oder speichere sie in Shelvr und schaffe dabei Platz.",
-  "permissions.allowPhotos": "Fotozugriff erlauben",
   "permissions.openSettings": "Einstellungen öffnen",
-  "loading.tidy": "Aufräumen wird geöffnet",
-  "tidy.proTitle": "Aufräumen ist eine Pro-Funktion",
-  "tidy.proBody": "Durchsuche deine Fotomediathek und schaffe Ordnung. Sieh dir die Shelvr Pro-Abos an, um Aufräumen und alle weiteren Pro-Funktionen freizuschalten.",
   "errors.photoTooLargeTitle": "Foto zu groß",
   "errors.photoUnavailableTitle": "Foto nicht verfügbar",
   "errors.pageNotFoundTitle": "Seite nicht gefunden",
@@ -596,7 +577,6 @@
   "interests.vibeDateNights": "Date-Abende",
   "interests.vibeHiddenGems": "Geheimtipps",
   "interests.vibeGoingOut": "Ausgehen",
-  "albums.allPhotos": "Alle Fotos",
   "appearance.system": "System",
   "appearance.light": "Hell",
   "appearance.warmDark": "Warmes Dunkel",
@@ -643,23 +623,6 @@
   "spaces.suggestionCount": {
     "one": "%{formattedCount} Vorschlag",
     "other": "%{formattedCount} Vorschläge"
-  },
-  "tidy.keptCount": {
-    "one": "%{formattedCount} Foto behalten",
-    "other": "%{formattedCount} Fotos behalten"
-  },
-  "tidy.savedCount": {
-    "one": "%{formattedCount} Foto in Shelvr gespeichert",
-    "other": "%{formattedCount} Fotos in Shelvr gespeichert"
-  },
-  "tidy.deletedCount": {
-    "one": "%{formattedCount} Foto gelöscht",
-    "other": "%{formattedCount} Fotos gelöscht"
-  },
-  "tidy.emptyBody": "In %{source} gibt es nichts mehr zu sortieren. Wähle oben eine andere Quelle.",
-  "tidy.pendingDeleteCount": {
-    "one": "%{formattedCount} Löschung zu bestätigen",
-    "other": "%{formattedCount} Löschungen zu bestätigen"
   },
   "digest.waitingCount": {
     "one": "%{formattedCount} gespeicherter Inhalt wartet auf dich",

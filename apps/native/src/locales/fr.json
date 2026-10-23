@@ -263,14 +263,8 @@
   "feedback.cancel": "Annuler l'avis",
   "feedback.sending": "Envoi…",
   "feedback.send": "Envoyer",
-  "tidy.completeTitle": "Tout est trié",
-  "tidy.batchTitle": "Lot trié",
-  "tidy.continue": "Poursuivre",
-  "tidy.keep": "Garder",
-  "tidy.save": "Enregistrer dans Shelvr",
   "common.loading": "Chargement",
   "navigation.home": "Accueil",
-  "navigation.tidy": "Trier",
   "navigation.map": "Carte",
   "navigation.search": "Recherche",
   "digest.loadFailed": "Impossible de charger votre étagère hebdomadaire",
@@ -542,20 +536,7 @@
   "loading.spaces": "Ouverture de vos collections",
   "spaces.listEmptyTitle": "Créer une collection",
   "spaces.listEmptyBody": "Les collections regroupent un thème — inspiration déco,\nrecettes, idées cadeaux. Shelvr suggère des contenus adaptés ;\nvous choisissez ceux à garder.",
-  "navigation.tidyHeader": "trier",
-  "tidy.confirmDelete": "Supprimer les photos examinées",
-  "albums.chooseLimited": "Choisir un album photo. Accès limité aux photos.",
-  "albums.choose": "Choisir un album photo",
-  "albums.source": "Source des photos",
-  "albums.manageAccessAction": "Gérer l'accès aux photos…",
-  "albums.manageAccessTitle": "Gérer l'accès aux photos",
-  "tidy.introTitle": "Faites le tri dans vos photos",
-  "tidy.introBody": "Autorisez l’accès aux photos pour les faire défiler une à une.\nGardez-les, supprimez-les ou enregistrez-les dans Shelvr, et libérez de l’espace au passage.",
-  "permissions.allowPhotos": "Autoriser l'accès aux photos",
   "permissions.openSettings": "Ouvrir les réglages",
-  "loading.tidy": "Ouverture de Trier",
-  "tidy.proTitle": "Trier est une fonction Pro",
-  "tidy.proBody": "Parcourez votre photothèque et faites de la place. Consultez les offres Shelvr Pro pour débloquer Trier et toutes les autres fonctions Pro.",
   "errors.photoTooLargeTitle": "Photo trop volumineuse",
   "errors.photoUnavailableTitle": "Photo indisponible",
   "errors.pageNotFoundTitle": "Page introuvable",
@@ -606,7 +587,6 @@
   "interests.vibeDateNights": "Soirées en couple",
   "interests.vibeHiddenGems": "Pépites cachées",
   "interests.vibeGoingOut": "Sorties nocturnes",
-  "albums.allPhotos": "Toutes les photos",
   "appearance.system": "Système",
   "appearance.light": "Clair",
   "appearance.warmDark": "Sombre chaleureux",
@@ -657,27 +637,6 @@
     "one": "%{formattedCount} suggestion",
     "many": "%{formattedCount} suggestions",
     "other": "%{formattedCount} suggestions"
-  },
-  "tidy.keptCount": {
-    "one": "%{formattedCount} photo conservée",
-    "many": "%{formattedCount} photos conservées",
-    "other": "%{formattedCount} photos conservées"
-  },
-  "tidy.savedCount": {
-    "one": "%{formattedCount} photo enregistrée dans Shelvr",
-    "many": "%{formattedCount} photos enregistrées dans Shelvr",
-    "other": "%{formattedCount} photos enregistrées dans Shelvr"
-  },
-  "tidy.deletedCount": {
-    "one": "%{formattedCount} photo supprimée",
-    "many": "%{formattedCount} photos supprimées",
-    "other": "%{formattedCount} photos supprimées"
-  },
-  "tidy.emptyBody": "Plus rien à trier dans %{source}. Choisissez une autre source ci-dessus.",
-  "tidy.pendingDeleteCount": {
-    "one": "%{formattedCount} suppression à confirmer",
-    "many": "%{formattedCount} suppressions à confirmer",
-    "other": "%{formattedCount} suppressions à confirmer"
   },
   "digest.waitingCount": {
     "one": "%{formattedCount} contenu enregistré vous attend",

@@ -128,15 +128,14 @@ leaves its nominal rate exits INCONCLUSIVE rather than being timed by index.
 Reduce Motion is `System` by default on the timing objects except the `fade`
 token and the fade builders, which use `Never`. Screens add explicit branches
 where spatial motion would carry meaning: navigation stacks
-fade instead of sliding, zoom transitions are suppressed, the tidy card
-container drops its transforms, and the text morph falls back to native text
+fade instead of sliding, zoom transitions are suppressed, and the text morph falls back to native text
 (alongside Dynamic Type above 1x and complex scripts, which native text
 shapes correctly and per-glyph Skia cannot). Pure opacity changes may opt
 into `ReduceMotion.Never` to keep state changes legible.
 
 ## Primitives
 
-`Button` is the capsule action for a screen's main step (Tidy's Continue).
+`Button` is the capsule action for a screen's main step.
 Where iOS supports Liquid Glass (`hasLiquidGlass` in
 `src/components/glass.tsx`) it is interactive glass and the system owns the
 press response; elsewhere it is a solid capsule that opacity-shifts and scales

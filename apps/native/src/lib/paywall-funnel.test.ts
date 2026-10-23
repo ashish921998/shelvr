@@ -101,7 +101,7 @@ describe("blocked action resume", () => {
 
   it("ignores a resume at a different placement", async () => {
     const funnel = await loadFunnel();
-    funnel.recordBlockedAction("tidy", false);
+    funnel.recordBlockedAction("map", false);
     funnel.resumeBlockedAction("add");
     expect(mock.capture).not.toHaveBeenCalled();
   });
