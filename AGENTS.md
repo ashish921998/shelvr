@@ -199,12 +199,18 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change,
-  or `version` in `app.json`) makes new updates invisible to binaries built
-  from the old fingerprint: cut a fresh store build before resuming OTA
-  publishes. The version is the easy one to miss: a bump must land on
-  `main` before any OTA aimed at the build carrying it. The build number is
-  not an input.
+  fingerprint (a native dependency added or removed, a native config change)
+  makes new updates invisible to binaries built from the old fingerprint: cut a
+  fresh store build before resuming OTA publishes. The version fields in
+  `app.json` (`version`, `ios.buildNumber`, `android.versionCode`) are not
+  inputs. `@expo/fingerprint` 0.21 (Expo SDK 58) defaults to its `balanced`
+  preset, which skips them (`SourceSkips.ExpoConfigVersions`), so a version bump
+  alone does not move the fingerprint. It did through SDK 57, and would again if
+  a `fingerprint.config.js` set `preset: "strict"`.
+  Re-check after an Expo upgrade: edit `version`, run
+  `node tools/verify-ota-compatibility.mjs --profile production --platform ios`
+  under `APP_VARIANT=production` before and after, and the tree's hash must not
+  change.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed
