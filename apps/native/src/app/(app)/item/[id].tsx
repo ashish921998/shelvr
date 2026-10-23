@@ -380,10 +380,19 @@ function useRemoveFromSpace({
 }) {
   const router = useRouter();
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
-  const available =
-    from === "space" &&
-    !!spaceId &&
-    !!space?.items.some((item) => item._id === activeId);
+  const inSpace = useCallback(
+    (itemId: string) =>
+      from === "space" &&
+      !!spaceId &&
+      !!space?.items.some((item) => item._id === itemId),
+    [from, spaceId, space],
+  );
+  const available = inSpace(activeId);
+  const deleteLabelFor = useCallback(
+    (itemId: string) =>
+      inSpace(itemId) ? t("item.deleteEverywhere") : t("common.delete"),
+    [inSpace],
+  );
   const pending = useRef(false);
   const remove = useCallback(async () => {
     if (!spaceId || !activeId || !items || pending.current) return;
@@ -431,7 +440,8 @@ function useRemoveFromSpace({
   return {
     available,
     remove,
-    deleteLabel: available ? t("item.deleteEverywhere") : t("common.delete"),
+    deleteLabel: deleteLabelFor(activeId),
+    deleteLabelFor,
     menuActions: available
       ? [{ label: t("spaces.removeFromSpace"), onPress: remove }]
       : [],
@@ -696,6 +706,10 @@ function ItemScreenContent() {
     writeParams,
     cancelParamWrite,
   });
+  const deleteFromPage = useMemo(
+    () => ({ label: removeFromSpace.deleteLabelFor, remove: deletePage }),
+    [removeFromSpace.deleteLabelFor, deletePage],
+  );
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
@@ -811,7 +825,7 @@ function ItemScreenContent() {
         </Stack.Toolbar>
       ) : null}
 
-      <DeleteActiveSaveContext value={deletePage}>
+      <DeleteActiveSaveContext value={deleteFromPage}>
         <FlashList
           ref={listRef}
           style={styles.container}

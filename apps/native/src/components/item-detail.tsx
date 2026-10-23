@@ -16,6 +16,7 @@ import { SimilarGrid } from "@/components/similar-grid";
 import { TagChip } from "@/components/tag-chip";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
+import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { DeleteActiveSaveContext } from "@/lib/delete-active-save";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
@@ -742,7 +743,7 @@ function SaveStatusNotice({
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
-  const deleteSave = useContext(DeleteActiveSaveContext);
+  const deleteFromPage = useContext(DeleteActiveSaveContext);
   const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
   const [retrying, setRetrying] = useState(false);
   // The React Compiler flags impure calls such as Date.now() in the render body.
@@ -788,7 +789,7 @@ function SaveStatusNotice({
         {noticeFor(state, item.type)}
       </Text>
       {isTerminalFailure(item.failureReason) ? (
-        deleteSave ? (
+        deleteFromPage ? (
           <Pressable
             accessibilityRole="button"
             style={({ pressed }) => [
@@ -796,7 +797,9 @@ function SaveStatusNotice({
               styles.deleteChip,
               pressed && { opacity: 0.7 },
             ]}
-            onPress={() => deleteSave(item._id)}
+            onPress={() =>
+              confirmItemDelete(() => deleteFromPage.remove(item._id))
+            }
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
           >
             <AppSymbolIcon
@@ -805,7 +808,7 @@ function SaveStatusNotice({
               tintColor={theme.colors.danger}
             />
             <Text style={[styles.chipLabel, styles.deleteChipLabel]}>
-              {t("common.delete")}
+              {deleteFromPage.label(item._id)}
             </Text>
           </Pressable>
         ) : null

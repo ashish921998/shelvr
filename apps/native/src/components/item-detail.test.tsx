@@ -281,10 +281,13 @@ describe("a plain link's page", () => {
     );
   });
 
-  it("offers to delete a page that is gone instead of sending people to it", () => {
-    const deleteSave = vi.fn();
+  function renderGonePage() {
+    const deleteFromPage = {
+      label: vi.fn(() => "item.deleteEverywhere"),
+      remove: vi.fn(),
+    };
     render(
-      <DeleteActiveSaveContext value={deleteSave}>
+      <DeleteActiveSaveContext value={deleteFromPage}>
         <ItemDetail
           item={{ ...product, status: "failed", failureReason: "not_found" }}
           isZoomTarget={false}
@@ -293,12 +296,31 @@ describe("a plain link's page", () => {
         />
       </DeleteActiveSaveContext>,
     );
+    return deleteFromPage;
+  }
+
+  it("offers to delete a page that is gone instead of sending people to it", () => {
+    const { label } = renderGonePage();
     expect(screen.getByText("item.pageGone")).toBeTruthy();
     expect(screen.queryByText("common.tryAgain")).toBeNull();
     expect(screen.queryByText(/item\.(view|watch)OnSite/)).toBeNull();
     expect(ItemSourceLink).toHaveBeenCalled();
-    fireEvent.click(screen.getByText("common.delete"));
-    expect(deleteSave).toHaveBeenCalledExactlyOnceWith(product._id);
+    expect(label).toHaveBeenCalledWith(product._id);
+    expect(screen.getByText("item.deleteEverywhere")).toBeTruthy();
+  });
+
+  it("asks before deleting a page that is gone, and deletes only on Delete", () => {
+    const { remove } = renderGonePage();
+    fireEvent.click(screen.getByText("item.deleteEverywhere"));
+    expect(remove).not.toHaveBeenCalled();
+    const [title, body, buttons] = vi.mocked(Alert.alert).mock.calls[0];
+    expect([title, body]).toEqual(["item.deleteTitle", "item.deleteBody"]);
+    const answer = (style: string) =>
+      buttons?.find((button) => button.style === style)?.onPress?.();
+    answer("cancel");
+    expect(remove).not.toHaveBeenCalled();
+    answer("destructive");
+    expect(remove).toHaveBeenCalledExactlyOnceWith(product._id);
   });
 
   it("keeps the retry for a page that read only partly", () => {
