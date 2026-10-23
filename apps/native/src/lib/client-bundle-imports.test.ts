@@ -35,7 +35,7 @@ function sourceFiles(dir: string): string[] {
 function onlyInlineTypes(clause: string): boolean {
   const named = /^\s*\{([^}]*)\}\s*$/.exec(clause);
   if (named === null) return false;
-  const names = named[1]
+  const names = named[1]!
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
@@ -50,11 +50,11 @@ function runtimeImports(file: string): string[] {
     /(?:^|\n)\s*(?:import|export)\s+(type\s+)?(?:([^"';]*?)\sfrom\s+)?["']([^"']+)["']/g;
   for (const [, typeOnly, clause, specifier] of text.matchAll(declaration)) {
     if (typeOnly === undefined && !onlyInlineTypes(clause ?? "")) {
-      specifiers.push(specifier);
+      specifiers.push(specifier!);
     }
   }
   const call = /\b(?:import|require)\(\s*["']([^"']+)["']\s*\)/g;
-  for (const [, specifier] of text.matchAll(call)) specifiers.push(specifier);
+  for (const [, specifier] of text.matchAll(call)) specifiers.push(specifier!);
   return specifiers;
 }
 

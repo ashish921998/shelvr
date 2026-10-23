@@ -958,13 +958,13 @@ describe("steering spend controls", () => {
     });
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId: other,
-      itemIds: [ids[0]],
+      itemIds: [ids[0]!],
     });
     await t.mutation(api.spaces.acceptAllSuggestions, { spaceId: bulk });
 
     expect(
       await t.mutation(api.spaces.acceptSuggestion, {
-        itemId: ids[0],
+        itemId: ids[0]!,
         spaceId: other,
       }),
     ).toBe(true);
