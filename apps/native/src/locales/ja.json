@@ -306,6 +306,7 @@
   "spaces.addAll": "すべて追加",
   "spaces.emptyTitle": "まだ何もありません",
   "spaces.emptyBody": "Shelvrがこのスペースに合う項目を探しています。\n上の＋から自分で追加することもできます。",
+  "spaces.emptyBodyManual": "上の＋からこのスペースに項目を追加できます。",
   "plan.make": "プランを作る",
   "plan.button": "プラン",
   "plan.pickerTitle": "何を計画しますか？",

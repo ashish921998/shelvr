@@ -305,6 +305,7 @@ export type MessageParams = {
   "spaces.addAll": undefined;
   "spaces.emptyTitle": undefined;
   "spaces.emptyBody": undefined;
+  "spaces.emptyBodyManual": undefined;
   "plan.make": undefined;
   "plan.button": undefined;
   "plan.pickerTitle": undefined;
