@@ -279,18 +279,28 @@ function isLinkHub(hostname: string): boolean {
 }
 
 export function firstLinkedUrl(text: string | undefined): string | undefined {
+  return linkedUrls(text, 1)[0];
+}
+
+/** The caption's own links in order, link hubs left out. */
+function linkedUrls(text: string | undefined, limit: number): string[] {
+  const urls: string[] = [];
   if (!text) {
-    return undefined;
+    return urls;
   }
   for (const match of text.matchAll(/https?:\/\/[^\s<>"'()]+/gi)) {
     const candidate = match[0].replace(/[.,;:!?]+$/, "");
     try {
-      if (!isLinkHub(new URL(candidate).hostname)) {
-        return candidate;
+      if (
+        !isLinkHub(new URL(candidate).hostname) &&
+        !urls.includes(candidate)
+      ) {
+        urls.push(candidate);
+        if (urls.length === limit) break;
       }
     } catch {}
   }
-  return undefined;
+  return urls;
 }
 
 export function isTransientFetchFailure(code: SafeFetchError, status?: number) {
@@ -359,28 +369,38 @@ function recipeFromMarkup(
       );
 }
 
+// A sponsor or shop link often comes before the recipe's, so a few links are read, side by side.
+const MAX_LINKED_RECIPE_URLS = 3;
+
+async function linkedRecipe(url: string): Promise<Recipe | undefined> {
+  try {
+    const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
+    if (!result.ok) {
+      return undefined;
+    }
+    return recipeFromMarkup(
+      decodeWithContentType(result.bytes, result.contentType),
+      result.truncated,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 export async function withLinkedRecipe(page: PageData): Promise<PageData> {
   const caption = captionText(page);
   if (caption === undefined) {
     return page;
   }
-  const linkedUrl = page.linkedUrl ?? firstLinkedUrl(caption);
-  if (linkedUrl === undefined) {
-    return page;
-  }
-  try {
-    const result = await safeFetch(linkedUrl, PAGE_FETCH_OPTIONS);
-    if (!result.ok) {
-      return page;
-    }
-    const recipe = recipeFromMarkup(
-      decodeWithContentType(result.bytes, result.contentType),
-      result.truncated,
-    );
-    return recipe === undefined ? page : { ...page, recipe };
-  } catch {
-    return page;
-  }
+  const urls = [
+    ...new Set([
+      ...(page.linkedUrl !== undefined ? [page.linkedUrl] : []),
+      ...linkedUrls(caption, MAX_LINKED_RECIPE_URLS),
+    ]),
+  ].slice(0, MAX_LINKED_RECIPE_URLS);
+  const recipes = await Promise.all(urls.map(linkedRecipe));
+  const recipe = recipes.find((found) => found !== undefined);
+  return recipe === undefined ? page : { ...page, recipe };
 }
 
 export async function fetchPage(
