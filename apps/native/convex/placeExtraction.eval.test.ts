@@ -61,7 +61,7 @@ function serve(video: Video) {
     if (video.oembed && url.startsWith("https://www.tiktok.com/oembed?")) {
       return ok(url, "application/json", JSON.stringify(video.oembed));
     }
-    if (video.instagram && url.includes("instagram.com/")) {
+    if (video.instagram && new URL(url).hostname === "www.instagram.com") {
       return ok(
         url,
         "text/html",
