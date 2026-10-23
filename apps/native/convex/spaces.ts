@@ -421,7 +421,6 @@ async function scheduleSteering(
   userId: Id<"users">,
   item: Doc<"items">,
   spaceId: Id<"spaces">,
-  options: { throws: boolean },
 ): Promise<boolean> {
   if (item.status !== "ready") {
     return false;
@@ -434,7 +433,6 @@ async function scheduleSteering(
   }
   const { ok } = await rateLimiter.limit(ctx, "steerItem", {
     key: userId,
-    throws: options.throws,
   });
   if (!ok) {
     return false;
@@ -471,7 +469,7 @@ export const addItemToSpace = mutation({
     } else {
       return null;
     }
-    await scheduleSteering(ctx, userId, item, args.spaceId, { throws: true });
+    await scheduleSteering(ctx, userId, item, args.spaceId);
     return null;
   },
 });
@@ -506,7 +504,7 @@ export const acceptSuggestion = mutation({
       return false;
     }
     await setMembershipStatus(ctx, row, "saved");
-    await scheduleSteering(ctx, userId, item, args.spaceId, { throws: true });
+    await scheduleSteering(ctx, userId, item, args.spaceId);
     return true;
   },
 });
@@ -559,9 +557,7 @@ export const acceptAllSuggestions = mutation({
       }
       const item = await ctx.db.get(row.itemId);
       if (item !== null && item.status === "ready") {
-        steeringAllowed = await scheduleSteering(ctx, userId, item, space._id, {
-          throws: false,
-        });
+        steeringAllowed = await scheduleSteering(ctx, userId, item, space._id);
       }
     }
     return suggested.length;
