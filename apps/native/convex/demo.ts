@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import {} from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
