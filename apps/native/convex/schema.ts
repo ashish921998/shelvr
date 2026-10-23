@@ -112,6 +112,7 @@ export default defineSchema({
     note: v.optional(v.string()),
     intents: v.optional(v.array(intentValidator)),
     cities: v.optional(v.array(v.string())),
+    places: v.optional(v.array(v.string())),
     products: v.optional(
       v.array(
         v.object({

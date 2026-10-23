@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_ITEM_CITIES, normalizeCities } from "./itemFields";
+import {
+  MAX_ITEM_CITIES,
+  MAX_ITEM_PLACES,
+  normalizeCities,
+  normalizePlaces,
+} from "./itemFields";
 
 describe("normalizeCities", () => {
   it("trims, single-spaces and drops trailing punctuation", () => {
@@ -34,5 +39,23 @@ describe("normalizeCities", () => {
 
   it("treats a missing answer as no cities", () => {
     expect(normalizeCities(undefined)).toEqual([]);
+  });
+});
+
+describe("normalizePlaces", () => {
+  it("keeps each place once, ignoring case, tidied, in first-seen order", () => {
+    expect(
+      normalizePlaces([" Café  de Flore. ", "Santelmo", "café de flore", ""]),
+    ).toEqual(["Café de Flore", "Santelmo"]);
+  });
+
+  it("drops runaway text and caps the list", () => {
+    expect(normalizePlaces(["x".repeat(81), "Intenso"])).toEqual(["Intenso"]);
+    const many = Array.from({ length: 40 }, (_, i) => `Place ${i}`);
+    expect(normalizePlaces(many)).toHaveLength(MAX_ITEM_PLACES);
+  });
+
+  it("reads a missing list as none", () => {
+    expect(normalizePlaces(undefined)).toEqual([]);
   });
 });

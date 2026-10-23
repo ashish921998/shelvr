@@ -129,9 +129,12 @@ export function toPlanSource(
     url: item.url,
     siteName: item.siteName,
     author: item.author,
-    places: [...(item.intents ?? []), ...(join.intents ?? [])]
-      .filter((intent) => intent.kind === "open_maps")
-      .map((intent) => intent.value),
+    places: [
+      ...[...(item.intents ?? []), ...(join.intents ?? [])]
+        .filter((intent) => intent.kind === "open_maps")
+        .map((intent) => intent.value),
+      ...(item.places ?? []),
+    ],
   };
 }
 

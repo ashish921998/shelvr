@@ -37,6 +37,7 @@ const classificationValidator = v.object({
   tags: v.array(v.string()),
   intents: v.optional(v.array(intentValidator)),
   cities: v.optional(v.array(v.string())),
+  places: v.optional(v.array(v.string())),
   recipe: v.optional(recipeValidator),
   embedding: v.optional(
     v.object({ text: v.string(), vector: v.array(v.float64()) }),
@@ -62,6 +63,7 @@ type Words = {
   tags: string[];
   intents: Doc<"items">["intents"];
   cities: string[] | undefined;
+  places: string[] | undefined;
   recipe: Recipe | undefined;
 };
 
@@ -77,6 +79,7 @@ function readingWords(item: Doc<"items">, reading: Reading): Words {
     tags: item.tags,
     intents: item.intents ?? [],
     cities: item.cities,
+    places: item.places,
     recipe: reading.recipe ?? item.recipe,
   };
 }
@@ -91,6 +94,7 @@ function classifiedWords(
     tags: classification.tags,
     intents: classification.intents,
     cities: classification.cities,
+    places: classification.places,
     recipe: reading.recipe ?? classification.recipe,
   };
 }
@@ -176,6 +180,7 @@ export function completionPatch(
     aspectRatio: reading.aspectRatio,
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
+    ...(words.places !== undefined ? { places: words.places } : {}),
     status: "ready",
     enrichment: reading.enrichment,
     failureReason: undefined,

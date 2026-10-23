@@ -221,9 +221,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships (`saved` in a space set to auto-file). A cooking
-  TikTok or reel whose caption and linked page gave no recipe has its speech read through Treg
-  (`model/videoTranscript.ts`) for a second, recipe-only call. The file also holds
+  matches become `suggested` memberships (`saved` in a space set to auto-file). The model
+  also lists every place a save names into `items.places` (server-only: `enrichItem` strips
+  it; plans and trips read it through `toPlanSource`). A short video's speech is read once
+  through Treg (`model/videoTranscript.ts`) when the model flags it as a cooking video whose
+  caption and linked page gave no recipe, or as a video that recommends or visits places;
+  a second call then lifts the recipe, the spoken places, or both. The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
@@ -453,7 +456,8 @@ needed at runtime by the features that use them:
   Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
   oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
 - `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
-  cooking TikTok or reel whose caption has no recipe (`model/videoTranscript.ts`, about $0.002
+  cooking TikTok or reel whose caption has no recipe, or one that recommends or visits places
+  (`model/videoTranscript.ts`, about $0.002
   each, rate limited per user and globally). Transcripts are fetched only while the switch is
   `"true"` and the key is set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay

@@ -212,8 +212,10 @@ function stripEmbedding(
   | "embeddingVersion"
   | "embeddingAttempts"
   | "productsSearchStartedAt"
+  | "places"
 > {
   const {
+    places: _places,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
