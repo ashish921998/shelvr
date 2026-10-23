@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   entering: vi.fn(),
   query: vi.fn(),
   results: new Map<string, unknown[]>(),
+  lastData: undefined as unknown[] | undefined,
+  failing: new Set<string>(),
   tabSearch: "",
   platform: "ios",
 }));
@@ -59,11 +61,32 @@ vi.mock("@convex-dev/react-query", () => ({
     return { queryKey: args === "skip" ? "skip" : args.query };
   },
 }));
-vi.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: { queryKey: string }) => ({
-    data: mocks.results.get(queryKey),
-  }),
-}));
+vi.mock("@tanstack/react-query", () => {
+  const keepPreviousData = Symbol("keepPreviousData");
+  return {
+    keepPreviousData,
+    useQuery: ({
+      queryKey,
+      placeholderData,
+    }: {
+      queryKey: string;
+      placeholderData?: unknown;
+    }) => {
+      const data = mocks.results.get(queryKey);
+      if (data !== undefined || queryKey === "skip") {
+        if (data !== undefined) mocks.lastData = data;
+        return { data, isPlaceholderData: false, isError: false };
+      }
+      const kept =
+        placeholderData === keepPreviousData ? mocks.lastData : undefined;
+      return {
+        data: kept,
+        isPlaceholderData: kept !== undefined,
+        isError: mocks.failing.has(queryKey),
+      };
+    },
+  };
+});
 vi.mock("expo-router", () => ({
   useLocalSearchParams: () => ({}),
   Stack: {
@@ -94,6 +117,8 @@ beforeEach(() => {
   mocks.entering.mockClear();
   mocks.query.mockClear();
   mocks.results.clear();
+  mocks.lastData = undefined;
+  mocks.failing.clear();
   mocks.tabSearch = "";
 });
 afterEach(() => vi.useRealTimers());
@@ -174,5 +199,48 @@ describe.each(["ios", "android"])("%s search input", (platform) => {
     await debounce();
     expect(mocks.query).toHaveBeenLastCalledWith("skip");
     expectImmediate("search.emptyTitle");
+  });
+
+  it("keeps the last results while the next query loads, and says when it fails", async () => {
+    mocks.results.set("pas", ["a", "b"]);
+    mocks.failing.add("broken");
+    const { change } = renderSearch(platform);
+    change("pas");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("2");
+    change("pasta");
+    await debounce();
+    expect(mocks.query).toHaveBeenLastCalledWith({ query: "pasta" });
+    expect(screen.getByTestId("feed").textContent).toBe("2");
+    expect(screen.queryByText("search.noResultsTitle")).toBeNull();
+
+    mocks.lastData = undefined;
+    change("broken");
+    await debounce();
+    expectImmediate("errors.searchTitle");
+  });
+
+  it("starts blank after the field is cleared", async () => {
+    mocks.results.set("pas", ["a", "b"]);
+    const { change } = renderSearch(platform);
+    change("pas");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("2");
+    change("");
+    await debounce();
+    expectImmediate("search.emptyTitle");
+
+    change("tacos");
+    await debounce();
+    expect(mocks.query).toHaveBeenLastCalledWith({ query: "tacos" });
+    expect(screen.getByTestId("feed").textContent).toBe("0");
+
+    mocks.results.set("tacos", ["t"]);
+    change("tacos ");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("1");
+    change("tacos al");
+    await debounce();
+    expect(screen.getByTestId("feed").textContent).toBe("1");
   });
 });

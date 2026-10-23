@@ -1,11 +1,12 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { searchView } from "@/lib/search-view";
 import { EmptyState } from "@/components/empty-state";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { useTabSearchQuery } from "@/lib/tab-search-query";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
@@ -46,21 +47,26 @@ export default function SearchScreen() {
   // 'skip', not `enabled`: a disabled React Query still subscribes through
   // the Convex adapter (see the pager), so an empty query would hold a live
   // server subscription that answers [] on every push.
-  const { data: results } = useQuery({
+  // Results carry over only from one query to the next, never across a
+  // cleared field: after a clear, the next query starts blank.
+  const [cleared, setCleared] = useState(query.length === 0);
+  if (query.length === 0 && !cleared) setCleared(true);
+  const results = useQuery({
     ...convexQuery(
       api.items.searchItems,
       query.length > 0 ? { query } : "skip",
     ),
+    placeholderData: cleared ? undefined : keepPreviousData,
   });
-  const emptyCopy =
-    query.length === 0
-      ? { title: t("search.emptyTitle"), message: t("search.emptyBody") }
-      : results?.length === 0
-        ? {
-            title: t("search.noResultsTitle"),
-            message: t("search.noResults", { query }),
-          }
-        : null;
+  if (
+    cleared &&
+    query.length > 0 &&
+    results.data !== undefined &&
+    !results.isPlaceholderData
+  ) {
+    setCleared(false);
+  }
+  const view = searchView(query, results);
 
   return (
     <View style={styles.container}>
@@ -76,11 +82,15 @@ export default function SearchScreen() {
       ) : (
         <View style={{ height: headerHeight }} />
       )}
-      {emptyCopy ? (
-        <EmptyState animateEntrance={false} {...emptyCopy} />
+      {view.kind === "message" ? (
+        <EmptyState
+          animateEntrance={false}
+          title={view.title}
+          message={view.message}
+        />
       ) : (
         <MasonryFeed
-          items={results ?? []}
+          items={view.items}
           source={{ from: "search", q: query }}
           onScrollBeginDrag={() => searchBarRef.current?.blur()}
         />
