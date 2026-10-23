@@ -1,10 +1,10 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import {} from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { beginProcessingRun } from "./items";
-import { requireUserId } from "./model/auth";
+import { authedMutation } from "./model/auth";
 import { demoError, MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure, MAX_ITEM_TITLE_CHARS } from "./model/itemFields";
@@ -69,7 +69,7 @@ async function savedSpaceNames(
 }
 
 /** The one link save a user gets without Pro; a repeat returns that item with `reused: true`. */
-export const createDemoItem = mutation({
+export const createDemoItem = authedMutation({
   args: {
     url: v.string(),
     spaceName: v.optional(v.string()),
@@ -85,7 +85,7 @@ export const createDemoItem = mutation({
     savedSpaceNames: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
 
     const existing = await ctx.db
       .query("onboardingDemos")
@@ -166,14 +166,14 @@ export const createDemoItem = mutation({
   },
 });
 
-export const retryDemoItem = mutation({
+export const retryDemoItem = authedMutation({
   args: {},
   returns: v.object({
     scheduled: v.boolean(),
     status: demoStatusValidator,
   }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const demo = await ctx.db
       .query("onboardingDemos")
       .withIndex("by_user", (q) => q.eq("userId", userId))

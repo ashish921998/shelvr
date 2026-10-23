@@ -76,11 +76,8 @@ type Widened<Ctx> = AuthedDefinition<
 const authedFunctions = new WeakSet<object>();
 
 /** True when `authedQuery` or `authedMutation` built `fn`, so every call runs `requireUserId` first. */
-export function isAuthedFunction(fn: unknown): boolean {
-  return (
-    (typeof fn === "function" || (typeof fn === "object" && fn !== null)) &&
-    authedFunctions.has(fn)
-  );
+export function isAuthedFunction(fn: object): boolean {
+  return authedFunctions.has(fn);
 }
 
 /** A public query that runs `requireUserId` before its handler, which gets the id as `ctx.userId`. */

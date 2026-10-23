@@ -1,8 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { requireUserId, authedMutation, authedQuery } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import {
@@ -250,11 +250,11 @@ export const saveTripInternal = internalMutation({
   },
 });
 
-export const swapTripStop = mutation({
+export const swapTripStop = authedMutation({
   args: { tripId: v.id("trips"), itemId: v.id("items"), name: v.string() },
   returns: v.object({ itemId: v.id("items"), name: v.string() }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const trip = await ctx.db.get(args.tripId);
     if (trip === null || trip.userId !== userId) {
       throw new Error("Trip not found");
@@ -315,11 +315,11 @@ const tripViewValidator = v.object({
   wishlist: v.array(tripStopViewValidator),
 });
 
-export const getSpaceTrip = query({
+export const getSpaceTrip = authedQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.union(tripViewValidator, v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) return null;
     const trip = await ctx.db
@@ -360,11 +360,11 @@ export const getSpaceTrip = query({
   },
 });
 
-export const tripCities = query({
+export const tripCities = authedQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.array(v.object({ city: v.string(), count: v.number() })),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) return [];
     const saves = await loadReadySaves(ctx, args.spaceId, userId);

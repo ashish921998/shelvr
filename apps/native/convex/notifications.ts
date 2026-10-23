@@ -3,17 +3,12 @@ import {
   notificationLocale,
 } from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
-import {
-  internalMutation,
-  mutation,
-  query,
-  type QueryCtx,
-} from "./_generated/server";
+import { internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
 import { tripStopItemIds } from "./tripData";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   localHour,
   nextLocalHourAt,
@@ -73,11 +68,11 @@ const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
 const REMINDER_CHECKS_PER_KIND = 100;
 const MAX_FAILED_REMINDERS = 2;
 
-export const getPreferences = query({
+export const getPreferences = authedQuery({
   args: {},
   returns: preferencesValidator,
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -93,7 +88,7 @@ export const getPreferences = query({
   },
 });
 
-export const setPreferences = mutation({
+export const setPreferences = authedMutation({
   args: {
     weeklyShelfEnabled: v.boolean(),
     nextDigestAt: v.optional(v.number()),
@@ -101,7 +96,7 @@ export const setPreferences = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const existing = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -156,7 +151,7 @@ export const setPreferences = mutation({
   },
 });
 
-export const registerDevice = mutation({
+export const registerDevice = authedMutation({
   args: {
     locale: v.optional(v.string()),
     token: v.string(),
@@ -166,7 +161,7 @@ export const registerDevice = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const token = args.token.trim();
     if (token.length === 0 || token.length > 4096) {
       throw new Error("Invalid notification token");
@@ -252,11 +247,11 @@ export const registerDevice = mutation({
   },
 });
 
-export const setSaveReminders = mutation({
+export const setSaveReminders = authedMutation({
   args: { enabled: v.boolean(), timezone: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const existing = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -298,11 +293,11 @@ export const setSaveReminders = mutation({
   },
 });
 
-export const unregisterDevice = mutation({
+export const unregisterDevice = authedMutation({
   args: { token: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const device = await ctx.db
       .query("notificationDevices")
       .withIndex("by_token", (q) => q.eq("token", args.token))
@@ -313,11 +308,11 @@ export const unregisterDevice = mutation({
   },
 });
 
-export const markItemOpened = mutation({
+export const markItemOpened = authedMutation({
   args: { itemId: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== userId) {
       return null;
@@ -343,11 +338,11 @@ export const markItemOpened = mutation({
   },
 });
 
-export const getDigest = query({
+export const getDigest = authedQuery({
   args: { id: v.optional(v.id("weeklyDigests")) },
   returns: v.union(digestResponseValidator, v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const digest =
       args.id !== undefined
         ? await ctx.db.get(args.id)
@@ -380,11 +375,11 @@ export const getDigest = query({
   },
 });
 
-export const markDigestOpened = mutation({
+export const markDigestOpened = authedMutation({
   args: { id: v.id("weeklyDigests") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const digest = await ctx.db.get(args.id);
     if (
       digest !== null &&

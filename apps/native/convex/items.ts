@@ -3,16 +3,16 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  query,
-  mutation,
-  internalQuery,
-  internalMutation,
-} from "./_generated/server";
+import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { liveOwner, requireUserId, senderFirstName } from "./model/auth";
+import {
+  liveOwner,
+  senderFirstName,
+  authedMutation,
+  authedQuery,
+} from "./model/auth";
 import {
   hasProEntitlement,
   hasProEntitlementAt,
@@ -251,11 +251,11 @@ async function toItemCard(
   return recipe ? { ...card, hasRecipe: true } : card;
 }
 
-export const listItems = query({
+export const listItems = authedQuery({
   args: {},
   returns: v.array(enrichedItemValidator),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const items = await ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -268,11 +268,11 @@ export const listItems = query({
 const SAVE_PROGRESS_GOAL = 3;
 const SAVE_PROGRESS_MAX_READ = 20;
 
-export const saveProgress = query({
+export const saveProgress = authedQuery({
   args: {},
   returns: v.object({ saved: v.number(), goal: v.number() }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const demo = await ctx.db
       .query("onboardingDemos")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -295,11 +295,11 @@ export const saveProgress = query({
   },
 });
 
-export const listItemsPage = query({
+export const listItemsPage = authedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(itemCardValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const opts = args.paginationOpts;
     const result = await ctx.db
       .query("items")
@@ -320,11 +320,11 @@ export const listItemsPage = query({
   },
 });
 
-export const listRecentItems = query({
+export const listRecentItems = authedQuery({
   args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const entitled =
       (await hasProEntitlementStatus(ctx, userId)) &&
       (args.now === undefined ||
@@ -346,7 +346,7 @@ export const listRecentItems = query({
 });
 
 /** `now` is passed in because a Convex query does not rerun as time passes. */
-export const nextUp = query({
+export const nextUp = authedQuery({
   args: { now: v.number(), skip: v.array(v.id("items")) },
   returns: v.union(
     v.null(),
@@ -362,7 +362,7 @@ export const nextUp = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     if (
       !(await hasProEntitlementStatus(ctx, userId)) ||
       !(await hasProEntitlementAt(ctx, userId, args.now))
@@ -402,7 +402,7 @@ export const nextUp = query({
   },
 });
 
-export const listLocatedItems = query({
+export const listLocatedItems = authedQuery({
   args: {},
   returns: v.array(
     v.object({
@@ -414,7 +414,7 @@ export const listLocatedItems = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const photos = await ctx.db
       .query("items")
       .withIndex("by_user_and_type", (q) =>
@@ -440,11 +440,11 @@ export const listLocatedItems = query({
   },
 });
 
-export const getItem = query({
+export const getItem = authedQuery({
   args: { id: v.id("items") },
   returns: v.union(enrichedItemWithSpacesValidator, v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       return null;
@@ -469,11 +469,11 @@ export const getItem = query({
   },
 });
 
-export const searchItems = query({
+export const searchItems = authedQuery({
   args: { query: v.string() },
   returns: v.array(enrichedItemValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const trimmed = args.query.trim();
     if (trimmed === "") {
       return [];
@@ -495,11 +495,11 @@ const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
 const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
 const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
 
-export const similarItems = query({
+export const similarItems = authedQuery({
   args: { id: v.id("items") },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.status !== "ready") {
       return [];
@@ -648,11 +648,11 @@ async function requirePhotoQuota(
   return count;
 }
 
-export const photoUsage = query({
+export const photoUsage = authedQuery({
   args: {},
   returns: v.object({ count: v.number(), limit: v.number() }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return {
       count: await countPhotos(ctx, userId),
       limit: MAX_PHOTOS_PER_ACCOUNT,
@@ -689,14 +689,14 @@ function validateImageMetadata(args: {
   }
 }
 
-export const beginImageImport = mutation({
+export const beginImageImport = authedMutation({
   args: { operationId: v.string() },
   returns: v.union(
     v.object({ kind: v.literal("upload"), uploadUrl: v.string() }),
     v.object({ kind: v.literal("complete"), itemId: v.id("items") }),
   ),
   handler: async (ctx, args): Promise<BeginImageImportResult> => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return await beginImageImportForUser(ctx, userId, args.operationId);
   },
 });
@@ -802,7 +802,7 @@ export async function beginImageImportForUser(
   };
 }
 
-export const attachImageUpload = mutation({
+export const attachImageUpload = authedMutation({
   args: {
     operationId: v.string(),
     storageId: v.id("_storage"),
@@ -812,7 +812,7 @@ export const attachImageUpload = mutation({
     error: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return await attachImageUploadForUser(ctx, userId, args);
   },
 });
@@ -982,11 +982,11 @@ type FinalizeImageImportArgs = Infer<typeof finalizeImageImportArgs> & {
   captureContext?: string;
 };
 
-export const finalizeImageImport = mutation({
+export const finalizeImageImport = authedMutation({
   args: finalizeImageImportArgs.fields,
   returns: v.id("items"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return await finalizeImageImportForUser(ctx, userId, args);
   },
 });
@@ -1062,7 +1062,7 @@ export async function finalizeImageImportForUser(
   return itemId;
 }
 
-export const getImportOperation = query({
+export const getImportOperation = authedQuery({
   args: { operationId: v.string() },
   returns: v.union(
     v.object({
@@ -1073,7 +1073,7 @@ export const getImportOperation = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const op = await ctx.db
       .query("itemOperations")
       .withIndex("by_user_operation", (q) =>
@@ -1322,7 +1322,7 @@ async function scheduleProcessedTelemetry(
   });
 }
 
-export const createLinkItem = mutation({
+export const createLinkItem = authedMutation({
   args: {
     url: v.string(),
     spaceId: v.optional(v.id("spaces")),
@@ -1332,7 +1332,7 @@ export const createLinkItem = mutation({
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const url = normalizeExternalUrl(args.url);
     return await createItemWithOperation(
@@ -1350,7 +1350,7 @@ export const createLinkItem = mutation({
   },
 });
 
-export const createNoteItem = mutation({
+export const createNoteItem = authedMutation({
   args: {
     text: v.string(),
     spaceId: v.optional(v.id("spaces")),
@@ -1360,7 +1360,7 @@ export const createNoteItem = mutation({
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
@@ -1403,14 +1403,14 @@ async function hasSavedLink(
   return match !== null;
 }
 
-export const importLinks = mutation({
+export const importLinks = authedMutation({
   args: {
     urls: v.array(v.string()),
     staggerOffset: v.optional(v.number()),
   },
   returns: importLinksResultValidator,
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     if (args.urls.length > MAX_IMPORT_BATCH) {
       throw new ConvexError(
@@ -1511,7 +1511,7 @@ async function noteRunDelay(
     : Math.max(NOTE_REFRESH_DELAY_MS, retryAfter ?? 0);
 }
 
-export const updateNoteItem = mutation({
+export const updateNoteItem = authedMutation({
   args: {
     id: v.id("items"),
     title: v.optional(v.string()),
@@ -1519,7 +1519,7 @@ export const updateNoteItem = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.type !== "note") {
@@ -1589,11 +1589,11 @@ export const updateNoteItem = mutation({
   },
 });
 
-export const findLinks = mutation({
+export const findLinks = authedMutation({
   args: { id: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
@@ -1651,12 +1651,12 @@ async function freeDemoRetry(
   return demo;
 }
 
-export const reprocessItem = mutation({
+export const reprocessItem = authedMutation({
   args: { id: v.id("items") },
   // True when a new run was scheduled; false when the server does not consider the item retryable.
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const freeDemo = await freeDemoRetry(ctx, userId, args.id);
     if (freeDemo === null) await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
@@ -1695,11 +1695,11 @@ export const reprocessItem = mutation({
   },
 });
 
-export const deleteItem = mutation({
+export const deleteItem = authedMutation({
   args: { id: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1734,7 +1734,7 @@ export const deleteItem = mutation({
   },
 });
 
-export const createShareLink = mutation({
+export const createShareLink = authedMutation({
   args: {
     itemId: v.id("items"),
     // Set by clients that call `settleShareLink` afterwards; without it the link is never withdrawn.
@@ -1742,7 +1742,7 @@ export const createShareLink = mutation({
   },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1778,11 +1778,11 @@ export const createShareLink = mutation({
   },
 });
 
-export const settleShareLink = mutation({
+export const settleShareLink = authedMutation({
   args: { itemId: v.id("items"), shared: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
