@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
-import { DeviceSession } from "./notification-device-session";
+import { NotificationDeviceSession } from "./notification-device-session";
 
 function deferred() {
   let resolve!: () => void;
@@ -35,7 +35,7 @@ function setup(
     resetAnalytics: vi.fn(),
     reportError: vi.fn(),
   };
-  const session = new DeviceSession(
+  const session = new NotificationDeviceSession(
     {
       read: async () => tokens,
       write: async (next) => {
@@ -399,9 +399,18 @@ describe("notification device session", () => {
     await session.register();
     expect(deps.saveToken).toHaveBeenCalledWith("token-a");
     expect(deps.signOut).not.toHaveBeenCalled();
+    expect(deps.revokeCapture).not.toHaveBeenCalled();
     expect(deps.resetAnalytics).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toBe("idle");
     expect(deps.clearWidget).not.toHaveBeenCalled();
+  });
+
+  it("deletes after push revocation without revoking capture before or after deletion", async () => {
+    const { session, deps } = setup(["token-a"]);
+    await session.deleteAccount();
+    expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
+    expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    expect(deps.revokeCapture).not.toHaveBeenCalled();
   });
 
   it("keeps successful deletion successful when local cleanup fails", async () => {
@@ -410,8 +419,7 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
-    expect(deps.revokeToken).toHaveBeenCalledBefore(deps.revokeCapture);
-    expect(deps.revokeCapture).toHaveBeenCalledBefore(deps.deleteAccount);
+    expect(deps.revokeCapture).not.toHaveBeenCalled();
     expect(deps.clearWidget).toHaveBeenCalledOnce();
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
     expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);

@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { beforeEach } from "@e2e-dev/mobile";
 import { type App, expect, type Locator, type Screen } from "e2e";
 
-import { isExpoLauncher, LAUNCHER_GRACE_MS } from "./launch.ts";
+import { openUntilReady } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 
 const BUNDLE_TIMEOUT = 180_000;
@@ -98,24 +98,16 @@ async function openApp(
   screen: Screen,
   ready: () => Promise<boolean>,
 ): Promise<void> {
-  // The dev launcher shows its server list when Metro is slow to answer for the bundle.
   const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
-  await app.open();
-  let openedAt = Date.now();
-  await pollUntil(
-    async () => {
-      if (await ready()) return true;
-      if (
-        Date.now() - openedAt > LAUNCHER_GRACE_MS &&
-        (await isExpoLauncher(screen))
-      ) {
-        await app.open();
-        openedAt = Date.now();
-      } else if (await keepAi.isVisible()) await keepAi.tap();
-      return false;
+  await openUntilReady({
+    open: () => app.open(),
+    screen,
+    ready,
+    onPoll: async () => {
+      if (await keepAi.isVisible()) await keepAi.tap();
     },
-    { timeout: BUNDLE_TIMEOUT },
-  );
+    timeout: BUNDLE_TIMEOUT,
+  });
 }
 
 const AI_CONSENT_ALLOW = "Keep it on";

@@ -21,7 +21,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { DeviceSession } from "./notification-device-session";
+import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
@@ -45,7 +45,8 @@ const tokenStore = {
     SecureStore.setItemAsync(tokenStorageKey, JSON.stringify(tokens)),
 };
 
-const NotificationSessionContext = createContext<DeviceSession | null>(null);
+const NotificationSessionContext =
+  createContext<NotificationDeviceSession | null>(null);
 
 export function useNotificationSession() {
   const session = use(NotificationSessionContext);
@@ -82,7 +83,7 @@ export function NotificationSessionProvider({
   const revokeCaptureToken = useMutation(api.appIntents.revokeCaptureToken);
   const session = useMemo(
     () =>
-      new DeviceSession(tokenStore, {
+      new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
         getTimezone: getNotificationTimezone,

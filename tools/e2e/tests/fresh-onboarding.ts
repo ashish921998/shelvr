@@ -1,13 +1,7 @@
 import type { Device } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
-import {
-  BUNDLE_ID,
-  LAUNCH_ARGUMENTS,
-  isExpoLauncher,
-  LAUNCHER_GRACE_MS,
-} from "./launch.ts";
-import { pollUntil } from "./poll.ts";
+import { BUNDLE_ID, LAUNCH_ARGUMENTS, openUntilReady } from "./launch.ts";
 import { tapUntilVisible } from "./seeded-home.ts";
 
 export async function startFreshOnboarding({
@@ -61,33 +55,18 @@ export async function walkToSharePractice(
   });
 }
 
-const STALLED_LAUNCH_MS = 75_000;
-
 export async function relaunchWith(
   device: Device,
   screen: Screen,
   launchArguments: readonly string[],
   ready: () => Promise<boolean>,
 ): Promise<void> {
-  let openedAt = 0;
-  const open = async () => {
-    await device.openApp(BUNDLE_ID, { relaunch: true, launchArguments });
-    openedAt = Date.now();
-  };
-  await open();
-  await pollUntil(
-    async () => {
-      if (await ready()) return true;
-      const sinceOpen = Date.now() - openedAt;
-      if (
-        sinceOpen > STALLED_LAUNCH_MS ||
-        (sinceOpen > LAUNCHER_GRACE_MS && (await isExpoLauncher(screen)))
-      )
-        await open();
-      return false;
-    },
-    { timeout: 180_000 },
-  );
+  await openUntilReady({
+    open: () => device.openApp(BUNDLE_ID, { relaunch: true, launchArguments }),
+    screen,
+    ready,
+    timeout: 180_000,
+  });
   await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
     timeout: 30_000,
   });

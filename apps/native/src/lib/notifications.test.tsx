@@ -132,12 +132,12 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
-  it("revokes Siri before deleting the account and signing out", async () => {
+  it("deletes the account and signs out without revoking Siri", async () => {
     const { result } = renderSession();
     await act(async () => {
       await result.current.session.deleteAccount();
     });
-    expect(mock.revokeSiri).toHaveBeenCalledBefore(mock.deleteAccount);
+    expect(mock.revokeSiri).not.toHaveBeenCalled();
     expect(mock.deleteAccount).toHaveBeenCalledBefore(mock.signOut);
   });
 
@@ -150,7 +150,7 @@ describe("notification session lifecycle", () => {
     });
     expect(result.current.operation).toBe("idle");
     expect(result.current.session).toBe(session);
-    expect(mock.revokeSiri).toHaveBeenCalledBefore(mock.deleteAccount);
+    expect(mock.revokeSiri).not.toHaveBeenCalled();
     expect(mock.signOut).not.toHaveBeenCalled();
   });
 

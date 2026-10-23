@@ -7,9 +7,8 @@ import { convex, persister, queryClient } from "@/lib/query-client";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Slot, useRouter, useSegments, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, type ReactNode } from "react";
-import { ScreenLoader } from "@/components/ui/screen-loader";
-import { t } from "@/lib/i18n";
+import { useEffect } from "react";
+import { AccountDeletionGate } from "@/lib/account-deletion-gate";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
 import { useUnistyles } from "react-native-unistyles";
@@ -18,7 +17,6 @@ import { isDarkThemeName } from "@/lib/appearance";
 import {
   NotificationSessionProvider,
   useNotificationObserver,
-  useNotificationSession,
 } from "@/lib/notifications";
 import { SplashGate, useSplashGate } from "@/components/splash/splash-gate";
 import { NavThemeProvider } from "@/lib/nav-theme";
@@ -57,15 +55,6 @@ function AppIntentsSignOutReset() {
 function AccountGoneSignOut() {
   useSignOutWhenAccountGone();
   return null;
-}
-
-function AccountDeletionGate({ children }: { children: ReactNode }) {
-  const { operation } = useNotificationSession();
-  return operation === "delete_account" ? (
-    <ScreenLoader label={t("loading.app")} />
-  ) : (
-    children
-  );
 }
 
 function ConvexQueryHealer() {

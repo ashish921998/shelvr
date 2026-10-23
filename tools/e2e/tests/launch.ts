@@ -1,4 +1,5 @@
 import type { Screen } from "e2e";
+import { pollUntil } from "./poll.ts";
 
 export const METRO_PORT = process.env.E2E_METRO_PORT ?? "8091";
 export const METRO_URL = `http://localhost:${METRO_PORT}`;
@@ -35,8 +36,43 @@ export const LAUNCH_ARGUMENTS = [
   "YES",
 ];
 
-export const LAUNCHER_GRACE_MS = 15_000;
+const LAUNCHER_GRACE_MS = 15_000;
 
-export function isExpoLauncher(screen: Screen): Promise<boolean> {
-  return screen.getByText("DEVELOPMENT SERVERS").isVisible();
+export async function openUntilReady({
+  open,
+  screen,
+  ready,
+  stalledMs = 75_000,
+  onPoll,
+  timeout,
+}: {
+  open: () => Promise<unknown>;
+  screen: Screen;
+  ready: () => Promise<boolean>;
+  stalledMs?: number;
+  onPoll?: () => Promise<void>;
+  timeout: number;
+}): Promise<void> {
+  const reopen = async () => {
+    await open();
+    return Date.now();
+  };
+  let openedAt = await reopen();
+  await pollUntil(
+    async () => {
+      if (await ready()) return true;
+      const sinceOpen = Date.now() - openedAt;
+      if (
+        sinceOpen > stalledMs ||
+        (sinceOpen > LAUNCHER_GRACE_MS &&
+          (await screen.getByText("DEVELOPMENT SERVERS").isVisible()))
+      ) {
+        openedAt = await reopen();
+      } else {
+        await onPoll?.();
+      }
+      return false;
+    },
+    { timeout },
+  );
 }

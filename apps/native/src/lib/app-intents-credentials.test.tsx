@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
-import { useSyncExternalStore } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { AppIntentsBridge, revokeSiriCapture } from "./app-intents";
-import { DeviceSession } from "./notification-device-session";
 
 const mock = vi.hoisted(() => ({
   token: "old-test-token",
@@ -71,40 +69,10 @@ beforeEach(() => {
   mock.store.set("captureOwner", "test-user");
 });
 
-it("replaces revoked Siri credentials when failed deletion remounts the app", async () => {
-  const deletionError = new Error("deletion unavailable");
-  const signOut = vi.fn(async () => {});
-  const session = new DeviceSession(
-    { read: async () => [], write: async () => {} },
-    {
-      getToken: async () => null,
-      saveToken: async () => {},
-      revokeToken: async () => {},
-      revokeCapture: () => revokeSiriCapture(mock.revoke),
-      setWeeklyShelf: async () => {},
-      setSaveReminders: async () => {},
-      signOut,
-      deleteAccount: async () => {
-        throw deletionError;
-      },
-      clearWidget: async () => {},
-      resetAnalytics: vi.fn(),
-      reportError: mock.report,
-    },
-  );
-  function App() {
-    const operation = useSyncExternalStore(
-      session.subscribe,
-      session.getSnapshot,
-    );
-    return operation === "delete_account" ? null : <AppIntentsBridge />;
-  }
-  render(<App />);
-  await act(async () => {});
-  expect(mock.issue).not.toHaveBeenCalled();
-  await act(async () => {
-    await expect(session.deleteAccount()).rejects.toBe(deletionError);
-  });
+it("replaces successfully revoked credentials on the next bridge mount", async () => {
+  await revokeSiriCapture(mock.revoke);
+  expect(mock.store.has("captureOwner")).toBe(false);
+  render(<AppIntentsBridge />);
   await waitFor(() =>
     expect(mock.setCredentials).toHaveBeenCalledWith(
       expect.any(String),
@@ -112,9 +80,7 @@ it("replaces revoked Siri credentials when failed deletion remounts the app", as
     ),
   );
   expect(mock.revoke).toHaveBeenCalledWith({ token: "old-test-token" });
-  expect(mock.issue).toHaveBeenCalledOnce();
   expect(mock.store.get("captureOwner")).toBe("test-user");
-  expect(signOut).not.toHaveBeenCalled();
 });
 
 it("keeps valid credentials when server revocation fails", async () => {

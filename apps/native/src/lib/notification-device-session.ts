@@ -37,12 +37,16 @@ type SessionDependencies = {
   reportError: (error: unknown) => void;
 };
 
-type SessionOperation = "idle" | "preferences" | "sign_out" | "delete_account";
+type NotificationOperation =
+  | "idle"
+  | "preferences"
+  | "sign_out"
+  | "delete_account";
 
-export class DeviceSession {
+export class NotificationDeviceSession {
   private generation = 0;
   private paused = true;
-  private operation: SessionOperation = "idle";
+  private operation: NotificationOperation = "idle";
   private listeners = new Set<() => void>();
   private queue: Promise<void> = Promise.resolve();
   private registeredKey: string | null = null;
@@ -61,13 +65,13 @@ export class DeviceSession {
     };
   };
 
-  private setOperation(operation: SessionOperation) {
+  private setOperation(operation: NotificationOperation) {
     this.operation = operation;
     for (const listener of this.listeners) listener();
   }
 
   private async runOperation<T>(
-    operation: Exclude<SessionOperation, "idle">,
+    operation: Exclude<NotificationOperation, "idle">,
     action: () => Promise<T>,
   ) {
     if (this.operation !== "idle") return;
@@ -198,7 +202,7 @@ export class DeviceSession {
         try {
           for (const token of await this.store.read())
             await this.deps.revokeToken(token);
-          await this.deps.revokeCapture();
+          if (operation === "sign_out") await this.deps.revokeCapture();
           await (operation === "delete_account"
             ? this.deps.deleteAccount()
             : this.deps.signOut());
