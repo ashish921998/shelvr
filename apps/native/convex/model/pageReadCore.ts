@@ -95,9 +95,9 @@ function* tagAttributes(html: string, tagName: string) {
 
 export function extractCanonical(html: string): string | undefined {
   for (const link of tagAttributes(html, "link")) {
-    const href = link.get("href")?.trim();
+    const href = decodeEntities(link.get("href") ?? "").trim();
     if (href && link.get("rel")?.toLowerCase() === "canonical") {
-      return decodeEntities(href);
+      return href;
     }
   }
   return undefined;
@@ -109,13 +109,13 @@ export function extractMetaContent(
 ): string | undefined {
   const wanted = key.toLowerCase();
   for (const meta of tagAttributes(html, "meta")) {
-    const content = meta.get("content")?.trim();
+    const content = decodeEntities(meta.get("content") ?? "").trim();
     if (
       content &&
       (meta.get("property")?.toLowerCase() === wanted ||
         meta.get("name")?.toLowerCase() === wanted)
     ) {
-      return decodeEntities(content);
+      return content;
     }
   }
   return undefined;

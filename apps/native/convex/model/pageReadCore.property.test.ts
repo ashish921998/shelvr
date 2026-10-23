@@ -170,6 +170,14 @@ describe("extractCanonical", () => {
     ).toBe("https://a.example/x");
   });
 
+  it("keeps reading after a canonical link whose href is an encoded space", () => {
+    expect(
+      extractCanonical(
+        `<link rel="canonical" href="&#32;"><link rel="canonical" href="https://a.example/x">`,
+      ),
+    ).toBe("https://a.example/x");
+  });
+
   it("keeps reading after a canonical link whose href is blank", () => {
     expect(
       extractCanonical(
@@ -193,6 +201,14 @@ describe("extractCanonical", () => {
 });
 
 describe("extractTitle", () => {
+  it("skips an og:title that is only an encoded space", () => {
+    expect(
+      extractTitle(
+        `<meta property="og:title" content="&#32;&nbsp;"><title>Dal</title>`,
+      ),
+    ).toBe("Dal");
+  });
+
   it("reads the first title element in any case, up to its first closing tag", () => {
     expect(
       extractTitle("<TITLE lang='en'>Dal\n  makhani</Title><p>x</p></title>"),
