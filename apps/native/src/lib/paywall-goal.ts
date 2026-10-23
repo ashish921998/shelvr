@@ -123,6 +123,7 @@ const string = (value: string) => ({ type: "string" as const, value });
 /**
  * Custom variables that let the paywall echo the onboarding answers. A skipped
  * city ("Not sure yet", "Somewhere else") is stored as null and reads as no city.
+ * `goal_city` is the unlocalized city id, which the paywall uses to pick the city's photo.
  */
 export function goalPaywallVariables(
   progress: GoalProgress,
@@ -140,6 +141,7 @@ export function goalPaywallVariables(
   };
   return {
     goal: string(goal),
+    goal_city: string(progress.travelCity ?? ""),
     goal_headline: string(copy.headline(answers)),
     goal_subline: string(copy.subline(answers)),
     goal_photo_tag: string(copy.photoTag(answers)),

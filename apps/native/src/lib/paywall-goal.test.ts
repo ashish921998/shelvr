@@ -40,6 +40,7 @@ describe("goalPaywallVariables", () => {
   it("names the city in travel copy, and reads without it when none was picked", () => {
     expect(values(progress("travel", "lisbon"))).toEqual({
       goal: "travel",
+      goal_city: "lisbon",
       goal_headline: "Let’s plan Lisbon\nfrom your saves.",
       goal_subline: "Every place you save, on one map, day by day.",
       goal_photo_tag: "Your sample trip",
@@ -51,6 +52,7 @@ describe("goalPaywallVariables", () => {
       goal_benefit_body: "Saved places become a day-by-day plan.",
     });
     expect(values(progress("travel"))).toMatchObject({
+      goal_city: "",
       goal_headline: "Let’s plan your next trip\nfrom your saves.",
       goal_answer_2: "",
       goal_today: "Your saves become a day-by-day plan.",
@@ -94,6 +96,7 @@ describe("goalPaywallVariables", () => {
   it("writes recipes out, with no second answer", () => {
     expect(values(progress("recipes", "rome"))).toEqual({
       goal: "recipes",
+      goal_city: "rome",
       goal_headline: "Let’s get dinner\nout of your saves.",
       goal_subline: "Every recipe written out, even from a video.",
       goal_photo_tag: "Your sample recipe",
@@ -110,6 +113,7 @@ describe("goalPaywallVariables", () => {
   it("lists the first two picked interests for other", () => {
     expect(values(progress("other", null, ["Gear", "Books", "Art"]))).toEqual({
       goal: "other",
+      goal_city: "",
       goal_headline: "Let’s make your saves\nworth keeping.",
       goal_subline: "Find anything again by what you remember.",
       goal_photo_tag: "Your first save",
