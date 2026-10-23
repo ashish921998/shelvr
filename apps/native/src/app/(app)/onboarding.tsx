@@ -5,6 +5,7 @@ import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import type { SampleCityId } from "@/lib/sample-cities";
 import { type EveningAfter, isSampleCity, samplePlan } from "@/lib/sample-trip";
+import { notificationPermissionState } from "@/lib/notification-token";
 import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import {
   GOAL_PLANS,
@@ -41,6 +42,7 @@ import { SignInView } from "@/components/sign-in-view";
 import { CityStep, GoalStep } from "@/components/onboarding/goal";
 import { InterestsStep } from "@/components/onboarding/interests";
 import { OpenerStep } from "@/components/onboarding/opener";
+import { NotificationsStep } from "@/components/onboarding/notifications";
 import { PromiseStep } from "@/components/onboarding/promise";
 import { RecipeRevealStep } from "@/components/onboarding/recipe-reveal";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
@@ -67,6 +69,7 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   tripReveal: 0.8,
   recipeReveal: 0.8,
   promise: 1,
+  notifications: 1,
 };
 
 const SHARE_TITLES = {
@@ -93,6 +96,16 @@ function practiceSampleFor(
     (goal === null ? undefined : goalShareSample(goal, city)) ??
     practiceShareSample(interests, null)
   );
+}
+
+/** Whether the notifications step has anything to ask; it is skipped once notifications are on or refused for good. */
+async function shouldAskNotifications(): Promise<boolean> {
+  try {
+    return (await notificationPermissionState()) === "ask";
+  } catch (err) {
+    analytics.captureError("onboarding_notifications_failed", err);
+    return false;
+  }
 }
 
 function holdIncomingShare() {
@@ -380,6 +393,21 @@ export default function OnboardingScreen() {
               after={eveningAfter}
               leaving={paywall.asked}
               onCommit={() => {
+                void shouldAskNotifications().then((ask) => {
+                  if (ask) return advance();
+                  recordCurrentStep();
+                  paywall.ask();
+                });
+              }}
+            />
+          )}
+
+          {step === "notifications" && (
+            <NotificationsStep
+              goal={goal}
+              trip={trip}
+              leaving={paywall.asked}
+              onDone={() => {
                 recordCurrentStep();
                 paywall.ask();
               }}

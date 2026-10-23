@@ -95,6 +95,9 @@ vi.mock("@/components/ui/header-icon-button", () => ({
   HeaderIconButton: nothing,
 }));
 vi.mock("@/lib/trial-reminder", () => ({ useTrialReminder: vi.fn() }));
+vi.mock("@/lib/pending-weekly-shelf", () => ({
+  usePendingWeeklyShelf: vi.fn(),
+}));
 vi.mock("@/lib/welcome-save", () => ({ useWelcomeSaveTracker: vi.fn() }));
 vi.mock("@/lib/widget-sync", () => ({ RecentSavesWidgetSync: nothing }));
 vi.mock("react-native-reanimated", () => ({ useReducedMotion: () => false }));
