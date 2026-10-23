@@ -596,6 +596,7 @@ describe("processItem for X posts", () => {
           spaceNames: [],
           intents: [],
           cities: [],
+          places: [],
           recipe: {
             name: "Pancakes",
             servings: "4 servings",
