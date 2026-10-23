@@ -197,10 +197,12 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
   fingerprint (a native dependency added or removed, a native config change)
   makes new updates invisible to binaries built from the old fingerprint: cut a
-  fresh store build before resuming OTA publishes. The app `version` and the
-  build number are not inputs. `@expo/fingerprint` 0.21 (Expo SDK 58) defaults
-  to its `balanced` preset, which skips them (`SourceSkips.ExpoConfigVersions`),
-  so a version bump alone does not move the fingerprint (through SDK 57 it did).
+  fresh store build before resuming OTA publishes. The version fields in
+  `app.json` (`version`, `ios.buildNumber`, `android.versionCode`) are not
+  inputs. `@expo/fingerprint` 0.21 (Expo SDK 58) defaults to its `balanced`
+  preset, which skips them (`SourceSkips.ExpoConfigVersions`), so a version bump
+  alone does not move the fingerprint. It did through SDK 57, and would again if
+  a `fingerprint.config.js` set `preset: "strict"`.
   Re-check after an Expo upgrade: edit `version`, run
   `node tools/verify-ota-compatibility.mjs --profile production --platform ios`
   under `APP_VARIANT=production` before and after, and the tree's hash must not

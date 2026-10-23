@@ -510,8 +510,11 @@ needed at runtime by the features that use them:
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A
   change that moves the fingerprint (a new native module, a config plugin, `app.json`
-  other than its `version`, `app.config.js`) strands every later OTA until a store build
-  ships, and the diff does not say so. Two layers cover it. On a pull request CI runs
+  other than its version fields (`version`, `ios.buildNumber`, `android.versionCode`),
+  `app.config.js`) strands every later OTA until a store build ships, and the diff does
+  not say so. The default `balanced` preset skips the version fields; a
+  `fingerprint.config.js` that sets `preset: "strict"` would hash them again. Two layers
+  cover it. On a pull request CI runs
   `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
   and never fails the check; acknowledge an intended move with the
   `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
