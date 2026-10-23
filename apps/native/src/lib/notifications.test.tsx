@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => ({
   token: vi.fn(),
   register: vi.fn(),
   otherMutation: vi.fn(),
+  deleteAccount: vi.fn(async () => {}),
   signOut: vi.fn(),
   clearWidget: vi.fn(async () => true),
   revokeSiri: vi.fn(async () => {}),
@@ -65,8 +66,11 @@ vi.mock("@convex/_generated/api", () => ({
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
-  useMutation: (ref: string) =>
-    ref === "register" ? mock.register : mock.otherMutation,
+  useMutation: (ref: string) => {
+    if (ref === "register") return mock.register;
+    if (ref === "delete") return mock.deleteAccount;
+    return mock.otherMutation;
+  },
 }));
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mock.signOut }),
@@ -118,6 +122,7 @@ beforeEach(() => {
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
+  mock.deleteAccount.mockReset().mockResolvedValue(undefined);
 });
 
 function renderSession() {
@@ -127,6 +132,28 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
+  it("deletes the account and signs out without revoking Siri", async () => {
+    const { result } = renderSession();
+    await act(async () => {
+      await result.current.session.deleteAccount();
+    });
+    expect(mock.revokeSiri).not.toHaveBeenCalled();
+    expect(mock.deleteAccount).toHaveBeenCalledBefore(mock.signOut);
+  });
+
+  it("keeps the session signed in when account deletion fails", async () => {
+    mock.deleteAccount.mockRejectedValueOnce(new Error("offline"));
+    const { result } = renderSession();
+    const session = result.current.session;
+    await act(async () => {
+      await expect(session.deleteAccount()).rejects.toThrow("offline");
+    });
+    expect(result.current.operation).toBe("idle");
+    expect(result.current.session).toBe(session);
+    expect(mock.revokeSiri).not.toHaveBeenCalled();
+    expect(mock.signOut).not.toHaveBeenCalled();
+  });
+
   it("reports the safe file-cleanup category from account deletion", async () => {
     mock.clearWidget.mockRejectedValueOnce(
       new Error("widget_thumbnail_cleanup_failed"),

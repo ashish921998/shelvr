@@ -31,7 +31,10 @@ nothing is started by hand. Before a run:
   stops unless the screen is 402 x 874 points (iPhone 17). The other flows run
   on any iPhone.
 - **Port.** 8091 by default; `E2E_METRO_PORT` moves it. A Metro already on the
-  port makes the run fail to start its own.
+  port makes the run fail to start its own. The test-driver session is scoped
+  to this port too, so another checkout on a different simulator and Metro
+  port cannot reuse the same driver session and redirect its taps or recordings.
+  For concurrent checkout runs, pin each to a different `E2E_DEVICE` as well.
 - **Env.** `apps/native/.env.local` copied from the main checkout, pointing at
   the dev Convex deployment, with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true`.
   The dev deployment must set `AUTH_ENABLE_ANONYMOUS=true`.

@@ -14,6 +14,7 @@ import { SHEET_TRANSITION_MS } from "./tests/seeded-home.ts";
 const ios = mobile({
   platform: "ios",
   device: process.env.E2E_DEVICE,
+  session: `shelvr-${METRO_PORT}`,
   transition: SHEET_TRANSITION_MS,
 });
 

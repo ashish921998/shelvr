@@ -8,6 +8,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { Slot, useRouter, useSegments, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { AccountDeletionGate } from "@/lib/account-deletion-gate";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
 import { useUnistyles } from "react-native-unistyles";
@@ -118,13 +119,15 @@ export default function RootLayout() {
           <ConvexQueryHealer />
           <AccountGoneSignOut />
           <NotificationSessionProvider>
-            {posthog ? (
-              <PostHogProvider client={posthog} autocapture={false}>
-                {appContent}
-              </PostHogProvider>
-            ) : (
-              appContent
-            )}
+            <AccountDeletionGate>
+              {posthog ? (
+                <PostHogProvider client={posthog} autocapture={false}>
+                  {appContent}
+                </PostHogProvider>
+              ) : (
+                appContent
+              )}
+            </AccountDeletionGate>
           </NotificationSessionProvider>
         </PersistQueryClientProvider>
       </ConvexAuthProvider>

@@ -107,8 +107,8 @@ export function NotificationSessionProvider({
           });
           if (!enabled) await clearFirstSaveReminder();
         },
+        revokeCapture: () => revokeSiriCapture(revokeCaptureToken),
         signOut: async () => {
-          await revokeSiriCapture(revokeCaptureToken);
           await signOut();
           await clearFirstSaveReminder();
           await clearTrialReminder();

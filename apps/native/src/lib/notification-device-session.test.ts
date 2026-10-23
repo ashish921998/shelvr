@@ -26,6 +26,7 @@ function setup(
       async (_token: string, _locale?: string, _timezone?: string) => {},
     ),
     revokeToken: vi.fn(async (_token: string) => {}),
+    revokeCapture: vi.fn(async () => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
     signOut: vi.fn(async () => {}),
@@ -274,6 +275,9 @@ describe("notification device session", () => {
     deps.revokeToken.mockImplementation(async (token) => {
       events.push(`revoked:${token}`);
     });
+    deps.revokeCapture.mockImplementation(async () => {
+      events.push("capture revoked");
+    });
     deps.signOut.mockImplementation(async () => {
       events.push("signed out");
     });
@@ -284,7 +288,12 @@ describe("notification device session", () => {
     await logout;
     expect(await blocked).toBe(false);
     expect(deps.saveToken).toHaveBeenCalledTimes(1);
-    expect(events).toEqual(["registered", "revoked:token-a", "signed out"]);
+    expect(events).toEqual([
+      "registered",
+      "revoked:token-a",
+      "capture revoked",
+      "signed out",
+    ]);
   });
 
   it("does not let an old completion suppress a new account registration", async () => {
@@ -390,9 +399,18 @@ describe("notification device session", () => {
     await session.register();
     expect(deps.saveToken).toHaveBeenCalledWith("token-a");
     expect(deps.signOut).not.toHaveBeenCalled();
+    expect(deps.revokeCapture).not.toHaveBeenCalled();
     expect(deps.resetAnalytics).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toBe("idle");
     expect(deps.clearWidget).not.toHaveBeenCalled();
+  });
+
+  it("deletes after push revocation without revoking capture before or after deletion", async () => {
+    const { session, deps } = setup(["token-a"]);
+    await session.deleteAccount();
+    expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
+    expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    expect(deps.revokeCapture).not.toHaveBeenCalled();
   });
 
   it("keeps successful deletion successful when local cleanup fails", async () => {
@@ -401,6 +419,7 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    expect(deps.revokeCapture).not.toHaveBeenCalled();
     expect(deps.clearWidget).toHaveBeenCalledOnce();
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
     expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);

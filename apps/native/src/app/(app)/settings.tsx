@@ -35,7 +35,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 export default function SettingsScreen() {
   useAppLocale();
   const { session, operation } = useNotificationSession();
-  const deleting = operation === "delete_account";
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
@@ -315,9 +314,7 @@ export default function SettingsScreen() {
         disabled={busy}
         onPress={confirmDeleteAccount}
       >
-        <Text style={styles.deleteAccountText}>
-          {deleting ? t("account.deleting") : t("account.delete")}
-        </Text>
+        <Text style={styles.deleteAccountText}>{t("account.delete")}</Text>
       </Pressable>
     </ScrollView>
   );

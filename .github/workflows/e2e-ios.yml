@@ -81,6 +81,7 @@ jobs:
         shard:
           - name: a
             tests: >-
+              tests/account-deletion.e2e.ts
               tests/create-space.e2e.ts
               tests/item-detail.e2e.ts
               tests/onboarding.e2e.ts

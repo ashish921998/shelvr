@@ -29,6 +29,7 @@ type SessionDependencies = {
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   setSaveReminders: (enabled: boolean) => Promise<unknown>;
+  revokeCapture: () => Promise<unknown>;
   signOut: () => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
   clearWidget: () => Promise<unknown>;
@@ -201,6 +202,7 @@ export class NotificationDeviceSession {
         try {
           for (const token of await this.store.read())
             await this.deps.revokeToken(token);
+          if (operation === "sign_out") await this.deps.revokeCapture();
           await (operation === "delete_account"
             ? this.deps.deleteAccount()
             : this.deps.signOut());
