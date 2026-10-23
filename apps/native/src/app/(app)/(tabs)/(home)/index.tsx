@@ -10,6 +10,7 @@ import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { DateTripHome } from "@/components/home/date-trip-home";
 import { NextUpCard } from "@/components/home/next-up-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
@@ -245,11 +246,17 @@ export default function HomeScreen() {
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
         // header on iOS.
         ListHeaderComponent={
-          cancelSurveyCard ??
-          howToHeader ??
-          progressCard ??
-          recallCard ??
-          lastHeader(feedback, busySaving, nextUpCard)
+          <View>
+            <DateTripHome />
+            {cancelSurveyCard ??
+              howToHeader ??
+              progressCard ??
+              recallCard ??
+              lastHeader(feedback, busySaving, nextUpCard)}
+            <Text style={[styles.shelfLabel, styles.feedLabel]}>
+              {t("homePlans.everythingSaved")}
+            </Text>
+          </View>
         }
       />
       <HeaderScrim />
@@ -345,5 +352,10 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 0.8,
     textTransform: "uppercase",
     color: theme.colors.faint,
+  },
+  feedLabel: {
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(2),
+    paddingBottom: theme.gap(1),
   },
 }));
