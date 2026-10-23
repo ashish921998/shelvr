@@ -3,6 +3,8 @@ import { DIGEST_WINDOW_MS } from "./notificationFields";
 
 export const SHELF_SIZE = 3;
 export const SHELF_SCAN_ITEMS = 1000;
+// Article saves carry up to 100k characters each; 1,000 of them would pass the transaction read limit.
+export const SHELF_SCAN_BYTES = 6 * 1024 * 1024;
 export const SHELF_HISTORY = 12;
 export const ARCHIVE_CHECKS = 50;
 

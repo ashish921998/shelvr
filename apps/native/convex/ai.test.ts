@@ -1530,6 +1530,28 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     expect(item?.status).toBe("ready");
   });
 
+  function jsonLdHtml(where: "head" | "body"): string {
+    const script = `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Miso butter roast chicken",
+      recipeIngredient: INGREDIENTS,
+      recipeInstructions: STEPS,
+    })}</script>`;
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title>${where === "head" ? script : ""}</head><body>${where === "body" ? script : ""}<p>${"Comments. ".repeat(50)}`;
+  }
+
+  it("keeps a JSON-LD recipe from a whole head when the page was cut", async () => {
+    const item = await save(jsonLdHtml("head"), true);
+    expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    expect(item?.recipe?.steps).toEqual(STEPS);
+  });
+
+  it("refuses a JSON-LD recipe in the body of a cut page", async () => {
+    const item = await save(jsonLdHtml("body"), true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
   describe("when the model proposes a recipe too", () => {
     const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
 

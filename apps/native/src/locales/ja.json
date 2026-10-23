@@ -83,6 +83,8 @@
   "permissions.allowCamera": "カメラを許可",
   "capture.photoMode": "写真",
   "capture.stickerMode": "ステッカー",
+  "capture.flipCamera": "カメラを切り替え",
+  "capture.takePhoto": "写真を撮る",
   "spaces.changeFailed": "スペースを変更できませんでした",
   "spaces.changeFailedBody": "前の選択は保存されています。もう一度お試しください。",
   "navigation.spaces": "スペース",

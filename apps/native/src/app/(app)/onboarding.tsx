@@ -193,8 +193,10 @@ export default function OnboardingScreen() {
 
   const advance = useCallback(() => {
     recordCurrentStep();
-    setStep((current) => flow[flow.indexOf(current) + 1] ?? current);
-  }, [recordCurrentStep, flow]);
+    setStep((current) =>
+      current === step ? (flow[flow.indexOf(step) + 1] ?? current) : current,
+    );
+  }, [recordCurrentStep, flow, step]);
 
   const pickGoal = (picked: Goal) => {
     recordCurrentStep();

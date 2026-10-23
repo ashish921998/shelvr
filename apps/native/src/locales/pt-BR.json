@@ -83,6 +83,8 @@
   "permissions.allowCamera": "Permitir câmera",
   "capture.photoMode": "FOTO",
   "capture.stickerMode": "FIGURINHA",
+  "capture.flipCamera": "Alternar câmera",
+  "capture.takePhoto": "Tirar foto",
   "spaces.changeFailed": "Não foi possível alterar a coleção",
   "spaces.changeFailedBody": "Sua escolha anterior continua salva. Tente novamente.",
   "navigation.spaces": "Coleções",
