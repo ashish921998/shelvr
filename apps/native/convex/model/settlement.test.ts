@@ -121,6 +121,33 @@ describe("a decline that lands at commit", () => {
   });
 });
 
+describe("the places a run brings", () => {
+  const classification = {
+    description: "Where to eat",
+    tags: ["lisbon"],
+    intents: [],
+    places: ["Santelmo", "Intenso"],
+  };
+
+  it("stores the model's places with AI allowed", () => {
+    const patch = completionPatch(
+      savedItem(),
+      { reading: {}, classification },
+      true,
+    );
+    expect(patch.places).toEqual(["Santelmo", "Intenso"]);
+  });
+
+  it("keeps the save's places when AI is declined", () => {
+    const patch = completionPatch(
+      savedItem({ places: ["Antiga"] }),
+      { reading: {}, classification },
+      false,
+    );
+    expect(patch.places).toEqual(["Antiga"]);
+  });
+});
+
 describe("the embedding a run brings", () => {
   const reading = { siteName: "Example", content: "Body text" };
   const classification = {

@@ -91,6 +91,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/accountDeletion.test.ts` and says how to read a failure. Use it before
   changing the deletion drain in `convex/users.ts`, a table with a user key, an
   owner check, or a function that writes rows for a user.
+- **Proving photo saves keep their image:** `.agents/skills/image-import-storage`
+  model-checks the image import and upload receiver in TLA+
+  (`tools/formal/image-import`). Use it before changing those functions, the
+  storage cleanup crons, or any code that deletes a `_storage` blob.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
@@ -195,12 +199,18 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change,
-  or `version` in `app.json`) makes new updates invisible to binaries built
-  from the old fingerprint: cut a fresh store build before resuming OTA
-  publishes. The version is the easy one to miss: a bump must land on
-  `main` before any OTA aimed at the build carrying it. The build number is
-  not an input.
+  fingerprint (a native dependency added or removed, a native config change)
+  makes new updates invisible to binaries built from the old fingerprint: cut a
+  fresh store build before resuming OTA publishes. The version fields in
+  `app.json` (`version`, `ios.buildNumber`, `android.versionCode`) are not
+  inputs. `@expo/fingerprint` 0.21 (Expo SDK 58) defaults to its `balanced`
+  preset, which skips them (`SourceSkips.ExpoConfigVersions`), so a version bump
+  alone does not move the fingerprint. It did through SDK 57, and would again if
+  a `fingerprint.config.js` set `preset: "strict"`.
+  Re-check after an Expo upgrade: edit `version`, run
+  `node tools/verify-ota-compatibility.mjs --profile production --platform ios`
+  under `APP_VARIANT=production` before and after, and the tree's hash must not
+  change.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed
@@ -236,6 +246,7 @@ cannot happen.
 | No `console.*` in app code outside the loggers                                     | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
 | `check:code` is the one gate                                                       | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
 | The pre-push hook gates a push of branch commits, not deletes or tags              | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
+| Convex modules the app imports pull in no server-only package (zod, ai, linkedom)  | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
 | `_generated/api.d.ts` lists every Convex module                                    | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
 | Copy lives in `en.json`; generated catalogs untouched                              | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |
 | `CLAUDE.md` names every table, module and route                                    | `tools/verify-agent-docs.mjs`                                                                                    | `check:code`                         |
@@ -248,9 +259,14 @@ cannot happen.
 | OTA reaches only builds with the same native fingerprint                           | `tools/verify-ota-compatibility.mjs` blocks the publish; `tools/verify-native-fingerprint.mjs` only warns on PRs | OTA `before_update`; CI warns        |
 | A PR shows how it was verified; UI shows a screenshot                              | `tools/verify-pr-evidence.mjs`                                                                                   | CI `PR evidence`                     |
 | No high or critical advisories                                                     | `pnpm run audit`                                                                                                 | `check`, CI on dependency PRs, daily |
-| `requireUserId`, no client `userId`, `liveOwner`                                   | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| Public queries and mutations use the auth builders or are in `PUBLIC_ON_PURPOSE`   | `convex/model/publicFunctions.test.ts`; public actions stay review-only                                          | `check:code`                         |
+| A built function refuses a signed-out and a deleting caller before its handler     | The same test calls each one with a ctx stub                                                                     | `check:code`                         |
+| A `PUBLIC_ON_PURPOSE` reason matches its handler                                   | Review against `REVIEW.md`; CODEOWNERS only labels the file                                                      | nowhere                              |
+| No client `userId`; `liveOwner` before acting for an account                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | `requireProEntitlement`; `aiAllowed` before content leaves                         | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | AI passes touch only `suggested` memberships                                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | No database `.filter((q) => ...)` in `convex/` outside tests                       | ESLint `no-restricted-syntax` (name an index instead)                                                            | `lint`                               |
 | `logEvent` scalars; `safeFetch`                                                    | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| `newConvexTest()`; `captureError`; no test in `src/app`                            | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| Convex test harnesses come from `newConvexTest()`                                  | ESLint `no-restricted-imports` on `convexTest` outside `convex/test.setup.ts`                                    | `lint`                               |
+| No test file under `src/app`                                                       | ESLint `no-restricted-syntax` on `src/app/**/*.{test,spec}.*`                                                    | `lint`                               |
+| `captureError`                                                                     | Review against `REVIEW.md`                                                                                       | nowhere                              |

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
+import { safeExceptionValue, superProperties } from "./posthog";
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
@@ -104,6 +104,99 @@ describe("posthog before_send", () => {
     expect(list[0].value).toBe("ERR_UNAVAILABLE");
   });
 
+  it.each([
+    ["an empty frame list", { type: "raw", frames: [] }],
+    ["no stack trace", undefined],
+  ])(
+    "groups and names a handled error with %s by its failure code",
+    (_shape, stacktrace) => {
+      const sent = sentBeforeSend()({
+        event: "$exception",
+        properties: {
+          error_event: "sample_map_camera_failed",
+          $exception_list: [{ type: "Error", value: "Error", stacktrace }],
+        },
+      });
+      expect(sent.properties).toMatchObject({
+        $exception_fingerprint: "sample_map_camera_failed:Error",
+        $issue_name: "sample_map_camera_failed",
+      });
+    },
+  );
+
+  it("keeps two causes of one stackless failure in separate issues", () => {
+    const send = (value: string) =>
+      sentBeforeSend()({
+        event: "$exception",
+        properties: {
+          error_event: "auth_failed",
+          $exception_list: [{ type: "Error", value }],
+        },
+      }).properties?.$exception_fingerprint;
+    expect(send("ERR_CANCELED")).toBe("auth_failed:ERR_CANCELED");
+    expect(send("Network request failed")).toBe(
+      "auth_failed:Network request failed",
+    );
+  });
+
+  it("never puts a raw message into a stackless fingerprint", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "auth_failed",
+        $exception_list: [
+          { type: "Error", value: "Failed for https://private.example/note" },
+        ],
+      },
+    });
+    expect(sent.properties?.$exception_fingerprint).toBe("auth_failed:Error");
+  });
+
+  it("never puts a type that is not a class name into a stackless fingerprint", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "auth_failed",
+        $exception_list: [{ type: "Bearer private-token", value: "x y" }],
+      },
+    });
+    expect(sent.properties?.$exception_fingerprint).toBe("auth_failed");
+  });
+
+  it("leaves a handled error that has stack frames to PostHog's grouping", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "render_error",
+        $exception_list: [
+          {
+            type: "TypeError",
+            value: "TypeError",
+            stacktrace: { type: "raw", frames: [{ filename: "app.js" }] },
+          },
+        ],
+      },
+    });
+    expect(sent.properties).not.toHaveProperty("$exception_fingerprint");
+    expect(sent.properties).not.toHaveProperty("$issue_name");
+  });
+
+  it("leaves an autocaptured exception with no failure code to PostHog", () => {
+    const sent = sentBeforeSend()(
+      exceptionEvent({
+        list: [
+          {
+            type: "Error",
+            value: "Error",
+            stacktrace: { type: "raw", frames: [] },
+          },
+        ],
+      }),
+    );
+    expect(sent.properties).not.toHaveProperty("$exception_fingerprint");
+    expect(sent.properties).not.toHaveProperty("$issue_name");
+  });
+
   it("redacts an all-caps message that is not a bare code token", () => {
     const beforeSend = sentBeforeSend();
     const sent = beforeSend(
@@ -187,8 +280,12 @@ describe("posthog before_send", () => {
     expect(sent.properties?.$exception_list).toBe("not-a-list");
   });
 
-  it("exports the shared allowlist used by analytics.captureError", () => {
-    expect(SAFE_ERROR_MESSAGES.has("Network request failed")).toBe(true);
+  it("shares one safe-value rule with analytics.captureError", () => {
+    expect(safeExceptionValue("Network request failed")).toBe(
+      "Network request failed",
+    );
+    expect(safeExceptionValue("ERR_CANCELED")).toBe("ERR_CANCELED");
+    expect(safeExceptionValue("Failed for https://x.test")).toBeUndefined();
   });
 });
 

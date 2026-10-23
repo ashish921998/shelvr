@@ -46,7 +46,10 @@ export function NextUpCard({
         testID="next-up-open"
         onPress={() => {
           onOpen();
-          router.push({ pathname: "/item/[id]", params: { id: item._id } });
+          router.push({
+            pathname: "/item/[id]",
+            params: { id: item._id, from: "next-up" },
+          });
         }}
         style={({ pressed }) => [
           styles.card,

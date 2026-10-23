@@ -54,6 +54,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
@@ -416,6 +417,8 @@ function ItemScreenContent() {
         : undefined;
     }
     if (from === "search") return searchQ.data;
+    // On Android a deep start index in the home pager drew an empty page.
+    if (from === "next-up") return undefined;
     return homeFeed.items;
   }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
@@ -587,11 +590,16 @@ function ItemScreenContent() {
     } else {
       router.back();
     }
-    const changed = await dismissSuggestion({
-      itemId: dismissedId,
-      spaceId: spaceId as Id<"spaces">,
-    });
-    if (changed) analytics.capture("suggestion_dismissed");
+    try {
+      const changed = await dismissSuggestion({
+        itemId: dismissedId,
+        spaceId: spaceId as Id<"spaces">,
+      });
+      if (changed) analytics.capture("suggestion_dismissed");
+    } catch (error) {
+      analytics.captureError("suggestion_dismiss_failed", error);
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    }
   }, [
     spaceId,
     activeId,
@@ -605,27 +613,29 @@ function ItemScreenContent() {
     reducedMotion,
   ]);
 
-  const onDelete = useCallback(async () => {
+  const onDelete = useCallback(() => {
     if (!activeItem || !items) return;
-    cancelParamWrite();
-    const idx = items.findIndex((item) => item._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    try {
-      await deleteItem({ id: activeItem._id });
-      forgetDeletedSharedItem(activeItem._id);
-      analytics.itemDeleted(activeItem, "item_detail");
-      if (neighbor) {
-        goTo(neighbor._id);
-        writeParams(neighbor._id);
-        listRef.current?.scrollToIndex({
-          index: Math.min(idx, items.length - 2),
-          animated: !reducedMotion,
-        });
-      } else if (router.canGoBack()) router.back();
-      else router.replace("/(app)/(tabs)/(home)");
-    } catch {
-      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-    }
+    confirmItemDelete(async () => {
+      cancelParamWrite();
+      const idx = items.findIndex((item) => item._id === activeItem._id);
+      const neighbor = items[idx + 1] ?? items[idx - 1];
+      try {
+        await deleteItem({ id: activeItem._id });
+        forgetDeletedSharedItem(activeItem._id);
+        analytics.itemDeleted(activeItem, "item_detail");
+        if (neighbor) {
+          goTo(neighbor._id);
+          writeParams(neighbor._id);
+          listRef.current?.scrollToIndex({
+            index: Math.min(idx, items.length - 2),
+            animated: !reducedMotion,
+          });
+        } else if (router.canGoBack()) router.back();
+        else router.replace("/(app)/(tabs)/(home)");
+      } catch {
+        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+      }
+    });
   }, [
     activeItem,
     items,

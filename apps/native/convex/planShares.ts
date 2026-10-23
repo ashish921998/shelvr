@@ -4,12 +4,15 @@ import { internal } from "./_generated/api";
 import {
   internalMutation,
   internalQuery,
-  mutation,
   type MutationCtx,
-  query,
   type QueryCtx,
 } from "./_generated/server";
-import { liveOwner, requireUserId, senderFirstName } from "./model/auth";
+import {
+  liveOwner,
+  senderFirstName,
+  authedMutation,
+  authedQuery,
+} from "./model/auth";
 import {
   MAX_AREA_CHARS,
   MAX_PLACE_NAME_CHARS,
@@ -65,7 +68,7 @@ async function liveShare(
   return share;
 }
 
-export const createPlanShare = mutation({
+export const createPlanShare = authedMutation({
   args: {
     spaceId: v.id("spaces"),
     city: v.optional(v.string()),
@@ -73,7 +76,7 @@ export const createPlanShare = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
@@ -116,7 +119,7 @@ export const createPlanShare = mutation({
   },
 });
 
-export const latestPlanShare = query({
+export const latestPlanShare = authedQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.union(
     v.object({
@@ -140,7 +143,7 @@ export const latestPlanShare = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) return null;
     const share = await ctx.db

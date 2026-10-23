@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { mutation, query } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { authedMutation, authedQuery } from "./model/auth";
 import {
   cancelSurveyOutcomeValidator,
   cancelSurveyReasonValidator,
@@ -14,21 +13,20 @@ async function findSurveyRow(ctx: QueryCtx | MutationCtx, userId: string) {
     .first();
 }
 
-export const getStatus = query({
+export const getStatus = authedQuery({
   args: {},
   returns: v.object({ asked: v.boolean() }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
-    const row = await findSurveyRow(ctx, userId);
+    const row = await findSurveyRow(ctx, ctx.userId);
     return { asked: row !== null };
   },
 });
 
-export const markShown = mutation({
+export const markShown = authedMutation({
   args: {},
   returns: v.object({ accepted: v.boolean() }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     if (await findSurveyRow(ctx, userId)) return { accepted: false };
     await ctx.db.insert("cancelSurveys", {
       userId,
@@ -38,14 +36,14 @@ export const markShown = mutation({
   },
 });
 
-export const respond = mutation({
+export const respond = authedMutation({
   args: {
     outcome: cancelSurveyOutcomeValidator,
     reason: v.optional(cancelSurveyReasonValidator),
   },
   returns: v.object({ accepted: v.boolean() }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const existing = await findSurveyRow(ctx, userId);
     const now = Date.now();
     if (existing === null) {

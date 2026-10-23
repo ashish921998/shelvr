@@ -222,6 +222,31 @@ describe("useMakePlan", () => {
       expect(second.planId).not.toBe(first.planId);
     }
   });
+
+  it("keeps the shown plan and says so when a shuffle fails", async () => {
+    mocks.makePlan
+      .mockResolvedValueOnce({ places: [place("Alpha")], considered: 3 })
+      .mockRejectedValueOnce(new Error("RateLimited"));
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
+    await waitFor(() => expect(result.current.state.status).toBe("ready"));
+    const shown = result.current.state;
+
+    await act(() => result.current.retry());
+
+    expect(result.current.state).toBe(shown);
+    expect(mocks.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the error screen when the first plan fails and its retry fails", async () => {
+    mocks.makePlan.mockRejectedValue(new Error("down"));
+    const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    await act(() => result.current.retry());
+
+    expect(result.current.state.status).toBe("error");
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
 });
 
 describe("usePlanPicker", () => {
@@ -277,6 +302,32 @@ describe("usePlanPicker", () => {
     expect(onPicked).toHaveBeenCalledTimes(1);
     expect(result.current.picked).not.toBeNull();
     expect(onPicked).toHaveBeenCalledWith(result.current.picked);
+  });
+
+  it("can pick again when a failed shuffle brings back the plan it was spinning", () => {
+    vi.useFakeTimers();
+    const onPicked = vi.fn();
+    const places = [place("Alpha"), place("Beta"), place("Gamma")];
+    const { result, rerender } = renderHook(
+      ({ planId }: { planId: number | null }) =>
+        usePlanPicker(places, planId, { reducedMotion: false, onPicked }),
+      { initialProps: { planId: 1 as number | null } },
+    );
+    act(() => result.current.pickForMe());
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current.isSpinning).toBe(true);
+
+    rerender({ planId: null });
+    rerender({ planId: 1 });
+    expect(result.current.isSpinning).toBe(false);
+    expect(result.current.highlight).toBeNull();
+
+    act(() => result.current.pickForMe());
+    spinToEnd();
+    expect(onPicked).toHaveBeenCalledTimes(1);
+    expect(result.current.isSpinning).toBe(false);
   });
 
   it("clears its timers on unmount", () => {

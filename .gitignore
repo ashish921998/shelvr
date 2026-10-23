@@ -61,6 +61,7 @@ yarn-error.log*
 .agents/skills/*
 !.agents/skills/verify-shelvr
 !.agents/skills/account-deletion
+!.agents/skills/image-import-storage
 .claude/
 .codex/
 .cursor/

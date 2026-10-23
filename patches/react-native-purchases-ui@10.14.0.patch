@@ -1,0 +1,20 @@
+diff --git a/ios/RNPaywalls.m b/ios/RNPaywalls.m
+index ce28cbeebf70ca0249df9a00a567eb5228255a64..8b5cc31339851f4a2875eb259aaa997319cdd3ae 100644
+--- a/ios/RNPaywalls.m
++++ b/ios/RNPaywalls.m
+@@ -120,6 +120,7 @@ - (PaywallProxy *)paywalls API_AVAILABLE(ios(15.0)){
+             options[PaywallOptionsKeys.presentedOfferingContext] = presentedOfferingContext;
+         }
+         options[PaywallOptionsKeys.displayCloseButton] = @(displayCloseButton);
++        options[PaywallOptionsKeys.presentationMode] = @"fullScreen";
+         if (fontFamily) {
+             options[PaywallOptionsKeys.fontName] = fontFamily;
+         }
+@@ -159,6 +160,7 @@ - (PaywallProxy *)paywalls API_AVAILABLE(ios(15.0)){
+         }
+         options[PaywallOptionsKeys.requiredEntitlementIdentifier] = requiredEntitlementIdentifier;
+         options[PaywallOptionsKeys.displayCloseButton] = @(displayCloseButton);
++        options[PaywallOptionsKeys.presentationMode] = @"fullScreen";
+         if (fontFamily) {
+             options[PaywallOptionsKeys.fontName] = fontFamily;
+         }

@@ -23,6 +23,7 @@ import {
 } from "react";
 import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
+import { applyQueuedWeeklyShelf } from "./pending-weekly-shelf";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
 import { deferLink } from "@/lib/deferred-sheet-link";
@@ -145,6 +146,10 @@ export function NotificationSessionProvider({
       return;
     }
     session.start();
+    applyQueuedWeeklyShelf((enabled) => session.setWeeklyShelf(enabled)).catch(
+      (error: unknown) =>
+        analytics.captureError("weekly_shelf_preference_failed", error),
+    );
 
     const register = async (
       devicePushToken?: Notifications.DevicePushToken,

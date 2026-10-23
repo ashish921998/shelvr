@@ -10,6 +10,8 @@ import {
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
 
+const NOT_NOW = "Not now";
+
 // Leave the app signed out at the opener, not mid-onboarding, for the next test.
 afterEach(async ({ device, screen }) => {
   await startFreshOnboarding({ device, screen });
@@ -33,9 +35,11 @@ test(
 
     await shareLater.tap();
     await screen.getByRole("button", "Let's go").tap({ timeout: 30_000 });
+    // The notifications screen comes between the promise and the paywall, and stays put when the paywall closes.
+    const commit = screen.getByRole("button", NOT_NOW);
+    await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
-    const commit = screen.getByRole("button", "Let's go");
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
     await expect(commit).toBeVisible({ timeout: 30_000 });
@@ -58,7 +62,7 @@ test(
 );
 
 test(
-  "shows a sample trip, open, before the promise and the paywall for someone saving travel ideas",
+  "shows a sample trip, open, then the promise, the notifications screen and the paywall for someone saving travel ideas",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -72,8 +76,12 @@ test(
     await expect(screen.getByText("Staré Město")).toBeVisible();
     await screen.getByRole("button", "Continue").tap();
 
-    const commit = screen.getByRole("button", "Let's go");
-    await commit.tap({ timeout: 30_000 });
+    await screen.getByRole("button", "Let's go").tap({ timeout: 30_000 });
+    await expect(screen.getByText(/^Remember every spot/)).toBeVisible({
+      timeout: 30_000,
+    });
+    const commit = screen.getByRole("button", NOT_NOW);
+    await commit.tap();
     await expectPaywall(screen);
     await screen.getByRole("button", "Close").first().tap();
     await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
