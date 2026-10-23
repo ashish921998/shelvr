@@ -12,6 +12,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
+import { tripStopItemIds } from "./tripData";
 import { liveOwner, requireUserId } from "./model/auth";
 import {
   localHour,
@@ -489,7 +490,12 @@ export const prepareWeeklyDigest = internalMutation({
         )
         .flatMap((digest) => digest.itemIds),
     );
-    const candidates = shelfCandidates(items, previouslyIncluded, args.now);
+    const planned = await tripStopItemIds(ctx, args.userId);
+    const candidates = shelfCandidates(
+      items,
+      new Set([...previouslyIncluded, ...planned]),
+      args.now,
+    );
 
     const recentOpened = await Promise.all(
       candidates.recent.map((item) => wasOpened(ctx, args.userId, item._id)),
@@ -711,6 +717,7 @@ export const prepareSaveReminder = internalMutation({
       items,
       now,
       reminders[0]?.kind,
+      await tripStopItemIds(ctx, userId),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

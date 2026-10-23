@@ -201,6 +201,26 @@ export async function deleteTripsForSpace(
   }
 }
 
+// ponytail: the newest 50 trips (one per space); a user with more spaces keeps older trips' stops on the shelf.
+const TRIP_STOP_SCAN = 50;
+
+/** Saves planned on a day of one of the user's trips. A place that didn't fit (`wishlist`) is not planned. */
+export async function tripStopItemIds(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<Set<string>> {
+  const trips = await ctx.db
+    .query("trips")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(TRIP_STOP_SCAN);
+  return new Set(
+    trips.flatMap((trip) =>
+      trip.days.flatMap((day) => day.stops.map((stop) => stop.itemId)),
+    ),
+  );
+}
+
 export const saveTripInternal = internalMutation({
   args: {
     spaceId: v.id("spaces"),

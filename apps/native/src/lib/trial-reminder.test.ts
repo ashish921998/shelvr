@@ -48,7 +48,7 @@ vi.mock("expo-notifications", () => ({
 }));
 
 const DAY = 24 * 60 * 60 * 1000;
-const NOW = 1_800_000_000_000;
+const NOW = new Date(2027, 0, 15, 12, 0).getTime();
 const granted = { granted: true, canAskAgain: true, ios: { status: 2 } };
 const undetermined = { granted: false, canAskAgain: true, ios: { status: 0 } };
 
@@ -61,6 +61,17 @@ beforeEach(() => {
 describe("trialReminderAt", () => {
   it("fires two days before the trial ends", () => {
     expect(trialReminderAt(NOW + 7 * DAY, NOW)).toBe(NOW + 5 * DAY);
+  });
+
+  it("moves a night reminder earlier into the day, never later", () => {
+    const at = (hour: number, minute: number) => {
+      const start = new Date(2027, 0, 4, hour, minute).getTime();
+      return new Date(trialReminderAt(start + 7 * DAY, start) ?? 0);
+    };
+    expect(at(23, 30)).toEqual(new Date(2027, 0, 9, 20, 0));
+    expect(at(6, 15)).toEqual(new Date(2027, 0, 8, 20, 0));
+    expect(at(20, 0)).toEqual(new Date(2027, 0, 9, 20, 0));
+    expect(at(9, 0)).toEqual(new Date(2027, 0, 9, 9, 0));
   });
 
   it("skips a trial that ends within two days", () => {
