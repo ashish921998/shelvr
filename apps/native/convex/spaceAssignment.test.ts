@@ -66,7 +66,7 @@ describe("explicit space assignment vs classification", () => {
         .withIndex("by_item", (q) => q.eq("itemId", itemId))
         .collect();
       expect(joins).toHaveLength(1);
-      expect(joins[0].status).toBe("saved");
+      expect(joins[0]!.status).toBe("saved");
     });
   });
 

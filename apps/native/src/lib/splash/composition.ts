@@ -116,11 +116,15 @@ function sampleThread(
 
 function threadXAt(above: Point[], below: Point[], y: number): number {
   const points = y < CENTER_Y ? above : below;
-  let nearest = points[0];
+  let nearest: Point | undefined;
   for (const point of points) {
-    if (Math.abs(point[1] - y) < Math.abs(nearest[1] - y)) nearest = point;
+    if (
+      nearest === undefined ||
+      Math.abs(point[1] - y) < Math.abs(nearest[1] - y)
+    )
+      nearest = point;
   }
-  return nearest[0];
+  return nearest?.[0] ?? CENTER_X;
 }
 
 export function buildComposition(seed = 7): Composition {
@@ -156,7 +160,7 @@ export function buildComposition(seed = 7): Composition {
     marks.push({
       x,
       y,
-      type: SAVE_TYPES[Math.floor(random() * SAVE_TYPES.length)],
+      type: SAVE_TYPES[Math.floor(random() * SAVE_TYPES.length)] ?? "note",
       size: 6 + random() * 4.5,
       rotation: (random() - 0.5) * 0.7,
       tone: toneRoll < 0.78 ? "ink" : toneRoll < 0.91 ? "accent" : "cool",
@@ -170,10 +174,10 @@ export function buildComposition(seed = 7): Composition {
   }
 
   for (let i = MARK_COUNT - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    const slot = marks[i].slot;
-    marks[i].slot = marks[j].slot;
-    marks[j].slot = slot;
+    const a = marks[i];
+    const b = marks[Math.floor(random() * (i + 1))];
+    if (a === undefined || b === undefined) continue;
+    [a.slot, b.slot] = [b.slot, a.slot];
   }
 
   const dust: Dust[] = [];

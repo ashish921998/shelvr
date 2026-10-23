@@ -64,7 +64,7 @@ export async function runImageBatch(
     deps.alert(
       t("errors.batchSaveTitle"),
       t("capture.partialFailure", {
-        reason: localizeError(otherFailures[0].message),
+        reason: localizeError(otherFailures[0]?.message),
         saved: savedSoFar.length,
         total: savedSoFar.length + failed.length,
       }),

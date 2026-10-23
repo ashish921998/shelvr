@@ -1,5 +1,6 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { pickAndSaveImages } from "@/lib/pick-and-save-images";
+import { onlyResult } from "@/lib/image-save-result";
 import {
   type ImageSaveRequest,
   reportSaveFailures,
@@ -113,10 +114,9 @@ export default function CameraScreen() {
   const saveSingle = async (request: ImageSaveRequest) => {
     setBusy(true);
     try {
-      const [result] = await saveImages([request], {
-        ...pinnedSpace,
-        saveSource: "camera",
-      });
+      const result = onlyResult(
+        await saveImages([request], { ...pinnedSpace, saveSource: "camera" }),
+      );
       if (result.status === "saved") {
         analytics.capture("photo_captured", { capture_mode: mode });
         router.back();

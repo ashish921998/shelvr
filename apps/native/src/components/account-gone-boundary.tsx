@@ -8,19 +8,19 @@ export class AccountGoneBoundary extends Component<
   { signedIn: boolean; children: ReactNode },
   { error: unknown; failed: boolean }
 > {
-  state = { error: undefined as unknown, failed: false };
+  override state = { error: undefined as unknown, failed: false };
 
   static getDerivedStateFromError(error: unknown) {
     return { error, failed: true };
   }
 
-  componentDidUpdate(previous: { signedIn: boolean }) {
+  override componentDidUpdate(previous: { signedIn: boolean }) {
     if (previous.signedIn && !this.props.signedIn && this.state.failed) {
       this.setState({ error: undefined, failed: false });
     }
   }
 
-  render() {
+  override render() {
     if (!this.state.failed) return this.props.children;
     return <AccountGoneFallback error={this.state.error} />;
   }

@@ -35,5 +35,6 @@ const LABELS: Record<string, TextMessageKey> = {
 };
 
 export function onboardingLabel(id: string): string {
-  return Object.hasOwn(LABELS, id) ? t(LABELS[id]) : id;
+  const label = Object.hasOwn(LABELS, id) ? LABELS[id] : undefined;
+  return label === undefined ? id : t(label);
 }

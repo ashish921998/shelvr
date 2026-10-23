@@ -142,7 +142,7 @@ describe("captureError", () => {
     });
     expect(console.error).not.toHaveBeenCalledWith("share_save_failed", error);
     expect(mock.captureException).toHaveBeenCalledTimes(1);
-    const [reported, properties] = mock.captureException.mock.calls[0];
+    const [reported, properties] = mock.captureException.mock.calls[0]!;
     expect(reported).toBeInstanceOf(Error);
     expect((reported as Error).name).toBe("TypeError");
     expect((reported as Error).stack).toBe(error.stack);
@@ -160,7 +160,7 @@ describe("captureError", () => {
   it("passes through whitelisted fixed messages", () => {
     const error = new Error("Network request failed");
     analytics.captureError("image_upload_failed", error);
-    expect(mock.captureException.mock.calls[0][0]).toBe(error);
+    expect(mock.captureException.mock.calls[0]![0]).toBe(error);
   });
 
   it("does not log custom error names or arbitrary thrown values", () => {
@@ -181,7 +181,7 @@ describe("captureError", () => {
 
   it("reduces non-Error throws to their type", () => {
     analytics.captureError("sign_out_failed", "boom");
-    const reported = mock.captureException.mock.calls[0][0] as Error;
+    const reported = mock.captureException.mock.calls[0]![0] as Error;
     expect(reported.message).toBe("string");
   });
 

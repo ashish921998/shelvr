@@ -42,7 +42,7 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
   };
   const html = str("html") ?? "";
   const paragraph = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-  const body = paragraph ? paragraph[1] : html;
+  const body = paragraph?.[1] ?? html;
   const content = decodeEntities(
     body
       .replace(/<[^>]+>/g, " ")
@@ -52,9 +52,11 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
   // t.co anchors show the display URL; pic.twitter.com media links lead nowhere useful.
   const hrefs = Array.from(
     body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi),
-  )
-    .filter(([, , label]) => !/^\s*pic\.(twitter|x)\.com/i.test(label))
-    .map(([, href]) => decodeEntities(href));
+  ).flatMap(([, href, label]) =>
+    href === undefined || /^\s*pic\.(twitter|x)\.com/i.test(label ?? "")
+      ? []
+      : [decodeEntities(href)],
+  );
   const handle = str("author_url")?.match(
     /(?:twitter\.com|x\.com)\/([^/?#]+)/i,
   )?.[1];
@@ -181,7 +183,8 @@ function parseXSyndication(body: unknown): PageData | undefined {
         ]
       : [];
   });
-  if (content === undefined && media.length === 0) {
+  const [hero] = media;
+  if (content === undefined && hero === undefined) {
     return undefined;
   }
   return {
@@ -190,10 +193,10 @@ function parseXSyndication(body: unknown): PageData | undefined {
     author,
     content,
     ...(post.note_tweet ? { truncated: true as const } : {}),
-    ...(media.length > 0
+    ...(hero !== undefined
       ? {
-          heroImageUrl: media[0].imageUrl,
-          heroAspectRatio: media[0].aspectRatio,
+          heroImageUrl: hero.imageUrl,
+          heroAspectRatio: hero.aspectRatio,
           media,
         }
       : {}),

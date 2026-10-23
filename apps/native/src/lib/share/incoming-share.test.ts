@@ -28,7 +28,7 @@ const ctx = (over: Partial<ShareContext> = {}): ShareContext => ({
   resolved: [
     {
       contentType: "website",
-      value: raw[0].value,
+      value: raw[0]!.value,
       contentUri: null,
       contentMimeType: "text/plain",
     },
@@ -80,7 +80,7 @@ describe("incoming share owner", () => {
       { type: "reconciled", result: { kind: "new", session: s1 } },
       { type: "reconciled", result: { kind: "resume", session: s1 } },
     ]);
-    expect(types(effects[0])).toEqual(["save"]);
+    expect(types(effects[0]!)).toEqual(["save"]);
     expect(effects[1]).toEqual([]);
     expect(state.phase.kind).toBe("saving");
     expect(state.running).toBe("s1");
@@ -97,7 +97,7 @@ describe("incoming share owner", () => {
     ]);
     expect(effects[1]).toEqual([]);
     expect(effects[2]).toEqual([]);
-    expect(types(effects[3])).toEqual(["save"]);
+    expect(types(effects[3]!)).toEqual(["save"]);
     expect(state.partial).toBeNull();
   });
 
@@ -109,14 +109,14 @@ describe("incoming share owner", () => {
         {
           type: "entrySettled",
           sessionId: "s1",
-          entry: session("s1", "saved").entries[0],
+          entry: session("s1", "saved").entries[0]!,
         },
         { type: "saveSettled", session: session("s1", "saved") },
         { type: "saveSettled", session: session("s2", "saved") },
       ],
       ctx({ storedSessionId: "s2" }),
     );
-    expect(types(effects[1])).toEqual(["save"]);
+    expect(types(effects[1]!)).toEqual(["save"]);
     expect(effects[2]).toEqual([
       {
         type: "persistEntry",
@@ -125,7 +125,7 @@ describe("incoming share owner", () => {
       },
     ]);
     expect(effects[3]).toEqual([{ type: "markComplete", sessionId: "s1" }]);
-    expect(types(effects[4])).toEqual([
+    expect(types(effects[4]!)).toEqual([
       "markComplete",
       "tombstone",
       "nativeClear",
@@ -149,7 +149,7 @@ describe("incoming share owner", () => {
     );
     expect(effects[2]).toEqual([]);
     expect(effects[3]).toEqual([]);
-    expect(types(effects[4])).toEqual([
+    expect(types(effects[4]!)).toEqual([
       "markComplete",
       "tombstone",
       "nativeClear",
@@ -174,7 +174,7 @@ describe("incoming share owner", () => {
       ctx(),
       initialIncomingShare(false),
     );
-    expect(types(effects[1])).toEqual(["markComplete", "nativeClear"]);
+    expect(types(effects[1]!)).toEqual(["markComplete", "nativeClear"]);
   });
 
   it("records the discard when Cancel's native clear throws", () => {
@@ -279,9 +279,9 @@ describe("incoming share owner", () => {
         ],
       }),
     );
-    const save = effects[0][0];
-    expect(save.type).toBe("save");
-    if (save.type !== "save") return;
+    const save = effects[0]![0];
+    expect(save!.type).toBe("save");
+    if (save!.type !== "save") return;
     expect(save.input).toBe(s1);
     expect(save.classified.map((e) => e.status)).toEqual(["unsupported"]);
   });
@@ -315,7 +315,7 @@ describe("incoming share owner", () => {
     expect(state.phase).toEqual({ kind: "partial", session: s1 });
     expect(state.partial).toBe("s1");
     expect(state.running).toBeNull();
-    expect(types(effects[0])).toEqual(["saveFailed"]);
+    expect(types(effects[0]!)).toEqual(["saveFailed"]);
   });
 
   it("skips the tombstone when the store already holds a newer record", () => {
@@ -326,7 +326,7 @@ describe("incoming share owner", () => {
       ],
       ctx({ storedSessionId: "s2" }),
     );
-    expect(types(stale.effects[1])).toEqual(["markComplete", "nativeClear"]);
+    expect(types(stale.effects[1]!)).toEqual(["markComplete", "nativeClear"]);
   });
 
   it("keeps the current phase when a replaced session settles partial", () => {
@@ -352,7 +352,7 @@ describe("incoming share owner", () => {
       ],
       ctx({ storedSessionId: null }),
     );
-    expect(types(effects[1])).toEqual(["markComplete", "nativeClear"]);
+    expect(types(effects[1]!)).toEqual(["markComplete", "nativeClear"]);
     expect(state.completing).toBe("s1");
   });
 });

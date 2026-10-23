@@ -27,8 +27,10 @@ const TOTAL_MS = 3200;
 export const HERO_BEATS = {
   scan: [700 / TOTAL_MS, 1500 / TOTAL_MS],
   reveal: [1400 / TOTAL_MS, 1900 / TOTAL_MS],
-  tag: (index: number) =>
-    [2000 + index * 150, 2320 + index * 150].map((ms) => ms / TOTAL_MS),
+  tag: (index: number): [number, number] => [
+    (2000 + index * 150) / TOTAL_MS,
+    (2320 + index * 150) / TOTAL_MS,
+  ],
 } as const;
 const SCAN_WIDTH = 56;
 

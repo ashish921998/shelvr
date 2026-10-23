@@ -112,9 +112,9 @@ vi.mock("react-native-reanimated", () => ({
     output: number[],
     clamp?: string,
   ) => {
-    const fraction = (value - input[0]) / (input[1] - input[0]);
+    const fraction = (value - input[0]!) / (input[1]! - input[0]!);
     const progress = clamp ? Math.min(1, Math.max(0, fraction)) : fraction;
-    return output[0] + progress * (output[1] - output[0]);
+    return output[0]! + progress * (output[1]! - output[0]!);
   },
 }));
 vi.mock("react-native-gesture-handler", () => ({
@@ -181,23 +181,23 @@ function point(x: number, y: number, id = 1): TouchEvent {
 
 function down(x = 40, y = 29) {
   const manager = { activate: vi.fn(), end: vi.fn(), fail: vi.fn() };
-  act(() => mock.handlers.onTouchesDown(point(x, y), manager));
+  act(() => mock.handlers.onTouchesDown!(point(x, y), manager));
   expect(manager.activate).toHaveBeenCalledOnce();
   return manager;
 }
 
 function move(x: number, y: number, id = 1) {
   const event = point(x, y, id);
-  event.changedTouches[0].x = 999;
-  event.changedTouches[0].y = 999;
-  act(() => mock.handlers.onTouchesMove(event));
+  event.changedTouches[0]!.x = 999;
+  event.changedTouches[0]!.y = 999;
+  act(() => mock.handlers.onTouchesMove!(event));
 }
 
 function release(success = true) {
   const manager = { activate: vi.fn(), end: vi.fn(), fail: vi.fn() };
   act(() => {
-    mock.handlers.onTouchesUp(point(40, 29), manager);
-    mock.handlers.onFinalize(point(40, 29), success);
+    mock.handlers.onTouchesUp!(point(40, 29), manager);
+    mock.handlers.onFinalize!(point(40, 29), success);
   });
   expect(manager.end).toHaveBeenCalledOnce();
 }
@@ -255,8 +255,8 @@ describe.each([false, true])(
         [412, 170, 112, 112],
         [150, 29, 0, 0],
       ]) {
-        move(x, y);
-        expectTransform(overflowX, overflowY, true);
+        move(x!, y!);
+        expectTransform(overflowX!, overflowY!, true);
       }
       release();
       expectTransform(0, 0, false);
@@ -317,8 +317,8 @@ describe.each([false, true])(
       const manager = down();
       move(260, 29);
       act(() => {
-        mock.handlers.onTouchesCancelled(point(260, 29), manager);
-        mock.handlers.onFinalize(point(260, 29), false);
+        mock.handlers.onTouchesCancelled!(point(260, 29), manager);
+        mock.handlers.onFinalize!(point(260, 29), false);
       });
       expect(manager.fail).toHaveBeenCalledOnce();
       expect(mock.presses).not.toHaveBeenCalled();

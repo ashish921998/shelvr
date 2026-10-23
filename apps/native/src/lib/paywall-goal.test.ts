@@ -237,7 +237,7 @@ describe("paywallGoal catalog copy", () => {
       for (const key of keys) {
         const value = (catalog as unknown as Record<string, string>)[key];
         expect(value, `${locale} ${key}`).not.toMatch(/[—–]/);
-        expect(value, `${locale} ${key}`).not.toMatch(free[locale]);
+        expect(value, `${locale} ${key}`).not.toMatch(free[locale]!);
       }
     }
   });

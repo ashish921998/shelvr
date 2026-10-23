@@ -25,11 +25,11 @@ function Throws(): ReactNode {
 }
 
 class Root extends Component<{ children: ReactNode }, { error?: unknown }> {
-  state: { error?: unknown } = {};
+  override state: { error?: unknown } = {};
   static getDerivedStateFromError(error: unknown) {
     return { error };
   }
-  render() {
+  override render() {
     return this.state.error === undefined ? (
       this.props.children
     ) : (

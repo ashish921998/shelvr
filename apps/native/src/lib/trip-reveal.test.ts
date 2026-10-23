@@ -56,7 +56,7 @@ describe("revealCovers", () => {
         .slice(0, 2)
         .map((cover) => cover.id),
     ).toEqual(["lower", "spaced"]);
-    expect(revealCovers(items, "rio de janeiro")[0].id).toBe("split");
+    expect(revealCovers(items, "rio de janeiro")[0]!.id).toBe("split");
   });
 });
 
@@ -65,7 +65,7 @@ describe("revealLayout", () => {
     const layout = revealLayout(390, 844, 6);
     expect(layout.cards).toHaveLength(6);
     expect(layout.cards[0]).toMatchObject({ left: 12, top: 228, width: 183 });
-    expect(layout.cards[1].left).toBe(195);
+    expect(layout.cards[1]!.left).toBe(195);
     expect(layout.dots).toHaveLength(16);
     expect(layout.landing).toEqual({ x: 195, y: 422 });
   });
@@ -75,8 +75,8 @@ describe("revealLayout", () => {
     for (const [index, card] of layout.cards.entries()) {
       const centreX = card.left + card.width / 2 + card.toX;
       const centreY = card.top + card.height / 2 + card.toY;
-      expect(centreX).toBeCloseTo(layout.dots[index].x);
-      expect(centreY).toBeCloseTo(layout.dots[index].y);
+      expect(centreX).toBeCloseTo(layout.dots[index]!.x);
+      expect(centreY).toBeCloseTo(layout.dots[index]!.y);
     }
   });
 

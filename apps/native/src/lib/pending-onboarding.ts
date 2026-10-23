@@ -286,7 +286,10 @@ export function resolveOnboardingSpaceName(id: string): string {
   getOrCreatePendingOperationId();
   const record = readPendingRecord();
   if (record === null) throw new Error("Onboarding state unavailable");
-  if (Object.hasOwn(record.spaceNames, id)) return record.spaceNames[id];
+  const frozen = Object.hasOwn(record.spaceNames, id)
+    ? record.spaceNames[id]
+    : undefined;
+  if (frozen !== undefined) return frozen;
   const name = onboardingLabel(id);
   writePendingRecord({
     ...record,

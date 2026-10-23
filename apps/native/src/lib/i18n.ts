@@ -23,7 +23,7 @@ export function formattingLocale(): string {
     if (!normalized) continue;
     const { canonical, baseName } = normalized;
     const [language, ...subtags] = baseName.split("-");
-    if (language === selected.split("-")[0]) return canonical;
+    if (language === selected.split("-", 1)[0]) return canonical;
     const region = subtags.find((part) => /^[A-Z]{2}$|^\d{3}$/.test(part));
     if (fallback === "en" && region) fallback = `en-${region}`;
   }
@@ -53,9 +53,9 @@ export function localizeError(
   message: unknown,
   fallback: TextMessageKey = "errors.saveFallback",
 ): string {
-  const key =
+  const known =
     typeof message === "string" && Object.hasOwn(ERROR_MESSAGES, message)
       ? ERROR_MESSAGES[message]
-      : fallback;
-  return t(key);
+      : undefined;
+  return t(known ?? fallback);
 }

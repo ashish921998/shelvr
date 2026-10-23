@@ -80,7 +80,7 @@ describe("listItems (installed builds)", () => {
       });
     });
     expect(
-      (await t.query(api.items.listItems, {}))[0].heroImageUrl,
+      (await t.query(api.items.listItems, {}))[0]!.heroImageUrl,
     ).toBeUndefined();
   });
   it("still returns every item as a full row, newest first", async () => {
@@ -89,7 +89,7 @@ describe("listItems (installed builds)", () => {
 
     const items = await t.query(api.items.listItems, {});
     expect(items.map((item) => item._id)).toEqual([...ids].reverse());
-    expect(items[0].content).toContain("Article body 2");
+    expect(items[0]!.content).toContain("Article body 2");
     expect(items[0]).toHaveProperty("imageUrl");
   });
 
@@ -110,7 +110,7 @@ describe("listItems (installed builds)", () => {
 
     const results = await t.query(api.items.searchItems, { query: "save" });
     expect(results.map((item) => item._id)).toEqual([id]);
-    expect(results[0].content).toContain("Article body 0");
+    expect(results[0]!.content).toContain("Article body 0");
     expect(results[0]).toHaveProperty("imageUrl");
   });
 
@@ -198,7 +198,7 @@ describe("listItemsPage", () => {
     });
     expect(page).toHaveLength(1);
     const row = page[0];
-    expect(row._id).toBe(id);
+    expect(row!._id).toBe(id);
     for (const dropped of [
       "content",
       "searchText",
@@ -216,9 +216,9 @@ describe("listItemsPage", () => {
       tags: ["tag"],
       imageUrl: null,
     });
-    expect(typeof row._creationTime).toBe("number");
+    expect(typeof row!._creationTime).toBe("number");
 
-    const full = await t.query(api.items.getItem, { id });
+    const full = await t.query(api.items.getItem, { id: id! });
     expect(full?.content).toContain("Article body 0");
     expect(full?.products).toHaveLength(1);
   });
@@ -447,7 +447,7 @@ describe("nextUp", () => {
   it("suggests the newest article the user has not opened", async () => {
     const { t, userId } = await as();
     const ids = await seedFeed(t, userId, 3);
-    await markOpened(t, userId, ids[2], Date.now());
+    await markOpened(t, userId, ids[2]!, Date.now());
 
     const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
     expect(next?.kind).toBe("read");
@@ -515,7 +515,7 @@ describe("nextUp", () => {
 
     const next = await t.query(api.items.nextUp, {
       now: later(2),
-      skip: [ids[2]],
+      skip: [ids[2]!],
     });
     expect(next?.item._id).toBe(ids[1]);
   });
@@ -860,7 +860,7 @@ describe("canonical save telemetry", () => {
       (job) => job.name === "analytics:captureSave",
     );
     expect(telemetry).toHaveLength(1);
-    expect(telemetry[0].args).toEqual([
+    expect(telemetry[0]!.args).toEqual([
       {
         itemId,
         userId,
@@ -2643,11 +2643,11 @@ describe("importLinks", () => {
     ]);
     const runs = await processRuns(t);
     expect(runs).toHaveLength(2);
-    expect(runs[0].scheduledTime).toBeGreaterThanOrEqual(
+    expect(runs[0]!.scheduledTime).toBeGreaterThanOrEqual(
       before + 5 * IMPORT_STAGGER_MS,
     );
     expect(
-      runs[1].scheduledTime - runs[0].scheduledTime,
+      runs[1]!.scheduledTime - runs[0]!.scheduledTime,
     ).toBeGreaterThanOrEqual(IMPORT_STAGGER_MS);
     for (const run of runs) {
       const { itemId, runId } = run.args[0] as {
@@ -3006,7 +3006,7 @@ describe("stale processing runs", () => {
     });
     expect(typeof note?.processingRunId).toBe("string");
     const [job] = await scheduledJobs(t, "ai:processItem");
-    expect(job.args[0]).toEqual({
+    expect(job!.args[0]).toEqual({
       itemId: noteId,
       runId: note?.processingRunId,
     });

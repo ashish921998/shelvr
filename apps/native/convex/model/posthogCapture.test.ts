@@ -44,7 +44,7 @@ describe("deliverPostHogEvent", () => {
     expect(await deliverPostHogEvent(request({ timestamp: 1000 }))).toEqual({
       status: "delivered",
     });
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://analytics.example/capture/");
     expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(JSON.parse(init.body)).toEqual({
@@ -80,7 +80,7 @@ describe("deliverPostHogEvent", () => {
     const fetchMock = ok();
     vi.stubGlobal("fetch", fetchMock);
     await deliverPostHogEvent(request());
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty(
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).not.toHaveProperty(
       "timestamp",
     );
   });

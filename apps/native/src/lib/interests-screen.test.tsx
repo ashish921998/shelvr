@@ -88,7 +88,7 @@ vi.mock("@/lib/onboarding-paywall", () => ({
 }));
 vi.mock("@/lib/use-incoming-share-url", () => ({
   holdsOnlyLink: (payloads: { value: string }[], url: string) =>
-    payloads.length === 1 && payloads[0].value === url,
+    payloads.length === 1 && payloads[0]!.value === url,
 }));
 vi.mock("@/lib/share/process-share", () => ({
   firstSharedUrl: (payloads: { value: string }[]) => payloads[0]?.value ?? null,

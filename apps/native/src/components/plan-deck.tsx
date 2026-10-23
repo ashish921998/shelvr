@@ -33,11 +33,13 @@ type Props = {
   onOpenMaps: (place: PlanPlace, rank: number) => void;
 };
 
+const FAN_TOP = { rotate: -1, x: 0, y: 0 };
+const FAN_LAST = { rotate: 9, x: 22, y: 22 };
 const FAN = [
-  { rotate: -1, x: 0, y: 0 },
+  FAN_TOP,
   { rotate: 5, x: 14, y: 8 },
   { rotate: -6, x: -16, y: 14 },
-  { rotate: 9, x: 22, y: 22 },
+  FAN_LAST,
 ];
 const FLIP_MS = 360;
 
@@ -103,7 +105,7 @@ export function PlanDeck({
     transform: [
       { translateX: panX.get() },
       {
-        rotate: `${interpolate(panX.get(), [-cardWidth, 0, cardWidth], [-12, FAN[0].rotate, 12])}deg`,
+        rotate: `${interpolate(panX.get(), [-cardWidth, 0, cardWidth], [-12, FAN_TOP.rotate, 12])}deg`,
       },
     ],
   }));
@@ -129,7 +131,7 @@ export function PlanDeck({
         const depth = order.length - 1 - i;
         const key = `${place.itemId}-${place.name}`;
         if (depth > 0) {
-          const fan = FAN[depth] ?? FAN[FAN.length - 1];
+          const fan = FAN[depth] ?? FAN_LAST;
           return (
             <View
               key={key}

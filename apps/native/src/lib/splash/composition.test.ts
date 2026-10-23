@@ -30,8 +30,8 @@ describe("buildComposition", () => {
   it("draws the thread in two segments meeting at the centre", () => {
     const { threadAbove, threadBelow } = buildComposition();
     expect(threadAbove.at(-1)?.[1]).toBeCloseTo(CENTER_Y, 5);
-    expect(threadBelow[0][1]).toBeCloseTo(CENTER_Y, 5);
-    expect(threadAbove[0][1]).toBeLessThan(0);
+    expect(threadBelow[0]![1]).toBeCloseTo(CENTER_Y, 5);
+    expect(threadAbove[0]![1]).toBeLessThan(0);
     expect(threadBelow.at(-1)?.[1]).toBeGreaterThan(CENTER_Y);
   });
 

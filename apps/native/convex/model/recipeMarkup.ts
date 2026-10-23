@@ -214,16 +214,17 @@ function extractMicrodata(document: Document): RecipeDraft | undefined {
   const scopes = Array.from(
     document.querySelectorAll('[itemtype*="schema.org/Recipe"]'),
   );
-  if (scopes.length !== 1) {
+  const [scope] = scopes;
+  if (scope === undefined || scopes.length !== 1) {
     return undefined;
   }
-  const scope = scopes[0];
   const instructionNodes = Array.from(
     scope.querySelectorAll('[itemprop="recipeInstructions"]'),
   );
+  const [instructions] = instructionNodes;
   const steps =
-    instructionNodes.length === 1
-      ? Array.from(instructionNodes[0].querySelectorAll("li, p"))
+    instructions !== undefined && instructionNodes.length === 1
+      ? Array.from(instructions.querySelectorAll("li, p"))
           .map((element) =>
             (element.textContent ?? "").replace(/\s+/g, " ").trim(),
           )

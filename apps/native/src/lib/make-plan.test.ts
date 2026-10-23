@@ -40,7 +40,7 @@ describe("placeLabel", () => {
 describe("planShareText", () => {
   it("lists every place in order, the pick, and the link", () => {
     const places = [place("Balthazar", "SoHo"), place("Bar Lola")];
-    const text = planShareText("Date night", places, places[1]);
+    const text = planShareText("Date night", places, places[1]!);
 
     expect(text).toBe(
       [
@@ -71,7 +71,7 @@ describe("spinSteps", () => {
     expect(steps.at(-1)?.index).toBe(3);
     expect(steps.every((step) => step.index >= 0 && step.index < 5)).toBe(true);
     for (let i = 1; i < steps.length; i++) {
-      expect(steps[i].holdMs).toBeGreaterThanOrEqual(steps[i - 1].holdMs);
+      expect(steps[i]!.holdMs).toBeGreaterThanOrEqual(steps[i - 1]!.holdMs);
     }
   });
 

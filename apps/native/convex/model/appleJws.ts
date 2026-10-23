@@ -34,26 +34,32 @@ type Certificate = {
 };
 
 class AppleJwsError extends Error {
-  name = "AppleJwsError";
+  override name = "AppleJwsError";
 }
 
 function fail(reason: string): never {
   throw new AppleJwsError(reason);
 }
 
+function byteAt(der: Bytes, offset: number): number {
+  const byte = der[offset];
+  return byte === undefined ? fail("der_truncated") : byte;
+}
+
 function readNode(der: Bytes, start: number, limit: number): Node {
   if (start + 2 > limit) fail("der_truncated");
-  let length = der[start + 1];
+  let length = byteAt(der, start + 1);
   let body = start + 2;
   if (length & 0x80) {
     const count = length & 0x7f;
     if (count === 0 || count > 3 || body + count > limit) fail("der_length");
     length = 0;
-    for (let i = 0; i < count; i++) length = (length << 8) | der[body + i];
+    for (let i = 0; i < count; i++)
+      length = (length << 8) | byteAt(der, body + i);
     body += count;
   }
   if (body + length > limit) fail("der_truncated");
-  return { tag: der[start], start, body, end: body + length };
+  return { tag: byteAt(der, start), start, body, end: body + length };
 }
 
 function children(der: Bytes, parent: Node): Node[] {
@@ -85,7 +91,10 @@ function readTime(der: Bytes, node: Node): number {
     text,
   );
   if (!match || (node.tag !== 0x17 && node.tag !== 0x18)) fail("der_time");
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  // The pattern matched, so every field is present.
+  const [year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0] = match
+    .slice(1)
+    .map(Number);
   const fullYear =
     node.tag === 0x18 ? year : year < 50 ? 2000 + year : 1900 + year;
   return Date.UTC(fullYear, month - 1, day, hour, minute, second);
@@ -101,6 +110,7 @@ function parseCertificate(der: Bytes): Certificate {
   const fields = children(der, tbs);
   if (fields[0]?.tag !== 0xa0 || fields.length < 7) fail("cert_shape");
   const [, , , issuer, validity, subject, spki] = fields;
+  if (!issuer || !validity || !subject || !spki) fail("cert_shape");
   const [notBefore, notAfter] = children(der, validity);
   if (!notBefore || !notAfter) fail("cert_shape");
   const slice = (node: Node) => der.subarray(node.start, node.end);
@@ -199,8 +209,15 @@ export async function verifyAppleJws(
   now: number,
 ): Promise<unknown> {
   const segments = jws.split(".");
-  if (segments.length !== 3) fail("jws_shape");
-  const header = decodeJson(segments[0]) as { alg?: unknown; x5c?: unknown };
+  const [headerSegment, payloadSegment, signatureSegment] = segments;
+  if (
+    segments.length !== 3 ||
+    headerSegment === undefined ||
+    payloadSegment === undefined ||
+    signatureSegment === undefined
+  )
+    fail("jws_shape");
+  const header = decodeJson(headerSegment) as { alg?: unknown; x5c?: unknown };
   const x5c = header?.x5c;
   if (
     header?.alg !== "ES256" ||
@@ -213,6 +230,7 @@ export async function verifyAppleJws(
   const [leaf, intermediate, anchor] = x5c.map((entry: string) =>
     parseCertificate(decodeBase64(entry)),
   );
+  if (!leaf || !intermediate || !anchor) fail("jws_header");
   if (!sameBytes(anchor.der, decodeBase64(root))) fail("chain_root");
   if (
     !contains(leaf.tbs, OID_APPLE_LEAF) ||
@@ -228,8 +246,8 @@ export async function verifyAppleJws(
   )
     fail("chain_signature");
 
-  const signed = new TextEncoder().encode(`${segments[0]}.${segments[1]}`);
-  if (!(await verify(leaf, "SHA-256", decodeBase64(segments[2]), signed)))
+  const signed = new TextEncoder().encode(`${headerSegment}.${payloadSegment}`);
+  if (!(await verify(leaf, "SHA-256", decodeBase64(signatureSegment), signed)))
     fail("jws_signature");
-  return decodeJson(segments[1]);
+  return decodeJson(payloadSegment);
 }

@@ -35,17 +35,18 @@ export async function loadReadySaves(
   spaceId: Id<"spaces">,
   userId: string,
 ): Promise<{ item: Doc<"items">; join: Doc<"spaceItems"> }[]> {
-  const [saved, legacy] = await Promise.all(
-    (["saved", undefined] as const).map((status) =>
-      ctx.db
-        .query("spaceItems")
-        .withIndex("by_space_and_status", (q) =>
-          q.eq("spaceId", spaceId).eq("status", status),
-        )
-        .order("desc")
-        .take(MAX_PLAN_ITEMS),
-    ),
-  );
+  const withStatus = (status: "saved" | undefined) =>
+    ctx.db
+      .query("spaceItems")
+      .withIndex("by_space_and_status", (q) =>
+        q.eq("spaceId", spaceId).eq("status", status),
+      )
+      .order("desc")
+      .take(MAX_PLAN_ITEMS);
+  const [saved, legacy] = await Promise.all([
+    withStatus("saved"),
+    withStatus(undefined),
+  ]);
   const joins = [...saved, ...legacy]
     .sort((a, b) => b._creationTime - a._creationTime)
     .slice(0, MAX_PLAN_ITEMS);
@@ -79,7 +80,7 @@ function countCities(items: Doc<"items">[]): { city: string; count: number }[] {
   }
   return [...counts.values()]
     .map(({ count, spellings }) => ({
-      city: [...spellings].sort((a, b) => b[1] - a[1])[0][0],
+      city: [...spellings].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "",
       count,
     }))
     .sort((a, b) => b.count - a.count);

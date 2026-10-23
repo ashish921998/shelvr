@@ -91,23 +91,23 @@ describe("runImageBatch", () => {
     await runImageBatch(["a", "b", "c"].map(request), h.deps);
 
     expect(h.alerts).toHaveLength(1);
-    const retry = h.alerts[0].buttons[0];
-    expect(retry.text).toBe("Retry failed");
+    const retry = h.alerts[0]!.buttons[0];
+    expect(retry!.text).toBe("Retry failed");
 
-    retry.onPress?.();
+    retry!.onPress?.();
     await vi.waitFor(() => expect(h.calls).toHaveLength(2));
 
     expect(h.calls[1]).toEqual([
       { image: { uri: "b" }, operationId: "image:op-b" },
       { image: { uri: "c" }, operationId: "image:op-c" },
     ]);
-    expect(h.calls[1].map((r) => r.operationId)).toEqual([
+    expect(h.calls[1]!.map((r) => r.operationId)).toEqual([
       "image:op-b",
       "image:op-c",
     ]);
-    expect(h.calls[1].some((r) => r.image.uri === "a")).toBe(false);
+    expect(h.calls[1]!.some((r) => r.image.uri === "a")).toBe(false);
     expect(h.allSaved).toHaveLength(1);
-    expect(h.allSaved[0].map((r) => r.operationId)).toEqual([
+    expect(h.allSaved[0]!.map((r) => r.operationId)).toEqual([
       "image:op-a",
       "image:op-b",
       "image:op-c",
@@ -126,14 +126,14 @@ describe("runImageBatch", () => {
       [saved("c", "image:op-c")],
     ]);
     await runImageBatch(["a", "b", "c"].map(request), h.deps);
-    expect(h.alerts[0].message).toContain("1 of 3 saved.");
+    expect(h.alerts[0]!.message).toContain("1 of 3 saved.");
 
-    h.alerts[0].buttons[0].onPress?.();
+    h.alerts[0]!.buttons[0]!.onPress?.();
     await vi.waitFor(() => expect(h.alerts).toHaveLength(2));
-    expect(h.alerts[1].message).toContain("2 of 3 saved.");
+    expect(h.alerts[1]!.message).toContain("2 of 3 saved.");
     expect(h.calls[2 - 1]).toHaveLength(2);
 
-    h.alerts[1].buttons[0].onPress?.();
+    h.alerts[1]!.buttons[0]!.onPress?.();
     await vi.waitFor(() => expect(h.allSaved).toHaveLength(1));
     expect(h.calls[2]).toEqual([
       { image: { uri: "c" }, operationId: "image:op-c" },
@@ -187,10 +187,10 @@ describe("runImageBatch", () => {
 
     expect(h.openPaywall).toHaveBeenCalledTimes(1);
     expect(h.alerts).toHaveLength(1);
-    expect(h.alerts[0].message).toContain("too large");
-    h.alerts[0].buttons[0].onPress?.();
+    expect(h.alerts[0]!.message).toContain("too large");
+    h.alerts[0]!.buttons[0]!.onPress?.();
     await vi.waitFor(() => expect(h.calls).toHaveLength(2));
-    expect(h.calls[1].map((r) => r.operationId)).toEqual([
+    expect(h.calls[1]!.map((r) => r.operationId)).toEqual([
       "image:op-a",
       "image:op-b",
     ]);
@@ -206,9 +206,9 @@ describe("runImageBatch", () => {
 
     expect(h.spaceIds).toEqual(["ks_space"]);
     expect(reportSaveFailures).toHaveBeenCalledTimes(1);
-    expect(h.alerts[0].title).toBe("Could not save all images");
-    expect(h.alerts[0].message).toContain("0 of 1 saved.");
-    h.alerts[0].buttons[1].onPress?.();
+    expect(h.alerts[0]!.title).toBe("Could not save all images");
+    expect(h.alerts[0]!.message).toContain("0 of 1 saved.");
+    h.alerts[0]!.buttons[1]!.onPress?.();
     expect(h.onDismiss).toHaveBeenCalledTimes(1);
     expect(h.busy).toEqual([true, false]);
   });

@@ -75,7 +75,7 @@ export function useTripReveal(
   const [held, setHeld] = useState(false);
   const reducedMotion = useReducedMotion();
   const requested =
-    request?.city ?? (cities?.length === 1 ? cities[0].city : undefined);
+    request?.city ?? (cities?.length === 1 ? cities[0]?.city : undefined);
   const items = space?.items;
   const covers = useMemo(
     () => revealCovers(items ?? [], requested),
@@ -180,14 +180,12 @@ export function TripReveal({
         dots={layout.dots}
         landing={layout.landing}
       />
-      {covers.map((cover, index) => (
-        <Card
-          key={cover.id}
-          cover={cover}
-          card={layout.cards[index]}
-          stage={stage}
-        />
-      ))}
+      {covers.map((cover, index) => {
+        const card = layout.cards[index];
+        return card ? (
+          <Card key={cover.id} cover={cover} card={card} stage={stage} />
+        ) : null;
+      })}
       <View style={styles.caption} pointerEvents="none">
         {stage === "dive" ? (
           <Animated.View

@@ -29,7 +29,7 @@ const PRIVATE = fc.oneof(
 
 const dotted = (o: number[]) => o.join(".");
 const mappedHex = (o: number[]) =>
-  `::ffff:${((o[0] << 8) | o[1]).toString(16)}:${((o[2] << 8) | o[3]).toString(16)}`;
+  `::ffff:${((o[0]! << 8) | o[1]!).toString(16)}:${((o[2]! << 8) | o[3]!).toString(16)}`;
 
 describe("isPublicAddress", () => {
   it("never allows a private or reserved IPv4, in any spelling", () => {

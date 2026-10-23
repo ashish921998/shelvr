@@ -47,9 +47,9 @@ async function setup(options: { pro?: boolean } = {}) {
       name: "Thalassa",
       area: "Vagator",
       why: "Sunset dinner",
-      itemId: itemIds[0],
+      itemId: itemIds[0]!,
     },
-    { name: "Gunpowder", why: "South Indian", itemId: itemIds[1] },
+    { name: "Gunpowder", why: "South Indian", itemId: itemIds[1]! },
   ];
   return { backend, t, userId, spaceId, itemIds, places };
 }
@@ -127,7 +127,7 @@ describe("createPlanShare", () => {
     await expect(
       t.mutation(api.planShares.createPlanShare, {
         spaceId,
-        places: [{ ...places[0], itemId: foreignItem }],
+        places: [{ ...places[0]!, itemId: foreignItem }],
       }),
     ).rejects.toThrow("Item not found");
   });
@@ -327,7 +327,7 @@ describe("votes", () => {
         name: "Thalassa",
         area: "Vagator",
         why: "Sunset dinner",
-        itemId: places[0].itemId,
+        itemId: places[0]!.itemId,
         picks: 0,
         passes: 0,
       },
@@ -335,7 +335,7 @@ describe("votes", () => {
         key: "p1",
         name: "Gunpowder",
         why: "South Indian",
-        itemId: places[1].itemId,
+        itemId: places[1]!.itemId,
         picks: 0,
         passes: 0,
       },
@@ -366,7 +366,7 @@ describe("votes", () => {
       spaceId,
       places,
     });
-    await t.run((ctx) => ctx.db.delete(itemIds[0]));
+    await t.run((ctx) => ctx.db.delete(itemIds[0]!));
     expect(
       await backend.query(internal.planShares.getPublicPlanShare, { token }),
     ).toMatchObject({ places: [{ key: "p1" }] });
@@ -376,7 +376,7 @@ describe("votes", () => {
       ),
     ).toEqual(["p1"]);
 
-    await t.run((ctx) => ctx.db.delete(itemIds[1]));
+    await t.run((ctx) => ctx.db.delete(itemIds[1]!));
     expect(
       await backend.query(internal.planShares.getPublicPlanShare, { token }),
     ).toBeNull();
@@ -390,7 +390,7 @@ describe("votes", () => {
     await t.mutation(api.planShares.createPlanShare, { spaceId, places });
     await t.mutation(api.placeVisits.setVisited, {
       name: "Thalassa",
-      itemId: places[0].itemId,
+      itemId: places[0]!.itemId,
       visited: true,
     });
     const shared = await t.query(api.planShares.latestPlanShare, { spaceId });
@@ -399,7 +399,7 @@ describe("votes", () => {
 
     await t.mutation(api.placeVisits.setVisited, {
       name: "Thalassa",
-      itemId: places[0].itemId,
+      itemId: places[0]!.itemId,
       visited: false,
     });
     const unmarked = await t.query(api.planShares.latestPlanShare, {

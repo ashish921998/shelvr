@@ -149,7 +149,7 @@ describe("shipped localization resources", () => {
       `${locale}: distinct navigation labels`,
     ).toBe(5);
     for (const [key, source] of Object.entries(en)) {
-      const translated = messages[key];
+      const translated = messages[key]!;
       expect(typeof translated).toBe(typeof source);
       const reference = typeof source === "string" ? source : source.other;
       if (typeof translated === "object") {
@@ -163,7 +163,7 @@ describe("shipped localization resources", () => {
           pt,
         };
         expect(Object.keys(translated).sort()).toEqual(
-          [...categories[locale.split("-")[0]].cardinal].sort(),
+          [...categories[locale.split("-")[0]!]!.cardinal].sort(),
         );
       }
       const variants =

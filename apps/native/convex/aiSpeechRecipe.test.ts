@@ -119,7 +119,7 @@ describe("processItem recipe from a video's speech", () => {
 
     expect(item).toMatchObject({ status: "ready", recipe: SPOKEN });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const prompt = generateObject.mock.calls[1][0].prompt as string;
+    const prompt = generateObject.mock.calls[1]![0].prompt as string;
     expect(prompt).toContain("Best creamy pasta ever");
     expect(prompt).toContain("a third of a cup of heavy cream");
   });
@@ -128,7 +128,7 @@ describe("processItem recipe from a video's speech", () => {
     model(true);
     transcript("Butter and cream.");
     await process(newConvexTest());
-    const schema = generateObject.mock.calls[0][0].schema as {
+    const schema = generateObject.mock.calls[0]![0].schema as {
       shape: Record<string, unknown>;
     };
     expect(Object.keys(schema.shape)).toContain("cookingVideo");
@@ -218,7 +218,7 @@ describe("processItem recipe from a video's speech", () => {
     );
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
     expect(url.searchParams.get("url")).toBe(TIKTOK);
   });
 

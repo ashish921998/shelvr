@@ -86,9 +86,9 @@ function firstLink(resolved: ResolvedPayload[]): string | null {
 
 function classifyInShare(
   resolved: ResolvedPayload[],
-  index: number,
+  payload: ResolvedPayload,
 ): ReturnType<typeof classifyPayload> {
-  const result = classifyPayload(resolved[index]);
+  const result = classifyPayload(payload);
   if (result.kind !== "note" || result.reason !== undefined) return result;
   const url = firstLink(resolved);
   return url === null ? result : { kind: "link", url };
@@ -101,7 +101,7 @@ function shareLinkUrl(
   if (entry.status === "saved" && entry.kind !== "link") return null;
   const payload = resolved[entry.index];
   if (payload === undefined) return null;
-  const { kind, reason, url } = classifyInShare(resolved, entry.index);
+  const { kind, reason, url } = classifyInShare(resolved, payload);
   if (kind !== "link" || reason !== undefined) return null;
   return url ?? payload.value.trim();
 }
@@ -175,7 +175,7 @@ export function classifyEntries(
         message: "No resolved payload for this entry",
       };
     }
-    const { kind, reason } = classifyInShare(resolved, entry.index);
+    const { kind, reason } = classifyInShare(resolved, payload);
     if (reason !== undefined) {
       const status: ShareEntry["status"] =
         kind === "unsupported" ? "unsupported" : "failed";
@@ -255,7 +255,7 @@ async function processOne(
       message: "No resolved payload for this entry",
     };
   }
-  const { kind, reason, url } = classifyInShare(resolved, entry.index);
+  const { kind, reason, url } = classifyInShare(resolved, payload);
   if (reason !== undefined) {
     const status: ShareEntry["status"] =
       kind === "unsupported" ? "unsupported" : "failed";

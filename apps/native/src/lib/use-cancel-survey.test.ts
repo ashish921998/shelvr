@@ -389,7 +389,7 @@ describe("useCancelSurvey", () => {
       react.mount(() => useCancelSurvey());
       await flush();
       latest().presented();
-      await mock.markShown.mock.results[0].value;
+      await mock.markShown.mock.results[0]!.value;
       await flush();
       latest().finish({ outcome: "submitted", reason: "other" });
       await flush();
@@ -414,7 +414,7 @@ describe("useCancelSurvey", () => {
         react.mount(() => useCancelSurvey());
       }
       await flush();
-      await mock.respond.mock.results[1].value;
+      await mock.respond.mock.results[1]!.value;
       await flush();
       expect(latest().visible).toBe(false);
       expect(mock.respond).toHaveBeenCalledTimes(2);

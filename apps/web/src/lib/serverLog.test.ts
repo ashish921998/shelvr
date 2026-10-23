@@ -16,7 +16,7 @@ describe("serverLog", () => {
     });
 
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({
+    expect(JSON.parse(warn.mock.calls[0]![0] as string)).toMatchObject({
       level: "warn",
       event: "waitlist_rate_limited",
       status: 429,

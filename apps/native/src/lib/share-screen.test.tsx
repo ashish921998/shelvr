@@ -225,7 +225,7 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   mock.entitled = true;
   view.rerender(<ShareScreen />);
   await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
-  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
+  expect(mock.createLinkItem.mock.calls[0]![0]).toMatchObject({
     url: link.value,
   });
   await waitFor(() =>
@@ -425,7 +425,7 @@ it("still resumes and saves a different batch after a discard", async () => {
     expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
   );
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
-  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
+  expect(mock.createLinkItem.mock.calls[0]![0]).toMatchObject({
     url: other.value,
   });
   expect(mock.secure.get(DISCARDED_SHARE_KEY)).toBe("");

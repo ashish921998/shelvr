@@ -155,7 +155,7 @@ describe("choosing a save reminder", () => {
         [3, article],
       ],
     });
-    await open(ids[1], NOW - DAY);
+    await open(ids[1]!, NOW - DAY);
     await prepare();
     expect(await reminders()).toEqual([]);
   });
@@ -174,7 +174,7 @@ describe("choosing a save reminder", () => {
     await prepare(NOW + DAY);
     const sent = await reminders();
     expect(sent.map((reminder) => reminder.kind)).toEqual(["read", "cook"]);
-    expect(sent[1].itemId).toBe(lasagna);
+    expect(sent[1]!.itemId).toBe(lasagna);
   });
 
   it("never reminds about the same save twice", async () => {
@@ -238,7 +238,7 @@ describe("choosing a save reminder", () => {
     });
     await prepare();
     expect(await reminders()).toHaveLength(3);
-    await open(ignored[0], NOW - DAY);
+    await open(ignored[0]!, NOW - DAY);
     await due(NOW);
     await prepare();
     expect(await reminders()).toHaveLength(4);
@@ -251,7 +251,7 @@ describe("choosing a save reminder", () => {
     await t.run((ctx) =>
       ctx.db.insert("saveReminders", {
         userId,
-        itemId: ids[0],
+        itemId: ids[0]!,
         kind: "read",
         createdAt: NOW - 3 * DAY,
         deliveryStatus: "failed",
@@ -262,7 +262,7 @@ describe("choosing a save reminder", () => {
     const sent = await reminders();
     expect(sent).toHaveLength(2);
     await t.run((ctx) =>
-      ctx.db.patch(sent[1]._id, {
+      ctx.db.patch(sent[1]!._id, {
         deliveryStatus: "failed",
         deliveryError: "no_devices",
       }),
@@ -521,10 +521,10 @@ describe("the server switch", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await t.action(internal.notificationDelivery.sendReminder, {
-      reminderId: reminder._id,
+      reminderId: reminder!._id,
     });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "reminders_paused",
     });
@@ -576,17 +576,17 @@ describe("delivering a save reminder", () => {
       .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
     vi.stubGlobal("fetch", fetchMock);
     await t.action(internal.notificationDelivery.sendReminder, {
-      reminderId: reminder._id,
+      reminderId: reminder!._id,
     });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual([
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual([
       {
         to: "token-a",
         title: "Saved for later",
         body: "“Why bread rises” is ready when you are.",
         data: {
-          url: `/item/${reminder.itemId}`,
+          url: `/item/${reminder!.itemId}`,
           kind: "read_reminder",
-          notificationId: reminder._id,
+          notificationId: reminder!._id,
         },
         sound: "default",
         channelId: "save-reminders",
@@ -605,9 +605,9 @@ describe("delivering a save reminder", () => {
       .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
     vi.stubGlobal("fetch", fetchMock);
     await t.action(internal.notificationDelivery.sendReminder, {
-      reminderId: reminder._id,
+      reminderId: reminder!._id,
     });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0]).toMatchObject({
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)[0]).toMatchObject({
       body: "今日は「Lasagna」を作ってみませんか？",
       data: { kind: "cook_reminder" },
     });
@@ -624,7 +624,7 @@ describe("delivering a save reminder", () => {
     );
     const send = () =>
       t.action(internal.notificationDelivery.sendReminder, {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       });
     const telemetry = async () =>
       (
@@ -634,20 +634,20 @@ describe("delivering a save reminder", () => {
       ).filter((job) => job.name.includes("captureNotification"));
     await send();
     expect(await telemetry()).toHaveLength(0);
-    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    const row = await t.run((ctx) => ctx.db.get(reminder!._id));
     vi.setSystemTime(row!.deliveryNextAttemptAt!);
     await send();
     await send();
     const jobs = await telemetry();
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].args[0]).toMatchObject({
+    expect(jobs[0]!.args[0]).toMatchObject({
       userId,
-      notificationId: reminder._id,
+      notificationId: reminder!._id,
       kind: "read_reminder",
       itemCount: 1,
       delivered: true,
     });
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "complete",
     });
   });
@@ -660,10 +660,10 @@ describe("delivering a save reminder", () => {
     );
     const send = () =>
       t.action(internal.notificationDelivery.sendReminder, {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       });
     await send();
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "pending",
       deliveryRecipients: [{ state: "receipt" }],
     });
@@ -671,10 +671,10 @@ describe("delivering a save reminder", () => {
       const row = await ctx.db.query("notificationPreferences").unique();
       await ctx.db.patch(row!._id, { remindersEnabled: false });
     });
-    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    const row = await t.run((ctx) => ctx.db.get(reminder!._id));
     vi.setSystemTime(row!.deliveryNextAttemptAt!);
     await send();
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "complete",
       deliveryError: "notifications_disabled",
     });
@@ -685,12 +685,12 @@ describe("delivering a save reminder", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const deleted = await queued();
-    await deleted.t.run((ctx) => ctx.db.delete(deleted.reminder.itemId));
+    await deleted.t.run((ctx) => ctx.db.delete(deleted.reminder!.itemId));
     await deleted.t.action(internal.notificationDelivery.sendReminder, {
-      reminderId: deleted.reminder._id,
+      reminderId: deleted.reminder!._id,
     });
     expect(
-      await deleted.t.run((ctx) => ctx.db.get(deleted.reminder._id)),
+      await deleted.t.run((ctx) => ctx.db.get(deleted.reminder!._id)),
     ).toMatchObject({ deliveryStatus: "failed", deliveryError: "no_items" });
 
     const off = await queued();
@@ -699,10 +699,10 @@ describe("delivering a save reminder", () => {
       await ctx.db.patch(row!._id, { remindersEnabled: false });
     });
     await off.t.action(internal.notificationDelivery.sendReminder, {
-      reminderId: off.reminder._id,
+      reminderId: off.reminder!._id,
     });
     expect(
-      await off.t.run((ctx) => ctx.db.get(off.reminder._id)),
+      await off.t.run((ctx) => ctx.db.get(off.reminder!._id)),
     ).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "notifications_disabled",
@@ -717,11 +717,11 @@ describe("delivering a save reminder", () => {
     vi.stubGlobal("fetch", fetchMock);
     const before = await sendJobs(t);
     await t.action(internal.notificationDelivery.sendReminder, {
-      reminderId: reminder._id,
+      reminderId: reminder!._id,
     });
     await t.mutation(internal.notificationDelivery.recover, {});
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "owner_unavailable",
     });
@@ -736,10 +736,10 @@ describe("delivering a save reminder", () => {
     );
     const send = () =>
       t.action(internal.notificationDelivery.sendReminder, {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       });
     await send();
-    const sent = await t.run((ctx) => ctx.db.get(reminder._id));
+    const sent = await t.run((ctx) => ctx.db.get(reminder!._id));
     expect(sent?.deliveryRecipients).toMatchObject([{ state: "receipt" }]);
     await t.run((ctx) => ctx.db.delete(userId));
     vi.setSystemTime(sent!.deliveryNextAttemptAt!);
@@ -748,7 +748,7 @@ describe("delivering a save reminder", () => {
     const before = await sendJobs(t);
     await send();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "owner_unavailable",
     });
@@ -760,17 +760,17 @@ describe("delivering a save reminder", () => {
     const claimed = await t.mutation(
       internal.notificationDelivery.claimReminder,
       {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       },
     );
     await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
     const before = await sendJobs(t);
     await t.mutation(internal.notificationDelivery.finishReminder, {
-      reminderId: reminder._id,
+      reminderId: reminder!._id,
       attempt: claimed!.attempt,
       recipients: [{ token: "token-a", state: "delivered" }],
     });
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "complete",
     });
     expect(await sendJobs(t)).toBe(before);
@@ -781,12 +781,12 @@ describe("delivering a save reminder", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     const send = () =>
       t.action(internal.notificationDelivery.sendReminder, {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       });
     await send();
     vi.setSystemTime(NOW + 6 * 60 * 60 * 1000);
     await send();
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "expired",
     });
@@ -798,16 +798,16 @@ describe("delivering a save reminder", () => {
     vi.stubGlobal("fetch", fetchMock);
     const send = () =>
       t.action(internal.notificationDelivery.sendReminder, {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       });
     await send();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await open(reminder.itemId, NOW + 60_000);
-    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    await open(reminder!.itemId, NOW + 60_000);
+    const row = await t.run((ctx) => ctx.db.get(reminder!._id));
     vi.setSystemTime(row!.deliveryNextAttemptAt!);
     await send();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+    expect(await t.run((ctx) => ctx.db.get(reminder!._id))).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "item_opened",
     });
@@ -838,15 +838,15 @@ describe("delivering a save reminder", () => {
     );
     const send = () =>
       t.action(internal.notificationDelivery.sendReminder, {
-        reminderId: reminder._id,
+        reminderId: reminder!._id,
       });
     await send();
-    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    const row = await t.run((ctx) => ctx.db.get(reminder!._id));
     vi.setSystemTime(row!.deliveryNextAttemptAt!);
     await send();
     vi.setSystemTime(NOW + 6 * 60 * 60 * 1000);
     await send();
-    const final = await t.run((ctx) => ctx.db.get(reminder._id));
+    const final = await t.run((ctx) => ctx.db.get(reminder!._id));
     expect(final).toMatchObject({ deliveryStatus: "complete" });
     expect(final?.deliveredAt).toBeDefined();
     const events = (
@@ -855,6 +855,6 @@ describe("delivering a save reminder", () => {
       )
     ).filter((job) => job.name.includes("captureNotification"));
     expect(events).toHaveLength(1);
-    expect(events[0].args[0]).toMatchObject({ delivered: true });
+    expect(events[0]!.args[0]).toMatchObject({ delivered: true });
   });
 });

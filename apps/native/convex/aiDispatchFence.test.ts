@@ -257,7 +257,7 @@ describe("AI dispatch uses fresh live ownership", () => {
       await handler(sweepItemEmbeddings)({ ...ctx, runQuery }, {});
       expect(batches).toBe(1);
     });
-    expect(embedMany.mock.calls[0][0].values).toEqual([
+    expect(embedMany.mock.calls[0]![0].values).toEqual([
       expect.stringContaining("Synthetic save"),
       "Second allowed",
     ]);
@@ -408,10 +408,10 @@ describe("AI dispatch uses fresh live ownership", () => {
       },
     );
     expect(embedMany).toHaveBeenCalledOnce();
-    expect(embedMany.mock.calls[0][0].values).toEqual([
+    expect(embedMany.mock.calls[0]![0].values).toEqual([
       expect.stringContaining("Allowed synthetic note"),
     ]);
-    expect(embedMany.mock.calls[0][0].values).not.toEqual(
+    expect(embedMany.mock.calls[0]![0].values).not.toEqual(
       expect.arrayContaining([expect.stringContaining("Synthetic note")]),
     );
   });
@@ -608,7 +608,7 @@ describe("AI dispatch uses fresh live ownership", () => {
       (ctx) => handler(sweepItemEmbeddings)(ctx, {}),
       () => invalidate(f, "deleted item"),
     );
-    expect(embedMany.mock.calls[0][0].values).toEqual(["Surviving synthetic"]);
+    expect(embedMany.mock.calls[0]![0].values).toEqual(["Surviving synthetic"]);
     expect(await f.t.run((ctx) => ctx.db.get(survivingId))).toMatchObject({
       embedding: vector,
     });
@@ -652,10 +652,10 @@ describe("AI dispatch uses fresh live ownership", () => {
       (ctx) => handler(recommendForSpace)(ctx, { spaceId: f.spaceId }),
       () => invalidate(f, "deleted item"),
     );
-    expect(generateObject.mock.calls[0][0].prompt).not.toContain(
+    expect(generateObject.mock.calls[0]![0].prompt).not.toContain(
       "Synthetic save",
     );
-    expect(generateObject.mock.calls[0][0].prompt).toContain(
+    expect(generateObject.mock.calls[0]![0].prompt).toContain(
       "1. Surviving synthetic",
     );
     expect(

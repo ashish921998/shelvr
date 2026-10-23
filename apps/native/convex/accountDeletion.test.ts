@@ -67,7 +67,7 @@ const TABLES = schema.tables as unknown as Record<
 >;
 
 function fieldsOf(table: string): Record<string, Validator> {
-  const { validator } = TABLES[table];
+  const { validator } = TABLES[table]!;
   if (validator.kind !== "object" || validator.fields === undefined) {
     throw new Error(`${table}: only object tables are understood`);
   }
@@ -161,7 +161,7 @@ function sample(
     case "id":
       return refs.get(field.tableName ?? "") ?? missingRef(field.tableName);
     case "union":
-      return sample(field.members![0], name, owner, refs);
+      return sample(field.members![0]!, name, owner, refs);
     case "object":
       return requiredFields(field.fields!, owner, refs);
     default:
@@ -837,7 +837,7 @@ async function callWriter(
   try {
     await recipe.call(backend, userId, now);
   } catch (thrown) {
-    error = String(thrown).split("\n")[0];
+    error = String(thrown).split("\n")[0]!;
   }
   const wrote = (await countRows(backend, recipe.table)) > before;
   return { wrote, error };
@@ -883,33 +883,33 @@ describe.each(Object.keys(RECIPES))("%s, with an owner check", (key) => {
   const recipe = RECIPES[key];
 
   it("writes for a live account in the sweep's setup (the recipe reaches the insert)", async () => {
-    const { backend, userId, now } = await newDrainingUniverse(recipe);
-    const { wrote, error } = await callWriter(recipe, backend, userId, now);
+    const { backend, userId, now } = await newDrainingUniverse(recipe!);
+    const { wrote, error } = await callWriter(recipe!, backend, userId, now);
     expect(wrote, error ?? "the writer inserted nothing").toBe(true);
   });
 
   it("refuses a draining account at every drain pass", async () => {
-    const outcomes = await runWriterAtEveryBoundary(recipe);
+    const outcomes = await runWriterAtEveryBoundary(recipe!);
     expect(
       outcomes.filter((o) => !o.gone).length,
       `the account finished deleting before there were two gaps to test\n${story(outcomes)}`,
     ).toBeGreaterThan(1);
     expect(
       outcomes.filter((o) => o.wrote || o.error !== null || o.leftover > 0),
-      `${recipe.fence}\n${story(outcomes)}`,
+      `${recipe!.fence}\n${story(outcomes)}`,
     ).toEqual([]);
   });
 });
 
-describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key].claim))(
+describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key]!.claim))(
   "%s, then its delivery claim",
   (key) => {
     const recipe = RECIPES[key];
 
     async function prepared() {
-      const universe = await newUniverse(recipe);
+      const universe = await newUniverse(recipe!);
       const { wrote, error } = await callWriter(
-        recipe,
+        recipe!,
         universe.backend,
         universe.userId,
         universe.now,
@@ -920,7 +920,7 @@ describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key].claim))(
 
     it("hands out what it prepared for a live account (the recipe reaches the claim)", async () => {
       const { backend } = await prepared();
-      expect(await recipe.claim!(backend)).not.toBeNull();
+      expect(await recipe!.claim!(backend)).not.toBeNull();
     });
 
     it("hands out nothing once the account began deleting", async () => {
@@ -931,7 +931,7 @@ describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key].claim))(
         "the account finished deleting in one pass, so there is no window to test",
       ).toBe(true);
       expect(
-        await recipe.claim!(backend),
+        await recipe!.claim!(backend),
         "the claim accepted a notification for an account that began deleting; give it a liveOwner check",
       ).toBeNull();
     });
@@ -949,7 +949,7 @@ describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key].claim))(
             ).length,
         );
       const before = await jobs();
-      await recipe.claim!(backend);
+      await recipe!.claim!(backend);
       await backend.mutation(internal.notificationDelivery.recover, {});
       expect(
         await jobs(),
@@ -957,7 +957,7 @@ describe.each(Object.keys(RECIPES).filter((key) => RECIPES[key].claim))(
       ).toBe(before);
       const row = await backend.run((ctx) =>
         ctx.db
-          .query(recipe.table as TableNames)
+          .query(recipe!.table as TableNames)
           .order("desc")
           .first(),
       );

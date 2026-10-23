@@ -80,7 +80,7 @@ describe("model call deadlines", () => {
     const t = newConvexTest();
     const itemId = await note(t, "run-1");
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    const call = generateObject.mock.calls[0][0];
+    const call = generateObject.mock.calls[0]![0];
     expect(call.abortSignal).toBeInstanceOf(AbortSignal);
     expect(call.maxRetries).toBe(1);
   });
@@ -104,7 +104,7 @@ describe("model call deadlines", () => {
       });
       expect(console.error).not.toHaveBeenCalled();
       expect(console.warn).toHaveBeenCalledTimes(1);
-      const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+      const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body));
       expect(body.event).toBe("ai_categorization_failed");
       expect(body.properties.error_category).toBe("model_timeout");
       expect(JSON.stringify(body)).not.toContain("eggs");
@@ -131,16 +131,18 @@ describe("categorization telemetry delivery", () => {
       )
     ).filter((job) => job.name === "ai:retryCategorizationTelemetry");
     expect(jobs).toHaveLength(1);
-    const first = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    const first = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body));
     expect(first.event).toBe("ai_categorization_succeeded");
     expect(first.uuid).toMatch(/^[0-9a-f-]{36}$/);
-    expect(jobs[0].args[0]).toMatchObject({
+    expect(jobs[0]!.args[0]).toMatchObject({
       deliveryId: first.uuid,
       attempt: 1,
     });
 
-    await t.action(internal.ai.retryCategorizationTelemetry, jobs[0].args[0]);
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual(first);
+    await t.action(internal.ai.retryCategorizationTelemetry, jobs[0]!.args[0]);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1]?.body))).toEqual(
+      first,
+    );
   });
 
   it("gives up after the attempt budget without faulting the action", async () => {

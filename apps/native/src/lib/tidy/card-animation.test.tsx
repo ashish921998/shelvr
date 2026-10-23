@@ -137,45 +137,45 @@ beforeEach(() => {
 describe("CardAnimationProvider", () => {
   it("derives the commit thresholds from the window", () => {
     const { card } = setup(0);
-    expect(card.panDistanceX).toBe(100);
-    expect(card.panDistanceY).toBe(160);
-    expect(card.panX.value).toBe(0);
-    expect(card.panY.value).toBe(0);
+    expect(card!.panDistanceX).toBe(100);
+    expect(card!.panDistanceY).toBe(160);
+    expect(card!.panX.value).toBe(0);
+    expect(card!.panY.value).toBe(0);
   });
 
   it("marks dragging, records the grab point, and re-arms the haptic on begin", () => {
     const { card, deck } = setup(0);
     fire("onBegin", { absoluteY: 437 });
-    expect(deck.isDragging.value).toBe(true);
-    expect(card.absoluteYAnchor.value).toBe(437);
+    expect(deck!.isDragging.value).toBe(true);
+    expect(card!.absoluteYAnchor.value).toBe(437);
     expect(haptics.reset).toHaveBeenCalled();
   });
 
   it("advances animatedIndex by the dominant-axis shift while dragging", () => {
     const { card, deck } = setup(0);
     fire("onChange", { translationX: 250, translationY: 0 });
-    expect(deck.animatedIndex.value).toBe(0);
-    expect(card.panX.value).toBe(250);
+    expect(deck!.animatedIndex.value).toBe(0);
+    expect(card!.panX.value).toBe(250);
     expect(haptics.change).toHaveBeenCalledWith(250, 0);
   });
 
   it("never advances a downward drag", () => {
     const { deck } = setup(0);
     fire("onChange", { translationX: 0, translationY: 400 });
-    expect(deck.animatedIndex.value).toBe(1);
+    expect(deck!.animatedIndex.value).toBe(1);
   });
 
   it("does not shift the deck for a downward-dominant drag past the side threshold", () => {
     const { card, deck, onDecision } = setup(0);
     fire("onChange", { translationX: 150, translationY: 400 });
-    expect(deck.animatedIndex.value).toBe(1);
+    expect(deck!.animatedIndex.value).toBe(1);
     fire(
       "onEnd",
       { translationX: 150, translationY: 400, velocityX: 0, velocityY: 0 },
       true,
     );
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.currentIndex.value).toBe(1);
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
@@ -184,10 +184,10 @@ describe("CardAnimationProvider", () => {
   it("commits a right fling as keep on a velocity spring", () => {
     const { card, deck, onDecision } = setup(0);
     drag({ x: 250, y: 0 });
-    expect(deck.currentIndex.value).toBe(0);
-    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.currentIndex.value).toBe(0);
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 500 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.animatedIndex.value).toEqual({ driver: "spring", value: 0 });
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
     expect(haptics.commit).toHaveBeenCalledTimes(1);
@@ -196,7 +196,7 @@ describe("CardAnimationProvider", () => {
   it("commits a left fling as delete", () => {
     const { card, onDecision } = setup(0);
     drag({ x: -250, y: 0 });
-    expect(card.panX.value).toEqual({ driver: "spring", value: -500 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: -500 });
     expect(flushDecision()).toBe("delete");
     expect(onDecision).toHaveBeenCalledWith(0, "delete");
   });
@@ -204,8 +204,8 @@ describe("CardAnimationProvider", () => {
   it("commits an upward fling as save", () => {
     const { card, onDecision } = setup(0);
     drag({ x: 0, y: -200 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: -800 * 1.15 });
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: -800 * 1.15 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(flushDecision()).toBe("save");
     expect(onDecision).toHaveBeenCalledWith(0, "save");
   });
@@ -213,10 +213,10 @@ describe("CardAnimationProvider", () => {
   it("springs back without deciding when the fling is short", () => {
     const { card, deck, onDecision } = setup(0);
     drag({ x: 30, y: 10 });
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
-    expect(deck.currentIndex.value).toBe(1);
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(deck!.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
@@ -246,8 +246,8 @@ describe("CardAnimationProvider", () => {
   it("springs back on a diagonal where neither axis crosses its threshold", () => {
     const { card, onDecision } = setup(0);
     drag({ x: 80, y: -120 });
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: 0 });
     expect(onDecision).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
   });
@@ -287,10 +287,10 @@ describe("CardAnimationProvider", () => {
       { translationX: 0, translationY: 0, velocityX: -500, velocityY: 0 },
       true,
     );
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.currentIndex.value).toBe(1);
-    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.currentIndex.value).toBe(1);
+    expect(deck!.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
@@ -305,28 +305,30 @@ describe("CardAnimationProvider", () => {
       { translationX: 250, translationY: 0, velocityX: 0, velocityY: 0 },
       true,
     );
-    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 500 });
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
   });
 
   it("cancels in-flight animations and resumes from the card's offset on begin", () => {
     const { card, deck } = setup(0);
-    card.panX.value = 120;
-    card.panY.value = 40;
+    card!.panX.value = 120;
+    card!.panY.value = 40;
     fire("onBegin", { absoluteY: 437 });
-    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(card.panX);
-    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(card.panY);
-    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(deck.animatedIndex);
+    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(card!.panX);
+    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(card!.panY);
+    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(
+      deck!.animatedIndex,
+    );
     fire("onChange", { translationX: 30, translationY: 0 });
-    expect(card.panX.value).toBe(150);
-    expect(card.panY.value).toBe(40);
-    expect(deck.animatedIndex.value).toBe(0);
+    expect(card!.panX.value).toBe(150);
+    expect(card!.panY.value).toBe(40);
+    expect(deck!.animatedIndex.value).toBe(0);
   });
 
   it("commits on release from a re-grab whose own translation is short", () => {
     const { card, onDecision } = setup(0);
-    card.panX.value = 120;
+    card!.panX.value = 120;
     fire("onBegin", { absoluteY: 400 });
     fire(
       "onEnd",
@@ -338,7 +340,7 @@ describe("CardAnimationProvider", () => {
       },
       true,
     );
-    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 500 });
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
   });
@@ -348,10 +350,10 @@ describe("CardAnimationProvider", () => {
     fire("onBegin", { absoluteY: 400 });
     fire("onChange", { translationX: 250, translationY: 0 });
     fire("onFinalize", { translationX: 250 }, false);
-    expect(deck.isDragging.value).toBe(false);
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(deck!.isDragging.value).toBe(false);
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
@@ -366,16 +368,16 @@ describe("CardAnimationProvider", () => {
       { translationX: 250, translationY: 0, velocityX: 0, velocityY: 0 },
       false,
     );
-    expect(deck.isDragging.value).toBe(false);
-    expect(card.panX.value).toBe(250);
-    expect(deck.currentIndex.value).toBe(1);
+    expect(deck!.isDragging.value).toBe(false);
+    expect(card!.panX.value).toBe(250);
+    expect(deck!.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
     fire("onFinalize", { velocityX: 0, velocityY: 0 }, false);
-    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
-    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card!.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck!.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
     expect(onDecision).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
   });
@@ -384,7 +386,7 @@ describe("CardAnimationProvider", () => {
     const { card, deck } = setup(0);
     drag({ x: 250, y: 0 });
     fire("onFinalize", { velocityX: 0, velocityY: 0 }, true);
-    expect(deck.isDragging.value).toBe(false);
-    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
+    expect(deck!.isDragging.value).toBe(false);
+    expect(card!.panX.value).toEqual({ driver: "spring", value: 500 });
   });
 });

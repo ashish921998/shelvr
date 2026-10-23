@@ -261,8 +261,8 @@ function isAddressPart(part: string): boolean {
   const words = wordsOf(part);
   if (words.length < 2) return false;
   return (
-    STREET_SUFFIXES.has(words[words.length - 1]) ||
-    STREET_PREFIXES.has(words[0])
+    STREET_SUFFIXES.has(words.at(-1) ?? "") ||
+    STREET_PREFIXES.has(words[0] ?? "")
   );
 }
 
@@ -285,8 +285,9 @@ export function sanitizePicks<T extends RawPlanPlace>(
   const seen = new Set<string>();
   for (const pick of raw) {
     const n = pick.saveNumber;
-    if (!Number.isInteger(n) || n < 1 || n > sources.length) continue;
+    if (!Number.isInteger(n) || n < 1) continue;
     const source = sources[n - 1];
+    if (source === undefined) continue;
     const evidence = evidenceOf(source);
     const name = withoutAddress(clip(pick.name, MAX_NAME_CHARS), evidence);
     const key = squash(name);

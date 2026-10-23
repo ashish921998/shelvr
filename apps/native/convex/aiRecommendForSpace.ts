@@ -159,8 +159,9 @@ export const recommendForSpace = internalAction({
 
       const itemIds: Id<"items">[] = [];
       for (const n of object.itemNumbers) {
-        if (Number.isInteger(n) && n >= 1 && n <= items.length) {
-          itemIds.push(items[n - 1]._id);
+        const item = Number.isInteger(n) && n >= 1 ? items[n - 1] : undefined;
+        if (item !== undefined) {
+          itemIds.push(item._id);
         }
         if (itemIds.length >= MAX_RECOMMENDATIONS) {
           break;

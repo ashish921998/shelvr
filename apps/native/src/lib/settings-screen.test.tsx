@@ -205,12 +205,12 @@ it.each(["trialing", "pro"])(
       "pro.manage",
       "account.delete",
     ]);
-    expect(buttons[0].style).toBe("cancel");
-    expect(buttons[2].style).toBe("destructive");
+    expect(buttons[0]!.style).toBe("cancel");
+    expect(buttons[2]!.style).toBe("destructive");
 
-    buttons[1].onPress?.();
+    buttons[1]!.onPress?.();
     expect(mocks.deleteAccount).not.toHaveBeenCalled();
-    const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+    const dismiss = mocks.manageSubscription.mock.calls[0]![0] as () => void;
     dismiss();
     expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
     expect(mocks.replace).not.toHaveBeenCalled();
@@ -222,9 +222,9 @@ it("replaces a root Profile with Home before Customer Center", () => {
   mocks.stackRoot = "profile";
   render(<SettingsScreen />);
   fireEvent.click(screen.getByText("account.delete"));
-  lastAlert().buttons[1].onPress?.();
+  lastAlert().buttons[1]!.onPress?.();
 
-  const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+  const dismiss = mocks.manageSubscription.mock.calls[0]![0] as () => void;
   dismiss();
   expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
   expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
@@ -235,9 +235,9 @@ it("keeps another root, such as a linked plan, under Customer Center", () => {
   mocks.stackRoot = "plan/[id]";
   render(<SettingsScreen />);
   fireEvent.click(screen.getByText("account.delete"));
-  lastAlert().buttons[1].onPress?.();
+  lastAlert().buttons[1]!.onPress?.();
 
-  const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+  const dismiss = mocks.manageSubscription.mock.calls[0]![0] as () => void;
   dismiss();
   expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
   expect(mocks.replace).not.toHaveBeenCalled();

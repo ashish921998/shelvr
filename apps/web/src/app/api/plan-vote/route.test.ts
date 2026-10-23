@@ -37,7 +37,7 @@ describe("POST /api/plan-vote", () => {
     const result = await POST(request(vote));
 
     expect(result.status).toBe(200);
-    const [url, init] = mocks.fetch.mock.calls[0];
+    const [url, init] = mocks.fetch.mock.calls[0]!;
     expect(url).toBe("https://deployment.convex.site/plan/votes");
     expect(init.headers).toMatchObject({
       "x-waitlist-secret": "secret",

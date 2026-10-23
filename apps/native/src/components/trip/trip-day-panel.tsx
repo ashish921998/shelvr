@@ -57,15 +57,12 @@ function gapLabel(gap: TripSlot, area: string | undefined): string {
 
 function dayTitle(day: TripDayView, index: number): string {
   const number = String(index + 1);
-  if (day.areas.length >= 2) {
-    return t("trip.dayTitleTwo", {
-      day: number,
-      first: day.areas[0],
-      second: day.areas[1],
-    });
+  const [first, second] = day.areas;
+  if (first !== undefined && second !== undefined) {
+    return t("trip.dayTitleTwo", { day: number, first, second });
   }
-  if (day.areas.length === 1) {
-    return t("trip.dayTitleOne", { day: number, area: day.areas[0] });
+  if (first !== undefined) {
+    return t("trip.dayTitleOne", { day: number, area: first });
   }
   return t("trip.dayTab", { day: number });
 }

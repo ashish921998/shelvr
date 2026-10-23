@@ -48,7 +48,7 @@ async function runMod(
   modResults: { language?: string; contents?: string },
   platformProjectRoot: string,
 ) {
-  return config.mods.android[name]({
+  return config.mods.android[name]!({
     modResults,
     modRequest: { platformProjectRoot },
   });

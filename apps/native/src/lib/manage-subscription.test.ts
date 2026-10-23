@@ -60,7 +60,7 @@ it("points to the App Store when Customer Center cannot present", async () => {
   mock.present.mockResolvedValue(false);
   await manageSubscription(() => {});
 
-  const buttons = mock.alert.mock.calls[0][2] as {
+  const buttons = mock.alert.mock.calls[0]![2] as {
     text: string;
     onPress?: () => void;
   }[];

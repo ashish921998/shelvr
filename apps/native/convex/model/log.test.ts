@@ -64,7 +64,7 @@ describe("logEvent", () => {
 describe("errorName", () => {
   it("returns the class of an Error and the typeof anything else", () => {
     class ConvexError extends Error {
-      name = "ConvexError";
+      override name = "ConvexError";
     }
     expect(errorName(new TypeError("fetch failed: https://x"))).toBe(
       "TypeError",

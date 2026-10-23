@@ -95,7 +95,7 @@ describe("storePoster", () => {
 
     expect(stored).toBe("kg2storedposter");
     expect(store).toHaveBeenCalledOnce();
-    expect(safeFetch.mock.calls[0][1].maxBytes).toBeGreaterThanOrEqual(
+    expect(safeFetch.mock.calls[0]![1].maxBytes).toBeGreaterThanOrEqual(
       heroBytes,
     );
   });
@@ -127,7 +127,7 @@ describe("fetchImageAspectRatio", () => {
     );
 
     expect(ratio).toBeCloseTo(1971 / 1314);
-    expect(safeFetch.mock.calls[0][1].onOverflow).toBe("truncate");
+    expect(safeFetch.mock.calls[0]![1].onOverflow).toBe("truncate");
   });
 });
 
@@ -467,7 +467,7 @@ describe("fetchXPost", () => {
   it("asks the syndication CDN for the post id with a derived token", async () => {
     serveX({ status: 200, body: textSyndication }, { status: 500 });
     await fetchXPost("https://twitter.com/jack/status/20?s=21");
-    expect(safeFetch.mock.calls[0][0]).toBe(
+    expect(safeFetch.mock.calls[0]![0]).toBe(
       "https://cdn.syndication.twimg.com/tweet-result?id=20&token=6dq1a2xwd93",
     );
   });
@@ -581,7 +581,7 @@ describe("processItem for X posts", () => {
     expect(item?.content).toMatch(/^An app spent \$21,418/);
     expect(item?.enrichment).toBeUndefined();
     expect(item).not.toHaveProperty("media");
-    expect(generateObject.mock.calls[0][0].prompt).toContain(
+    expect(generateObject.mock.calls[0]![0].prompt).toContain(
       "Page title: How this GLP-1 app generated 20m+ views",
     );
   });
@@ -1519,7 +1519,7 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
   });
 
   it("refuses a recipe whose method the cap cut off after one step", async () => {
-    const item = await save(cutAt(microdataHtml(), STEPS[1]), true);
+    const item = await save(cutAt(microdataHtml(), STEPS[1]!), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
   });

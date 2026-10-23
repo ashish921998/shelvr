@@ -156,9 +156,8 @@ export function pickedStop(
   const stop = stops.findIndex(
     (s) => s.itemId === pick.itemId && s.name === pick.name,
   );
-  return stop === -1
-    ? null
-    : { ref: { day: pick.day, stop }, view: stops[stop] };
+  const view = stops[stop];
+  return view === undefined ? null : { ref: { day: pick.day, stop }, view };
 }
 
 export function directionsUrl(

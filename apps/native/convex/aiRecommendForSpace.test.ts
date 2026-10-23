@@ -76,8 +76,8 @@ async function seed(items: SeedItem[]) {
 }
 
 function promptedTitles(): string[] {
-  const { prompt } = generateObject.mock.calls[0][0] as { prompt: string };
-  return [...prompt.matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1]);
+  const { prompt } = generateObject.mock.calls[0]![0] as { prompt: string };
+  return [...prompt.matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1]!);
 }
 
 async function suggestedTitles(t: Awaited<ReturnType<typeof seed>>["t"]) {
@@ -113,7 +113,7 @@ describe("recommendForSpace candidate selection", () => {
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
     expect(embedMany).toHaveBeenCalledTimes(1);
-    const call = embedMany.mock.calls[0][0];
+    const call = embedMany.mock.calls[0]![0];
     expect(call.providerOptions.google.taskType).toBe("RETRIEVAL_QUERY");
     expect(call.providerOptions.google.outputDimensionality).toBe(
       EMBEDDING_DIMENSIONS,
@@ -155,7 +155,7 @@ describe("recommendForSpace candidate selection", () => {
       await ctx.db.insert("spaceItems", {
         userId: USER,
         spaceId,
-        itemId: itemIds.Carbonara,
+        itemId: itemIds.Carbonara!,
         status: "saved" as const,
       });
     });
@@ -184,7 +184,7 @@ describe("recommendForSpace candidate selection", () => {
       await ctx.db.insert("spaceItems", {
         userId: USER,
         spaceId,
-        itemId: itemIds.Carbonara,
+        itemId: itemIds.Carbonara!,
         status: "dismissed" as const,
       });
     });

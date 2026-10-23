@@ -23,7 +23,7 @@ type Mod = (mod: { modResults: ResourceXML }) => Promise<{
 
 function runMod(name: string, modResults: ResourceXML) {
   const config = plugin({}) as { mods: { android: Record<string, Mod> } };
-  return config.mods.android[name]({ modResults });
+  return config.mods.android[name]!({ modResults });
 }
 
 describe("Android accent config plugin", () => {
@@ -56,7 +56,7 @@ describe("Android accent config plugin", () => {
       },
     });
 
-    expect(styles.modResults.resources.style?.[0].item).toContainEqual({
+    expect(styles.modResults.resources.style?.[0]!.item).toContainEqual({
       $: { name: "colorAccent" },
       _: "@color/colorAccent",
     });

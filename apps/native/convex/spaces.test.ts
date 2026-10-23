@@ -263,7 +263,7 @@ describe("filing corrections", () => {
     expect(space?.suggestions.map((item) => item._id)).toEqual([ids.itemId]);
     expect(await t.mutation(api.spaces.acceptSuggestion, ids)).toBe(true);
     const restored = await t.query(api.spaces.getSpace, { id: ids.spaceId });
-    expect(restored?.items[0].spaceIntents).toBeUndefined();
+    expect(restored?.items[0]!.spaceIntents).toBeUndefined();
   });
 
   it("keeps a removal through both AI passes and lets an explicit undo restore membership", async () => {
@@ -312,7 +312,7 @@ describe("filing corrections", () => {
     expect(restored?.suggestions).toHaveLength(0);
     const rows = await t.run((ctx) => ctx.db.query("spaceItems").collect());
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe("saved");
+    expect(rows[0]!.status).toBe("saved");
   });
 
   it("rejects corrections against another user's item or space", async () => {
@@ -532,9 +532,9 @@ describe("denormalized space summary", () => {
     await t.mutation(api.spaces.addItemToSpace, { itemId: noImage, spaceId });
 
     let [listed] = await t.query(api.spaces.listSpaces, {});
-    expect(listed.itemCount).toBe(2);
-    expect(listed.suggestionCount).toBe(0);
-    expect(listed.previews).toEqual([
+    expect(listed!.itemCount).toBe(2);
+    expect(listed!.suggestionCount).toBe(0);
+    expect(listed!.previews).toEqual([
       {
         url: expect.stringContaining("/api/storage/"),
         type: "link",
@@ -551,9 +551,9 @@ describe("denormalized space summary", () => {
       }),
     );
     [listed] = await t.query(api.spaces.listSpaces, {});
-    expect(listed.itemCount).toBe(7);
-    expect(listed.suggestionCount).toBe(3);
-    expect(listed.previews).toEqual([
+    expect(listed!.itemCount).toBe(7);
+    expect(listed!.suggestionCount).toBe(3);
+    expect(listed!.previews).toEqual([
       {
         url: expect.stringContaining("/api/storage/"),
         type: "link",
@@ -592,8 +592,8 @@ describe("denormalized space summary", () => {
     expect(await readSpace(t, legacy)).not.toHaveProperty("savedCount");
 
     const [listed] = await t.query(api.spaces.listSpaces, {});
-    expect(listed.itemCount).toBe(2);
-    expect(listed.suggestionCount).toBe(1);
+    expect(listed!.itemCount).toBe(2);
+    expect(listed!.suggestionCount).toBe(1);
     const covers = await t.run(async (ctx) =>
       Promise.all(
         [b, a, s].map(async (id) => {
@@ -602,7 +602,7 @@ describe("denormalized space summary", () => {
         }),
       ),
     );
-    expect(listed.previews.map((p) => p.url)).toEqual(covers);
+    expect(listed!.previews.map((p) => p.url)).toEqual(covers);
     expect(await readSpace(t, legacy)).not.toHaveProperty("savedCount");
 
     const empty = await t.run((ctx) =>
@@ -774,7 +774,7 @@ describe("denormalized space summary", () => {
       (job) => job.name === "spaces:backfillSpaceCounters",
     );
     expect(continuation).toHaveLength(1);
-    expect(continuation[0].args[0]).toMatchObject({
+    expect(continuation[0]!.args[0]).toMatchObject({
       cursor: first.cursor,
       readBudget: 8,
     });
@@ -805,7 +805,7 @@ describe("denormalized space summary", () => {
     }
 
     await t.run((ctx) =>
-      ctx.db.patch(spaces[0], {
+      ctx.db.patch(spaces[0]!, {
         savedCount: undefined,
         suggestedCount: undefined,
         previewItemIds: undefined,
@@ -823,14 +823,14 @@ describe("denormalized space summary", () => {
       done: false,
       cursor: spaces[0],
     });
-    expect((await readSpace(t, spaces[0])).savedCount).toBeUndefined();
+    expect((await readSpace(t, spaces[0]!)).savedCount).toBeUndefined();
 
-    await t.run((ctx) => ctx.db.patch(spaces[0], { savedCount: 99 }));
+    await t.run((ctx) => ctx.db.patch(spaces[0]!, { savedCount: 99 }));
     const forced = await t.mutation(internal.spaces.backfillSpaceCounters, {
       force: true,
     });
     expect(forced).toMatchObject({ processed: 3, updated: 3, done: true });
-    expect(await readSpace(t, spaces[0])).toMatchObject({ savedCount: 5 });
+    expect(await readSpace(t, spaces[0]!)).toMatchObject({ savedCount: 5 });
 
     const before = (
       await t.run((ctx) =>
@@ -958,13 +958,13 @@ describe("steering spend controls", () => {
     });
     await t.mutation(internal.items.suggestItemsForSpace, {
       spaceId: other,
-      itemIds: [ids[0]],
+      itemIds: [ids[0]!],
     });
     await t.mutation(api.spaces.acceptAllSuggestions, { spaceId: bulk });
 
     expect(
       await t.mutation(api.spaces.acceptSuggestion, {
-        itemId: ids[0],
+        itemId: ids[0]!,
         spaceId: other,
       }),
     ).toBe(true);
@@ -1076,14 +1076,14 @@ describe("steering spend controls", () => {
     );
     expect(spaces).toHaveLength(10);
     await expect(
-      t.mutation(api.spaces.updateSpace, { id: spaces[0]._id, dynamic: true }),
+      t.mutation(api.spaces.updateSpace, { id: spaces[0]!._id, dynamic: true }),
     ).rejects.toThrow();
-    expect((await readSpace(t, spaces[0]._id)).dynamic).toBe(false);
+    expect((await readSpace(t, spaces[0]!._id)).dynamic).toBe(false);
     await t.mutation(api.spaces.updateSpace, {
-      id: spaces[0]._id,
+      id: spaces[0]!._id,
       name: "Renamed",
     });
-    expect((await readSpace(t, spaces[0]._id)).name).toBe("Renamed");
+    expect((await readSpace(t, spaces[0]!._id)).name).toBe("Renamed");
     const jobs = await t.run((ctx) =>
       ctx.db.system.query("_scheduled_functions").collect(),
     );

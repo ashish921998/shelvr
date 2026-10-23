@@ -76,8 +76,9 @@ const RecentSavesWidget = (
     (environment.date ?? new Date()).getTime() >= props.validUntil;
   const locked = (props.locked ?? true) || expired;
   const items = locked ? [] : (props.items ?? []);
+  const [featured] = items;
 
-  if (items.length === 0) {
+  if (featured === undefined) {
     return (
       <VStack
         spacing={6}
@@ -185,7 +186,6 @@ const RecentSavesWidget = (
     );
   }
 
-  const featured = items[0];
   const rest = items.slice(1, 5);
 
   const row = (item?: WidgetSaveItem) => {

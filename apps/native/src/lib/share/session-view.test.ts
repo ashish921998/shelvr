@@ -96,8 +96,8 @@ describe("countProgress / countPartial", () => {
   it("counts entries that reuse one item as a single save", () => {
     const reel = "https://www.instagram.com/reel/abc/";
     const session = makeSession(["saved", "saved", "pending"]);
-    session.entries[0].itemId = "items:reel";
-    session.entries[1].itemId = "items:reel";
+    session.entries[0]!.itemId = "items:reel";
+    session.entries[1]!.itemId = "items:reel";
     const payloads = [
       resolved(reel, "website"),
       resolved(reel),
@@ -122,11 +122,11 @@ describe("countProgress / countPartial", () => {
   it("keeps a caption an older build saved as a note apart from its failed link", () => {
     const session = makeSession(["saved", "failed"]);
     session.entries[0] = {
-      ...session.entries[0],
+      ...session.entries[0]!,
       kind: "note",
       itemId: "items:note",
     };
-    session.entries[1].message = "offline";
+    session.entries[1]!.message = "offline";
     const payloads = [
       resolved("See this post"),
       resolved("https://www.instagram.com/reel/abc/", "website"),
@@ -173,7 +173,7 @@ describe("withEntry", () => {
   it("replaces only the matching index and leaves the original untouched", () => {
     const session = makeSession(["pending", "pending"]);
     const settled: ShareEntry = {
-      ...session.entries[1],
+      ...session.entries[1]!,
       status: "saved",
       itemId: "items:1",
     };
@@ -182,7 +182,7 @@ describe("withEntry", () => {
 
     expect(next.entries.map((e) => e.status)).toEqual(["pending", "saved"]);
     expect(next.entries[0]).toBe(session.entries[0]);
-    expect(session.entries[1].status).toBe("pending");
+    expect(session.entries[1]!.status).toBe("pending");
   });
 });
 
@@ -229,7 +229,7 @@ describe("selectProcessorPayloads", () => {
     });
 
     expect(payloads.map((p) => p.contentType)).toEqual(["image", "text"]);
-    expect(payloads[0].contentUri).toBeNull();
+    expect(payloads[0]!.contentUri).toBeNull();
   });
 
   it("leaves fallback images without a contentUri so they fail explicitly", () => {

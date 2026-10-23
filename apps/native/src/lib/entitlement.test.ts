@@ -241,11 +241,11 @@ describe("selling before sign-in", () => {
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
     expect(mock.logIn).toHaveBeenCalledWith("user_1");
     expect(mock.logIn.mock.invocationCallOrder[0]).toBeLessThan(
-      mock.syncPurchasesForResult.mock.invocationCallOrder[0],
+      mock.syncPurchasesForResult.mock.invocationCallOrder[0]!,
     );
     expect(
       mock.syncPurchasesForResult.mock.invocationCallOrder[0],
-    ).toBeLessThan(mock.syncPurchase.mock.invocationCallOrder[0]);
+    ).toBeLessThan(mock.syncPurchase.mock.invocationCallOrder[0]!);
     await vi.waitFor(() =>
       expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
     );

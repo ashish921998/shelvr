@@ -278,14 +278,14 @@ describe("RecentSavesWidgetSync", () => {
     renderSync([note]);
     await waitFor(() => expect(fsx.timelines).toHaveLength(1));
     expect(fsx.snapshots).toHaveLength(0);
-    const [live, lock] = fsx.timelines[0];
-    expect(live.props).toMatchObject({
+    const [live, lock] = fsx.timelines[0]!;
+    expect(live!.props).toMatchObject({
       locked: false,
       validUntil: lockAt,
       items: [{ id: "i2" }],
     });
-    expect(lock.date.getTime()).toBe(lockAt);
-    expect(lock.props).toMatchObject({ items: [], locked: true });
+    expect(lock!.date.getTime()).toBe(lockAt);
+    expect(lock!.props).toMatchObject({ items: [], locked: true });
   });
 
   it("never schedules a lock for a lifetime entitlement", async () => {
@@ -488,8 +488,8 @@ describe("RecentSavesWidgetSync", () => {
     const snapshot = fsx.snapshots[0] as {
       items: { id: string; imageUri?: string }[];
     };
-    expect(snapshot.items[0].imageUri).toBeUndefined();
-    expect(snapshot.items[1].id).toBe("i2");
+    expect(snapshot.items[0]!.imageUri).toBeUndefined();
+    expect(snapshot.items[1]!.id).toBe("i2");
     expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
       reason: "error",
     });
@@ -508,8 +508,8 @@ describe("RecentSavesWidgetSync", () => {
       const snapshot = fsx.snapshots[0] as {
         items: { id: string; imageUri?: string }[];
       };
-      expect(snapshot.items[0].imageUri).toBeUndefined();
-      expect(snapshot.items[1].id).toBe("i2");
+      expect(snapshot.items[0]!.imageUri).toBeUndefined();
+      expect(snapshot.items[1]!.id).toBe("i2");
       expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
         reason: "timeout",
       });

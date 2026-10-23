@@ -28,8 +28,10 @@ export function holdsOnlyLink(
   payloads: RawSharePayload[],
   url: string,
 ): boolean {
-  if (payloads.length !== 1 || firstSharedUrl(payloads) !== url) return false;
-  return (payloads[0].value.match(/https?:\/\//gi) ?? []).length <= 1;
+  const [only] = payloads;
+  if (only === undefined || payloads.length !== 1) return false;
+  if (firstSharedUrl(payloads) !== url) return false;
+  return (only.value.match(/https?:\/\//gi) ?? []).length <= 1;
 }
 
 let handedUrl: string | null = null;

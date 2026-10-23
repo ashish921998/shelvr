@@ -29,7 +29,7 @@ describe("OnboardingProvider", () => {
   it("defaults to onboarded outside the provider", () => {
     const sink: Onboarding[] = [];
     render(<Probe sink={sink} />);
-    expect(sink[0].onboarded).toBe(true);
+    expect(sink[0]!.onboarded).toBe(true);
   });
 
   it("starts not onboarded when nothing is persisted", () => {
@@ -39,7 +39,7 @@ describe("OnboardingProvider", () => {
         <Probe sink={sink} />
       </OnboardingProvider>,
     );
-    expect(sink[0].onboarded).toBe(false);
+    expect(sink[0]!.onboarded).toBe(false);
   });
 
   it("completing onboarding persists the flag and flips the gate", () => {
@@ -49,9 +49,9 @@ describe("OnboardingProvider", () => {
         <Probe sink={sink} />
       </OnboardingProvider>,
     );
-    expect(sink[0].onboarded).toBe(false);
+    expect(sink[0]!.onboarded).toBe(false);
     act(() => {
-      sink[0].completeOnboarding();
+      sink[0]!.completeOnboarding();
     });
     expect(store.map.get("shelvr.onboarded")).toBe("true");
     expect(sink.at(-1)?.onboarded).toBe(true);
@@ -65,6 +65,6 @@ describe("OnboardingProvider", () => {
         <Probe sink={sink} />
       </OnboardingProvider>,
     );
-    expect(sink[0].onboarded).toBe(true);
+    expect(sink[0]!.onboarded).toBe(true);
   });
 });

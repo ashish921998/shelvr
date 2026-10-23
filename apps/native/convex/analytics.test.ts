@@ -42,10 +42,10 @@ describe("save telemetry delivery", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     expect(jobs).toHaveLength(1);
-    const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const firstBody = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(firstBody.uuid).toMatch(/^[0-9a-f-]{36}$/);
     expect(firstBody.timestamp).toBe("1970-01-01T00:00:01.000Z");
-    expect(jobs[0].args).toEqual([
+    expect(jobs[0]!.args).toEqual([
       { ...args, attempt: 1, eventId: firstBody.uuid },
     ]);
     await t.action(internal.analytics.captureSave, {
@@ -53,7 +53,7 @@ describe("save telemetry delivery", () => {
       attempt: 1,
       eventId: firstBody.uuid,
     });
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(firstBody);
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toEqual(firstBody);
     expect(firstBody.properties.save_session_id).toBe("save-session");
     expect(firstBody.properties.save_source).toBe("share_extension");
     expect(firstBody.properties.operation_id).toBe("share:session-1:0");
@@ -89,7 +89,7 @@ describe("save telemetry delivery", () => {
       finishedAt: 2000,
     });
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.event).toBe("item_processed");
     expect(body.timestamp).toBe("1970-01-01T00:00:02.000Z");
     expect(body.properties).toMatchObject({

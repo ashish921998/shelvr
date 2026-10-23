@@ -13,11 +13,13 @@ type Message = string | Record<string, string>;
 function fallbackChain(locale: string): string[] {
   const chain: string[] = [];
   for (const entry of [locale, "en"]) {
-    const codes = entry.split("-");
+    const [language = entry, script, ...rest] = entry.split("-");
     for (const candidate of [
       entry,
-      ...(codes.length === 3 ? [`${codes[0]}-${codes[1]}`] : []),
-      codes[0],
+      ...(script !== undefined && rest.length === 1
+        ? [`${language}-${script}`]
+        : []),
+      language,
     ]) {
       if (!chain.includes(candidate)) chain.push(candidate);
     }
@@ -58,8 +60,12 @@ function missing(locale: string, scope: string): string {
 
 export function canonicalizeTag(tag: string) {
   try {
-    const canonical = Intl.getCanonicalLocales(tag.replaceAll("_", "-"))[0];
-    return { canonical, baseName: canonical.split(/-[ux]-/i)[0] };
+    const [canonical] = Intl.getCanonicalLocales(tag.replaceAll("_", "-"));
+    if (canonical === undefined) return undefined;
+    return {
+      canonical,
+      baseName: canonical.split(/-[ux]-/i, 1)[0] ?? canonical,
+    };
   } catch {
     return undefined;
   }
@@ -72,7 +78,7 @@ export function resolveLocale(
     const normalized = canonicalizeTag(tag);
     if (!normalized) continue;
     const { baseName } = normalized;
-    const language = baseName.split("-")[0];
+    const [language = baseName] = baseName.split("-", 1);
     if (isSupportedLocale(baseName)) return baseName;
     if (isSupportedLocale(language)) return language;
     const regionalFallback = Object.keys(catalogs)

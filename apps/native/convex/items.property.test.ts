@@ -91,7 +91,7 @@ async function deleteOneSave(
 ): Promise<void> {
   const mine = [...saves].filter(([, s]) => s.user === step.user);
   if (mine.length === 0) return;
-  const [itemId] = mine[step.pick % mine.length];
+  const [itemId] = mine[step.pick % mine.length]!;
   await t.mutation(api.items.deleteItem, { id: itemId });
   saves.delete(itemId);
   for (const [key, op] of operations) {

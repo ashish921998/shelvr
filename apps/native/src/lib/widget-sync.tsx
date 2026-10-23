@@ -104,7 +104,7 @@ function toPlainPath(uri: string): string {
 function widgetTitle(item: FeedItem): string {
   if (item.title) return item.title;
   if (item.type === "note" && item.note)
-    return item.note.split("\n")[0].slice(0, 80);
+    return (item.note.split("\n", 1)[0] ?? "").slice(0, 80);
   if (item.type === "link") return displayHost(item.url) || t("item.link");
   return t("item.savedItem");
 }

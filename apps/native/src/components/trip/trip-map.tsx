@@ -19,7 +19,7 @@ export type StopRef = { day: number; stop: number };
 const pinId = (ref: StopRef) => `${ref.day}:${ref.stop}`;
 
 function parsePin(id: string | undefined): StopRef | null {
-  const [day, stop] = (id ?? "").split(":").map(Number);
+  const [day = NaN, stop = NaN] = (id ?? "").split(":").map(Number);
   return Number.isInteger(day) && Number.isInteger(stop) ? { day, stop } : null;
 }
 

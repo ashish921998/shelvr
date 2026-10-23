@@ -122,7 +122,8 @@ export function makeValidatingLookup(resolver: DnsResolver) {
       callback(err, "", 4);
       return;
     }
-    if (addresses.length === 0) {
+    const chosen = addresses[0];
+    if (chosen === undefined) {
       callback(
         Object.assign(new Error("no DNS answers"), {
           code: "ENOTFOUND",
@@ -145,7 +146,6 @@ export function makeValidatingLookup(resolver: DnsResolver) {
       callback(null, [...addresses] as LookupAddress[], undefined);
       return;
     }
-    const chosen = addresses[0];
     callback(null, chosen.address, chosen.family);
   };
 }
@@ -472,10 +472,11 @@ const WINDOWS_1252_C1: readonly number[] = [
 
 function decodeWindows1252(bytes: Uint8Array): string {
   let out = "";
-  for (let i = 0; i < bytes.length; i++) {
-    const byte = bytes[i];
+  for (const byte of bytes) {
     out += String.fromCharCode(
-      byte >= 0x80 && byte <= 0x9f ? WINDOWS_1252_C1[byte - 0x80] : byte,
+      byte >= 0x80 && byte <= 0x9f
+        ? (WINDOWS_1252_C1[byte - 0x80] ?? byte)
+        : byte,
     );
   }
   return out;

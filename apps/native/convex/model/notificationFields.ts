@@ -50,11 +50,17 @@ export function recipientError(recipient: Recipient, error: string): Recipient {
   };
 }
 
+type NotificationLocale = keyof typeof translations;
+
+function isNotificationLocale(locale: string): locale is NotificationLocale {
+  return Object.hasOwn(translations, locale);
+}
+
 export function notificationLocale(
   locale: string | undefined,
-): string | undefined {
+): NotificationLocale | undefined {
   if (locale === undefined) return undefined;
-  return Object.hasOwn(translations, locale) ? locale : "en";
+  return isNotificationLocale(locale) ? locale : "en";
 }
 
 export const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -73,7 +79,7 @@ export function truncateTitle(title: string): string | undefined {
 }
 
 const catalogs: Record<
-  string,
+  NotificationLocale,
   {
     title: string;
     body: Record<string, string>;
@@ -84,6 +90,16 @@ const catalogs: Record<
     reminder: Record<"read" | "cook", { title: string; body: string }>;
   }
 > = translations;
+
+/** The form for `count` in `locale`, falling back to "other", which every
+ * catalog carries. */
+function pluralForm(
+  locale: NotificationLocale,
+  forms: Record<string, string>,
+  count: number,
+): string {
+  return forms[pluralRules[locale]?.(count) ?? "other"] ?? forms.other ?? "";
+}
 
 export function digestCopy(
   locale: string | undefined,
@@ -106,7 +122,7 @@ export function digestCopy(
       };
     return {
       title: copy.title,
-      body: copy.body[pluralRules[selected](count)].replace(
+      body: pluralForm(selected, copy.body, count).replace(
         "%{formattedCount}",
         format(count),
       ),
@@ -124,9 +140,11 @@ export function digestCopy(
   const others = count - 1;
   return {
     title: copy.title,
-    body: (olderIncluded ? copy.namedShelf : copy.named)[
-      pluralRules[selected](others)
-    ]
+    body: pluralForm(
+      selected,
+      olderIncluded ? copy.namedShelf : copy.named,
+      others,
+    )
       .replace("%{formattedCount}", format(others))
       .replace("%{title}", () => title),
   };

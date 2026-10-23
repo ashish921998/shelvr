@@ -176,9 +176,11 @@ const DOT_SPACING = 7;
 
 function routeDots(points: Point[], width: number, height: number): Point[] {
   const dots: Point[] = [];
-  for (let i = 1; i < points.length; i++) {
-    const from = { x: points[i - 1].x * width, y: points[i - 1].y * height };
-    const to = { x: points[i].x * width, y: points[i].y * height };
+  for (const [i, point] of points.entries()) {
+    const previous = points[i - 1];
+    if (previous === undefined) continue;
+    const from = { x: previous.x * width, y: previous.y * height };
+    const to = { x: point.x * width, y: point.y * height };
     const steps = Math.floor(
       Math.hypot(to.x - from.x, to.y - from.y) / DOT_SPACING,
     );

@@ -22,7 +22,7 @@ function closesMoreThanItOpens(url: string, open: string, close: string) {
 function trimTrailingPunctuation(url: string) {
   let trimmed = url;
   while (trimmed.length > 0) {
-    const last = trimmed[trimmed.length - 1];
+    const last = trimmed.slice(-1);
     const drop =
       TRAILING_PUNCTUATION.test(last) ||
       (last === ")" && closesMoreThanItOpens(trimmed, "(", ")")) ||
@@ -69,11 +69,10 @@ const REGISTRY_LABELS = new Set([
 
 function siteLabel(host: string): string {
   const labels = host.replace(/\.$/, "").split(".");
-  if (labels.length < 2) return host;
-  const second = labels[labels.length - 2];
-  return labels.length > 2 && REGISTRY_LABELS.has(second)
-    ? labels[labels.length - 3]
-    : second;
+  const second = labels.at(-2);
+  if (second === undefined) return host;
+  const third = labels.at(-3);
+  return third !== undefined && REGISTRY_LABELS.has(second) ? third : second;
 }
 
 export function siteMonogram(url: string | undefined): string | undefined {

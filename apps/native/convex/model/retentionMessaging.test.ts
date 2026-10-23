@@ -19,7 +19,7 @@ const answer = (signedPayload: string, root = fixtures.root, at = now) =>
 
 function flipLastByte(segment: string): string {
   const bytes = Buffer.from(segment, "base64url");
-  bytes[bytes.length - 1] ^= 1;
+  bytes[bytes.length - 1]! ^= 1;
   return bytes.toString("base64url");
 }
 
@@ -71,17 +71,17 @@ describe("answerRetentionRequest", () => {
   it("rejects a tampered signature", async () => {
     const [header, payload, signature] = fixtures.valid.split(".");
     expect(
-      await answer(`${header}.${payload}.${flipLastByte(signature)}`),
+      await answer(`${header}.${payload}.${flipLastByte(signature!)}`),
     ).toMatchObject({ status: 400, reason: "jws_signature" });
   });
 
   it("rejects a leaf certificate altered after it was issued", async () => {
     const [headerSegment, payload, signature] = fixtures.valid.split(".");
     const header = JSON.parse(
-      Buffer.from(headerSegment, "base64url").toString(),
+      Buffer.from(headerSegment!, "base64url").toString(),
     );
     const leaf = Buffer.from(header.x5c[0], "base64");
-    leaf[leaf.length - 1] ^= 1;
+    leaf[leaf.length - 1]! ^= 1;
     header.x5c[0] = leaf.toString("base64");
     const forged = Buffer.from(JSON.stringify(header)).toString("base64url");
     expect(await answer(`${forged}.${payload}.${signature}`)).toMatchObject({
@@ -184,16 +184,16 @@ describe("promotional offers", () => {
     const valid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
-      Buffer.from(signature, "base64url"),
+      Buffer.from(signature!, "base64url"),
       new TextEncoder().encode(`${header}.${payload}`),
     );
     expect(valid).toBe(true);
-    expect(JSON.parse(Buffer.from(header, "base64url").toString())).toEqual({
+    expect(JSON.parse(Buffer.from(header!, "base64url").toString())).toEqual({
       alg: "ES256",
       kid: "KEY123",
       typ: "JWT",
     });
-    const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
+    const claims = JSON.parse(Buffer.from(payload!, "base64url").toString());
     expect(claims).toEqual({
       iss: "issuer-uuid",
       iat: Math.floor(now / 1000),

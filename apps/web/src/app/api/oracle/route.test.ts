@@ -79,7 +79,7 @@ describe("POST /api/oracle", () => {
       tagline: verdict.tagline,
       spaces: verdict.spaces,
     });
-    const [url, init] = mocks.fetch.mock.calls[0];
+    const [url, init] = mocks.fetch.mock.calls[0]!;
     expect(url).toBe("https://example.convex.site/oracle");
     expect(init.body).toBe(tabs);
     expect(init.headers).toMatchObject({

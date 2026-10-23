@@ -250,7 +250,7 @@ describe("useReviewPrompt", () => {
     });
     expect(
       mock.markNativeReviewPrompted.mock.invocationCallOrder[0],
-    ).toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
+    ).toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]!);
   });
 
   it("records nothing when a guard fails after hasAction() resolves, and retries on the next return from a save", async () => {

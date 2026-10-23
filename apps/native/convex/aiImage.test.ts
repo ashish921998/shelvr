@@ -81,7 +81,7 @@ describe("Siri capture context", () => {
       itemId,
       captureContext: "Siri: save this\n\nText in the image:\nMiso ramen",
     });
-    const text = generateObject.mock.calls[0][0].messages[0].content.find(
+    const text = generateObject.mock.calls[0]![0].messages[0].content.find(
       (part: { type: string }) => part.type === "text",
     ).text as string;
     expect(text).toContain("saved this with Siri");
@@ -92,7 +92,7 @@ describe("Siri capture context", () => {
     const t = newConvexTest();
     const { itemId } = await photo(t);
     await t.action(internal.ai.processItem, { itemId });
-    const text = generateObject.mock.calls[0][0].messages[0].content.find(
+    const text = generateObject.mock.calls[0]![0].messages[0].content.find(
       (part: { type: string }) => part.type === "text",
     ).text as string;
     expect(text).not.toContain("Siri");
@@ -104,7 +104,7 @@ describe("stored photo processing", () => {
     const t = newConvexTest();
     const { itemId, storageId, spaceId } = await photo(t);
     await t.action(internal.ai.processItem, { itemId });
-    const image = generateObject.mock.calls[0][0].messages[0].content.find(
+    const image = generateObject.mock.calls[0]![0].messages[0].content.find(
       (part: { type: string }) => part.type === "file",
     );
     expect(image.data).toBeInstanceOf(Uint8Array);
@@ -133,7 +133,7 @@ describe("stored photo processing", () => {
     const { itemId } = await photo(t);
     generateObject.mockResolvedValue({ object: { query: "" } });
     await t.action(internal.ai.findProductLinks, { itemId });
-    const image = generateObject.mock.calls[0][0].messages[0].content.find(
+    const image = generateObject.mock.calls[0]![0].messages[0].content.find(
       (part: { type: string }) => part.type === "file",
     );
     expect(Array.from(image.data)).toEqual(Array.from(bytes));
@@ -236,7 +236,7 @@ describe("stored photo processing", () => {
           });
       });
       await t.action(internal.ai.processItem, { itemId });
-      const call = generateObject.mock.calls[0][0];
+      const call = generateObject.mock.calls[0]![0];
       const prompt =
         type === "image" ? call.messages[0].content[0].text : call.prompt;
       expect(
@@ -273,7 +273,7 @@ describe("stored photo processing", () => {
       }),
     );
     await t.action(internal.ai.processItem, { itemId });
-    const prompt = generateObject.mock.calls[0][0].messages[0].content[0].text;
+    const prompt = generateObject.mock.calls[0]![0].messages[0].content[0].text;
     expect(prompt).toContain("a".repeat(511) + "😀");
     expect(prompt).not.toContain("😀end");
   });
@@ -307,7 +307,7 @@ describe("stored photo processing", () => {
     await expect(
       t.action(internal.ai.processItem, { itemId }),
     ).resolves.toBeNull();
-    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]![1]?.body));
     expect(body.event).toBe("ai_categorization_rejected");
     expect(console.error).not.toHaveBeenCalled();
   });

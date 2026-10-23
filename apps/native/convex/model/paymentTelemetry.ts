@@ -102,7 +102,7 @@ const CANCEL_CATEGORIES: Record<string, CancelCategory> = {
 
 function cancelCategory(reason: unknown): CancelCategory {
   return typeof reason === "string" && Object.hasOwn(CANCEL_CATEGORIES, reason)
-    ? CANCEL_CATEGORIES[reason]
+    ? (CANCEL_CATEGORIES[reason] ?? "unknown")
     : "unknown";
 }
 

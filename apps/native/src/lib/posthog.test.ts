@@ -49,7 +49,7 @@ vi.mock("expo-constants", () => ({
 function sentBeforeSend(): BeforeSend {
   const options = posthogCtor.options as Record<string, BeforeSend>;
   expect(options, "PostHog was constructed with options").toBeTruthy();
-  return options["before_send"];
+  return options["before_send"]!;
 }
 
 function exceptionEvent(overrides: {
@@ -101,7 +101,7 @@ describe("posthog before_send", () => {
     );
     expect(sent.properties?.$exception_message).toBe("ERR_UNAVAILABLE");
     const list = sent.properties?.$exception_list as ExceptionListEntry[];
-    expect(list[0].value).toBe("ERR_UNAVAILABLE");
+    expect(list[0]!.value).toBe("ERR_UNAVAILABLE");
   });
 
   it("redacts an all-caps message that is not a bare code token", () => {
@@ -143,8 +143,8 @@ describe("posthog before_send", () => {
     expect(serialized).not.toContain(noteUrl);
     expect(sent.properties?.$exception_message).toBe("TypeError");
     const list = sent.properties?.$exception_list as ExceptionListEntry[];
-    expect(list[0].value).toBe("TypeError");
-    expect(list[0].stacktrace).toBe("frame at app.js:1");
+    expect(list[0]!.value).toBe("TypeError");
+    expect(list[0]!.stacktrace).toBe("frame at app.js:1");
   });
 
   it("drops the launch deep link from Application Opened", () => {

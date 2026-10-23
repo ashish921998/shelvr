@@ -1,18 +1,23 @@
+import {
+  invocationOperationId,
+  isSavableUrl,
+  itemRecord,
+  param,
+  spaceParam,
+  spaceRecord,
+  stagedImagePaths,
+  wantedThumbnails,
+} from "@/lib/app-intent-records";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
 import { useHomeFeed } from "@/lib/home-feed";
-import { t } from "@/lib/i18n";
-import { displayHost } from "@/lib/url";
 import { useSaveImages } from "@/lib/use-save-image";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
-import { MAX_URL_LENGTH } from "@convex/model/externalUrl";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useAction, useConvexAuth, useMutation } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import * as AppIntents from "expo-app-intents";
 import { Directory, File, Paths } from "expo-file-system";
 import { requireOptionalNativeModule } from "expo-modules-core";
@@ -32,7 +37,6 @@ const ITEM_CATALOG_LIMIT = 300;
 const THUMB_LIMIT = 60;
 const THUMB_MAX_DIM = 256;
 const THUMB_TIMEOUT_MS = 20_000;
-const NOTE_TEXT_LIMIT = 600;
 
 type SetupModule = {
   setCaptureCredentials(siteUrl: string, token: string): Promise<void>;
@@ -55,48 +59,9 @@ const siteUrl =
   );
 
 type FeedItem = NonNullable<ReturnType<typeof useHomeFeed>["items"]>[number];
-type ListedSpace = FunctionReturnType<typeof api.spaces.listSpaces>[number];
 
 function thumbDirectory() {
   return new Directory(Paths.document, "app-intent-thumbs");
-}
-
-function itemTitle(item: FeedItem): string {
-  const title = item.title?.trim();
-  if (title) return title;
-  if (item.type === "note" && item.note)
-    return item.note.trim().split("\n")[0].slice(0, 80) || t("item.note");
-  if (item.type === "link") return displayHost(item.url) || t("item.link");
-  return t("item.savedItem");
-}
-
-function itemRecord(item: FeedItem): AppIntents.AppIntentEntity {
-  const metadata: Record<string, string> = {
-    kind: item.type,
-    savedAt: String(Math.round(item._creationTime)),
-  };
-  if (item.url) metadata.url = item.url;
-  if (item.siteName) metadata.site = item.siteName;
-  if (item.note) metadata.text = item.note.slice(0, NOTE_TEXT_LIMIT);
-  const imageUrl = item.imageUrl ?? item.heroImageUrl;
-  if (imageUrl) metadata.imageUrl = imageUrl;
-  return {
-    id: item._id,
-    title: itemTitle(item),
-    subtitle: item.description?.trim() || item.siteName || undefined,
-    synonyms: [
-      ...new Set(item.tags.map((tag) => tag.trim()).filter(Boolean)),
-    ].slice(0, 12),
-    metadata,
-  };
-}
-
-function spaceRecord(space: ListedSpace): AppIntents.AppIntentEntity {
-  return {
-    id: space._id,
-    title: space.name.trim() || t("item.savedItem"),
-    subtitle: space.description?.trim() || undefined,
-  };
 }
 
 function toPlainPath(uri: string): string {
@@ -132,11 +97,7 @@ async function writeThumbnails(
 ): Promise<boolean> {
   const dir = thumbDirectory();
   if (!dir.exists) dir.create({ intermediates: true });
-  const wanted = new Map<string, string>();
-  for (const item of items) {
-    const url = item.imageUrl ?? item.heroImageUrl;
-    if (url && wanted.size < THUMB_LIMIT) wanted.set(`${item._id}.jpg`, url);
-  }
+  const wanted = wantedThumbnails(items, THUMB_LIMIT);
 
   let created = false;
   for (const [fileName, url] of wanted) {
@@ -300,27 +261,6 @@ function useCaptureCredentials(userId: string | undefined) {
   }, [userId, issueCaptureToken]);
 }
 
-function param(
-  invocation: AppIntents.AppIntentInvocation,
-  name: string,
-): string | undefined {
-  const value = invocation.params[name];
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-/** A cheap stand-in for the server's URL policy (React Native's URL is too
- * partial to run it here): an oversized or non-web link would be refused on
- * every launch, so it is dropped instead of queued forever. */
-function isSavableUrl(url: string): boolean {
-  return url.length <= MAX_URL_LENGTH && /^https?:\/\//i.test(url.trim());
-}
-
-function spaceParam(
-  invocation: AppIntents.AppIntentInvocation,
-): Id<"spaces"> | undefined {
-  return param(invocation, "spaceId") as Id<"spaces"> | undefined;
-}
-
 function useInvocationHandler() {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
@@ -336,8 +276,7 @@ function useInvocationHandler() {
   }
 
   async function handle(invocation: AppIntents.AppIntentInvocation) {
-    const operationId =
-      param(invocation, "operationId") ?? `siri:${invocation.id}`;
+    const operationId = invocationOperationId(invocation);
     switch (invocation.name) {
       case "search": {
         await whenNavigationReady();
@@ -387,26 +326,12 @@ function useInvocationHandler() {
         return;
       }
       case "saveImages": {
-        const paths = invocation.params.paths;
-        if (!Array.isArray(paths)) return;
-        const operationIds = invocation.params.operationIds;
-        const staged = paths.flatMap((path, index) => {
-          if (typeof path !== "string") return [];
-          const file = new File(`file://${encodeURI(path)}`);
-          if (!file.exists) return [];
-          const sent = Array.isArray(operationIds)
-            ? operationIds[index]
-            : undefined;
-          return [
-            {
-              file,
-              operationId:
-                typeof sent === "string" && sent.length > 0
-                  ? sent
-                  : `${operationId}:${index}`,
-            },
-          ];
-        });
+        const staged = stagedImagePaths(invocation, operationId).flatMap(
+          ({ path, operationId: imageOperationId }) => {
+            const file = new File(`file://${encodeURI(path)}`);
+            return file.exists ? [{ file, operationId: imageOperationId }] : [];
+          },
+        );
         const files = staged.map(({ file }) => file);
         if (files.length === 0) return;
         const results = await saveImages(

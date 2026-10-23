@@ -176,7 +176,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     expect(users[0]).not.toHaveProperty("appleRefreshToken");
     expect(tokens).toHaveLength(1);
     expect(tokens[0]).toMatchObject({
-      userId: users[0]._id,
+      userId: users[0]!._id,
       refreshToken: "second",
     });
   });
@@ -186,7 +186,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     await signIn(t, "web-first");
     const row = (await tokenRows(t))[0];
     await t.mutation(internal.users.keepNativeAppleToken, {
-      userId: row.userId,
+      userId: row!.userId,
       refreshToken: "native",
       clientId: "app.shelvr.save",
     });
@@ -207,7 +207,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     const t = newConvexTest();
     await signIn(t, "web-first");
     const [retained] = await tokenRows(t);
-    await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
+    await t.run((ctx) => ctx.db.patch(retained!.userId, { deleting: true }));
 
     await signIn(t, "web-during-deletion");
     const users = await t.run((ctx) => ctx.db.query("users").collect());
@@ -215,7 +215,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     expect(users[0]).not.toHaveProperty("appleRefreshToken");
     expect(await tokenRows(t)).toEqual([retained]);
 
-    await t.run((ctx) => ctx.db.delete(retained._id));
+    await t.run((ctx) => ctx.db.delete(retained!._id));
     await signIn(t, "web-after-forget");
     expect(await tokenRows(t)).toEqual([]);
   });
@@ -225,7 +225,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     const t = newConvexTest();
     await signIn(t, "web-first");
     const [retained] = await tokenRows(t);
-    await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
+    await t.run((ctx) => ctx.db.patch(retained!.userId, { deleting: true }));
 
     await signIn(t, "web-during-deletion");
     expect(await tokenRows(t)).toEqual([retained]);
@@ -239,7 +239,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     ).find((entry) => entry.name === "appleRevoke:revokeDetachedToken");
     await t.action(internal.appleRevoke.revokeDetachedToken, job!.args[0]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://appleid.apple.com/auth/revoke");
     const body = new URLSearchParams(String(init.body));
     expect(body.get("token")).toBe("web-during-deletion");
@@ -254,7 +254,7 @@ describe("capturing Apple's refresh token at sign-in", () => {
     const t = newConvexTest();
     await signIn(t, "web-first");
     const [retained] = await tokenRows(t);
-    await t.run((ctx) => ctx.db.patch(retained.userId, { deleting: true }));
+    await t.run((ctx) => ctx.db.patch(retained!.userId, { deleting: true }));
 
     await signIn(t, "web-during-deletion");
     const parked = await detachedRows(t);
@@ -267,10 +267,10 @@ describe("capturing Apple's refresh token at sign-in", () => {
     expect(JSON.stringify(jobs)).not.toContain("web-during-deletion");
     expect(
       jobs.find((job) => job.name === "appleRevoke:revokeDetachedToken")?.args,
-    ).toEqual([{ tokenId: parked[0]._id }]);
+    ).toEqual([{ tokenId: parked[0]!._id }]);
     expect(
       jobs.find((job) => job.name === "users:forgetDetachedAppleToken")?.args,
-    ).toEqual([{ tokenId: parked[0]._id }]);
+    ).toEqual([{ tokenId: parked[0]!._id }]);
   });
 
   it.each([
@@ -360,8 +360,8 @@ describe("deleting an account that signed in with Apple", () => {
 
     const jobs = await scheduledRevokes(t);
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].args).toEqual([{ tokenId }]);
-    expect(JSON.stringify(jobs[0].args)).not.toContain("r.token");
+    expect(jobs[0]!.args).toEqual([{ tokenId }]);
+    expect(JSON.stringify(jobs[0]!.args)).not.toContain("r.token");
 
     const fallback = (
       await t.run((ctx) =>
@@ -416,7 +416,7 @@ describe("revoke", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(await tokenRows(t)).toEqual([]);
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://appleid.apple.com/auth/revoke");
     expect(init.method).toBe("POST");
     const body = new URLSearchParams(String(init.body));
@@ -427,18 +427,18 @@ describe("revoke", () => {
     const [header, payload, signature] = body.get("client_secret")!.split(".");
     const decode = (part: string) =>
       JSON.parse(new TextDecoder().decode(base64Url(part)));
-    expect(decode(header)).toEqual({ alg: "ES256", kid: "KEY123" });
-    expect(decode(payload)).toMatchObject({
+    expect(decode(header!)).toEqual({ alg: "ES256", kid: "KEY123" });
+    expect(decode(payload!)).toMatchObject({
       iss: "TEAM456",
       sub: "app.shelvr.signin",
       aud: "https://appleid.apple.com",
     });
-    expect(decode(payload).exp).toBeGreaterThan(decode(payload).iat);
+    expect(decode(payload!).exp).toBeGreaterThan(decode(payload!).iat);
     expect(
       await crypto.subtle.verify(
         { name: "ECDSA", hash: "SHA-256" },
         key.publicKey,
-        base64Url(signature),
+        base64Url(signature!),
         new TextEncoder().encode(`${header}.${payload}`),
       ),
     ).toBe(true);
@@ -454,11 +454,11 @@ describe("revoke", () => {
 
     await t.action(internal.appleRevoke.revoke, { tokenId });
 
-    const body = new URLSearchParams(String(fetchMock.mock.calls[0][1].body));
+    const body = new URLSearchParams(String(fetchMock.mock.calls[0]![1].body));
     expect(body.get("client_id")).toBe("app.shelvr.save");
     const payload = body.get("client_secret")!.split(".")[1];
     expect(
-      JSON.parse(new TextDecoder().decode(base64Url(payload))),
+      JSON.parse(new TextDecoder().decode(base64Url(payload!))),
     ).toMatchObject({ sub: "app.shelvr.save" });
     expect(await tokenRows(t)).toEqual([]);
   });
@@ -498,7 +498,7 @@ describe("revoke", () => {
 
     await t.action(internal.appleRevoke.revoke, { tokenId });
 
-    expect((await scheduledRevokes(t))[0].args).toEqual([
+    expect((await scheduledRevokes(t))[0]!.args).toEqual([
       { tokenId, attempt: 2 },
     ]);
     expect(await tokenRows(t)).toHaveLength(1);
@@ -512,7 +512,7 @@ describe("revoke", () => {
 
     await t.action(internal.appleRevoke.revoke, { tokenId });
     const [retry] = await scheduledRevokes(t);
-    expect(retry.args).toEqual([{ tokenId, attempt: 2 }]);
+    expect(retry!.args).toEqual([{ tokenId, attempt: 2 }]);
     expect(await tokenRows(t)).toHaveLength(1);
 
     await t.action(internal.appleRevoke.revoke, { tokenId, attempt: 3 });

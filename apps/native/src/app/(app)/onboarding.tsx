@@ -206,7 +206,8 @@ export default function OnboardingScreen() {
       setTravelCity(null);
     }
     const next = goalFlow(picked);
-    setStep(next[next.indexOf("goal") + 1]);
+    const following = next[next.indexOf("goal") + 1];
+    if (following !== undefined) setStep(following);
   };
 
   const pickCity = (city: SampleCityId | null) => {

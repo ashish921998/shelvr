@@ -129,7 +129,9 @@ export async function saveImageOperations(
   const worker = async () => {
     while (next < requests.length) {
       const index = next++;
-      results[index] = await saveImageOperation(requests[index], deps, options);
+      const request = requests[index];
+      if (request === undefined) break;
+      results[index] = await saveImageOperation(request, deps, options);
     }
   };
   await Promise.all(

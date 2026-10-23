@@ -9,12 +9,14 @@ export function imageSizeErrorCode(
 ): "image_empty" | "image_too_large" | undefined {
   if (size === 0) return "image_empty";
   if (size > MAX_STORED_IMAGE_BYTES) return "image_too_large";
+  return undefined;
 }
 
 export function imageSizeError(size: number): string | undefined {
   const code = imageSizeErrorCode(size);
   if (code === "image_empty") return IMAGE_EMPTY_MESSAGE;
   if (code === "image_too_large") return IMAGE_TOO_LARGE_MESSAGE;
+  return undefined;
 }
 
 export const MAX_PHOTOS_PER_ACCOUNT = 1000;
@@ -25,13 +27,13 @@ export function heifMediaType(bytes: Uint8Array): string | undefined {
     bytes.length < 16 ||
     String.fromCharCode(...bytes.subarray(4, 8)) !== "ftyp"
   )
-    return;
+    return undefined;
   const size = new DataView(
     bytes.buffer,
     bytes.byteOffset,
     bytes.byteLength,
   ).getUint32(0);
-  if (size < 16 || size > bytes.length) return;
+  if (size < 16 || size > bytes.length) return undefined;
   const brands: string[] = [];
   for (let offset = 8; offset + 4 <= Math.min(size, 256); offset += 4) {
     if (offset !== 12)
@@ -41,4 +43,5 @@ export function heifMediaType(bytes: Uint8Array): string | undefined {
   if (brands.some((b) => ["heic", "heix", "hevc", "hevx"].includes(b)))
     return "image/heic";
   if (brands.some((b) => ["mif1", "msf1"].includes(b))) return "image/heif";
+  return undefined;
 }

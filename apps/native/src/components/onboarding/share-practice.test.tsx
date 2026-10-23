@@ -288,7 +288,7 @@ describe("share practice", () => {
     act(() => mock.arrive?.());
     expect(received()).toHaveLength(1);
     expect(screen.getByText("sharePractice.savedTitle")).toBeTruthy();
-    expect(screen.getByText(DEMO_SAMPLES[1].pageHeading)).toBeTruthy();
+    expect(screen.getByText(DEMO_SAMPLES[1]!.pageHeading)).toBeTruthy();
     expect(mock.announce).toHaveBeenCalledWith(
       "sharePractice.savedTitle sharePractice.savedBody",
     );

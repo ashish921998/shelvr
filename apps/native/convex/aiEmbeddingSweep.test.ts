@@ -67,7 +67,7 @@ describe("sweepItemEmbeddings", () => {
     const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
     await t.run(async (ctx) => {
       const owner = (await ctx.db.query("users").collect())[0];
-      await ctx.db.patch(owner._id, { deleting: true });
+      await ctx.db.patch(owner!._id, { deleting: true });
       const userId = await ctx.db.insert("users", {});
       await ctx.db.insert("items", {
         userId,
@@ -84,7 +84,7 @@ describe("sweepItemEmbeddings", () => {
     await t.action(internal.ai.sweepItemEmbeddings, {});
     await t.action(internal.ai.sweepItemEmbeddings, {});
     expect(embedMany).toHaveBeenCalledOnce();
-    expect(embedMany.mock.calls[0][0].values).toEqual(["Live owner's save"]);
+    expect(embedMany.mock.calls[0]![0].values).toEqual(["Live owner's save"]);
     const rows = await t.run((ctx) => ctx.db.query("items").collect());
     expect(
       rows.every((row) => row.embeddingVersion === CURRENT_EMBEDDING_VERSION),
@@ -96,7 +96,7 @@ describe("sweepItemEmbeddings", () => {
     const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
     await t.run(async (ctx) => {
       const owner = (await ctx.db.query("users").collect())[0];
-      await ctx.db.delete(owner._id);
+      await ctx.db.delete(owner!._id);
       const userId = await ctx.db.insert("users", {});
       await ctx.db.insert("items", {
         userId,
@@ -113,7 +113,7 @@ describe("sweepItemEmbeddings", () => {
     await t.action(internal.ai.sweepItemEmbeddings, {});
     await t.action(internal.ai.sweepItemEmbeddings, {});
     expect(embedMany).toHaveBeenCalledOnce();
-    expect(embedMany.mock.calls[0][0].values).toEqual(["Live owner's save"]);
+    expect(embedMany.mock.calls[0]![0].values).toEqual(["Live owner's save"]);
     const rows = await t.run((ctx) => ctx.db.query("items").collect());
     expect(
       rows.every((row) => row.embeddingVersion === CURRENT_EMBEDDING_VERSION),
@@ -194,9 +194,9 @@ describe("sweepItemEmbeddings", () => {
     }
 
     const [row] = await t.run((ctx) => ctx.db.query("items").collect());
-    expect(row.embeddingAttempts).toBe(MAX_EMBEDDING_ATTEMPTS);
-    expect(row.embeddingVersion).toBe(CURRENT_EMBEDDING_VERSION);
-    expect(row.embedding).toBeUndefined();
+    expect(row!.embeddingAttempts).toBe(MAX_EMBEDDING_ATTEMPTS);
+    expect(row!.embeddingVersion).toBe(CURRENT_EMBEDDING_VERSION);
+    expect(row!.embedding).toBeUndefined();
     expect(
       await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
         limit: EMBEDDING_SWEEP_PAGE,
