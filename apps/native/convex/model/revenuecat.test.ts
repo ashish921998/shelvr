@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isTestStore,
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   parseRevenueCatSnapshot,
@@ -403,5 +404,71 @@ describe("RevenueCat parsing edge cases", () => {
         event: { type: "TRANSFER", transferred_from: ids },
       })?.transferredFrom,
     ).toEqual(ids);
+  });
+});
+
+describe("Test Store purchases", () => {
+  const now = Date.parse("2026-10-23T12:00:00Z");
+  const yearly = (store: string) => ({
+    request_date_ms: now,
+    subscriber: {
+      entitlements: {
+        "Shelvr Pro": {
+          product_identifier: "yearly",
+          expires_date: "2026-11-23T12:00:00Z",
+        },
+      },
+      subscriptions: { yearly: { period_type: "normal", store } },
+    },
+  });
+  const lifetime = {
+    request_date_ms: now,
+    subscriber: {
+      entitlements: {
+        "Shelvr Pro": { product_identifier: "lifetime", expires_date: null },
+      },
+      subscriptions: {},
+      non_subscriptions: { lifetime: [{ id: "a", store: "test_store" }] },
+    },
+  };
+
+  it("reads the store a webhook event names", () => {
+    expect(
+      parseRevenueCatEvent({
+        event: { type: "INITIAL_PURCHASE", store: "TEST_STORE" },
+      })?.store,
+    ).toBe("TEST_STORE");
+  });
+
+  it("recognizes the Test Store in the webhook and REST spellings", () => {
+    expect(isTestStore("TEST_STORE")).toBe(true);
+    expect(isTestStore("test_store")).toBe(true);
+    expect(isTestStore("APP_STORE")).toBe(false);
+    expect(isTestStore("app_store")).toBe(false);
+    expect(isTestStore(undefined)).toBe(false);
+  });
+
+  it("grants nothing for a Test Store subscription unless told to accept it", () => {
+    expect(parseRevenueCatSnapshot(yearly("test_store"))).toEqual({
+      status: "lapsed",
+      expiresAt: 0,
+    });
+    expect(
+      parseRevenueCatSnapshot(yearly("test_store"), "Shelvr Pro", {
+        acceptTestStore: true,
+      }).status,
+    ).toBe("pro");
+    expect(parseRevenueCatSnapshot(yearly("app_store")).status).toBe("pro");
+  });
+
+  it("grants nothing for a Test Store lifetime purchase unless told to accept it", () => {
+    expect(parseRevenueCatSnapshot(lifetime)).toEqual({
+      status: "lapsed",
+      expiresAt: 0,
+    });
+    expect(
+      parseRevenueCatSnapshot(lifetime, "Shelvr Pro", { acceptTestStore: true })
+        .status,
+    ).toBe("lifetime");
   });
 });

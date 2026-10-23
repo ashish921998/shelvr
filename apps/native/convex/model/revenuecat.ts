@@ -4,6 +4,7 @@ export type RevenueCatEvent = {
   expiresAt?: number;
   productId?: string;
   periodType?: string;
+  store?: string;
   cancelReason?: string;
   expirationReason?: string;
   eventTimestampMs?: number;
@@ -33,6 +34,7 @@ export function parseRevenueCatEvent(
     expiresAt,
     productId,
     periodType,
+    store: readString(event.store),
     cancelReason: readString(event.cancel_reason),
     expirationReason: readString(event.expiration_reason),
     eventTimestampMs,
@@ -43,6 +45,11 @@ export function parseRevenueCatEvent(
         }
       : {}),
   };
+}
+
+/** Webhook events spell it TEST_STORE, the REST API test_store. */
+export function isTestStore(store: unknown): boolean {
+  return typeof store === "string" && store.toLowerCase() === "test_store";
 }
 
 const ANONYMOUS_PREFIX = "$RCAnonymousID:";
@@ -125,6 +132,7 @@ type RevenueCatSnapshot = {
 export function parseRevenueCatSnapshot(
   body: unknown,
   entitlementIdentifier = "Shelvr Pro",
+  { acceptTestStore = false }: { acceptTestStore?: boolean } = {},
 ): RevenueCatSnapshot {
   const response = readRecord(body);
   const subscriber = readRecord(response?.subscriber);
@@ -140,6 +148,8 @@ export function parseRevenueCatSnapshot(
   const productId = readString(entitlement?.product_identifier);
   if (!entitlement || !productId)
     throw new Error("Invalid RevenueCat entitlement");
+  if (!acceptTestStore && fromTestStore(subscriber, productId))
+    return { status: "lapsed", expiresAt: 0 };
   if (entitlement.expires_date === null)
     return { status: "lifetime", expiresAt: 0, productId };
   const expiresAt = parseDate(entitlement.expires_date);
@@ -157,6 +167,21 @@ export function parseRevenueCatSnapshot(
     expiresAt: effectiveExpiry,
     productId,
   };
+}
+
+function fromTestStore(
+  subscriber: Record<string, unknown> | undefined,
+  productId: string,
+): boolean {
+  const subscription = readRecord(
+    readRecord(subscriber?.subscriptions)?.[productId],
+  );
+  if (subscription) return isTestStore(subscription.store);
+  const purchases = readRecord(subscriber?.non_subscriptions)?.[productId];
+  return (
+    Array.isArray(purchases) &&
+    purchases.some((purchase) => isTestStore(readRecord(purchase)?.store))
+  );
 }
 
 function parseDate(value: unknown): number {

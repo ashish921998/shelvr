@@ -22,11 +22,8 @@ import {
   verifyAppleIdToken,
 } from "./model/appleIdToken";
 import { keepAppleRefreshToken } from "./model/appleTokens";
+import { isDevDeployment } from "./model/deployment";
 import { errorName, logEvent } from "./model/log";
-
-const isDevDeployment = () =>
-  process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
-  "https://amicable-antelope-639.convex.site";
 
 async function revokeUnstoredToken(
   signing: {

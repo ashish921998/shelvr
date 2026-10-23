@@ -1,5 +1,6 @@
 import { internal } from "../_generated/api";
 import { env, type ActionCtx } from "../_generated/server";
+import { isDevDeployment } from "./deployment";
 import { parseRevenueCatSnapshot } from "./revenuecat";
 
 export async function reconcileRevenueCatCustomers(
@@ -28,6 +29,7 @@ export async function reconcileRevenueCatCustomers(
     const snapshot = parseRevenueCatSnapshot(
       body,
       env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro",
+      { acceptTestStore: isDevDeployment() },
     );
     snapshots.push({ userId, ...snapshot });
   }
