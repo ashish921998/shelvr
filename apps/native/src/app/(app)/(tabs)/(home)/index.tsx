@@ -1,9 +1,9 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { ProCard } from "@/components/home/pro-card";
-import { SaveHowTo } from "@/components/home/save-how-to";
 import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
+import { SetupChecklist } from "@/components/home/setup-checklist";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
@@ -15,11 +15,8 @@ import { NextUpCard } from "@/components/home/next-up-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import {
-  hasSavedFirstShare,
-  shouldShowHowTo,
-  weeklyNudge,
-} from "@/lib/first-share";
+import { weeklyNudge } from "@/lib/first-share";
+import { setupProgress, shouldShowSetup } from "@/lib/setup-checklist";
 import { useHomeFeed } from "@/lib/home-feed";
 import { useNextUp } from "@/lib/next-up";
 import {
@@ -155,7 +152,6 @@ export default function HomeScreen() {
   const nextUp = useNextUp(user?._id, entitlement.entitled);
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
-  const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
   const proCard = locked ? (
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : null;
@@ -175,7 +171,9 @@ export default function HomeScreen() {
   }
 
   const progressCard = saveProgressCard(progress);
-  const showHowTo = howToVisible(progress, firstShareSaved, items.length);
+  const setup = setupProgress(items);
+  const showHowTo =
+    !progress.deferLater && shouldShowSetup(setup, items.length);
   const nudge = user ? (
     <HomeSheets
       userId={user._id}
@@ -196,7 +194,11 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        {emptyFeedStarter(proCard, showHowTo, progressCard) ??
+        {emptyFeedStarter(
+          proCard,
+          showHowTo ? <SetupChecklist progress={setup} /> : null,
+          progressCard,
+        ) ??
           (progress.pending ? null : (
             <EmptyState
               title={t("home.emptyTitle")}
@@ -229,7 +231,9 @@ export default function HomeScreen() {
 
   const howToHeader =
     proCard || showHowTo ? (
-      <View style={styles.howToHeader}>{proCard ?? <SaveHowTo />}</View>
+      <View style={styles.howToHeader}>
+        {proCard ?? <SetupChecklist progress={setup} />}
+      </View>
     ) : null;
 
   return (
@@ -281,28 +285,18 @@ function lastHeader(
   return nextUpCard;
 }
 
-function howToVisible(
-  progress: ReturnType<typeof useSaveProgress>,
-  firstShareSaved: boolean,
-  itemCount: number,
-): boolean {
-  return (
-    !progress.deferLater && shouldShowHowTo({ firstShareSaved, itemCount })
-  );
-}
-
 function emptyFeedStarter(
   proCard: ReactNode,
-  showHowTo: boolean,
+  setupCard: ReactNode,
   progressCard: ReactNode,
 ): ReactNode {
-  if (proCard || showHowTo) {
+  if (proCard || setupCard) {
     return (
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.howToOnly}
       >
-        {proCard ?? <SaveHowTo />}
+        {proCard ?? setupCard}
       </ScrollView>
     );
   }

@@ -1,28 +1,25 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { ahaSample } from "@/lib/aha-sample";
+import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
-import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import type { SampleCityId } from "@/lib/sample-cities";
-import { type EveningAfter, isSampleCity, samplePlan } from "@/lib/sample-trip";
 import { notificationPermissionState } from "@/lib/notification-token";
-import { isInterest, type Interest } from "@/lib/onboarding-interests";
 import {
-  GOAL_PLANS,
-  GOAL_SPACES,
-  goalFlow,
-  goalShareSample,
-  isPlacesGoal,
-  isPracticePost,
+  GOALS,
+  goalSpaces,
+  planKindFor,
   type Goal,
+  type Planner,
+  type SavedCount,
 } from "@/lib/onboarding-goals";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
-import { practiceShareSample } from "@/lib/onboarding-demo";
-import { firstSharedUrl } from "@/lib/share/process-share";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
+  nextOnboardingStep,
   previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
@@ -34,71 +31,51 @@ import {
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
-import {
-  clearPendingShareOnDevice,
-  markPendingShareOnDevice,
-} from "@/lib/share/pending-share-store";
+import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { SignInView } from "@/components/sign-in-view";
-import { CityStep, GoalStep } from "@/components/onboarding/goal";
-import { InterestsStep } from "@/components/onboarding/interests";
+import { AhaPlanStep } from "@/components/onboarding/aha-plan";
+import { AhaShareStep } from "@/components/onboarding/aha-share";
+import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
+import { CityStep } from "@/components/onboarding/city-step";
 import { OpenerStep } from "@/components/onboarding/opener";
-import { NotificationsStep } from "@/components/onboarding/notifications";
-import { PromiseStep } from "@/components/onboarding/promise";
-import { RecipeRevealStep } from "@/components/onboarding/recipe-reveal";
-import { SharePracticeStep } from "@/components/onboarding/share-practice";
+import { ScalePressable } from "@/components/onboarding/parts";
 import {
-  TripBuildStep,
-  TripRevealStep,
-} from "@/components/onboarding/trip-teaser";
+  GoalStep,
+  PlannerStep,
+  SavedCountStep,
+} from "@/components/onboarding/questions";
+import { ReminderStep } from "@/components/onboarding/reminder";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
-import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
+import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
+import { Text, View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  goal: 0.2,
-  city: 0.4,
-  interests: 0.4,
-  share: 0.6,
-  tripBuild: 0.8,
-  tripReveal: 0.8,
-  recipeReveal: 0.8,
-  promise: 1,
-  notifications: 1,
+  savedCount: 0.12,
+  goal: 0.25,
+  planner: 0.38,
+  city: 0.5,
+  ahaShare: 0.62,
+  ahaSpots: 0.75,
+  ahaPlan: 0.88,
+  reminder: 1,
 };
 
-const SHARE_TITLES = {
-  travel: { inCity: "goal.shareTravel", anywhere: "sharePractice.title" },
-  food: { inCity: "goal.shareFood", anywhere: "goal.shareFoodAnywhere" },
-  date: { inCity: "goal.shareDate", anywhere: "goal.shareDateAnywhere" },
-} as const;
+/** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
+const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
+  "savedCount",
+  "goal",
+  "planner",
+  "city",
+]);
 
-/** `city` is null when the sample city only stands in for one we don't cover. */
-function shareTitle(goal: Goal | null, city: string | null) {
-  if (goal === null || goal === "other") return undefined;
-  if (goal === "recipes") return t("goal.shareRecipes");
-  return city === null
-    ? t(SHARE_TITLES[goal].anywhere)
-    : t(SHARE_TITLES[goal].inCity, { city });
-}
-
-function practiceSampleFor(
-  goal: Goal | null,
-  city: SampleCityId | null,
-  interests: readonly Interest[],
-) {
-  return (
-    (goal === null ? undefined : goalShareSample(goal, city)) ??
-    practiceShareSample(interests, null)
-  );
-}
-
-/** Whether the notifications step has anything to ask; it is skipped once notifications are on or refused for good. */
+/** Whether the reminder step has anything to ask; it is skipped once notifications are on or refused for good. */
 async function shouldAskNotifications(): Promise<boolean> {
   try {
     return (await notificationPermissionState()) === "ask";
@@ -116,116 +93,137 @@ function holdIncomingShare() {
   }
 }
 
-/** Drops a held practice share by what was shared, since the goal, city or topics, and so the offered post, can change after it. */
-function dropPracticeShare() {
-  try {
-    const payloads = getSharedPayloads();
-    const url = firstSharedUrl(payloads);
-    if (url === null || !isPracticePost(url)) return;
-    if (!holdsOnlyLink(payloads, url)) return;
-    clearSharedPayloads();
-    clearPendingShareOnDevice();
-  } catch (err) {
-    analytics.captureError("onboarding_drop_share_failed", err);
-  }
+function useStepAnalytics(step: OnboardingStep) {
+  const tracked = useRef(new Set<OnboardingStep>());
+  const viewed = useRef(new Set<OnboardingStep>());
+  const enteredAt = useRef(0);
+  const current = useRef<OnboardingStep | null>(null);
+  const index = ONBOARDING_STEPS.indexOf(step);
+
+  useEffect(() => {
+    if (current.current === step) return;
+    current.current = step;
+    enteredAt.current = Date.now();
+    if (viewed.current.has(step)) return;
+    viewed.current.add(step);
+    analytics.capture("onboarding_step_viewed", {
+      step_id: ONBOARDING_STEP_IDS[step],
+      step_index: index,
+      flow_version: ONBOARDING_FLOW_VERSION,
+    });
+  }, [step, index]);
+
+  return useCallback(() => {
+    if (tracked.current.has(step)) return;
+    analytics.capture("onboarding_step_completed", {
+      step_id: ONBOARDING_STEP_IDS[step],
+      step_index: index,
+      flow_version: ONBOARDING_FLOW_VERSION,
+      duration_ms: Math.max(0, Date.now() - enteredAt.current),
+    });
+    tracked.current.add(step);
+  }, [step, index]);
+}
+
+function Header({
+  step,
+  onBack,
+  onSkip,
+}: {
+  step: OnboardingStep;
+  onBack: (() => void) | null;
+  onSkip: (() => void) | null;
+}) {
+  const { theme } = useUnistyles();
+  const progress = PROGRESS[step];
+  if (progress === null) return null;
+  return (
+    <View style={styles.header}>
+      <View style={styles.side}>
+        {onBack ? (
+          <ScalePressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.back")}
+            hitSlop={theme.gap(1)}
+            style={styles.back}
+          >
+            <AppSymbolIcon
+              name="chevron.left"
+              size={16}
+              weight="semibold"
+              tintColor={theme.colors.foreground}
+            />
+          </ScalePressable>
+        ) : null}
+      </View>
+      <View style={styles.barWrap}>
+        <View
+          style={[styles.bar, { width: `${Math.round(progress * 100)}%` }]}
+        />
+      </View>
+      <View style={[styles.side, styles.sideEnd]}>
+        {onSkip ? (
+          <ScalePressable
+            onPress={onSkip}
+            accessibilityRole="button"
+            hitSlop={theme.gap(1)}
+          >
+            <Text style={styles.skip}>{t("onboardingQ.skip")}</Text>
+          </ScalePressable>
+        ) : null}
+      </View>
+    </View>
+  );
 }
 
 export default function OnboardingScreen() {
   useAppLocale();
   const insets = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
   const { theme } = useUnistyles();
+  const reduced = useReducedMotion();
   const { completeOnboarding } = useOnboarding();
   const { isAuthenticated } = useConvexAuth();
 
-  const [initialProgress] = useState(() => getOnboardingProgress());
-  const [initialStep] = useState(() =>
-    restoreOnboardingStep(initialProgress.step),
+  const [initial] = useState(() => getOnboardingProgress());
+  const [step, setStep] = useState<OnboardingStep>(() =>
+    restoreOnboardingStep(initial.step),
   );
-  const [step, setStep] = useState<OnboardingStep>(initialStep);
-  const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
-  const [travelCity, setTravelCity] = useState<SampleCityId | null>(() =>
-    isSampleCity(initialProgress.travelCity)
-      ? initialProgress.travelCity
-      : null,
+  const [goals, setGoals] = useState<Goal[]>(initial.goals);
+  const [savedCount, setSavedCount] = useState<SavedCount | null>(
+    initial.savedCount,
   );
-  const [goal, setGoal] = useState<Goal | null>(initialProgress.goal);
-  const [eveningAfter, setEveningAfter] = useState<EveningAfter>(
-    initialProgress.eveningAfter ?? "walk",
+  const [planner, setPlanner] = useState<Planner | null>(initial.planner);
+  const [travelCity, setTravelCity] = useState<SampleCityId | null>(
+    initial.travelCity,
   );
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const trackedStepsRef = useRef(new Set<OnboardingStep>());
-  const viewedStepsRef = useRef(new Set<OnboardingStep>());
-  const [viewedOpenerPages] = useState(() => new Set<number>());
-  const stepEnteredAt = useRef(0);
-  const viewedStep = useRef<OnboardingStep | null>(null);
+  const recordCurrentStep = useStepAnalytics(step);
+  const kind = planKindFor(goals);
+  const spaces = goalSpaces(goals);
+  const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
-  const interests = spaces.filter(isInterest);
-  const flow = goalFlow(goal);
-  const planKind = goal === null ? null : GOAL_PLANS[goal];
-  const pickedCity = planKind === null ? null : travelCity;
-  const trip = samplePlan(planKind ?? "trip", pickedCity);
-  const cityName = t(trip.name);
-  const cityStandIn =
-    planKind !== null && planKind !== "trip" && pickedCity !== trip.city;
 
   useEffect(() => {
     setOnboardingProgress({
-      spaces,
+      spaces: goalSpaces(goals),
       travelCity,
-      goal,
-      eveningAfter,
+      goals,
+      savedCount,
+      planner,
       step: stepIndex,
     });
-  }, [spaces, travelCity, goal, eveningAfter, stepIndex]);
+  }, [travelCity, goals, savedCount, planner, stepIndex]);
 
-  useEffect(() => {
-    if (viewedStep.current === step) return;
-    viewedStep.current = step;
-    stepEnteredAt.current = Date.now();
-    if (viewedStepsRef.current.has(step)) return;
-    viewedStepsRef.current.add(step);
-    analytics.capture("onboarding_step_viewed", {
-      step_id: ONBOARDING_STEP_IDS[step],
-      step_index: stepIndex,
-      flow_version: ONBOARDING_FLOW_VERSION,
-    });
-  }, [step, stepIndex]);
-
-  const recordCurrentStep = useCallback(() => {
-    if (trackedStepsRef.current.has(step)) return;
-    analytics.capture("onboarding_step_completed", {
-      step_id: ONBOARDING_STEP_IDS[step],
-      step_index: stepIndex,
-      flow_version: ONBOARDING_FLOW_VERSION,
-      duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
-    });
-    trackedStepsRef.current.add(step);
-  }, [step, stepIndex]);
-
+  const [backward, setBackward] = useState(false);
   const advance = useCallback(() => {
     recordCurrentStep();
+    setBackward(false);
     setStep((current) =>
-      current === step ? (flow[flow.indexOf(step) + 1] ?? current) : current,
+      current === step ? nextOnboardingStep(current) : current,
     );
-  }, [recordCurrentStep, flow, step]);
-
-  const pickGoal = (picked: Goal) => {
-    recordCurrentStep();
-    if (picked !== goal) {
-      setGoal(picked);
-      setSpaces([...GOAL_SPACES[picked]]);
-      setTravelCity(null);
-    }
-    const next = goalFlow(picked);
-    setStep(next[next.indexOf("goal") + 1]);
-  };
-
-  const pickCity = (city: SampleCityId | null) => {
-    setTravelCity(city);
-    advance();
-  };
+  }, [recordCurrentStep, step]);
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
@@ -234,20 +232,18 @@ export default function OnboardingScreen() {
     completeOnboarding();
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
-  const toggleInterest = (interest: Interest) =>
-    setSpaces((current) =>
-      current.includes(interest)
-        ? current.filter((value) => value !== interest)
-        : [...current, interest],
-    );
-
   const finish = () => {
     if (process.env.EXPO_OS === "ios") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(spaces, pickedCity, goal),
+      onboardingCompletedProperties(spaces, {
+        travelCity,
+        goals,
+        savedCount,
+        planner,
+      }),
     );
     recordCurrentStep();
     holdIncomingShare();
@@ -255,15 +251,19 @@ export default function OnboardingScreen() {
     completeOnboarding();
   };
 
-  const practiceSample = practiceSampleFor(goal, pickedCity, interests);
   const paywall = useOnboardingPaywall({
     onPro: finish,
-    onDecline: () => {
-      dropPracticeShare();
-      finish();
-    },
+    onDecline: finish,
     onUnavailable: finish,
   });
+
+  const askAfterPlan = () => {
+    void shouldAskNotifications().then((ask) => {
+      if (ask) return advance();
+      recordCurrentStep();
+      paywall.ask();
+    });
+  };
 
   if (showSignIn) {
     return (
@@ -274,151 +274,106 @@ export default function OnboardingScreen() {
     );
   }
 
-  const progress = PROGRESS[step];
-  const previous = previousOnboardingStep(step, flow);
-  const goBack =
-    paywall.asked || previous === null ? null : () => setStep(previous);
+  const previous = previousOnboardingStep(step);
+  const skip = () => {
+    if (step === "goal") setGoals([...GOALS]);
+    if (step === "city") setTravelCity(null);
+    advance();
+  };
+
+  const body = (() => {
+    switch (step) {
+      case "opener":
+        return (
+          <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
+        );
+      case "savedCount":
+        return (
+          <SavedCountStep
+            picked={savedCount}
+            onPick={setSavedCount}
+            onContinue={advance}
+          />
+        );
+      case "goal":
+        return (
+          <GoalStep picked={goals} onChange={setGoals} onContinue={advance} />
+        );
+      case "planner":
+        return (
+          <PlannerStep
+            picked={planner}
+            onPick={setPlanner}
+            onContinue={advance}
+          />
+        );
+      case "city":
+        return (
+          <CityStep
+            kind={kind}
+            city={travelCity}
+            onPick={(city) => {
+              setTravelCity(city);
+              advance();
+            }}
+          />
+        );
+      case "ahaShare":
+        return <AhaShareStep sample={sample} onShared={advance} />;
+      case "ahaSpots":
+        return <AhaSpotsStep sample={sample} onContinue={advance} />;
+      case "ahaPlan":
+        return (
+          <AhaPlanStep
+            sample={sample}
+            savedCount={savedCount}
+            leaving={paywall.asked}
+            onContinue={askAfterPlan}
+          />
+        );
+      case "reminder":
+        return (
+          <ReminderStep
+            city={sample.city}
+            leaving={paywall.asked}
+            onDone={() => {
+              recordCurrentStep();
+              paywall.ask();
+            }}
+          />
+        );
+    }
+  })();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        {goBack ? (
-          <Pressable
-            onPress={goBack}
-            accessibilityRole="button"
-            accessibilityLabel={t("common.back")}
-            hitSlop={12}
-            style={styles.back}
-          >
-            <AppSymbolIcon
-              name="chevron.left"
-              size={20}
-              tintColor={theme.colors.foreground}
-            />
-          </Pressable>
-        ) : null}
-        <View style={[styles.barWrap, progress === null && styles.barHidden]}>
-          <View
-            style={[
-              styles.bar,
-              { width: `${Math.round((progress ?? 0) * 100)}%` },
-            ]}
-          />
-        </View>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: insets.top, paddingBottom: insets.bottom + theme.gap(1) },
+      ]}
+    >
+      <Header
+        step={step}
+        onBack={
+          paywall.asked || previous === null
+            ? null
+            : () => {
+                setBackward(true);
+                setStep(previous);
+              }
+        }
+        onSkip={SKIPPABLE.has(step) ? skip : null}
+      />
+      <View style={styles.content}>
+        {/* Keyed by step, so a new step springs in while the old one leaves; neither blocks a tap. */}
+        <Animated.View
+          key={step}
+          {...stepTransition(reduced, backward)}
+          style={styles.step}
+        >
+          {body}
+        </Animated.View>
       </View>
-
-      {step === "opener" ? (
-        <View
-          style={[
-            styles.content,
-            styles.scroll,
-            { paddingBottom: insets.bottom + theme.gap(1) },
-          ]}
-        >
-          <OpenerStep
-            // iOS: a live text-size change leaves native text measurements stale (react-native#57512); remounting re-measures.
-            key={fontScale}
-            onStart={advance}
-            onSignIn={() => setShowSignIn(true)}
-            viewedPages={viewedOpenerPages}
-          />
-        </View>
-      ) : step === "goal" || step === "city" ? (
-        <View
-          style={[
-            styles.content,
-            styles.scroll,
-            { paddingBottom: insets.bottom },
-          ]}
-        >
-          {step === "goal" || !isPlacesGoal(goal) ? (
-            <GoalStep goal={goal} onPick={pickGoal} />
-          ) : (
-            <CityStep goal={goal} city={travelCity} onPick={pickCity} />
-          )}
-        </View>
-      ) : step === "interests" ||
-        step === "tripReveal" ||
-        step === "recipeReveal" ? (
-        <View
-          style={[
-            styles.content,
-            styles.scroll,
-            { paddingBottom: insets.bottom + theme.gap(3) },
-          ]}
-        >
-          {step === "interests" ? (
-            <InterestsStep
-              picked={interests}
-              onToggle={toggleInterest}
-              onAdvance={advance}
-            />
-          ) : step === "recipeReveal" ? (
-            <RecipeRevealStep onContinue={advance} />
-          ) : (
-            <TripRevealStep
-              trip={trip}
-              standIn={cityStandIn}
-              after={eveningAfter}
-              onAfter={setEveningAfter}
-              onContinue={advance}
-            />
-          )}
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: insets.bottom + theme.gap(3) },
-          ]}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
-          {step === "share" && (
-            <SharePracticeStep
-              title={shareTitle(goal, cityStandIn ? null : cityName)}
-              sample={practiceSample}
-              leaving={paywall.asked}
-              onFinish={advance}
-            />
-          )}
-
-          {step === "promise" && (
-            <PromiseStep
-              goal={goal ?? "other"}
-              city={pickedCity === trip.city ? cityName : null}
-              after={eveningAfter}
-              leaving={paywall.asked}
-              onCommit={() => {
-                void shouldAskNotifications().then((ask) => {
-                  if (ask) return advance();
-                  recordCurrentStep();
-                  paywall.ask();
-                });
-              }}
-            />
-          )}
-
-          {step === "notifications" && (
-            <NotificationsStep
-              goal={goal}
-              trip={trip}
-              leaving={paywall.asked}
-              onDone={() => {
-                recordCurrentStep();
-                paywall.ask();
-              }}
-            />
-          )}
-
-          {step === "tripBuild" && (
-            <TripBuildStep trip={trip} onDone={advance} />
-          )}
-        </ScrollView>
-      )}
     </View>
   );
 }
@@ -430,37 +385,49 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(3),
   },
   header: {
-    height: 28,
-    marginTop: -12,
-    marginBottom: -13,
-    zIndex: 1,
+    minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1.5),
   },
+  side: {
+    minWidth: theme.control.minHeight,
+  },
+  sideEnd: {
+    alignItems: "flex-end",
+  },
   back: {
-    padding: theme.gap(0.5),
+    width: theme.gap(4.5),
+    height: theme.gap(4.5),
+    borderRadius: theme.gap(2.25),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceMuted,
   },
   barWrap: {
     flex: 1,
-    height: 3,
+    height: 4,
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: 2,
     overflow: "hidden",
   },
-  barHidden: {
-    opacity: 0,
-  },
   bar: {
-    height: 3,
+    height: 4,
     backgroundColor: theme.colors.primary,
     borderRadius: 2,
   },
-  scroll: {
-    flex: 1,
+  skip: {
+    ...theme.type.subheadLabel,
+    color: theme.colors.muted,
   },
   content: {
-    flexGrow: 1,
-    paddingTop: theme.gap(3),
+    flex: 1,
+    marginHorizontal: -theme.gap(3),
+    overflow: "hidden",
+  },
+  step: {
+    ...StyleSheet.absoluteFillObject,
+    paddingTop: theme.gap(2),
+    paddingHorizontal: theme.gap(3),
   },
 }));

@@ -7,7 +7,6 @@ import {
   SAMPLE_CROPS,
   SAMPLE_MAP,
   SAMPLE_SLOT_LABELS,
-  sampleRows,
   sampleStops,
   samplePlan,
   sampleTrip,
@@ -193,43 +192,4 @@ it("keeps both crops inside the drawing", () => {
     expect(crop.top).toBeGreaterThanOrEqual(0);
     expect(crop.top + crop.height).toBeLessThanOrEqual(SAMPLE_MAP.height);
   }
-});
-
-describe("sampleRows", () => {
-  const trip = sampleTrip("prague");
-
-  it("lists each day's header, then that day's stops", () => {
-    expect(
-      sampleRows(trip).map((row) =>
-        row.kind === "day" ? `day ${row.day}` : row.entry.stop.name,
-      ),
-    ).toEqual([
-      "day 0",
-      "Old Town Square",
-      "Grand Café Orient",
-      "Charles Bridge",
-      "Lokál Dlouhááá",
-      "day 1",
-      "Prague Castle",
-      "Café Savoy",
-      "Petřín Lookout Tower",
-      "Terasa U Zlaté studně",
-    ]);
-  });
-
-  it("gives each day's header its title and place count", () => {
-    expect(sampleRows(trip)[0]).toEqual({
-      kind: "day",
-      day: 0,
-      title: "tripTeaser.pragueDayOne",
-      places: 4,
-    });
-  });
-
-  it("carries every stop once, numbered as the map numbers them", () => {
-    const numbers = sampleRows(trip).flatMap((row) =>
-      row.kind === "stop" ? [row.entry.number] : [],
-    );
-    expect(numbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-  });
 });

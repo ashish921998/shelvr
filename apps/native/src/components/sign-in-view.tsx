@@ -2,6 +2,7 @@ import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
+import { PhotoCollage } from "@/components/onboarding/collage";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
@@ -54,9 +55,13 @@ export function SignInView({
           />
         </Pressable>
       ) : null}
+      <PhotoCollage />
       <View style={styles.center}>
         <View style={styles.header}>
-          <Text style={styles.title}>shelvr</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            shelvr
+          </Text>
+          <Text style={styles.tagline}>{t("opener.tagline")}</Text>
           <Text style={styles.subtitle}>{t("account.signInTitle")}</Text>
         </View>
 
@@ -72,7 +77,7 @@ export function SignInView({
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
-              cornerRadius={theme.radius.md}
+              cornerRadius={26}
               style={[
                 styles.appleButton,
                 pending !== null && styles.buttonDisabled,
@@ -170,7 +175,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     padding: theme.gap(2.5),
     paddingTop: rt.insets.top + theme.gap(3),
     paddingBottom: rt.insets.bottom + theme.gap(2),
-    alignItems: "center",
+    alignItems: "stretch",
+    gap: theme.gap(3),
+    backgroundColor: theme.colors.background,
   },
   back: {
     position: "absolute",
@@ -180,24 +187,27 @@ const styles = StyleSheet.create((theme, rt) => ({
     zIndex: 1,
   },
   center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
     alignSelf: "stretch",
-    gap: theme.gap(8),
+    gap: theme.gap(3),
   },
   header: {
-    alignItems: "center",
     gap: theme.gap(1),
   },
   title: {
     fontFamily: theme.fonts.display,
     fontSize: 48,
-    color: theme.colors.primary,
+    lineHeight: 52,
+    color: theme.colors.primaryText,
+  },
+  tagline: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 24,
+    lineHeight: 30,
+    letterSpacing: -0.3,
+    color: theme.colors.foreground,
   },
   subtitle: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 16,
+    ...theme.type.subhead,
     color: theme.colors.muted,
   },
   buttons: {
@@ -213,7 +223,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.foreground,
     borderWidth: 1,
     borderColor: theme.colors.foreground,
-    borderRadius: theme.radius.md,
+    borderRadius: 999,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
@@ -228,7 +238,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
+    borderRadius: 999,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
@@ -255,8 +265,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     lineHeight: 20,
     color: theme.colors.faint,
     textAlign: "center",
-    paddingHorizontal: theme.gap(4),
-    marginBottom: theme.gap(2),
+    paddingHorizontal: theme.gap(2),
   },
   termsLink: {
     fontFamily: theme.fonts.medium,
