@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { analytics } from "@/lib/analytics";
 import { getNotificationUrl } from "@/lib/notifications";
 import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
+import { claimDailySplash } from "@/lib/splash/daily-splash";
 import {
   isDirectLaunch,
   subscribeDirectLaunch,
@@ -35,7 +36,10 @@ export function useSplashGate() {
       !hasPlayed &&
       !isDirectLaunch() &&
       !launchedByNotificationRoute() &&
-      !hasResumableSharedPayloads();
+      !hasResumableSharedPayloads() &&
+      // Last, so a launch that skips the splash for another reason does not
+      // use up the day's showing.
+      claimDailySplash();
     hasPlayed = true;
     return play;
   });

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -13,9 +13,13 @@ type Props = {
   children?: ReactNode;
   pointerEvents?: string;
   testID?: string;
+  onPress?: () => void;
 };
 
 vi.mock("react-native", () => ({
+  Pressable: vi.fn(({ testID, onPress }: Props) => (
+    <button data-testid={testID} onClick={onPress} />
+  )),
   Text: vi.fn(({ children }: Props) => <span>{children}</span>),
   View: vi.fn(({ children }: Props) => <div>{children}</div>),
   useWindowDimensions: () => ({ width: 390, height: 844 }),
@@ -109,4 +113,38 @@ it("lets touches through to the app once the cross-fade starts", async () => {
 
   act(() => vi.advanceTimersByTime(SPLASH_EXIT_FROM * 1000));
   expect(screen(container)?.getAttribute("data-pointer-events")).toBe("none");
+});
+
+it("fades out and hands over as soon as it is tapped", async () => {
+  const { AnimatedSplash } = await import("./animated-splash");
+  const onFinish = vi.fn();
+  const { container, getByTestId } = render(
+    <AnimatedSplash onFinish={onFinish} />,
+  );
+
+  act(() => vi.advanceTimersByTime(400));
+  fireEvent.click(getByTestId("splash-skip"));
+  expect(screen(container)?.getAttribute("data-pointer-events")).toBe("none");
+  expect(onFinish).not.toHaveBeenCalled();
+
+  act(() => motion.completions.at(-1)?.(true));
+  expect(onFinish).toHaveBeenCalledTimes(1);
+
+  act(() => vi.advanceTimersByTime(SPLASH_DURATION * 1000 + 1000));
+  expect(onFinish).toHaveBeenCalledTimes(1);
+});
+
+it("ignores a second tap while it is already fading", async () => {
+  const { AnimatedSplash } = await import("./animated-splash");
+  render(<AnimatedSplash onFinish={() => {}} />);
+  const before = motion.completions.length;
+
+  const skip = document.querySelector('[data-testid="splash-skip"]');
+  act(() => {
+    fireEvent.click(skip!);
+  });
+  act(() => {
+    fireEvent.click(skip!);
+  });
+  expect(motion.completions.length).toBe(before + 1);
 });
