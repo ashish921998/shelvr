@@ -281,6 +281,7 @@ describe("choosing a save reminder", () => {
     });
     await t.run(async (ctx) => {
       const spaceId = await ctx.db.insert("spaces", { userId, name: "Lisbon" });
+      await ctx.db.insert("spaceItems", { userId, spaceId, itemId: ids[0] });
       const stop = { name: "Café", why: "saved", slot: "morning" as const };
       await ctx.db.insert("trips", {
         userId,

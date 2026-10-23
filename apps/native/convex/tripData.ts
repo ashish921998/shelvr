@@ -201,10 +201,10 @@ export async function deleteTripsForSpace(
   }
 }
 
-// ponytail: the newest 50 trips (one per space); a user with more spaces keeps older trips' stops on the shelf.
-const TRIP_STOP_SCAN = 50;
+// ponytail: the newest 10 trips, up to 105 day stops and one membership read each; older trips' stops stay on the shelf.
+const TRIP_STOP_SCAN = 10;
 
-/** Saves planned on a day of one of the user's trips. A place that didn't fit (`wishlist`) is not planned. */
+/** Saves the trip page shows on a day of one of the user's trips. A place that didn't fit (`wishlist`) is not planned. */
 export async function tripStopItemIds(
   ctx: QueryCtx,
   userId: string,
@@ -214,11 +214,19 @@ export async function tripStopItemIds(
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .order("desc")
     .take(TRIP_STOP_SCAN);
-  return new Set(
-    trips.flatMap((trip) =>
-      trip.days.flatMap((day) => day.stops.map((stop) => stop.itemId)),
+  const stops = trips.flatMap((trip) =>
+    trip.days.flatMap((day) =>
+      day.stops.map((stop) => ({ itemId: stop.itemId, spaceId: trip.spaceId })),
     ),
   );
+  const planned = new Set<string>();
+  for (const { itemId, spaceId } of stops) {
+    if (planned.has(itemId)) continue;
+    const membership = await getMembership(ctx, itemId, spaceId);
+    if (membership !== null && effectiveStatus(membership) === "saved")
+      planned.add(itemId);
+  }
+  return planned;
 }
 
 export const saveTripInternal = internalMutation({
