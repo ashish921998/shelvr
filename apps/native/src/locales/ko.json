@@ -106,7 +106,7 @@
   "spaces.editorHelp": "제목을 지으면 Shelvr가 어울리는 저장 항목을 추천해요. 남길 항목은 직접 선택하세요.",
   "spaces.titlePlaceholder": "집 꾸미기 쇼핑 목록",
   "spaces.dynamic": "자동 추천",
-  "spaces.dynamicHelp": "Shelvr가 어울리는 항목을 계속 추천해요",
+  "spaces.dynamicHelp": "어울리는 항목이 여기에 추천으로 표시돼요",
   "spaces.autoFile": "자동으로 추가",
   "spaces.autoFileHelp": "어울리는 새 저장 항목이 바로 들어가요. 언제든 뺄 수 있어요.",
   "common.saveChanges": "변경 사항 저장",

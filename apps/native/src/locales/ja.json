@@ -106,7 +106,7 @@
   "spaces.editorHelp": "タイトルを付けると、Shelvrが合いそうな保存項目を提案します。残す項目は自分で選べます。",
   "spaces.titlePlaceholder": "新居の買い物リスト",
   "spaces.dynamic": "自動提案",
-  "spaces.dynamicHelp": "Shelvrが合う項目を継続して提案します",
+  "spaces.dynamicHelp": "合う項目がここに提案として表示されます",
   "spaces.autoFile": "自動で追加",
   "spaces.autoFileHelp": "合う新しい保存項目をそのまま追加します。いつでも外せます。",
   "common.saveChanges": "変更を保存",
