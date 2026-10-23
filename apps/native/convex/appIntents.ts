@@ -2,12 +2,11 @@ import { v } from "convex/values";
 import {
   action,
   internalMutation,
-  mutation,
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, requireUserId, authedMutation } from "./model/auth";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { IMAGE_EMPTY_MESSAGE } from "./model/imagePolicy";
 import {
@@ -78,11 +77,11 @@ export const storeCaptureToken = internalMutation({
   },
 });
 
-export const revokeCaptureToken = mutation({
+export const revokeCaptureToken = authedMutation({
   args: { token: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     if (
       args.token.length === 0 ||
       args.token.length > MAX_CAPTURE_TOKEN_LENGTH

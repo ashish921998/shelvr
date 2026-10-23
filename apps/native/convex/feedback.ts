@@ -5,11 +5,10 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
-  mutation,
   type ActionCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireUserId } from "./model/auth";
+import { authedMutation } from "./model/auth";
 import {
   feedbackDeliveryStatusValidator,
   feedbackPlatformValidator,
@@ -76,7 +75,7 @@ function boundContext(value: string | undefined): string | undefined {
   return bounded.length > 0 ? bounded : undefined;
 }
 
-export const submitFeedback = mutation({
+export const submitFeedback = authedMutation({
   args: {
     message: v.string(),
     surface: feedbackSurfaceValidator,
@@ -89,7 +88,7 @@ export const submitFeedback = mutation({
     deliveryState: v.union(v.literal("scheduled"), v.literal("unconfigured")),
   }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await rateLimiter.limit(ctx, "feedbackSubmit", {
       key: userId,
       throws: true,

@@ -108,6 +108,12 @@ vi.mock("@/components/sign-in-view", () => ({ SignInView: vi.fn(() => null) }));
 vi.mock("@/components/onboarding/opener", () => ({
   OpenerStep: vi.fn(() => null),
 }));
+vi.mock("@/components/onboarding/notifications", () => ({
+  NotificationsStep: vi.fn(() => null),
+}));
+vi.mock("@/lib/notification-token", () => ({
+  notificationPermissionState: vi.fn(async () => "granted"),
+}));
 vi.mock("@/components/onboarding/promise", () => ({
   PromiseStep: mocks.promise,
 }));
@@ -243,6 +249,21 @@ it("asks a date-night city, practises with a stop in that plan, then shows the p
   };
   act(onContinue);
   expect(mocks.promise.mock.lastCall?.[0].goal).toBe("date");
+});
+
+it("moves one step on a double tap, so the build after the share practice still shows", () => {
+  render(<OnboardingScreen />);
+  tap("goal:date");
+  tap("city:paris");
+  const { onFinish } = mocks.sharePractice.mock.lastCall?.[0] as unknown as {
+    onFinish: () => void;
+  };
+  act(() => {
+    onFinish();
+    onFinish();
+  });
+  expect(screen.getByRole("button", { name: "built" })).toBeTruthy();
+  expect(mocks.reveal).not.toHaveBeenCalled();
 });
 
 it("skips the city for recipes, practises with the recipe post, then shows the recipe and the promise", () => {

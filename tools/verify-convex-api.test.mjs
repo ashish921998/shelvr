@@ -374,6 +374,55 @@ export const listTags = query({ ...contract, handler: async () => null });
   assert.deepEqual(diff.changed, ["api:listTags"]);
 });
 
+const authedItems = items
+  .replace(
+    'import { query, mutation, internalQuery } from "./_generated/server";',
+    'import { internalQuery } from "./_generated/server";\nimport { authedMutation, authedQuery } from "./model/auth";',
+  )
+  .replace(
+    "export const listItems = query({",
+    "export const listItems = authedQuery({",
+  )
+  .replace(
+    "export const deleteItem = mutation({",
+    "export const deleteItem = authedMutation({",
+  );
+const authedBase = tree({ items: authedItems, "model/items": shared });
+
+test("a function built with authedQuery or authedMutation is public", () => {
+  const found = [...signatures(authedBase).keys()].sort();
+  assert.deepEqual(found, ["items:deleteItem", "items:listItems"]);
+});
+
+test("moving a function onto authedQuery or authedMutation is not a contract change", () => {
+  const diff = diffSignatures(signatures(base), signatures(authedBase));
+  assert.deepEqual(diff, { added: [], removed: [], changed: [] });
+});
+
+test("changing authedQuery to authedMutation is a change", () => {
+  const head = tree({
+    "model/items": shared,
+    items: authedItems.replace(
+      "export const listItems = authedQuery({",
+      "export const listItems = authedMutation({",
+    ),
+  });
+  const diff = diffSignatures(signatures(authedBase), signatures(head));
+  assert.deepEqual(diff.changed, ["items:listItems"]);
+  assert.equal(isBreaking(diff), true);
+});
+
+test("a function built by a registrar the scanner does not know fails the scan", () => {
+  const head = tree({
+    "model/items": shared,
+    items: authedItems.replaceAll("authedQuery", "authedAction"),
+  });
+  assert.throws(
+    () => signatures(head),
+    /items\.ts: listItems is registered by authedAction, which tools\/verify-convex-api\.mjs does not know/,
+  );
+});
+
 const checkScript = fileURLToPath(
   new URL("./verify-convex-api.mjs", import.meta.url),
 );

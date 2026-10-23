@@ -1,5 +1,6 @@
 import type { Doc } from "../_generated/dataModel";
 import { env } from "../_generated/server";
+import { linkSource } from "./externalUrl";
 
 type ReminderKind = "read" | "cook";
 
@@ -45,6 +46,7 @@ export function reminderKind(item: Doc<"items">): ReminderKind | undefined {
     return "cook";
   if (
     item.type === "link" &&
+    linkSource(item.url) === undefined &&
     item.media === undefined &&
     item.enrichment === undefined &&
     (item.content?.trim().length ?? 0) > 0
@@ -73,6 +75,7 @@ export function reminderCandidates(
   newestFirst: readonly Doc<"items">[],
   now: number,
   previousKind: ReminderKind | undefined,
+  tripStops: ReadonlySet<string>,
 ): ReminderCandidate[] {
   const read: ReminderCandidate[] = [];
   const cook: ReminderCandidate[] = [];
@@ -82,7 +85,12 @@ export function reminderCandidates(
     const subject = reminderSubject(item, kind);
     if (subject === undefined) continue;
     const age = now - item._creationTime;
-    if (kind === "read" && age >= READ_MIN_AGE_MS && age <= READ_MAX_AGE_MS)
+    if (
+      kind === "read" &&
+      age >= READ_MIN_AGE_MS &&
+      age <= READ_MAX_AGE_MS &&
+      !tripStops.has(item._id)
+    )
       read.push({ item, kind, subject });
     if (kind === "cook" && age >= COOK_MIN_AGE_MS)
       cook.push({ item, kind, subject });

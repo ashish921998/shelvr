@@ -3,6 +3,8 @@ import { DIGEST_WINDOW_MS } from "./notificationFields";
 
 export const SHELF_SIZE = 3;
 export const SHELF_SCAN_ITEMS = 1000;
+// Article saves carry up to 100k characters each; 1,000 of them would pass the transaction read limit.
+export const SHELF_SCAN_BYTES = 6 * 1024 * 1024;
 export const SHELF_HISTORY = 12;
 export const ARCHIVE_CHECKS = 50;
 
@@ -19,13 +21,13 @@ export function weekStart(now: number): number {
 
 export function shelfCandidates<Item extends ShelfItem>(
   items: readonly Item[],
-  previouslyIncluded: ReadonlySet<string>,
+  skipped: ReadonlySet<string>,
   now: number,
 ): { recent: Item[]; archive: Item[] } {
   const recent: Item[] = [];
   const archive: Item[] = [];
   for (const item of items) {
-    if (item.status !== "ready" || previouslyIncluded.has(item._id)) continue;
+    if (item.status !== "ready" || skipped.has(item._id)) continue;
     if (item._creationTime >= now - DIGEST_WINDOW_MS) recent.push(item);
     else archive.push(item);
   }

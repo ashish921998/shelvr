@@ -70,31 +70,52 @@ export function stripTags(html: string): string {
   }
 }
 
+const ATTRIBUTE_OR_TAG_END =
+  /[\s/]*(?:>|(?<name>[^\s/>][^\s/>=]*)\s*(?:=\s*(?:"(?<doubleQuoted>[^"]*)"|'(?<singleQuoted>[^']*)'|[^\s>]*))?)/y;
+
+function* tagAttributes(html: string, tagName: string) {
+  const tagStart = new RegExp(`<${tagName}(?=[\\s/>])`, "gi");
+  const step = new RegExp(ATTRIBUTE_OR_TAG_END);
+  while (tagStart.exec(html) !== null) {
+    const attributes = new Map<string, string | undefined>();
+    step.lastIndex = tagStart.lastIndex;
+    for (;;) {
+      const match = step.exec(html);
+      if (match === null) return;
+      const { name, doubleQuoted, singleQuoted } = match.groups ?? {};
+      if (name === undefined) break;
+      const key = name.toLowerCase();
+      if (!attributes.has(key))
+        attributes.set(key, doubleQuoted ?? singleQuoted);
+    }
+    tagStart.lastIndex = step.lastIndex;
+    yield attributes;
+  }
+}
+
 export function extractCanonical(html: string): string | undefined {
-  const tag = html.match(/<link[^>]*rel\s*=\s*["']canonical["'][^>]*>/i)?.[0];
-  const href = tag?.match(/href\s*=\s*["']([^"']*)["']/i)?.[1]?.trim();
-  return href ? decodeEntities(href) : undefined;
+  for (const link of tagAttributes(html, "link")) {
+    const href = decodeEntities(link.get("href") ?? "").trim();
+    if (href && link.get("rel")?.toLowerCase() === "canonical") {
+      return href;
+    }
+  }
+  return undefined;
 }
 
 export function extractMetaContent(
   html: string,
   key: string,
 ): string | undefined {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
-    new RegExp(
-      `<meta[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*["']([^"']*)["'][^>]*>`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]*content\\s*=\\s*["']([^"']*)["'][^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
-      "i",
-    ),
-  ];
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match && match[1].trim() !== "") {
-      return decodeEntities(match[1].trim());
+  const wanted = key.toLowerCase();
+  for (const meta of tagAttributes(html, "meta")) {
+    const content = decodeEntities(meta.get("content") ?? "").trim();
+    if (
+      content &&
+      (meta.get("property")?.toLowerCase() === wanted ||
+        meta.get("name")?.toLowerCase() === wanted)
+    ) {
+      return content;
     }
   }
   return undefined;
@@ -131,14 +152,24 @@ export async function fetchImageAspectRatio(
   return undefined;
 }
 
-function extractTitle(html: string): string | undefined {
+function firstTitleText(html: string): string | undefined {
+  const open = html.search(/<title/i);
+  const tagEnd = open === -1 ? -1 : html.indexOf(">", open);
+  if (tagEnd === -1) return undefined;
+  const close = /<\/title>/gi;
+  close.lastIndex = tagEnd + 1;
+  const textEnd = close.exec(html)?.index;
+  return textEnd === undefined ? undefined : html.slice(tagEnd + 1, textEnd);
+}
+
+export function extractTitle(html: string): string | undefined {
   const ogTitle = extractMetaContent(html, "og:title");
   if (ogTitle) {
     return ogTitle;
   }
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (match) {
-    const title = decodeEntities(match[1]).replace(/\s+/g, " ").trim();
+  const text = firstTitleText(html);
+  if (text !== undefined) {
+    const title = decodeEntities(text).replace(/\s+/g, " ").trim();
     if (title !== "") {
       return title;
     }
@@ -270,18 +301,28 @@ function isLinkHub(hostname: string): boolean {
 }
 
 export function firstLinkedUrl(text: string | undefined): string | undefined {
+  return linkedUrls(text, 1)[0];
+}
+
+/** The caption's own links in order, link hubs left out. */
+function linkedUrls(text: string | undefined, limit: number): string[] {
+  const urls: string[] = [];
   if (!text) {
-    return undefined;
+    return urls;
   }
   for (const match of text.matchAll(/https?:\/\/[^\s<>"'()]+/gi)) {
     const candidate = match[0].replace(/[.,;:!?]+$/, "");
     try {
-      if (!isLinkHub(new URL(candidate).hostname)) {
-        return candidate;
+      if (
+        !isLinkHub(new URL(candidate).hostname) &&
+        !urls.includes(candidate)
+      ) {
+        urls.push(candidate);
+        if (urls.length === limit) break;
       }
     } catch {}
   }
-  return undefined;
+  return urls;
 }
 
 export function isTransientFetchFailure(code: SafeFetchError, status?: number) {
@@ -340,7 +381,32 @@ function recipeFromMarkup(
   html: string,
   truncated: true | undefined,
 ): Recipe | undefined {
-  return truncated ? undefined : sanitizeRecipe(extractRecipeMarkup(html));
+  if (!truncated) return sanitizeRecipe(extractRecipeMarkup(html));
+  // A cut page can end mid-recipe or drop a second recipe, but a head that arrived whole is complete.
+  const headEnd = html.search(/<\/head\s*>/i);
+  return headEnd === -1
+    ? undefined
+    : sanitizeRecipe(
+        extractRecipeMarkup(`${html.slice(0, headEnd)}</head></html>`),
+      );
+}
+
+// A sponsor or shop link often comes before the recipe's, so a few links are read, side by side.
+const MAX_LINKED_RECIPE_URLS = 3;
+
+async function linkedRecipe(url: string): Promise<Recipe | undefined> {
+  try {
+    const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
+    if (!result.ok) {
+      return undefined;
+    }
+    return recipeFromMarkup(
+      decodeWithContentType(result.bytes, result.contentType),
+      result.truncated,
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 export async function withLinkedRecipe(page: PageData): Promise<PageData> {
@@ -348,23 +414,19 @@ export async function withLinkedRecipe(page: PageData): Promise<PageData> {
   if (caption === undefined) {
     return page;
   }
-  const linkedUrl = page.linkedUrl ?? firstLinkedUrl(caption);
-  if (linkedUrl === undefined) {
-    return page;
-  }
-  try {
-    const result = await safeFetch(linkedUrl, PAGE_FETCH_OPTIONS);
-    if (!result.ok) {
-      return page;
+  const urls = [
+    ...new Set([
+      ...(page.linkedUrl !== undefined ? [page.linkedUrl] : []),
+      ...linkedUrls(caption, MAX_LINKED_RECIPE_URLS),
+    ]),
+  ].slice(0, MAX_LINKED_RECIPE_URLS);
+  for (const read of urls.map(linkedRecipe)) {
+    const recipe = await read;
+    if (recipe !== undefined) {
+      return { ...page, recipe };
     }
-    const recipe = recipeFromMarkup(
-      decodeWithContentType(result.bytes, result.contentType),
-      result.truncated,
-    );
-    return recipe === undefined ? page : { ...page, recipe };
-  } catch {
-    return page;
   }
+  return page;
 }
 
 export async function fetchPage(

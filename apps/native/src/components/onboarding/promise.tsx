@@ -1,11 +1,10 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton } from "@/components/onboarding/parts";
-import { AppSymbolIcon } from "@/components/symbol";
 import type { Goal } from "@/lib/onboarding-goals";
 import type { EveningAfter } from "@/lib/sample-trip";
 import { Text, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 
 const DATE_PICKS = {
   walk: "promise.datePickWalk",
@@ -92,7 +91,6 @@ export function PromiseStep({
   onCommit: () => void;
 }) {
   useAppLocale();
-  const { theme } = useUnistyles();
   const copy = promiseCopy(goal, city, after);
   return (
     <View style={styles.wrap}>
@@ -111,15 +109,6 @@ export function PromiseStep({
             <Text style={styles.lineText}>{line}</Text>
           </View>
         ))}
-      </View>
-
-      <View style={styles.reminder}>
-        <AppSymbolIcon
-          name="bell"
-          size={15}
-          tintColor={theme.colors.primaryText}
-        />
-        <Text style={styles.reminderText}>{t("promise.reminder")}</Text>
       </View>
 
       <View style={styles.foot}>
@@ -182,23 +171,6 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.display,
     fontSize: 20,
     lineHeight: 25,
-    color: theme.colors.foreground,
-  },
-  reminder: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.25),
-    paddingVertical: theme.gap(1.5),
-    paddingHorizontal: theme.gap(1.75),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  reminderText: {
-    flex: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 19,
     color: theme.colors.foreground,
   },
   foot: {
