@@ -88,7 +88,8 @@ function lockScreenFor(goal: Goal, trip: SampleTrip): LockScreen {
     return {
       photo: ARTICLE_PHOTO,
       day: 2,
-      hour: 20,
+      // The server's default reminder hour; reminders only go out 10:00-19:00.
+      hour: 18,
       title: t("reminder.readTitle"),
       body: t("reminder.readBody", { title: sampleHeading("Articles") }),
     };
@@ -98,11 +99,12 @@ function lockScreenFor(goal: Goal, trip: SampleTrip): LockScreen {
     photo: CITY_PICTURES[trip.city][goal === "food" ? "food" : "view"],
     day: 0,
     hour: 9,
-    title: t("weekly.previewTitle"),
+    // The push copy itself, as a first shelf of three saves from this week sends it.
+    title: t("digest.title"),
     body:
       stop === undefined
-        ? t("weekly.previewFallback")
-        : t("weekly.previewBody", { title: stop }),
+        ? t("digest.waitingCount", { count: 3 })
+        : t("digest.namedCount", { title: stop, count: 2 }),
   };
 }
 

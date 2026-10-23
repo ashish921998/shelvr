@@ -94,9 +94,9 @@ describe("NotificationsStep", () => {
     expect(
       screen.getByText("onboardingNotify.travelTitle", { exact: false }),
     ).toBeTruthy();
-    expect(screen.getByText("weekly.previewTitle")).toBeTruthy();
+    expect(screen.getByText("digest.title")).toBeTruthy();
     expect(
-      screen.getByText("weekly.previewBody Catedral de Barcelona"),
+      screen.getByText("digest.namedCount Catedral de Barcelona"),
     ).toBeTruthy();
   });
 
@@ -113,7 +113,7 @@ describe("NotificationsStep", () => {
     expect(
       screen.getByText("reminder.cookBody Easy classic lasagne"),
     ).toBeTruthy();
-    expect(screen.queryByText("weekly.previewTitle")).toBeNull();
+    expect(screen.queryByText("digest.title")).toBeNull();
   });
 
   it("falls back to the general screen when no goal was picked", () => {
@@ -126,6 +126,8 @@ describe("NotificationsStep", () => {
       />,
     );
     expect(screen.getByText("reminder.readTitle")).toBeTruthy();
+    // Reminders go out between 10:00 and 19:00, 18:00 by default.
+    expect(screen.getByText("6:00 PM")).toBeTruthy();
   });
 
   it("asks iOS, queues the shelf it promised, and moves on", async () => {
