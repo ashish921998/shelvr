@@ -53,7 +53,7 @@ export default function NewSpaceScreen() {
     isError,
   } = useQuery(
     convexQuery(
-      api.spaces.getSpace,
+      api.spaces.getSpaceCards,
       editing ? { id: id as Id<"spaces"> } : "skip",
     ),
   );

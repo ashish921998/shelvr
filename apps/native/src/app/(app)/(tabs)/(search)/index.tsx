@@ -48,7 +48,7 @@ export default function SearchScreen() {
   // server subscription that answers [] on every push.
   const { data: results } = useQuery({
     ...convexQuery(
-      api.items.searchItems,
+      api.items.searchItemCards,
       query.length > 0 ? { query } : "skip",
     ),
   });

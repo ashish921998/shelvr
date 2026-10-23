@@ -80,6 +80,7 @@ export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 const LIST_CAP = 1000;
 
 export const LIST_PAGE_MAX = 100;
+const SEARCH_LIMIT = 50;
 const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
 
 export const RECENT_ITEMS_MAX = 20;
@@ -234,7 +235,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   };
 }
 
-async function toItemCard(
+export async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
 ): Promise<ItemCard> {
@@ -469,22 +470,43 @@ export const getItem = query({
   },
 });
 
+async function searchOwnItems(
+  ctx: QueryCtx,
+  query: string,
+): Promise<Doc<"items">[]> {
+  const userId = await requireUserId(ctx);
+  const trimmed = query.trim();
+  if (trimmed === "") {
+    return [];
+  }
+  return await ctx.db
+    .query("items")
+    .withSearchIndex("search_text", (q) =>
+      q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
+    )
+    .take(SEARCH_LIMIT);
+}
+
+/** Full rows, article body included, for builds that open a result from the row. */
 export const searchItems = query({
   args: { query: v.string() },
   returns: v.array(enrichedItemValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
-    const trimmed = args.query.trim();
-    if (trimmed === "") {
-      return [];
-    }
-    const items = await ctx.db
-      .query("items")
-      .withSearchIndex("search_text", (q) =>
-        q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
-      )
-      .take(50);
+    const items = await searchOwnItems(ctx, args.query);
     return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+  },
+});
+
+/**
+ * Card rows: what the results grid draws. The detail page reads the body
+ * itself, so a keystroke never ships up to 50 article bodies.
+ */
+export const searchItemCards = query({
+  args: { query: v.string() },
+  returns: v.array(itemCardValidator),
+  handler: async (ctx, args) => {
+    const items = await searchOwnItems(ctx, args.query);
+    return await Promise.all(items.map((item) => toItemCard(ctx, item)));
   },
 });
 

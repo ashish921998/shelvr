@@ -32,7 +32,7 @@ export default function SpaceScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
-    convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
+    convexQuery(api.spaces.getSpaceCards, { id: id as Id<"spaces"> }),
   );
   const { data: storedTrip } = useQuery(
     convexQuery(api.tripData.getSpaceTrip, { spaceId: id as Id<"spaces"> }),
