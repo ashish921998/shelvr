@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as SecureStore from "expo-secure-store";
 import {
   confirmTrialReminderAsk,
   scheduleTrialReminder,
   TRIAL_LAST_DAY_ID,
   TRIAL_NUDGES,
   TRIAL_REMINDER_ID,
+  setTrialReminderLeadDays,
   trialLastDayAt,
   trialNudgeAt,
   trialNudgesAllowed,
   trialReminderAt,
+  trialReminderLeadDays,
   trialReminderPrimer,
 } from "./trial-reminder";
 
@@ -22,7 +25,10 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
 }));
 vi.mock("react-native", () => ({ Platform: mock.platform }));
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/lib/i18n", () => ({
+  t: (key: string, values?: { count?: number }) =>
+    values?.count === undefined ? key : `${key}:${values.count}`,
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: vi.fn() },
 }));
@@ -77,6 +83,45 @@ describe("trialReminderAt", () => {
   it("skips a trial that ends within two days", () => {
     expect(trialReminderAt(NOW + 2 * DAY, NOW)).toBeNull();
     expect(trialReminderAt(NOW + DAY, NOW)).toBeNull();
+  });
+});
+
+describe("the reminder's lead", () => {
+  it("keeps the days picked in onboarding, and falls back to two", () => {
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce(null);
+    expect(trialReminderLeadDays()).toBe(2);
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("9");
+    expect(trialReminderLeadDays()).toBe(2);
+    setTrialReminderLeadDays(3);
+    expect(SecureStore.setItem).toHaveBeenCalledWith(
+      "shelvr.trialReminderLeadDays",
+      "3",
+    );
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("3");
+    expect(trialReminderLeadDays()).toBe(3);
+  });
+
+  it("schedules three days ahead and names the days when three were picked", async () => {
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("3");
+    expect(await scheduleTrialReminder(NOW + 7 * DAY, NOW, false)).toBe(true);
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: TRIAL_REMINDER_ID,
+        content: expect.objectContaining({
+          title: "notifications.trialEndingTitle:3",
+        }),
+        trigger: expect.objectContaining({ date: new Date(NOW + 4 * DAY) }),
+      }),
+    );
+  });
+
+  it("sends no second last-day warning when the reminder is a day ahead", async () => {
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("1");
+    expect(await scheduleTrialReminder(NOW + 7 * DAY, NOW, false)).toBe(true);
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
+    );
+    expect(ids).toEqual([TRIAL_REMINDER_ID]);
   });
 });
 

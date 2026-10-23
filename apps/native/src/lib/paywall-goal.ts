@@ -1,21 +1,17 @@
-import { isPlacesGoal, type Goal } from "@/lib/onboarding-goals";
-import {
-  resolveOnboardingSpaceName,
-  type getOnboardingProgress,
-} from "@/lib/pending-onboarding";
+import { primaryGoal, type Goal } from "@/lib/onboarding-goals";
+import type { getOnboardingProgress } from "@/lib/pending-onboarding";
 import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 
 export type GoalProgress = Pick<
   ReturnType<typeof getOnboardingProgress>,
-  "goal" | "travelCity" | "spaces"
+  "goals" | "travelCity"
 >;
 
-/** What a slot's copy can depend on: the city the user picked (null for "not sure") and, for "other", the interests. */
-type Answers = { city: string | null; interests: string[] };
+/** What a slot's copy can depend on: the city the user picked (null for "not sure"). */
+type Answers = { city: string | null };
 type Copy = (answers: Answers) => string;
 
-const NO_ANSWER: Copy = () => "";
 const withCity =
   (named: (city: string) => string, plain: () => string): Copy =>
   ({ city }) =>
@@ -94,49 +90,25 @@ const GOAL_COPY: Record<Goal, GoalCopy> = {
     benefitTitle: () => t("paywallGoal.dateBenefitTitle"),
     benefitBody: () => t("paywallGoal.dateBenefitBody"),
   },
-  recipes: {
-    headline: () => t("paywallGoal.recipesHeadline"),
-    subline: () => t("paywallGoal.recipesSubline"),
-    photoTag: () => t("paywallGoal.recipesPhotoTag"),
-    answer1: () => t("paywallGoal.recipesAnswerOne"),
-    answer2: NO_ANSWER,
-    today: () => t("paywallGoal.recipesToday"),
-    planTitle: () => t("paywallGoal.recipesPlanTitle"),
-    benefitTitle: () => t("paywallGoal.recipesBenefitTitle"),
-    benefitBody: () => t("paywallGoal.recipesBenefitBody"),
-  },
-  other: {
-    headline: () => t("paywallGoal.otherHeadline"),
-    subline: () => t("paywallGoal.otherSubline"),
-    photoTag: () => t("paywallGoal.otherPhotoTag"),
-    answer1: () => t("paywallGoal.otherAnswerOne"),
-    answer2: ({ interests }) => interests.slice(0, 2).join(", "),
-    today: () => t("paywallGoal.otherToday"),
-    planTitle: () => t("paywallGoal.otherPlanTitle"),
-    benefitTitle: () => t("paywallGoal.otherBenefitTitle"),
-    benefitBody: () => t("paywallGoal.otherBenefitBody"),
-  },
 };
 
 const string = (value: string) => ({ type: "string" as const, value });
 
 /**
- * Custom variables that let the paywall echo the onboarding answers. A skipped
+ * Custom variables that let the paywall echo the onboarding answers, worded for
+ * the goal that leads (date night, then trips, then places to eat). A skipped
  * city ("Not sure yet", "Somewhere else") is stored as null and reads as no city.
  * `goal_city` is the unlocalized city id, which the paywall uses to pick the city's photo.
- * Goals that never ask for a city send none, even if an earlier answer left one stored.
  */
 export function goalPaywallVariables(
   progress: GoalProgress,
 ): Record<string, { type: "string"; value: string }> {
-  const { goal } = progress;
+  const goal = primaryGoal(progress.goals);
   if (goal === null) return {};
   const copy = GOAL_COPY[goal];
-  const city = isPlacesGoal(goal) ? progress.travelCity : null;
+  const city = progress.travelCity;
   const answers: Answers = {
     city: city === null ? null : t(SAMPLE_CITIES[city].name),
-    interests:
-      goal === "other" ? progress.spaces.map(resolveOnboardingSpaceName) : [],
   };
   return {
     goal: string(goal),

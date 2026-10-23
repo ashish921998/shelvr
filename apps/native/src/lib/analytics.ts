@@ -6,7 +6,7 @@ import {
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
-import type { Goal } from "@/lib/onboarding-goals";
+import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
 import Constants from "expo-constants";
 
@@ -79,7 +79,6 @@ export type AnalyticsEventProperties = {
     flow_version: number;
     duration_ms: number;
   };
-  onboarding_opener_page_viewed: { page_index: number };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
@@ -202,6 +201,9 @@ export type AnalyticsEventProperties = {
     travel_vibes: string[];
     sample_city: SampleCityId | null;
     goal: Goal | null;
+    goals: Goal[];
+    saved_count: SavedCount | null;
+    planner: Planner | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
@@ -248,7 +250,7 @@ export type AnalyticsEventProperties = {
   trial_reminder_permission: { granted: boolean };
   trial_reminder_primer: { outcome: "accepted" | "declined" };
   welcome_save_shown: { trial: boolean };
-  welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
+  welcome_save_action: { action: "explore" | "dismiss"; trial: boolean };
   notification_permission_result: {
     outcome: "granted" | "provisional" | "denied";
   };
