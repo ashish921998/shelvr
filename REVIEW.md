@@ -44,8 +44,9 @@ Native app (`apps/native/src`):
 
 - [ ] New visible copy is in every locale catalog, with generated files regenerated, not
       hand-edited.
-- [ ] A change to native modules, config plugins, `app.json` or `app.config.js` moves the
-      fingerprint: it needs the `Native-Fingerprint: changed` trailer and a store build.
+- [ ] A change to native modules, config plugins, `app.json` other than its `version`, or
+      `app.config.js` moves the fingerprint: it needs the `Native-Fingerprint: changed`
+      trailer and a store build.
 - [ ] No test file under `src/app`.
 - [ ] Handled failures report through `analytics.captureError`.
 
