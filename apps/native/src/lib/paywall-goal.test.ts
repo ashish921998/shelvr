@@ -38,7 +38,7 @@ describe("goalPaywallVariables", () => {
   });
 
   it("names the city in travel copy, and reads without it when none was picked", () => {
-    expect(values(progress("travel", "lisbon"))).toMatchObject({
+    expect(values(progress("travel", "lisbon"))).toEqual({
       goal: "travel",
       goal_headline: "Let’s plan Lisbon\nfrom your saves.",
       goal_subline: "Every place you save, on one map, day by day.",
@@ -92,7 +92,7 @@ describe("goalPaywallVariables", () => {
   });
 
   it("writes recipes out, with no second answer", () => {
-    expect(values(progress("recipes", "rome"))).toMatchObject({
+    expect(values(progress("recipes", "rome"))).toEqual({
       goal: "recipes",
       goal_headline: "Let’s get dinner\nout of your saves.",
       goal_subline: "Every recipe written out, even from a video.",
@@ -108,9 +108,7 @@ describe("goalPaywallVariables", () => {
   });
 
   it("lists the first two picked interests for other", () => {
-    expect(
-      values(progress("other", null, ["Gear", "Books", "Art"])),
-    ).toMatchObject({
+    expect(values(progress("other", null, ["Gear", "Books", "Art"]))).toEqual({
       goal: "other",
       goal_headline: "Let’s make your saves\nworth keeping.",
       goal_subline: "Find anything again by what you remember.",
@@ -123,81 +121,6 @@ describe("goalPaywallVariables", () => {
       goal_benefit_body: "Sorted into your spaces as you save.",
     });
     expect(values(progress("other")).goal_answer_2).toBe("");
-  });
-
-  it("shows the first day of the onboarding sample for travel, in the picked city", () => {
-    const lisbon = values(progress("travel", "lisbon"));
-    expect(lisbon).toMatchObject({
-      goal_outcome_headline: "Your Lisbon trip,\nday by day.",
-      goal_outcome_sub: "Every place you save lands on the plan.",
-    });
-    const paris = values(progress("travel", "paris"));
-    expect(paris.goal_outcome_1).not.toBe(lisbon.goal_outcome_1);
-    for (const v of [lisbon, paris]) {
-      expect(v.goal_outcome_1).not.toBe("");
-      expect(v.goal_outcome_3).not.toBe("");
-      expect(v.goal_outcome_meta).toMatch(/^\d+ stops from your saves$/);
-    }
-  });
-
-  it("falls back to the default sample and a city-free headline without a city", () => {
-    const v = values(progress("travel"));
-    expect(v.goal_outcome_headline).toBe(
-      "A trip from your saves,\nday by day.",
-    );
-    expect(v.goal_outcome_1).not.toBe("");
-  });
-
-  it("drops the city from the headline when that city has no sample trip", () => {
-    const seattle = values(progress("travel", "seattle"));
-    expect(seattle.goal_outcome_headline).toBe(
-      "A trip from your saves,\nday by day.",
-    );
-    expect(seattle.goal_outcome_1).toBe(
-      values(progress("travel")).goal_outcome_1,
-    );
-  });
-
-  it("uses plan samples for food and date", () => {
-    expect(values(progress("food", "paris"))).toMatchObject({
-      goal_outcome_headline: "Your weekend shortlist,\nready.",
-      goal_outcome_sub: "Picked from the spots you saved.",
-    });
-    const date = values(progress("date", "london"));
-    expect(date.goal_outcome_headline).toBe(
-      "A whole evening,\nalready planned.",
-    );
-    expect(date.goal_outcome_1).not.toBe("");
-  });
-
-  it("writes out the recipe rows", () => {
-    expect(values(progress("recipes"))).toMatchObject({
-      goal_outcome_headline: "Every recipe,\nwritten out.",
-      goal_outcome_title: "Weeknight lasagne",
-      goal_outcome_meta: "Written out from a video",
-      goal_outcome_1: "Brown the mince with onion",
-      goal_outcome_1_meta: "10 min",
-      goal_outcome_2: "Layer sauce, pasta and cheese",
-      goal_outcome_2_meta: "5 min",
-      goal_outcome_3: "Bake until golden",
-      goal_outcome_3_meta: "35 min",
-    });
-  });
-
-  it("lists up to three interests for other and leaves missing rows empty", () => {
-    expect(values(progress("other", null, ["Gear"]))).toMatchObject({
-      goal_outcome_title: "Your spaces",
-      goal_outcome_meta: "Filed as you save",
-      goal_outcome_1: "Gear",
-      goal_outcome_1_meta: "Sorted for you",
-      goal_outcome_2: "",
-      goal_outcome_2_meta: "",
-      goal_outcome_3: "",
-      goal_outcome_3_meta: "",
-    });
-    expect(
-      values(progress("other", null, ["A", "B", "C", "D"])).goal_outcome_3,
-    ).toBe("C");
   });
 
   it("keeps the goal id unlocalized for every goal", () => {
@@ -261,8 +184,8 @@ describe("paywallGoal catalog copy", () => {
   };
   const keys = Object.keys(en).filter((key) => key.startsWith("paywallGoal."));
 
-  it("has the 72 keys in every locale", () => {
-    expect(keys).toHaveLength(72);
+  it("has the 49 keys in every locale", () => {
+    expect(keys).toHaveLength(49);
     for (const [locale, catalog] of Object.entries(catalogs)) {
       const own = Object.keys(catalog).filter((key) =>
         key.startsWith("paywallGoal."),

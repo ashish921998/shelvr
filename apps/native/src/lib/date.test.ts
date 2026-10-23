@@ -17,7 +17,6 @@ describe("trialTimelineVariables", () => {
       trial_today: text(" · Oct 28"),
       trial_day5: text(" · Nov 2"),
       trial_day7: text(" · Nov 4"),
-      trial_end_date: text("Nov 4"),
       trial_remind_date: text("Nov 2"),
       trial_remind_day: text("5"),
       trial_end_day: text("7"),
@@ -39,7 +38,6 @@ describe("trialTimelineVariables", () => {
     const month = { unit: "MONTH", count: 1 };
     expect(trialTimelineVariables(at(2027, 1, 31), month)).toMatchObject({
       trial_day7: text(" · Feb 28"),
-      trial_end_date: text("Feb 28"),
       trial_remind_date: text("Feb 26"),
       trial_end_day: text("28"),
     });

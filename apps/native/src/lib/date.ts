@@ -65,7 +65,6 @@ export function trialTimelineVariables(now: number, trial: TrialPeriod) {
     trial_today: string(` · ${label(start)}`),
     trial_day5: string(` · ${label(remind)}`),
     trial_day7: string(` · ${label(end)}`),
-    trial_end_date: string(label(end)),
     trial_remind_date: string(label(remind)),
     trial_remind_day: string(dayNumber(remind)),
     trial_end_day: string(dayNumber(end)),
