@@ -194,6 +194,7 @@ export function CityStep({
         style={styles.cityList}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
