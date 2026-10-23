@@ -785,6 +785,50 @@ describe("weekly shelf selection", () => {
     ]);
   });
 
+  it("leaves a save planned on a trip day off the shelf, but not one that didn't fit or left the space", async () => {
+    const t = await user();
+    const recent = await seedRecent(t, 4);
+    await t.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", {
+        userId: userA,
+        name: "Lisbon",
+      });
+      for (const [itemId, status] of [
+        [recent[0], "saved"],
+        [recent[1], "dismissed"],
+      ] as const)
+        await ctx.db.insert("spaceItems", {
+          userId: userA,
+          spaceId,
+          itemId,
+          status,
+        });
+      const stop = { name: "Café", why: "saved", slot: "morning" as const };
+      await ctx.db.insert("trips", {
+        userId: userA,
+        spaceId,
+        pace: "easy",
+        days: [
+          {
+            areas: [],
+            stops: [
+              { ...stop, itemId: recent[0] },
+              { ...stop, itemId: recent[1] },
+            ],
+            gaps: [],
+          },
+        ],
+        wishlist: [{ ...stop, itemId: recent[3] }],
+      });
+    });
+
+    expect(shelfIds(await prepare(t))).toEqual([
+      recent[1],
+      recent[2],
+      recent[3],
+    ]);
+  });
+
   it("adds one older save to two from this week", async () => {
     const t = await user();
     await seedOld(t, 5);
