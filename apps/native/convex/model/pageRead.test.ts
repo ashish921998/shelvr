@@ -779,6 +779,64 @@ describe("readPage for Instagram posts", () => {
       recipe.recipeIngredient,
     );
   });
+
+  describe("with two caption links", () => {
+    const postUrl = "https://www.instagram.com/p/ABC125/";
+    const embedUrl = "https://www.instagram.com/p/ABC125/embed/captioned/";
+    const firstUrl = "https://example.com/lemon-pasta/";
+    const secondUrl = "https://example.org/garlic-bread/";
+
+    function recipePage(url: string, name: string) {
+      const recipe = {
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name,
+        recipeIngredient: [`1 ${name}`],
+        recipeInstructions: [`Make the ${name}.`],
+      };
+      return html(
+        url,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      );
+    }
+
+    function serveCaption(first: unknown, second: unknown) {
+      serve({
+        [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+        [embedUrl]: html(
+          embedUrl,
+          `<div class="Caption"><a class="CaptionUsername">cook</a>Pasta: ${firstUrl} Bread: ${secondUrl}<div class="CaptionComments"></div></div>`,
+        ),
+        [firstUrl]: first,
+        [secondUrl]: second,
+      });
+    }
+
+    it("returns the first link's recipe without waiting for a slower later link", async () => {
+      serveCaption(recipePage(firstUrl, "pasta"), new Promise(() => {}));
+      const read = await Promise.race([
+        readPage(postUrl),
+        new Promise((resolve) => setTimeout(resolve, 1000, "waited")),
+      ]);
+      expect(read).toMatchObject({
+        status: "ok",
+        page: { recipe: { ingredients: ["1 pasta"] } },
+      });
+    });
+
+    it("keeps the first link's recipe when a later link answers first", async () => {
+      serveCaption(
+        new Promise((resolve) =>
+          setTimeout(resolve, 50, recipePage(firstUrl, "pasta")),
+        ),
+        recipePage(secondUrl, "bread"),
+      );
+      const read = await readPage(postUrl);
+      expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual([
+        "1 pasta",
+      ]);
+    });
+  });
 });
 
 describe("readPage for TikTok videos", () => {
