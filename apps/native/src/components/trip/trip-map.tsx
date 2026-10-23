@@ -7,6 +7,11 @@ import {
   type LatLng,
   type Trip,
 } from "@/lib/trip";
+import {
+  TRIP_SIDE_PANEL_MARGIN,
+  TRIP_SIDE_PANEL_WIDTH,
+  useTripSidePanel,
+} from "@/lib/wide-layout";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "react-native-reanimated";
@@ -69,6 +74,7 @@ export function TripMap({
       : 0;
 
   const { width, height } = rt.screen;
+  const side = useTripSidePanel();
   const top = rt.insets.top + theme.gap(7);
   const camera = useMemo(() => {
     const points: LatLng[] = active.map((s) => s.coordinates);
@@ -78,7 +84,14 @@ export function TripMap({
         width,
         height,
         top,
-        bottom: height * TRIP_PANEL_SHARE,
+        ...(side
+          ? {
+              bottom: rt.insets.bottom,
+              left:
+                rt.insets.left + TRIP_SIDE_PANEL_MARGIN + TRIP_SIDE_PANEL_WIDTH,
+              right: rt.insets.right,
+            }
+          : { bottom: height * TRIP_PANEL_SHARE }),
         ...(process.env.EXPO_OS === "ios"
           ? {
               worldWidth: width,
@@ -87,7 +100,17 @@ export function TripMap({
           : { worldWidth: 256, centerY: height / 2 }),
       },
     );
-  }, [active, days, width, height, top, rt.insets.bottom]);
+  }, [
+    active,
+    days,
+    width,
+    height,
+    top,
+    side,
+    rt.insets.bottom,
+    rt.insets.left,
+    rt.insets.right,
+  ]);
 
   // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
   // setCameraPosition goes through the native view, which is not registered yet on mount.

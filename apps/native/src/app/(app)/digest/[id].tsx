@@ -71,7 +71,6 @@ export default function DigestScreen() {
       <Stack.Screen options={{ title: "" }} />
       <MasonryFeed
         items={digest.items}
-        numColumns={2}
         source={{ from: "digest" }}
         ListHeaderComponent={
           <View style={styles.header}>

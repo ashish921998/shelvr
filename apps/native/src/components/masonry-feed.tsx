@@ -3,10 +3,10 @@ import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
 import { StitchRing } from "@/components/ui/stitch-loader";
+import { useFeedColumns } from "@/lib/wide-layout";
 
 type Props = {
   items: FeedItem[];
-  numColumns?: number;
   source?: ItemSource;
   firstItemZoomTarget?: boolean;
   onEndReached?: () => void;
@@ -18,7 +18,6 @@ type Props = {
 
 export function MasonryFeed({
   items,
-  numColumns = 2,
   source,
   firstItemZoomTarget,
   onEndReached,
@@ -28,6 +27,7 @@ export function MasonryFeed({
   onScrollBeginDrag,
 }: Props) {
   const { theme } = useUnistyles();
+  const numColumns = useFeedColumns();
   return (
     <FlashList
       data={items}

@@ -80,6 +80,24 @@ describe("revealLayout", () => {
     }
   });
 
+  it("keeps the dot map's shape on a wide screen", () => {
+    const spread = (layout: ReturnType<typeof revealLayout>) => {
+      const xs = layout.dots.map((dot) => dot.x);
+      const ys = layout.dots.map((dot) => dot.y);
+      return (
+        (Math.max(...xs) - Math.min(...xs)) /
+        (Math.max(...ys) - Math.min(...ys))
+      );
+    };
+    const wide = revealLayout(951, 669, 6);
+    expect(spread(wide)).toBeCloseTo(spread(revealLayout(390, 844, 6)));
+    for (const [index, card] of wide.cards.entries()) {
+      expect(card.left + card.width / 2 + card.toX).toBeCloseTo(
+        wide.dots[index].x,
+      );
+    }
+  });
+
   it("keeps the extra dots when only a few saves have covers", () => {
     const layout = revealLayout(390, 844, 2);
     expect(layout.cards).toHaveLength(2);
