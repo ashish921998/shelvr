@@ -113,6 +113,31 @@ describe("listItems (installed builds)", () => {
     expect(results[0].content).toContain("Article body 0");
     expect(results[0]).toHaveProperty("imageUrl");
   });
+
+  it("finds a note by its own text while it processes and after its run fails", async () => {
+    const { t } = await as();
+    const itemId = await t.mutation(api.items.createNoteItem, {
+      text: "Zucchini lasagna for Sunday",
+      operationId: "note:search-failed-1",
+    });
+    const ids = async () =>
+      (await t.query(api.items.searchItems, { query: "zucchini" })).map(
+        (item) => item._id,
+      );
+
+    expect(await ids()).toEqual([itemId]);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))?.processingRunId;
+    expect(runId).toBeDefined();
+    expect(
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "error",
+        runId,
+      }),
+    ).toBe("applied");
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.status).toBe("failed");
+    expect(await ids()).toEqual([itemId]);
+  });
 });
 
 describe("listItemsPage", () => {
