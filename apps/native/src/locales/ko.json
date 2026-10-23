@@ -617,7 +617,7 @@
   "pro.notFoundBody": "이 %{store} 계정에서 유효한 Shelvr Pro 구매를 찾지 못했어요.",
   "pro.restoreFailedBody": "연결을 확인하고 다시 시도하세요. %{store}에서 요금제를 관리할 수도 있어요.",
   "profile.appearanceLabel": "화면 모드: %{appearance}",
-  "profile.photoUsage": "사진: %{count} / %{limit}",
+  "profile.photoUsage": "저장한 사진: %{limit}장 중 %{count}장",
   "share.progress": "%{total}개 중 %{saved}개 저장했어요…",
   "share.failureCount": {
     "other": "항목 %{formattedCount}개를 저장하지 못했어요"
