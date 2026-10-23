@@ -74,7 +74,9 @@ function groupStacklessFailure(properties: unknown): void {
   const list = record.$exception_list;
   if (typeof code !== "string" || !Array.isArray(list)) return;
   if (list.some(hasStackFrames)) return;
-  record.$exception_fingerprint = code;
+  const value = (list[0] as { value?: unknown } | null)?.value;
+  record.$exception_fingerprint =
+    typeof value === "string" ? `${code}:${value}` : code;
   record.$issue_name = code;
 }
 

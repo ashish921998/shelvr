@@ -118,11 +118,26 @@ describe("posthog before_send", () => {
         },
       });
       expect(sent.properties).toMatchObject({
-        $exception_fingerprint: "sample_map_camera_failed",
+        $exception_fingerprint: "sample_map_camera_failed:Error",
         $issue_name: "sample_map_camera_failed",
       });
     },
   );
+
+  it("keeps two causes of one stackless failure in separate issues", () => {
+    const send = (value: string) =>
+      sentBeforeSend()({
+        event: "$exception",
+        properties: {
+          error_event: "auth_failed",
+          $exception_list: [{ type: "Error", value }],
+        },
+      }).properties?.$exception_fingerprint;
+    expect(send("ERR_CANCELED")).toBe("auth_failed:ERR_CANCELED");
+    expect(send("Network request failed")).toBe(
+      "auth_failed:Network request failed",
+    );
+  });
 
   it("leaves a handled error that has stack frames to PostHog's grouping", () => {
     const sent = sentBeforeSend()({
