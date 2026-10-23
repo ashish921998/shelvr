@@ -3,6 +3,7 @@ import {
   posthog,
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
+import { moduleErrorCode } from "@/lib/module-error-code";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
@@ -314,7 +315,7 @@ function captureError(
     const reported =
       !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
         ? original
-        : Object.assign(new Error(original.name), {
+        : Object.assign(new Error(moduleErrorCode(error) ?? original.name), {
             name: original.name,
             stack: original.stack,
           });

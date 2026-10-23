@@ -1,5 +1,6 @@
 import { markAiDisclosedAtSignIn } from "@/lib/ai-consent";
 import { analytics, type AuthMethod, type OAuthSurface } from "@/lib/analytics";
+import { moduleErrorCode } from "@/lib/module-error-code";
 import { useAuthActions } from "@convex-dev/auth/react";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { makeRedirectUri } from "expo-auth-session";
@@ -81,13 +82,6 @@ type FlowOutcome =
       browserMs: number;
       nativeError: ReturnType<typeof nativeError>;
     };
-
-function moduleErrorCode(err: unknown): string | undefined {
-  const code = (err as { code?: unknown } | null)?.code;
-  return typeof code === "string" && /^ERR_[A-Z_]{1,60}$/.test(code)
-    ? code
-    : undefined;
-}
 
 async function authMethod(provider: OAuthProvider): Promise<AuthMethod> {
   if (provider !== "apple" || Platform.OS !== "ios") return "web";

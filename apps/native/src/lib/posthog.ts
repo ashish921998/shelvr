@@ -58,6 +58,26 @@ function redactExceptionProperties(properties: unknown): void {
   }
 }
 
+function hasStackFrames(entry: unknown): boolean {
+  const frames = (entry as { stacktrace?: { frames?: unknown } } | null)
+    ?.stacktrace?.frames;
+  return Array.isArray(frames) && frames.length > 0;
+}
+
+// PostHog groups an exception by its stack frames, and by its type alone when
+// there are none, so every stackless handled failure would share one "Error"
+// issue. `error_event` is the captureError code, already sent as is.
+function groupStacklessFailure(properties: unknown): void {
+  if (typeof properties !== "object" || properties === null) return;
+  const record = properties as Record<string, unknown>;
+  const code = record.error_event;
+  const list = record.$exception_list;
+  if (typeof code !== "string" || !Array.isArray(list)) return;
+  if (list.some(hasStackFrames)) return;
+  record.$exception_fingerprint = code;
+  record.$issue_name = code;
+}
+
 function dropLaunchUrl(event: {
   event: string;
   properties?: Record<string, unknown>;
@@ -108,6 +128,7 @@ export const posthog =
         before_send: (event) => {
           if (event !== null) {
             redactExceptionProperties(event.properties);
+            groupStacklessFailure(event.properties);
             dropLaunchUrl(event);
           }
           return event;
