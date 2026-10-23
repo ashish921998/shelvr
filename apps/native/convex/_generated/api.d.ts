@@ -43,6 +43,7 @@ import type * as model_captureRequest from "../model/captureRequest.js";
 import type * as model_captureTokens from "../model/captureTokens.js";
 import type * as model_clientIp from "../model/clientIp.js";
 import type * as model_demoErrors from "../model/demoErrors.js";
+import type * as model_deployment from "../model/deployment.js";
 import type * as model_embedding from "../model/embedding.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
@@ -148,6 +149,7 @@ declare const fullApi: ApiFromModules<{
   "model/captureTokens": typeof model_captureTokens;
   "model/clientIp": typeof model_clientIp;
   "model/demoErrors": typeof model_demoErrors;
+  "model/deployment": typeof model_deployment;
   "model/embedding": typeof model_embedding;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
