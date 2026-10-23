@@ -1,7 +1,7 @@
 import {
-  SAFE_ERROR_MESSAGES,
   posthog,
   resetIfIdentified as resetClientIfIdentified,
+  safeExceptionValue,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
@@ -312,10 +312,16 @@ function captureError(
 
   try {
     const original = error instanceof Error ? error : new Error(typeof error);
+    const message =
+      error instanceof Error
+        ? (safeExceptionValue(error.message) ??
+          safeExceptionValue((error as { code?: unknown }).code) ??
+          error.name)
+        : original.message;
     const reported =
-      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+      message === original.message
         ? original
-        : Object.assign(new Error(original.name), {
+        : Object.assign(new Error(message), {
             name: original.name,
             stack: original.stack,
           });

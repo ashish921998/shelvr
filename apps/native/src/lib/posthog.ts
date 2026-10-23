@@ -20,20 +20,29 @@ const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
   Constants.expoConfig?.extra?.variant,
 );
 
-export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
+const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
 const SAFE_EXCEPTION_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 
-function isSafeExceptionValue(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
+const ERROR_CLASS_NAME = /^[A-Z][A-Za-z0-9]{0,60}$/;
+
+type ExceptionEntry = {
+  type?: unknown;
+  value?: unknown;
+  stacktrace?: { frames?: unknown };
+};
+
+/** The one rule for exception text that may leave the device: a fixed allowlisted message or a bare code token. */
+export function safeExceptionValue(value: unknown): string | undefined {
+  return typeof value === "string" &&
     (SAFE_ERROR_MESSAGES.has(value) ||
       (value.length <= 80 && SAFE_EXCEPTION_CODE.test(value)))
-  );
+    ? value
+    : undefined;
 }
 
 function sanitizeExceptionValue(value: unknown, fallback: unknown): unknown {
-  return isSafeExceptionValue(value) ? value : fallback;
+  return safeExceptionValue(value) ?? fallback;
 }
 
 function redactExceptionProperties(properties: unknown): void {
@@ -56,6 +65,32 @@ function redactExceptionProperties(properties: unknown): void {
       record.$exception_type,
     );
   }
+}
+
+function hasStackFrames(entry: ExceptionEntry | null): boolean {
+  const frames = entry?.stacktrace?.frames;
+  return Array.isArray(frames) && frames.length > 0;
+}
+
+// PostHog groups an exception by its stack frames, and by its type alone when
+// there are none, so every stackless handled failure would share one "Error"
+// issue. `error_event` is the captureError code, already sent as is. The value
+// is re-checked here so the fingerprint stays safe whatever ran before.
+function groupStacklessFailure(properties: unknown): void {
+  if (typeof properties !== "object" || properties === null) return;
+  const record = properties as Record<string, unknown>;
+  const code = record.error_event;
+  const list = record.$exception_list as (ExceptionEntry | null)[] | undefined;
+  if (typeof code !== "string" || !Array.isArray(list)) return;
+  if (list.some(hasStackFrames)) return;
+  const type = list[0]?.type;
+  const cause =
+    safeExceptionValue(list[0]?.value) ??
+    (typeof type === "string" && ERROR_CLASS_NAME.test(type)
+      ? type
+      : undefined);
+  record.$exception_fingerprint = cause ? `${code}:${cause}` : code;
+  record.$issue_name = code;
 }
 
 function dropLaunchUrl(event: {
@@ -108,6 +143,7 @@ export const posthog =
         before_send: (event) => {
           if (event !== null) {
             redactExceptionProperties(event.properties);
+            groupStacklessFailure(event.properties);
             dropLaunchUrl(event);
           }
           return event;
