@@ -276,9 +276,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`**: `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
-  argument.** It takes a query or mutation context; an action derives the caller through the
-  internal mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`),
-  so authorization and the write stay in one transaction.
+  argument.** A public query or mutation gets it through `authedQuery` or `authedMutation`, which
+  run `requireUserId` before the handler and pass the id as `ctx.userId`. The functions that skip
+  the builders are listed in `model/publicFunctions.ts`: `PUBLIC_ON_PURPOSE` names each one that
+  must answer a caller with no live account, with a reason, and `NOT_MOVED_YET` names the rest
+  until they move over. `model/publicFunctions.test.ts` fails on any public query or mutation
+  that is neither built nor listed, and `.github/CODEOWNERS` sends a change to the lists to the
+  owner. Public actions have no builder yet; an action derives the caller through the internal
+  mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`), so
+  authorization and the write stay in one transaction.
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
@@ -473,7 +479,10 @@ needed at runtime by the features that use them:
 - Do not reintroduce the old notes-app domain (`notes` table, OpenAI summary action, `/notes`
   routes). The product domain is **items + spaces**. `GLOSSARY.md` names the domain's terms: say
   "save" in copy and docs while tables and code keep `items`.
-- Never pass `userId` from the client into Convex public functions.
+- Never pass `userId` from the client into Convex public functions. Build a public query or
+  mutation with `authedQuery` or `authedMutation` from `model/auth.ts` and read `ctx.userId`. A
+  function that must answer a signed-out or deleting caller goes in `PUBLIC_ON_PURPOSE` in
+  `model/publicFunctions.ts` with a reason, which the owner reviews.
 - Keep `returns:` validators accurate. Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
 - Public Convex functions are contracts with every app build in the wild, and the backend

@@ -67,6 +67,7 @@ import type * as model_placeVisits from "../model/placeVisits.js";
 import type * as model_plan from "../model/plan.js";
 import type * as model_planVote from "../model/planVote.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
+import type * as model_publicFunctions from "../model/publicFunctions.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
 import type * as model_readBudget from "../model/readBudget.js";
 import type * as model_readers_instagram from "../model/readers/instagram.js";
@@ -175,6 +176,7 @@ declare const fullApi: ApiFromModules<{
   "model/plan": typeof model_plan;
   "model/planVote": typeof model_planVote;
   "model/posthogCapture": typeof model_posthogCapture;
+  "model/publicFunctions": typeof model_publicFunctions;
   "model/rateLimiter": typeof model_rateLimiter;
   "model/readBudget": typeof model_readBudget;
   "model/readers/instagram": typeof model_readers_instagram;

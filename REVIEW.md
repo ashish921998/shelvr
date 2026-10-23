@@ -20,9 +20,12 @@ finding twice across reruns, and do not count two reviewers agreeing as proof: c
 
 Backend (`apps/native/convex`):
 
-- [ ] Every public function derives the user with `requireUserId(ctx)` (`model/auth.ts`).
-      No `userId` argument from the client. Code that acts for an account checks it is
-      still live (`liveOwner`), not mid-deletion.
+- [ ] A public query or mutation is built with `authedQuery` / `authedMutation`
+      (`model/auth.ts`) and reads `ctx.userId`, or sits in `model/publicFunctions.ts` with a
+      reason the owner accepted. `model/publicFunctions.test.ts` enforces that, so check the
+      reason, not the call. A public action still derives the user with `requireUserId(ctx)`
+      inside the internal function it runs. No `userId` argument from the client. Code that
+      acts for an account checks it is still live (`liveOwner`), not mid-deletion.
 - [ ] Every save and Pro feature calls `requireProEntitlement(ctx, userId)`.
 - [ ] Anything that sends user content to Gemini, SerpAPI or Treg checks AI
       consent first (`aiAllowed` in `aiConsent.ts`, `internal.aiConsent.isAllowed`
