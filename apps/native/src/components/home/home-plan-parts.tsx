@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-export type SpotItem = {
+type SpotItem = {
   _id: Id<"items">;
   title?: string;
   imageUrl: string | null;
