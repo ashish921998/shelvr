@@ -8,6 +8,7 @@ export type MessageParams = {
   "common.show": undefined;
   "item.tags": undefined;
   "item.similar": undefined;
+  "item.continueOnX": undefined;
   "spaces.addItem": undefined;
   "spaces.dismissSuggestion": undefined;
   "common.share": undefined;

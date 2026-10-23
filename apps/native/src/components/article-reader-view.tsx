@@ -5,6 +5,8 @@ import { RecipeSection } from "@/components/recipe-section";
 import { ItemSpaces } from "@/components/item-spaces";
 import { PostMediaButton } from "@/components/post-media-button";
 import { displayHost, siteMonogram } from "@/lib/url";
+import { withAlpha } from "@/lib/color";
+import { isCutOffXPreview } from "@/lib/x-preview";
 import { SimilarGrid } from "@/components/similar-grid";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import type { DetailItem } from "@/components/item-detail";
@@ -74,6 +76,7 @@ export function ArticleReaderView({
   }, [item._id]);
 
   const openSource = () => openItemSource(item);
+  const cutOff = isCutOffXPreview(item);
 
   const mediaFrame = (aspectRatio: number) => {
     const width = Math.min(
@@ -255,8 +258,40 @@ export function ArticleReaderView({
               </Fragment>
             ))}
             {mediaAt(paragraphs.length)}
+            {cutOff ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.cutOffFade,
+                  {
+                    // Built in render: Unistyles can drop a stylesheet's
+                    // experimental_backgroundImage on theme change (see HeaderScrim).
+                    experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${theme.colors.background} 100%)`,
+                  },
+                ]}
+              />
+            ) : null}
           </View>
         )}
+
+        {cutOff && !item.recipe ? (
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={12}
+            onPress={openSource}
+            style={({ pressed }) => [
+              styles.continueRow,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.continueText}>{t("item.continueOnX")}</Text>
+            <AppSymbolIcon
+              name="arrow.up.right"
+              size={12}
+              tintColor={theme.colors.primaryText}
+            />
+          </Pressable>
+        ) : null}
 
         {item.status === "ready" ? (
           <ProductsSection item={item} inset={theme.gap(2.5)} />
@@ -393,6 +428,26 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 19,
     lineHeight: 28,
+  },
+  cutOffFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 87,
+  },
+  continueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    gap: 5,
+    paddingVertical: theme.gap(1),
+  },
+  continueText: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    color: theme.colors.primaryText,
   },
   articleMediaRow: {
     alignItems: "center",
