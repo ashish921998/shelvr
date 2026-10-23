@@ -1,18 +1,16 @@
 import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
+import type { LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
 const SEARCH_TIMEOUT_MS = 8_000;
-export const MAX_CITY_DISTANCE_KM = 80;
 
 export type AppleMapsConfig = {
   privateKey: string;
   keyId: string;
   teamId: string;
 };
-
-export type LatLng = { lat: number; lng: number };
 
 export function appleMapsConfig(env: {
   APPLE_MAPS_PRIVATE_KEY?: string;
@@ -102,14 +100,4 @@ export async function appleMapsLookup(
   } catch {
     return null;
   }
-}
-
-export function distanceKm(a: LatLng, b: LatLng): number {
-  const rad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = rad(b.lat - a.lat);
-  const dLng = rad(b.lng - a.lng);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
