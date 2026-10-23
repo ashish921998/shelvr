@@ -77,15 +77,16 @@ function* tagAttributes(html: string, tagName: string) {
   const tagStart = new RegExp(`<${tagName}(?=[\\s/>])`, "gi");
   const step = new RegExp(ATTRIBUTE_OR_TAG_END);
   while (tagStart.exec(html) !== null) {
-    const attributes = new Map<string, string>();
+    const attributes = new Map<string, string | undefined>();
     step.lastIndex = tagStart.lastIndex;
     for (;;) {
       const match = step.exec(html);
       if (match === null) return;
       const { name, doubleQuoted, singleQuoted } = match.groups ?? {};
       if (name === undefined) break;
-      const value = doubleQuoted ?? singleQuoted;
-      if (value !== undefined) attributes.set(name.toLowerCase(), value);
+      const key = name.toLowerCase();
+      if (!attributes.has(key))
+        attributes.set(key, doubleQuoted ?? singleQuoted);
     }
     tagStart.lastIndex = step.lastIndex;
     yield attributes;
@@ -161,7 +162,7 @@ function firstTitleText(html: string): string | undefined {
   return textEnd === undefined ? undefined : html.slice(tagEnd + 1, textEnd);
 }
 
-function extractTitle(html: string): string | undefined {
+export function extractTitle(html: string): string | undefined {
   const ogTitle = extractMetaContent(html, "og:title");
   if (ogTitle) {
     return ogTitle;

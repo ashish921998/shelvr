@@ -1,24 +1,17 @@
 import * as fc from "fast-check";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   extractCanonical,
   extractMetaContent,
-  fetchPage,
+  extractTitle,
   stripTags,
 } from "./pageReadCore";
 
-const safeFetch = vi.hoisted(() => vi.fn());
+const SIZES = [16, 64, 256, 1024].map((kilobytes) => kilobytes * 1024);
 
-vi.mock("./safeFetch", async (original) => ({
-  ...(await original<typeof import("./safeFetch")>()),
-  safeFetch,
-}));
-
-const MEGABYTE = 1024 * 1024;
-
-function megabyteOf(unit: string): string {
-  return unit.repeat(Math.ceil(MEGABYTE / unit.length)).slice(0, MEGABYTE);
+function pageOf(unit: string, size: number): string {
+  return unit.repeat(Math.ceil(size / unit.length)).slice(0, size);
 }
 
 const KEYS = ["og:title", "description", "og:image"];
@@ -146,6 +139,20 @@ describe("extractMetaContent", () => {
     expect(extractMetaContent(html, "og:title")).toBe("Dal");
     expect(extractMetaContent(html, "description")).toBeUndefined();
   });
+
+  it("reads the first of two attributes with the same name", () => {
+    const html = `<meta name="description" name="og:title" content="Dal">`;
+    expect(extractMetaContent(html, "description")).toBe("Dal");
+    expect(extractMetaContent(html, "og:title")).toBeUndefined();
+  });
+
+  it("does not read a tag written inside a quoted value", () => {
+    const html = `<meta name="description" content="Add <meta property='og:title' content='X'> tags">`;
+    expect(extractMetaContent(html, "og:title")).toBeUndefined();
+    expect(extractMetaContent(html, "description")).toBe(
+      "Add <meta property='og:title' content='X'> tags",
+    );
+  });
 });
 
 describe("extractCanonical", () => {
@@ -162,36 +169,63 @@ describe("extractCanonical", () => {
       ),
     ).toBe("https://a.example/x");
   });
+
+  it("keeps reading after a canonical link whose href is blank", () => {
+    expect(
+      extractCanonical(
+        `<link rel="canonical" href=" "><link rel="canonical" href="https://a.example/x">`,
+      ),
+    ).toBe("https://a.example/x");
+  });
+
+  it("reads the first of two attributes with the same name", () => {
+    expect(
+      extractCanonical(
+        `<link rel="canonical" href="https://a.example/x" rel="nofollow">`,
+      ),
+    ).toBe("https://a.example/x");
+    expect(
+      extractCanonical(
+        `<link rel="canonical" href="https://a.example/x" href="">`,
+      ),
+    ).toBe("https://a.example/x");
+  });
 });
 
-describe("page reading on a megabyte of tags that never close", () => {
+describe("extractTitle", () => {
+  it("reads the first title element in any case, up to its first closing tag", () => {
+    expect(
+      extractTitle("<TITLE lang='en'>Dal\n  makhani</Title><p>x</p></title>"),
+    ).toBe("Dal makhani");
+  });
+});
+
+describe("page reading on up to a megabyte of tags that never close", () => {
   it.each([
     '<meta name="og:title" ',
     "<meta ",
     '<meta content="',
     '<link rel="canonical" ',
     "<link ",
-  ])("reads meta and canonical tags from %j in linear time", (unit) => {
-    const html = megabyteOf(unit);
-    const started = performance.now();
-    expect(extractMetaContent(html, "og:title")).toBeUndefined();
-    expect(extractCanonical(html)).toBeUndefined();
-    expect(performance.now() - started).toBeLessThan(1000);
+  ])("reads meta and canonical tags from %j in under a second", (unit) => {
+    for (const size of SIZES) {
+      const html = pageOf(unit, size);
+      const started = performance.now();
+      expect(extractMetaContent(html, "og:title")).toBeUndefined();
+      expect(extractCanonical(html)).toBeUndefined();
+      expect(performance.now() - started).toBeLessThan(1000);
+    }
   });
 
   it.each(["<title>", "<title "])(
-    "reads the title from %j in linear time",
-    async (unit) => {
-      safeFetch.mockResolvedValueOnce({
-        ok: true,
-        bytes: new TextEncoder().encode(megabyteOf(unit)),
-        contentType: "text/html",
-        finalUrl: "https://a.example/",
-      });
-      const started = performance.now();
-      const page = await fetchPage("https://a.example/");
-      expect(performance.now() - started).toBeLessThan(1000);
-      expect(page.title).toBeUndefined();
+    "reads the title from %j in under a second",
+    (unit) => {
+      for (const size of SIZES) {
+        const html = pageOf(unit, size);
+        const started = performance.now();
+        expect(extractTitle(html)).toBeUndefined();
+        expect(performance.now() - started).toBeLessThan(1000);
+      }
     },
   );
 });
