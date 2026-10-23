@@ -51,7 +51,7 @@ function isLoopback(url: string | undefined): boolean {
   }
 }
 
-const ANALYSIS_KEYS = "cities,description,intents,spaceNames,tags,title";
+const ANALYSIS_KEYS = "cities,description,intents,places,spaceNames,tags,title";
 const NOTE_TASK = "Analyze this saved note";
 const NOTE_MARKER = "\n\nNote:\n";
 const LINK_TASK = "Analyze this saved web page";
@@ -71,6 +71,7 @@ type Analysis = {
   spaceNames: string[];
   intents: never[];
   cities: never[];
+  places: never[];
 };
 
 type PromptPage = { title?: string; description?: string; content?: string };
@@ -97,6 +98,7 @@ export function fakeNoteAnalysis(note: string): Analysis {
     spaceNames: [],
     intents: [],
     cities: [],
+    places: [],
   };
 }
 
@@ -110,6 +112,7 @@ export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
     spaceNames: [],
     intents: [],
     cities: [],
+    places: [],
   };
 }
 

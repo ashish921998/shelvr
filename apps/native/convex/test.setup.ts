@@ -10,12 +10,14 @@ export function revenuecatSnapshot({
   expiresAt = Date.now() + 60_000,
   graceUntil,
   periodType = "normal",
+  store,
 }: {
   entitlement?: string;
   productId?: string;
   expiresAt?: number;
   graceUntil?: number;
   periodType?: string;
+  store?: string;
 } = {}) {
   return {
     request_date_ms: Date.now(),
@@ -36,7 +38,7 @@ export function revenuecatSnapshot({
           }
         : {},
       subscriptions: productId
-        ? { [productId]: { period_type: periodType } }
+        ? { [productId]: { period_type: periodType, store } }
         : {},
     },
   };

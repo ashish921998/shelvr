@@ -1,18 +1,13 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import {
-  internalMutation,
-  mutation,
-  query,
-  type MutationCtx,
-} from "./_generated/server";
+import { internalMutation, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireUserId } from "./model/auth";
+import { authedMutation, authedQuery } from "./model/auth";
 import { logEvent } from "./model/log";
 import { TERMS_VERSION } from "./model/legalConsent";
 import { MAX_SYNC_ATTEMPTS, deliversGrant } from "./legalConsentSync";
 
-export const get = query({
+export const get = authedQuery({
   args: {},
   returns: v.union(
     v.null(),
@@ -26,7 +21,7 @@ export const get = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await ctx.db
       .query("legalConsents")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -43,11 +38,11 @@ export const get = query({
   },
 });
 
-export const review = mutation({
+export const review = authedMutation({
   args: { version: v.literal(TERMS_VERSION), accepted: v.boolean() },
   returns: v.null(),
   handler: async (ctx, { version, accepted }) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     if (!(await ctx.db.get(userId))) throw new Error("Account unavailable");
     const existing = await ctx.db
       .query("legalConsents")
@@ -83,11 +78,11 @@ export const review = mutation({
   },
 });
 
-export const withdraw = mutation({
+export const withdraw = authedMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await revoke(ctx, userId, false);
     return null;
   },

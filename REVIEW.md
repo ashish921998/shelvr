@@ -20,9 +20,15 @@ finding twice across reruns, and do not count two reviewers agreeing as proof: c
 
 Backend (`apps/native/convex`):
 
-- [ ] Every public function derives the user with `requireUserId(ctx)` (`model/auth.ts`).
-      No `userId` argument from the client. Code that acts for an account checks it is
-      still live (`liveOwner`), not mid-deletion.
+- [ ] A public query or mutation is built with `authedQuery` / `authedMutation`
+      (`model/auth.ts`) and reads `ctx.userId`, or is listed in `PUBLIC_ON_PURPOSE`
+      (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails an unlisted one,
+      and a built one that does not refuse a signed-out or deleting caller before its
+      handler runs. A `PUBLIC_ON_PURPOSE` entry's reason is yours to check against its
+      handler. A public action still derives the user with
+      `requireUserId(ctx)` inside the internal function it runs. No `userId` argument from
+      the client. Code that acts for an account checks it is still live (`liveOwner`), not
+      mid-deletion.
 - [ ] Every save and Pro feature calls `requireProEntitlement(ctx, userId)`.
 - [ ] Anything that sends user content to Gemini, SerpAPI or Treg checks AI
       consent first (`aiAllowed` in `aiConsent.ts`, `internal.aiConsent.isAllowed`
@@ -44,8 +50,10 @@ Native app (`apps/native/src`):
 
 - [ ] New visible copy is in every locale catalog, with generated files regenerated, not
       hand-edited.
-- [ ] A change to native modules, config plugins, `app.json` or `app.config.js` moves the
-      fingerprint: it needs the `Native-Fingerprint: changed` trailer and a store build.
+- [ ] A change to native modules, config plugins, `app.json` other than its version fields
+      (`version`, `ios.buildNumber`, `android.versionCode`; the default `balanced` preset
+      skips them), or `app.config.js` moves the fingerprint: it needs the
+      `Native-Fingerprint: changed` trailer and a store build.
 - [ ] No test file under `src/app`.
 - [ ] Handled failures report through `analytics.captureError`.
 

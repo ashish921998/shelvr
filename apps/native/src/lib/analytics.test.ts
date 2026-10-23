@@ -179,6 +179,23 @@ describe("captureError", () => {
     );
   });
 
+  it("names an Expo module rejection by its error code, not its message", () => {
+    const error = Object.assign(
+      new Error("Unable to find the 'AppleMapsViewWrapper' view with tag '12'"),
+      { code: "ERR_SWIFT_U_I_VIEW_NOT_FOUND" },
+    );
+    analytics.captureError("sample_map_camera_failed", error);
+    const reported = mock.captureException.mock.calls[0][0] as Error;
+    expect(reported.message).toBe("ERR_SWIFT_U_I_VIEW_NOT_FOUND");
+    expect(reported.name).toBe("Error");
+  });
+
+  it("keeps a message that is already a bare code", () => {
+    const error = new Error("AI_CONSENT_REQUIRED");
+    analytics.captureError("plan_failed", error);
+    expect(mock.captureException.mock.calls[0][0]).toBe(error);
+  });
+
   it("reduces non-Error throws to their type", () => {
     analytics.captureError("sign_out_failed", "boom");
     const reported = mock.captureException.mock.calls[0][0] as Error;

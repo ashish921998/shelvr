@@ -66,18 +66,9 @@ export default function DigestScreen() {
     );
   }
 
-  const openNext = () => {
-    const first = digest.items[0];
-    if (!first) return;
-    router.push({
-      pathname: "/item/[id]",
-      params: { id: first._id, from: "digest" },
-    });
-  };
-
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: t("notifications.weeklyShelf") }} />
+      <Stack.Screen options={{ title: "" }} />
       <MasonryFeed
         items={digest.items}
         numColumns={2}
@@ -91,16 +82,6 @@ export default function DigestScreen() {
                 count: digest.itemCount,
               })}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={openNext}
-              style={({ pressed }) => [
-                styles.button,
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Text style={styles.buttonText}>{t("digest.openNext")}</Text>
-            </Pressable>
           </View>
         }
       />

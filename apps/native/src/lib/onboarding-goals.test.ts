@@ -12,7 +12,7 @@ import { planAsCity, planCities } from "./sample-plans";
 
 describe("goalFlow", () => {
   it.each(["travel", "food", "date"] as const)(
-    "takes %s through a city, the share, the sample and the promise",
+    "takes %s through a city, the share, the sample, the promise and notifications",
     (goal) => {
       expect(goalFlow(goal)).toEqual([
         "opener",
@@ -22,6 +22,7 @@ describe("goalFlow", () => {
         "tripBuild",
         "tripReveal",
         "promise",
+        "notifications",
       ]);
     },
   );
@@ -33,6 +34,7 @@ describe("goalFlow", () => {
       "share",
       "recipeReveal",
       "promise",
+      "notifications",
     ]);
   });
 
@@ -43,6 +45,7 @@ describe("goalFlow", () => {
       "interests",
       "share",
       "promise",
+      "notifications",
     ]);
   });
 });

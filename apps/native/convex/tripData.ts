@@ -1,8 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { requireUserId, authedMutation, authedQuery } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import {
@@ -129,9 +129,12 @@ export function toPlanSource(
     url: item.url,
     siteName: item.siteName,
     author: item.author,
-    places: [...(item.intents ?? []), ...(join.intents ?? [])]
-      .filter((intent) => intent.kind === "open_maps")
-      .map((intent) => intent.value),
+    places: [
+      ...[...(item.intents ?? []), ...(join.intents ?? [])]
+        .filter((intent) => intent.kind === "open_maps")
+        .map((intent) => intent.value),
+      ...(item.places ?? []),
+    ],
   };
 }
 
@@ -201,6 +204,34 @@ export async function deleteTripsForSpace(
   }
 }
 
+// ponytail: the newest 10 trips, up to 105 day stops and one membership read each; older trips' stops stay on the shelf.
+const TRIP_STOP_SCAN = 10;
+
+/** Saves the trip page shows on a day of one of the user's trips. A place that didn't fit (`wishlist`) is not planned. */
+export async function tripStopItemIds(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<Set<string>> {
+  const trips = await ctx.db
+    .query("trips")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(TRIP_STOP_SCAN);
+  const stops = trips.flatMap((trip) =>
+    trip.days.flatMap((day) =>
+      day.stops.map((stop) => ({ itemId: stop.itemId, spaceId: trip.spaceId })),
+    ),
+  );
+  const planned = new Set<string>();
+  for (const { itemId, spaceId } of stops) {
+    if (planned.has(itemId)) continue;
+    const membership = await getMembership(ctx, itemId, spaceId);
+    if (membership !== null && effectiveStatus(membership) === "saved")
+      planned.add(itemId);
+  }
+  return planned;
+}
+
 export const saveTripInternal = internalMutation({
   args: {
     spaceId: v.id("spaces"),
@@ -222,11 +253,11 @@ export const saveTripInternal = internalMutation({
   },
 });
 
-export const swapTripStop = mutation({
+export const swapTripStop = authedMutation({
   args: { tripId: v.id("trips"), itemId: v.id("items"), name: v.string() },
   returns: v.object({ itemId: v.id("items"), name: v.string() }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const trip = await ctx.db.get(args.tripId);
     if (trip === null || trip.userId !== userId) {
       throw new Error("Trip not found");
@@ -287,11 +318,11 @@ const tripViewValidator = v.object({
   wishlist: v.array(tripStopViewValidator),
 });
 
-export const getSpaceTrip = query({
+export const getSpaceTrip = authedQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.union(tripViewValidator, v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) return null;
     const trip = await ctx.db
@@ -332,11 +363,11 @@ export const getSpaceTrip = query({
   },
 });
 
-export const tripCities = query({
+export const tripCities = authedQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.array(v.object({ city: v.string(), count: v.number() })),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) return [];
     const saves = await loadReadySaves(ctx, args.spaceId, userId);
