@@ -57,3 +57,21 @@ it("reports a failed read and leaves the state unknown", async () => {
   );
   expect(result.current).toBeUndefined();
 });
+
+it("keeps the newer read when an older one answers last", async () => {
+  let answerFirst: (state: string) => void = () => undefined;
+  mocks.state
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        answerFirst = resolve;
+      }),
+    )
+    .mockResolvedValueOnce("blocked");
+  const { result } = renderHook(() => useNotificationPermission());
+
+  act(() => mocks.listeners.forEach((listener) => listener("active")));
+  await waitFor(() => expect(result.current).toBe("blocked"));
+
+  await act(async () => answerFirst("granted"));
+  expect(result.current).toBe("blocked");
+});

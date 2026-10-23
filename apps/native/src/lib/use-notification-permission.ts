@@ -15,10 +15,13 @@ export function useNotificationPermission(): PermissionState | undefined {
 
   useEffect(() => {
     let live = true;
+    // An earlier read can answer after a later one; only the latest may land.
+    let latest = 0;
     const read = () => {
+      const id = ++latest;
       notificationPermissionState().then(
         (next) => {
-          if (live) setState(next);
+          if (live && id === latest) setState(next);
         },
         (error: unknown) => {
           analytics.captureError("notification_permission_read_failed", error);
