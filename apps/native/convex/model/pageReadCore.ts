@@ -398,9 +398,13 @@ export async function withLinkedRecipe(page: PageData): Promise<PageData> {
       ...linkedUrls(caption, MAX_LINKED_RECIPE_URLS),
     ]),
   ].slice(0, MAX_LINKED_RECIPE_URLS);
-  const recipes = await Promise.all(urls.map(linkedRecipe));
-  const recipe = recipes.find((found) => found !== undefined);
-  return recipe === undefined ? page : { ...page, recipe };
+  for (const read of urls.map(linkedRecipe)) {
+    const recipe = await read;
+    if (recipe !== undefined) {
+      return { ...page, recipe };
+    }
+  }
+  return page;
 }
 
 export async function fetchPage(
