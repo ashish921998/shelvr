@@ -43,10 +43,9 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
   const router = useRouter();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   const aspectRatio = similarRatio(item);
-  const title =
-    item.title ??
-    item.note ??
-    (item.url ? displayHost(item.url) : t("item.untitledItem"));
+  const host = item.url ? displayHost(item.url) : undefined;
+  const title = item.title ?? item.note ?? host ?? t("item.untitledItem");
+  const caption = imageUri ? title : host !== title ? host : undefined;
 
   return (
     <Pressable
@@ -91,9 +90,14 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
           </Text>
         </View>
       )}
-      <Text style={styles.similarCardTitle} numberOfLines={2}>
-        {title}
-      </Text>
+      {caption ? (
+        <Text
+          style={[styles.similarCardTitle, !imageUri && styles.similarCardHost]}
+          numberOfLines={imageUri ? 2 : 1}
+        >
+          {caption}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -165,5 +169,9 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 10,
     lineHeight: 12,
     color: theme.colors.foreground,
+  },
+  similarCardHost: {
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.muted,
   },
 }));
