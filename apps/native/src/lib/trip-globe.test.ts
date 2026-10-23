@@ -1,4 +1,8 @@
-import { geoDistance, geoOrthographic } from "d3-geo";
+import { geoContains, geoDistance, geoOrthographic } from "d3-geo";
+import type { Feature, MultiPolygon } from "geojson";
+import { feature } from "topojson-client";
+import type { GeometryCollection, Topology } from "topojson-specification";
+import land from "../../assets/world/land-110m.json";
 import { describe, expect, it } from "vitest";
 import {
   GLOBE_DIVE_MS,
@@ -203,49 +207,85 @@ describe("globePaths", () => {
 });
 
 describe("thinLand", () => {
-  it("keeps each ring's ends, drops close points and rings too small to draw", () => {
-    const ring = [
-      [0, 0],
-      [0.2, 0],
-      [2, 0],
-      [2, 2],
-      [0.1, 2],
-      [0, 0],
-    ];
+  const outline = feature(
+    land as unknown as Topology,
+    (land as unknown as Topology).objects.land as GeometryCollection,
+  );
+  const points = (shape: Feature) =>
+    (shape.geometry as MultiPolygon).coordinates.flat(2).length;
+  const fullPoints = outline.features
+    .map((shape) =>
+      shape.geometry.type === "Polygon"
+        ? shape.geometry.coordinates.flat().length
+        : (shape.geometry as MultiPolygon).coordinates.flat(2).length,
+    )
+    .reduce((sum, count) => sum + count, 0);
+
+  it("keeps every island while drawing the world from about half the points", () => {
+    const thin = thinLand(outline, 1.5);
+    const islands = outline.features.flatMap((shape) =>
+      shape.geometry.type === "Polygon"
+        ? [shape.geometry.coordinates]
+        : (shape.geometry as MultiPolygon).coordinates,
+    );
+    expect((thin.geometry as MultiPolygon).coordinates).toHaveLength(
+      islands.length,
+    );
+    expect(points(thin)).toBeLessThan(fullPoints * 0.6);
+    const corsica = { lng: 9.1, lat: 42.1 };
+    expect(
+      (thin.geometry as MultiPolygon).coordinates.some((polygon) =>
+        geoContains({ type: "Polygon", coordinates: polygon }, [
+          corsica.lng,
+          corsica.lat,
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a ring too small to thin as it is", () => {
     const speck = [
       [5, 5],
       [5.1, 5],
       [5, 5.1],
       [5, 5],
     ];
-    const land = {
-      type: "FeatureCollection" as const,
-      features: [
-        {
-          type: "Feature" as const,
-          properties: {},
-          geometry: {
-            type: "MultiPolygon" as const,
-            coordinates: [[ring], [speck]],
+    const thin = thinLand(
+      {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "Polygon", coordinates: [speck] },
           },
-        },
-      ],
-    };
-    const thin = thinLand(land, 1);
+        ],
+      },
+      1,
+    );
     expect(thin.geometry).toEqual({
       type: "MultiPolygon",
-      coordinates: [
-        [
-          [
-            [0, 0],
-            [2, 0],
-            [2, 2],
-            [0.1, 2],
-            [0, 0],
-          ],
-        ],
-      ],
+      coordinates: [[speck]],
     });
+  });
+
+  it("spins on the thinned land and dives on the full outline", () => {
+    const spinning = globeCamera({
+      t: 5000,
+      diveAt: null,
+      ...SCREEN,
+      target: LISBON,
+    });
+    const diving = globeCamera({
+      t: 5001,
+      diveAt: 5000,
+      ...SCREEN,
+      target: LISBON,
+    });
+    const commands = (camera: ReturnType<typeof globeCamera>) =>
+      (globePaths(camera, SCREEN, null).land.match(/L/g) ?? []).length;
+    expect(diving.dive).toBeGreaterThan(0);
+    expect(commands(spinning)).toBeLessThan(commands(diving) * 0.7);
   });
 });
 

@@ -6,13 +6,7 @@ import {
   geoOrthographic,
   geoPath,
 } from "d3-geo";
-import type {
-  Feature,
-  FeatureCollection,
-  MultiPolygon,
-  Polygon,
-  Position,
-} from "geojson";
+import type { Feature, FeatureCollection, Position } from "geojson";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import countriesData from "../../assets/world/countries-50m.json";
@@ -44,13 +38,7 @@ export type GlobePaths = {
 
 const RADIUS = 230;
 const LANDED_RADIUS = 2600;
-/** Up to this radius the whole globe is in view and the land is drawn from
- * the thinned outline (`SPIN_LAND_STEP`). */
-const SPIN_LAND_RADIUS = 1.5 * RADIUS;
-/** Degrees between the land outline's points while the whole globe is in
- * view: a few pixels at its size, and about half the points, which halves
- * the time a spinning frame takes to project. */
-const SPIN_LAND_STEP = 1.5;
+const SPIN_LAND_STEP_DEGREES = 1.5;
 const DETAIL_RADIUS = 700;
 const NEARBY = 25;
 const DEGREES = 180 / Math.PI;
@@ -71,8 +59,6 @@ const easeOut = (k: number) => 1 - Math.pow(1 - k, 4);
 const nearestTurn = (from: number, to: number) =>
   from + ((((to - from) % 360) + 540) % 360) - 180;
 
-/** A ring with points closer than `step` degrees (along either axis, added)
- * to the last one kept dropped; the first and last point always stay. */
 function thinRing(ring: Position[], step: number): Position[] {
   const kept = [ring[0]];
   for (let i = 1; i < ring.length - 1; i += 1) {
@@ -83,25 +69,17 @@ function thinRing(ring: Position[], step: number): Position[] {
     }
   }
   kept.push(ring[ring.length - 1]);
-  return kept;
+  return kept.length >= 4 ? kept : ring;
 }
 
-/** The land as one outline with fewer points, for the small, spinning globe.
- * Rings left with under four points (tiny islands) are dropped. */
 export function thinLand(land: FeatureCollection, step: number): Feature {
-  const polygons = land.features.flatMap((shape) => {
-    const geometry = shape.geometry as Polygon | MultiPolygon;
-    return geometry.type === "Polygon"
-      ? [geometry.coordinates]
-      : geometry.coordinates;
-  });
-  const coordinates = polygons
-    .map((polygon) =>
-      polygon
-        .map((ring) => thinRing(ring, step))
-        .filter((ring) => ring.length >= 4),
-    )
-    .filter((polygon) => polygon.length > 0);
+  const coordinates = land.features
+    .flatMap(({ geometry }) => {
+      if (geometry.type === "Polygon") return [geometry.coordinates];
+      if (geometry.type === "MultiPolygon") return geometry.coordinates;
+      return [];
+    })
+    .map((polygon) => polygon.map((ring) => thinRing(ring, step)));
   return {
     type: "Feature",
     properties: {},
@@ -125,7 +103,7 @@ function loadWorld() {
     const outline = feature(land, land.objects.land);
     world = {
       land: outline,
-      spinLand: thinLand(outline, SPIN_LAND_STEP),
+      spinLand: thinLand(outline, SPIN_LAND_STEP_DEGREES),
       countries: features,
       bounds: features.map((country) => geoBounds(country)),
     };
@@ -298,17 +276,16 @@ export function globePaths(
     .precision(camera.scale > DETAIL_RADIUS ? 0.5 : 1);
   const path = geoPath(projection);
   const close = region !== null && closeUp(camera, screen, region);
+  const atlas = loadWorld();
+  const land = close
+    ? region.nearby
+    : camera.dive === 0
+      ? atlas.spinLand
+      : atlas.land;
   return {
     sphere: path({ type: "Sphere" }) ?? "",
     graticule: path(GRATICULE) ?? "",
-    land:
-      path(
-        close
-          ? region.nearby
-          : camera.scale <= SPIN_LAND_RADIUS
-            ? loadWorld().spinLand
-            : loadWorld().land,
-      ) ?? "",
+    land: path(land) ?? "",
     country:
       region?.country && countryLight(camera.dive) > 0
         ? (path(region.country) ?? "")

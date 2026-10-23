@@ -406,7 +406,7 @@ type GlobeFrame = {
   pin: Pin | null;
 };
 
-const SPIN_FRAME_MS = 1000 / 24;
+const SPIN_FRAME_MS = 1000 / 30;
 
 const toSkPath = (svg: string): SkPath | null =>
   svg === "" ? null : Skia.Path.MakeFromSVGString(svg);
@@ -440,8 +440,6 @@ function Globe({
   const width = rt.screen.width;
   const height = rt.screen.height;
 
-  // Parsing the map takes a moment; do it while the saves lift off. A tick
-  // later, so the cards' springs start first (this effect runs before theirs).
   useEffect(() => {
     const id = setTimeout(warmGlobe, 0);
     return () => clearTimeout(id);
@@ -461,15 +459,16 @@ function Globe({
     const screen = { width, height };
     let handle = 0;
     let shown = false;
-    let drawn = -Infinity;
+    let drawnSlot = -1;
     const tick = () => {
       const t = Date.now() - startedAt;
       const diveAt = dive.current?.at ?? null;
-      if (diveAt === null && t - drawn < SPIN_FRAME_MS) {
+      const slot = Math.floor(t / SPIN_FRAME_MS);
+      if (diveAt === null && slot === drawnSlot) {
         handle = requestAnimationFrame(tick);
         return;
       }
-      drawn = t;
+      drawnSlot = slot;
       const camera = globeCamera({ t, diveAt, ...screen, target: aim });
       const paths = globePaths(camera, screen, dive.current?.region ?? null);
       const framePin =
@@ -490,8 +489,6 @@ function Globe({
   }, [stage, startedAt, lng, lat, width, height, glow, landing]);
 
   const { light } = frame;
-  // Parsed once each: the land and the sphere are drawn twice (fill, then
-  // edge), and a string would be parsed again for every <Path>.
   const paths = useMemo(
     () => ({
       sphere: toSkPath(frame.paths.sphere),
