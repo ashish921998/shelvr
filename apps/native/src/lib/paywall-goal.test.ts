@@ -148,6 +148,16 @@ describe("goalPaywallVariables", () => {
     expect(v.goal_outcome_1).not.toBe("");
   });
 
+  it("drops the city from the headline when that city has no sample trip", () => {
+    const seattle = values(progress("travel", "seattle"));
+    expect(seattle.goal_outcome_headline).toBe(
+      "A trip from your saves,\nday by day.",
+    );
+    expect(seattle.goal_outcome_1).toBe(
+      values(progress("travel")).goal_outcome_1,
+    );
+  });
+
   it("uses plan samples for food and date", () => {
     expect(values(progress("food", "paris"))).toMatchObject({
       goal_outcome_headline: "Your weekend shortlist,\nready.",

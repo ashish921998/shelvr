@@ -151,10 +151,11 @@ function placesOutcome(
   city: string | null,
 ): Outcome {
   const plan = GOAL_PLANS[goal];
-  const day = samplePlan(plan ?? "trip", travelCity).days[0];
+  const trip = samplePlan(plan ?? "trip", travelCity);
+  const day = trip.days[0];
   const headlines = {
     travel:
-      city === null
+      city === null || trip.city !== travelCity
         ? t("paywallGoal.travelOutcomeHeadlineNoCity")
         : t("paywallGoal.travelOutcomeHeadline", { city }),
     food: t("paywallGoal.foodOutcomeHeadline"),
