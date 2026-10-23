@@ -12,10 +12,12 @@ through the paywall and signs in after it.
 - `Something else` asks for interests (checkboxes such as `AI & tech`), then
   Continue. `Travel ideas` asks "Where are you going next?" with a city list
   ending in "Not sure yet".
-- The share practice step offers "I'll try it later"; then "Let's go" asks
-  for the paywall.
-- Closing the paywall keeps the person on the "Let's go" step, signed out; a
-  cold launch comes back to the same step.
+- The share practice step offers "I'll try it later"; then "Let's go" leads
+  to the notifications screen, whose "Not now" opens the paywall.
+- The paywall has no close. A relaunch comes back to the notifications
+  screen, signed out, and "Not now" opens the paywall again.
+- The paywall's intro speaks to the goal: travel reads "Let's plan your next
+  trip from your saves."
 - Travel shows a sample Prague trip first ("There it is. Your Prague trip.",
   "SAMPLE TRIP", day 1 "Staré Město") on a map, before "Let's go".
 
@@ -39,15 +41,15 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After each paywall close "Let's go" is back and `dev-login-button` stays
-hidden; a cold relaunch returns to "Let's go" with the splash gone. No
-purchase is made.
+After a relaunch from the paywall, the notifications screen's "Not now" is
+back with the splash gone and `dev-login-button` hidden, and it opens the
+paywall again. No purchase is made.
 
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Start yours through the share practice and Let's go; close the paywall, relaunch, and check the step is kept and nothing signs in
-onboarding-travel|ios|skeptic|From a fresh install, pick Travel ideas and Not sure yet, skip the share practice, and check the sample Prague trip shows before the paywall and Let's go returns after it closes
+onboarding-flow|ios|skeptic|From a fresh install, walk Start yours through the share practice, Let's go and Not now to the paywall; relaunch, and check the notifications step is kept, nothing signs in, and the paywall opens again
+onboarding-travel|ios|skeptic|From a fresh install, pick Travel ideas and Not sure yet, skip the share practice, and check the sample Prague trip shows before the paywall and the paywall's intro speaks to the trip
 ```
 
 ## Gotchas

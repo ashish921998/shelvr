@@ -1,5 +1,5 @@
 import { afterEach, test } from "@e2e-dev/mobile";
-import { expect } from "e2e";
+import { expect, type Screen } from "e2e";
 
 import {
   SHARE_LATER,
@@ -8,9 +8,19 @@ import {
   walkToSharePractice,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
+import { expectPaywall } from "./paywall-sheet.ts";
+import { tapUntilVisible } from "./seeded-home.ts";
 
 const NOT_NOW = "Not now";
+
+// A tap that lands while the notifications screen settles is dropped.
+async function openPaywall(screen: Screen): Promise<void> {
+  await tapUntilVisible(
+    screen.getByRole("button", NOT_NOW),
+    screen.getByRole("button", "Continue"),
+    { waitMs: 5_000, timeout: 60_000 },
+  );
+}
 
 // Leave the app signed out at the opener, not mid-onboarding, for the next test.
 afterEach(async ({ device, screen }) => {
@@ -19,7 +29,7 @@ afterEach(async ({ device, screen }) => {
 });
 
 test(
-  "asks for the paywall at the end of onboarding, and a close keeps it there",
+  "asks for the paywall at the end of onboarding, and a relaunch comes back to it",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -35,19 +45,13 @@ test(
 
     await shareLater.tap();
     await screen.getByRole("button", "Let's go").tap({ timeout: 30_000 });
-    // The notifications screen comes between the promise and the paywall, and stays put when the paywall closes.
+    // The notifications screen comes between the promise and the paywall. The
+    // paywall has no close, so a relaunch is how someone leaves it; they land
+    // back on the notifications screen, still signed out.
     const commit = screen.getByRole("button", NOT_NOW);
-    await commit.tap({ timeout: 30_000 });
-    await expectPaywall(screen);
-
-    await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
     await expect(commit).toBeVisible({ timeout: 30_000 });
-    await expect(screen.getByTestId("dev-login-button")).toBeHidden();
-    await commit.tap();
+    await openPaywall(screen);
     await expectPaywall(screen);
-    await screen.getByRole("button", "Close").first().tap();
-    await expect(commit).toBeVisible({ timeout: 30_000 });
 
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
@@ -58,6 +62,8 @@ test(
       timeout: 30_000,
     });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
+    await openPaywall(screen);
+    await expectPaywall(screen);
   },
 );
 
@@ -80,12 +86,11 @@ test(
     await expect(screen.getByText(/^Remember every spot/)).toBeVisible({
       timeout: 30_000,
     });
-    const commit = screen.getByRole("button", NOT_NOW);
-    await commit.tap();
+    await openPaywall(screen);
+    // The paywall's first step speaks to the travel goal.
+    await expect(screen.getByText(/^Let.s plan your next trip/)).toBeVisible({
+      timeout: 60_000,
+    });
     await expectPaywall(screen);
-    await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
-    await expect(commit).toBeVisible({ timeout: 30_000 });
-    await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );
