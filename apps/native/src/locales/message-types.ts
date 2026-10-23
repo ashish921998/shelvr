@@ -698,7 +698,6 @@ export type MessageParams = {
   "home.howToMore": undefined;
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
-  "home.onYourShelf": undefined;
   "home.progressTitleFirst": undefined;
   "home.progressTitleNext": undefined;
   "home.progressTitleLast": undefined;

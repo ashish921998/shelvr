@@ -229,10 +229,7 @@ export default function HomeScreen() {
 
   const howToHeader =
     proCard || showHowTo ? (
-      <View style={styles.howToHeader}>
-        {proCard ?? <SaveHowTo />}
-        <Text style={styles.shelfLabel}>{t("home.onYourShelf")}</Text>
-      </View>
+      <View style={styles.howToHeader}>{proCard ?? <SaveHowTo />}</View>
     ) : null;
 
   return (

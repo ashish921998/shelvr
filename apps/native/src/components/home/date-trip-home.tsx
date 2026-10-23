@@ -46,11 +46,11 @@ function ModeSwitch({
     { mode: "trips", label: t("homePlans.trips") },
   ];
   return (
-    <View style={styles.switch} accessibilityRole="tablist">
+    <View style={styles.switch}>
       {segments.map((segment) => (
         <Pressable
           key={segment.mode}
-          accessibilityRole="tab"
+          accessibilityRole="button"
           accessibilityLabel={segment.label}
           accessibilityState={{ selected: mode === segment.mode }}
           onPress={() => onChange(segment.mode)}
@@ -109,14 +109,18 @@ function DatesPanel({
         </Text>
         {previews.length > 0 ? (
           <View style={styles.previews}>
-            {previews.slice(0, MAX_PREVIEWS).map((url) => (
-              <Image
-                key={url}
-                source={{ uri: url }}
-                style={styles.preview}
-                contentFit="cover"
-              />
-            ))}
+            {Array.from({ length: MAX_PREVIEWS }, (_, index) =>
+              previews[index] ? (
+                <Image
+                  key={previews[index]}
+                  source={{ uri: previews[index] }}
+                  style={styles.preview}
+                  contentFit="cover"
+                />
+              ) : (
+                <View key={`empty-${index}`} style={styles.preview} />
+              ),
+            )}
           </View>
         ) : null}
         {canMakePlan(items) ? (
