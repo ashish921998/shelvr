@@ -973,5 +973,53 @@
   "recipeReveal.ingredientMozzarella": "125 g de muçarela, rasgada",
   "recipeReveal.stepSauce": "Doure a carne com a cebola e o alho. Junte a passata e cozinhe por 20 minutos.",
   "recipeReveal.stepLayer": "Alterne três camadas de molho de carne, massa e molho branco. Cubra com a muçarela.",
-  "recipeReveal.stepBake": "Asse a 190 °C por 40 minutos, até dourar e borbulhar."
+  "recipeReveal.stepBake": "Asse a 190 °C por 40 minutos, até dourar e borbulhar.",
+  "homePlans.greetingMorning": "Bom dia",
+  "homePlans.greetingAfternoon": "Boa tarde",
+  "homePlans.greetingEvening": "Boa noite",
+  "homePlans.headline": "Para onde agora?",
+  "homePlans.dateNights": "Encontros",
+  "homePlans.trips": "Viagens",
+  "homePlans.fridayNight": "Noite de sexta",
+  "homePlans.seePlan": "Ver o plano",
+  "homePlans.saveMoreDates": "Salve mais alguns lugares para encontros e receba um plano",
+  "homePlans.yourDateSpots": "Seus lugares para encontros",
+  "homePlans.dateEmptyTitle": "Salve lugares para encontros do TikTok ou Instagram",
+  "homePlans.dateEmptyBody": "Compartilhe um reel com o Shelvr e ele aparece aqui.",
+  "homePlans.addSpot": "Adicionar um lugar",
+  "homePlans.untitled": "Sem título",
+  "homePlans.today": "Hoje",
+  "homePlans.tomorrow": "Amanhã",
+  "homePlans.yourTrip": "Sua viagem",
+  "homePlans.openDayByDay": "Abrir dia a dia",
+  "homePlans.citiesSaved": "Cidades que você salvou",
+  "homePlans.justSaved": "Salvos recentemente",
+  "homePlans.tripEmptyTitle": "Salve lugares para a próxima viagem",
+  "homePlans.tripEmptyBody": "Compartilhe reels de viagem com o Shelvr e transformamos em uma viagem dia a dia.",
+  "homePlans.everythingSaved": "Tudo que você salvou",
+  "homePlans.dateSpotCount": {
+    "one": "%{formattedCount} lugar para encontros à escolha",
+    "many": "%{formattedCount} lugares para encontros à escolha",
+    "other": "%{formattedCount} lugares para encontros à escolha"
+  },
+  "homePlans.inDays": {
+    "one": "Em %{formattedCount} dia",
+    "many": "Em %{formattedCount} dias",
+    "other": "Em %{formattedCount} dias"
+  },
+  "homePlans.tripSummary": {
+    "one": "Viagem de %{days} d · %{formattedCount} lugar dos seus salvos",
+    "many": "Viagem de %{days} d · %{formattedCount} lugares dos seus salvos",
+    "other": "Viagem de %{days} d · %{formattedCount} lugares dos seus salvos"
+  },
+  "homePlans.cityReady": {
+    "one": "%{formattedCount} lugar · pronto para planejar",
+    "many": "%{formattedCount} lugares · pronto para planejar",
+    "other": "%{formattedCount} lugares · pronto para planejar"
+  },
+  "homePlans.cityMore": {
+    "one": "%{formattedCount} lugar · salve mais %{remaining} para planejar",
+    "many": "%{formattedCount} lugares · salve mais %{remaining} para planejar",
+    "other": "%{formattedCount} lugares · salve mais %{remaining} para planejar"
+  }
 }

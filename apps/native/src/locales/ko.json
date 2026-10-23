@@ -927,5 +927,43 @@
   "recipeReveal.ingredientMozzarella": "모차렐라 125g (찢은 것)",
   "recipeReveal.stepSauce": "다짐육을 양파, 마늘과 함께 볶아요. 토마토 퓌레를 넣고 20분 끓여요.",
   "recipeReveal.stepLayer": "미트 소스, 라자냐 면, 화이트 소스를 세 번 번갈아 쌓아요. 위에 모차렐라를 올려요.",
-  "recipeReveal.stepBake": "190°C 오븐에서 40분, 노릇하게 보글보글 끓을 때까지 구워요."
+  "recipeReveal.stepBake": "190°C 오븐에서 40분, 노릇하게 보글보글 끓을 때까지 구워요.",
+  "homePlans.greetingMorning": "좋은 아침이에요",
+  "homePlans.greetingAfternoon": "좋은 오후예요",
+  "homePlans.greetingEvening": "좋은 저녁이에요",
+  "homePlans.headline": "다음엔 어디로?",
+  "homePlans.dateNights": "데이트 나이트",
+  "homePlans.trips": "여행",
+  "homePlans.fridayNight": "금요일 밤",
+  "homePlans.seePlan": "플랜 보기",
+  "homePlans.saveMoreDates": "플랜을 받으려면 데이트 장소를 조금 더 저장하세요",
+  "homePlans.yourDateSpots": "내 데이트 장소",
+  "homePlans.dateEmptyTitle": "TikTok이나 Instagram에서 데이트 장소 저장하기",
+  "homePlans.dateEmptyBody": "릴스를 Shelvr에 공유하면 여기에 나타납니다.",
+  "homePlans.addSpot": "장소 추가",
+  "homePlans.untitled": "제목 없음",
+  "homePlans.today": "오늘",
+  "homePlans.tomorrow": "내일",
+  "homePlans.yourTrip": "나의 여행",
+  "homePlans.openDayByDay": "일별로 열기",
+  "homePlans.citiesSaved": "저장한 도시",
+  "homePlans.justSaved": "방금 저장함",
+  "homePlans.tripEmptyTitle": "다음 여행을 위한 장소 저장",
+  "homePlans.tripEmptyBody": "여행 릴스를 Shelvr에 공유하면 일별 여행 일정으로 만들어 드려요.",
+  "homePlans.everythingSaved": "저장한 모든 것",
+  "homePlans.dateSpotCount": {
+    "other": "고를 수 있는 데이트 장소 %{formattedCount}곳"
+  },
+  "homePlans.inDays": {
+    "other": "%{formattedCount}일 후"
+  },
+  "homePlans.tripSummary": {
+    "other": "%{days}일 여행 · 저장한 장소 %{formattedCount}곳"
+  },
+  "homePlans.cityReady": {
+    "other": "장소 %{formattedCount}곳 · 계획 준비 완료"
+  },
+  "homePlans.cityMore": {
+    "other": "장소 %{formattedCount}곳 · %{remaining}곳 더 저장하면 계획할 수 있어요"
+  }
 }

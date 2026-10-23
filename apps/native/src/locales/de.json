@@ -950,5 +950,48 @@
   "recipeReveal.ingredientMozzarella": "125 g Mozzarella, zerzupft",
   "recipeReveal.stepSauce": "Hack mit Zwiebel und Knoblauch anbraten. Passierte Tomaten einrühren und 20 Minuten köcheln lassen.",
   "recipeReveal.stepLayer": "Fleischsoße, Lasagneplatten und Béchamel dreimal schichten. Mit Mozzarella belegen.",
-  "recipeReveal.stepBake": "Bei 190 °C 40 Minuten backen, bis alles goldbraun ist und blubbert."
+  "recipeReveal.stepBake": "Bei 190 °C 40 Minuten backen, bis alles goldbraun ist und blubbert.",
+  "homePlans.greetingMorning": "Guten Morgen",
+  "homePlans.greetingAfternoon": "Guten Tag",
+  "homePlans.greetingEvening": "Guten Abend",
+  "homePlans.headline": "Wohin als Nächstes?",
+  "homePlans.dateNights": "Date-Abende",
+  "homePlans.trips": "Reisen",
+  "homePlans.fridayNight": "Freitagabend",
+  "homePlans.seePlan": "Plan ansehen",
+  "homePlans.saveMoreDates": "Speichere ein paar weitere Date-Spots, um einen Plan zu bekommen",
+  "homePlans.yourDateSpots": "Deine Date-Spots",
+  "homePlans.dateEmptyTitle": "Speichere Date-Spots von TikTok oder Instagram",
+  "homePlans.dateEmptyBody": "Teile ein Reel mit Shelvr, und es landet hier.",
+  "homePlans.addSpot": "Spot hinzufügen",
+  "homePlans.untitled": "Ohne Titel",
+  "homePlans.today": "Heute",
+  "homePlans.tomorrow": "Morgen",
+  "homePlans.yourTrip": "Deine Reise",
+  "homePlans.openDayByDay": "Tag für Tag öffnen",
+  "homePlans.citiesSaved": "Städte, die du gespeichert hast",
+  "homePlans.justSaved": "Gerade gespeichert",
+  "homePlans.tripEmptyTitle": "Speichere Orte für deine nächste Reise",
+  "homePlans.tripEmptyBody": "Teile Reise-Reels mit Shelvr, und wir machen daraus eine Reise, Tag für Tag.",
+  "homePlans.everythingSaved": "Alles, was du gespeichert hast",
+  "homePlans.dateSpotCount": {
+    "one": "%{formattedCount} Date-Spot zur Auswahl",
+    "other": "%{formattedCount} Date-Spots zur Auswahl"
+  },
+  "homePlans.inDays": {
+    "one": "In %{formattedCount} Tag",
+    "other": "In %{formattedCount} Tagen"
+  },
+  "homePlans.tripSummary": {
+    "one": "%{days}-Tages-Reise · %{formattedCount} Spot aus deinen gespeicherten Inhalten",
+    "other": "%{days}-Tages-Reise · %{formattedCount} Spots aus deinen gespeicherten Inhalten"
+  },
+  "homePlans.cityReady": {
+    "one": "%{formattedCount} Spot · bereit zur Planung",
+    "other": "%{formattedCount} Spots · bereit zur Planung"
+  },
+  "homePlans.cityMore": {
+    "one": "%{formattedCount} Spot · speichere noch %{remaining} für die Planung",
+    "other": "%{formattedCount} Spots · speichere noch %{remaining} für die Planung"
+  }
 }
