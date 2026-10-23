@@ -329,3 +329,39 @@ it("leaves the title empty when Shelvr's title only repeats the first line", () 
   expect(title.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
   expect(title.getAttribute("data-placeholder-color")).toBe("gray");
 });
+
+const longLine =
+  "Mum said the best route is the coastal path from Cascais to Guincho, stop at the café by the lighthouse for lunch";
+
+it.each([
+  [
+    "is the first 80 characters of a longer first line",
+    longLine.slice(0, 80),
+    `${longLine}\nBring sunscreen`,
+  ],
+  [
+    "differs from the first line only in case and punctuation",
+    "Call the landlord!",
+    "call the Landlord\nabout the tap",
+  ],
+])("leaves the title empty when Shelvr's title %s", (_, title, note) => {
+  render(<NoteEditor item={{ ...item, title, note }} />);
+  const input = screen.getByLabelText("item.noteTitleLabel");
+  expect(input.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
+  expect(input.getAttribute("data-placeholder-color")).toBe("gray");
+});
+
+it("shows Shelvr's title when it says something the first line doesn't", () => {
+  render(
+    <NoteEditor
+      item={{
+        ...item,
+        title: "Call the plumber",
+        note: "Call the landlord\nabout the tap",
+      }}
+    />,
+  );
+  const input = screen.getByLabelText("item.noteTitleLabel");
+  expect(input.getAttribute("placeholder")).toBe("Call the plumber");
+  expect(input.getAttribute("data-placeholder-color")).toBe("ink");
+});

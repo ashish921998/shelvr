@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { createNoteSaveQueue, type NoteEdit } from "@/lib/note-edit";
+import { firstLineRepeat } from "@/lib/note-heading";
 import { api } from "@convex/_generated/api";
 import {
   MAX_ITEM_TITLE_CHARS,
@@ -130,7 +131,7 @@ export function NoteEditor({ item }: { item: DetailItem }) {
   const shelvrTitle =
     item.titleSource !== "user" &&
     item.title &&
-    item.title.trim() !== draft.text.trim().split("\n")[0]?.trim()
+    !firstLineRepeat(draft.text, item.title)
       ? item.title
       : undefined;
 
