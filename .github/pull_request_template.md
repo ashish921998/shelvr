@@ -45,5 +45,5 @@ Paywall changes live in RevenueCat, so CI cannot see them: they still need scree
 <!-- Keep the lines that apply and delete the rest. Each trailer goes on a commit in this PR. -->
 
 - Public Convex function `args` or `returns` changed: add the `Convex-Api: changed` trailer and say how installed apps survive it.
-- Native fingerprint moved (native module, config plugin, `app.json` other than its version fields (`version`, `ios.buildNumber`, `android.versionCode`; the default `balanced` preset skips them), `app.config.js`): add the `Native-Fingerprint: changed` trailer. OTAs wait for a store build.
+- Native fingerprint may have moved (native module, config plugin, `app.json`, `app.config.js`): CI's `native fingerprint` job decides. If it reports CHANGED, add the `Native-Fingerprint: changed` trailer. OTAs wait for a store build.
 - Backend must deploy before the client: say so.

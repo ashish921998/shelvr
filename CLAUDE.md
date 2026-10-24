@@ -401,7 +401,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
     this is set, so a build without it keeps working and uploads switch on the moment the EAS
     secret is added. The upload runs inside the native build and needs `@posthog/cli` available
     there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
-    variables rather than in `eas.json`, which the native fingerprint hashes. Turning the upload
+    variables rather than in `eas.json`. Turning the upload
     on adds a config plugin, so it moves the fingerprint and needs a store build.
     `metro.config.js` stamps the matching debug id into every bundle regardless
 
@@ -526,12 +526,9 @@ needed at runtime by the features that use them:
   expand/contract: deploy the tolerant version first, tighten once old
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A
-  change that moves the fingerprint (a new native module, a config plugin, `app.json`
-  other than its version fields (`version`, `ios.buildNumber`, `android.versionCode`),
-  `app.config.js`) strands every later OTA until a store build ships, and the diff does
-  not say so. The default `balanced` preset skips the version fields; a
-  `fingerprint.config.js` that sets `preset: "strict"` would hash them again. Two layers
-  cover it. On a pull request CI runs
+  change to a native module, a config plugin, `app.json` or `app.config.js` may move the
+  fingerprint, and a moved fingerprint strands every later OTA until a store build ships.
+  The diff does not say so. Two layers cover it. On a pull request CI runs
   `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
   and never fails the check; acknowledge an intended move with the
   `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
@@ -540,8 +537,9 @@ needed at runtime by the features that use them:
   `apps/native/released-builds.json` and blocks the publish on anything but a match,
   including a profile or platform with no recorded release. A blocked publish means
   nothing published from this tree reaches the recorded binary, so the usual fix is a
-  store build, and recording the release afterwards. See
-  [push notification builds and updates](docs/architecture/push-notifications.md).
+  store build, and recording the release afterwards. Do not predict a move: run
+  `pnpm run verify:fingerprint origin/main HEAD`. What the fingerprint hashes is in
+  [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 - Adding a field to a table is a one-way door once rows carry it. Convex validates
   every existing document against the new schema on deploy, and a table validator
   rejects a field it does not declare, failing with an "Unexpected field" error

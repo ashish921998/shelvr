@@ -70,6 +70,36 @@ The workflow is manual and checks both backend URLs plus the Firebase file for
 Android. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
 runtime; publishing it does not upgrade an old binary's native configuration.
 
+### What the fingerprint hashes
+
+The runtime version is the hash `@expo/fingerprint` computes for the native
+project, and the library's preset decides which sources count. Since
+`@expo/fingerprint` 0.21 (Expo SDK 58) the default is `balanced`. It skips the
+app's version fields (`version`, `ios.buildNumber`, `android.versionCode`,
+`ios.version`, `android.version`) and the `eas.json` and `.easignore` files.
+Through SDK 57 the version was hashed. A version bump alone therefore does not
+move the fingerprint, and an OTA from the bumped tree still reaches the
+previous build.
+
+Three settings would change that, and nothing in this repo sets any of them. A
+`fingerprint.config.js` in `apps/native` that selects `preset: "strict"` or sets
+its own `sourceSkips` can bring the version back into the hash.
+`EXPO_UPDATES_FINGERPRINT_OVERRIDE` replaces the hash at build time. Separately,
+`apps/native/.fingerprintignore` leaves files out of the hash (described above).
+
+Do not predict what moves the fingerprint; run the comparison.
+`pnpm run verify:fingerprint origin/main HEAD` prints `unchanged` or `CHANGED`
+for each platform, and every source that moved. Read the verdict, not the
+hashes. The comparison runs without EAS's production variables, so its hashes
+differ from the ones in `apps/native/released-builds.json`.
+
+After an Expo upgrade, check the first paragraph once. On a scratch branch,
+commit a change that only bumps `version` in `apps/native/app.json`, then run
+`pnpm run verify:fingerprint HEAD~1 HEAD`. Expect `unchanged` on both platforms
+and exit code 0. It takes about half a minute, because it installs the
+dependencies of both refs. A `CHANGED` on either platform means the first
+paragraph is out of date.
+
 ### Two layers guard OTA compatibility
 
 **On a pull request, an early warning.** CI computes the fingerprint of the

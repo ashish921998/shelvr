@@ -50,8 +50,10 @@ xcrun simctl openurl <udid> 'exp+shelvr://expo-development-client/?url=http%3A%2
 ## Building the dev client
 
 The runtime version uses the fingerprint policy (`app.json`), so a dev client
-only loads bundles whose native fingerprint matches. Rebuild with
-`npx expo run:ios` after a native dependency or config plugin changes.
+only loads bundles whose native fingerprint matches (see
+[What the fingerprint hashes](push-notifications.md#what-the-fingerprint-hashes)).
+Rebuild with `npx expo run:ios` after a native dependency or config plugin
+changes.
 
 - **Set a UTF-8 locale.** In a shell without one, `pod install` dies with
   `Unicode Normalization not appropriate for ASCII-8BIT`. Prefix the command
