@@ -6,12 +6,12 @@ import {
 import type { SampleCityId } from "@/lib/sample-cities";
 import type { SaveKind } from "@/lib/save-kinds";
 
-export type DemoKind = Extract<
+type DemoKind = Extract<
   SaveKind,
   "Articles" | "Recipes" | "Products" | "Travel" | "Videos"
 >;
 
-export type DemoSample = {
+type DemoSample = {
   kind: DemoKind;
   interest?: Interest;
   city?: SampleCityId;
@@ -21,7 +21,7 @@ export type DemoSample = {
   domain: string;
 };
 
-export const DEMO_SAMPLES: readonly DemoSample[] = [
+const DEMO_SAMPLES: readonly DemoSample[] = [
   {
     kind: "Recipes",
     url: "https://www.bbcgoodfood.com/recipes/classic-lasagne",
@@ -189,14 +189,6 @@ const CITY_SAMPLES: readonly DemoSample[] = Object.entries(CITY_PAGES).map(
   }),
 );
 
-function inCity(sample: DemoSample, city: SampleCityId | null): DemoSample {
-  if (sample.kind !== "Travel" || city === null || city === "prague") {
-    return sample;
-  }
-  const local = CITY_SAMPLES.find((other) => other.city === city);
-  return local === undefined ? sample : { ...local, interest: sample.interest };
-}
-
 const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.flatMap(
   (interest) => {
     const page = INTEREST_PAGES[interest];
@@ -205,17 +197,6 @@ const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.flatMap(
     return shared === undefined ? [] : [{ ...shared, interest }];
   },
 );
-
-/** The post share practice offers: the first picked topic's page, in the picked city, or the article sample. */
-export function practiceShareSample(
-  interests: readonly Interest[],
-  city: SampleCityId | null = null,
-): DemoSample | undefined {
-  const sample =
-    INTEREST_SAMPLES.find((other) => other.interest === interests[0]) ??
-    DEMO_SAMPLES.find((other) => other.kind === "Articles");
-  return sample === undefined ? undefined : inCity(sample, city);
-}
 
 export function findSample(url: string): DemoSample | undefined {
   return [...DEMO_SAMPLES, ...INTEREST_SAMPLES, ...CITY_SAMPLES].find(

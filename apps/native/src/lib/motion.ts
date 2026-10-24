@@ -5,6 +5,12 @@ import {
   FadeInDown,
   FadeOut,
   ReduceMotion,
+  SlideInDown,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutDown,
+  SlideOutLeft,
+  SlideOutRight,
 } from "react-native-reanimated";
 
 const curves = {
@@ -12,7 +18,16 @@ const curves = {
   inOut: [0.77, 0, 0.175, 1],
 } as const;
 
-const duration = { feedback: 120, state: 180, enter: 250, exit: 200 } as const;
+const duration = {
+  feedback: 120,
+  state: 180,
+  enter: 250,
+  exit: 200,
+  // A critically damped spring settles in this long (Apple's fluid-interface default).
+  spring: 350,
+  // The gap between items that arrive one after another, like pins dropping.
+  stagger: 300,
+} as const;
 const easing = {
   out: Easing.bezier(...curves.out),
   inOut: Easing.bezier(...curves.inOut),
@@ -74,6 +89,11 @@ export const motion = {
     },
   },
   spring: {
+    snap: {
+      duration: duration.spring,
+      dampingRatio: 1,
+      reduceMotion: ReduceMotion.System,
+    },
     settle: {
       duration: 400,
       dampingRatio: 1,
@@ -111,3 +131,34 @@ export const REDUCED_FADE_IN = FadeIn.duration(duration.feedback)
 export const REDUCED_FADE_OUT = FadeOut.duration(duration.feedback)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
+
+/** A critically damped spring entrance: no overshoot, interruptible, and a short cross-fade under Reduce Motion. */
+export const springIn = (reduced: boolean, delay = 0) =>
+  reduced
+    ? FadeIn.delay(delay).duration(duration.feedback).easing(easing.out)
+    : FadeInDown.delay(delay)
+        .springify(duration.spring)
+        .dampingRatio(1)
+        .reduceMotion(ReduceMotion.Never);
+
+/** A screen of a step-by-step flow: forward arrives from the right, Back leaves to the right. */
+export function stepTransition(reduced: boolean, backward: boolean) {
+  if (reduced) return { entering: REDUCED_FADE_IN, exiting: REDUCED_FADE_OUT };
+  const [entering, exiting] = backward
+    ? [SlideInLeft, SlideOutRight]
+    : [SlideInRight, SlideOutLeft];
+  return {
+    entering: entering.springify(duration.spring).dampingRatio(1),
+    exiting: exiting.springify(duration.spring).dampingRatio(1),
+  };
+}
+
+/** A sheet that comes up from the bottom and leaves downward. */
+export const sheetIn = (reduced: boolean, delay = 0) =>
+  reduced
+    ? FadeIn.delay(delay).duration(duration.feedback)
+    : SlideInDown.delay(delay).springify(duration.spring).dampingRatio(1);
+export const sheetOut = (reduced: boolean) =>
+  reduced
+    ? FadeOut.duration(duration.feedback)
+    : SlideOutDown.springify(duration.spring).dampingRatio(1);

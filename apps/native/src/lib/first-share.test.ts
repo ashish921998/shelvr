@@ -8,7 +8,6 @@ import {
   isWeeklyNudgePending,
   recordShareSaved,
   shouldOfferWeeklyNudge,
-  shouldShowHowTo,
 } from "./first-share";
 
 const store = vi.hoisted(() => new Map<string, string>());
@@ -55,21 +54,6 @@ describe("first share-sheet save", () => {
     recordShareSaved("user_a");
     expect(isWeeklyNudgePending("user_a")).toBe(true);
   });
-});
-
-describe("shouldShowHowTo", () => {
-  it.each([
-    [false, 0, true],
-    [false, 1, true],
-    [false, 2, false],
-    [true, 0, false],
-    [true, 1, false],
-  ])(
-    "firstShareSaved=%s with %i items shows the how-to: %s",
-    (firstShareSaved, itemCount, expected) => {
-      expect(shouldShowHowTo({ firstShareSaved, itemCount })).toBe(expected);
-    },
-  );
 });
 
 describe("weekly nudge timing", () => {

@@ -2,23 +2,31 @@ import { afterEach, test } from "@e2e-dev/mobile";
 import { expect, type Screen } from "e2e";
 
 import {
-  SHARE_LATER,
+  SHARE_TO_SHELVR,
   relaunchWith,
   startFreshOnboarding,
-  walkToSharePractice,
+  walkToSampleReel,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall } from "./paywall-sheet.ts";
-import { tapUntilVisible } from "./seeded-home.ts";
+import { pollUntil } from "./poll.ts";
 
 const NOT_NOW = "Not now";
 
-// A tap that lands while the notifications screen settles is dropped.
+// A tap that lands while the reminder screen settles is dropped, so tap
+// until the screen gives way to the paywall.
 async function openPaywall(screen: Screen): Promise<void> {
-  await tapUntilVisible(
-    screen.getByRole("button", NOT_NOW),
-    screen.getByRole("button", "Continue"),
-    { waitMs: 5_000, timeout: 60_000 },
+  const notNow = screen.getByRole("button", NOT_NOW);
+  await pollUntil(
+    async () => {
+      if (!(await notNow.isVisible())) return true;
+      await notNow.tap({ timeout: 5_000 }).catch(() => undefined);
+      await expect(notNow)
+        .toBeHidden({ timeout: 5_000 })
+        .catch(() => undefined);
+      return !(await notNow.isVisible());
+    },
+    { timeout: 60_000 },
   );
 }
 
@@ -28,26 +36,39 @@ afterEach(async ({ device, screen }) => {
   await device.closeApp().catch(() => undefined);
 });
 
+/** Saves the sample reel and walks its spots and plan, up to the trial reminder. */
+async function walkTheSample(screen: Screen): Promise<void> {
+  await screen.getByRole("button", SHARE_TO_SHELVR).tap();
+  await expect(screen.getByText("Found 3 spots in that reel")).toBeVisible({
+    timeout: 30_000,
+  });
+  const next = screen.getByRole("button", "Continue");
+  await expect(next).toBeEnabled({ timeout: 10_000 });
+  await next.tap();
+  await screen
+    .getByRole("button", "Save your own spots")
+    .tap({ timeout: 30_000 });
+}
+
 test(
   "asks for the paywall at the end of onboarding, and a relaunch comes back to it",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToSharePractice(screen);
+    await walkToSampleReel(screen);
 
-    const shareLater = screen.getByRole("button", SHARE_LATER);
+    const share = screen.getByRole("button", SHARE_TO_SHELVR);
     await relaunchWith(
       device,
       screen,
       [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
-      () => shareLater.isVisible(),
+      () => share.isVisible(),
     );
 
-    await shareLater.tap();
-    await screen.getByRole("button", "Let's go").tap({ timeout: 30_000 });
-    // The notifications screen comes between the promise and the paywall. The
+    await walkTheSample(screen);
+    // The reminder screen comes between the sample plan and the paywall. The
     // paywall has no close, so a relaunch is how someone leaves it; they land
-    // back on the notifications screen, still signed out.
+    // back on the reminder screen, still signed out.
     const commit = screen.getByRole("button", NOT_NOW);
     await expect(commit).toBeVisible({ timeout: 30_000 });
     await openPaywall(screen);
@@ -68,29 +89,32 @@ test(
 );
 
 test(
-  "shows a sample trip, open, then the promise, the notifications screen and the paywall for someone saving travel ideas",
+  "turns one sample reel into a date night, then asks about the trial reminder and the paywall",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToSharePractice(screen, "Travel ideas");
+    await walkToSampleReel(screen);
 
-    await screen.getByRole("button", SHARE_LATER).tap();
-    await expect(screen.getByText(/^There it is\./)).toBeVisible({
+    await screen.getByRole("button", SHARE_TO_SHELVR).tap();
+    await expect(screen.getByText("Found 3 spots in that reel")).toBeVisible({
       timeout: 30_000,
     });
-    await expect(screen.getByText(/^Sample trip$/i)).toBeVisible();
-    await expect(screen.getByText("Staré Město")).toBeVisible();
-    await screen.getByRole("button", "Continue").tap();
-
-    await screen.getByRole("button", "Let's go").tap({ timeout: 30_000 });
-    await expect(screen.getByText(/^Remember every spot/)).toBeVisible({
+    // The map pin carries the same label as the list row.
+    await expect(screen.getByText("Kampa Park").first()).toBeVisible({
       timeout: 30_000,
     });
+    const next = screen.getByRole("button", "Continue");
+    await expect(next).toBeEnabled({ timeout: 10_000 });
+    await next.tap();
+    await expect(screen.getByText("Your date night in Prague")).toBeVisible({
+      timeout: 30_000,
+    });
+    await screen.getByRole("button", "Save your own spots").tap();
+
+    await expect(
+      screen.getByText("We'll remind you before it ends"),
+    ).toBeVisible({ timeout: 30_000 });
     await openPaywall(screen);
-    // The paywall's first step speaks to the travel goal.
-    await expect(screen.getByText(/^Let.s plan your next trip/)).toBeVisible({
-      timeout: 60_000,
-    });
     await expectPaywall(screen);
   },
 );

@@ -134,7 +134,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   work. Successful upload retries return the same storage ID.
   Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
-  `reprocessItem` (retry a failed or partially enriched save), `deleteItem`, and the share
+  `reprocessItem` (retry a failed or partially enriched save), `listCities` and `listCityItems`
+  (the cities Home and the City screen show), `deleteItem`, and the share
   link pair `createShareLink` / `settleShareLink` (a cancelled share sheet withdraws a
   fresh, never-confirmed link). The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
@@ -143,7 +144,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`spaces.ts`**: public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
   `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
-  `acceptAllSuggestions`), plus internal join helpers.
+  `acceptAllSuggestions`), `ensureCitySpace` (the space "Plan a date" / "Plan a trip" on the City
+  screen files a city's saves into), plus internal join helpers.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
@@ -346,7 +348,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `plan-gate`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
+  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`,
   `digest/[id]`
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
   entitlement sees it instead of every other route except `profile`, `settings` and `paywall`

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nextSaveGoalStep, progressTitleKey, trackSaveGoal } from "./save-goal";
+import { nextSaveGoalStep, trackSaveGoal } from "./save-goal";
 
 const mock = vi.hoisted(() => ({
   store: new Map<string, string>(),
@@ -122,13 +122,5 @@ describe("trackSaveGoal", () => {
       1,
     );
     expect(mock.capture).not.toHaveBeenCalled();
-  });
-});
-
-describe("progressTitleKey", () => {
-  it("counts down the saves still to go", () => {
-    expect(progressTitleKey(0, 3)).toBe("home.progressTitleFirst");
-    expect(progressTitleKey(1, 3)).toBe("home.progressTitleNext");
-    expect(progressTitleKey(2, 3)).toBe("home.progressTitleLast");
   });
 });

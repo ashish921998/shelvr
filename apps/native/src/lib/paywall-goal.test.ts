@@ -16,18 +16,15 @@ import { planCities } from "@/lib/sample-plans";
 vi.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: "en-US" }],
 }));
-vi.mock("@/lib/pending-onboarding", () => ({
-  resolveOnboardingSpaceName: (id: string) => id,
-}));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
+vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 
 type Progress = Parameters<typeof goalPaywallVariables>[0];
 const progress = (
   goal: Goal | null,
   travelCity: Progress["travelCity"] = null,
-  spaces: string[] = [],
-): Progress => ({ goal, travelCity, spaces });
+): Progress => ({ goals: goal === null ? [] : [goal], travelCity });
 const values = (p: Progress) =>
   Object.fromEntries(
     Object.entries(goalPaywallVariables(p)).map(([k, v]) => [k, v.value]),
@@ -94,38 +91,13 @@ describe("goalPaywallVariables", () => {
     expect(values(progress("date")).goal_answer_2).toBe("");
   });
 
-  it("writes recipes out, with no second answer and no stale city", () => {
-    expect(values(progress("recipes", "rome"))).toEqual({
-      goal: "recipes",
-      goal_city: "",
-      goal_headline: "Let’s get dinner\nout of your saves.",
-      goal_subline: "Every recipe written out, even from a video.",
-      goal_photo_tag: "Your sample recipe",
-      goal_answer_1: "Recipes",
-      goal_answer_2: "",
-      goal_today: "Every recipe you save, written out.",
-      goal_plan_title: "Cook it without rewatching the video",
-      goal_benefit_title: "Recipes, written out",
-      goal_benefit_body:
-        "Ingredients and steps, even when the caption has none.",
-    });
-  });
-
-  it("lists the first two picked interests for other", () => {
-    expect(values(progress("other", null, ["Gear", "Books", "Art"]))).toEqual({
-      goal: "other",
-      goal_city: "",
-      goal_headline: "Let’s make your saves\nworth keeping.",
-      goal_subline: "Find anything again by what you remember.",
-      goal_photo_tag: "Your first save",
-      goal_answer_1: "Products and articles",
-      goal_answer_2: "Gear, Books",
-      goal_today: "A space for each thing you’re into.",
-      goal_plan_title: "Find it when you need it",
-      goal_benefit_title: "A space for each interest",
-      goal_benefit_body: "Sorted into your spaces as you save.",
-    });
-    expect(values(progress("other")).goal_answer_2).toBe("");
+  it("words the paywall for the goal that leads when several were picked", () => {
+    expect(
+      values({ goals: ["food", "travel", "date"], travelCity: "paris" }),
+    ).toMatchObject({ goal: "date", goal_city: "paris" });
+    expect(values({ goals: ["food", "travel"], travelCity: null }).goal).toBe(
+      "travel",
+    );
   });
 
   it("keeps the goal id unlocalized for every goal", () => {
@@ -184,15 +156,15 @@ describe("paywallVariables", () => {
       { unit: "DAY", count: 7 },
       [],
       undefined,
-      progress("recipes"),
+      progress("food"),
     );
     expect(variables).toMatchObject({
       trial_end_day: { type: "string", value: "7" },
-      goal: { type: "string", value: "recipes" },
+      goal: { type: "string", value: "food" },
       goal_city: { type: "string", value: "" },
     });
     expect(
-      paywallVariables(0, undefined, [], undefined, progress("recipes")),
+      paywallVariables(0, undefined, [], undefined, progress("food")),
     ).toHaveProperty("goal_headline");
   });
 });
@@ -222,8 +194,8 @@ describe("paywallGoal catalog copy", () => {
   };
   const keys = Object.keys(en).filter((key) => key.startsWith("paywallGoal."));
 
-  it("has the 49 keys in every locale", () => {
-    expect(keys).toHaveLength(49);
+  it("has the 33 keys in every locale", () => {
+    expect(keys).toHaveLength(33);
     for (const [locale, catalog] of Object.entries(catalogs)) {
       const own = Object.keys(catalog).filter((key) =>
         key.startsWith("paywallGoal."),

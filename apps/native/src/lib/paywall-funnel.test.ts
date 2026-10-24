@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({ NativeModules: {} }));
+vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 vi.mock("@/lib/pending-onboarding", () => ({
   resolveOnboardingSpaceName: (id: string) => id,
 }));
