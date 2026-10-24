@@ -725,7 +725,7 @@ export type MessageParams = {
   "onboardingChart.whenWeekend": undefined;
   "onboardingChart.whenTrip": undefined;
   "onboardingChart.body": undefined;
-  "onboardingChart.chartLabel": { lost: string; goal: string };
+  "onboardingChart.chartLabel": { lost: string; goal: string; when: string };
   "aha.shareTitle": undefined;
   "aha.sampleBadge": undefined;
   "aha.captionDate": { city: string };

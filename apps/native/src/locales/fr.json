@@ -808,7 +808,7 @@
   "onboardingChart.whenWeekend": "Ce week-end",
   "onboardingChart.whenTrip": "Votre prochain voyage",
   "onboardingChart.body": "C'est parti. Les reels et TikToks enregistrés deviennent un plan sur une carte, avec seulement les lieux que vous avez choisis.",
-  "onboardingChart.chartLabel": "Une courbe de %{lost} maintenant à %{goal}",
+  "onboardingChart.chartLabel": "Une courbe de %{lost} maintenant à %{goal}. %{when}",
   "aha.shareTitle": "Essayez : enregistrez ce reel dans Shelvr",
   "aha.sampleBadge": "Exemple",
   "aha.captionDate": "3 adresses pour la soirée parfaite à %{city} 🍷",

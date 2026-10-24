@@ -766,7 +766,7 @@
   "onboardingChart.whenWeekend": "今週末",
   "onboardingChart.whenTrip": "次の旅行",
   "onboardingChart.body": "準備完了。保存したリールやTikTokが、選んだ場所だけで地図上のプランになります。",
-  "onboardingChart.chartLabel": "今の%{lost}から%{goal}へのカーブ",
+  "onboardingChart.chartLabel": "今の%{lost}から%{goal}へのカーブ。%{when}",
   "aha.shareTitle": "試してみよう：このリールをShelvrに保存",
   "aha.sampleBadge": "サンプル",
   "aha.captionDate": "%{city}で最高のデートができる3つのスポット 🍷",
