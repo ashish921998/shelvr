@@ -27,14 +27,19 @@ describe("visibleCities", () => {
 });
 
 describe("spacesWithoutCities", () => {
-  it("drops a space named like a city, ignoring case and spacing", () => {
+  it("drops a space named like a city, ignoring case and inner spacing", () => {
     const spaces = [
       { name: " lisbon " },
+      { name: "new  york" },
       { name: "Recipes" },
       { name: "Porto" },
     ];
     expect(
-      spacesWithoutCities(spaces, [city("Lisbon"), city("PORTO")]),
+      spacesWithoutCities(spaces, [
+        city("Lisbon"),
+        city("PORTO"),
+        city("New York"),
+      ]),
     ).toEqual([{ name: "Recipes" }]);
   });
 

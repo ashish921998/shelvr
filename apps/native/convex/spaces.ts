@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -10,7 +10,7 @@ import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
-import { tidyCity } from "./model/trip";
+import { cityKey, tidyCity } from "./model/trip";
 import {
   deleteMembershipsForSpace,
   effectiveStatus,
@@ -298,13 +298,25 @@ export const ensureCitySpace = authedMutation({
     const name = validateSpaceName(tidyCity(args.city));
     await requireProEntitlement(ctx, userId);
     const saves = await readyCitySaves(ctx, userId, args.city);
+    if (saves.length === 0) {
+      throw new ConvexError({
+        code: "city_empty",
+        message: "No ready saves in this city",
+      });
+    }
 
-    const existing = await ctx.db
+    // listCities groups case-insensitively and its display spelling can flip,
+    // so match the space by the same key, not the exact name.
+    const key = cityKey(name);
+    let existing: Doc<"spaces"> | null = null;
+    for await (const space of ctx.db
       .query("spaces")
-      .withIndex("by_user_and_name", (q) =>
-        q.eq("userId", userId).eq("name", name),
-      )
-      .first();
+      .withIndex("by_user", (q) => q.eq("userId", userId))) {
+      if (cityKey(space.name) === key) {
+        existing = space;
+        break;
+      }
+    }
     const spaceId =
       existing?._id ??
       (await ctx.db.insert("spaces", {
@@ -314,7 +326,8 @@ export const ensureCitySpace = authedMutation({
         autoFile: false,
         ...emptySummary(),
       }));
-    for (const item of saves) {
+    // Oldest first, so planners that read the newest memberships keep the recent saves.
+    for (const item of [...saves].reverse()) {
       if ((await getMembership(ctx, item._id, spaceId)) === null) {
         await insertMembership(ctx, {
           userId,

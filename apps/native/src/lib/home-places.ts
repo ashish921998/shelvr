@@ -1,10 +1,12 @@
+import { cityKey } from "@convex/model/trip";
+
 const VISIBLE_CITIES = 4;
 const MAX_SPACE_ROWS = 6;
 
 export type City = { city: string; count: number; cover: string | null };
 
-const sameName = (a: string, b: string) =>
-  a.trim().toLowerCase() === b.trim().toLowerCase();
+// The same key listCities groups by and ensureCitySpace matches on.
+const sameName = (a: string, b: string) => cityKey(a) === cityKey(b);
 
 /** The cities to draw now, and how many the "+ n more" tile stands for. */
 export function visibleCities(

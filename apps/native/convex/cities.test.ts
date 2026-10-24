@@ -143,6 +143,54 @@ describe("ensureCitySpace", () => {
     expect(joins.every((j) => j.status === "saved")).toBe(true);
   });
 
+  it("files saves oldest first", async () => {
+    const { base, t, save, userId } = await setup();
+    const older = await save(userId, { title: "a", cities: ["Lisbon"] });
+    const newer = await save(userId, { title: "b", cities: ["Lisbon"] });
+    const spaceId = await t.mutation(api.spaces.ensureCitySpace, {
+      city: "Lisbon",
+    });
+    const { joins } = await members(base, spaceId);
+    expect(joins.map((j) => j.itemId)).toEqual([older, newer]);
+  });
+
+  it("reuses the city's space whatever its spelling", async () => {
+    const { base, t, save, userId } = await setup();
+    await save(userId, { title: "a", cities: ["Lisbon"] });
+    const spaceId = await base.run((ctx) =>
+      ctx.db.insert("spaces", { userId, name: "lisbon", dynamic: false }),
+    );
+    expect(
+      await t.mutation(api.spaces.ensureCitySpace, { city: " LISBON " }),
+    ).toBe(spaceId);
+    const spaces = await base.run((ctx) =>
+      ctx.db
+        .query("spaces")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+    );
+    expect(spaces).toHaveLength(1);
+  });
+
+  it("creates no space for a city with no ready saves", async () => {
+    const { base, t, save, userId } = await setup();
+    await save(userId, {
+      title: "a",
+      cities: ["Lisbon"],
+      status: "processing",
+    });
+    await expect(
+      t.mutation(api.spaces.ensureCitySpace, { city: "Lisbon" }),
+    ).rejects.toThrow(/city_empty/);
+    const spaces = await base.run((ctx) =>
+      ctx.db
+        .query("spaces")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+    );
+    expect(spaces).toHaveLength(0);
+  });
+
   it("leaves dismissed and suggested memberships as they are", async () => {
     const { base, t, save, userId } = await setup();
     const dismissed = await save(userId, { title: "d", cities: ["Lisbon"] });

@@ -10,7 +10,7 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -74,8 +74,11 @@ export default function CityScreen() {
   const loaded = items.data !== undefined;
   const count = items.data?.length ?? 0;
 
+  const opened = useRef(false);
   useEffect(() => {
-    if (loaded) analytics.capture("city_opened", { count });
+    if (!loaded || opened.current) return;
+    opened.current = true;
+    analytics.capture("city_opened", { count });
   }, [loaded, count]);
 
   if (items.data === undefined) return <ScreenLoader />;
@@ -96,18 +99,20 @@ export default function CityScreen() {
               cover={entry?.cover ?? null}
               height={COVER_HEIGHT}
             />
-            <View style={styles.plans}>
-              <PlanButton
-                kind="date"
-                busy={busy}
-                onPress={() => void start("date")}
-              />
-              <PlanButton
-                kind="trip"
-                busy={busy}
-                onPress={() => void start("trip")}
-              />
-            </View>
+            {count > 0 ? (
+              <View style={styles.plans}>
+                <PlanButton
+                  kind="date"
+                  busy={busy}
+                  onPress={() => void start("date")}
+                />
+                <PlanButton
+                  kind="trip"
+                  busy={busy}
+                  onPress={() => void start("trip")}
+                />
+              </View>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => <SaveRow item={item} />}
