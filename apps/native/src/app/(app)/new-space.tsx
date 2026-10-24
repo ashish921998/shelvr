@@ -149,7 +149,10 @@ function SpaceForm(props: SpaceFormProps) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       // The sheet may have been swiped away while the save ran.
-      if (!navigation.isFocused()) return;
+      if (!navigation.isFocused()) {
+        setSaving(false);
+        return;
+      }
       if (createdId) {
         router.replace({ pathname: "/space/[id]", params: { id: createdId } });
       } else {
