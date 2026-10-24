@@ -341,13 +341,8 @@ function useInvocationHandler() {
     switch (invocation.name) {
       case "search": {
         await whenNavigationReady();
-        router.navigate({
-          pathname: "/(app)/(tabs)/(search)",
-          params: {
-            q: param(invocation, "query") ?? "",
-            t: String(invocation.createdAt),
-          },
-        });
+        // Search left the tab bar; the intent opens Home, where the cities are.
+        router.navigate("/(app)/(tabs)/(home)");
         return;
       }
       case "openItem": {
