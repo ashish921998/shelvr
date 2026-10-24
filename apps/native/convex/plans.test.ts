@@ -139,7 +139,7 @@ describe("makePlan", () => {
     });
   });
 
-  it("ranks a place the user marked We went last, tagged been", async () => {
+  it("leaves out a place the user marked We went", async () => {
     const { t, spaceId, itemIds } = await setup([
       { title: "Tigre is the moodiest bar in town" },
       { title: "Sweet Linda for natural wine" },
@@ -166,7 +166,6 @@ describe("makePlan", () => {
     );
     expect(plan.places).toEqual([
       { name: "Sweet Linda", why: "Wine", itemId: itemIds[1] },
-      { name: "TIGRE", why: "Moody", itemId: itemIds[0], been: true },
     ]);
   });
 

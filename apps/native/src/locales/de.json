@@ -723,6 +723,7 @@
   "goal.citySomewhere": "Woanders",
   "goal.citySearch": "Städte suchen",
   "homePlaces.yourCities": "Deine Städte",
+  "homePlaces.citiesHint": "Orte aus den Reels und TikToks, die du gespeichert hast",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} Spot",
     "other": "%{formattedCount} Spots"
@@ -739,6 +740,10 @@
   "homePlaces.planDateHint": "Ein Abend, ein paar Stopps",
   "homePlaces.planTrip": "Reise planen",
   "homePlaces.planTripHint": "Tag für Tag",
+  "cityMap.placesFromSaves": {
+    "one": "%{formattedCount} Ort aus deinen Inhalten",
+    "other": "%{formattedCount} Orte aus deinen Inhalten"
+  },
   "opener.tagline": "Speichere die Orte. Wir planen das Date oder die Reise.",
   "onboardingQ.skip": "Überspringen",
   "onboardingQ.savedTitle": "Wie viele Orte hast du schon gespeichert?",

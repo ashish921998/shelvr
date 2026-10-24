@@ -162,11 +162,7 @@ function AppStack() {
           />
           <Stack.Screen
             name="city/[name]"
-            options={{
-              scrollEdgeEffects: { top: "soft" },
-              title: "",
-              headerBackButtonDisplayMode: "minimal",
-            }}
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}

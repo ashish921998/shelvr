@@ -4,7 +4,6 @@ import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { SetupChecklist } from "@/components/home/setup-checklist";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
-import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
@@ -34,7 +33,7 @@ import {
   useCallback,
   useState,
 } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 function nudgeSheetReady(
@@ -123,7 +122,7 @@ function HomeSheets({
 
 export default function HomeScreen() {
   useAppLocale();
-  const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
+  const { items } = useHomeFeed();
 
   const cancelSurvey = useCancelSurvey();
   const entitlement = useEntitlement();
@@ -238,28 +237,17 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <MasonryFeed
-        items={items}
-        numColumns={2}
-        source={{ from: "home" }}
-        onEndReached={canLoadMore ? loadMore : undefined}
-        loadingMore={loadingMore}
-        // Inside the feed so contentInsetAdjustmentBehavior clears the blur
-        // header on iOS.
-        ListHeaderComponent={
-          <View>
-            <HomePlaces />
-            {cancelSurveyCard ??
-              howToHeader ??
-              progressCard ??
-              recallCard ??
-              lastHeader(feedback, busySaving, nextUpCard)}
-            <Text style={[styles.shelfLabel, styles.feedLabel]}>
-              {t("homePlaces.everythingSaved")}
-            </Text>
-          </View>
-        }
-      />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.cities}
+      >
+        {cancelSurveyCard ??
+          howToHeader ??
+          progressCard ??
+          recallCard ??
+          lastHeader(feedback, busySaving, nextUpCard)}
+        <HomePlaces />
+      </ScrollView>
       <HeaderScrim />
       {nudge}
       {feedback.modalOpen ? (
@@ -329,21 +317,14 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(1.5),
   },
-  shelfLabel: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.faint,
-  },
+
   emptyPlaces: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: theme.gap(2),
   },
-  feedLabel: {
-    paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(2),
-    paddingBottom: theme.gap(1),
+  cities: {
+    paddingTop: theme.gap(1),
+    paddingBottom: theme.gap(12),
   },
 }));

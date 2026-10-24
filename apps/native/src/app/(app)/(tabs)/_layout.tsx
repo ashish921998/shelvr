@@ -28,28 +28,12 @@ export default function TabsLayout() {
             {t("navigation.home")}
           </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="(spaces)">
-          <NativeTabs.Trigger.Icon
-            sf={{
-              default: "rectangle.stack",
-              selected: "rectangle.stack.fill",
-            }}
-          />
-          <NativeTabs.Trigger.Label>
-            {t("navigation.spaces")}
-          </NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
         <NativeTabs.Trigger name="(map)">
           <NativeTabs.Trigger.Icon
             sf={{ default: "map", selected: "map.fill" }}
           />
           <NativeTabs.Trigger.Label>
             {t("navigation.map")}
-          </NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="(search)" role="search">
-          <NativeTabs.Trigger.Label>
-            {t("navigation.search")}
           </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
       </NativeTabs>

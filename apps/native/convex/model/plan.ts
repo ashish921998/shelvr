@@ -274,7 +274,7 @@ function withoutAddress(name: string, evidence: Evidence): string {
   return short !== "" && namesPlace(short, evidence) ? short : name;
 }
 
-/** Keeps deduped picks that point at a real save naming the place; places in `been` go last, tagged. */
+/** Keeps deduped picks that point at a real save naming the place; places in `been` are left out unless nothing else is left, then kept tagged. */
 export function sanitizePicks<T extends RawPlanPlace>(
   raw: T[],
   sources: PlanSource[],
@@ -307,10 +307,8 @@ export function sanitizePicks<T extends RawPlanPlace>(
       },
     });
   }
-  return [
-    ...kept.filter(({ place }) => !place.been),
-    ...kept.filter(({ place }) => place.been),
-  ].slice(0, limit);
+  const fresh = kept.filter(({ place }) => !place.been);
+  return (fresh.length > 0 ? fresh : kept).slice(0, limit);
 }
 
 export function sanitizePlan(

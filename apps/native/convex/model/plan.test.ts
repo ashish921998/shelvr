@@ -425,7 +425,7 @@ describe("sanitizePlan", () => {
     expect(street.name).toBe("The Palomar");
   });
 
-  it("caps the shortlist after visited places move last", () => {
+  it("leaves out visited places while an unvisited one is left", () => {
     const sources = Array.from({ length: 6 }, (_, i) =>
       source({ itemId: `item${i}` as Id<"items">, title: `Spot${i} dinner` }),
     );
@@ -437,9 +437,16 @@ describe("sanitizePlan", () => {
     }));
     const been = new Set([0, 1, 2, 3, 4].map((i) => placeKey(`Spot${i}`)));
     const places = sanitizePlan(raw, sources, been);
-    expect(places).toHaveLength(5);
+    expect(places).toHaveLength(1);
     expect(places[0]).toMatchObject({ name: "Spot5" });
     expect(places[0].been).toBeUndefined();
+  });
+
+  it("keeps visited places, tagged, when every pick is one", () => {
+    const sources = [source({ title: "Spot0 dinner" })];
+    const raw = [{ saveNumber: 1, name: "Spot0", area: "", why: "Good" }];
+    const places = sanitizePlan(raw, sources, new Set([placeKey("Spot0")]));
+    expect(places).toEqual([expect.objectContaining({ been: true })]);
   });
 
   it("keeps the address when the name before it proves nothing alone", () => {
