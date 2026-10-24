@@ -104,6 +104,19 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Booting takes 2 to 4 minutes and needs nothing from this checkout, so
+      # it starts here and runs under the install and cache restores. The
+      # flows run on any iPhone; the runtime is the newest the image has.
+      - name: Create a simulator and start it booting
+        run: |
+          runtime=$(xcrun simctl list runtimes available -j | node -p '
+            JSON.parse(require("fs").readFileSync(0)).runtimes
+              .filter((r) => r.platform === "iOS").at(-1).identifier')
+          echo "runtime $runtime"
+          udid=$(xcrun simctl create e2e "iPhone 17" "$runtime")
+          xcrun simctl boot "$udid"
+          echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -167,17 +180,12 @@ jobs:
           path: ~/.agent-device
           key: ${{ steps.fingerprint.outputs.runner-key }}
 
-      # The flows run on any iPhone; the runtime is the newest the image has.
-      - name: Boot a simulator and install the build
+      # The simulator was started at the top of the job; bootstatus waits for
+      # the boot to finish before the build goes onto it.
+      - name: Install the build
         run: |
-          runtime=$(xcrun simctl list runtimes available -j | node -p '
-            JSON.parse(require("fs").readFileSync(0)).runtimes
-              .filter((r) => r.platform === "iOS").at(-1).identifier')
-          echo "runtime $runtime"
-          udid=$(xcrun simctl create e2e "iPhone 17" "$runtime")
-          xcrun simctl bootstatus "$udid" -b
-          xcrun simctl install "$udid" apps/native/build/e2e/ShelvrDev.app
-          echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
+          xcrun simctl bootstatus "$E2E_DEVICE" -b
+          xcrun simctl install "$E2E_DEVICE" apps/native/build/e2e/ShelvrDev.app
 
       # A cold runner build can outlast the budget e2e gives the engine to
       # start (seen: "boot failed: Daemon request timed out"), so it is built
