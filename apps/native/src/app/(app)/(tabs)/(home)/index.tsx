@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ProCard } from "@/components/home/pro-card";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
@@ -21,8 +22,16 @@ import {
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { welcomeSave } from "@/lib/welcome-save";
-import { ScrollView, View } from "react-native";
+import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  ScrollView,
+  View,
+} from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+
+// Older saves with no place sit past the first feed page, so Home pages on like a list would.
+const LOAD_MORE_DISTANCE = 600;
 
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
@@ -30,7 +39,14 @@ function trialEnd(entitlement: Entitlement): number | undefined {
 
 export default function HomeScreen() {
   useAppLocale();
-  const { items } = useHomeFeed();
+  const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const shortOfScreen =
+    viewportHeight > 0 && contentHeight < viewportHeight + LOAD_MORE_DISTANCE;
+  useEffect(() => {
+    if (shortOfScreen && canLoadMore && !loadingMore) loadMore();
+  }, [shortOfScreen, canLoadMore, loadingMore, loadMore, items?.length]);
   const cancelSurvey = useCancelSurvey();
   const entitlement = useEntitlement();
   const locked = !entitlement.loading && !entitlement.entitled;
@@ -70,6 +86,18 @@ export default function HomeScreen() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
+        scrollEventThrottle={200}
+        onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, height) => setContentHeight(height)}
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          const { layoutMeasurement, contentOffset, contentSize } =
+            e.nativeEvent;
+          if (
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - LOAD_MORE_DISTANCE
+          )
+            loadMore();
+        }}
       >
         {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
         {items.length > 0 ? (

@@ -21,6 +21,8 @@ export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const { width } = rt.screen;
+  // A save can name several places; a tapped pin focuses itself, a row its save's first pin.
+  const [tappedPin, setTappedPin] = useState<number | null>(null);
 
   const fit = useMemo(
     () =>
@@ -39,14 +41,18 @@ export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
     [pins, width, height, rt.insets.top, theme],
   );
   const focus = useMemo(() => {
-    const pin = pins.find((p) => p.itemId === selected);
+    const tapped = tappedPin === null ? undefined : pins[tappedPin];
+    const pin =
+      tapped?.itemId === selected
+        ? tapped
+        : pins.find((p) => p.itemId === selected);
     return pin
       ? {
           coordinates: { latitude: pin.lat, longitude: pin.lng },
           zoom: SELECTED_ZOOM,
         }
       : undefined;
-  }, [pins, selected]);
+  }, [pins, selected, tappedPin]);
   const standard = focus ?? fit;
   const camera = useMemo(
     () =>
@@ -90,8 +96,10 @@ export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
     };
   });
   const select = (id: string | undefined) => {
-    const itemId = (id ?? "").split(":")[0];
-    if (itemId) onSelect(itemId);
+    const [itemId, index] = (id ?? "").split(":");
+    if (!itemId) return;
+    setTappedPin(Number(index));
+    onSelect(itemId);
   };
 
   if (process.env.EXPO_OS === "ios") {
