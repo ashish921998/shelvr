@@ -847,7 +847,13 @@ export const setMembershipIntentsInternal = internalMutation({
     if (!(await aiAllowed(ctx, row.userId))) {
       return null;
     }
+    const hadPlace = (row.intents ?? []).some((i) => i.kind === "open_maps");
     await ctx.db.patch(row._id, { intents: args.intents });
+    if (hadPlace || args.intents.some((i) => i.kind === "open_maps")) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     return null;
   },
 });

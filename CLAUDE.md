@@ -271,6 +271,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   with no saved place shows as a gap; the trip never adds a place the saves do not name.
   `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
   reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
+- **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names. `locateItem` looks each
+  `open_maps` intent value (the save's own and its spaces') up in Apple Maps and `storePins` writes at most five,
+  dropping any place no longer named. Scheduled from `finalizeItem` and from steering; `backfillPage` fills
+  older saves, run by hand. Skipped when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
