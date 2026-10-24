@@ -72,10 +72,12 @@ export const toLocate = internalQuery({
     if (item === null || item.status !== "ready") return null;
     if (!(await aiAllowed(ctx, item.userId))) return null;
     const pinned = new Set((item.placePins ?? []).map((p) => placeKey(p.name)));
-    const names = [...(await wantedPlaces(ctx, item))]
+    const wanted = [...(await wantedPlaces(ctx, item))];
+    const kept = wanted.filter(([key]) => pinned.has(key)).length;
+    const names = wanted
       .filter(([key]) => !pinned.has(key))
       .map(([, name]) => name)
-      .slice(0, MAX_PINS);
+      .slice(0, Math.max(0, MAX_PINS - kept));
     return { names, city: item.cities?.[0] };
   },
 });
@@ -180,9 +182,11 @@ export const backfillPage = internalMutation({
       );
     }
     if (!isDone) {
-      await ctx.scheduler.runAfter(0, internal.placePins.backfillPage, {
-        cursor: continueCursor,
-      });
+      await ctx.scheduler.runAfter(
+        todo.length * BACKFILL_STAGGER_MS,
+        internal.placePins.backfillPage,
+        { cursor: continueCursor },
+      );
     }
     return null;
   },

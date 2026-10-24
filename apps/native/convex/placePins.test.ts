@@ -165,6 +165,19 @@ describe("placePins", () => {
     expect(await pins()).toHaveLength(5);
   });
 
+  it("does not look up places once five are already pinned", async () => {
+    const { queries } = await withMaps();
+    const names = ["A1", "B2", "C3", "D4", "E5", "F6", "G7"];
+    const { t, itemId } = await setup(names);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: names.slice(0, 5).map((name) => ({ name, lat: 1, lng: 1 })),
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries()).toEqual([]);
+  });
+
   it("reads places from a space's steered intents too", async () => {
     const { queries } = await withMaps();
     const { t, itemId, pins } = await setup([]);
