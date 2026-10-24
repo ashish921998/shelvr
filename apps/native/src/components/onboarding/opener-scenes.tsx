@@ -4,8 +4,14 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { PHONE_CUT } from "@/components/onboarding/opener-phone";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { Image } from "expo-image";
-import { useState } from "react";
-import { Text, View, type LayoutChangeEvent } from "react-native";
+import { useState, type ComponentProps, type ReactNode } from "react";
+import {
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -157,7 +163,7 @@ export function FiledToast() {
   );
 }
 
-type Point = { x: number; y: number };
+export type Point = { x: number; y: number };
 
 const PINS: Point[] = [
   { x: 0.26, y: 0.3 },
@@ -174,7 +180,7 @@ const BLOCKS = [
   { left: "32%", top: "52%", width: "14%", height: "16%" },
 ] as const;
 
-const STOPS: { slot: TextMessageKey; name: TextMessageKey }[] = [
+const STOPS: SceneStop[] = [
   { slot: "onboarding.sceneMorning", name: "onboarding.sceneMiradouro" },
   { slot: "onboarding.sceneLunch", name: "onboarding.sceneTimeOut" },
   { slot: "onboarding.sceneAfternoon", name: "onboarding.sceneLxFactory" },
@@ -201,66 +207,117 @@ function routeDots(points: Point[], width: number, height: number): Point[] {
   return dots;
 }
 
-export function PlanScene(_props: SceneProps) {
-  useAppLocale();
-  const [map, setMap] = useState({ width: 0, height: 0 });
-  const onMapLayout = (event: LayoutChangeEvent) => {
+export type MapSize = { width: number; height: number };
+
+/** The drawn city map the opener and sign-in share: blocks, a river, and whatever the caller puts on it once its size is known. */
+export function SceneMap({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: (size: MapSize) => ReactNode;
+}) {
+  const [size, setSize] = useState<MapSize>({ width: 0, height: 0 });
+  const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
-    setMap((current) =>
+    setSize((current) =>
       current.width === width && current.height === height
         ? current
         : { width, height },
     );
   };
   return (
+    <View style={[styles.map, style]} onLayout={onLayout}>
+      {BLOCKS.map((block, index) => (
+        <View key={index} style={[styles.block, block]} />
+      ))}
+      <View style={styles.river} />
+      {size.width > 0 ? children(size) : null}
+    </View>
+  );
+}
+
+/** A numbered pin at `point`, a fraction of the map. */
+export function MapPin({
+  number,
+  point,
+  style,
+}: {
+  number: number;
+  point: Point;
+  style?: ComponentProps<typeof Animated.View>["style"];
+}) {
+  return (
+    <Animated.View
+      style={[
+        styles.pin,
+        { left: `${point.x * 100}%`, top: `${point.y * 100}%` },
+        style,
+      ]}
+    >
+      <Text style={styles.pinText}>{number}</Text>
+    </Animated.View>
+  );
+}
+
+export type SceneStop = { slot: TextMessageKey; name: TextMessageKey };
+
+/** A titled list of stops: the time of day, then the place. */
+export function DayStops({
+  title,
+  stops,
+}: {
+  title: TextMessageKey;
+  stops: readonly SceneStop[];
+}) {
+  return (
+    <View style={styles.dayStops}>
+      <Text style={styles.dayTitle}>{t(title)}</Text>
+      {stops.map((stop) => (
+        <View key={stop.slot} style={styles.stop}>
+          <Text
+            style={styles.stopSlot}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {t(stop.slot)}
+          </Text>
+          <Text
+            style={styles.stopName}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
+            {t(stop.name)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function PlanScene(_props: SceneProps) {
+  useAppLocale();
+  return (
     <View style={styles.appScreen}>
-      <View style={styles.map} onLayout={onMapLayout}>
-        {BLOCKS.map((block, index) => (
-          <View key={index} style={[styles.block, block]} />
-        ))}
-        <View style={styles.river} />
-        {map.width > 0
-          ? routeDots(PINS, map.width, map.height).map((dot, index) => (
+      <SceneMap>
+        {({ width, height }) => (
+          <>
+            {routeDots(PINS, width, height).map((dot, index) => (
               <View
                 key={index}
                 style={[styles.routeDot, { left: dot.x, top: dot.y }]}
               />
-            ))
-          : null}
-        {PINS.map((pin, index) => (
-          <View
-            key={index}
-            style={[
-              styles.pin,
-              { left: `${pin.x * 100}%`, top: `${pin.y * 100}%` },
-            ]}
-          >
-            <Text style={styles.pinText}>{index + 1}</Text>
-          </View>
-        ))}
-      </View>
+            ))}
+            {PINS.map((pin, index) => (
+              <MapPin key={index} number={index + 1} point={pin} />
+            ))}
+          </>
+        )}
+      </SceneMap>
       <View style={styles.day}>
-        <Text style={styles.dayTitle}>{t("onboarding.sceneDayTitle")}</Text>
-        {STOPS.map((stop) => (
-          <View key={stop.slot} style={styles.stop}>
-            <Text
-              style={styles.stopSlot}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {t(stop.slot)}
-            </Text>
-            <Text
-              style={styles.stopName}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-            >
-              {t(stop.name)}
-            </Text>
-          </View>
-        ))}
+        <DayStops title="onboarding.sceneDayTitle" stops={STOPS} />
       </View>
     </View>
   );
@@ -474,6 +531,8 @@ const styles = StyleSheet.create((theme) => ({
   day: {
     paddingTop: theme.gap(1.5),
     paddingBottom: PHONE_CUT + theme.gap(6),
+  },
+  dayStops: {
     gap: theme.gap(0.75),
   },
   dayTitle: {

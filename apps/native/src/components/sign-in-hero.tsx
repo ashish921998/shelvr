@@ -1,14 +1,22 @@
+import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { PhoneFrame } from "@/components/onboarding/opener-phone";
+import {
+  DayStops,
+  MapPin,
+  SceneMap,
+  type MapSize,
+  type Point,
+  type SceneStop,
+} from "@/components/onboarding/opener-scenes";
 import { splashTheme } from "@/components/splash/timeline";
 import { isDarkThemeName } from "@/lib/appearance";
 import { t, useAppLocale } from "@/lib/i18n";
-import { easeInOut, span } from "@/lib/splash/composition";
-import type { TextMessageKey } from "@/locales/message-types";
+import { easeInOut, span, threadJitter } from "@/lib/splash/composition";
 import { Canvas, Path, Skia, type SkPath } from "@shopify/react-native-skia";
 import { Image } from "expo-image";
-import { useEffect, useMemo, useState } from "react";
-import { Text, View, type LayoutChangeEvent } from "react-native";
-import Animated, {
+import { useEffect, useMemo } from "react";
+import { Text, View } from "react-native";
+import {
   Easing,
   useAnimatedStyle,
   useDerivedValue,
@@ -20,8 +28,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-type Point = { x: number; y: number };
-
 // One pin per stop, in the order the evening goes.
 const PINS: Point[] = [
   { x: 0.24, y: 0.32 },
@@ -29,22 +35,15 @@ const PINS: Point[] = [
   { x: 0.7, y: 0.68 },
 ];
 
-const BLOCKS = [
-  { left: "6%", top: "8%", width: "26%", height: "18%" },
-  { left: "40%", top: "6%", width: "32%", height: "14%" },
-  { left: "8%", top: "44%", width: "20%", height: "22%" },
-  { left: "50%", top: "38%", width: "40%", height: "18%" },
-] as const;
-
-const STOPS: { slot: TextMessageKey; name: TextMessageKey }[] = [
+const STOPS: SceneStop[] = [
   { slot: "signInScene.sunset", name: "onboarding.sceneMiradouro" },
   { slot: "signInScene.dinner", name: "onboarding.sceneTimeOut" },
   { slot: "signInScene.dessert", name: "onboarding.scenePasteis" },
 ];
 
 const REELS = [
-  require("../../assets/onboarding/city-lisbon-view.jpg"),
-  require("../../assets/onboarding/city-lisbon-food.jpg"),
+  CITY_PICTURES.lisbon.view,
+  CITY_PICTURES.lisbon.food,
   require("../../assets/onboarding/prague.jpg"),
 ];
 
@@ -54,8 +53,8 @@ const THREAD_MS = 1400;
 const THREAD_DELAY_MS = 300;
 const SAMPLES_PER_LEG = 36;
 
-/** A hand-drawn thread through the pins: each leg bows a little and wobbles like the splash's. */
-function threadPath(points: Point[], width: number, height: number): SkPath {
+/** A thread through the pins: each leg bows a little and trembles like the splash's. */
+function threadPath(points: Point[], { width, height }: MapSize): SkPath {
   const path = Skia.PathBuilder.Make();
   const at = points.map((p) => ({ x: p.x * width, y: p.y * height }));
   path.moveTo(at[0].x, at[0].y);
@@ -74,98 +73,79 @@ function threadPath(points: Point[], width: number, height: number): SkPath {
         (1 - k) ** 2 * from.x + 2 * (1 - k) * k * control.x + k ** 2 * to.x;
       const y =
         (1 - k) ** 2 * from.y + 2 * (1 - k) * k * control.y + k ** 2 * to.y;
-      path.lineTo(
-        x + 0.7 * Math.sin(step * 0.61 + 1) + 0.4 * Math.sin(step * 1.73),
-        y + 0.5 * Math.cos(step * 0.83),
-      );
+      path.lineTo(x + threadJitter(step), y);
     }
   }
   return path.detach();
 }
 
-function Pin({
+/** A pin that pops in as the thread reaches it. */
+function ThreadPin({
   index,
-  pin,
   drawn,
 }: {
   index: number;
-  pin: Point;
   drawn: SharedValue<number>;
 }) {
-  // The thread reaches pin `index` at this share of its length.
   const reachedAt = index / (PINS.length - 1);
   const style = useAnimatedStyle(() => {
     const shown = span(drawn.get(), reachedAt - 0.1, reachedAt);
     return { opacity: shown, transform: [{ scale: 0.6 + 0.4 * shown }] };
   });
+  return <MapPin number={index + 1} point={PINS[index]} style={style} />;
+}
+
+function Thread({
+  size,
+  drawn,
+}: {
+  size: MapSize;
+  drawn: SharedValue<number>;
+}) {
+  const { rt } = useUnistyles();
+  const path = useMemo(() => threadPath(PINS, size), [size]);
   return (
-    <Animated.View
-      style={[
-        styles.pin,
-        { left: `${pin.x * 100}%`, top: `${pin.y * 100}%` },
-        style,
-      ]}
-    >
-      <Text style={styles.pinText}>{index + 1}</Text>
-    </Animated.View>
+    <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Path
+        path={path}
+        style="stroke"
+        strokeWidth={THREAD_WIDTH}
+        strokeCap="round"
+        strokeJoin="round"
+        color={splashTheme(isDarkThemeName(rt.themeName)).palette.thread}
+        start={0}
+        end={drawn}
+      />
+    </Canvas>
   );
 }
 
 function RouteMap() {
-  const { rt } = useUnistyles();
   const reduced = useReducedMotion();
-  const [size, setSize] = useState({ width: 0, height: 0 });
   const clock = useSharedValue(reduced ? 1 : 0);
   const drawn = useDerivedValue(() => easeInOut(clock.get()));
-  const thread = useMemo(
-    () => (size.width > 0 ? threadPath(PINS, size.width, size.height) : null),
-    [size.width, size.height],
-  );
 
   useEffect(() => {
-    if (size.width === 0 || reduced) return;
+    if (reduced) return;
     clock.set(
       withDelay(
         THREAD_DELAY_MS,
         withTiming(1, { duration: THREAD_MS, easing: Easing.linear }),
       ),
     );
-  }, [size.width, reduced, clock]);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setSize((current) =>
-      current.width === width && current.height === height
-        ? current
-        : { width, height },
-    );
-  };
-  const palette = splashTheme(isDarkThemeName(rt.themeName)).palette;
+  }, [reduced, clock]);
 
   return (
-    <View style={styles.map} onLayout={onLayout}>
-      {BLOCKS.map((block, index) => (
-        <View key={index} style={[styles.block, block]} />
-      ))}
-      <View style={styles.river} />
-      {thread ? (
-        <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Path
-            path={thread}
-            style="stroke"
-            strokeWidth={THREAD_WIDTH}
-            strokeCap="round"
-            strokeJoin="round"
-            color={palette.thread}
-            start={0}
-            end={drawn}
-          />
-        </Canvas>
-      ) : null}
-      {PINS.map((pin, index) => (
-        <Pin key={index} index={index} pin={pin} drawn={drawn} />
-      ))}
-    </View>
+    <SceneMap style={styles.map}>
+      {(size) => (
+        <>
+          <Thread size={size} drawn={drawn} />
+          {PINS.map((_, index) => (
+            <ThreadPin key={index} index={index} drawn={drawn} />
+          ))}
+        </>
+      )}
+    </SceneMap>
   );
 }
 
@@ -191,37 +171,13 @@ export function SignInHero() {
             {t("signInScene.fromReels")}
           </Text>
         </View>
-        <View style={styles.day}>
-          <Text style={styles.dayTitle}>{t("signInScene.dateTitle")}</Text>
-          {STOPS.map((stop) => (
-            <View key={stop.slot} style={styles.stop}>
-              <Text
-                style={styles.stopSlot}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {t(stop.slot)}
-              </Text>
-              <Text
-                style={styles.stopName}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.85}
-              >
-                {t(stop.name)}
-              </Text>
-            </View>
-          ))}
-        </View>
+        <DayStops title="signInScene.dateTitle" stops={STOPS} />
       </View>
     </PhoneFrame>
   );
 }
 
-const PIN = 22;
 const REEL = 32;
-const MAP_HEIGHT = 112;
 
 const styles = StyleSheet.create((theme) => ({
   // Pinned to the top so the scene never sets the frame's height: the frame
@@ -244,46 +200,11 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.muted,
   },
   map: {
-    height: MAP_HEIGHT,
-    marginTop: theme.gap(1),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    overflow: "hidden",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  block: {
-    position: "absolute",
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.surface,
-  },
-  river: {
-    position: "absolute",
-    left: "-10%",
-    right: "-10%",
-    bottom: "-8%",
-    height: "20%",
-    transform: [{ rotate: "-7deg" }],
-    backgroundColor: theme.colors.border,
-  },
-  pin: {
-    position: "absolute",
-    width: PIN,
-    height: PIN,
-    marginLeft: -PIN / 2,
-    marginTop: -PIN / 2,
-    borderRadius: PIN / 2,
-    borderWidth: 2,
-    borderColor: theme.colors.frame,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.primary,
-  },
-  pinText: {
-    ...theme.type.badge,
-    color: theme.colors.onTint,
+    flex: 0,
+    height: 120,
   },
   reels: {
-    marginTop: theme.gap(1),
+    marginVertical: theme.gap(1),
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(0.75),
@@ -300,30 +221,5 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.finePrint,
     flex: 1,
     color: theme.colors.muted,
-  },
-  day: {
-    paddingTop: theme.gap(1),
-    gap: theme.gap(0.75),
-  },
-  dayTitle: {
-    ...theme.type.labelStrong,
-    color: theme.colors.foreground,
-  },
-  stop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
-  },
-  stopSlot: {
-    ...theme.type.badge,
-    width: 64,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    color: theme.colors.primaryText,
-  },
-  stopName: {
-    ...theme.type.captionLabel,
-    flex: 1,
-    color: theme.colors.foreground,
   },
 }));
