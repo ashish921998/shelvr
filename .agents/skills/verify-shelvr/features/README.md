@@ -5,7 +5,7 @@ view. Each names the test that pins it, the locators that matter, the proof,
 and its bug-bash charters. Every test but onboarding starts on the seeded
 Home (`startOnSeededHome` in `tools/e2e/tests/seeded-home.ts`); onboarding
 launches as a fresh install (`-E2EFreshInstall YES`) and starts at "Get started". Not mapped yet:
-Tidy, Map, link and photo pages, sharing, settings, notifications. Map them when a change touches them.
+Map, link and photo pages, sharing, settings, notifications. Map them when a change touches them.
 
 | Feature                           | Where                                       | Test                                                          | Status                                     |
 | --------------------------------- | ------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------ |

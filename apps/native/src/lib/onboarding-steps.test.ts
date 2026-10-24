@@ -30,25 +30,25 @@ describe("previousOnboardingStep", () => {
     ["goal", "savedCount"],
     ["planner", "goal"],
     ["city", "planner"],
+    ["ahaShare", "city"],
+    ["ahaSpots", "ahaShare"],
+    ["ahaPlan", "ahaSpots"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
 
-  it.each(["opener", "ahaShare", "ahaSpots", "ahaPlan", "reminder"] as const)(
-    "leaves %s without a step to go back to, so the sample never replays",
-    (step) => {
-      expect(previousOnboardingStep(step)).toBeNull();
-    },
-  );
+  it("leaves the opener without a step to go back to", () => {
+    expect(previousOnboardingStep("opener")).toBeNull();
+  });
 });
 
 describe("nextOnboardingStep", () => {
-  it("walks the questions, the city and the sample, then asks about the reminder", () => {
+  it("walks the questions, the city and the sample, and stays on the sample plan", () => {
     const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
     while (walked.length < ONBOARDING_STEPS.length)
       walked.push(nextOnboardingStep(walked[walked.length - 1]));
     expect(walked).toEqual([...ONBOARDING_STEPS]);
-    expect(nextOnboardingStep("reminder")).toBe("reminder");
+    expect(nextOnboardingStep("ahaPlan")).toBe("ahaPlan");
   });
 });
 

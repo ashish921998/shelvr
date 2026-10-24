@@ -1,8 +1,10 @@
 # Onboarding
 
 A new account answers three short questions, picks a city, sees one sample
-reel turned into a plan, answers the trial reminder, then meets the paywall.
-The opener carries an "Already have an account? Sign in" link for returning
+reel turned into a plan, then meets the paywall.
+The opener is three pages that swipe (on their own until a swipe, never with
+Reduce Motion), each with "Get started"
+and an "Already have an account? Sign in" link for returning
 people; a new account stays signed out through the paywall and signs in
 after it.
 
@@ -11,16 +13,16 @@ after it.
 - "Get started" opens "How many spots have you saved already?"; then "What
   do you want to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
   `A bit of everything`) and "How do you like to plan?". Each has Continue
-  (disabled until an answer) and "Skip" in the header.
+  (disabled until an answer) and "Skip" in the header. Every step after the
+  opener has a back button.
 - "Pick a city to try it with" is a photo grid; "Skip" or "Somewhere else"
   uses Prague.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to
   "Found 3 spots in that reel" (Continue enables once the pins land), then
-  "Your date night in Prague" and "Save your own spots".
-- "We'll remind you before it ends" asks 1, 2 or 3 days; "Not now" or
-  Continue asks for the paywall. Skipped when notifications are settled.
-- The paywall has no close. A relaunch comes back to the reminder step,
-  signed out, and "Not now" opens the paywall again.
+  "Your date night in Prague" and "Save your own spots", which asks for the
+  paywall. Notification permission is asked after a trial starts, not here.
+- The paywall has no close. A relaunch comes back to the sample plan,
+  signed out, and "Save your own spots" opens the paywall again.
 
 ## How to get to it (user POV)
 
@@ -42,15 +44,15 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After a relaunch from the paywall, the reminder step's "Not now" is back with
-the splash gone and `dev-login-button` hidden, and it opens the paywall again.
+After a relaunch from the paywall, "Save your own spots" is back with the
+splash gone and `dev-login-button` hidden, and it opens the paywall again.
 No purchase is made.
 
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the reminder and the paywall; relaunch, and check the step is kept, nothing signs in, and the paywall opens again
-onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots, the date-night plan and the reminder show before the paywall
+onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the sample plan and the paywall; relaunch, and check the step is kept, nothing signs in, and the paywall opens again
+onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots and the date-night plan show before the paywall
 ```
 
 ## Gotchas

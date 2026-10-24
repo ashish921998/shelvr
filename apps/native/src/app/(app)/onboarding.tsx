@@ -6,7 +6,6 @@ import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import type { SampleCityId } from "@/lib/sample-cities";
-import { notificationPermissionState } from "@/lib/notification-token";
 import {
   GOALS,
   goalSpaces,
@@ -45,7 +44,6 @@ import {
   PlannerStep,
   SavedCountStep,
 } from "@/components/onboarding/questions";
-import { ReminderStep } from "@/components/onboarding/reminder";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
@@ -62,10 +60,9 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   goal: 0.25,
   planner: 0.38,
   city: 0.5,
-  ahaShare: 0.62,
-  ahaSpots: 0.75,
-  ahaPlan: 0.88,
-  reminder: 1,
+  ahaShare: 0.65,
+  ahaSpots: 0.8,
+  ahaPlan: 1,
 };
 
 /** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
@@ -75,16 +72,6 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "planner",
   "city",
 ]);
-
-/** Whether the reminder step has anything to ask; it is skipped once notifications are on or refused for good. */
-async function shouldAskNotifications(): Promise<boolean> {
-  try {
-    return (await notificationPermissionState()) === "ask";
-  } catch (err) {
-    analytics.captureError("onboarding_notifications_failed", err);
-    return false;
-  }
-}
 
 function holdIncomingShare() {
   try {
@@ -199,6 +186,7 @@ export default function OnboardingScreen() {
     initial.travelCity,
   );
   const [showSignIn, setShowSignIn] = useState(false);
+  const [viewedOpenerPages] = useState(() => new Set<number>());
   const [signedIn, setSignedIn] = useState(false);
   const recordCurrentStep = useStepAnalytics(step);
   const kind = planKindFor(goals);
@@ -260,11 +248,8 @@ export default function OnboardingScreen() {
   });
 
   const askAfterPlan = () => {
-    void shouldAskNotifications().then((ask) => {
-      if (ask) return advance();
-      recordCurrentStep();
-      paywall.ask();
-    });
+    recordCurrentStep();
+    paywall.ask();
   };
 
   if (showSignIn) {
@@ -287,7 +272,11 @@ export default function OnboardingScreen() {
     switch (step) {
       case "opener":
         return (
-          <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
+          <OpenerStep
+            onStart={advance}
+            onSignIn={() => setShowSignIn(true)}
+            viewedPages={viewedOpenerPages}
+          />
         );
       case "savedCount":
         return (
@@ -331,17 +320,6 @@ export default function OnboardingScreen() {
             savedCount={savedCount}
             leaving={paywall.asked}
             onContinue={askAfterPlan}
-          />
-        );
-      case "reminder":
-        return (
-          <ReminderStep
-            city={sample.city}
-            leaving={paywall.asked}
-            onDone={() => {
-              recordCurrentStep();
-              paywall.ask();
-            }}
           />
         );
     }

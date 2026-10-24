@@ -7,9 +7,8 @@ export const ONBOARDING_STEPS = [
   "ahaShare",
   "ahaSpots",
   "ahaPlan",
-  "reminder",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 16;
+export const ONBOARDING_FLOW_VERSION = 17;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -22,22 +21,12 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   ahaShare: "aha_share",
   ahaSpots: "aha_spots",
   ahaPlan: "aha_plan",
-  reminder: "reminder_ask",
 };
 
-const NO_BACK: readonly OnboardingStep[] = [
-  "opener",
-  "ahaShare",
-  "ahaSpots",
-  "ahaPlan",
-  "reminder",
-];
-
-/** The step before `step`; none once the sample is showing, so it never replays. */
+/** The step before `step`; none on the opener. */
 export function previousOnboardingStep(
   step: OnboardingStep,
 ): OnboardingStep | null {
-  if (NO_BACK.includes(step)) return null;
   return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) - 1] ?? null;
 }
 
