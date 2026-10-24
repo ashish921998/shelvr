@@ -79,6 +79,8 @@ import { safeDeleteStorage } from "./model/storage";
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 
 const LIST_CAP = 1000;
+// ponytail: cities come from the newest 1000 ready saves only; past that, keep a
+// per-user city count table updated in finalizeItem and deleteItem.
 export const CITY_SCAN_ROWS = 1000;
 const CITY_SCAN_BYTES = 4 * 1024 * 1024;
 export const CITY_ITEMS_MAX = 200;

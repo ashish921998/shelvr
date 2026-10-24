@@ -121,7 +121,8 @@ function SpaceList({ spaces }: { spaces: SpaceEntry[] }) {
   );
 }
 
-function EmptyCard() {
+/** The places pitch for an empty shelf; Home shows it before the first save. */
+export function HomePlacesEmptyCard() {
   const router = useRouter();
   const { guard } = usePaywallGuard("home");
   return (
@@ -152,20 +153,17 @@ export function HomePlaces() {
   if (!entitled || cities.data === undefined || spaces.data === undefined) {
     return null;
   }
-  if (cities.data.length === 0) {
-    return (
-      <View style={styles.container}>
-        <EmptyCard />
-      </View>
-    );
-  }
+  const otherSpaces = spacesWithoutCities(spaces.data, cities.data);
+  if (cities.data.length === 0 && otherSpaces.length === 0) return null;
   return (
     <View style={styles.container}>
-      <View style={styles.section}>
-        <Text style={styles.label}>{t("homePlaces.yourCities")}</Text>
-        <CityGrid cities={cities.data} />
-      </View>
-      <SpaceList spaces={spacesWithoutCities(spaces.data, cities.data)} />
+      {cities.data.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.label}>{t("homePlaces.yourCities")}</Text>
+          <CityGrid cities={cities.data} />
+        </View>
+      ) : null}
+      <SpaceList spaces={otherSpaces} />
     </View>
   );
 }

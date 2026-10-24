@@ -26,10 +26,11 @@ export function useCityPlan(city: string) {
       if (!allowed) return;
       analytics.capture("city_plan_started", { kind });
       const spaceId = await ensureCitySpace({ city });
-      router.push({
-        pathname: kind === "date" ? "/plan/[id]" : "/trip/[id]",
-        params: { id: spaceId },
-      });
+      if (kind === "date") {
+        router.push({ pathname: "/plan/[id]", params: { id: spaceId } });
+      } else {
+        router.push({ pathname: "/trip/[id]", params: { id: spaceId, city } });
+      }
     } catch (error) {
       analytics.captureError("city_plan_failed", error);
       Alert.alert(t("errors.tryAgain"));

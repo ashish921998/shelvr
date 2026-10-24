@@ -1,5 +1,4 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { EmptyState } from "@/components/empty-state";
 import { ProCard } from "@/components/home/pro-card";
 import { SaveHowTo } from "@/components/home/save-how-to";
 import { SaveProgressCard } from "@/components/home/save-progress-card";
@@ -10,7 +9,7 @@ import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
-import { HomePlaces } from "@/components/home/home-places";
+import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
 import { NextUpCard } from "@/components/home/next-up-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
@@ -198,10 +197,9 @@ export default function HomeScreen() {
       <View style={styles.container}>
         {emptyFeedStarter(proCard, showHowTo, progressCard) ??
           (progress.pending ? null : (
-            <EmptyState
-              title={t("home.emptyTitle")}
-              message={t("home.emptyBody")}
-            />
+            <View style={styles.emptyPlaces}>
+              <HomePlacesEmptyCard />
+            </View>
           ))}
         {cancelSurveyCard}
         {nudge}
@@ -349,6 +347,11 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 0.8,
     textTransform: "uppercase",
     color: theme.colors.faint,
+  },
+  emptyPlaces: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: theme.gap(2),
   },
   feedLabel: {
     paddingHorizontal: theme.gap(2),

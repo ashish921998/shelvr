@@ -505,8 +505,6 @@
   "navigation.profile": "プロフィール",
   "capture.add": "項目を保存",
   "loading.home": "シェルフを準備しています",
-  "home.emptyTitle": "あとで見るために保存",
-  "home.emptyBody": "＋をタップしてリンク、写真、ふと思いついたことを追加。\n必要になるまでShelvrが大切に保管します。",
   "navigation.mapHeader": "地図",
   "loading.map": "地図を開いています",
   "map.proTitle": "地図はProの機能です",

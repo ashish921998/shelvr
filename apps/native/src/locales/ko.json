@@ -505,8 +505,6 @@
   "navigation.profile": "프로필",
   "capture.add": "저장 항목 추가",
   "loading.home": "책장 준비 중",
-  "home.emptyTitle": "나중을 위해 저장하세요",
-  "home.emptyBody": "+를 눌러 링크, 사진, 떠오른 생각을 넣어 보세요.\n필요할 때까지 Shelvr가 간직해 줘요.",
   "navigation.mapHeader": "지도",
   "loading.map": "내 지도 여는 중",
   "map.proTitle": "지도는 Pro 기능이에요",

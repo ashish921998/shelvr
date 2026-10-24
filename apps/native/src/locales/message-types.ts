@@ -486,8 +486,6 @@ export type MessageParams = {
   "navigation.profile": undefined;
   "capture.add": undefined;
   "loading.home": undefined;
-  "home.emptyTitle": undefined;
-  "home.emptyBody": undefined;
   "navigation.mapHeader": undefined;
   "loading.map": undefined;
   "map.proTitle": undefined;
