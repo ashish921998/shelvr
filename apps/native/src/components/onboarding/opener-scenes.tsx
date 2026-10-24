@@ -267,12 +267,12 @@ export function DayStops({
   title,
   stops,
 }: {
-  title: TextMessageKey;
+  title: string;
   stops: readonly SceneStop[];
 }) {
   return (
     <View style={styles.dayStops}>
-      <Text style={styles.dayTitle}>{t(title)}</Text>
+      <Text style={styles.dayTitle}>{title}</Text>
       {stops.map((stop) => (
         <View key={stop.slot} style={styles.stop}>
           <Text
@@ -317,7 +317,7 @@ export function PlanScene(_props: SceneProps) {
         )}
       </SceneMap>
       <View style={styles.day}>
-        <DayStops title="onboarding.sceneDayTitle" stops={STOPS} />
+        <DayStops title={t("onboarding.sceneDayTitle")} stops={STOPS} />
       </View>
     </View>
   );

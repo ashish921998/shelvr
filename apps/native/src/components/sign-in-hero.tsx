@@ -171,7 +171,7 @@ export function SignInHero() {
             {t("signInScene.fromReels")}
           </Text>
         </View>
-        <DayStops title="signInScene.dateTitle" stops={STOPS} />
+        <DayStops title={t("signInScene.dateTitle")} stops={STOPS} />
       </View>
     </PhoneFrame>
   );
