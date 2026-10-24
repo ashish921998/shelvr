@@ -21,11 +21,8 @@ test(
     await screen.getByRole("button", "Save").tap();
     await expect(input).toBeHidden({ timeout: 30_000 });
 
-    await expect(screen.getByText("No place found")).toBeVisible({
-      timeout: 60_000,
-    });
     await expect(
-      screen.getByRole("button", new RegExp(`^${TITLE}`)),
+      screen.getByRole("button", `${TITLE}, No place in this one`),
     ).toHaveCount(1, { timeout: 60_000 });
   },
 );
