@@ -2,7 +2,9 @@
 
 A new account answers three short questions, picks a city, sees one sample
 reel turned into a plan, answers the trial reminder, then meets the paywall.
-The opener carries an "Already have an account? Sign in" link for returning
+The opener is three pages that swipe (on their own until a swipe, never with
+Reduce Motion), each with "Get started"
+and an "Already have an account? Sign in" link for returning
 people; a new account stays signed out through the paywall and signs in
 after it.
 
@@ -11,7 +13,8 @@ after it.
 - "Get started" opens "How many spots have you saved already?"; then "What
   do you want to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
   `A bit of everything`) and "How do you like to plan?". Each has Continue
-  (disabled until an answer) and "Skip" in the header.
+  (disabled until an answer) and "Skip" in the header. Every step after the
+  opener has a back button.
 - "Pick a city to try it with" is a photo grid; "Skip" or "Somewhere else"
   uses Prague.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to

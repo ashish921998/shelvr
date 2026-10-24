@@ -199,6 +199,7 @@ export default function OnboardingScreen() {
     initial.travelCity,
   );
   const [showSignIn, setShowSignIn] = useState(false);
+  const [viewedOpenerPages] = useState(() => new Set<number>());
   const [signedIn, setSignedIn] = useState(false);
   const recordCurrentStep = useStepAnalytics(step);
   const kind = planKindFor(goals);
@@ -287,7 +288,11 @@ export default function OnboardingScreen() {
     switch (step) {
       case "opener":
         return (
-          <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
+          <OpenerStep
+            onStart={advance}
+            onSignIn={() => setShowSignIn(true)}
+            viewedPages={viewedOpenerPages}
+          />
         );
       case "savedCount":
         return (
