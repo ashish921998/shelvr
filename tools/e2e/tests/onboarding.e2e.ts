@@ -69,7 +69,8 @@ test(
     await walkToSampleReel(screen);
 
     await shareTheSampleReel(screen);
-    await expect(screen.getByText("Kampa Park")).toBeVisible({
+    // The place is both a map pin's title and a row under it; either proves the spot landed.
+    await expect(screen.getByText("Kampa Park").first()).toBeVisible({
       timeout: 30_000,
     });
     const commit = screen.getByRole("button", COMMIT);
