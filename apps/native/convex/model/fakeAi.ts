@@ -58,6 +58,10 @@ const LINK_TASK = "Analyze this saved web page";
 const CONTENT_MARKER = "\n\nPage content:\n";
 const INTENTS_MARKER = "\n\nAlso propose up to ";
 const RECOMMEND_KEYS = "itemNumbers";
+const PLAN_KEYS = "places";
+const PLAN_TASK = "You help someone decide where to actually go";
+const SAVE_HEADER = /^Save (\d+)$/;
+const PLACES_LINE = "Places: ";
 const RECOMMEND_TASK = "The user just created a space";
 const SPACE_NAME = /^Space name: "(.*)"$/m;
 const SAVES_MARKER = "Below is a numbered list of the user's saved items.";
@@ -70,8 +74,12 @@ type Analysis = {
   tags: string[];
   spaceNames: string[];
   intents: never[];
-  cities: never[];
-  places: never[];
+  cities: string[];
+  places: string[];
+};
+
+type PlanAnswer = {
+  places: { saveNumber: number; name: string; area: string; why: string }[];
 };
 
 type PromptPage = { title?: string; description?: string; content?: string };
@@ -105,14 +113,15 @@ export function fakeNoteAnalysis(note: string): Analysis {
 export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
   if (page.title === undefined) return undefined;
   const firstLine = page.content?.trim().split("\n")[0]?.trim();
+  const fixture = fixtureTitled(page.title);
   return {
     title: page.title,
     description: page.description ?? firstLine ?? page.title,
     tags: tagsFrom(`${page.title}\n${page.content ?? ""}`),
     spaceNames: [],
     intents: [],
-    cities: [],
-    places: [],
+    cities: fixture?.cities ?? [],
+    places: fixture?.places ?? [],
   };
 }
 
@@ -169,6 +178,28 @@ export function fakeRecommendation(
   return { itemNumbers };
 }
 
+/** Picks every place the saves list, in order, the way the model is asked to. */
+export function fakePlan(prompt: string): PlanAnswer | undefined {
+  if (!prompt.includes(PLAN_TASK)) return undefined;
+  const places: PlanAnswer["places"] = [];
+  let saveNumber = 0;
+  for (const line of prompt.split("\n")) {
+    const header = SAVE_HEADER.exec(line);
+    if (header) saveNumber = Number(header[1]);
+    else if (saveNumber > 0 && line.startsWith(PLACES_LINE)) {
+      for (const name of line.slice(PLACES_LINE.length).split("; ")) {
+        places.push({
+          saveNumber,
+          name,
+          area: "",
+          why: "Saved for a night out",
+        });
+      }
+    }
+  }
+  return { places };
+}
+
 function promptText(options: CallOptions): string {
   return options.prompt
     .filter((message) => message.role === "user")
@@ -200,9 +231,14 @@ export class FakeAiUnansweredError extends Error {
 
 export function fakeAnswer(
   options: CallOptions,
-): Analysis | { itemNumbers: number[] } {
+): Analysis | PlanAnswer | { itemNumbers: number[] } {
   const keys = schemaKeys(options);
   const prompt = promptText(options);
+  if (keys === PLAN_KEYS) {
+    const plan = fakePlan(prompt);
+    if (plan === undefined) throw new FakeAiUnansweredError();
+    return plan;
+  }
   if (keys === RECOMMEND_KEYS) {
     const picks = fakeRecommendation(prompt);
     if (picks === undefined) throw new FakeAiUnansweredError();
@@ -249,6 +285,9 @@ type FixturePage = {
   siteName: string;
   description: string;
   content: string;
+  /** What the fake model reads off the page, as the real one would. */
+  cities?: string[];
+  places?: string[];
 };
 
 const FIXTURE_PAGES = new Map<string, FixturePage>([
@@ -262,7 +301,27 @@ const FIXTURE_PAGES = new Map<string, FixturePage>([
         "Quince paste, or membrillo, sets once the fruit has cooked down for an hour.\n\nServe it with sharp cheese.",
     },
   ],
+  [
+    "/lisbon-date-night",
+    {
+      title: "Date night in Lisbon",
+      siteName: "Shelvr fixtures",
+      description: "Three Lisbon spots for an evening out.",
+      content:
+        "Start with petiscos at Taberna da Rua das Flores.\n\nWatch the sunset from Miradouro da Graça.\n\nFinish with a custard tart at Manteigaria.",
+      cities: ["Lisbon"],
+      places: [
+        "Taberna da Rua das Flores",
+        "Miradouro da Graça",
+        "Manteigaria",
+      ],
+    },
+  ],
 ]);
+
+function fixtureTitled(title: string): FixturePage | undefined {
+  return [...FIXTURE_PAGES.values()].find((page) => page.title === title);
+}
 
 export function fixturePage(url: string): FixturePage | undefined {
   try {

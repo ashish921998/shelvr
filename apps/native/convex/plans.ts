@@ -9,7 +9,7 @@ import { summarizeError } from "./ai";
 import { MODEL, modelCallOptions } from "./model/aiProvider";
 import { logEvent } from "./model/log";
 import {
-  MAX_PLAN_PLACES,
+  MAX_PLAN_CANDIDATES,
   placeKey,
   planBeenLine,
   planPlaceValidator,
@@ -46,11 +46,16 @@ const planSchema = z.object({
           ),
       }),
     )
-    .describe(`At most ${MAX_PLAN_PLACES} places, best first.`),
+    .describe(`At most ${MAX_PLAN_CANDIDATES} places, best first.`),
 });
 
 export const makePlan = action({
-  args: { spaceId: v.id("spaces"), locale: v.optional(v.string()) },
+  args: {
+    spaceId: v.id("spaces"),
+    locale: v.optional(v.string()),
+    /** The city the plan was opened from; it plans that city's saves, not the space's. */
+    city: v.optional(v.string()),
+  },
   returns: v.object({
     places: v.array(planPlaceValidator),
     considered: v.number(),
@@ -66,6 +71,7 @@ export const makePlan = action({
     }: { spaceName: string; sources: PlanSource[]; been: string[] } =
       await ctx.runMutation(internal.spaces.claimPlanInternal, {
         spaceId: args.spaceId,
+        city: args.city,
       });
     if (sources.length === 0) {
       return { places: [], considered: 0 };
@@ -79,7 +85,7 @@ export const makePlan = action({
         schema: planSchema,
         prompt: [
           "You help someone decide where to actually go, using what they saved in a save-it-for-later app. Many saves are restaurant, bar and café reels.",
-          `The saves below come from their space "${spaceName}". Find the places the saves name (restaurants, bars, cafés, bakeries, shops, sights) and pick the ${MAX_PLAN_PLACES} best to go to, best first. Prefer places that sound great for a night out together.`,
+          `The saves below come from their space "${spaceName}". Find the places the saves name (restaurants, bars, cafés, bakeries, shops, sights) and pick the ${MAX_PLAN_CANDIDATES} best to go to, best first. Prefer places that sound great for a night out together.`,
           "Only pick a place a save names in its own text. Never invent or guess a name: a save that shows food but names no place is skipped. One entry per place, even if several saves name it.",
           planBeenLine(been),
           `Write each "why" in ${planLanguage(args.locale)}. Keep place names and areas as the saves write them.`,

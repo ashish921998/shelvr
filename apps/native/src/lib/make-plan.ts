@@ -34,9 +34,10 @@ export function useMakePlan(
   spaceId: Id<"spaces">,
   locale: string,
   shared: SharedShortlist | null | undefined,
+  city?: string,
 ) {
   const makePlan = useAction(api.plans.makePlan);
-  const key = `${spaceId}:${locale}`;
+  const key = `${spaceId}:${locale}:${city ?? ""}`;
   const sharedRef = useRef(shared);
   useEffect(() => {
     sharedRef.current = shared;
@@ -51,7 +52,7 @@ export function useMakePlan(
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
-        const plan = await makePlan({ spaceId, locale });
+        const plan = await makePlan({ spaceId, locale, city });
         analytics.capture("plan_made", {
           considered: plan.considered,
           place_count: plan.places.length,
@@ -66,7 +67,7 @@ export function useMakePlan(
         return { status: aiOff ? "ai_off" : "error" };
       }
     },
-    [makePlan, spaceId, locale],
+    [makePlan, spaceId, locale, city],
   );
 
   useEffect(() => {

@@ -7,6 +7,7 @@ import {
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  placePinsValidator,
   postMediaValidator,
   recipeValidator,
 } from "./model/itemFields";
@@ -100,6 +101,7 @@ export default defineSchema({
     capturedAt: v.optional(v.number()),
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
+    placePins: v.optional(placePinsValidator),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),

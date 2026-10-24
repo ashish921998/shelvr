@@ -67,6 +67,7 @@
   "capture.title": "Save something",
   "common.back": "Back",
   "capture.linkPlaceholder": "Paste or type a link…",
+  "capture.linkHint": "A reel, TikTok or page that names places. Shelvr puts them under their city.",
   "capture.notePlaceholder": "Jot a note…",
   "item.note": "Note",
   "item.article": "Link",
@@ -723,6 +724,11 @@
   "goal.citySomewhere": "Somewhere else",
   "goal.citySearch": "Search cities",
   "homePlaces.yourCities": "Your cities",
+  "homePlaces.citiesHint": "Places from the reels and TikToks you saved",
+  "homePlaces.noPlaceTitle": "No place found",
+  "homePlaces.noPlaceReading": "Still reading…",
+  "homePlaces.noPlaceFailed": "Couldn't read this one",
+  "homePlaces.noPlaceNone": "No place in this one",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} spot",
     "other": "%{formattedCount} spots"
@@ -739,6 +745,10 @@
   "homePlaces.planDateHint": "One evening, a few stops",
   "homePlaces.planTrip": "Plan a trip",
   "homePlaces.planTripHint": "Day by day",
+  "cityMap.placesFromSaves": {
+    "one": "%{formattedCount} place from your saves",
+    "other": "%{formattedCount} places from your saves"
+  },
   "opener.tagline": "Save the spots. We'll plan the date or the trip.",
   "onboardingQ.skip": "Skip",
   "onboardingQ.savedTitle": "How many spots have you saved already?",

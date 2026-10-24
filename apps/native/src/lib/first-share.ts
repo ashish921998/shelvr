@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 const firstShareKey = (userId: string) => `shelvr.firstShareSaved.${userId}`;
 
-export const weeklyNudge = oncePerAccount("weeklyNudge");
+const weeklyNudge = oncePerAccount("weeklyNudge");
 
 export function recordShareSaved(userId: string): void {
   SecureStore.setItem(firstShareKey(userId), "1");

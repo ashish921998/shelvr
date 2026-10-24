@@ -31,19 +31,19 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   so search for the hook name, not the filename. Subfolders exist only for
   `src/lib/share` and `src/lib/splash`.
 - **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
-  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
-  `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.
+  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
   `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
   The server side is `convex/subscriptions.ts`.
-- **Home feed:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`);
-  cards in `src/components/item-card.tsx` and `src/components/home`.
+- **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
+  cities list and "No place found" section are in `src/components/home`
+  (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`.
+  the Add sheet (`src/app/(app)/add.tsx`) takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.
@@ -198,19 +198,13 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
-- OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change)
-  makes new updates invisible to binaries built from the old fingerprint: cut a
-  fresh store build before resuming OTA publishes. The version fields in
-  `app.json` (`version`, `ios.buildNumber`, `android.versionCode`) are not
-  inputs. `@expo/fingerprint` 0.21 (Expo SDK 58) defaults to its `balanced`
-  preset, which skips them (`SourceSkips.ExpoConfigVersions`), so a version bump
-  alone does not move the fingerprint. It did through SDK 57, and would again if
-  a `fingerprint.config.js` set `preset: "strict"`.
-  Re-check after an Expo upgrade: edit `version`, run
-  `node tools/verify-ota-compatibility.mjs --profile production --platform ios`
-  under `APP_VARIANT=production` before and after, and the tree's hash must not
-  change.
+- OTA updates reach installs by EAS fingerprint. A change to a native module, a
+  config plugin, `app.json` or `app.config.js` may move the fingerprint, and a
+  moved fingerprint makes new updates invisible to binaries built from the old
+  one: cut a fresh store build before resuming OTA publishes. Do not predict a
+  move; run `pnpm run verify:fingerprint origin/main HEAD`. What the
+  fingerprint hashes, and what it cannot see, is in
+  `docs/architecture/push-notifications.md#what-the-fingerprint-hashes`.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed

@@ -1,3 +1,4 @@
+import { saveSource } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
@@ -8,26 +9,49 @@ import { StyleSheet } from "react-native-unistyles";
 type SaveRowItem = {
   _id: Id<"items">;
   title?: string;
+  url?: string;
   imageUrl: string | null;
   heroImageUrl?: string;
   author?: string;
   siteName?: string;
 };
 
-export function SaveRow({ item }: { item: SaveRowItem }) {
+type Props = {
+  item: SaveRowItem;
+  /** The number on this save's map pin; a save with no located place has none. */
+  number?: number;
+  selected?: boolean;
+  /** A place the user marked "We went": the badge fades like its pin. */
+  /** Replaces opening the save, so the city page can select its pin first. */
+  onPress?: () => void;
+};
+
+export function SaveRow({ item, number, selected, onPress }: Props) {
   const router = useRouter();
   const image = item.imageUrl ?? item.heroImageUrl;
-  const source = item.author ?? item.siteName;
+  const source = saveSource(item);
   const title = item.title ?? t("homePlaces.untitled");
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      onPress={() =>
-        router.push({ pathname: "/item/[id]", params: { id: item._id } })
+      accessibilityState={{ selected: selected === true }}
+      onPress={
+        onPress ??
+        (() =>
+          router.push({ pathname: "/item/[id]", params: { id: item._id } }))
       }
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.row,
+        selected && styles.selected,
+        pressed && styles.pressed,
+      ]}
     >
+      {number !== undefined ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{number}</Text>
+        </View>
+      ) : null}
       {image ? (
         <Image
           source={{ uri: image }}
@@ -52,8 +76,26 @@ export function SaveRow({ item }: { item: SaveRowItem }) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  row: { flexDirection: "row", alignItems: "center", gap: theme.gap(1.5) },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    padding: theme.gap(0.75),
+    marginHorizontal: -theme.gap(0.75),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+  },
+  selected: { backgroundColor: theme.colors.primarySoft },
   pressed: { opacity: theme.opacity.pressed },
+  badge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primary,
+  },
+  badgeText: { ...theme.type.badge, color: theme.colors.onTint },
   thumb: {
     width: 56,
     height: 56,

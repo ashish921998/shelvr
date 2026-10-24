@@ -1,4 +1,5 @@
 import { rememberSheetLink } from "@/lib/deferred-sheet-link";
+import { appSchemeRoute, resolveRootHref } from "@/lib/home-href";
 import { readOnboardedFlag } from "@/lib/onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { isDeepLink, markDirectLaunch } from "@/lib/splash/launch-intent";
@@ -34,6 +35,12 @@ export function redirectSystemPath({
       if (!onboardedOrUnknown()) return "/onboarding";
       markPendingShareQuietly();
       return "/share";
+    }
+
+    const route = appSchemeRoute(path);
+    if (route !== null && route !== "/") {
+      const href = resolveRootHref(route);
+      if (href !== route) return href;
     }
   } catch {}
   return path;

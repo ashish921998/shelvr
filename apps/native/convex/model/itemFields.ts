@@ -23,6 +23,10 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const placePinsValidator = v.array(
+  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+);
+
 export const postMediaValidator = v.object({
   kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
   imageUrl: v.string(),

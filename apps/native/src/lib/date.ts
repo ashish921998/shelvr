@@ -1,15 +1,5 @@
 import { formattingLocale } from "./i18n";
 
-export function parseExifDate(
-  exif: Record<string, unknown> | null | undefined,
-): number | undefined {
-  const raw = exif?.DateTimeOriginal;
-  if (typeof raw !== "string") return undefined;
-  const iso = raw.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? undefined : ms;
-}
-
 export function formatShortDate(ms: number): string {
   return new Date(ms).toLocaleDateString(formattingLocale(), {
     month: "short",

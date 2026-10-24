@@ -68,6 +68,7 @@
   "capture.title": "Guardar algo",
   "common.back": "Atrás",
   "capture.linkPlaceholder": "Pega o escribe un enlace…",
+  "capture.linkHint": "Un reel, TikTok o página que mencione lugares. Shelvr los pone bajo su ciudad.",
   "capture.notePlaceholder": "Escribe una nota…",
   "item.note": "Nota",
   "item.article": "Enlace",
@@ -742,6 +743,11 @@
   "goal.citySomewhere": "En otro sitio",
   "goal.citySearch": "Buscar ciudades",
   "homePlaces.yourCities": "Tus ciudades",
+  "homePlaces.citiesHint": "Lugares de los reels y TikToks que guardaste",
+  "homePlaces.noPlaceTitle": "Sin lugar encontrado",
+  "homePlaces.noPlaceReading": "Leyendo…",
+  "homePlaces.noPlaceFailed": "No se pudo leer",
+  "homePlaces.noPlaceNone": "Aquí no se menciona ningún lugar",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} sitio",
     "many": "%{formattedCount} sitios",
@@ -759,6 +765,11 @@
   "homePlaces.planDateHint": "Una noche, unas cuantas paradas",
   "homePlaces.planTrip": "Planear un viaje",
   "homePlaces.planTripHint": "Día a día",
+  "cityMap.placesFromSaves": {
+    "one": "%{formattedCount} lugar de tus guardados",
+    "many": "%{formattedCount} lugares de tus guardados",
+    "other": "%{formattedCount} lugares de tus guardados"
+  },
   "opener.tagline": "Guarda los sitios. Nosotros planeamos la cita o el viaje.",
   "onboardingQ.skip": "Omitir",
   "onboardingQ.savedTitle": "¿Cuántos sitios has guardado ya?",

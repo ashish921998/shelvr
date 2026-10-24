@@ -32,7 +32,7 @@ test("keeps someone without Pro on the plan gate", async ({
 }) => {
   const seePlans = await openPlanGate(device, screen);
   await expect(screen.getByRole("button", "Add")).toBeHidden();
-  await expect(screen.getByTestId("fixture-item-ramen")).toBeHidden();
+  await expect(screen.getByText("Your cities")).toBeHidden();
 
   await seePlans.tap();
   await expectPaywall(screen);

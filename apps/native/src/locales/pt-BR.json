@@ -68,6 +68,7 @@
   "capture.title": "Salvar algo",
   "common.back": "Voltar",
   "capture.linkPlaceholder": "Cole ou digite um link…",
+  "capture.linkHint": "Um reel, TikTok ou página que cite lugares. O Shelvr coloca cada um na sua cidade.",
   "capture.notePlaceholder": "Escreva uma nota…",
   "item.note": "Nota",
   "item.article": "Link",
@@ -742,6 +743,11 @@
   "goal.citySomewhere": "Outro lugar",
   "goal.citySearch": "Buscar cidades",
   "homePlaces.yourCities": "Suas cidades",
+  "homePlaces.citiesHint": "Lugares dos reels e TikToks que você salvou",
+  "homePlaces.noPlaceTitle": "Nenhum lugar encontrado",
+  "homePlaces.noPlaceReading": "Ainda lendo…",
+  "homePlaces.noPlaceFailed": "Não deu para ler",
+  "homePlaces.noPlaceNone": "Nenhum lugar neste",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",
@@ -759,6 +765,11 @@
   "homePlaces.planDateHint": "Uma noite, algumas paradas",
   "homePlaces.planTrip": "Planejar uma viagem",
   "homePlaces.planTripHint": "Dia a dia",
+  "cityMap.placesFromSaves": {
+    "one": "%{formattedCount} lugar dos seus salvos",
+    "many": "%{formattedCount} lugares dos seus salvos",
+    "other": "%{formattedCount} lugares dos seus salvos"
+  },
   "opener.tagline": "Salve os lugares. A gente planeja o encontro ou a viagem.",
   "onboardingQ.skip": "Pular",
   "onboardingQ.savedTitle": "Quantos lugares você já salvou?",
