@@ -1,4 +1,5 @@
 import { rememberSheetLink } from "@/lib/deferred-sheet-link";
+import { resolveRootHref } from "@/lib/home-href";
 import { readOnboardedFlag } from "@/lib/onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { isDeepLink, markDirectLaunch } from "@/lib/splash/launch-intent";
@@ -6,6 +7,7 @@ import * as Linking from "expo-linking";
 
 export function redirectSystemPath({
   path,
+  initial,
 }: {
   path: string;
   initial: boolean;
@@ -18,8 +20,11 @@ export function redirectSystemPath({
   try {
     const url = new URL(path);
 
+    const appScheme = ["shelvr:", "shelvr-dev:", "shelvr-preview:"].includes(
+      url.protocol,
+    );
     const isOAuthCallback =
-      ["shelvr:", "shelvr-dev:", "shelvr-preview:"].includes(url.protocol) &&
+      appScheme &&
       ((url.hostname === "auth" && url.pathname === "/callback") ||
         (url.hostname === "" && url.pathname === "/auth/callback"));
     const isClaimedOAuthCallback =
@@ -34,6 +39,11 @@ export function redirectSystemPath({
       if (!onboardedOrUnknown()) return "/onboarding";
       markPendingShareQuietly();
       return "/share";
+    }
+
+    // A widget opens a running app at its root, which would otherwise land on Map.
+    if (!initial && appScheme && url.hostname === "" && url.pathname === "/") {
+      return resolveRootHref("/") + url.search + url.hash;
     }
   } catch {}
   return path;

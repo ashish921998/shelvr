@@ -6,6 +6,7 @@ import {
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
 import { pickAndSaveImages } from "@/lib/pick-and-save-images";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
@@ -411,7 +412,7 @@ function AndroidAddSheet() {
       });
       return;
     }
-    router.back();
+    backOrHome(router);
   }, [router]);
 
   return (
@@ -439,7 +440,7 @@ export default function AddScreen() {
 
   return (
     <AddContent
-      close={() => router.back()}
+      close={() => backOrHome(router)}
       openCamera={(spaceId) => {
         router.back();
         router.push({
