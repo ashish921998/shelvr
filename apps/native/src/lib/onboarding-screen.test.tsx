@@ -20,7 +20,6 @@ const mocks = vi.hoisted(() => ({
   completeOnboarding: vi.fn(),
   capture: vi.fn(),
   ask: vi.fn(),
-  permission: "granted",
   view: ({ children }: Children) => <div>{children}</div>,
   text: ({ children }: Children) => <span>{children}</span>,
   pressable: ({
@@ -77,9 +76,6 @@ vi.mock("@/lib/pending-onboarding", () => ({
 }));
 vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice: vi.fn(),
-}));
-vi.mock("@/lib/notification-token", () => ({
-  notificationPermissionState: vi.fn(async () => mocks.permission),
 }));
 vi.mock("@/components/sign-in-view", () => ({ SignInView: vi.fn(() => null) }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
@@ -170,11 +166,6 @@ vi.mock("@/components/onboarding/aha-plan", () => ({
     button("aha:plan", onContinue),
   ),
 }));
-vi.mock("@/components/onboarding/reminder", () => ({
-  ReminderStep: vi.fn(({ onDone }: { onDone: () => void }) =>
-    button("reminder:done", onDone),
-  ),
-}));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: false }),
 }));
@@ -210,7 +201,6 @@ const startAt = (step: (typeof ONBOARDING_STEPS)[number]) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.permission = "granted";
   mocks.progress = {
     spaces: [],
     step: 0,
@@ -276,28 +266,17 @@ it("moves one step on a double tap", () => {
   expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
 });
 
-it("goes straight to the paywall when notifications are already settled", async () => {
+it("opens the paywall from the sample plan", async () => {
   startAt("ahaPlan");
   render(<OnboardingScreen />);
   await act(async () => tap("aha:plan"));
-  expect(mocks.ask).toHaveBeenCalledTimes(1);
-  expect(screen.queryByRole("button", { name: "reminder:done" })).toBeNull();
-});
-
-it("asks about the reminder first when notifications can still be asked", async () => {
-  mocks.permission = "ask";
-  startAt("ahaPlan");
-  render(<OnboardingScreen />);
-  await act(async () => tap("aha:plan"));
-  expect(mocks.ask).not.toHaveBeenCalled();
-  tap("reminder:done");
   expect(mocks.ask).toHaveBeenCalledTimes(1);
 });
 
 it("hands the goals' spaces to the replay and reports the answers when onboarding ends", () => {
   mocks.progress = {
     ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("reminder"),
+    step: ONBOARDING_STEPS.indexOf("ahaPlan"),
     goals: ["date"],
     savedCount: "few",
     planner: "planner",

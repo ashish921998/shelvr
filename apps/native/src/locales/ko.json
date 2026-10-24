@@ -777,14 +777,6 @@
   "aha.calloutLostCount": "이건 릴스 하나였어요. 저장한 게 셀 수도 없다고 했죠. 그게 전부 이렇게 된다고 상상해 보세요.",
   "aha.calloutNone": "이건 릴스 하나였어요. 저장한 장소가 전부 이렇게 된다고 상상해 보세요.",
   "aha.saveYours": "내 장소 저장하기",
-  "reminderStep.title": "끝나기 전에 알려드릴게요",
-  "reminderStep.body": "체험에는 알림이 함께 와요. 언제 받을지 골라 주세요.",
-  "reminderStep.previewTitle": "체험이 곧 끝나요",
-  "reminderStep.previewBody": "그 전에 계획 하나 더 세워 보세요",
-  "reminderStep.now": "지금",
-  "reminderStep.daysBefore": {
-    "other": "%{formattedCount}일 전"
-  },
   "welcomeLetter.title": "계획은 덜, 외출은 더",
   "welcomeLetter.body": "Shelvr에 오신 걸 환영해요. 늘 가보고 싶던 장소를 위한 앱이에요. 릴스나 게시물을 공유하면 Shelvr가 장소를 찾아 지도에 핀으로 표시하고 데이트나 여행 계획으로 만들어 드려요. 이번 주에 저장한 곳부터 시작해 보세요.",
   "welcomeLetter.signature": "Ashish",

@@ -797,15 +797,6 @@
   "aha.calloutLostCount": "That was 1 reel. You've lost count of yours. Imagine those.",
   "aha.calloutNone": "That was 1 reel. Imagine every spot you've saved.",
   "aha.saveYours": "Save your own spots",
-  "reminderStep.title": "We'll remind you before it ends",
-  "reminderStep.body": "Your trial comes with a heads-up. Pick when you'd like it.",
-  "reminderStep.previewTitle": "Your trial ends soon",
-  "reminderStep.previewBody": "Make one more plan first",
-  "reminderStep.now": "now",
-  "reminderStep.daysBefore": {
-    "one": "%{formattedCount} day before",
-    "other": "%{formattedCount} days before"
-  },
   "welcomeLetter.title": "Plan less, go out more",
   "welcomeLetter.body": "Welcome to Shelvr. It's for the spots you keep meaning to go to. Share a reel or a post, and Shelvr finds the places, pins them on a map and turns them into a date night or a trip. Start with one you saved this week.",
   "welcomeLetter.signature": "Ashish",

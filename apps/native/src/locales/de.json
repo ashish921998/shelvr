@@ -797,15 +797,6 @@
   "aha.calloutLostCount": "Das war 1 Reel. Du hast bei deinen den Überblick verloren. Stell dir die vor.",
   "aha.calloutNone": "Das war 1 Reel. Stell dir alle Orte vor, die du gespeichert hast.",
   "aha.saveYours": "Speichere deine eigenen Orte",
-  "reminderStep.title": "Wir erinnern dich, bevor sie endet",
-  "reminderStep.body": "Zu deiner Testphase gehört eine Erinnerung. Wähle, wann sie kommen soll.",
-  "reminderStep.previewTitle": "Deine Testphase endet bald",
-  "reminderStep.previewBody": "Mach vorher noch einen Plan",
-  "reminderStep.now": "jetzt",
-  "reminderStep.daysBefore": {
-    "one": "%{formattedCount} Tag vorher",
-    "other": "%{formattedCount} Tage vorher"
-  },
   "welcomeLetter.title": "Weniger planen, mehr ausgehen",
   "welcomeLetter.body": "Willkommen bei Shelvr. Es ist für die Orte, die du schon lange besuchen willst. Teile ein Reel oder einen Post, und Shelvr findet die Orte, markiert sie auf einer Karte und macht daraus einen Date-Abend oder eine Reise. Fang mit einem an, den du diese Woche gespeichert hast.",
   "welcomeLetter.signature": "Ashish",

@@ -7,9 +7,8 @@ export const ONBOARDING_STEPS = [
   "ahaShare",
   "ahaSpots",
   "ahaPlan",
-  "reminder",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 16;
+export const ONBOARDING_FLOW_VERSION = 17;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -22,7 +21,6 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   ahaShare: "aha_share",
   ahaSpots: "aha_spots",
   ahaPlan: "aha_plan",
-  reminder: "reminder_ask",
 };
 
 /** The step before `step`; none on the opener. */

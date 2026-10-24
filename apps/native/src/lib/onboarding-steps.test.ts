@@ -33,7 +33,6 @@ describe("previousOnboardingStep", () => {
     ["ahaShare", "city"],
     ["ahaSpots", "ahaShare"],
     ["ahaPlan", "ahaSpots"],
-    ["reminder", "ahaPlan"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
@@ -44,12 +43,12 @@ describe("previousOnboardingStep", () => {
 });
 
 describe("nextOnboardingStep", () => {
-  it("walks the questions, the city and the sample, then asks about the reminder", () => {
+  it("walks the questions, the city and the sample, and stays on the sample plan", () => {
     const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
     while (walked.length < ONBOARDING_STEPS.length)
       walked.push(nextOnboardingStep(walked[walked.length - 1]));
     expect(walked).toEqual([...ONBOARDING_STEPS]);
-    expect(nextOnboardingStep("reminder")).toBe("reminder");
+    expect(nextOnboardingStep("ahaPlan")).toBe("ahaPlan");
   });
 });
 

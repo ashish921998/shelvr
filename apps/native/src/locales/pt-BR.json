@@ -817,16 +817,6 @@
   "aha.calloutLostCount": "Isso foi 1 reel. Você já perdeu a conta dos seus. Imagine esses.",
   "aha.calloutNone": "Isso foi 1 reel. Imagine todos os lugares que você salvou.",
   "aha.saveYours": "Salve seus próprios lugares",
-  "reminderStep.title": "A gente avisa antes de terminar",
-  "reminderStep.body": "Seu teste vem com um aviso. Escolha quando quer recebê-lo.",
-  "reminderStep.previewTitle": "Seu teste termina em breve",
-  "reminderStep.previewBody": "Faça mais um plano antes",
-  "reminderStep.now": "agora",
-  "reminderStep.daysBefore": {
-    "one": "%{formattedCount} dia antes",
-    "many": "%{formattedCount} dias antes",
-    "other": "%{formattedCount} dias antes"
-  },
   "welcomeLetter.title": "Planeje menos, saia mais",
   "welcomeLetter.body": "Boas-vindas ao Shelvr. Ele é para aqueles lugares que você sempre quer conhecer. Compartilhe um reel ou um post, e o Shelvr encontra os lugares, marca no mapa e transforma tudo em um encontro ou uma viagem. Comece com um que você salvou esta semana.",
   "welcomeLetter.signature": "Ashish",
