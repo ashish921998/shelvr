@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { deleteMembership } from "./model/memberships";
 import { newConvexTest } from "./test.setup";
 
 async function testKey(): Promise<string> {
@@ -217,6 +218,42 @@ describe("placePins", () => {
       vi.useRealTimers();
     }
     expect(await pins()).toHaveLength(1);
+  });
+
+  it("drops a pin whose place came only from a space the save left", async () => {
+    const { t, itemId, pins } = await setup([]);
+    await t.run(async (ctx) => {
+      const item = (await ctx.db.get(itemId))!;
+      const spaceId = await ctx.db.insert("spaces", {
+        userId: item.userId,
+        name: "Trip",
+        dynamic: false,
+      });
+      await ctx.db.insert("spaceItems", {
+        userId: item.userId,
+        spaceId,
+        itemId,
+        status: "saved",
+        intents: [maps("Pink Street")],
+      });
+      await ctx.db.patch(itemId, {
+        placePins: [{ name: "Pink Street", lat: 1, lng: 1 }],
+      });
+    });
+    vi.useFakeTimers();
+    try {
+      await t.run(async (ctx) => {
+        const row = await ctx.db
+          .query("spaceItems")
+          .withIndex("by_item", (q) => q.eq("itemId", itemId))
+          .unique();
+        await deleteMembership(ctx, row!);
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await pins()).toEqual([]);
   });
 
   it("backfill queues only ready saves that name a place and have no pins", async () => {
