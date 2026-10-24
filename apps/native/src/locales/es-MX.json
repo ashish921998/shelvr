@@ -719,7 +719,6 @@
   "aiConsent.setting": "Títulos, etiquetas y sugerencias con IA",
   "aiConsent.settingHelp": "Envía lo que guardas a Gemini, la IA de Google. Desactivado: lo guardado conserva solo el título de la página.",
   "aiConsent.findLinksOff": "Activa la IA en Configuración para buscar enlaces.",
-  "aiConsent.signInNote": "Shelvr usa Gemini AI de Google para titular y ordenar lo que guardas. Al continuar lo permites. Puedes desactivarlo en Configuración.",
   "updates.title": "Actualizaciones de la app",
   "updates.check": "Buscar actualizaciones",
   "updates.checking": "Buscando…",
@@ -879,5 +878,10 @@
   "onboarding.sceneLunch": "Comida",
   "onboarding.sceneAfternoon": "Tarde",
   "onboarding.sceneEvening": "Noche",
+  "signInScene.fromReels": "De 3 reels que guardaste",
+  "signInScene.dateTitle": "Cita · Alfama",
+  "signInScene.sunset": "Atardecer",
+  "signInScene.dinner": "Cena",
+  "signInScene.dessert": "Postre",
   "opener.getStarted": "Empezar"
 }

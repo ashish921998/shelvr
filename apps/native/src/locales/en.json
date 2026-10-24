@@ -700,7 +700,6 @@
   "aiConsent.setting": "AI titles, tags and suggestions",
   "aiConsent.settingHelp": "Sends what you save to Google's Gemini AI. Off: saves keep only the page's own title.",
   "aiConsent.findLinksOff": "Turn on AI in Settings to find links.",
-  "aiConsent.signInNote": "Shelvr uses Google's Gemini AI to title and file your saves. Continuing allows this. You can turn it off in Settings.",
   "updates.title": "App updates",
   "updates.check": "Check for updates",
   "updates.checking": "Checking…",
@@ -858,5 +857,10 @@
   "onboarding.sceneLunch": "Lunch",
   "onboarding.sceneAfternoon": "Afternoon",
   "onboarding.sceneEvening": "Evening",
+  "signInScene.fromReels": "From 3 reels you saved",
+  "signInScene.dateTitle": "Date night · Alfama",
+  "signInScene.sunset": "Sunset",
+  "signInScene.dinner": "Dinner",
+  "signInScene.dessert": "Dessert",
   "opener.getStarted": "Get started"
 }

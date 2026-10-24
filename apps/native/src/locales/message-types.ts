@@ -644,7 +644,6 @@ export type MessageParams = {
   "aiConsent.setting": undefined;
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
-  "aiConsent.signInNote": undefined;
   "updates.title": undefined;
   "updates.check": undefined;
   "updates.checking": undefined;
@@ -796,6 +795,11 @@ export type MessageParams = {
   "onboarding.sceneLunch": undefined;
   "onboarding.sceneAfternoon": undefined;
   "onboarding.sceneEvening": undefined;
+  "signInScene.fromReels": undefined;
+  "signInScene.dateTitle": undefined;
+  "signInScene.sunset": undefined;
+  "signInScene.dinner": undefined;
+  "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
 };
 export type MessageKey = keyof MessageParams;
