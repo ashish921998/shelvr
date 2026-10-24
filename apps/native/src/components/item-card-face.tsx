@@ -4,6 +4,7 @@ import { SuggestedBadge } from "@/components/suggested-badge";
 import { clampRatio, letterboxedVideoRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { displayHost, siteMonogram } from "@/lib/url";
+import { firstLineRepeat } from "@/lib/note-heading";
 import { shortFormSource } from "@convex/model/externalUrl";
 import { socialPost } from "@/lib/social-post";
 import type {
@@ -94,48 +95,16 @@ export function textFaceCopy(
   return { body: name ?? failedLabel ?? displayHost(item.url) };
 }
 
-const NOTE_TITLE_CUT = 80;
-
-const FILLER_WORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "for",
-  "my",
-  "of",
-  "the",
-  "to",
-]);
-
-function headingWords(text: string): Set<string> {
-  const words = text.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-  return new Set(
-    words.filter((word) => word.length > 1 && !FILLER_WORDS.has(word)),
-  );
-}
-
 function afterOwnHeading(
   note: string | undefined,
   title: string | undefined,
 ): string | undefined {
   if (!note || !title) return note;
-  const [first = "", ...rest] = note.trim().split("\n");
-  const line = first.trim();
-  const cut = title.trim();
-  if (
-    line.length > NOTE_TITLE_CUT &&
-    line.slice(0, NOTE_TITLE_CUT).trim() === cut
-  ) {
-    return undefined;
-  }
-  const heading = headingWords(line);
-  const named = headingWords(title);
-  const same =
-    line === cut ||
-    (heading.size > 0 &&
-      heading.size === named.size &&
-      [...heading].every((word) => named.has(word)));
-  return same ? rest.join("\n").trim() || undefined : note;
+  const repeat = firstLineRepeat(note, title);
+  if (!repeat) return note;
+  if (repeat === "cut") return undefined;
+  const [, ...rest] = note.trim().split("\n");
+  return rest.join("\n").trim() || undefined;
 }
 
 const FACE_SYMBOL = {

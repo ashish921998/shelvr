@@ -27,7 +27,9 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { muted: "gray" } } }),
+  useUnistyles: () => ({
+    theme: { colors: { muted: "gray", foreground: "ink" } },
+  }),
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: React.ReactNode }) => (
@@ -38,13 +40,19 @@ vi.mock("react-native", () => ({
       value,
       onChangeText,
       accessibilityLabel,
+      placeholder,
+      placeholderTextColor,
     }: {
       value: string;
       onChangeText: (text: string) => void;
       accessibilityLabel: string;
+      placeholder: string;
+      placeholderTextColor: string;
     }) => (
       <textarea
         aria-label={accessibilityLabel}
+        placeholder={placeholder}
+        data-placeholder-color={placeholderTextColor}
         value={value}
         onChange={(event) => onChangeText(event.target.value)}
       />
@@ -292,3 +300,68 @@ it.each(["before", "after"])(
     expect(titleInput.value).toBe("Remote title");
   },
 );
+
+it("shows Shelvr's title in the title color, not as a faded hint", () => {
+  render(<NoteEditor item={item} />);
+  const title = screen.getByLabelText("item.noteTitleLabel");
+  expect(title.getAttribute("placeholder")).toBe("AI title");
+  expect(title.getAttribute("data-placeholder-color")).toBe("ink");
+});
+
+it("fades the hint when the note has no title yet", () => {
+  render(<NoteEditor item={{ ...item, title: undefined }} />);
+  const title = screen.getByLabelText("item.noteTitleLabel");
+  expect(title.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
+  expect(title.getAttribute("data-placeholder-color")).toBe("gray");
+});
+
+it("leaves the title empty when Shelvr's title only repeats the first line", () => {
+  render(
+    <NoteEditor
+      item={{
+        ...item,
+        title: "Call the landlord",
+        note: "Call the landlord\nabout the tap",
+      }}
+    />,
+  );
+  const title = screen.getByLabelText("item.noteTitleLabel");
+  expect(title.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
+  expect(title.getAttribute("data-placeholder-color")).toBe("gray");
+});
+
+const longLine =
+  "Mum said the best route is the coastal path from Cascais to Guincho, stop at the café by the lighthouse for lunch";
+
+it.each([
+  [
+    "is the first 80 characters of a longer first line",
+    longLine.slice(0, 80),
+    `${longLine}\nBring sunscreen`,
+  ],
+  [
+    "differs from the first line only in case and punctuation",
+    "Call the landlord!",
+    "call the Landlord\nabout the tap",
+  ],
+])("leaves the title empty when Shelvr's title %s", (_, title, note) => {
+  render(<NoteEditor item={{ ...item, title, note }} />);
+  const input = screen.getByLabelText("item.noteTitleLabel");
+  expect(input.getAttribute("placeholder")).toBe("item.noteTitlePlaceholder");
+  expect(input.getAttribute("data-placeholder-color")).toBe("gray");
+});
+
+it("shows Shelvr's title when it says something the first line doesn't", () => {
+  render(
+    <NoteEditor
+      item={{
+        ...item,
+        title: "Call the plumber",
+        note: "Call the landlord\nabout the tap",
+      }}
+    />,
+  );
+  const input = screen.getByLabelText("item.noteTitleLabel");
+  expect(input.getAttribute("placeholder")).toBe("Call the plumber");
+  expect(input.getAttribute("data-placeholder-color")).toBe("ink");
+});
