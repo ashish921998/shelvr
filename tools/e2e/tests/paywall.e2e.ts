@@ -37,9 +37,10 @@ test("keeps someone without Pro on the plan gate", async ({
   await seePlans.tap();
   await expectPaywall(screen);
 
-  // A relaunch is the only way out without buying; it lands on the gate again.
+  // A relaunch leaves the paywall; it lands on the gate again.
   await openPlanGate(device, screen);
   await expect(screen.getByRole("button", "Add")).toBeHidden();
+  await expect(screen.getByText("Your cities")).toBeHidden();
 
   await screen.getByRole("button", "Settings").tap();
   const deleteAccount = screen.getByRole("button", "Delete account");
