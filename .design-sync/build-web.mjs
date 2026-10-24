@@ -46,6 +46,21 @@ const APP_BABEL_FILTER =
 const appBabel = {
   name: 'app-babel',
   setup(b) {
+    // StitchMark (ScreenLoader's mark) draws with Skia, which on web needs the
+    // CanvasKit wasm loaded first. A design gets the same mark as a still SVG,
+    // sewn: no animation.
+    b.onLoad({ filter: /[\\/]components[\\/]ui[\\/]stitch-mark\.tsx$/ }, (args) => ({
+      contents: `import { createElement as h } from 'react';
+const D = ${JSON.stringify(readFileSync(args.path, 'utf8').match(/MARK_PATH =\s*"([^"]+)"/)[1])};
+export function StitchMark({ size = 64 }) {
+  return h('svg', { width: size, height: size, viewBox: '200 200 624 624' },
+    h('path', { d: D, style: { fill: 'var(--colors-primary-soft)' } }),
+    h('path', { d: D, fill: 'none', strokeWidth: 30, strokeLinecap: 'round', strokeDasharray: '46 38',
+      style: { stroke: 'var(--colors-primary)' } }));
+}`,
+      loader: 'js',
+      resolveDir: dirname(args.path),
+    }));
     b.onLoad({ filter: APP_BABEL_FILTER }, async (args) => {
       const out = await babel.transformAsync(await readFile(args.path, 'utf8'), {
         filename: args.path,
@@ -84,7 +99,13 @@ const webGaps = {
     // loader and, under __DEV__, its fast-refresh, HMR and message sockets.
     // There is no Metro server behind a design, so the sockets only log
     // connection errors.
-    b.onLoad({ filter: /[\\/]expo[\\/]src[\\/]async-require[\\/](index|setup)\.ts$/ }, () => ({
+    b.onLoad({ filter: /[\\/]expo[\\/](?:src|build)[\\/]async-require[\\/](index|setup)\.[jt]s$/ }, () => ({
+      contents: '',
+      loader: 'js',
+    }));
+    // SDK 58's expo-modules-core ships ts-declarations/global.js with value imports
+    // of names its sibling files only declare as types.
+    b.onLoad({ filter: /[\\/]expo-modules-core[\\/]build[\\/]ts-declarations[\\/]global\.js$/ }, () => ({
       contents: '',
       loader: 'js',
     }));
@@ -94,10 +115,15 @@ const webGaps = {
     b.onResolve({ filter: /^react-native-unistyles\/components\/native\/[A-Za-z]+$/ }, (args) => ({
       path: join(UNISTYLES_NATIVE, `${args.path.split('/').pop()}.js`),
     }));
-    // expo-symbols imports PlatformColor (Android-only call site); react-native-web
-    // doesn't export it, and esbuild rejects the missing named import.
+    // expo-symbols imports PlatformColor (Android-only call site), and since SDK 58
+    // expo-asset and expo-image import AssetRegistry; react-native-web exports
+    // neither, and esbuild rejects the missing named import. The registry is
+    // @react-native/assets-registry's two functions.
     b.onLoad({ filter: /react-native-web[\\/]dist[\\/]index\.js$/ }, async (args) => ({
-      contents: `${await readFile(args.path, 'utf8')}\nexport const PlatformColor = (...names) => names[0];\n`,
+      contents:
+        `${await readFile(args.path, 'utf8')}\nexport const PlatformColor = (...names) => names[0];\n` +
+        'const assets = [];\n' +
+        'export const AssetRegistry = { registerAsset: (a) => assets.push(a), getAssetByID: (id) => assets[id - 1] };\n',
       loader: 'js',
       resolveDir: dirname(args.path),
     }));
