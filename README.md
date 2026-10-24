@@ -294,21 +294,13 @@ with plaintext or sensitive visibility in EAS production so builds and
 updates use the same config inputs. Both environment validation and OTA
 publication pin `APP_VARIANT=production`.
 
-**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
-change that alters it makes new updates invisible to binaries built from the
-old fingerprint. That includes a native dependency added or removed, or a
-native config change. Cut a fresh store build before resuming OTA publishes.
-
-The app `version` and the build number are not inputs. `@expo/fingerprint`
-0.21 (Expo SDK 58) defaults to its `balanced` preset, which skips them, so
-bumping `version` alone leaves the fingerprint where it was and an OTA from the
-bumped tree still reaches the previous build. Through SDK 57 the version was an
-input: bumping 1.0.3 to 1.0.4 moved the iOS fingerprint. To re-check after an
-Expo upgrade, edit `version` and run `APP_VARIANT=production node
-tools/verify-ota-compatibility.mjs --profile production --platform ios` before
-and after: the hash it prints for this tree (after "this tree is", or "shared
-runtime" on a match) must not change. A `fingerprint.config.js` in `apps/native`
-that sets `preset: "strict"` would make the version an input again.
+**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. A change to
+a native module, a config plugin, `app.json` or `app.config.js` may move it, and
+a moved fingerprint makes new updates invisible to binaries built from the old
+one. Cut a fresh store build before resuming OTA publishes. Do not predict a
+move; run `pnpm run verify:fingerprint origin/main HEAD`. What the fingerprint
+hashes, and what it cannot see, is in
+[What the fingerprint hashes](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 
 **Building outside the workflow.** `eas build --local` runs on your own
 machine when EAS cloud minutes run out, but it is not guaranteed to produce
