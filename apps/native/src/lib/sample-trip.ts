@@ -13,18 +13,6 @@ import type { TextMessageKey } from "@/locales/message-types";
 
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
-export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
-  morning: "trip.slotMorning",
-  lunch: "trip.slotLunch",
-  afternoon: "trip.slotAfternoon",
-  dinner: "trip.slotDinner",
-  drinks: "trip.slotDrinks",
-  dessert: "trip.slotDessert",
-  walk: "trip.slotWalk",
-  brunch: "trip.slotBrunch",
-  coffee: "trip.slotCoffee",
-};
-
 export const SAMPLE_MAP = { width: 340, height: 168 } as const;
 
 export type SampleCrop = { top: number; height: number };
