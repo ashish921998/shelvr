@@ -816,16 +816,6 @@
   "aha.calloutLostCount": "C'était 1 reel. Vous avez arrêté de compter les vôtres. Imaginez-les.",
   "aha.calloutNone": "C'était 1 reel. Imaginez toutes les adresses que vous avez enregistrées.",
   "aha.saveYours": "Enregistrez vos adresses",
-  "reminderStep.title": "On vous préviendra avant la fin",
-  "reminderStep.body": "Votre essai inclut un rappel. Choisissez quand le recevoir.",
-  "reminderStep.previewTitle": "Votre essai se termine bientôt",
-  "reminderStep.previewBody": "Faites encore un plan avant",
-  "reminderStep.now": "maintenant",
-  "reminderStep.daysBefore": {
-    "one": "%{formattedCount} jour avant",
-    "many": "%{formattedCount} jours avant",
-    "other": "%{formattedCount} jours avant"
-  },
   "welcomeLetter.title": "Moins planifier, sortir plus",
   "welcomeLetter.body": "Bienvenue sur Shelvr. C'est pour les adresses où vous voulez toujours aller. Partagez un reel ou une publication, et Shelvr trouve les lieux, les épingle sur une carte et en fait une soirée en amoureux ou un voyage. Commencez par une adresse enregistrée cette semaine.",
   "welcomeLetter.signature": "Ashish",

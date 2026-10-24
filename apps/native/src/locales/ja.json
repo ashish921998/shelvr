@@ -776,14 +776,6 @@
   "aha.calloutLostCount": "これはリール1本ぶん。あなたの保存はもう数えきれないとのこと。それが全部こうなると想像してみて。",
   "aha.calloutNone": "これはリール1本ぶん。保存したスポットが全部こうなると想像してみて。",
   "aha.saveYours": "自分のスポットを保存する",
-  "reminderStep.title": "終了前にお知らせします",
-  "reminderStep.body": "トライアルにはお知らせが付いています。受け取るタイミングを選んでください。",
-  "reminderStep.previewTitle": "トライアルがもうすぐ終了します",
-  "reminderStep.previewBody": "その前にもうひとつプランを作ろう",
-  "reminderStep.now": "今",
-  "reminderStep.daysBefore": {
-    "other": "%{formattedCount}日前"
-  },
   "welcomeLetter.title": "計画は少なく、お出かけは多く",
   "welcomeLetter.body": "Shelvrへようこそ。いつか行きたいと思っているスポットのためのアプリです。リールや投稿を共有すると、Shelvrが場所を見つけて地図にピン留めし、デートや旅行のプランにします。まずは今週保存したものから始めてみましょう。",
   "welcomeLetter.signature": "Ashish",

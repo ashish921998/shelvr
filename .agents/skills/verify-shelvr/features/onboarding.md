@@ -1,7 +1,7 @@
 # Onboarding
 
 A new account answers three short questions, picks a city, sees one sample
-reel turned into a plan, answers the trial reminder, then meets the paywall.
+reel turned into a plan, then meets the paywall.
 The opener is three pages that swipe (on their own until a swipe, never with
 Reduce Motion), each with "Get started"
 and an "Already have an account? Sign in" link for returning
@@ -19,10 +19,9 @@ after it.
   uses Prague.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to
   "Found 3 spots in that reel" (Continue enables once the pins land), then
-  "Your date night in Prague" and "Save your own spots".
-- "We'll remind you before it ends" asks 1, 2 or 3 days; "Not now" or
-  Continue asks for the paywall. Skipped when notifications are settled.
-- Closing the paywall keeps the person on the reminder step, signed out; a
+  "Your date night in Prague" and "Save your own spots", which asks for the
+  paywall. Notification permission is asked after a trial starts, not here.
+- Closing the paywall keeps the person on the sample plan, signed out; a
   cold launch comes back to the same step.
 
 ## How to get to it (user POV)
@@ -52,8 +51,8 @@ purchase is made.
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the reminder; close the paywall, relaunch, and check the step is kept and nothing signs in
-onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots, the date-night plan and the reminder show before the paywall
+onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the sample plan; close the paywall, relaunch, and check the step is kept and nothing signs in
+onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots, and the date-night plan show before the paywall
 ```
 
 ## Gotchas

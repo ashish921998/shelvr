@@ -10,7 +10,7 @@ import {
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
 
-const NOT_NOW = "Not now";
+const SAVE_YOUR_OWN = "Save your own spots";
 
 // Leave the app signed out at the opener, not mid-onboarding, for the next test.
 afterEach(async ({ device, screen }) => {
@@ -18,7 +18,7 @@ afterEach(async ({ device, screen }) => {
   await device.closeApp().catch(() => undefined);
 });
 
-/** Saves the sample reel and walks its spots and plan, up to the trial reminder. */
+/** Saves the sample reel and walks its spots to the sample plan. */
 async function walkTheSample(screen: Screen): Promise<void> {
   await screen.getByRole("button", SHARE_TO_SHELVR).tap();
   await expect(screen.getByText("Found 3 spots in that reel")).toBeVisible({
@@ -27,9 +27,6 @@ async function walkTheSample(screen: Screen): Promise<void> {
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
-  await screen
-    .getByRole("button", "Save your own spots")
-    .tap({ timeout: 30_000 });
 }
 
 test(
@@ -48,8 +45,8 @@ test(
     );
 
     await walkTheSample(screen);
-    // The reminder screen comes between the sample plan and the paywall, and stays put when the paywall closes.
-    const commit = screen.getByRole("button", NOT_NOW);
+    // The sample plan opens the paywall, and stays put when the paywall closes.
+    const commit = screen.getByRole("button", SAVE_YOUR_OWN);
     await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
@@ -75,7 +72,7 @@ test(
 );
 
 test(
-  "turns one sample reel into a date night, then asks about the trial reminder and the paywall",
+  "turns one sample reel into a date night, then asks for the paywall",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -94,12 +91,7 @@ test(
     await expect(screen.getByText("Your date night in Prague")).toBeVisible({
       timeout: 30_000,
     });
-    await screen.getByRole("button", "Save your own spots").tap();
-
-    await expect(
-      screen.getByText("We'll remind you before it ends"),
-    ).toBeVisible({ timeout: 30_000 });
-    const commit = screen.getByRole("button", NOT_NOW);
+    const commit = screen.getByRole("button", SAVE_YOUR_OWN);
     await commit.tap();
     await expectPaywall(screen);
     await screen.getByRole("button", "Close").first().tap();

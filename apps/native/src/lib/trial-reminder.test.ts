@@ -11,11 +11,7 @@ import {
   trialNudgesAllowed,
   trialReminderPrimer,
 } from "./trial-reminder";
-import {
-  setTrialReminderLeadDays,
-  trialReminderAt,
-  trialReminderLeadDays,
-} from "./trial-reminder-lead";
+import { trialReminderAt, trialReminderLeadDays } from "./trial-reminder-lead";
 
 const mock = vi.hoisted(() => ({
   platform: { OS: "ios" },
@@ -89,16 +85,11 @@ describe("trialReminderAt", () => {
 });
 
 describe("the reminder's lead", () => {
-  it("keeps the days picked in onboarding, and falls back to two", () => {
+  it("keeps the days an install already picked, and falls back to two", () => {
     vi.mocked(SecureStore.getItem).mockReturnValueOnce(null);
     expect(trialReminderLeadDays()).toBe(2);
     vi.mocked(SecureStore.getItem).mockReturnValueOnce("9");
     expect(trialReminderLeadDays()).toBe(2);
-    setTrialReminderLeadDays(3);
-    expect(SecureStore.setItem).toHaveBeenCalledWith(
-      "shelvr.trialReminderLeadDays",
-      "3",
-    );
     vi.mocked(SecureStore.getItem).mockReturnValueOnce("3");
     expect(trialReminderLeadDays()).toBe(3);
   });

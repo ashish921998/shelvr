@@ -6,15 +6,11 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 const BILLING_EARLIEST_HOUR = 9;
 const BILLING_LATEST_HOUR = 20;
 
-/** How many days before the trial ends the reminder comes; onboarding asks. */
-export const TRIAL_REMINDER_LEAD_DAYS = [1, 2, 3] as const;
-export type TrialReminderLeadDays = (typeof TRIAL_REMINDER_LEAD_DAYS)[number];
+/** How many days before the trial ends the reminder comes; installs that answered the old onboarding step keep their pick. */
+const TRIAL_REMINDER_LEAD_DAYS = [1, 2, 3] as const;
+type TrialReminderLeadDays = (typeof TRIAL_REMINDER_LEAD_DAYS)[number];
 const DEFAULT_LEAD_DAYS: TrialReminderLeadDays = 2;
 const LEAD_DAYS_KEY = "shelvr.trialReminderLeadDays";
-
-export function setTrialReminderLeadDays(days: TrialReminderLeadDays): void {
-  SecureStore.setItem(LEAD_DAYS_KEY, String(days));
-}
 
 export function trialReminderLeadDays(): TrialReminderLeadDays {
   const stored = Number(SecureStore.getItem(LEAD_DAYS_KEY));

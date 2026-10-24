@@ -737,12 +737,6 @@ export type MessageParams = {
   "aha.calloutLostCount": undefined;
   "aha.calloutNone": undefined;
   "aha.saveYours": undefined;
-  "reminderStep.title": undefined;
-  "reminderStep.body": undefined;
-  "reminderStep.previewTitle": undefined;
-  "reminderStep.previewBody": undefined;
-  "reminderStep.now": undefined;
-  "reminderStep.daysBefore": { count: number };
   "welcomeLetter.title": undefined;
   "welcomeLetter.body": undefined;
   "welcomeLetter.signature": undefined;
