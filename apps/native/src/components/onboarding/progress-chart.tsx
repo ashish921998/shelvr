@@ -49,6 +49,13 @@ const HEIGHT = 230;
 const BASELINE = HEIGHT - 30;
 const GRID = [0.25, 0.48, 0.71].map((at) => at * BASELINE);
 const DRAW_MS = 1100;
+// The labels sit on fixed points of the curve, so they stay one line and stop
+// growing past this scale; VoiceOver reads them from the chart's own label.
+const LABEL_FIT = {
+  numberOfLines: 1,
+  adjustsFontSizeToFit: true,
+  maxFontSizeMultiplier: 1.3,
+} as const;
 // Splits the translated title around the accent, whatever the word order.
 const ACCENT_MARK = "⁣";
 
@@ -185,7 +192,9 @@ function Chart({ kind }: { kind: PlanKind }) {
               { bottom: HEIGHT - start.y + 14 },
             ]}
           >
-            <Text style={styles.pillText}>{lost}</Text>
+            <Text style={styles.pillText} {...LABEL_FIT}>
+              {lost}
+            </Text>
           </View>
           <Animated.View
             entering={reduced ? undefined : FadeIn.delay(DRAW_MS * 0.85)}
@@ -195,13 +204,19 @@ function Chart({ kind }: { kind: PlanKind }) {
               { bottom: HEIGHT - end.y + 14 },
             ]}
           >
-            <Text style={styles.pillText}>{goal}</Text>
+            <Text style={styles.pillText} {...LABEL_FIT}>
+              {goal}
+            </Text>
           </Animated.View>
-          <Text style={[styles.axis, styles.now, { left: start.x - 14 }]}>
+          <Text
+            style={[styles.axis, styles.now, { left: start.x - 14 }]}
+            {...LABEL_FIT}
+          >
             {t("onboardingChart.now")}
           </Text>
           <Text
             style={[styles.axis, styles.when, { right: width - end.x - 14 }]}
+            {...LABEL_FIT}
           >
             {t(COPY[kind].when)}
           </Text>
