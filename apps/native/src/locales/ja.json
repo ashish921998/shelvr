@@ -824,5 +824,10 @@
   "onboarding.sceneLunch": "昼食",
   "onboarding.sceneAfternoon": "午後",
   "onboarding.sceneEvening": "夜",
+  "signInScene.fromReels": "保存したリール3本から",
+  "signInScene.dateTitle": "デート・アルファマ",
+  "signInScene.sunset": "夕日",
+  "signInScene.dinner": "ディナー",
+  "signInScene.dessert": "デザート",
   "opener.getStarted": "はじめる"
 }

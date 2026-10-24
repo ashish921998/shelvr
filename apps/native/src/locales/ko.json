@@ -824,5 +824,10 @@
   "onboarding.sceneLunch": "점심",
   "onboarding.sceneAfternoon": "오후",
   "onboarding.sceneEvening": "저녁",
+  "signInScene.fromReels": "저장한 릴스 3개로",
+  "signInScene.dateTitle": "데이트 · 알파마",
+  "signInScene.sunset": "노을",
+  "signInScene.dinner": "저녁",
+  "signInScene.dessert": "디저트",
   "opener.getStarted": "시작하기"
 }

@@ -866,5 +866,10 @@
   "onboarding.sceneLunch": "Almoço",
   "onboarding.sceneAfternoon": "Tarde",
   "onboarding.sceneEvening": "Noite",
+  "signInScene.fromReels": "De 3 reels que você salvou",
+  "signInScene.dateTitle": "Encontro · Alfama",
+  "signInScene.sunset": "Pôr do sol",
+  "signInScene.dinner": "Jantar",
+  "signInScene.dessert": "Sobremesa",
   "opener.getStarted": "Começar"
 }

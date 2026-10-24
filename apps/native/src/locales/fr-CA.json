@@ -866,5 +866,10 @@
   "onboarding.sceneLunch": "Dîner",
   "onboarding.sceneAfternoon": "Après-midi",
   "onboarding.sceneEvening": "Soir",
+  "signInScene.fromReels": "À partir de 3 reels enregistrés",
+  "signInScene.dateTitle": "Soirée · Alfama",
+  "signInScene.sunset": "Coucher de soleil",
+  "signInScene.dinner": "Souper",
+  "signInScene.dessert": "Dessert",
   "opener.getStarted": "Commencer"
 }

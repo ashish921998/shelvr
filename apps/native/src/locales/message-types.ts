@@ -783,6 +783,11 @@ export type MessageParams = {
   "onboarding.sceneLunch": undefined;
   "onboarding.sceneAfternoon": undefined;
   "onboarding.sceneEvening": undefined;
+  "signInScene.fromReels": undefined;
+  "signInScene.dateTitle": undefined;
+  "signInScene.sunset": undefined;
+  "signInScene.dinner": undefined;
+  "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
 };
 export type MessageKey = keyof MessageParams;
