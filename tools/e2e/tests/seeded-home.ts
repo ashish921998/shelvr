@@ -10,7 +10,7 @@ import { pollUntil } from "./poll.ts";
 const BUNDLE_TIMEOUT = 180_000;
 
 /** The engine delays a tap only on a control that appeared or moved with the last action. */
-const SHEET_TRANSITION_MS = 1000;
+export const SHEET_TRANSITION_MS = 1000;
 
 const ADD_SHEET_WAIT_MS = 3000;
 
