@@ -314,6 +314,17 @@ function AddContent({ close, openCamera }: AddContentProps) {
           </Stack.Toolbar>
         </>
       ) : null}
+      {!isComposer && Platform.OS === "ios" ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="xmark"
+            tintColor={theme.colors.primary}
+            onPress={dismiss}
+          >
+            {t("common.close")}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      ) : null}
 
       {isComposer ? (
         <TextInput

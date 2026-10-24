@@ -29,6 +29,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 import { StitchRow } from "@/components/ui/stitch-loader";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { backOrHome } from "@/lib/screen-dismiss";
 
 const SUBMIT_CONTENT_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ scale: motion.scale.pressed }] },
@@ -115,6 +117,7 @@ function SpaceForm(props: SpaceFormProps) {
     }
     setSaving(true);
     try {
+      let createdId: Id<"spaces"> | null = null;
       if (props.mode === "edit") {
         await updateSpace({
           id: props.space._id,
@@ -123,7 +126,7 @@ function SpaceForm(props: SpaceFormProps) {
           autoFile: dynamic && autoFile,
         });
       } else {
-        await createSpace({
+        createdId = await createSpace({
           name: trimmed,
           dynamic,
           autoFile: dynamic && autoFile,
@@ -136,7 +139,11 @@ function SpaceForm(props: SpaceFormProps) {
       if (process.env.EXPO_OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      router.back();
+      if (createdId) {
+        router.replace({ pathname: "/space/[id]", params: { id: createdId } });
+      } else {
+        backOrHome(router);
+      }
     } catch (error) {
       // A ConvexError carries the server's user-facing sentence in `data`;
       // anything else is redacted to "Server Error" in production.
@@ -158,9 +165,16 @@ function SpaceForm(props: SpaceFormProps) {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.heading}>
-        {editing ? t("spaces.editTitle") : t("spaces.newTitle")}
-      </Text>
+      <View style={styles.sheetHeader}>
+        <Text accessibilityRole="header" style={styles.heading}>
+          {editing ? t("spaces.editTitle") : t("spaces.newTitle")}
+        </Text>
+        <HeaderIconButton
+          icon="xmark"
+          label={t("common.close")}
+          onPress={() => backOrHome(router)}
+        />
+      </View>
       <Text style={styles.subheading}>{t("spaces.editorHelp")}</Text>
 
       <TextInput
@@ -233,7 +247,14 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(2.5),
     gap: theme.gap(1.5),
   },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+  },
   heading: {
+    flexShrink: 1,
     fontFamily: theme.fonts.display,
     fontSize: 24,
     color: theme.colors.foreground,

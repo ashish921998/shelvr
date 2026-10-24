@@ -5,17 +5,20 @@ import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { StitchRing } from "@/components/ui/stitch-loader";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { backOrHome } from "@/lib/screen-dismiss";
 
 export default function ManageSpacesScreen() {
   useAppLocale();
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const id = itemId as Id<"items">;
+  const router = useRouter();
 
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
   const { data: item } = useQuery(convexQuery(api.items.getItem, { id }));
@@ -106,7 +109,16 @@ export default function ManageSpacesScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.heading}>{t("navigation.spaces")}</Text>
+      <View style={styles.sheetHeader}>
+        <Text accessibilityRole="header" style={styles.heading}>
+          {t("navigation.spaces")}
+        </Text>
+        <HeaderIconButton
+          icon="xmark"
+          label={t("common.close")}
+          onPress={() => backOrHome(router)}
+        />
+      </View>
       <Text style={styles.subheading}>{t("spaces.membershipHelp")}</Text>
       <Text style={styles.subheading}>{t("spaces.dismissedHelp")}</Text>
 
@@ -169,7 +181,14 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.gap(4),
     gap: theme.gap(1.5),
   },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+  },
   heading: {
+    flexShrink: 1,
     fontFamily: theme.fonts.display,
     fontSize: 24,
     color: theme.colors.foreground,

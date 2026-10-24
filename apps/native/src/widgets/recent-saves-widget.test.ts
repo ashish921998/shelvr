@@ -135,14 +135,14 @@ describe("RecentSavesWidget", () => {
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
     expect(textOf(tree, 1)).toBe("Shelvr Pro");
     expect(textOf(tree, 2)).toBe("Unlock your latest saves");
-    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(widgetUrl(tree)).toBe("shelvr:///");
   });
 
   it("fails closed to the Pro state before the app writes a snapshot", () => {
     const tree = widget()({}, smallLight);
 
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
-    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(widgetUrl(tree)).toBe("shelvr:///");
   });
 
   it("renders the normal empty state for an entitled user", () => {
@@ -212,7 +212,7 @@ describe("RecentSavesWidget", () => {
     );
 
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
-    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(widgetUrl(tree)).toBe("shelvr:///");
     expect(JSON.stringify(tree)).not.toContain("Chair");
   });
 });
@@ -224,6 +224,6 @@ it.each(["shelvr-dev", "shelvr-preview"])(
       { items: [], locked: true, scheme },
       { colorScheme: "light", widgetFamily: "systemSmall", date: new Date() },
     );
-    expect(widgetUrl(tree)).toBe(`${scheme}:///paywall`);
+    expect(widgetUrl(tree)).toBe(`${scheme}:///`);
   },
 );
