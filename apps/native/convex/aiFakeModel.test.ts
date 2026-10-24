@@ -140,6 +140,10 @@ describe("the e2e fake model from a saved page to a date plan", () => {
       title: "Date night in Lisbon",
       cities: ["Lisbon"],
     });
+    const scheduled = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(scheduled.map((job) => job.name)).toContain("placePins:locateItem");
 
     const spaceId = await t.mutation(api.spaces.ensureCitySpace, {
       city: "Lisbon",

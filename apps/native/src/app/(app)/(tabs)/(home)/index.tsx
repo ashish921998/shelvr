@@ -15,6 +15,7 @@ import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
 import { useHomeFeed } from "@/lib/home-feed";
+import { unplacedSaves } from "@/lib/home-places";
 import {
   useBusySaving,
   useFeedbackInvitation,
@@ -32,6 +33,9 @@ import { StyleSheet } from "react-native-unistyles";
 
 // Older saves with no place sit past the first feed page, so Home pages on like a list would.
 const LOAD_MORE_DISTANCE = 600;
+// Unasked, Home only pages until it has a screenful of unplaced saves, and never past this many saves; scrolling loads the rest.
+const AUTO_LOAD_SAVES = 200;
+const AUTO_LOAD_UNPLACED = 5;
 
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
@@ -44,9 +48,21 @@ export default function HomeScreen() {
   const [contentHeight, setContentHeight] = useState(0);
   const shortOfScreen =
     viewportHeight > 0 && contentHeight < viewportHeight + LOAD_MORE_DISTANCE;
+  const wantsMore =
+    items !== undefined &&
+    items.length < AUTO_LOAD_SAVES &&
+    unplacedSaves(items).length < AUTO_LOAD_UNPLACED;
   useEffect(() => {
-    if (shortOfScreen && canLoadMore && !loadingMore) loadMore();
-  }, [shortOfScreen, canLoadMore, loadingMore, loadMore, items?.length]);
+    if (shortOfScreen && wantsMore && canLoadMore && !loadingMore) loadMore();
+    // items.length re-runs it after each page, while the booleans stay the same.
+  }, [
+    shortOfScreen,
+    wantsMore,
+    canLoadMore,
+    loadingMore,
+    loadMore,
+    items?.length,
+  ]);
   const cancelSurvey = useCancelSurvey();
   const entitlement = useEntitlement();
   const locked = !entitlement.loading && !entitlement.entitled;
