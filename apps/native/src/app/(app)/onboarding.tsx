@@ -20,6 +20,7 @@ import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
   nextOnboardingStep,
+  onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
@@ -54,18 +55,6 @@ import { Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const PROGRESS: Record<OnboardingStep, number | null> = {
-  opener: null,
-  savedCount: 0.12,
-  goal: 0.25,
-  planner: 0.36,
-  chart: 0.46,
-  city: 0.56,
-  ahaShare: 0.68,
-  ahaSpots: 0.8,
-  ahaPlan: 1,
-};
 
 /** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
 const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
@@ -125,7 +114,7 @@ function Header({
   onSkip: (() => void) | null;
 }) {
   const { theme } = useUnistyles();
-  const progress = PROGRESS[step];
+  const progress = onboardingProgress(step);
   if (progress === null) return null;
   return (
     <View style={styles.header}>

@@ -25,6 +25,12 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   ahaPlan: "aha_plan",
 };
 
+/** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */
+export function onboardingProgress(step: OnboardingStep): number | null {
+  const index = ONBOARDING_STEPS.indexOf(step);
+  return index === 0 ? null : index / (ONBOARDING_STEPS.length - 1);
+}
+
 /** The step before `step`; none on the opener. */
 export function previousOnboardingStep(
   step: OnboardingStep,
