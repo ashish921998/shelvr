@@ -255,7 +255,7 @@ it("plans for every goal when the goal question is skipped", () => {
   expect(screen.getByRole("button", { name: "planner:continue" })).toBeTruthy();
 });
 
-it("goes back from a question, but not once the sample is showing", () => {
+it("goes back from a question and from the sample", () => {
   startAt("planner");
   render(<OnboardingScreen />);
   tap("common.back");
@@ -263,7 +263,8 @@ it("goes back from a question, but not once the sample is showing", () => {
   cleanup();
   startAt("ahaSpots");
   render(<OnboardingScreen />);
-  expect(screen.queryByRole("button", { name: "common.back" })).toBeNull();
+  tap("common.back");
+  expect(screen.getByRole("button", { name: "aha:share" })).toBeTruthy();
 });
 
 it("moves one step on a double tap", () => {
