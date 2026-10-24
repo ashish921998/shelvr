@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { TestConvexForDataModel } from "convex-test";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { EMBEDDING_DIMENSIONS } from "./model/embedding";
@@ -116,6 +116,40 @@ describe("the e2e fake model behind processItem", () => {
       description: "How to cook membrillo slowly until it sets.",
     });
     expect(item?.tags).toContain("membrillo");
+  });
+});
+
+describe("the e2e fake model from a saved page to a date plan", () => {
+  it("files the Lisbon fixture under Lisbon and plans its places", async () => {
+    const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        url: `${FIXTURE_ORIGIN}/lisbon-date-night`,
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      status: "ready",
+      title: "Date night in Lisbon",
+      cities: ["Lisbon"],
+    });
+
+    const spaceId = await t.mutation(api.spaces.ensureCitySpace, {
+      city: "Lisbon",
+    });
+    const plan = await t.action(api.plans.makePlan, { spaceId });
+    expect(plan.places.map((place) => place.name)).toEqual([
+      "Taberna da Rua das Flores",
+      "Miradouro da Graça",
+      "Manteigaria",
+    ]);
   });
 });
 

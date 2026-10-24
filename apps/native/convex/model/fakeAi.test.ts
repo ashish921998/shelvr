@@ -10,6 +10,7 @@ import {
   fakeAiLocks,
   fakeLinkAnalysis,
   fakeNoteAnalysis,
+  fakePlan,
   fakeRecommendation,
   FIXTURE_ORIGIN,
   fixturePage,
@@ -213,6 +214,43 @@ describe("fakeLinkAnalysis", () => {
 
   it("leaves a page with no title unanswered", () => {
     expect(fakeLinkAnalysis({ content: "text" })).toBeUndefined();
+  });
+});
+
+describe("fakePlan", () => {
+  const prompt = (saves: string) =>
+    [
+      "You help someone decide where to actually go, using what they saved.",
+      saves,
+    ].join("\n\n");
+
+  it("picks every place each save lists, numbered by its save", () => {
+    expect(
+      fakePlan(
+        prompt(
+          "Save 1\nTitle: No places here\n\nSave 2\nTitle: Date night\nPlaces: Manteigaria; Miradouro da Graça",
+        ),
+      ),
+    ).toEqual({
+      places: [
+        {
+          saveNumber: 2,
+          name: "Manteigaria",
+          area: "",
+          why: "Saved for a night out",
+        },
+        {
+          saveNumber: 2,
+          name: "Miradouro da Graça",
+          area: "",
+          why: "Saved for a night out",
+        },
+      ],
+    });
+  });
+
+  it("leaves a prompt that is not a plan unanswered", () => {
+    expect(fakePlan("Save 1\nPlaces: Manteigaria")).toBeUndefined();
   });
 });
 

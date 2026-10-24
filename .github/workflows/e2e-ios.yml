@@ -84,6 +84,7 @@ jobs:
           - name: b
             tests: >-
               tests/paywall.e2e.ts
+              tests/plan-city-date.e2e.ts
               tests/save-link-fixture.e2e.ts
     steps:
       - name: Check out the repository
@@ -282,8 +283,8 @@ jobs:
         id: flows
         continue-on-error: true
         working-directory: tools/e2e
-        # Tells the flow that needs the fake (save-link-fixture)
-        # that the backend runs it. E2E_FIXTURE_RESET has
+        # Tells the flows that need the fake (plan-city-date,
+        # save-link-fixture) that the backend runs it. E2E_FIXTURE_RESET has
         # the seeded flows reset their data with `convex run` against this
         # local backend instead of through Settings (startOnSeededHome), which
         # cost each flow about 50 seconds of taps and a relaunch.
