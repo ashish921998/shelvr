@@ -70,6 +70,58 @@ The workflow is manual and checks both backend URLs plus the Firebase file for
 Android. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
 runtime; publishing it does not upgrade an old binary's native configuration.
 
+### What the fingerprint hashes
+
+The runtime version is the hash `@expo/fingerprint` computes for the native
+project, and the library's preset decides which sources count. Since
+`@expo/fingerprint` 0.21 (Expo SDK 58) the default is `balanced`. Among other
+sources, it skips the app's version fields (`version`, `ios.buildNumber`,
+`android.versionCode`, `ios.version`, `android.version`) and the `eas.json` and
+`.easignore` files. Through SDK 57 the version was hashed. A version bump alone
+therefore does not move the fingerprint, and an OTA from the bumped tree still
+reaches the previous build.
+
+A `fingerprint.config.js` in `apps/native` that selects `preset: "strict"` or
+sets its own `sourceSkips` would bring the version back into the hash, and
+`EXPO_UPDATES_FINGERPRINT_OVERRIDE` would replace the hash at build time.
+Nothing in this repo sets either. `apps/native/.fingerprintignore` is different:
+it is set, and leaves files out of the hash (described above).
+
+Some changes alter the native build without moving the fingerprint, so the
+comparison below cannot see them. For each, decide by hand whether a store
+build must ship before the next OTA:
+
+- An `eas.json` field such as `ios.buildConfiguration` or
+  `android.gradleCommand`. The preset skips the whole file.
+- An `.easignore` edit that leaves a native file out of the build archive. The
+  preset skips this file too.
+- Adding, changing or removing a pnpm patch. `balanced` counts an autolinked
+  native module and a `node_modules` config plugin by `name@version` alone, and
+  the library reads patch files only from `apps/native/patches`, while ours live
+  in `patches/` at the repo root. If JS depends on the patch, a binary built
+  without it still accepts the OTA.
+
+Expo's
+[`SourceSkips` reference](https://docs.expo.dev/versions/v58.0.0/sdk/fingerprint/)
+lists the skipped sources and notes the `eas.json` and `.easignore` cases.
+
+Do not predict what moves the fingerprint; run the comparison.
+`pnpm run verify:fingerprint origin/main HEAD` prints `unchanged` or `CHANGED`
+for each platform, and every source that moved. It checks the production
+variant unless `APP_VARIANT` is set, as CI does, and its header line names the
+variant. A change that moves only the development or preview hash reads
+`unchanged` there, so put `APP_VARIANT=preview` or `APP_VARIANT=development` in
+front of the command for those builds. Read the verdict, not the hashes: the
+comparison runs without the EAS production variables that the app config reads,
+so its hashes can differ from the ones in `apps/native/released-builds.json`.
+
+After an Expo upgrade, check the list of skipped version fields above once. On a
+scratch branch, commit a change that only bumps `version` in
+`apps/native/app.json`, then run `pnpm run verify:fingerprint HEAD~1 HEAD`.
+Expect `unchanged` on both platforms and exit code 0. It takes about half a
+minute, because it installs the dependencies of both refs. A `CHANGED` on either
+platform means that list is out of date.
+
 ### Two layers guard OTA compatibility
 
 **On a pull request, an early warning.** CI computes the fingerprint of the
@@ -114,9 +166,9 @@ have not taken the store update yet. The gate blocks that publish today,
 because the tree's hash will not match the newer recorded build. To ship it,
 point the entry at the older build for that publish and put it back
 afterwards, or give the profile a list of builds if this stops being rare. And
-the pull-request warning fingerprints `APP_VARIANT=production` only, so a
-change that moves only the development or preview hash stays invisible until a
-publish on that profile.
+the pull-request warning checks the production variant only (see
+[What the fingerprint hashes](#what-the-fingerprint-hashes)), so a move in
+another variant surfaces at that profile's publish gate.
 
 ### Recording a release
 
