@@ -766,7 +766,7 @@
   "onboardingChart.whenWeekend": "이번 주말",
   "onboardingChart.whenTrip": "다음 여행",
   "onboardingChart.body": "준비됐어요. 저장한 릴스와 틱톡이 직접 고른 장소로만 지도 위 계획이 돼요.",
-  "onboardingChart.chartLabel": "지금의 %{lost}에서 %{goal}까지의 곡선",
+  "onboardingChart.chartLabel": "지금의 %{lost}에서 %{goal}까지의 곡선. %{when}",
   "aha.shareTitle": "해 보세요: 이 릴스를 Shelvr에 저장",
   "aha.sampleBadge": "샘플",
   "aha.captionDate": "%{city}에서 완벽한 데이트를 위한 3곳 🍷",

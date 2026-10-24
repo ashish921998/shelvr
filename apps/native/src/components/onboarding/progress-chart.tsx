@@ -120,13 +120,14 @@ function Chart({ kind }: { kind: PlanKind }) {
 
   const goal = t(COPY[kind].goal);
   const lost = t("onboardingChart.lost");
+  const when = t(COPY[kind].when);
   return (
     <View
       style={styles.chart}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={t("onboardingChart.chartLabel", { lost, goal })}
+      accessibilityLabel={t("onboardingChart.chartLabel", { lost, goal, when })}
     >
       {width > 0 && curve && area ? (
         <>
@@ -218,7 +219,7 @@ function Chart({ kind }: { kind: PlanKind }) {
             style={[styles.axis, styles.when, { right: width - end.x - 14 }]}
             {...LABEL_FIT}
           >
-            {t(COPY[kind].when)}
+            {when}
           </Text>
         </>
       ) : null}

@@ -787,7 +787,7 @@
   "onboardingChart.whenWeekend": "This weekend",
   "onboardingChart.whenTrip": "Your next trip",
   "onboardingChart.body": "You're set. The reels and TikToks you saved become a plan on a map, with only places you picked.",
-  "onboardingChart.chartLabel": "A curve from %{lost} now to %{goal}",
+  "onboardingChart.chartLabel": "A curve from %{lost} now to %{goal}. %{when}",
   "aha.shareTitle": "Try it: save this reel to Shelvr",
   "aha.sampleBadge": "Sample",
   "aha.captionDate": "3 spots for the perfect %{city} date night 🍷",
