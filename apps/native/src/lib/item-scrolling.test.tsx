@@ -159,9 +159,6 @@ vi.mock("@/lib/home-feed", () => ({
 }));
 vi.mock("@/lib/use-item-open", () => ({ useItemOpen: vi.fn() }));
 vi.mock("@/lib/use-item-share", () => ({ useItemShare: () => mock.mutation }));
-vi.mock("@/lib/use-find-links", () => ({
-  useFindLinks: () => ({ findLinks: mock.mutation, disabled: false }),
-}));
 vi.mock("@/lib/share/share-store", () => ({
   forgetDeletedSharedItem: mock.forget,
 }));

@@ -2,17 +2,11 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { saveErrorCode } from "@convex/model/saveErrors";
-import { ProductsSection } from "@/components/products-section";
-import { RecipeSection } from "@/components/recipe-section";
-import { ArticleReaderView } from "@/components/article-reader-view";
 import { SiteButton, SitePanel } from "@/components/site-panel";
-import { ItemSpaces } from "@/components/item-spaces";
 import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
-import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
-import { SimilarGrid } from "@/components/similar-grid";
 import { TagChip } from "@/components/tag-chip";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
@@ -82,7 +76,6 @@ function useItemDetailData(item: DetailItem) {
   const { data: withSpaces, isError: fullRowFailed } = useQuery(
     convexQuery(api.items.getItem, { id: item._id }),
   );
-  const spaces = withSpaces?.spaces ?? [];
 
   const detail = useMemo<DetailItem>(
     () =>
@@ -98,16 +91,6 @@ function useItemDetailData(item: DetailItem) {
     withSpaces === undefined &&
     !fullRowFailed;
 
-  // Use the 'skip' sentinel, not `enabled`: a disabled React Query still subscribes through the Convex adapter.
-  const similarReady = item.status === "ready" && item.type !== "note";
-  const { data: similar } = useQuery({
-    ...convexQuery(
-      api.items.similarItems,
-      similarReady ? { id: item._id } : "skip",
-    ),
-    gcTime: 30_000,
-  });
-
   const heroUri = item.imageUrl ?? item.heroImageUrl;
 
   const paragraphs = useMemo(
@@ -119,7 +102,7 @@ function useItemDetailData(item: DetailItem) {
     [detail.content],
   );
 
-  return { detail, bodyPending, spaces, similar, heroUri, paragraphs };
+  return { detail, bodyPending, heroUri, paragraphs };
 }
 
 export const ItemDetail = memo(function ItemDetail({
@@ -137,8 +120,7 @@ export const ItemDetail = memo(function ItemDetail({
 
   const headerInset = Platform.OS === "ios" ? headerHeight : 0;
 
-  const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
-    useItemDetailData(item);
+  const { detail, bodyPending, heroUri, paragraphs } = useItemDetailData(item);
 
   // FlashList can recycle this page instance for a different item.
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -150,25 +132,6 @@ export const ItemDetail = memo(function ItemDetail({
   }, [item._id]);
 
   const social = socialPost(item);
-
-  if (
-    !bodyPending &&
-    item.type === "link" &&
-    social === undefined &&
-    paragraphs.length > 0
-  ) {
-    return (
-      <ArticleReaderView
-        item={detail}
-        isZoomTarget={isZoomTarget}
-        headerHeight={headerInset}
-        spaces={spaces}
-        similar={similar}
-        heroUri={heroUri}
-        paragraphs={paragraphs}
-      />
-    );
-  }
 
   const intents = (() => {
     const base = item.intents ?? [];
@@ -211,8 +174,6 @@ export const ItemDetail = memo(function ItemDetail({
             <ItemSheetBody
               item={item}
               detail={detail}
-              spaces={spaces}
-              similar={similar}
               paragraphs={paragraphs}
               social={social}
             />
@@ -340,8 +301,6 @@ export const ItemDetail = memo(function ItemDetail({
       <ItemPageBody
         item={item}
         detail={detail}
-        spaces={spaces}
-        similar={similar}
         paragraphs={paragraphs}
         social={social}
         intents={intents}
@@ -454,8 +413,6 @@ function MoreMedia({ item, site }: { item: DetailItem; site: string }) {
 type DetailBodyProps = {
   item: DetailItem;
   detail: ReturnType<typeof useItemDetailData>["detail"];
-  spaces: ReturnType<typeof useItemDetailData>["spaces"];
-  similar: ReturnType<typeof useItemDetailData>["similar"];
   paragraphs: string[];
   social: SocialPost | undefined;
 };
@@ -463,8 +420,6 @@ type DetailBodyProps = {
 function ItemPageBody({
   item,
   detail,
-  spaces,
-  similar,
   paragraphs,
   social,
   intents,
@@ -478,9 +433,10 @@ function ItemPageBody({
   if (item.type === "note") {
     return (
       <View style={styles.body}>
-        <NoteEditor key={item._id} item={detail} />
-        {item.status === "ready" ? (
-          <ItemSpaces itemId={item._id} spaces={spaces} />
+        {detail.content ? (
+          <Text selectable style={styles.paragraph}>
+            {detail.content}
+          </Text>
         ) : null}
         <SaveStatusNotice item={detail} />
       </View>
@@ -490,10 +446,6 @@ function ItemPageBody({
   return (
     <View style={[styles.body, hasHero ? { paddingTop: theme.gap(5) } : null]}>
       <SaveStatusNotice item={item} centered />
-
-      {item.status === "ready" ? (
-        <ItemSpaces itemId={item._id} spaces={spaces} centered />
-      ) : null}
 
       {item.url && plainLink(item, social) ? (
         <View style={styles.siteActions}>
@@ -526,7 +478,7 @@ function ItemPageBody({
         </>
       )}
 
-      {item.description && !(social && detail.recipe) ? (
+      {item.description ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
@@ -549,7 +501,6 @@ function ItemPageBody({
       <DetailSections
         item={item}
         detail={detail}
-        similar={similar}
         paragraphs={paragraphs}
         social={social}
       />
@@ -557,21 +508,10 @@ function ItemPageBody({
   );
 }
 
-function ItemSheetBody({
-  item,
-  detail,
-  spaces,
-  similar,
-  paragraphs,
-  social,
-}: DetailBodyProps) {
+function ItemSheetBody({ item, detail, paragraphs, social }: DetailBodyProps) {
   useAppLocale();
   return (
     <View style={styles.body}>
-      {item.status === "ready" ? (
-        <ItemSpaces itemId={item._id} spaces={spaces} />
-      ) : null}
-
       {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
 
       {item.description ? (
@@ -581,7 +521,6 @@ function ItemSheetBody({
       <DetailSections
         item={item}
         detail={detail}
-        similar={similar}
         paragraphs={paragraphs}
         social={social}
       />
@@ -589,23 +528,10 @@ function ItemSheetBody({
   );
 }
 
-function DetailSections({
-  item,
-  detail,
-  similar,
-  paragraphs,
-  social,
-}: Omit<DetailBodyProps, "spaces">) {
-  const { theme } = useUnistyles();
-  const recipe = detail.recipe ? (
-    <RecipeSection key={item._id} recipe={detail.recipe} />
-  ) : null;
-  const recipeFirst = social !== undefined && recipe !== null;
+function DetailSections({ item, detail, paragraphs, social }: DetailBodyProps) {
   return (
     <>
-      {recipeFirst ? recipe : null}
-
-      {social && !recipeFirst && paragraphs.length > 0 ? (
+      {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>
@@ -613,26 +539,13 @@ function DetailSections({
 
       <TagsRow tags={item.tags} />
 
-      {item.status === "ready" ? (
-        <ProductsSection item={detail} inset={theme.gap(2)} />
-      ) : null}
-
-      {recipeFirst ? null : recipe ? (
-        recipe
-      ) : !social && paragraphs.length > 0 ? (
+      {!social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text selectable key={index} style={styles.paragraph}>
               {paragraph}
             </Text>
           ))}
-        </View>
-      ) : null}
-
-      {similar && similar.length > 0 ? (
-        <View style={styles.similarSection}>
-          <Text style={styles.similarTitle}>{t("item.similar")}</Text>
-          <SimilarGrid items={similar} />
         </View>
       ) : null}
     </>
@@ -961,18 +874,7 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 25,
     color: theme.colors.foreground,
   },
-  similarSection: {
-    gap: theme.gap(1),
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingTop: theme.gap(2.5),
-  },
-  similarTitle: {
-    fontFamily: theme.fonts.display,
-    fontSize: 18,
-    color: theme.colors.foreground,
-    paddingHorizontal: 4,
-  },
+
   chip: {
     flexDirection: "row",
     alignItems: "center",

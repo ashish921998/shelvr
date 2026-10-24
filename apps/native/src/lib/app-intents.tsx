@@ -356,7 +356,8 @@ function useInvocationHandler() {
         const id = param(invocation, "id");
         if (!id) return;
         await whenNavigationReady();
-        router.push({ pathname: "/space/[id]", params: { id } });
+        // Spaces left the app; the shortcut opens Home, where the cities are.
+        router.navigate("/(app)/(tabs)/(home)");
         return;
       }
       case "saveNote": {

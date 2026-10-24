@@ -1,6 +1,6 @@
 import { CityCover } from "@/components/city/city-cover";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
-import { type City, visibleCities } from "@/lib/home-places";
+import { type City, unplacedSaves, visibleCities } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -50,6 +50,56 @@ function CityGrid({ cities }: { cities: City[] }) {
           </Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+const MAX_UNPLACED_ROWS = 5;
+
+type UnplacedSave = {
+  _id: string;
+  status: "processing" | "ready" | "failed";
+  cities?: string[];
+  title?: string;
+  url?: string;
+};
+
+function unplacedLabel(save: UnplacedSave): string {
+  if (save.status === "processing") return t("homePlaces.noPlaceReading");
+  if (save.status === "failed") return t("homePlaces.noPlaceFailed");
+  return t("homePlaces.noPlaceNone");
+}
+
+/** Saves no city card shows, so nothing shared disappears; each opens its save to retry or delete. */
+export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
+  useAppLocale();
+  const router = useRouter();
+  const unplaced = unplacedSaves(saves).slice(0, MAX_UNPLACED_ROWS);
+  if (unplaced.length === 0) return null;
+  return (
+    <View style={styles.unplaced}>
+      <Text style={styles.sectionLabel}>{t("homePlaces.noPlaceTitle")}</Text>
+      {unplaced.map((save) => (
+        <Pressable
+          key={save._id}
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/item/[id]",
+              params: { id: save._id, from: "home" },
+            })
+          }
+          style={({ pressed }) => [
+            styles.unplacedRow,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.unplacedTitle} numberOfLines={1}>
+            {save.title ?? save.url ?? ""}
+          </Text>
+          <Text style={styles.muted}>{unplacedLabel(save)}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -118,6 +168,27 @@ const styles = StyleSheet.create((theme) => ({
   moreLabel: { ...theme.type.subheadStrong, color: theme.colors.foreground },
 
   muted: { ...theme.type.footnote, color: theme.colors.muted },
+  unplaced: {
+    gap: theme.gap(0.5),
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(2),
+  },
+  sectionLabel: {
+    ...theme.type.labelStrong,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.faint,
+  },
+  unplacedRow: {
+    gap: theme.gap(0.25),
+    paddingVertical: theme.gap(1),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  unplacedTitle: {
+    ...theme.type.subheadStrong,
+    color: theme.colors.foreground,
+  },
   card: {
     gap: theme.gap(1.5),
     padding: theme.gap(2),

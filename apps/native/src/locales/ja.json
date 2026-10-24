@@ -66,6 +66,7 @@
   "capture.title": "何かを保存",
   "common.back": "戻る",
   "capture.linkPlaceholder": "リンクを貼り付けるか入力…",
+  "capture.linkHint": "場所が出てくるリール、TikTok、ページ。Shelvrが都市ごとに整理します。",
   "capture.notePlaceholder": "メモを書く…",
   "item.note": "メモ",
   "item.article": "リンク",
@@ -705,6 +706,10 @@
   "goal.citySearch": "都市を検索",
   "homePlaces.yourCities": "あなたの都市",
   "homePlaces.citiesHint": "保存したリールやTikTokに出てくる場所",
+  "homePlaces.noPlaceTitle": "場所が見つからない保存",
+  "homePlaces.noPlaceReading": "読み込み中…",
+  "homePlaces.noPlaceFailed": "読み込めませんでした",
+  "homePlaces.noPlaceNone": "場所の記載がありません",
   "homePlaces.spotCount": {
     "other": "%{formattedCount}スポット"
   },

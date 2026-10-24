@@ -66,6 +66,7 @@
   "capture.title": "무언가 저장하기",
   "common.back": "뒤로",
   "capture.linkPlaceholder": "링크를 붙여넣거나 입력하세요…",
+  "capture.linkHint": "장소가 나오는 릴스, TikTok, 페이지. Shelvr가 도시별로 정리해요.",
   "capture.notePlaceholder": "메모를 적어 보세요…",
   "item.note": "메모",
   "item.article": "링크",
@@ -704,7 +705,11 @@
   "goal.citySomewhere": "다른 곳",
   "goal.citySearch": "도시 검색",
   "homePlaces.yourCities": "내 도시",
-  "homePlaces.citiesHint": "저장한 릴스와 틱톡에 나온 장소",
+  "homePlaces.citiesHint": "저장한 릴스와 TikTok에 나온 장소",
+  "homePlaces.noPlaceTitle": "장소를 찾지 못한 저장",
+  "homePlaces.noPlaceReading": "읽는 중…",
+  "homePlaces.noPlaceFailed": "읽지 못했어요",
+  "homePlaces.noPlaceNone": "장소가 없어요",
   "homePlaces.spotCount": {
     "other": "장소 %{formattedCount}곳"
   },

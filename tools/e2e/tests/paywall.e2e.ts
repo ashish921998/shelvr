@@ -31,7 +31,7 @@ test("keeps someone without Pro on the plan gate", async ({
   await expect(screen.getByText("Pick a plan to open Shelvr")).toBeVisible();
 
   await expect(screen.getByRole("button", "Add")).toBeHidden();
-  await expect(screen.getByTestId("fixture-item-ramen")).toBeHidden();
+  await expect(screen.getByText("Your cities")).toBeHidden();
 
   await seePlans.tap();
   await expectPaywall(screen);

@@ -9,17 +9,18 @@ import {
 describe("deferred sheet link", () => {
   it("reads sheet routes from scheme, triple-slash and relative links", () => {
     expect(sheetRouteOf("shelvr://add?mode=note")).toBe("/add?mode=note");
-    expect(sheetRouteOf("shelvr-dev:///camera")).toBe("/camera");
-    expect(sheetRouteOf("/manage-spaces")).toBe("/manage-spaces");
+    expect(sheetRouteOf("shelvr-dev:///add")).toBe("/add");
+    expect(sheetRouteOf("/add")).toBe("/add");
+    expect(sheetRouteOf("/camera")).toBeNull();
     expect(sheetRouteOf("shelvr://item/abc")).toBeNull();
     expect(sheetRouteOf("not a url")).toBeNull();
   });
 
   it("keeps a sheet link that arrives before the plan, once", () => {
-    rememberSheetLink("shelvr://new-space");
+    rememberSheetLink("shelvr://add");
     expect(releaseSheetLink(true)).toBeNull();
     expect(releaseSheetLink(false)).toEqual({
-      route: "/new-space",
+      route: "/add",
       sheet: true,
     });
     expect(releaseSheetLink(false)).toBeNull();

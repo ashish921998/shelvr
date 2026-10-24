@@ -68,6 +68,7 @@
   "capture.title": "Enregistrer",
   "common.back": "Retour",
   "capture.linkPlaceholder": "Collez ou saisissez un lien…",
+  "capture.linkHint": "Un reel, un TikTok ou une page qui cite des lieux. Shelvr les range sous leur ville.",
   "capture.notePlaceholder": "Écrivez une note…",
   "item.note": "Note",
   "item.article": "Lien",
@@ -743,6 +744,10 @@
   "goal.citySearch": "Rechercher une ville",
   "homePlaces.yourCities": "Vos villes",
   "homePlaces.citiesHint": "Les lieux des reels et TikToks que tu as enregistrés",
+  "homePlaces.noPlaceTitle": "Aucun lieu trouvé",
+  "homePlaces.noPlaceReading": "Lecture en cours…",
+  "homePlaces.noPlaceFailed": "Impossible de le lire",
+  "homePlaces.noPlaceNone": "Aucun lieu dans celui-ci",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} adresse",
     "many": "%{formattedCount} adresses",

@@ -29,14 +29,12 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Core save loop
 
-- **Link:** tap Add, paste a URL, and save. The item enters processing, then ready with title/description/tags when AI completes.
-- **Note:** tap Add, type a note, and save. The content remains if AI classification fails.
-- **Image:** Camera capture or library import. Upload progress and retry are shown on failure.
-- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
+- **Link:** tap Add, paste an Instagram Reel or TikTok link (any page link is accepted), and save. The save enters processing, then ready; the places it names appear under a city in Home's "Your cities". A save that names no place (or is still processing, or failed) shows under "No place found". Notes, photos and the camera are not part of this build.
+- **Share Sheet:** From Safari, Instagram or TikTok, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates new saves, Map, dynamic Spaces, and Find links.
+- Shelvr Pro gates new saves, Plan a date and Plan a trip.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers keep **read-only** access to existing library content.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -55,7 +53,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Profile → Settings → **Delete account**.
 - Deleting an account that used Sign in with Apple also revokes its Apple token, when Shelvr holds one. Shelvr started keeping that token with this release, so an account that last signed in before it has none: its deletion still removes everything, the revocation is skipped, and signing in again once stores a token.
-- Confirmation explains what is deleted (saves, spaces, uploads, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
+- Confirmation explains what is deleted (saves, places, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
 - After success the user is signed out.
 
 ## Legal and support
@@ -66,20 +64,17 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Permissions
 
-| Permission    | When requested                         | Why                                      |
-| ------------- | -------------------------------------- | ---------------------------------------- |
-| Camera        | User opens Camera to capture           | Save a photo into Shelvr                 |
-| Photo Library | User imports a photo                   | Import photos                            |
-| Calendar      | User adds an event from an item intent | Create calendar event from saved content |
+| Permission | When requested                         | Why                                      |
+| ---------- | -------------------------------------- | ---------------------------------------- |
+| Calendar   | User adds an event from an item intent | Create calendar event from saved content |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
 
 ## Privacy disclosures (summary)
 
 - Account email via Apple/Google.
-- Saved URLs, notes, images, extracted page content, AI titles/tags/classifications.
-- EXIF capture time / GPS from imported photos only (no live location tracking).
-- Product-search queries when user taps Find links.
+- Saved URLs, extracted page content, AI titles/tags/classifications and the places found.
+- Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
 
@@ -103,12 +98,12 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Confirm the Annual 7-day trial offer is available in every intended storefront. Generic app actions use **View Pro plans** because the Weekly plan does not include a trial.
 - Confirm App Privacy is published and matches `apps/native/privacy.json`, `ios.privacyManifests`, and the hosted Privacy Policy.
 - Add complete contact information and the notes below to App Review Information.
-- Attach the preview video from `shelvr-notes/store-assets/preview/` as the review demo if it reflects the submitted build; otherwise record a fresh walkthrough of sign-in, onboarding, paywall, save, restore, permissions, and account deletion.
+- Attach the preview video from `shelvr-notes/store-assets/preview/` as the review demo if it reflects the submitted build; otherwise record a fresh walkthrough of sign-in, onboarding, paywall, saving a reel link, a city page, restore, and account deletion.
 - Remove every unresolved review issue or mark it resolved before resubmitting.
 
 ## Paste-ready App Review notes
 
-Shelvr is a private save-it-for-later app for links, notes, and images. It uses AI to generate titles, descriptions, tags, and private Spaces. It has no feed and no messaging. A user can share one save through an unlisted link, which goes away when the save is deleted or the share sheet is cancelled.
+Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed and no messaging. A user can share one save through an unlisted link, which goes away when the save is deleted or the share sheet is cancelled.
 
 Account access:
 
@@ -128,16 +123,15 @@ Subscription testing:
 
 Core review flow:
 
-1. From Home, tap Add.
-2. Save a URL or note. The item first shows processing, then receives an AI-generated title, description, tags, and Space suggestions.
-3. Open Search to find the saved item.
-4. Open Spaces to create or inspect a collection.
-5. Camera permission is requested only after choosing Camera. Photo Library access is requested only after importing a photo.
-6. The Map uses only GPS metadata embedded in photos the user selects; Shelvr does not request or track live device location.
+1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear under a city in "Your cities". A link that names no place shows under "No place found".
+2. Tap a city to open its page: a map with a pin per place, and a sheet listing the places.
+3. On the city page, tap "Plan a date" or "Plan a trip" to get a shortlist or a day-by-day trip made from those saves.
+4. Tap a save to see its detail; the source link opens the original post.
+5. Shelvr does not request camera or photo access, and does not request or track live device location.
 
 Share extension, Siri and widget:
 
-1. In Safari, open any page, tap Share, and choose Shelvr. The link is saved without leaving Safari.
+1. In Safari or the Instagram or TikTok app, open a post, tap Share, and choose Shelvr. The link is saved without leaving Safari.
 2. In the Shortcuts app, open Shelvr and run "Save a Link". The same action works through Siri.
 3. Add the "Recent Saves" widget to the Home Screen to see the latest saves.
 
@@ -149,6 +143,6 @@ Account and support controls:
 
 - Profile contains subscription management and Sign out. Profile > Settings contains Contact Support, Restore Purchases, Terms of Service, Privacy Policy, and Delete account.
 - To delete an account: Profile > Settings > Delete account.
-- Delete account permanently removes the user's saves, spaces, uploads, subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.
+- Delete account permanently removes the user's saves, places, subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.
 
 Internet access is required for sign-in, subscriptions, cloud sync, and AI organization. Shelvr does not request an App Store rating during onboarding. It may ask once, after at least three saves, when the user returns to Home from a save they opened.
