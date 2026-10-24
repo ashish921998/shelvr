@@ -433,9 +433,9 @@ function ItemPageBody({
   if (item.type === "note") {
     return (
       <View style={styles.body}>
-        {detail.content ? (
+        {detail.note ? (
           <Text selectable style={styles.paragraph}>
-            {detail.content}
+            {detail.note}
           </Text>
         ) : null}
         <SaveStatusNotice item={detail} />
