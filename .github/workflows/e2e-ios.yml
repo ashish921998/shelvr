@@ -70,8 +70,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 90
     # The flows split over two runners, each with its own simulator and
-    # backend, balanced on the 2026-10-21 timings: 7 to 10 minutes of flows
-    # each once setup is done. One shard failing does not stop the other.
+    # backend, balanced on run 39919713009 (2026-10-23): about 12 minutes of
+    # flows each (a 732 s, b 731 s) when create-space passes first time. A
+    # create-space retry adds about 5.5 minutes to shard a. One shard failing
+    # does not stop the other.
     # A shard runs its files in name order. Onboarding stays behind
     # create-space, as on a single runner: as the first flow on a fresh
     # simulator it lost the driver twice ("Daemon request timed out").
@@ -82,14 +84,14 @@ jobs:
           - name: a
             tests: >-
               tests/create-space.e2e.ts
-              tests/item-detail.e2e.ts
               tests/onboarding.e2e.ts
-              tests/paywall.e2e.ts
-          - name: b
-            tests: >-
-              tests/save-link-fixture.e2e.ts
               tests/save-note.e2e.ts
               tests/search.e2e.ts
+          - name: b
+            tests: >-
+              tests/item-detail.e2e.ts
+              tests/paywall.e2e.ts
+              tests/save-link-fixture.e2e.ts
               tests/search-no-results.e2e.ts
               tests/space-suggestions.e2e.ts
     steps:
@@ -109,6 +111,20 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      # Booting takes 2 to 4 minutes and needs nothing from this checkout, so
+      # it starts here and runs under the install and cache restores. The
+      # picker taps in save-image are measured on an iPhone 17, and the other
+      # flows run on any iPhone; the runtime is the newest the image has.
+      - name: Create a simulator and start it booting
+        run: |
+          runtime=$(xcrun simctl list runtimes available -j | node -p '
+            JSON.parse(require("fs").readFileSync(0)).runtimes
+              .filter((r) => r.platform === "iOS").at(-1).identifier')
+          echo "runtime $runtime"
+          udid=$(xcrun simctl create e2e "iPhone 17" "$runtime")
+          xcrun simctl boot "$udid"
+          echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -173,18 +189,12 @@ jobs:
           path: ~/.agent-device
           key: ${{ steps.fingerprint.outputs.runner-key }}
 
-      # The picker taps in save-image are measured on an iPhone 17, and the
-      # other flows run on any iPhone; the runtime is the newest the image has.
-      - name: Boot a simulator and install the build
+      # The simulator was started at the top of the job; bootstatus waits for
+      # the boot to finish before the build goes onto it.
+      - name: Install the build
         run: |
-          runtime=$(xcrun simctl list runtimes available -j | node -p '
-            JSON.parse(require("fs").readFileSync(0)).runtimes
-              .filter((r) => r.platform === "iOS").at(-1).identifier')
-          echo "runtime $runtime"
-          udid=$(xcrun simctl create e2e "iPhone 17" "$runtime")
-          xcrun simctl bootstatus "$udid" -b
-          xcrun simctl install "$udid" apps/native/build/e2e/ShelvrDev.app
-          echo "E2E_DEVICE=$udid" >> "$GITHUB_ENV"
+          xcrun simctl bootstatus "$E2E_DEVICE" -b
+          xcrun simctl install "$E2E_DEVICE" apps/native/build/e2e/ShelvrDev.app
 
       # A cold runner build can outlast the budget e2e gives the engine to
       # start (seen: "boot failed: Daemon request timed out"), so it is built
