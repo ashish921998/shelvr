@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -48,6 +48,7 @@ export default function NewSpaceScreen() {
   useAppLocale();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = id !== undefined;
+  const router = useRouter();
 
   const {
     data: space,
@@ -67,6 +68,13 @@ export default function NewSpaceScreen() {
   if (editing && (isError || space === null)) {
     return (
       <View style={styles.loading}>
+        <View style={styles.unavailableClose}>
+          <HeaderIconButton
+            icon="xmark"
+            label={t("common.close")}
+            onPress={() => backOrHome(router)}
+          />
+        </View>
         <Text>{t("spaces.unavailable")}</Text>
       </View>
     );
@@ -86,6 +94,7 @@ function SpaceForm(props: SpaceFormProps) {
   useAppLocale();
   const editing = props.mode === "edit";
   const router = useRouter();
+  const navigation = useNavigation();
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const createSpace = useMutation(api.spaces.createSpace);
@@ -139,6 +148,8 @@ function SpaceForm(props: SpaceFormProps) {
       if (process.env.EXPO_OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+      // The sheet may have been swiped away while the save ran.
+      if (!navigation.isFocused()) return;
       if (createdId) {
         router.replace({ pathname: "/space/[id]", params: { id: createdId } });
       } else {
@@ -172,6 +183,7 @@ function SpaceForm(props: SpaceFormProps) {
         <HeaderIconButton
           icon="xmark"
           label={t("common.close")}
+          disabled={saving}
           onPress={() => backOrHome(router)}
         />
       </View>
@@ -242,6 +254,11 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  unavailableClose: {
+    position: "absolute",
+    top: theme.gap(2.5),
+    right: theme.gap(2.5),
   },
   content: {
     padding: theme.gap(2.5),
