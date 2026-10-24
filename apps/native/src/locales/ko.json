@@ -505,8 +505,6 @@
   "navigation.profile": "프로필",
   "capture.add": "저장 항목 추가",
   "loading.home": "책장 준비 중",
-  "home.emptyTitle": "나중을 위해 저장하세요",
-  "home.emptyBody": "+를 눌러 링크, 사진, 떠오른 생각을 넣어 보세요.\n필요할 때까지 Shelvr가 간직해 줘요.",
   "navigation.mapHeader": "지도",
   "loading.map": "내 지도 여는 중",
   "map.proTitle": "지도는 Pro 기능이에요",
@@ -739,7 +737,6 @@
   "home.howToMore": "안 보이나요? 더 보기 누르기",
   "home.howToMoreHelp": "그다음 Shelvr를 즐겨찾기에 추가하면 앞쪽에 계속 보여요.",
   "home.pasteLink": "링크 붙여넣기",
-  "home.onYourShelf": "내 책장",
   "home.progressTitleFirst": "다시 보고 싶은 것 3개를 저장해 보세요",
   "home.progressTitleNext": "다음 2개를 저장해 보세요",
   "home.progressTitleLast": "하나만 더 저장하면 돼요",
@@ -927,5 +924,21 @@
   "recipeReveal.ingredientMozzarella": "모차렐라 125g (찢은 것)",
   "recipeReveal.stepSauce": "다짐육을 양파, 마늘과 함께 볶아요. 토마토 퓌레를 넣고 20분 끓여요.",
   "recipeReveal.stepLayer": "미트 소스, 라자냐 면, 화이트 소스를 세 번 번갈아 쌓아요. 위에 모차렐라를 올려요.",
-  "recipeReveal.stepBake": "190°C 오븐에서 40분, 노릇하게 보글보글 끓을 때까지 구워요."
+  "recipeReveal.stepBake": "190°C 오븐에서 40분, 노릇하게 보글보글 끓을 때까지 구워요.",
+  "homePlaces.yourCities": "내 도시",
+  "homePlaces.spotCount": {
+    "other": "장소 %{formattedCount}곳"
+  },
+  "homePlaces.moreCities": "+ %{n}개 더 보기",
+  "homePlaces.yourSpaces": "내 공간",
+  "homePlaces.seeAll": "모두 보기",
+  "homePlaces.emptyTitle": "TikTok이나 Instagram에서 장소 저장하기",
+  "homePlaces.emptyBody": "릴스를 Shelvr에 공유하면 해당 도시에 담겨요.",
+  "homePlaces.addSpot": "장소 추가",
+  "homePlaces.everythingSaved": "저장한 모든 것",
+  "homePlaces.untitled": "제목 없음",
+  "homePlaces.planDate": "데이트 계획하기",
+  "homePlaces.planDateHint": "하룻밤, 몇 군데 들르기",
+  "homePlaces.planTrip": "여행 계획하기",
+  "homePlaces.planTripHint": "하루씩"
 }

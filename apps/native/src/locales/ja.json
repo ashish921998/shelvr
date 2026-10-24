@@ -505,8 +505,6 @@
   "navigation.profile": "プロフィール",
   "capture.add": "項目を保存",
   "loading.home": "シェルフを準備しています",
-  "home.emptyTitle": "あとで見るために保存",
-  "home.emptyBody": "＋をタップしてリンク、写真、ふと思いついたことを追加。\n必要になるまでShelvrが大切に保管します。",
   "navigation.mapHeader": "地図",
   "loading.map": "地図を開いています",
   "map.proTitle": "地図はProの機能です",
@@ -739,7 +737,6 @@
   "home.howToMore": "見つからない場合は「その他」をタップ",
   "home.howToMoreHelp": "Shelvrをよく使う項目に追加すると、先頭に表示されます。",
   "home.pasteLink": "リンクを貼り付ける",
-  "home.onYourShelf": "シェルフ",
   "home.progressTitleFirst": "あとで見返したいものを3つ保存しましょう",
   "home.progressTitleNext": "あと2つ保存しましょう",
   "home.progressTitleLast": "あと1つです",
@@ -927,5 +924,21 @@
   "recipeReveal.ingredientMozzarella": "モッツァレラ 125g（ちぎる）",
   "recipeReveal.stepSauce": "ひき肉を玉ねぎ、にんにくと炒める。トマトピューレを加えて20分煮込む。",
   "recipeReveal.stepLayer": "ミートソース、パスタ、ホワイトソースを3回重ねる。上にモッツァレラをのせる。",
-  "recipeReveal.stepBake": "190℃のオーブンで40分、こんがりグツグツするまで焼く。"
+  "recipeReveal.stepBake": "190℃のオーブンで40分、こんがりグツグツするまで焼く。",
+  "homePlaces.yourCities": "あなたの都市",
+  "homePlaces.spotCount": {
+    "other": "%{formattedCount}スポット"
+  },
+  "homePlaces.moreCities": "ほか%{n}件",
+  "homePlaces.yourSpaces": "あなたのスペース",
+  "homePlaces.seeAll": "すべて見る",
+  "homePlaces.emptyTitle": "TikTokやInstagramから場所を保存",
+  "homePlaces.emptyBody": "リールをShelvrに共有すると、その都市に入ります。",
+  "homePlaces.addSpot": "スポットを追加",
+  "homePlaces.everythingSaved": "保存したものすべて",
+  "homePlaces.untitled": "無題",
+  "homePlaces.planDate": "デートを計画",
+  "homePlaces.planDateHint": "ある夜、いくつかのスポット",
+  "homePlaces.planTrip": "旅行を計画",
+  "homePlaces.planTripHint": "日ごとに"
 }

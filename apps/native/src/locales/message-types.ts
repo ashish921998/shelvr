@@ -486,8 +486,6 @@ export type MessageParams = {
   "navigation.profile": undefined;
   "capture.add": undefined;
   "loading.home": undefined;
-  "home.emptyTitle": undefined;
-  "home.emptyBody": undefined;
   "navigation.mapHeader": undefined;
   "loading.map": undefined;
   "map.proTitle": undefined;
@@ -698,7 +696,6 @@ export type MessageParams = {
   "home.howToMore": undefined;
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
-  "home.onYourShelf": undefined;
   "home.progressTitleFirst": undefined;
   "home.progressTitleNext": undefined;
   "home.progressTitleLast": undefined;
@@ -883,6 +880,20 @@ export type MessageParams = {
   "recipeReveal.stepBake": undefined;
   "plan.buildTitleDate": undefined;
   "plan.buildTitleWeekend": undefined;
+  "homePlaces.yourCities": undefined;
+  "homePlaces.spotCount": { count: number };
+  "homePlaces.moreCities": { n: string };
+  "homePlaces.yourSpaces": undefined;
+  "homePlaces.seeAll": undefined;
+  "homePlaces.emptyTitle": undefined;
+  "homePlaces.emptyBody": undefined;
+  "homePlaces.addSpot": undefined;
+  "homePlaces.everythingSaved": undefined;
+  "homePlaces.untitled": undefined;
+  "homePlaces.planDate": undefined;
+  "homePlaces.planDateHint": undefined;
+  "homePlaces.planTrip": undefined;
+  "homePlaces.planTripHint": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

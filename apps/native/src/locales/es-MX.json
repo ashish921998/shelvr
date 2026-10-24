@@ -521,8 +521,6 @@
   "navigation.profile": "Perfil",
   "capture.add": "Agregar contenido",
   "loading.home": "Preparando tu estantería",
-  "home.emptyTitle": "Guárdalo para más tarde",
-  "home.emptyBody": "Toca + para agregar un enlace, una foto o una idea.\nShelvr lo guarda hasta que lo necesites.",
   "navigation.mapHeader": "mapa",
   "loading.map": "Abriendo tu mapa",
   "map.proTitle": "El mapa es una función Pro",
@@ -781,7 +779,6 @@
   "home.howToMore": "¿No aparece? Toca Más",
   "home.howToMoreHelp": "Después agrega Shelvr a Favoritos para que quede al principio.",
   "home.pasteLink": "Pega un enlace",
-  "home.onYourShelf": "En tu estantería",
   "home.progressTitleFirst": "Guarda tres cosas a las que quieras volver",
   "home.progressTitleNext": "Guarda las dos siguientes",
   "home.progressTitleLast": "Solo falta una más",
@@ -973,5 +970,23 @@
   "recipeReveal.ingredientMozzarella": "125 g de mozzarella, en trozos",
   "recipeReveal.stepSauce": "Dora la carne con la cebolla y el ajo. Agrega el puré de tomate y deja hervir a fuego bajo 20 minutos.",
   "recipeReveal.stepLayer": "Alterna tres capas de salsa de carne, láminas y bechamel. Cubre con la mozzarella.",
-  "recipeReveal.stepBake": "Hornea a 190 °C durante 40 minutos, hasta que esté dorada y burbujee."
+  "recipeReveal.stepBake": "Hornea a 190 °C durante 40 minutos, hasta que esté dorada y burbujee.",
+  "homePlaces.yourCities": "Tus ciudades",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
+  },
+  "homePlaces.moreCities": "+ %{n} más",
+  "homePlaces.yourSpaces": "Tus colecciones",
+  "homePlaces.seeAll": "Ver todo",
+  "homePlaces.emptyTitle": "Guarda lugares de TikTok o Instagram",
+  "homePlaces.emptyBody": "Comparte un reel con Shelvr y aparecerá en su ciudad.",
+  "homePlaces.addSpot": "Agregar un lugar",
+  "homePlaces.everythingSaved": "Todo lo que has guardado",
+  "homePlaces.untitled": "Sin título",
+  "homePlaces.planDate": "Planear una cita",
+  "homePlaces.planDateHint": "Una noche, unas cuantas paradas",
+  "homePlaces.planTrip": "Planear un viaje",
+  "homePlaces.planTripHint": "Día por día"
 }

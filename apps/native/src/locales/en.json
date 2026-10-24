@@ -512,8 +512,6 @@
   "navigation.profile": "Profile",
   "capture.add": "Add save",
   "loading.home": "Warming your shelf",
-  "home.emptyTitle": "Save it for later",
-  "home.emptyBody": "Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it.",
   "navigation.mapHeader": "map",
   "loading.map": "Opening your map",
   "map.proTitle": "Map is a Pro feature",
@@ -760,7 +758,6 @@
   "home.howToMore": "Not there? Tap More",
   "home.howToMoreHelp": "Then add Shelvr to Favorites so it stays up front.",
   "home.pasteLink": "Paste a link",
-  "home.onYourShelf": "On your shelf",
   "home.progressTitleFirst": "Save three things you'll want back",
   "home.progressTitleNext": "Save your next two",
   "home.progressTitleLast": "One more save to go",
@@ -950,5 +947,22 @@
   "recipeReveal.stepLayer": "Layer the meat sauce, lasagne sheets and white sauce three times. Top with the mozzarella.",
   "recipeReveal.stepBake": "Bake at 190°C for 40 minutes, until golden and bubbling.",
   "plan.buildTitleDate": "Building a sample",
-  "plan.buildTitleWeekend": "Building a sample"
+  "plan.buildTitleWeekend": "Building a sample",
+  "homePlaces.yourCities": "Your cities",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} spot",
+    "other": "%{formattedCount} spots"
+  },
+  "homePlaces.moreCities": "+ %{n} more",
+  "homePlaces.yourSpaces": "Your spaces",
+  "homePlaces.seeAll": "See all",
+  "homePlaces.emptyTitle": "Save places from TikTok or Instagram",
+  "homePlaces.emptyBody": "Share a reel to Shelvr and it lands under its city.",
+  "homePlaces.addSpot": "Add a spot",
+  "homePlaces.everythingSaved": "Everything you saved",
+  "homePlaces.untitled": "Untitled save",
+  "homePlaces.planDate": "Plan a date",
+  "homePlaces.planDateHint": "One evening, a few stops",
+  "homePlaces.planTrip": "Plan a trip",
+  "homePlaces.planTripHint": "Day by day"
 }

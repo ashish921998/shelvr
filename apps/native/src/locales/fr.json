@@ -521,8 +521,6 @@
   "navigation.profile": "Profil",
   "capture.add": "Ajouter un contenu",
   "loading.home": "Préparation de votre étagère",
-  "home.emptyTitle": "Gardez-le pour plus tard",
-  "home.emptyBody": "Touchez + pour ajouter un lien, une photo ou une idée.\nShelvr les garde au chaud jusqu'à ce que vous en ayez besoin.",
   "navigation.mapHeader": "carte",
   "loading.map": "Ouverture de votre carte",
   "map.proTitle": "La carte est une fonction Pro",
@@ -781,7 +779,6 @@
   "home.howToMore": "Absent ? Touchez Plus",
   "home.howToMoreHelp": "Ajoutez ensuite Shelvr aux Favoris pour qu'il reste en premier.",
   "home.pasteLink": "Coller un lien",
-  "home.onYourShelf": "Sur votre étagère",
   "home.progressTitleFirst": "Enregistrez trois choses à retrouver plus tard",
   "home.progressTitleNext": "Enregistrez les deux suivantes",
   "home.progressTitleLast": "Plus qu’une",
@@ -973,5 +970,23 @@
   "recipeReveal.ingredientMozzarella": "125 g de mozzarella, déchirée",
   "recipeReveal.stepSauce": "Faites dorer le bœuf avec l’oignon et l’ail. Ajoutez le coulis et laissez mijoter 20 minutes.",
   "recipeReveal.stepLayer": "Alternez trois fois sauce à la viande, feuilles de lasagnes et béchamel. Finissez par la mozzarella.",
-  "recipeReveal.stepBake": "Enfournez 40 minutes à 190 °C, jusqu’à ce que ce soit doré et bouillonnant."
+  "recipeReveal.stepBake": "Enfournez 40 minutes à 190 °C, jusqu’à ce que ce soit doré et bouillonnant.",
+  "homePlaces.yourCities": "Vos villes",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} adresse",
+    "many": "%{formattedCount} adresses",
+    "other": "%{formattedCount} adresses"
+  },
+  "homePlaces.moreCities": "+ %{n} de plus",
+  "homePlaces.yourSpaces": "Vos collections",
+  "homePlaces.seeAll": "Tout voir",
+  "homePlaces.emptyTitle": "Enregistrez des lieux depuis TikTok ou Instagram",
+  "homePlaces.emptyBody": "Partagez un reel avec Shelvr et il rejoint sa ville.",
+  "homePlaces.addSpot": "Ajouter une adresse",
+  "homePlaces.everythingSaved": "Tout ce que vous avez enregistré",
+  "homePlaces.untitled": "Sans titre",
+  "homePlaces.planDate": "Planifier un rendez-vous",
+  "homePlaces.planDateHint": "Une soirée, quelques étapes",
+  "homePlaces.planTrip": "Planifier un voyage",
+  "homePlaces.planTripHint": "Jour par jour"
 }

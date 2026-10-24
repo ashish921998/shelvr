@@ -191,6 +191,8 @@ export type AnalyticsEventProperties = {
     made: boolean;
   };
   trip_failed: { reason: "ai_consent" | "error" };
+  city_opened: { count: number };
+  city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };

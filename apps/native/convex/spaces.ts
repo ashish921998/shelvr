@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -10,6 +10,7 @@ import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { cityKey, tidyCity } from "./model/trip";
 import {
   deleteMembershipsForSpace,
   effectiveStatus,
@@ -24,7 +25,13 @@ import {
   toSummaryPatch,
   type MembershipSummary,
 } from "./model/memberships";
-import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import {
+  enrichItem,
+  enrichedItemValidator,
+  intentValidator,
+  CITY_SCAN_ROWS,
+  readyCitySaves,
+} from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
@@ -280,6 +287,57 @@ export const createSpace = authedMutation({
         spaceId,
       },
     );
+    return spaceId;
+  },
+});
+
+export const ensureCitySpace = authedMutation({
+  args: { city: v.string() },
+  returns: v.id("spaces"),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const name = validateSpaceName(tidyCity(args.city));
+    await requireProEntitlement(ctx, userId);
+    const saves = await readyCitySaves(ctx, userId, args.city, CITY_SCAN_ROWS);
+    if (saves.length === 0) {
+      throw new ConvexError({
+        code: "city_empty",
+        message: "No ready saves in this city",
+      });
+    }
+
+    // listCities groups case-insensitively and its display spelling can flip,
+    // so match the space by the same key, not the exact name.
+    const key = cityKey(name);
+    let existing: Doc<"spaces"> | null = null;
+    for await (const space of ctx.db
+      .query("spaces")
+      .withIndex("by_user", (q) => q.eq("userId", userId))) {
+      if (cityKey(space.name) === key) {
+        existing = space;
+        break;
+      }
+    }
+    const spaceId =
+      existing?._id ??
+      (await ctx.db.insert("spaces", {
+        userId,
+        name,
+        dynamic: false,
+        autoFile: false,
+        ...emptySummary(),
+      }));
+    // Oldest first, so planners that read the newest memberships keep the recent saves.
+    for (const item of [...saves].reverse()) {
+      if ((await getMembership(ctx, item._id, spaceId)) === null) {
+        await insertMembership(ctx, {
+          userId,
+          spaceId,
+          itemId: item._id,
+          status: "saved",
+        });
+      }
+    }
     return spaceId;
   },
 });

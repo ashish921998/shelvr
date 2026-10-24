@@ -512,8 +512,6 @@
   "navigation.profile": "Profil",
   "capture.add": "Inhalt hinzufügen",
   "loading.home": "Dein Regal wird vorbereitet",
-  "home.emptyTitle": "Für später speichern",
-  "home.emptyBody": "Tippe auf + für einen Link, ein Foto oder einen Gedanken.\nShelvr bewahrt alles auf, bis du es brauchst.",
   "navigation.mapHeader": "karte",
   "loading.map": "Deine Karte wird geöffnet",
   "map.proTitle": "Karte ist eine Pro-Funktion",
@@ -760,7 +758,6 @@
   "home.howToMore": "Nicht dabei? Tippe auf Mehr",
   "home.howToMoreHelp": "Füge Shelvr dann zu den Favoriten hinzu, damit es vorne bleibt.",
   "home.pasteLink": "Link einfügen",
-  "home.onYourShelf": "In deinem Regal",
   "home.progressTitleFirst": "Speichere drei Dinge, die du wiederfinden willst",
   "home.progressTitleNext": "Speichere die nächsten zwei",
   "home.progressTitleLast": "Noch ein Inhalt",
@@ -950,5 +947,22 @@
   "recipeReveal.ingredientMozzarella": "125 g Mozzarella, zerzupft",
   "recipeReveal.stepSauce": "Hack mit Zwiebel und Knoblauch anbraten. Passierte Tomaten einrühren und 20 Minuten köcheln lassen.",
   "recipeReveal.stepLayer": "Fleischsoße, Lasagneplatten und Béchamel dreimal schichten. Mit Mozzarella belegen.",
-  "recipeReveal.stepBake": "Bei 190 °C 40 Minuten backen, bis alles goldbraun ist und blubbert."
+  "recipeReveal.stepBake": "Bei 190 °C 40 Minuten backen, bis alles goldbraun ist und blubbert.",
+  "homePlaces.yourCities": "Deine Städte",
+  "homePlaces.spotCount": {
+    "one": "%{formattedCount} Spot",
+    "other": "%{formattedCount} Spots"
+  },
+  "homePlaces.moreCities": "+ %{n} weitere",
+  "homePlaces.yourSpaces": "Deine Sammlungen",
+  "homePlaces.seeAll": "Alle ansehen",
+  "homePlaces.emptyTitle": "Speichere Orte von TikTok oder Instagram",
+  "homePlaces.emptyBody": "Teile ein Reel mit Shelvr, und es landet unter seiner Stadt.",
+  "homePlaces.addSpot": "Spot hinzufügen",
+  "homePlaces.everythingSaved": "Alles, was du gespeichert hast",
+  "homePlaces.untitled": "Ohne Titel",
+  "homePlaces.planDate": "Date planen",
+  "homePlaces.planDateHint": "Ein Abend, ein paar Stopps",
+  "homePlaces.planTrip": "Reise planen",
+  "homePlaces.planTripHint": "Tag für Tag"
 }
