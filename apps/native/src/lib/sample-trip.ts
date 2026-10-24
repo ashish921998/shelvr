@@ -179,7 +179,7 @@ function spreadPins(
   }));
 }
 
-function buildTrip(
+export function buildTrip(
   kind: PlanKind,
   id: SampleCityId,
   city: SampleCity,

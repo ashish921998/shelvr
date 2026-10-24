@@ -7,9 +7,8 @@ export const ONBOARDING_STEPS = [
   "city",
   "ahaShare",
   "ahaSpots",
-  "ahaPlan",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 18;
+export const ONBOARDING_FLOW_VERSION = 20;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -22,7 +21,6 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   city: "city",
   ahaShare: "aha_share",
   ahaSpots: "aha_spots",
-  ahaPlan: "aha_plan",
 };
 
 /** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */

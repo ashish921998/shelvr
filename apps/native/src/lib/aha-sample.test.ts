@@ -1,7 +1,17 @@
+import { distanceKm } from "@convex/model/trip";
 import { describe, expect, it } from "vitest";
-import { AHA_SPOTS, ahaSample, walkMinutes } from "./aha-sample";
+import { ahaReel, ahaReelUrl } from "./aha-reels";
+import { AHA_SPOTS, ahaSample } from "./aha-sample";
 import { SAMPLE_CITY_IDS } from "./sample-cities";
 import { planCities } from "./sample-plans";
+
+const KINDS = ["date", "trip", "weekend"] as const;
+const reels = KINDS.flatMap((kind) =>
+  SAMPLE_CITY_IDS.flatMap((city) => {
+    const reel = ahaReel(kind, city);
+    return reel === null ? [] : [{ kind, city, reel }];
+  }),
+);
 
 describe("ahaSample", () => {
   it.each(["date", "trip", "weekend"] as const)(
@@ -15,11 +25,6 @@ describe("ahaSample", () => {
           sample.spots.map((spot) => spot.stop),
         );
         expect(sample.spots.map((spot) => spot.number)).toEqual([1, 2, 3]);
-        expect(sample.spots[0].walk).toBeNull();
-        for (const spot of sample.spots.slice(1))
-          expect(spot.walk).toBeGreaterThanOrEqual(1);
-        const times = sample.spots.map((spot) => spot.time);
-        expect([...times].sort((a, b) => a - b)).toEqual(times);
       }
     },
   );
@@ -30,17 +35,57 @@ describe("ahaSample", () => {
     expect(ahaSample("date", null).city).toBe("prague");
   });
 
-  it("credits a made-up account named for the city", () => {
-    expect(ahaSample("date", "los-angeles").handle).toBe("@losangeles.eats");
+  it("credits a made-up account named for the city where there is no reel", () => {
+    expect(ahaSample("date", "prague")).toMatchObject({
+      reel: null,
+      handle: "@prague.eats",
+    });
     expect(ahaSample("trip", "lisbon").handle).toBe("@lisbon.trips");
   });
+
+  it.each(reels.map((entry) => [entry.kind, entry.city, entry]))(
+    "pins the %s reel's first three places in %s in its video's order and credits its creator",
+    (kind, city, { reel }) => {
+      const sample = ahaSample(kind, city);
+      expect(sample.reel).toBe(reel);
+      expect(sample.handle).toBe(`@${reel.handle}`);
+      expect(sample.spots.map((spot) => spot.stop.name)).toEqual(
+        reel.places.slice(0, AHA_SPOTS).map(([, name]) => name),
+      );
+    },
+  );
 });
 
-it("counts a walk of a kilometre as about a quarter of an hour", () => {
-  const minutes = walkMinutes(
-    { lat: 50.0866, lng: 14.4096 },
-    { lat: 50.0956, lng: 14.4096 },
-  );
-  expect(minutes).toBeGreaterThanOrEqual(12);
-  expect(minutes).toBeLessThanOrEqual(16);
+describe("ahaReel", () => {
+  it("has a reel for each plan in each of the five pilot cities", () => {
+    for (const kind of KINDS)
+      for (const city of [
+        "austin",
+        "new-york",
+        "los-angeles",
+        "chicago",
+        "san-francisco",
+      ] as const)
+        expect(ahaReel(kind, city), `${kind} in ${city}`).not.toBeNull();
+  });
+
+  it("plays every reel once, and keeps each one's places together in its city", () => {
+    expect(new Set(reels.map(({ reel }) => reel.code)).size).toBe(reels.length);
+    for (const { reel } of reels) {
+      expect(reel.places.length).toBeGreaterThanOrEqual(AHA_SPOTS);
+      const [first, ...rest] = reel.places.map(([, , lat, lng]) => ({
+        lat,
+        lng,
+      }));
+      for (const at of rest)
+        expect(distanceKm(first, at), reel.code).toBeLessThan(30);
+    }
+  });
+
+  it("links the reel the way a share from Instagram does", () => {
+    const [{ reel }] = reels;
+    expect(ahaReelUrl(reel)).toBe(
+      `https://www.instagram.com/reel/${reel.code}/`,
+    );
+  });
 });
