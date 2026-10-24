@@ -21,8 +21,8 @@ after it.
   "Found 3 spots in that reel" (Continue enables once the pins land), then
   "Your date night in Prague" and "Save your own spots", which asks for the
   paywall. Notification permission is asked after a trial starts, not here.
-- Closing the paywall keeps the person on the sample plan, signed out; a
-  cold launch comes back to the same step.
+- The paywall has no close. A relaunch comes back to the sample plan,
+  signed out, and "Save your own spots" opens the paywall again.
 
 ## How to get to it (user POV)
 
@@ -44,16 +44,15 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After each paywall close "Save your own spots" is back and
-`dev-login-button` stays hidden; a cold relaunch returns to "Save your own
-spots" with the splash gone. No
-purchase is made.
+After a relaunch from the paywall, "Save your own spots" is back with the
+splash gone and `dev-login-button` hidden, and it opens the paywall again.
+No purchase is made.
 
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the sample plan; close the paywall, relaunch, and check the step is kept and nothing signs in
-onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots, and the date-night plan show before the paywall
+onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the sample plan and the paywall; relaunch, and check the step is kept, nothing signs in, and the paywall opens again
+onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots and the date-night plan show before the paywall
 ```
 
 ## Gotchas
