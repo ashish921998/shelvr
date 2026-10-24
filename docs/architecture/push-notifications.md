@@ -87,11 +87,24 @@ its own `sourceSkips` can bring the version back into the hash.
 `EXPO_UPDATES_FINGERPRINT_OVERRIDE` replaces the hash at build time. Separately,
 `apps/native/.fingerprintignore` leaves files out of the hash (described above).
 
+Skipping `eas.json` and `.easignore` also hides what in them changes the native
+build: `eas.json` fields such as `ios.buildConfiguration` and
+`android.gradleCommand`, and an `.easignore` edit that leaves a native file out
+of the build archive. None of these moves the fingerprint, so the comparison
+below cannot see them. Decide by hand whether such a change needs a store build
+before the next OTA. Expo's
+[`SourceSkips` reference](https://docs.expo.dev/versions/v58.0.0/sdk/fingerprint/)
+lists both.
+
 Do not predict what moves the fingerprint; run the comparison.
 `pnpm run verify:fingerprint origin/main HEAD` prints `unchanged` or `CHANGED`
-for each platform, and every source that moved. Read the verdict, not the
-hashes. The comparison runs without EAS's production variables, so its hashes
-differ from the ones in `apps/native/released-builds.json`.
+for each platform, and every source that moved. It checks the production
+variant unless `APP_VARIANT` is set, as CI does, and its header line names the
+variant. A change that moves only the development or preview hash reads
+`unchanged` there, so put `APP_VARIANT=preview` or `APP_VARIANT=development` in
+front of the command for those builds. Read the verdict, not the hashes. The
+comparison runs without EAS's production variables, so its hashes differ from
+the ones in `apps/native/released-builds.json`.
 
 After an Expo upgrade, check the first paragraph once. On a scratch branch,
 commit a change that only bumps `version` in `apps/native/app.json`, then run
