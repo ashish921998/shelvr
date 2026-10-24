@@ -34,7 +34,7 @@ function StepRow({
   const copy = COPY[step];
   return (
     <Pressable
-      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityRole="checkbox"
       accessibilityState={{ checked: done }}
       disabled={onPress === undefined}
       onPress={onPress}

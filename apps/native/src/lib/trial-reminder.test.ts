@@ -6,14 +6,16 @@ import {
   TRIAL_LAST_DAY_ID,
   TRIAL_NUDGES,
   TRIAL_REMINDER_ID,
-  setTrialReminderLeadDays,
   trialLastDayAt,
   trialNudgeAt,
   trialNudgesAllowed,
-  trialReminderAt,
-  trialReminderLeadDays,
   trialReminderPrimer,
 } from "./trial-reminder";
+import {
+  setTrialReminderLeadDays,
+  trialReminderAt,
+  trialReminderLeadDays,
+} from "./trial-reminder-lead";
 
 const mock = vi.hoisted(() => ({
   platform: { OS: "ios" },
@@ -113,6 +115,13 @@ describe("the reminder's lead", () => {
         trigger: expect.objectContaining({ date: new Date(NOW + 4 * DAY) }),
       }),
     );
+  });
+
+  it("puts a day's lead an hour inside the renewal window, not on its edge", () => {
+    const HOUR = 60 * 60 * 1000;
+    expect(trialReminderAt(NOW + 7 * DAY, NOW, 1)).toBe(NOW + 6 * DAY - HOUR);
+    expect(trialReminderAt(NOW + 7 * DAY, NOW, 2)).toBe(NOW + 5 * DAY);
+    expect(trialReminderAt(NOW + 7 * DAY, NOW, 3)).toBe(NOW + 4 * DAY);
   });
 
   it("sends no second last-day warning when the reminder is a day ahead", async () => {

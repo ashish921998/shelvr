@@ -1,4 +1,5 @@
 import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
+import { useLargeText } from "@/lib/use-large-text";
 import { Image } from "expo-image";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -11,8 +12,13 @@ const CARDS = [
   { picture: CITY_PICTURES["new-york"].food, left: 0.52, top: 0.42, turn: -6 },
 ] as const;
 
-/** Tilted city photos behind the opener and sign-in. Decorative only. */
+/**
+ * Tilted city photos behind the opener and sign-in. Decorative only: it takes
+ * the room left over, shrinks to nothing when there is none, and steps aside
+ * for large text so the buttons stay on screen.
+ */
 export function PhotoCollage() {
+  if (useLargeText()) return null;
   return (
     <View
       style={styles.collage}
@@ -45,7 +51,6 @@ export function PhotoCollage() {
 const styles = StyleSheet.create((theme) => ({
   collage: {
     flex: 1,
-    minHeight: 200,
   },
   card: {
     position: "absolute",

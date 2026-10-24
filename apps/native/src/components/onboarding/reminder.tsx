@@ -10,18 +10,12 @@ import type { SampleCityId } from "@/lib/sample-cities";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { requestNotificationPermission } from "@/lib/notification-token";
-import { useNotificationSession } from "@/lib/notifications";
-import {
-  applyQueuedWeeklyShelf,
-  queueWeeklyShelf,
-} from "@/lib/pending-weekly-shelf";
 import {
   TRIAL_REMINDER_LEAD_DAYS,
   setTrialReminderLeadDays,
   trialReminderLeadDays,
   type TrialReminderLeadDays,
-} from "@/lib/trial-reminder";
-import { useConvexAuth } from "convex/react";
+} from "@/lib/trial-reminder-lead";
 import { Image } from "expo-image";
 import { useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -62,8 +56,6 @@ export function ReminderStep({
   onDone: () => void;
 }) {
   useAppLocale();
-  const { isAuthenticated } = useConvexAuth();
-  const { session } = useNotificationSession();
   const [lead, setLead] = useState(trialReminderLeadDays);
   const [asking, setAsking] = useState(false);
   // State updates too late to stop a second tap before the next render.
@@ -86,16 +78,8 @@ export function ReminderStep({
     setTrialReminderLeadDays(lead);
     let granted = false;
     try {
+      // The trial reminder only; the weekly shelf stays its own opt-in.
       granted = await requestNotificationPermission();
-      if (granted) {
-        queueWeeklyShelf();
-        // Already signed in, so no sign-in is coming to apply it.
-        if (isAuthenticated) {
-          await applyQueuedWeeklyShelf((enabled) =>
-            session.setWeeklyShelf(enabled),
-          );
-        }
-      }
     } catch (error) {
       analytics.captureError("onboarding_notifications_failed", error);
     }

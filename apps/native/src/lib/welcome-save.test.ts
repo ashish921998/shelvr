@@ -18,6 +18,19 @@ const mock = vi.hoisted(() => ({
   focused: true,
   focusListeners: new Set<() => void>(),
   settle: [] as (() => void)[],
+  priorSaves: 0 as number | undefined,
+}));
+vi.mock("@convex/_generated/api", () => ({
+  api: { items: { saveProgress: "saveProgress" } },
+}));
+vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({
+    data:
+      mock.priorSaves === undefined
+        ? undefined
+        : { saved: mock.priorSaves, goal: 3 },
+  }),
 }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
@@ -85,7 +98,10 @@ describe("justStartedPro", () => {
 });
 
 describe("useWelcomeSaveTracker", () => {
-  beforeEach(() => mock.store.clear());
+  beforeEach(() => {
+    mock.store.clear();
+    mock.priorSaves = 0;
+  });
 
   function signIn(userId: string, status: string) {
     vi.mocked(useCurrentUser).mockReturnValue({
@@ -106,6 +122,18 @@ describe("useWelcomeSaveTracker", () => {
     signIn("u2", "trialing");
     renderHook(() => useWelcomeSaveTracker());
     expect(welcomeSave.isPending("u2")).toBe(false);
+  });
+
+  it("spends the flag without a letter when an existing account signs in", () => {
+    noteOnboardingFinished();
+    mock.priorSaves = undefined;
+    signIn("u4", "pro");
+    const { rerender } = renderHook(() => useWelcomeSaveTracker());
+    expect(mock.store.get("shelvr.welcomeAfterOnboarding")).toBe("true");
+    mock.priorSaves = 2;
+    rerender();
+    expect(welcomeSave.isPending("u4")).toBe(false);
+    expect(mock.store.get("shelvr.welcomeAfterOnboarding")).toBe("");
   });
 
   it("leaves a returning sign-in alone", () => {

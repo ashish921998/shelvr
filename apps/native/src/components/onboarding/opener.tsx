@@ -2,7 +2,7 @@ import { PhotoCollage } from "@/components/onboarding/collage";
 import { PillButton } from "@/components/onboarding/parts";
 import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function OpenerStep({
@@ -14,7 +14,11 @@ export function OpenerStep({
 }) {
   useAppLocale();
   return (
-    <View style={styles.wrap}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.wrap}
+      alwaysBounceVertical={false}
+    >
       <PhotoCollage />
       <View style={styles.copy}>
         <Text
@@ -41,13 +45,16 @@ export function OpenerStep({
           </Text>
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  wrap: {
+  scroll: {
     flex: 1,
+  },
+  wrap: {
+    flexGrow: 1,
     gap: theme.gap(3),
   },
   copy: {

@@ -1,6 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { trialReminderLeadDays } from "@/lib/trial-reminder-lead";
 import {
-  trialReminderLeadDays,
   trialReminderPrimer,
   useTrialReminderPrimerOpen,
 } from "@/lib/trial-reminder";

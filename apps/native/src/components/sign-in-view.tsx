@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   useColorScheme,
   View,
@@ -39,7 +40,11 @@ export function SignInView({
   const anonEnabled = isAnonymousAuthEnabled();
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      alwaysBounceVertical={false}
+    >
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -166,18 +171,21 @@ export function SignInView({
       {pending === null && interrupted && (
         <Text style={styles.error}>{t("account.signInNotFinished")}</Text>
       )}
-    </View>
+    </ScrollView>
   );
 }
 const styles = StyleSheet.create((theme, rt) => ({
-  container: {
+  scroll: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flexGrow: 1,
     padding: theme.gap(2.5),
     paddingTop: rt.insets.top + theme.gap(3),
     paddingBottom: rt.insets.bottom + theme.gap(2),
     alignItems: "stretch",
     gap: theme.gap(3),
-    backgroundColor: theme.colors.background,
   },
   back: {
     position: "absolute",

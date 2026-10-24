@@ -18,6 +18,7 @@ vi.mock("expo-localization", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
+vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 
 type Progress = Parameters<typeof goalPaywallVariables>[0];
 const progress = (

@@ -170,9 +170,19 @@ export default function HomeScreen() {
   }
 
   const setup = setupProgress(items);
-  const progressCard = saveProgressCard(progress, setup);
-  const showHowTo =
-    !progress.deferLater && shouldShowSetup(setup, items.length);
+  const progressCard = shouldShowSetup(
+    setup,
+    items.length,
+    progress.card !== null,
+  ) ? (
+    <View style={styles.setupCard}>
+      <SetupChecklist
+        progress={setup}
+        onDismiss={progress.dismiss}
+        onShown={progress.markShown}
+      />
+    </View>
+  ) : null;
   const nudge = user ? (
     <HomeSheets
       userId={user._id}
@@ -193,11 +203,7 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        {emptyFeedStarter(
-          proCard,
-          showHowTo ? <SetupChecklist progress={setup} /> : null,
-          progressCard,
-        ) ??
+        {emptyFeedStarter(proCard, progressCard) ??
           (progress.pending ? null : (
             <EmptyState
               title={t("home.emptyTitle")}
@@ -228,12 +234,9 @@ export default function HomeScreen() {
     />
   ) : undefined;
 
-  const howToHeader =
-    proCard || showHowTo ? (
-      <View style={styles.howToHeader}>
-        {proCard ?? <SetupChecklist progress={setup} />}
-      </View>
-    ) : null;
+  const howToHeader = proCard ? (
+    <View style={styles.howToHeader}>{proCard}</View>
+  ) : null;
 
   return (
     <View style={styles.container}>
@@ -286,16 +289,15 @@ function lastHeader(
 
 function emptyFeedStarter(
   proCard: ReactNode,
-  setupCard: ReactNode,
   progressCard: ReactNode,
 ): ReactNode {
-  if (proCard || setupCard) {
+  if (proCard) {
     return (
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.howToOnly}
       >
-        {proCard ?? setupCard}
+        {proCard}
       </ScrollView>
     );
   }
@@ -308,22 +310,6 @@ function emptyFeedStarter(
       {progressCard}
     </ScrollView>
   );
-}
-
-/** A new account's first card: the setup checklist, with the save-goal card's dismiss and tracking. */
-function saveProgressCard(
-  progress: ReturnType<typeof useSaveProgress>,
-  setup: ReturnType<typeof setupProgress>,
-) {
-  return progress.card ? (
-    <View style={styles.setupCard}>
-      <SetupChecklist
-        progress={setup}
-        onDismiss={progress.dismiss}
-        onShown={progress.markShown}
-      />
-    </View>
-  ) : null;
 }
 
 const styles = StyleSheet.create((theme) => ({

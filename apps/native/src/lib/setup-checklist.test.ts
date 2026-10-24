@@ -37,12 +37,21 @@ describe("setupProgress", () => {
 describe("shouldShowSetup", () => {
   const done = { tiktok: true, instagram: true, paste: true };
 
+  const open = { ...done, tiktok: false };
+
   it("hides once every step is done", () => {
-    expect(shouldShowSetup(done, 3)).toBe(false);
-    expect(shouldShowSetup({ ...done, instagram: false }, 3)).toBe(true);
+    expect(shouldShowSetup(done, 2, true)).toBe(false);
+    expect(shouldShowSetup({ ...done, instagram: false }, 2, true)).toBe(true);
   });
 
   it("leaves an account with a full shelf alone", () => {
-    expect(shouldShowSetup({ ...done, tiktok: false }, 20)).toBe(false);
+    expect(shouldShowSetup(open, 20, true)).toBe(false);
+  });
+
+  it("shows only while the new account's save-goal card would, so a dismiss sticks", () => {
+    expect(shouldShowSetup(open, 1, true)).toBe(true);
+    // An older account past the goal, or one that tapped Not now.
+    expect(shouldShowSetup(open, 5, false)).toBe(false);
+    expect(shouldShowSetup(open, 0, false)).toBe(false);
   });
 });

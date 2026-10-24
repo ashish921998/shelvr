@@ -1,6 +1,7 @@
 import * as fc from "fast-check";
 import { afterAll, describe, expect, it, vi } from "vitest";
-import { trialLastDayAt, trialReminderAt } from "./trial-reminder";
+import { trialLastDayAt } from "./trial-reminder";
+import { trialReminderAt } from "./trial-reminder-lead";
 
 const originalTz = process.env.TZ;
 afterAll(() => {

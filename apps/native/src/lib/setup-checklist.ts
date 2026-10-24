@@ -21,11 +21,19 @@ export function setupProgress(
   };
 }
 
+/**
+ * "Get set up" is a new account's card only: it rides the save-goal card's gate
+ * (fewer saves than the goal, never dismissed), so dismissing hides it for good
+ * and an older account never sees it.
+ */
 export function shouldShowSetup(
   progress: Record<SetupStep, boolean>,
   itemCount: number,
+  saveGoalCardVisible: boolean,
 ): boolean {
   return (
-    itemCount < SETUP_ITEM_LIMIT && SETUP_STEPS.some((step) => !progress[step])
+    saveGoalCardVisible &&
+    itemCount < SETUP_ITEM_LIMIT &&
+    SETUP_STEPS.some((step) => !progress[step])
   );
 }
