@@ -20,7 +20,7 @@ async function openPaywall(screen: Screen): Promise<void> {
   await pollUntil(
     async () => {
       if (!(await notNow.isVisible())) return true;
-      await notNow.tap({ timeout: 5_000 }).catch(() => undefined);
+      await notNow.tap({ timeout: 5_000 });
       await expect(notNow)
         .toBeHidden({ timeout: 5_000 })
         .catch(() => undefined);
@@ -116,5 +116,6 @@ test(
     ).toBeVisible({ timeout: 30_000 });
     await openPaywall(screen);
     await expectPaywall(screen);
+    await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );
