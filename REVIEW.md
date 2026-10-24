@@ -50,9 +50,12 @@ Native app (`apps/native/src`):
 
 - [ ] New visible copy is in every locale catalog, with generated files regenerated, not
       hand-edited.
-- [ ] A change to native modules, config plugins, `app.json` or `app.config.js` may move
-      the fingerprint. CI's `native fingerprint` job decides: when it reports CHANGED, the
-      PR needs the `Native-Fingerprint: changed` trailer and a store build.
+- [ ] A change to a native module, a config plugin, `app.json` or `app.config.js` may move
+      the fingerprint. CI's `native fingerprint` job reports it: when it says CHANGED, the
+      PR needs the `Native-Fingerprint: changed` trailer and a store build. The job checks
+      the production variant only, never blocks, and cannot see `eas.json` build fields,
+      `.easignore` edits or pnpm patches, so decide those by hand
+      ([what the fingerprint hashes](docs/architecture/push-notifications.md#what-the-fingerprint-hashes)).
 - [ ] No test file under `src/app`.
 - [ ] Handled failures report through `analytics.captureError`.
 

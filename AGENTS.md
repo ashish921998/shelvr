@@ -198,13 +198,13 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
-- OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change)
-  makes new updates invisible to binaries built from the old fingerprint: cut a
-  fresh store build before resuming OTA publishes. Do not predict what alters
-  it; run `pnpm run verify:fingerprint origin/main HEAD`. What counts as an
-  input is in `docs/architecture/push-notifications.md` (What the fingerprint
-  hashes).
+- OTA updates reach installs by EAS fingerprint. A change to a native module, a
+  config plugin, `app.json` or `app.config.js` may move the fingerprint, and a
+  moved fingerprint makes new updates invisible to binaries built from the old
+  one: cut a fresh store build before resuming OTA publishes. Do not predict a
+  move; run `pnpm run verify:fingerprint origin/main HEAD`. What the
+  fingerprint hashes, and what it cannot see, is in
+  `docs/architecture/push-notifications.md#what-the-fingerprint-hashes`.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed

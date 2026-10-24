@@ -401,8 +401,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
     this is set, so a build without it keeps working and uploads switch on the moment the EAS
     secret is added. The upload runs inside the native build and needs `@posthog/cli` available
     there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
-    variables rather than in `eas.json`. Turning the upload
-    on adds a config plugin, so it moves the fingerprint and needs a store build.
+    variables. Turning the upload on adds a config plugin, so it moves the fingerprint and needs a
+    store build.
     `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
@@ -538,7 +538,9 @@ needed at runtime by the features that use them:
   including a profile or platform with no recorded release. A blocked publish means
   nothing published from this tree reaches the recorded binary, so the usual fix is a
   store build, and recording the release afterwards. Do not predict a move: run
-  `pnpm run verify:fingerprint origin/main HEAD`. What the fingerprint hashes is in
+  `pnpm run verify:fingerprint origin/main HEAD`. The warning checks the production variant
+  only, and it cannot see `eas.json` build fields, `.easignore` edits or pnpm patches, so
+  decide those by hand. What the fingerprint hashes, and what it cannot see, is in
   [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 - Adding a field to a table is a one-way door once rows carry it. Convex validates
   every existing document against the new schema on deploy, and a table validator

@@ -294,12 +294,12 @@ with plaintext or sensitive visibility in EAS production so builds and
 updates use the same config inputs. Both environment validation and OTA
 publication pin `APP_VARIANT=production`.
 
-**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
-change that alters it makes new updates invisible to binaries built from the
-old fingerprint. That includes a native dependency added or removed, or a
-native config change. Cut a fresh store build before resuming OTA publishes.
-Do not predict what alters it; run
-`pnpm run verify:fingerprint origin/main HEAD`. What counts as an input is in
+**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. A change to
+a native module, a config plugin, `app.json` or `app.config.js` may move it, and
+a moved fingerprint makes new updates invisible to binaries built from the old
+one. Cut a fresh store build before resuming OTA publishes. Do not predict a
+move; run `pnpm run verify:fingerprint origin/main HEAD`. What the fingerprint
+hashes, and what it cannot see, is in
 [What the fingerprint hashes](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 
 **Building outside the workflow.** `eas build --local` runs on your own

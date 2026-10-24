@@ -45,5 +45,5 @@ Paywall changes live in RevenueCat, so CI cannot see them: they still need scree
 <!-- Keep the lines that apply and delete the rest. Each trailer goes on a commit in this PR. -->
 
 - Public Convex function `args` or `returns` changed: add the `Convex-Api: changed` trailer and say how installed apps survive it.
-- Native fingerprint may have moved (native module, config plugin, `app.json`, `app.config.js`): CI's `native fingerprint` job decides. If it reports CHANGED, add the `Native-Fingerprint: changed` trailer. OTAs wait for a store build.
+- Native fingerprint may have moved (native module, config plugin, `app.json`, `app.config.js`): CI's `native fingerprint` job reports it, for the production variant only and without blocking. If it reports CHANGED, add the `Native-Fingerprint: changed` trailer. OTAs wait for a store build. The job cannot see `eas.json` build fields, `.easignore` edits or pnpm patches; if you changed one, decide by hand ([what the fingerprint hashes](https://github.com/ashish921998/shelvr/blob/main/docs/architecture/push-notifications.md#what-the-fingerprint-hashes)).
 - Backend must deploy before the client: say so.
