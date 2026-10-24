@@ -56,7 +56,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { analytics } from "@/lib/analytics";
-import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
 import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
@@ -508,18 +507,6 @@ function ItemScreenContent() {
     }
   }, [activeItem]);
 
-  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(
-    activeFull ?? activeItem,
-  );
-
-  const openSpaces = useCallback(() => {
-    if (!activeItem) return;
-    router.push({
-      pathname: "/manage-spaces",
-      params: { itemId: activeItem._id },
-    });
-  }, [activeItem, router]);
-
   const activeIsSuggested =
     from === "space" &&
     !!spaceId &&
@@ -692,22 +679,9 @@ function ItemScreenContent() {
                       activeItem?.title ?? activeItem?.note ?? t("item.actions")
                     }
                     actions={[
-                      ...(activeItem?.status === "ready"
-                        ? [{ label: t("spaces.addItem"), onPress: openSpaces }]
-                        : []),
                       { label: t("common.share"), onPress: shareActive },
                       ...(activeItem?.url
                         ? [{ label: t("item.copyLink"), onPress: copyLink }]
-                        : []),
-                      ...(activeItem?.status === "ready" &&
-                      activeItem.type !== "note"
-                        ? [
-                            {
-                              label: t("products.findLinks"),
-                              onPress: onFindLinks,
-                              disabled: searchDisabled,
-                            },
-                          ]
                         : []),
                       ...removeFromSpace.menuActions,
                       {
@@ -728,14 +702,6 @@ function ItemScreenContent() {
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Menu icon="ellipsis">
-            {activeItem?.status === "ready" ? (
-              <Stack.Toolbar.MenuAction
-                icon="rectangle.stack"
-                onPress={openSpaces}
-              >
-                {t("spaces.addItem")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.up"
               onPress={shareActive}
@@ -745,15 +711,6 @@ function ItemScreenContent() {
             {activeItem?.url ? (
               <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
                 {t("item.copyLink")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-            {activeItem?.status === "ready" && activeItem.type !== "note" ? (
-              <Stack.Toolbar.MenuAction
-                icon="bag"
-                onPress={onFindLinks}
-                disabled={searchDisabled}
-              >
-                {t("products.findLinks")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction

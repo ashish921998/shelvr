@@ -27,7 +27,7 @@ export function useCityPlan(city: string) {
       analytics.capture("city_plan_started", { kind });
       const spaceId = await ensureCitySpace({ city });
       if (kind === "date") {
-        router.push({ pathname: "/plan/[id]", params: { id: spaceId } });
+        router.push({ pathname: "/plan/[id]", params: { id: spaceId, city } });
       } else {
         router.push({ pathname: "/trip/[id]", params: { id: spaceId, city } });
       }

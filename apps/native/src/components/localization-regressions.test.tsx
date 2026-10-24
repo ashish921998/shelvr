@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
@@ -191,12 +191,6 @@ vi.mock("./onboarding/parts", () => ({
   CtaButton: vi.fn(({ label }: { label: string }) => <button>{label}</button>),
 }));
 
-function changeLanguage(tag: string) {
-  act(() => {
-    device.tag = tag;
-    device.listeners.forEach((listener) => listener());
-  });
-}
 beforeEach(() => {
   device.tag = "en-US";
   device.fontReady = true;
@@ -231,7 +225,6 @@ vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),
 }));
-vi.mock("@/components/pro-gate", () => ({ ProGate: vi.fn(() => null) }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true, loading: false }),
 }));
@@ -260,15 +253,6 @@ vi.mock("expo-maps", () => {
     </div>
   );
   return { AppleMaps: { View: map }, GoogleMaps: { View: map } };
-});
-
-it("refreshes loaded map fallback titles without changing saved titles", async () => {
-  const { default: MapScreen } = await import("@/app/(app)/(tabs)/(map)/index");
-  render(<MapScreen />);
-  expect(screen.getByText("Saved photo")).toBeTruthy();
-  changeLanguage("ja-JP");
-  expect(screen.queryByText("Saved photo")).toBeNull();
-  expect(screen.getByText("My own title")).toBeTruthy();
 });
 
 it("keeps long header glyphs inside the available title width", () => {

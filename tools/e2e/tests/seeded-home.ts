@@ -143,23 +143,6 @@ export async function scrollSettingsTo(
   });
 }
 
-export async function tapTab(
-  screen: Screen,
-  name: string,
-  destination: Locator,
-): Promise<void> {
-  const tabBar = screen.getByRole("tablist");
-  const role = (await tabBar.getByRole("tab", name).isVisible())
-    ? "tab"
-    : "button";
-  await tapUntilVisible(tabBar.getByRole(role, name), destination, {
-    waitMs: TAB_WAIT_MS,
-    timeout: 30_000,
-  });
-}
-
-const TAB_WAIT_MS = 3000;
-
 export async function fillField(field: Locator, value: string): Promise<void> {
   try {
     await field.fill(value);
@@ -194,14 +177,12 @@ export async function tapUntilVisible(
   );
 }
 
-export async function chooseAddOption(
-  screen: Screen,
-  option: Locator,
-): Promise<void> {
-  await tapUntilVisible(screen.getByRole("button", "Add"), option, {
+/** Opens the + sheet, which takes a link and nothing else. */
+export async function openAddSheet(screen: Screen): Promise<Locator> {
+  const input = screen.getByTestId("add-article-input");
+  await tapUntilVisible(screen.getByRole("button", "Add"), input, {
     waitMs: ADD_SHEET_WAIT_MS,
     timeout: 60_000,
   });
-  await expect(option).toBeEnabled({ timeout: 30_000 });
-  await option.tap();
+  return input;
 }

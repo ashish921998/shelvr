@@ -1,159 +1,86 @@
+import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ProCard } from "@/components/home/pro-card";
-import { SaveRecallCard } from "@/components/home/save-recall-card";
-import { SetupChecklist } from "@/components/home/setup-checklist";
-import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
-import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
-import { NextUpCard } from "@/components/home/next-up-card";
+import {
+  HomePlaces,
+  HomePlacesEmptyCard,
+  UnplacedSaves,
+} from "@/components/home/home-places";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { weeklyNudge } from "@/lib/first-share";
-import { setupProgress, shouldShowSetup } from "@/lib/setup-checklist";
 import { useHomeFeed } from "@/lib/home-feed";
-import { useNextUp } from "@/lib/next-up";
+import { unplacedSaves } from "@/lib/home-places";
 import {
   useBusySaving,
   useFeedbackInvitation,
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
-import { useSaveProgress } from "@/lib/use-save-progress";
-import { useSaveRecall } from "@/lib/use-save-recall";
-import { HeaderScrim } from "@/components/ui/header-scrim";
 import { welcomeSave } from "@/lib/welcome-save";
-import { useFocusEffect } from "expo-router";
 import {
-  type ReactElement,
-  type ReactNode,
-  useCallback,
-  useState,
-} from "react";
-import { ScrollView, View } from "react-native";
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  ScrollView,
+  View,
+} from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-function nudgeSheetReady(
-  nudgeReady: boolean,
-  ...inlinePromptsVisible: boolean[]
-) {
-  return nudgeReady && !inlinePromptsVisible.some(Boolean);
-}
-
-function laterPromptsDeferred(
-  progress: { deferLater: boolean },
-  recall: { visible: boolean; pending: boolean },
-): boolean {
-  return progress.deferLater || recall.visible || recall.pending;
-}
-
-function useReviewDeferred(
-  userId: string | undefined,
-  laterDeferred: boolean,
-  progress: { firstSession: boolean; nudgeReady: boolean },
-  feedback: { invitationVisible: boolean; modalOpen: boolean },
-  welcomeSeen: boolean,
-): boolean {
-  const nudgePending = weeklyNudge.usePending(userId);
-  return (
-    laterDeferred ||
-    progress.firstSession ||
-    feedback.invitationVisible ||
-    feedback.modalOpen ||
-    (nudgePending && progress.nudgeReady && !welcomeSeen)
-  );
-}
+// Older saves with no place sit past the first feed page, so Home pages on like a list would.
+const LOAD_MORE_DISTANCE = 600;
+// Unasked, Home only pages until it has a screenful of unplaced saves, and never past this many saves; scrolling loads the rest.
+const AUTO_LOAD_SAVES = 200;
+const AUTO_LOAD_UNPLACED = 5;
 
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
 }
 
-function usePromptsDeferred(
-  userId: string | undefined,
-  surveyVisible: boolean,
-  proPending: boolean,
-): boolean {
-  const welcomePending = welcomeSave.usePending(userId);
-  return surveyVisible || proPending || welcomePending;
-}
-
-function useWelcomeSeen(userId: string | undefined): boolean {
-  const welcomePending = welcomeSave.usePending(userId);
-  const [seenFor, setSeenFor] = useState<string | null>(null);
-  if (welcomePending && userId && seenFor !== userId) setSeenFor(userId);
-  return userId !== undefined && seenFor === userId;
-}
-
-function HomeSheets({
-  userId,
-  entitled,
-  trialEndsAt,
-  surveyVisible,
-  previewTitle,
-  nudgeReady,
-  welcomeSeen,
-}: {
-  userId: string;
-  entitled: boolean;
-  trialEndsAt?: number;
-  surveyVisible: boolean;
-  previewTitle?: string;
-  nudgeReady: boolean;
-  welcomeSeen: boolean;
-}) {
-  return (
-    <>
-      <WelcomeSaveSheet
-        userId={userId}
-        ready={entitled && !surveyVisible}
-        trialEndsAt={trialEndsAt}
-      />
-      <WeeklyNudgeSheet
-        userId={userId}
-        previewTitle={previewTitle}
-        ready={nudgeReady && !welcomeSeen}
-      />
-    </>
-  );
-}
-
 export default function HomeScreen() {
   useAppLocale();
-  const { items } = useHomeFeed();
-
+  const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const shortOfScreen =
+    viewportHeight > 0 && contentHeight < viewportHeight + LOAD_MORE_DISTANCE;
+  const wantsMore =
+    items !== undefined &&
+    items.length < AUTO_LOAD_SAVES &&
+    unplacedSaves(items).length < AUTO_LOAD_UNPLACED;
+  useEffect(() => {
+    if (shortOfScreen && wantsMore && canLoadMore && !loadingMore) loadMore();
+    // items.length re-runs it after each page, while the booleans stay the same.
+  }, [
+    shortOfScreen,
+    wantsMore,
+    canLoadMore,
+    loadingMore,
+    loadMore,
+    items?.length,
+  ]);
   const cancelSurvey = useCancelSurvey();
   const entitlement = useEntitlement();
   const locked = !entitlement.loading && !entitlement.entitled;
-  const proPending = entitlement.loading || locked;
   const { data: user } = useCurrentUser();
-  const progress = useSaveProgress(user?._id, {
-    defer: usePromptsDeferred(user?._id, cancelSurvey.visible, proPending),
-  });
-  const recall = useSaveRecall(items, { defer: progress.deferLater });
-  const laterDeferred = laterPromptsDeferred(progress, recall);
-  const welcomeSeen = useWelcomeSeen(user?._id);
-  const feedback = useFeedbackInvitation(items, { defer: laterDeferred });
+  const welcomePending = welcomeSave.usePending(user?._id);
+  const deferPrompts =
+    cancelSurvey.visible || entitlement.loading || locked || welcomePending;
+  const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
   useReviewPrompt(items, {
-    defer: useReviewDeferred(
-      user?._id,
-      laterDeferred,
-      progress,
-      feedback,
-      welcomeSeen,
-    ),
+    defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
   });
   const busySaving = useBusySaving(items);
-  const nextUp = useNextUp(user?._id, entitlement.entitled);
-  const [, setFocusCount] = useState(0);
-  useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
-  const proCard = locked ? (
-    <ProCard lapsed={entitlement.status === "lapsed"} />
-  ) : null;
 
-  const cancelSurveyCard = cancelSurvey.visible ? (
+  if (items === undefined) {
+    return <ScreenLoader label={t("loading.home")} />;
+  }
+
+  const topCard = cancelSurvey.visible ? (
     <CancelSurveyCard
       onPresented={cancelSurvey.presented}
       onSubmit={(reason) =>
@@ -161,95 +88,53 @@ export default function HomeScreen() {
       }
       onDismiss={() => cancelSurvey.finish({ outcome: "dismissed" })}
     />
-  ) : null;
-
-  if (items === undefined) {
-    return <ScreenLoader label={t("loading.home")} />;
-  }
-
-  const setup = setupProgress(items);
-  const progressCard = shouldShowSetup(
-    setup,
-    items.length,
-    progress.card !== null,
-  ) ? (
-    <View style={styles.setupCard}>
-      <SetupChecklist
-        progress={setup}
-        onDismiss={progress.dismiss}
-        onShown={progress.markShown}
-      />
-    </View>
-  ) : null;
-  const nudge = user ? (
-    <HomeSheets
-      userId={user._id}
-      entitled={entitlement.entitled}
-      trialEndsAt={trialEnd(entitlement)}
-      surveyVisible={cancelSurvey.visible}
-      previewTitle={items[0]?.title}
-      nudgeReady={nudgeSheetReady(
-        progress.nudgeReady,
-        cancelSurvey.visible,
-        recall.visible,
-        feedback.invitationVisible,
-      )}
-      welcomeSeen={welcomeSeen}
+  ) : locked ? (
+    <ProCard lapsed={entitlement.status === "lapsed"} />
+  ) : feedback.invitationVisible && !busySaving ? (
+    <FeedbackInvitation
+      onSendFeedback={feedback.openFeedbackFromInvitation}
+      onDismiss={feedback.dismissInvitation}
     />
-  ) : null;
-
-  if (items.length === 0) {
-    return (
-      <View style={styles.container}>
-        {emptyFeedStarter(proCard, progressCard) ??
-          (progress.pending ? null : (
-            <View style={styles.emptyPlaces}>
-              <HomePlacesEmptyCard />
-            </View>
-          ))}
-        {cancelSurveyCard}
-        {nudge}
-      </View>
-    );
-  }
-
-  const recallCard = recall.visible ? (
-    <SaveRecallCard
-      savedTitle={recall.saved?.title}
-      matches={recall.matches}
-      onOpen={recall.opened}
-      onDismiss={recall.dismiss}
-    />
-  ) : null;
-
-  const nextUpCard = nextUp.next ? (
-    <NextUpCard
-      next={nextUp.next}
-      onShown={nextUp.shown}
-      onOpen={nextUp.opened}
-      onDismiss={nextUp.dismiss}
-    />
-  ) : undefined;
-
-  const howToHeader = proCard ? (
-    <View style={styles.howToHeader}>{proCard}</View>
   ) : null;
 
   return (
     <View style={styles.container}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.cities}
+        contentContainerStyle={styles.content}
+        scrollEventThrottle={200}
+        onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, height) => setContentHeight(height)}
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          const { layoutMeasurement, contentOffset, contentSize } =
+            e.nativeEvent;
+          if (
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - LOAD_MORE_DISTANCE
+          )
+            loadMore();
+        }}
       >
-        {cancelSurveyCard ??
-          howToHeader ??
-          progressCard ??
-          recallCard ??
-          lastHeader(feedback, busySaving, nextUpCard)}
-        <HomePlaces />
+        {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
+        {items.length > 0 ? (
+          <>
+            <HomePlaces />
+            <UnplacedSaves saves={items} />
+          </>
+        ) : locked ? null : (
+          <View style={styles.empty}>
+            <HomePlacesEmptyCard />
+          </View>
+        )}
       </ScrollView>
       <HeaderScrim />
-      {nudge}
+      {user ? (
+        <WelcomeSaveSheet
+          userId={user._id}
+          ready={entitlement.entitled && !cancelSurvey.visible}
+          trialEndsAt={trialEnd(entitlement)}
+        />
+      ) : null}
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}
@@ -257,74 +142,20 @@ export default function HomeScreen() {
   );
 }
 
-function lastHeader(
-  feedback: ReturnType<typeof useFeedbackInvitation>,
-  busySaving: boolean,
-  nextUpCard: ReactElement | undefined,
-): ReactElement | undefined {
-  if (feedback.invitationVisible && !busySaving) {
-    return (
-      <FeedbackInvitation
-        onSendFeedback={feedback.openFeedbackFromInvitation}
-        onDismiss={feedback.dismissInvitation}
-      />
-    );
-  }
-  return nextUpCard;
-}
-
-function emptyFeedStarter(
-  proCard: ReactNode,
-  progressCard: ReactNode,
-): ReactNode {
-  if (proCard) {
-    return (
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.howToOnly}
-      >
-        {proCard}
-      </ScrollView>
-    );
-  }
-  if (!progressCard) return null;
-  return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.progressOnly}
-    >
-      {progressCard}
-    </ScrollView>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
   },
-  howToOnly: {
-    padding: theme.gap(2),
-  },
-  setupCard: {
-    paddingHorizontal: theme.gap(2),
-    paddingBottom: theme.gap(1.5),
-  },
-  progressOnly: {
-    paddingVertical: theme.gap(1),
-  },
-  howToHeader: {
-    gap: theme.gap(2.5),
-    paddingHorizontal: theme.gap(2),
-    paddingBottom: theme.gap(1.5),
-  },
-
-  emptyPlaces: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: theme.gap(2),
-  },
-  cities: {
+  content: {
     paddingTop: theme.gap(1),
-    paddingBottom: theme.gap(12),
+    paddingBottom: theme.gap(6),
+  },
+  topCard: {
+    paddingHorizontal: theme.gap(2),
+    paddingBottom: theme.gap(1.5),
+  },
+  empty: {
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(4),
   },
 }));

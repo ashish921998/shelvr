@@ -296,3 +296,14 @@ it("keeps a post's source line instead of the site button", () => {
   expect(ItemSourceLink).toHaveBeenCalled();
   expect(screen.queryByText(/item\.(view|watch)OnSite/)).toBeNull();
 });
+
+it("shows a note's own text, read-only", () => {
+  renderPage({
+    ...product,
+    type: "note",
+    url: undefined,
+    title: "Apartment checklist",
+    note: "Lamp, shelves, linen.",
+  } as DetailItem);
+  expect(screen.getByText("Lamp, shelves, linen.")).toBeTruthy();
+});

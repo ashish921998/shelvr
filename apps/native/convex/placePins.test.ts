@@ -50,7 +50,7 @@ const maps = (value: string) => ({
 
 async function setup(
   places: string[],
-  options: { declined?: boolean; pins?: boolean } = {},
+  options: { declined?: boolean; pins?: boolean; read?: string[] } = {},
 ) {
   const t = newConvexTest();
   const itemId = await t.run(async (ctx) => {
@@ -72,6 +72,7 @@ async function setup(
       searchText: "Lisbon eats",
       cities: ["Lisbon"],
       intents: places.map(maps),
+      places: options.read,
       placePins: options.pins
         ? [{ name: places[0], lat: 1, lng: 2 }]
         : undefined,
@@ -97,6 +98,18 @@ describe("placePins", () => {
       "Pink Street",
     ]);
     expect(queries()).toContain("Time Out Market, Lisbon");
+  });
+
+  it("pins the places read off the save, with its Maps links after", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Pink Street"], {
+      read: ["Manteigaria", "pink street"],
+    });
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.map((p) => p.name)).toEqual([
+      "Manteigaria",
+      "pink street",
+    ]);
   });
 
   it("clears a pin once the save no longer names its place, without a Maps key", async () => {

@@ -15,3 +15,16 @@ export function visibleCities(
     hidden: cities.length - VISIBLE_CITIES,
   };
 }
+
+type PlaceableSave = {
+  _id: string;
+  status: "processing" | "ready" | "failed";
+  cities?: string[];
+};
+
+/** Saves that no city card shows: still reading, failed, or no place found. */
+export function unplacedSaves<T extends PlaceableSave>(saves: T[]): T[] {
+  return saves.filter(
+    (save) => save.status !== "ready" || (save.cities ?? []).length === 0,
+  );
+}

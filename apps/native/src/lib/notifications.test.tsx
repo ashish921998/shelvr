@@ -377,7 +377,7 @@ describe("notification opens", () => {
       notification_kind: "weekly_shelf",
       notification_id: "abc",
     });
-    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+    expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
   it("holds a tap while the plan loads, in the queue deep links share", () => {
@@ -404,7 +404,7 @@ describe("notification opens", () => {
       notification_kind: "unknown",
       notification_id: "",
     });
-    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+    expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
   it("handles a tap once, however often the observer remounts", () => {

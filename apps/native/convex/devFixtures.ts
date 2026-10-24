@@ -191,6 +191,7 @@ async function seedFixtures(
     longitude: -9.216,
     capturedAt: 1_700_000_000_000,
     tags: ["travel", "lisbon"],
+    cities: ["Lisbon"],
     searchText: "belém tower saved place lisbon travel",
   });
   const checklistId = await ctx.db.insert("items", {

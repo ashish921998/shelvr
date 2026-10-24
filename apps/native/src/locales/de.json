@@ -67,6 +67,7 @@
   "capture.title": "Etwas speichern",
   "common.back": "Zurück",
   "capture.linkPlaceholder": "Link einfügen oder eingeben…",
+  "capture.linkHint": "Ein Reel, TikTok oder eine Seite, die Orte nennt. Shelvr ordnet sie ihrer Stadt zu.",
   "capture.notePlaceholder": "Notiz festhalten…",
   "item.note": "Notiz",
   "item.article": "Link",
@@ -724,6 +725,10 @@
   "goal.citySearch": "Städte suchen",
   "homePlaces.yourCities": "Deine Städte",
   "homePlaces.citiesHint": "Orte aus den Reels und TikToks, die du gespeichert hast",
+  "homePlaces.noPlaceTitle": "Kein Ort gefunden",
+  "homePlaces.noPlaceReading": "Wird noch gelesen…",
+  "homePlaces.noPlaceFailed": "Konnte nicht gelesen werden",
+  "homePlaces.noPlaceNone": "Hier wird kein Ort genannt",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} Spot",
     "other": "%{formattedCount} Spots"
