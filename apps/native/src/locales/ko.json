@@ -786,6 +786,8 @@
   "aha.addedTo": "%{city}에 추가했어요",
   "aha.cityPlaces": "%{city} · 3곳",
   "aha.fromReel": "%{handle}님의 릴스에서",
+  "aha.shelvrExample": "Shelvr 예시",
+  "aha.reelBy": "%{handle}님의 샘플 릴스",
   "aha.quoted": "“%{quote}”",
   "aha.quoteCoffee": "줄 서서라도 마실 만한 플랫 화이트",
   "aha.quoteMorning": "붐비기 전에 일찍 가세요",

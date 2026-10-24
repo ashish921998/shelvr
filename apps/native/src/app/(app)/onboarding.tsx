@@ -1,7 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { ahaSample } from "@/lib/aha-sample";
-import { ahaReelUrl } from "@/lib/aha-reels";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
@@ -230,7 +229,7 @@ export default function OnboardingScreen() {
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     // The reel they shared in the demo becomes their first real save once they have Pro.
-    if (sample.reel !== null) queueDemoUrl(ahaReelUrl(sample.reel));
+    if (sample.firstSaveUrl !== null) queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };

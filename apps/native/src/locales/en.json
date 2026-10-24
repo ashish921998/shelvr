@@ -807,6 +807,8 @@
   "aha.addedTo": "Added to %{city}",
   "aha.cityPlaces": "%{city} · 3 places",
   "aha.fromReel": "From %{handle}'s reel",
+  "aha.shelvrExample": "Shelvr example",
+  "aha.reelBy": "Sample reel by %{handle}",
   "aha.quoted": "“%{quote}”",
   "aha.quoteCoffee": "The flat white here is worth the queue",
   "aha.quoteMorning": "Go early, before the crowds",

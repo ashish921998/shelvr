@@ -6,25 +6,9 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { AhaSample } from "@/lib/aha-sample";
 import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
-import type { PlanKind } from "@/lib/sample-plans";
 import { Image } from "expo-image";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-
-const CAPTIONS: Record<
-  PlanKind,
-  "aha.captionDate" | "aha.captionTrip" | "aha.captionWeekend"
-> = {
-  date: "aha.captionDate",
-  trip: "aha.captionTrip",
-  weekend: "aha.captionWeekend",
-};
-
-function reelCaption(sample: AhaSample): string {
-  return t(CAPTIONS[sample.kind], {
-    city: t(SAMPLE_CITIES[sample.city].name),
-  });
-}
 
 function reelPicture(sample: AhaSample): number {
   return CITY_PICTURES[sample.city][sample.kind === "trip" ? "view" : "food"];
@@ -33,82 +17,94 @@ function reelPicture(sample: AhaSample): number {
 const SHARE = "square.and.arrow.up.fill";
 const RAIL = ["heart.fill", "bubble.right.fill", SHARE] as const;
 
-/** A vertical video post, labelled a sample: the real reel where the city and plan have one, playing over the city photo. `thumb` is the small copy shown once it is read; `onShare` rings its share button as the thing to tap, and `dimmed` sets it back behind a sheet. */
+/** A vertical video post, labelled a sample: the real reel where the city and plan have one, playing over the city photo. `onShare` rings its share button as the thing to tap, and `dimmed` sets it back behind a sheet. */
 export function AhaReel({
   sample,
-  thumb = false,
   onShare,
   dimmed = false,
 }: {
   sample: AhaSample;
-  thumb?: boolean;
   onShare?: () => void;
   dimmed?: boolean;
 }) {
-  const caption = reelCaption(sample);
+  const caption =
+    sample.caption === null
+      ? null
+      : t(sample.caption, { city: t(SAMPLE_CITIES[sample.city].name) });
+  const credit = sample.creator ?? t("aha.shelvrExample");
   return (
-    <View
-      style={[styles.reel, thumb && styles.thumb]}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`${sample.handle}: ${caption}`}
-    >
-      <Image
-        source={reelPicture(sample)}
-        contentFit="cover"
+    <View style={styles.reel}>
+      {/* The picture is one image to VoiceOver, apart from the Share button, which stays reachable. */}
+      <View
         style={StyleSheet.absoluteFill}
-      />
-      {thumb || sample.reel === null ? null : (
-        <ReelVideo reelCode={sample.reel.code} />
-      )}
-      <View style={styles.scrim} />
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={
+          sample.creator === null
+            ? `${credit}: ${caption}`
+            : t("aha.reelBy", { handle: sample.creator })
+        }
+      >
+        <Image
+          source={reelPicture(sample)}
+          contentFit="cover"
+          style={StyleSheet.absoluteFill}
+        />
+        {sample.videoCode === null ? null : (
+          <ReelVideo reelCode={sample.videoCode} />
+        )}
+        <View style={styles.scrim} />
+      </View>
       {dimmed ? <View style={styles.dim} /> : null}
-      {thumb ? null : (
-        <>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{t("aha.sampleBadge")}</Text>
-          </View>
-          <View style={styles.rail}>
-            {RAIL.map((name) =>
-              name === SHARE && onShare !== undefined ? (
-                <View key={name}>
-                  <View style={styles.railCoach}>
-                    <Coach
-                      label={t("aha.coachTapThis")}
-                      style={styles.railCoachPill}
-                    />
-                  </View>
-                  <ScalePressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("common.share")}
-                    onPress={onShare}
-                    style={styles.shareRing}
-                  >
-                    <AppSymbolIcon name={name} size={24} tintColor="#FFFFFF" />
-                  </ScalePressable>
-                </View>
-              ) : (
-                <AppSymbolIcon
-                  key={name}
-                  name={name}
-                  size={24}
-                  tintColor="#FFFFFF"
-                  style={onShare !== undefined && styles.railFaded}
+      <View
+        style={styles.badge}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
+        <Text style={styles.badgeText}>{t("aha.sampleBadge")}</Text>
+      </View>
+      <View style={styles.rail}>
+        {RAIL.map((name) =>
+          name === SHARE && onShare !== undefined ? (
+            <View key={name}>
+              <View style={styles.railCoach}>
+                <Coach
+                  label={t("aha.coachTapThis")}
+                  style={styles.railCoachPill}
                 />
-              ),
-            )}
-          </View>
-          <View style={styles.foot}>
-            <Text style={styles.handle}>{sample.handle}</Text>
-            {/* Our caption never sits under a real creator's name as if they wrote it. */}
-            {sample.reel === null ? (
-              <Text style={styles.caption} numberOfLines={3}>
-                {caption}
-              </Text>
-            ) : null}
-          </View>
-        </>
-      )}
+              </View>
+              <ScalePressable
+                accessibilityRole="button"
+                accessibilityLabel={t("common.share")}
+                onPress={onShare}
+                style={styles.shareRing}
+              >
+                <AppSymbolIcon name={name} size={24} tintColor="#FFFFFF" />
+              </ScalePressable>
+            </View>
+          ) : (
+            <AppSymbolIcon
+              key={name}
+              name={name}
+              size={24}
+              tintColor="#FFFFFF"
+              style={onShare !== undefined && styles.railFaded}
+            />
+          ),
+        )}
+      </View>
+      <View
+        style={styles.foot}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
+        <Text style={styles.handle}>{credit}</Text>
+        {caption === null ? null : (
+          <Text style={styles.caption} numberOfLines={3}>
+            {caption}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -124,13 +120,6 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: "continuous",
     overflow: "hidden",
     backgroundColor: theme.colors.surfaceMuted,
-  },
-  thumb: {
-    flex: 0,
-    minHeight: 0,
-    width: 56,
-    height: 84,
-    borderRadius: theme.radius.sm,
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,

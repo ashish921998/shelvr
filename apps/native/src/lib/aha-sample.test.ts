@@ -21,10 +21,9 @@ describe("ahaSample", () => {
         const sample = ahaSample(kind, city);
         expect(sample.spots).toHaveLength(AHA_SPOTS);
         expect(sample.trip.days).toHaveLength(1);
-        expect(sample.trip.days[0].stops).toEqual(
-          sample.spots.map((spot) => spot.stop),
+        expect(sample.trip.days[0].stops.map((stop) => stop.name)).toEqual(
+          sample.spots.map((spot) => spot.name),
         );
-        expect(sample.spots.map((spot) => spot.number)).toEqual([1, 2, 3]);
       }
     },
   );
@@ -35,21 +34,29 @@ describe("ahaSample", () => {
     expect(ahaSample("date", null).city).toBe("prague");
   });
 
-  it("credits a made-up account named for the city where there is no reel", () => {
-    expect(ahaSample("date", "prague")).toMatchObject({
-      reel: null,
-      handle: "@prague.eats",
+  it("credits no one on Shelvr's own example, and gives it our caption and a line per spot", () => {
+    const sample = ahaSample("date", "prague");
+    expect(sample).toMatchObject({
+      creator: null,
+      videoCode: null,
+      caption: "aha.captionDate",
+      firstSaveUrl: null,
     });
-    expect(ahaSample("trip", "lisbon").handle).toBe("@lisbon.trips");
+    expect(sample.spots.every((spot) => spot.quote !== null)).toBe(true);
   });
 
   it.each(reels.map((entry) => [entry.kind, entry.city, entry]))(
     "pins the %s reel's first three places in %s in its video's order and credits its creator",
     (kind, city, { reel }) => {
       const sample = ahaSample(kind, city);
-      expect(sample.reel).toBe(reel);
-      expect(sample.handle).toBe(`@${reel.handle}`);
-      expect(sample.spots.map((spot) => spot.stop.name)).toEqual(
+      expect(sample).toMatchObject({
+        creator: `@${reel.handle}`,
+        videoCode: reel.code,
+        caption: null,
+        firstSaveUrl: ahaReelUrl(reel),
+      });
+      expect(sample.spots.every((spot) => spot.quote === null)).toBe(true);
+      expect(sample.spots.map((spot) => spot.name)).toEqual(
         reel.places.slice(0, AHA_SPOTS).map(([, name]) => name),
       );
     },

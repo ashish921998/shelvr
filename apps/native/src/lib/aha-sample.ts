@@ -1,16 +1,8 @@
-import { ahaReel, type AhaReel } from "@/lib/aha-reels";
-import {
-  SAMPLE_CITIES,
-  type SampleCityId,
-  type SampleSlot,
-} from "@/lib/sample-cities";
+import { ahaReel, ahaReelUrl, type AhaReel } from "@/lib/aha-reels";
+import type { SampleCityId, SampleSlot } from "@/lib/sample-cities";
 import type { PlanKind } from "@/lib/sample-plans";
-import {
-  buildTrip,
-  samplePlan,
-  type SampleStop,
-  type SampleTrip,
-} from "@/lib/sample-trip";
+import { samplePlan, stopsTrip, type SampleTrip } from "@/lib/sample-trip";
+import type { TextMessageKey } from "@/locales/message-types";
 
 /** How many spots the sample reel names. */
 export const AHA_SPOTS = 3;
@@ -28,73 +20,96 @@ const SLOT_TIMES: Record<SampleSlot, number> = {
   walk: 23 * 60,
 };
 
-type AhaSpot = {
-  stop: SampleStop;
-  number: number;
+const SLOT_QUOTES: Record<SampleSlot, TextMessageKey> = {
+  coffee: "aha.quoteCoffee",
+  morning: "aha.quoteMorning",
+  brunch: "aha.quoteBrunch",
+  lunch: "aha.quoteLunch",
+  afternoon: "aha.quoteAfternoon",
+  dinner: "aha.quoteDinner",
+  drinks: "aha.quoteDrinks",
+  dessert: "aha.quoteDessert",
+  walk: "aha.quoteWalk",
 };
 
+type CaptionKey = "aha.captionDate" | "aha.captionTrip" | "aha.captionWeekend";
+
+const CAPTIONS: Record<PlanKind, CaptionKey> = {
+  date: "aha.captionDate",
+  trip: "aha.captionTrip",
+  weekend: "aha.captionWeekend",
+};
+
+type AhaSpot = {
+  name: string;
+  /** A line about the spot, only on Shelvr's own example: a real creator gets no words they did not say. */
+  quote: TextMessageKey | null;
+};
+
+/** What the onboarding reel shows, decided here so the screens only render it. */
 export type AhaSample = {
   kind: PlanKind;
   city: SampleCityId;
-  /** The plan cut to the reel's spots, for the map. */
+  /** The spots as one day on the city's map. */
   trip: SampleTrip;
   spots: AhaSpot[];
-  /** The real reel this city and plan play, or null where only the photo shows. */
-  reel: AhaReel | null;
-  /** The reel's creator, or a made-up account when there is no reel, so the photo never stands in for a real creator. */
-  handle: string;
+  /** The real reel's creator, as "@handle"; null on Shelvr's own example, which credits no one. */
+  creator: string | null;
+  /** The real reel to play over the photo, or null where only the photo shows. */
+  videoCode: string | null;
+  /** Our caption (takes the city's name), only on Shelvr's own example. */
+  caption: CaptionKey | null;
+  /** The real reel's link, queued as the first save once the account has Pro. */
+  firstSaveUrl: string | null;
 };
 
-const REEL_PLANS = new Map<AhaReel, SampleTrip>();
+const REEL_TRIPS = new Map<AhaReel, SampleTrip>();
 
-/** The reel's places laid out on the city's map, as the sample plan's first day. */
-function reelPlan(plan: SampleTrip, reel: AhaReel): SampleTrip {
-  const cached = REEL_PLANS.get(reel);
-  if (cached !== undefined) return cached;
-  const city = SAMPLE_CITIES[plan.city];
-  const trip = buildTrip(plan.kind, plan.city, {
-    ...city,
-    saves: plan.saves,
-    days: [
-      {
-        title: plan.days[0].title,
-        stops: reel.places.map(([slot, name, lat, lng]) => ({
-          name,
-          slot,
-          at: { lat, lng },
-        })),
-      },
-    ],
-  });
-  REEL_PLANS.set(reel, trip);
+/** The real reel's first places on the city's map, in its video's order. */
+function reelTrip(plan: SampleTrip, reel: AhaReel): SampleTrip {
+  let trip = REEL_TRIPS.get(reel);
+  if (trip === undefined) {
+    trip = stopsTrip(
+      plan.kind,
+      plan.city,
+      plan.days[0].title,
+      reel.places
+        .slice(0, AHA_SPOTS)
+        .map(([slot, name, lat, lng]) => ({ name, slot, at: { lat, lng } })),
+    );
+    REEL_TRIPS.set(reel, trip);
+  }
   return trip;
 }
 
-/** The one reel onboarding shows: its first three spots (the real reel's where there is one, else the sample plan's) as one day: the sample's by the clock, the reel's in its video's order. */
+/** The sample plan's first three stops by the clock, as one day. */
+function exampleTrip(plan: SampleTrip): SampleTrip {
+  const stops = plan.days
+    .flatMap((day) => day.stops)
+    .slice(0, AHA_SPOTS)
+    .sort((a, b) => SLOT_TIMES[a.slot] - SLOT_TIMES[b.slot]);
+  return { ...plan, days: [{ ...plan.days[0], stops }] };
+}
+
+/** The one reel onboarding shows: the real reel where this city and plan have one, else Shelvr's own example. */
 export function ahaSample(
   kind: PlanKind,
   city: SampleCityId | null,
 ): AhaSample {
-  const sample = samplePlan(kind, city);
-  const reel = ahaReel(kind, sample.city);
-  const plan = reel === null ? sample : reelPlan(sample, reel);
-  const [first] = plan.days;
-  const firstStops = plan.days.flatMap((day) => day.stops).slice(0, AHA_SPOTS);
-  // A real reel's spots keep the order its video shows them; the sample's go by the clock.
-  const stops =
-    reel === null
-      ? firstStops.sort((a, b) => SLOT_TIMES[a.slot] - SLOT_TIMES[b.slot])
-      : firstStops;
-  const spots = stops.map((stop, index) => ({ stop, number: index + 1 }));
+  const plan = samplePlan(kind, city);
+  const reel = ahaReel(kind, plan.city);
+  const trip = reel === null ? exampleTrip(plan) : reelTrip(plan, reel);
   return {
     kind,
     city: plan.city,
-    trip: { ...plan, days: [{ ...first, stops }] },
-    spots,
-    reel,
-    handle:
-      reel === null
-        ? `@${plan.city.replace(/-/g, "")}.${kind === "trip" ? "trips" : "eats"}`
-        : `@${reel.handle}`,
+    trip,
+    spots: trip.days[0].stops.map((stop) => ({
+      name: stop.name,
+      quote: reel === null ? SLOT_QUOTES[stop.slot] : null,
+    })),
+    creator: reel === null ? null : `@${reel.handle}`,
+    videoCode: reel?.code ?? null,
+    caption: reel === null ? CAPTIONS[kind] : null,
+    firstSaveUrl: reel === null ? null : ahaReelUrl(reel),
   };
 }

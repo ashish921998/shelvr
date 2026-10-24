@@ -7,25 +7,12 @@ import {
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
 import { motion, springIn } from "@/lib/motion";
-import { SAMPLE_CITIES, type SampleSlot } from "@/lib/sample-cities";
+import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { SAMPLE_CROPS } from "@/lib/sample-trip";
-import type { TextMessageKey } from "@/locales/message-types";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
-
-const SLOT_QUOTES: Record<SampleSlot, TextMessageKey> = {
-  coffee: "aha.quoteCoffee",
-  morning: "aha.quoteMorning",
-  brunch: "aha.quoteBrunch",
-  lunch: "aha.quoteLunch",
-  afternoon: "aha.quoteAfternoon",
-  dinner: "aha.quoteDinner",
-  drinks: "aha.quoteDrinks",
-  dessert: "aha.quoteDessert",
-  walk: "aha.quoteWalk",
-};
 
 /** Pins dropped so far, one per stagger; all at once under Reduce Motion, where each row only fades in. */
 function useDroppedPins(count: number): number {
@@ -60,11 +47,7 @@ export function AhaSpotsStep({
     <View style={styles.wrap}>
       <View style={styles.map}>
         {process.env.EXPO_OS === "ios" ? (
-          <SampleAppleMap
-            trip={sample.trip}
-            visible={dropped}
-            style={styles.fill}
-          />
+          <SampleAppleMap trip={sample.trip} visible={dropped} />
         ) : (
           <SampleTripMap
             trip={sample.trip}
@@ -83,31 +66,35 @@ export function AhaSpotsStep({
             {t("aha.cityPlaces", { city })}
           </Text>
           <Text style={styles.credit}>
-            {t("aha.fromReel", { handle: sample.handle })}
+            {sample.creator === null
+              ? t("aha.shelvrExample")
+              : t("aha.fromReel", { handle: sample.creator })}
           </Text>
         </View>
-        <View accessibilityLiveRegion="polite">
-          {sample.spots.slice(0, dropped).map((spot) => (
+        {/* With large text the rows scroll, after the map has given up its room. */}
+        <ScrollView
+          style={styles.rows}
+          showsVerticalScrollIndicator={false}
+          accessibilityLiveRegion="polite"
+        >
+          {sample.spots.slice(0, dropped).map((spot, index) => (
             <Animated.View
-              key={spot.number}
+              key={spot.name}
               entering={springIn(reduced)}
               style={styles.spot}
             >
-              <PinBadge number={spot.number} day={0} />
+              <PinBadge number={index + 1} day={0} />
               <View style={styles.spotText}>
-                <Text style={styles.spotName}>{spot.stop.name}</Text>
-                {/* A real creator gets no words they did not say, so their reel's spots show only the name. */}
-                {sample.reel === null ? (
+                <Text style={styles.spotName}>{spot.name}</Text>
+                {spot.quote === null ? null : (
                   <Text style={styles.quote}>
-                    {t("aha.quoted", {
-                      quote: t(SLOT_QUOTES[spot.stop.slot]),
-                    })}
+                    {t("aha.quoted", { quote: t(spot.quote) })}
                   </Text>
-                ) : null}
+                )}
               </View>
             </Animated.View>
           ))}
-        </View>
+        </ScrollView>
       </View>
       <PillButton
         label={t("common.continue")}
@@ -132,9 +119,6 @@ const styles = StyleSheet.create((theme) => ({
     marginHorizontal: -theme.gap(3),
     overflow: "hidden",
   },
-  fill: {
-    flex: 1,
-  },
   added: {
     position: "absolute",
     top: theme.gap(1.5),
@@ -151,6 +135,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   sheet: {
+    flexShrink: 1,
     marginTop: -theme.gap(3),
     marginHorizontal: -theme.gap(3),
     paddingHorizontal: theme.gap(3),
@@ -170,6 +155,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   head: {
     gap: theme.gap(0.25),
+  },
+  rows: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   title: {
     ...theme.type.sheetTitle,

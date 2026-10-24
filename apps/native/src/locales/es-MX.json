@@ -828,6 +828,8 @@
   "aha.addedTo": "Agregado a %{city}",
   "aha.cityPlaces": "%{city} · 3 lugares",
   "aha.fromReel": "Del reel de %{handle}",
+  "aha.shelvrExample": "Ejemplo de Shelvr",
+  "aha.reelBy": "Reel de ejemplo de %{handle}",
   "aha.quoted": "«%{quote}»",
   "aha.quoteCoffee": "El flat white de aquí vale la pena la fila",
   "aha.quoteMorning": "Ve temprano, antes de que se llene",

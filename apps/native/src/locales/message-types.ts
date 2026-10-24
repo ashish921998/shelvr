@@ -745,6 +745,8 @@ export type MessageParams = {
   "aha.addedTo": { city: string };
   "aha.cityPlaces": { city: string };
   "aha.fromReel": { handle: string };
+  "aha.shelvrExample": undefined;
+  "aha.reelBy": { handle: string };
   "aha.quoted": { quote: string };
   "aha.quoteCoffee": undefined;
   "aha.quoteMorning": undefined;

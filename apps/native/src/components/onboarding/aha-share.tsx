@@ -92,7 +92,10 @@ export function AhaShareStep({
         />
         {stage === "panel" ? <AppPanel onShare={go("sheet")} /> : null}
         {stage === "sheet" ? (
-          <IosSheet title={sample.handle} onMore={go("tip")} />
+          <IosSheet
+            title={sample.creator ?? t("aha.shelvrExample")}
+            onMore={go("tip")}
+          />
         ) : null}
         {stage === "tip" ? (
           <AppsSheet top={<Tip onDone={go("pick")} />} />
