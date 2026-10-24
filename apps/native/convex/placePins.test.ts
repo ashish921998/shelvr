@@ -108,6 +108,22 @@ describe("placePins", () => {
     expect(await pins()).toEqual([]);
   });
 
+  it("drops a removed place's pin even when another place cannot be looked up", async () => {
+    const { t, itemId, pins } = await setup(
+      ["Time Out Market", "Pink Street"],
+      {
+        pins: true,
+      },
+    );
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        intents: [maps("Pink Street")],
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toEqual([]);
+  });
+
   it("does not look up a name that is already pinned", async () => {
     const { queries } = await withMaps();
     const { t, itemId, pins } = await setup(

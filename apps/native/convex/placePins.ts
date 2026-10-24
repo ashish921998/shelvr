@@ -114,42 +114,39 @@ export const storePins = internalMutation({
   },
 });
 
+async function lookUp(
+  names: string[],
+  city: string | undefined,
+): Promise<Pin[]> {
+  const config = appleMapsConfig(env);
+  if (config === null) {
+    logEvent("info", "place_pins_unconfigured", {});
+    return [];
+  }
+  const token = await appleMapsAccessToken(config);
+  if (token === null) {
+    logEvent("warn", "place_pins_token_failed", {});
+    return [];
+  }
+  const looked = await Promise.all(
+    names.map(async (name) => ({
+      name,
+      at: await appleMapsLookup(token, "search", lookupQuery(name, city)),
+    })),
+  );
+  return looked.flatMap(({ name, at }) =>
+    at === null ? [] : [{ name, lat: at.lat, lng: at.lng }],
+  );
+}
+
 export const locateItem = internalAction({
   args: { itemId: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
     const todo = await ctx.runQuery(internal.placePins.toLocate, args);
     if (todo === null) return null;
-    if (todo.names.length === 0) {
-      await ctx.runMutation(internal.placePins.storePins, {
-        itemId: args.itemId,
-        found: [],
-      });
-      return null;
-    }
-    const config = appleMapsConfig(env);
-    if (config === null) {
-      logEvent("info", "place_pins_unconfigured", {});
-      return null;
-    }
-    const token = await appleMapsAccessToken(config);
-    if (token === null) {
-      logEvent("warn", "place_pins_token_failed", {});
-      return null;
-    }
-    const looked = await Promise.all(
-      todo.names.map(async (name) => ({
-        name,
-        at: await appleMapsLookup(
-          token,
-          "search",
-          lookupQuery(name, todo.city),
-        ),
-      })),
-    );
-    const found = looked.flatMap(({ name, at }) =>
-      at === null ? [] : [{ name, lat: at.lat, lng: at.lng }],
-    );
+    const found =
+      todo.names.length === 0 ? [] : await lookUp(todo.names, todo.city);
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,
