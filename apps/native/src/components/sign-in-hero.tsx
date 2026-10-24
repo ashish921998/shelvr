@@ -1,5 +1,6 @@
 import { PhoneFrame } from "@/components/onboarding/opener-phone";
-import { SPLASH_THEMES } from "@/components/splash/timeline";
+import { splashTheme } from "@/components/splash/timeline";
+import { isDarkThemeName } from "@/lib/appearance";
 import { t, useAppLocale } from "@/lib/i18n";
 import { easeInOut, span } from "@/lib/splash/composition";
 import type { TextMessageKey } from "@/locales/message-types";
@@ -8,6 +9,7 @@ import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import { Text, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
@@ -123,7 +125,10 @@ function RouteMap() {
   useEffect(() => {
     if (size.width === 0 || reduced) return;
     clock.set(
-      withDelay(THREAD_DELAY_MS, withTiming(1, { duration: THREAD_MS })),
+      withDelay(
+        THREAD_DELAY_MS,
+        withTiming(1, { duration: THREAD_MS, easing: Easing.linear }),
+      ),
     );
   }, [size.width, reduced, clock]);
 
@@ -135,8 +140,7 @@ function RouteMap() {
         : { width, height },
     );
   };
-  const palette =
-    SPLASH_THEMES[rt.themeName === "dark" ? "dark" : "light"].palette;
+  const palette = splashTheme(isDarkThemeName(rt.themeName)).palette;
 
   return (
     <View style={styles.map} onLayout={onLayout}>
