@@ -77,25 +77,42 @@ export function AhaSpotsStep({
           showsVerticalScrollIndicator={false}
           accessibilityLiveRegion="polite"
         >
-          {sample.spots.slice(0, dropped).map((spot, index) => (
-            <Animated.View
-              key={spot.name}
-              entering={springIn(reduced)}
-              style={styles.spot}
-            >
-              <PinBadge number={index + 1} day={0} />
-              <View style={styles.spotText}>
-                <Text style={styles.spotName}>{spot.name}</Text>
-                {sample.source === "example" ? (
-                  <Text style={styles.quote}>
-                    {t("aha.quoted", {
-                      quote: t(sample.spots[index].quote),
-                    })}
-                  </Text>
-                ) : null}
+          {/* Every row takes its room from the start, so the map's size, and its camera, stay put while the pins drop. */}
+          {sample.spots.map((spot, index) => {
+            const row = (
+              <>
+                <PinBadge number={index + 1} day={0} />
+                <View style={styles.spotText}>
+                  <Text style={styles.spotName}>{spot.name}</Text>
+                  {sample.source === "example" ? (
+                    <Text style={styles.quote}>
+                      {t("aha.quoted", {
+                        quote: t(sample.spots[index].quote),
+                      })}
+                    </Text>
+                  ) : null}
+                </View>
+              </>
+            );
+            return index < dropped ? (
+              <Animated.View
+                key={`${spot.name}:shown`}
+                entering={springIn(reduced)}
+                style={styles.spot}
+              >
+                {row}
+              </Animated.View>
+            ) : (
+              <View
+                key={`${spot.name}:waiting`}
+                style={[styles.spot, styles.waiting]}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                {row}
               </View>
-            </Animated.View>
-          ))}
+            );
+          })}
         </ScrollView>
       </View>
       <PillButton
@@ -177,6 +194,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.gap(1.25),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
+  },
+  waiting: {
+    opacity: 0,
   },
   spotText: {
     flex: 1,
