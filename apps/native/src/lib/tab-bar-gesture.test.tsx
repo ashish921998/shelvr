@@ -277,14 +277,14 @@ describe.each([false, true])(
       down();
       move(260, 29);
       move(110, 29);
-      move(190, 29);
+      move(210, 29);
       move(40, 29, 2);
       expect(mock.presses).not.toHaveBeenCalled();
       release();
-      expect(mock.presses.mock.calls).toEqual([["(tidy)"]]);
-      mock.focused = "(tidy)";
+      expect(mock.presses.mock.calls).toEqual([["(map)"]]);
+      mock.focused = "(map)";
       view.rerender(<AppTabs />);
-      expect(screen.getByTestId("tab-tidy").getAttribute("data-selected")).toBe(
+      expect(screen.getByTestId("tab-map").getAttribute("data-selected")).toBe(
         "true",
       );
       expect(pill().width).toBe(300);

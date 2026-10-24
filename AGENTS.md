@@ -29,7 +29,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   that belongs to one feature is exported from that feature's module
   (`useTrialReminder` in `trial-reminder.ts`, `useHomeFeed` in `home-feed.tsx`),
   so search for the hook name, not the filename. Subfolders exist only for
-  `src/lib/share`, `src/lib/splash` and `src/lib/tidy`.
+  `src/lib/share` and `src/lib/splash`.
 - **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
   `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.

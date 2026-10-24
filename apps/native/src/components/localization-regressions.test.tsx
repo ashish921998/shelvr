@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
 import { Button } from "./ui/button";
 import { Pressable } from "react-native";
-import { TidyDone } from "./tidy/tidy-done";
 
 const device = vi.hoisted(() => ({
   tag: "en-US",
@@ -226,23 +225,6 @@ it("keeps the Latin font and punctuation morph, falling back for missing glyphs"
   expect(screen.getByTestId("canvas").textContent).toBe("Café — saved…");
   rerender(<AnimatedText text="ƀ" />);
   expect(screen.queryByTestId("canvas")).toBeNull();
-});
-
-it("translates the singular deleted-photo summary on a mounted screen", () => {
-  render(
-    <TidyDone
-      counts={{ kept: 0, saved: 0, deleted: 1 }}
-      pendingDeleteCount={0}
-      sourceTitle="My album"
-      empty={false}
-      loading={false}
-      onContinue={() => {}}
-    />,
-  );
-  expect(screen.getByText(/1 photo deleted/)).toBeTruthy();
-  changeLanguage("ja-JP");
-  expect(screen.queryByText(/1 photo deleted/)).toBeNull();
-  expect(screen.queryByText(/1 deleted/)).toBeNull();
 });
 
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));

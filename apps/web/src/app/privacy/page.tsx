@@ -44,8 +44,7 @@ export default function PrivacyPage() {
             save, including URLs, note text, extracted page content, titles,
             descriptions, tags, and space assignments, are stored in our backend
             (Convex) so they sync to your devices. Images are only imported when
-            you capture them or pick them from your camera or photo library
-            (including Tidy).
+            you capture them or pick them from your camera or photo library.
           </li>
           <li>
             <strong>Photo metadata.</strong> When you import a photo, EXIF

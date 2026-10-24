@@ -345,7 +345,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
+- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `plan-gate`, `profile`,
   `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`,

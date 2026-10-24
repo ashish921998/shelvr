@@ -251,14 +251,8 @@
   "feedback.cancel": "フィードバックをキャンセル",
   "feedback.sending": "送信中…",
   "feedback.send": "送信",
-  "tidy.completeTitle": "すべて整理しました",
-  "tidy.batchTitle": "この分の整理が完了しました",
-  "tidy.continue": "続ける",
-  "tidy.keep": "残す",
-  "tidy.save": "Shelvrに保存",
   "common.loading": "読み込み中",
   "navigation.home": "ホーム",
-  "navigation.tidy": "写真整理",
   "navigation.map": "地図",
   "navigation.search": "検索",
   "digest.loadFailed": "今週のシェルフを読み込めませんでした",
@@ -495,20 +489,7 @@
   "loading.spaces": "スペースを開いています",
   "spaces.listEmptyTitle": "スペースを作る",
   "spaces.listEmptyBody": "スペースはテーマごとの棚です。デザインの参考、\nレシピ、贈り物のアイデアなど。Shelvrが合う項目を提案し、\n残すものはあなたが選びます。",
-  "navigation.tidyHeader": "写真整理",
-  "tidy.confirmDelete": "確認済みの写真を削除",
-  "albums.chooseLimited": "写真アルバムを選択。写真へのアクセスは制限されています。",
-  "albums.choose": "写真アルバムを選択",
-  "albums.source": "写真の取得元",
-  "albums.manageAccessAction": "写真へのアクセスを管理…",
-  "albums.manageAccessTitle": "写真へのアクセスを管理",
-  "tidy.introTitle": "カメラロールを整理",
-  "tidy.introBody": "写真へのアクセスを許可すると、カメラロールを1枚ずつスワイプできます。\n残す、削除する、Shelvrに保存するから選べて、空き容量も増やせます。",
-  "permissions.allowPhotos": "写真へのアクセスを許可",
   "permissions.openSettings": "設定を開く",
-  "loading.tidy": "写真整理を開いています",
-  "tidy.proTitle": "写真整理はProの機能です",
-  "tidy.proBody": "写真ライブラリを見直して、不要な写真を片付けましょう。Shelvr Proのプランで、写真整理を含むすべてのPro機能が使えます。",
   "errors.photoTooLargeTitle": "写真が大きすぎます",
   "errors.photoUnavailableTitle": "写真を利用できません",
   "errors.pageNotFoundTitle": "ページが見つかりません",
@@ -555,7 +536,6 @@
   "interests.vibeDateNights": "デートの夜",
   "interests.vibeHiddenGems": "穴場",
   "interests.vibeGoingOut": "ナイトライフ",
-  "albums.allPhotos": "すべての写真",
   "appearance.system": "システム設定",
   "appearance.light": "ライト",
   "appearance.warmDark": "暖色ダーク",
@@ -598,19 +578,6 @@
   },
   "spaces.suggestionCount": {
     "other": "%{formattedCount}件の提案"
-  },
-  "tidy.keptCount": {
-    "other": "%{formattedCount}枚の写真を残しました"
-  },
-  "tidy.savedCount": {
-    "other": "%{formattedCount}枚の写真をShelvrに保存しました"
-  },
-  "tidy.deletedCount": {
-    "other": "%{formattedCount}枚の写真を削除しました"
-  },
-  "tidy.emptyBody": "%{source}の整理は完了です。上から別の取得元を選んでください。",
-  "tidy.pendingDeleteCount": {
-    "other": "%{formattedCount}件の削除が確認待ちです"
   },
   "digest.waitingCount": {
     "other": "%{formattedCount}件の保存項目があなたを待っています"

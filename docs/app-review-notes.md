@@ -25,7 +25,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
    - **Trial reminder:** "We'll remind you before it ends" shows a mock notification and asks how many days before the trial ends to remind the user (1, 2 or 3; 2 is picked). **Continue** asks for the iOS notification permission and keeps the choice for the trial reminder; **Not now** moves on without it. The screen is skipped when notifications were already allowed or refused. Either button opens the paywall.
 7. **Paywall:** the RevenueCat paywall, which has three screens. The opener, "Save the link. Shelvr does the filing.", shows a short carousel of what Shelvr does and has **Continue**. The trial explainer, "Get a heads-up before you pay", describes the 7-day trial on the Annual plan, which the paywall labels Yearly: Today, a reminder before the trial ends that is sent only if the user turns it on, and Day 7, when annual billing begins. It says to cancel at least 24 hours before the trial ends to avoid a charge, and where to cancel (Settings > your name > Subscriptions). **See plans** continues. The plan picker, "Pick a plan", offers **Yearly** (7-day trial, then the yearly price) and **Weekly** (no trial), each with its localized price. The buy button reads "Try for $0.00, then <price>/year" for Yearly with the trial (the zero is shown in the storefront's currency), and "Subscribe for <price>/week" for Weekly. The renewal line above the button, **Restore**, **Terms**, and **Privacy** are on this screen. These three screens are the offering for an account that can still start the trial, which includes a fresh sandbox account. An account that has already used its trial is shown a separate no-trial offering instead, which this note does not cover. The paywall fills the screen and has no close button. Its second and third screens can go back to the screen before. Anyone whose paywall cannot load goes on to Home (then the app asks again once Home is up), and an account that already has Pro skips the paywall. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves anything the user shared to Shelvr meanwhile.
 8. **Home:** a one-time letter, "Plan less, go out more", with **Explore Shelvr** to close it, then a "Get set up" card that ticks off **Share a TikTok**, **Add an Instagram reel or a screenshot** and **Paste a list** from the user's saves. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
-9. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
+9. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports a photo.
 10. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
 
 ## Core save loop
@@ -37,7 +37,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates new saves, Tidy, Map, dynamic Spaces, and Find links.
+- Shelvr Pro gates new saves, Map, dynamic Spaces, and Find links.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers keep **read-only** access to existing library content.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -70,7 +70,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 | Permission    | When requested                         | Why                                      |
 | ------------- | -------------------------------------- | ---------------------------------------- |
 | Camera        | User opens Camera to capture           | Save a photo into Shelvr                 |
-| Photo Library | User imports a photo or opens Tidy     | Import / tidy photos                     |
+| Photo Library | User imports a photo                   | Import photos                            |
 | Calendar      | User adds an event from an item intent | Create calendar event from saved content |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
@@ -133,7 +133,7 @@ Core review flow:
 2. Save a URL or note. The item first shows processing, then receives an AI-generated title, description, tags, and Space suggestions.
 3. Open Search to find the saved item.
 4. Open Spaces to create or inspect a collection.
-5. Camera permission is requested only after choosing Camera. Photo Library access is requested only after importing a photo or opening Tidy.
+5. Camera permission is requested only after choosing Camera. Photo Library access is requested only after importing a photo.
 6. The Map uses only GPS metadata embedded in photos the user selects; Shelvr does not request or track live device location.
 
 Share extension, Siri and widget:

@@ -251,14 +251,8 @@
   "feedback.cancel": "의견 취소",
   "feedback.sending": "보내는 중…",
   "feedback.send": "보내기",
-  "tidy.completeTitle": "모두 정리됐어요",
-  "tidy.batchTitle": "이 묶음은 정리됐어요",
-  "tidy.continue": "계속하기",
-  "tidy.keep": "유지",
-  "tidy.save": "Shelvr에 저장",
   "common.loading": "불러오는 중",
   "navigation.home": "홈",
-  "navigation.tidy": "사진 정리",
   "navigation.map": "지도",
   "navigation.search": "검색",
   "digest.loadFailed": "주간 책장을 불러오지 못했어요",
@@ -495,20 +489,7 @@
   "loading.spaces": "내 공간 여는 중",
   "spaces.listEmptyTitle": "공간을 만들어 보세요",
   "spaces.listEmptyBody": "공간은 디자인 영감, 레시피, 선물 아이디어 같은 주제별 책장이에요.\nShelvr가 어울리는 항목을 추천하고\n남길 항목은 직접 선택해요.",
-  "navigation.tidyHeader": "사진 정리",
-  "tidy.confirmDelete": "검토한 사진 삭제",
-  "albums.chooseLimited": "사진 앨범 선택. 사진 접근이 제한되어 있어요.",
-  "albums.choose": "사진 앨범 선택",
-  "albums.source": "사진 출처",
-  "albums.manageAccessAction": "사진 접근 관리…",
-  "albums.manageAccessTitle": "사진 접근 관리",
-  "tidy.introTitle": "사진첩을 정리하세요",
-  "tidy.introBody": "사진 접근을 허용하면 카메라 롤을 한 장씩 넘겨 볼 수 있어요.\n유지하거나 삭제하거나 Shelvr에 저장하면서 저장 공간도 확보하세요.",
-  "permissions.allowPhotos": "사진 접근 허용",
   "permissions.openSettings": "설정 열기",
-  "loading.tidy": "사진 정리 여는 중",
-  "tidy.proTitle": "사진 정리는 Pro 기능이에요",
-  "tidy.proBody": "사진 라이브러리를 둘러보며 불필요한 사진을 정리하세요. Shelvr Pro 요금제로 사진 정리와 모든 Pro 기능을 이용하세요.",
   "errors.photoTooLargeTitle": "사진이 너무 커요",
   "errors.photoUnavailableTitle": "사진을 사용할 수 없어요",
   "errors.pageNotFoundTitle": "페이지를 찾을 수 없어요",
@@ -555,7 +536,6 @@
   "interests.vibeDateNights": "데이트 나이트",
   "interests.vibeHiddenGems": "숨은 명소",
   "interests.vibeGoingOut": "나이트라이프",
-  "albums.allPhotos": "모든 사진",
   "appearance.system": "시스템",
   "appearance.light": "밝게",
   "appearance.warmDark": "따뜻한 다크",
@@ -598,19 +578,6 @@
   },
   "spaces.suggestionCount": {
     "other": "추천 %{formattedCount}개"
-  },
-  "tidy.keptCount": {
-    "other": "사진 %{formattedCount}장을 남겼어요"
-  },
-  "tidy.savedCount": {
-    "other": "사진 %{formattedCount}장을 Shelvr에 저장했어요"
-  },
-  "tidy.deletedCount": {
-    "other": "사진 %{formattedCount}장을 삭제했어요"
-  },
-  "tidy.emptyBody": "%{source}에서 더 정리할 항목이 없어요. 위에서 다른 출처를 선택하세요.",
-  "tidy.pendingDeleteCount": {
-    "other": "삭제 확인이 필요한 항목 %{formattedCount}개"
   },
   "digest.waitingCount": {
     "other": "저장 항목 %{formattedCount}개가 기다리고 있어요"
