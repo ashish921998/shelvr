@@ -3,6 +3,7 @@ import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
   nextOnboardingStep,
+  onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
@@ -29,7 +30,8 @@ describe("previousOnboardingStep", () => {
     ["savedCount", "opener"],
     ["goal", "savedCount"],
     ["planner", "goal"],
-    ["city", "planner"],
+    ["chart", "planner"],
+    ["city", "chart"],
     ["ahaShare", "city"],
     ["ahaSpots", "ahaShare"],
     ["ahaPlan", "ahaSpots"],
@@ -56,5 +58,16 @@ describe("ONBOARDING_STEP_IDS", () => {
   it("names every step once, so funnels can split on it", () => {
     const ids = ONBOARDING_STEPS.map((step) => ONBOARDING_STEP_IDS[step]);
     expect(new Set(ids).size).toBe(ONBOARDING_STEPS.length);
+  });
+});
+
+describe("onboardingProgress", () => {
+  it("has no bar on the opener and fills evenly to the sample plan", () => {
+    expect(onboardingProgress("opener")).toBeNull();
+    const bars = ONBOARDING_STEPS.slice(1).map(onboardingProgress);
+    expect(bars.at(-1)).toBe(1);
+    bars.forEach((bar, index) => {
+      if (index > 0) expect(bar).toBeGreaterThan(bars[index - 1] ?? 0);
+    });
   });
 });

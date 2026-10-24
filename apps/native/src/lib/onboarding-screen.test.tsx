@@ -134,6 +134,12 @@ vi.mock("@/components/onboarding/questions", () => ({
     ),
   ),
 }));
+vi.mock("@/components/onboarding/progress-chart", () => ({
+  ProgressChartStep: vi.fn(
+    ({ kind, onContinue }: { kind: string; onContinue: () => void }) =>
+      button(`chart:${kind}`, onContinue),
+  ),
+}));
 vi.mock("@/components/onboarding/city-step", () => ({
   CityStep: vi.fn(
     ({
@@ -222,6 +228,7 @@ it("walks the questions into a sample for the goal that leads, and keeps every a
   tap("goal:continue");
   tap("planner:explorer");
   tap("planner:continue");
+  tap("chart:trip");
   tap("city:trip:lisbon");
   expect(saved()).toMatchObject({
     goals: ["food", "travel"],

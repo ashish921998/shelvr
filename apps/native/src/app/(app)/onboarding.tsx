@@ -20,6 +20,7 @@ import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
   nextOnboardingStep,
+  onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
@@ -38,6 +39,7 @@ import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
 import { OpenerStep } from "@/components/onboarding/opener";
+import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
 import {
   GoalStep,
@@ -53,17 +55,6 @@ import { Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const PROGRESS: Record<OnboardingStep, number | null> = {
-  opener: null,
-  savedCount: 0.12,
-  goal: 0.25,
-  planner: 0.38,
-  city: 0.5,
-  ahaShare: 0.65,
-  ahaSpots: 0.8,
-  ahaPlan: 1,
-};
 
 /** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
 const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
@@ -123,7 +114,7 @@ function Header({
   onSkip: (() => void) | null;
 }) {
   const { theme } = useUnistyles();
-  const progress = PROGRESS[step];
+  const progress = onboardingProgress(step);
   if (progress === null) return null;
   return (
     <View style={styles.header}>
@@ -298,6 +289,8 @@ export default function OnboardingScreen() {
             onContinue={advance}
           />
         );
+      case "chart":
+        return <ProgressChartStep kind={kind} onContinue={advance} />;
       case "city":
         return (
           <CityStep

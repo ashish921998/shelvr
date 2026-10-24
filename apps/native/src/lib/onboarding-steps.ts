@@ -3,12 +3,13 @@ export const ONBOARDING_STEPS = [
   "savedCount",
   "goal",
   "planner",
+  "chart",
   "city",
   "ahaShare",
   "ahaSpots",
   "ahaPlan",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 17;
+export const ONBOARDING_FLOW_VERSION = 18;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -17,11 +18,18 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   savedCount: "saved_count",
   goal: "goal",
   planner: "planner",
+  chart: "progress_chart",
   city: "city",
   ahaShare: "aha_share",
   ahaSpots: "aha_spots",
   ahaPlan: "aha_plan",
 };
+
+/** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */
+export function onboardingProgress(step: OnboardingStep): number | null {
+  const index = ONBOARDING_STEPS.indexOf(step);
+  return index === 0 ? null : index / (ONBOARDING_STEPS.length - 1);
+}
 
 /** The step before `step`; none on the opener. */
 export function previousOnboardingStep(
