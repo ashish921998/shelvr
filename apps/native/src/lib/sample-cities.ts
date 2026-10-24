@@ -37,7 +37,7 @@ export type SampleSlot =
   | "brunch"
   | "coffee";
 export type LatLng = { lat: number; lng: number };
-type CityStop = {
+export type CityStop = {
   name: string;
   slot: SampleSlot;
   at: LatLng;

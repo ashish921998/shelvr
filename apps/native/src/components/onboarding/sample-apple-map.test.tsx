@@ -14,7 +14,6 @@ type MapProps = { annotations: Pin[]; cameraPosition: { coordinates: object } };
 const mock = vi.hoisted(() => ({
   props: undefined as MapProps | undefined,
   moves: [] as Camera[],
-  reduced: false,
   layout: undefined as Layout | undefined,
   view: ({
     children,
@@ -28,10 +27,7 @@ const mock = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("react-native", () => ({
-  PixelRatio: { get: () => 3 },
-  View: mock.view,
-}));
+vi.mock("react-native", () => ({ View: mock.view }));
 vi.mock("expo-maps", () => ({
   AppleMaps: {
     MapColorScheme: { DARK: "dark", LIGHT: "light" },
@@ -46,9 +42,6 @@ vi.mock("expo-maps", () => ({
       return null;
     }),
   },
-}));
-vi.mock("react-native-reanimated", () => ({
-  useReducedMotion: () => mock.reduced,
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFill: {} },
@@ -75,21 +68,16 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 
 const TRIP = samplePlan("trip", "barcelona");
-const DAY_ONE = TRIP.days[0]!.stops;
-const DAY_TWO = TRIP.days[1]!.stops;
+const STOPS = TRIP.days.flatMap((day) => day.stops);
 
-const measure = () =>
-  act(() =>
-    mock.layout?.({ nativeEvent: { layout: { width: 340, height: 170 } } }),
-  );
+const measure = (width: number, height: number) =>
+  act(() => mock.layout?.({ nativeEvent: { layout: { width, height } } }));
 
 beforeEach(() => {
-  vi.useFakeTimers();
   mock.props = undefined;
   mock.moves = [];
-  mock.reduced = false;
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => vi.restoreAllMocks());
 
 describe("SampleAppleMap", () => {
   it("waits for its size before drawing the map", () => {
@@ -97,40 +85,44 @@ describe("SampleAppleMap", () => {
     expect(mock.props).toBeUndefined();
   });
 
-  it("numbers the stops across days, in each day's color", () => {
-    render(<SampleAppleMap trip={TRIP} />);
-    measure();
+  it("numbers every stop in order, and shows only the dropped ones", () => {
+    render(<SampleAppleMap trip={TRIP} visible={2} />);
+    measure(340, 170);
     const pins = mock.props!.annotations;
-    expect(pins.map((pin) => pin.text)).toEqual(
-      [...DAY_ONE, ...DAY_TWO].map((_, index) => String(index + 1)),
-    );
+    expect(pins.map((pin) => pin.text)).toEqual(["1", "2"]);
     expect(pins[0]!.backgroundColor).toBe("#amber");
-    expect(pins[DAY_ONE.length]!.backgroundColor).toBe("#dark");
   });
 
-  it("opens on the first day and moves on to the next", () => {
+  it("frames the pins the way the city page does, below its middle when the top is padded more", () => {
     render(<SampleAppleMap trip={TRIP} />);
-    measure();
-    const dayOneLat =
-      DAY_ONE.reduce((sum, stop) => sum + stop.at.lat, 0) / DAY_ONE.length;
-    const dayTwoLat =
-      DAY_TWO.reduce((sum, stop) => sum + stop.at.lat, 0) / DAY_TWO.length;
-    const first = mock.props!.cameraPosition.coordinates as {
+    measure(402, 340);
+    const { latitude } = mock.props!.cameraPosition.coordinates as {
       latitude: number;
     };
-    const near = (a: number, b: number) =>
-      Math.abs(a - b) < Math.abs(dayOneLat - dayTwoLat) / 2;
-    expect(near(first.latitude, dayOneLat)).toBe(true);
-    act(() => vi.advanceTimersByTime(3500));
-    expect(near(mock.moves.at(-1)!.coordinates.latitude, dayTwoLat)).toBe(true);
+    const lats = STOPS.map((stop) => stop.at.lat);
+    const mid = (Math.min(...lats) + Math.max(...lats)) / 2;
+    // The camera sits north of the pins' middle, which puts them below the map's centre.
+    expect(latitude).toBeGreaterThan(mid);
   });
 
-  it("stays on the first day when motion is reduced", () => {
-    mock.reduced = true;
+  it("leaves the first camera to cameraPosition instead of moving there at mount", () => {
+    render(<SampleAppleMap trip={TRIP} visible={1} />);
+    measure(402, 340);
+    expect(mock.moves).toEqual([]);
+  });
+
+  it("keeps the camera still while the pins drop in", () => {
+    const { rerender } = render(<SampleAppleMap trip={TRIP} visible={1} />);
+    measure(402, 340);
+    rerender(<SampleAppleMap trip={TRIP} visible={3} />);
+    expect(mock.moves).toEqual([]);
+  });
+
+  it("moves the camera when the map's size changes", () => {
     render(<SampleAppleMap trip={TRIP} />);
-    measure();
-    const moved = mock.moves.length;
-    act(() => vi.advanceTimersByTime(10_000));
-    expect(mock.moves).toHaveLength(moved);
+    measure(402, 170);
+    const before = mock.moves.length;
+    measure(402, 400);
+    expect(mock.moves.length).toBeGreaterThan(before);
   });
 });

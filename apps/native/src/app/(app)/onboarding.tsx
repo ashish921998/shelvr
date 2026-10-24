@@ -28,13 +28,13 @@ import {
 import {
   clearPending,
   getOnboardingProgress,
+  queueDemoUrl,
   resolveOnboardingSpaceName,
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { SignInView } from "@/components/sign-in-view";
-import { AhaPlanStep } from "@/components/onboarding/aha-plan";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
@@ -228,6 +228,8 @@ export default function OnboardingScreen() {
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
+    // The reel they shared in the demo becomes their first real save once they have Pro.
+    if (sample.source === "reel") queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
@@ -238,7 +240,7 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
   });
 
-  const askAfterPlan = () => {
+  const askAfterSpots = () => {
     recordCurrentStep();
     paywall.ask();
   };
@@ -305,14 +307,11 @@ export default function OnboardingScreen() {
       case "ahaShare":
         return <AhaShareStep sample={sample} onShared={advance} />;
       case "ahaSpots":
-        return <AhaSpotsStep sample={sample} onContinue={advance} />;
-      case "ahaPlan":
         return (
-          <AhaPlanStep
+          <AhaSpotsStep
             sample={sample}
-            savedCount={savedCount}
             leaving={paywall.asked}
-            onContinue={askAfterPlan}
+            onContinue={askAfterSpots}
           />
         );
     }

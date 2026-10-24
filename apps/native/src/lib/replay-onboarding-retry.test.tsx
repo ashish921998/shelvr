@@ -45,7 +45,10 @@ vi.mock("expo-router", () => ({ useRouter: () => stableRouter }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: account.user }),
 }));
-vi.mock("@/lib/analytics", () => ({ analytics: { sessionId: () => "s" } }));
+const captureError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({
+  analytics: { sessionId: () => "s", captureError },
+}));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: true }),
 }));
@@ -74,6 +77,7 @@ beforeEach(() => {
   storage.clear();
   createSpace.mockReset();
   createLinkItem.mockReset();
+  captureError.mockReset();
   openPaywall.mockReset().mockResolvedValue(false);
   entitlement.entitled = true;
   account.user = { _id: "user_1" };
@@ -103,9 +107,28 @@ describe("useReplayOnboarding and the account", () => {
     await settle();
 
     expect(createLinkItem).toHaveBeenCalledWith(
-      expect.objectContaining({ url: "https://example.com/recipe" }),
+      expect.objectContaining({
+        url: "https://example.com/recipe",
+        saveSource: "onboarding_demo",
+      }),
     );
     expect(hasPending()).toBe(false);
+  });
+
+  it("reports a handed-over link that fails to save and keeps it queued", async () => {
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockRejectedValue(new Error("server error"));
+    queueDemoUrl("https://example.com/recipe", null, "user_1");
+    setPendingSpaces([]);
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(captureError).toHaveBeenCalledWith(
+      "onboarding_demo_save_failed",
+      expect.any(Error),
+    );
+    expect(hasPending()).toBe(true);
   });
 
   it("stops a run when another account signs in while it waits on the server", async () => {

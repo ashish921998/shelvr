@@ -1,6 +1,7 @@
 import {
   SAMPLE_CITIES,
   isSampleCity,
+  type CityStop,
   type LatLng,
   type SampleCity,
   type SampleCityId,
@@ -12,18 +13,6 @@ import type { TextMessageKey } from "@/locales/message-types";
 
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
-export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
-  morning: "trip.slotMorning",
-  lunch: "trip.slotLunch",
-  afternoon: "trip.slotAfternoon",
-  dinner: "trip.slotDinner",
-  drinks: "trip.slotDrinks",
-  dessert: "trip.slotDessert",
-  walk: "trip.slotWalk",
-  brunch: "trip.slotBrunch",
-  coffee: "trip.slotCoffee",
-};
-
 export const SAMPLE_MAP = { width: 340, height: 168 } as const;
 
 export type SampleCrop = { top: number; height: number };
@@ -33,7 +22,7 @@ export const SAMPLE_CROPS = {
 
 type Point = { x: number; y: number };
 
-export type SampleStop = {
+type SampleStop = {
   name: string;
   slot: SampleSlot;
   pin: Point;
@@ -243,6 +232,20 @@ export function samplePlan(kind: PlanKind, city?: string | null): SampleTrip {
     TRIPS.set(key, trip);
   }
   return trip;
+}
+
+/** Just these stops on the city's map, as one day: a real reel's places. */
+export function stopsTrip(
+  kind: PlanKind,
+  id: SampleCityId,
+  title: TextMessageKey,
+  stops: readonly CityStop[],
+): SampleTrip {
+  return buildTrip(kind, id, {
+    ...SAMPLE_CITIES[id],
+    saves: [],
+    days: [{ title, stops }],
+  });
 }
 
 export function sampleTrip(city?: string | null): SampleTrip {

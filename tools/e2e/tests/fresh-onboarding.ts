@@ -55,8 +55,29 @@ export async function walkToSampleReel(screen: Screen): Promise<void> {
     timeout: 30_000,
   });
   await skip.tap();
-  await expect(screen.getByRole("button", SHARE_TO_SHELVR)).toBeVisible({
+  await expect(screen.getByRole("button", SHARE_ON_REEL)).toBeVisible({
     timeout: 30_000,
+  });
+}
+
+/** Shares the sample reel the way the walk teaches (Share, Share to…, More, pinning Shelvr with Edit, + and Done, then Shelvr) and waits for its spots, ready to tap Continue. */
+export async function shareTheSampleReel(screen: Screen): Promise<void> {
+  for (const step of [
+    SHARE_ON_REEL,
+    "Share to…",
+    "More",
+    "Edit",
+    "Add Shelvr to Favorites",
+    "Done",
+  ]) {
+    await screen.getByRole("button", step).tap({ timeout: 30_000 });
+  }
+  await screen.getByRole("button", SHARE_TO_SHELVR).tap({ timeout: 30_000 });
+  await expect(screen.getByText(/· 3 places$/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(screen.getByRole("button", "Continue")).toBeEnabled({
+    timeout: 10_000,
   });
 }
 
@@ -93,4 +114,7 @@ export async function relaunchWith(
   });
 }
 
-export const SHARE_TO_SHELVR = "Shelvr";
+const SHARE_TO_SHELVR = "Shelvr";
+
+// The ringed share button on the sample reel; exact, so it never matches "Share to…".
+export const SHARE_ON_REEL = /^Share$/;
