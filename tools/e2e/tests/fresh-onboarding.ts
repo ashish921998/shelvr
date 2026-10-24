@@ -60,9 +60,16 @@ export async function walkToSampleReel(screen: Screen): Promise<void> {
   });
 }
 
-/** Shares the sample reel the way the walk teaches (Share, Share to…, More, the pin tip, Shelvr) and waits for its spots, ready to tap Continue. */
+/** Shares the sample reel the way the walk teaches (Share, Share to…, More, pinning Shelvr with Edit, + and Done, then Shelvr) and waits for its spots, ready to tap Continue. */
 export async function shareTheSampleReel(screen: Screen): Promise<void> {
-  for (const step of [SHARE_ON_REEL, "Share to…", "More", "Got it"]) {
+  for (const step of [
+    SHARE_ON_REEL,
+    "Share to…",
+    "More",
+    "Edit",
+    "Add Shelvr to Favorites",
+    "Done",
+  ]) {
     await screen.getByRole("button", step).tap({ timeout: 30_000 });
   }
   await screen.getByRole("button", SHARE_TO_SHELVR).tap({ timeout: 30_000 });

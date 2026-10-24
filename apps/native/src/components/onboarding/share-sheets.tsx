@@ -3,8 +3,10 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { withAlpha } from "@/lib/color";
 import { t } from "@/lib/i18n";
 import { sheetIn } from "@/lib/motion";
+import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
-import type { ReactNode } from "react";
+import * as Haptics from "expo-haptics";
+import { useState, type ReactNode } from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -162,52 +164,134 @@ export function IosSheet({
   );
 }
 
-/** The iOS "Apps" list behind More. `onPick` rings Shelvr; without it, Edit is what matters. */
-export function AppsSheet({
-  top,
-  onPick,
+/** Where the walk is in the iOS "Apps" list behind More: Edit, + next to Shelvr, Done, then Shelvr itself. */
+type AppsStep = "edit" | "add" | "done" | "pick";
+
+const NEXT_STEP: Record<Exclude<AppsStep, "pick">, AppsStep> = {
+  edit: "add",
+  add: "done",
+  done: "pick",
+};
+
+export function tick() {
+  if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+}
+
+const APPS_COACH: Record<AppsStep, TextMessageKey> = {
+  edit: "aha.coachEdit",
+  add: "aha.coachAdd",
+  done: "aha.coachDone",
+  pick: "aha.coachShelvr",
+};
+
+/** iOS's own edit-mode badges, drawn in its system colors like the rest of the sheet. */
+function EditBadge({
+  kind,
+  onPress,
 }: {
-  top: ReactNode;
-  onPick?: () => void;
+  kind: "add" | "remove";
+  onPress?: () => void;
 }) {
-  const { theme } = useUnistyles();
-  const picking = onPick !== undefined;
+  const add = kind === "add";
   return (
-    <Sheet top={top}>
+    <ScalePressable
+      accessibilityRole="button"
+      accessibilityLabel={add ? t("aha.pinShelvr") : undefined}
+      accessible={onPress !== undefined}
+      disabled={onPress === undefined}
+      onPress={onPress}
+      hitSlop={12}
+      style={[
+        styles.badge,
+        add ? styles.badgeAdd : styles.badgeRemove,
+        onPress && styles.badgeOn,
+      ]}
+    >
+      <AppSymbolIcon
+        name={add ? "plus" : "minus"}
+        size={12}
+        tintColor="#FFFFFF"
+      />
+    </ScalePressable>
+  );
+}
+
+/** The iOS "Apps" list, walked one tap at a time: only the step's target is lit and pressable. */
+export function AppsSheet({ onPick }: { onPick: () => void }) {
+  const { theme } = useUnistyles();
+  const [step, setStep] = useState<AppsStep>("edit");
+  const onNext =
+    step === "pick"
+      ? onPick
+      : () => {
+          tick();
+          setStep(NEXT_STEP[step]);
+        };
+  const editing = step === "add" || step === "done";
+  const pinned = step === "done" || step === "pick";
+  const corner = step === "edit" || step === "done";
+  const shelvr = (
+    <ScalePressable
+      accessibilityRole="button"
+      accessibilityLabel="Shelvr"
+      accessible={step === "pick"}
+      disabled={step !== "pick"}
+      onPress={onNext}
+      style={[
+        styles.listRow,
+        step === "pick" && styles.listRowOn,
+        step === "edit" && styles.faded,
+      ]}
+    >
+      {editing ? (
+        <EditBadge
+          kind={pinned ? "remove" : "add"}
+          onPress={step === "add" ? onNext : undefined}
+        />
+      ) : null}
+      <Image source={APP_ICON} style={styles.listIcon} />
+      <Text style={[styles.listLabel, step === "pick" && styles.listLabelOn]}>
+        Shelvr
+      </Text>
+    </ScalePressable>
+  );
+  return (
+    <Sheet top={<Coach label={t(APPS_COACH[step])} />}>
       <View style={styles.listHeader}>
         <Text style={[styles.listTitle, styles.faded]}>
           {t("aha.sheetApps")}
         </Text>
-        <Text style={[styles.edit, picking && styles.faded]}>
-          {t("aha.sheetEdit")}
-        </Text>
+        <ScalePressable
+          accessibilityRole="button"
+          disabled={!corner}
+          onPress={onNext}
+          hitSlop={12}
+          style={[styles.corner, corner ? styles.cornerOn : styles.faded]}
+        >
+          <Text style={styles.edit}>
+            {editing ? t("aha.sheetDone") : t("aha.sheetEdit")}
+          </Text>
+        </ScalePressable>
       </View>
-      <View style={[styles.listGroup, styles.faded]}>
-        <Text style={styles.section}>{t("aha.sheetFavorites")}</Text>
-        <View style={styles.listRow}>
-          <View style={styles.listIcon}>
-            <AppSymbolIcon
-              name="message.fill"
-              size={16}
-              tintColor={theme.colors.muted}
-            />
-          </View>
-          <Text style={styles.listLabel}>{t("aha.shareMessages")}</Text>
+      <Text style={[styles.section, styles.faded]}>
+        {t("aha.sheetFavorites")}
+      </Text>
+      <View style={[styles.listRow, styles.faded]}>
+        {editing ? <EditBadge kind="remove" /> : null}
+        <View style={styles.listIcon}>
+          <AppSymbolIcon
+            name="message.fill"
+            size={16}
+            tintColor={theme.colors.muted}
+          />
         </View>
-        <Text style={styles.section}>{t("aha.sheetSuggestions")}</Text>
+        <Text style={styles.listLabel}>{t("aha.shareMessages")}</Text>
       </View>
-      <ScalePressable
-        accessibilityRole="button"
-        accessibilityLabel="Shelvr"
-        disabled={!picking}
-        onPress={onPick}
-        style={[styles.listRow, picking && styles.listRowOn]}
-      >
-        <Image source={APP_ICON} style={styles.listIcon} />
-        <Text style={[styles.listLabel, picking && styles.listLabelOn]}>
-          Shelvr
-        </Text>
-      </ScalePressable>
+      {pinned ? shelvr : null}
+      <Text style={[styles.section, styles.faded]}>
+        {t("aha.sheetSuggestions")}
+      </Text>
+      {pinned ? null : shelvr}
     </Sheet>
   );
 }
@@ -347,15 +431,40 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.subheadLabel,
     color: theme.colors.foreground,
   },
+  corner: {
+    position: "absolute",
+    right: -theme.gap(0.75),
+    top: -theme.gap(0.5),
+    paddingVertical: theme.gap(0.5),
+    paddingHorizontal: theme.gap(0.75),
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  cornerOn: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+  },
   edit: {
     ...theme.type.subheadLabel,
-    position: "absolute",
-    right: 0,
     fontFamily: theme.fonts.bold,
     color: theme.colors.primaryText,
   },
-  listGroup: {
-    gap: theme.gap(1),
+  badge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeAdd: {
+    backgroundColor: "#34C759",
+  },
+  badgeRemove: {
+    backgroundColor: "#FF3B30",
+  },
+  badgeOn: {
+    boxShadow: `0 0 0 3px ${theme.colors.primary}`,
   },
   section: {
     ...theme.type.captionLabel,

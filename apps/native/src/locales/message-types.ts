@@ -728,9 +728,11 @@ export type MessageParams = {
   "aha.coachShare": undefined;
   "aha.coachMore": undefined;
   "aha.coachShelvr": undefined;
-  "aha.tipTitle": undefined;
-  "aha.tipBody": undefined;
-  "aha.tipOk": undefined;
+  "aha.coachEdit": undefined;
+  "aha.coachAdd": undefined;
+  "aha.coachDone": undefined;
+  "aha.sheetDone": undefined;
+  "aha.pinShelvr": undefined;
   "aha.reading": undefined;
   "aha.sheetSearch": undefined;
   "aha.sheetStory": undefined;
