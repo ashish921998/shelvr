@@ -12,7 +12,7 @@ export async function startFreshOnboarding({
   device: Device;
   screen: Screen;
 }): Promise<void> {
-  const start = screen.getByRole("button", "Start yours");
+  const start = screen.getByRole("button", "Get started");
   await relaunchWith(device, screen, FRESH_INSTALL_ARGUMENTS, () =>
     start.isVisible(),
   );
@@ -27,31 +27,31 @@ const FRESH_INSTALL_ARGUMENTS = [
   "YES",
 ];
 
-export async function walkToSharePractice(
-  screen: Screen,
-  goal: "Something else" | "Travel ideas" = "Something else",
-): Promise<void> {
+/** From the opener to the sample reel, planning date nights in the sample's own city (Prague). */
+export async function walkToSampleReel(screen: Screen): Promise<void> {
   await tapUntilVisible(
-    screen.getByRole("button", "Start yours"),
-    screen.getByText("What do you save?"),
+    screen.getByRole("button", "Get started"),
+    screen.getByText("How many spots have you saved already?"),
     { waitMs: 5_000, timeout: 60_000 },
   );
-  await screen.getByRole("button", new RegExp(`^${goal}`)).tap();
-  if (goal === "Travel ideas") {
-    // The last option, below the city list on an iPhone 17 screen.
-    const notSure = screen.getByRole("button", /^Not sure yet/);
-    await expect(screen.getByText("Where are you going next?")).toBeVisible({
-      timeout: 30_000,
-    });
-    await screen.scrollUntilVisible(notSure);
-    await notSure.tap();
-  } else {
-    await screen.getByRole("checkbox", /^AI & tech/).tap({ timeout: 30_000 });
-    const next = screen.getByRole("button", "Continue");
-    await expect(next).toBeEnabled({ timeout: 10_000 });
-    await next.tap();
-  }
-  await expect(screen.getByRole("button", SHARE_LATER)).toBeVisible({
+  const skip = screen.getByRole("button", "Skip");
+  await skip.tap();
+  await expect(screen.getByText("What do you want to plan?")).toBeVisible({
+    timeout: 30_000,
+  });
+  await screen.getByRole("checkbox", /^Date nights/).tap();
+  const next = screen.getByRole("button", "Continue");
+  await expect(next).toBeEnabled({ timeout: 10_000 });
+  await next.tap();
+  await expect(screen.getByText("How do you like to plan?")).toBeVisible({
+    timeout: 30_000,
+  });
+  await skip.tap();
+  await expect(screen.getByText("Pick a city to try it with")).toBeVisible({
+    timeout: 30_000,
+  });
+  await skip.tap();
+  await expect(screen.getByRole("button", SHARE_TO_SHELVR)).toBeVisible({
     timeout: 30_000,
   });
 }
@@ -89,4 +89,4 @@ export async function relaunchWith(
   });
 }
 
-export const SHARE_LATER = "I'll try it later";
+export const SHARE_TO_SHELVR = "Shelvr";

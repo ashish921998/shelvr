@@ -1,282 +1,80 @@
-import { analytics } from "@/lib/analytics";
+import { PhotoCollage } from "@/components/onboarding/collage";
+import { PillButton } from "@/components/onboarding/parts";
 import { t, useAppLocale } from "@/lib/i18n";
-import { motion, motionCSS } from "@/lib/motion";
-import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
-import type { TextMessageKey } from "@/locales/message-types";
-import { PhoneFrame } from "@/components/onboarding/opener-phone";
-import {
-  FiledToast,
-  FileScene,
-  PlanScene,
-  ShareScene,
-  type SceneProps,
-} from "@/components/onboarding/opener-scenes";
-import { CtaButton } from "@/components/onboarding/parts";
-import { useEffect, useRef, useState, type ComponentType } from "react";
-import {
-  AccessibilityInfo,
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  type ScrollViewInstance,
-  Text,
-  View,
-} from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-
-type Page = {
-  key: "save" | "file" | "plan";
-  title: TextMessageKey;
-  accent: TextMessageKey;
-  body: TextMessageKey;
-  Scene: ComponentType<SceneProps>;
-  Overlay?: ComponentType;
-};
-
-const PAGES: Page[] = [
-  {
-    key: "save",
-    title: "onboarding.openerSaveTitle",
-    accent: "onboarding.openerSaveAccent",
-    body: "onboarding.openerSaveBody",
-    Scene: ShareScene,
-  },
-  {
-    key: "file",
-    title: "onboarding.openerFileTitle",
-    accent: "onboarding.openerFileAccent",
-    body: "onboarding.openerFileBody",
-    Scene: FileScene,
-    Overlay: FiledToast,
-  },
-  {
-    key: "plan",
-    title: "onboarding.openerPlanTitle",
-    accent: "onboarding.openerPlanAccent",
-    body: "onboarding.openerPlanBody",
-    Scene: PlanScene,
-  },
-];
-
-const COPY_MIN_HEIGHT = 150;
-const AUTO_ADVANCE_MS = 4000;
-
-function useLiveReducedMotion() {
-  const [reduced, setReduced] = useState(useReducedMotion());
-  useEffect(() => {
-    let mounted = true;
-    let changed = false;
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      (enabled) => {
-        changed = true;
-        setReduced(enabled);
-      },
-    );
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted && !changed) setReduced(enabled);
-    });
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
-  return reduced;
-}
 
 export function OpenerStep({
   onStart,
   onSignIn,
-  viewedPages,
 }: {
   onStart: () => void;
   onSignIn: () => void;
-  viewedPages: Set<number>;
 }) {
   useAppLocale();
-  const largeText = useLargeText();
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  const [page, setPage] = useState(0);
-  const [reached, setReached] = useState(0);
-  const [swiped, setSwiped] = useState(false);
-  const reducedMotion = useLiveReducedMotion();
-  const pager = useRef<ScrollViewInstance>(null);
-
-  useEffect(() => {
-    if (viewedPages.has(page)) return;
-    viewedPages.add(page);
-    analytics.capture("onboarding_opener_page_viewed", { page_index: page });
-  }, [page, viewedPages]);
-
-  useEffect(() => {
-    if (swiped || reducedMotion || size.width <= 0) return;
-    if (page >= PAGES.length - 1) return;
-    const timer = setTimeout(() => {
-      pager.current?.scrollTo({ x: (page + 1) * size.width, animated: true });
-    }, AUTO_ADVANCE_MS);
-    return () => clearTimeout(timer);
-  }, [page, swiped, reducedMotion, size.width]);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setSize((current) =>
-      current.width === width && current.height === height
-        ? current
-        : { width, height },
-    );
-  };
-
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, layoutMeasurement } = event.nativeEvent;
-    if (layoutMeasurement.width <= 0) return;
-    const nearest = Math.round(contentOffset.x / layoutMeasurement.width);
-    const next = Math.min(PAGES.length - 1, Math.max(0, nearest));
-    setPage(next);
-    setReached((current) => Math.max(current, next));
-  };
-
-  const signIn = (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onSignIn}
-      style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
-    >
-      <Text style={styles.signInText}>
-        {t("onboarding.haveAccount")}{" "}
-        <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
-      </Text>
-    </Pressable>
-  );
-
   return (
-    <View style={styles.wrap}>
-      <ScrollView
-        ref={pager}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={onScroll}
-        onScrollBeginDrag={() => setSwiped(true)}
-        onLayout={onLayout}
-        style={styles.pager}
-      >
-        {size.width > 0
-          ? PAGES.map((item, index) => (
-              <ScrollView
-                key={item.key}
-                style={{ width: size.width, height: size.height }}
-                contentContainerStyle={styles.page}
-                alwaysBounceVertical={false}
-                showsVerticalScrollIndicator={false}
-                onScrollBeginDrag={() => setSwiped(true)}
-              >
-                <PhoneFrame
-                  overlay={
-                    item.Overlay && index <= reached ? <item.Overlay /> : null
-                  }
-                >
-                  <item.Scene shown={index <= reached} />
-                </PhoneFrame>
-                <View style={styles.copy}>
-                  <Text
-                    style={styles.headline}
-                    maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-                  >
-                    {t(item.title)}{" "}
-                    <Text style={styles.headlineAccent}>{t(item.accent)}</Text>
-                  </Text>
-                  <Text style={styles.support}>{t(item.body)}</Text>
-                </View>
-                {largeText ? signIn : null}
-              </ScrollView>
-            ))
-          : null}
-      </ScrollView>
-
-      <View
-        style={styles.dots}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        {PAGES.map((item, index) => (
-          <Animated.View
-            key={item.key}
-            testID={`opener-dot-${index}`}
-            style={[
-              styles.dot,
-              index === page && styles.dotOn,
-              {
-                transitionProperty: ["width", "backgroundColor"],
-                transitionDuration: motion.duration.state,
-                transitionTimingFunction: motionCSS.out,
-              },
-            ]}
-          />
-        ))}
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.wrap}
+      alwaysBounceVertical={false}
+    >
+      <PhotoCollage />
+      <View style={styles.copy}>
+        <Text
+          style={styles.wordmark}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          accessibilityRole="header"
+        >
+          shelvr
+        </Text>
+        <Text style={styles.tagline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+          {t("opener.tagline")}
+        </Text>
       </View>
-
       <View style={styles.foot}>
-        <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-        {largeText ? null : signIn}
+        <PillButton label={t("opener.getStarted")} onPress={onStart} />
+        <Pressable
+          accessibilityRole="button"
+          onPress={onSignIn}
+          style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
+        >
+          <Text style={styles.signInText}>
+            {t("onboarding.haveAccount")}{" "}
+            <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
+          </Text>
+        </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  scroll: {
+    flex: 1,
+  },
   wrap: {
-    flex: 1,
-    gap: theme.gap(2),
-  },
-  pager: {
-    flex: 1,
-    marginHorizontal: -theme.gap(3),
-  },
-  page: {
     flexGrow: 1,
-    gap: theme.gap(2),
-    paddingHorizontal: theme.gap(3),
+    gap: theme.gap(3),
   },
   copy: {
-    minHeight: COPY_MIN_HEIGHT,
     gap: theme.gap(1),
   },
-  headline: {
+  wordmark: {
     fontFamily: theme.fonts.display,
-    fontSize: 32,
-    lineHeight: 38,
-    color: theme.colors.foreground,
-  },
-  headlineAccent: {
+    fontSize: 56,
+    lineHeight: 60,
     color: theme.colors.primaryText,
   },
-  support: {
-    ...theme.type.body,
-    lineHeight: 22,
-    color: theme.colors.muted,
-  },
-  dots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: theme.colors.border,
-  },
-  dotOn: {
-    width: 20,
-    backgroundColor: theme.colors.primary,
+  tagline: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.3,
+    color: theme.colors.foreground,
   },
   foot: {
-    gap: theme.gap(1.5),
+    gap: theme.gap(1),
   },
   signIn: {
     minHeight: 44,

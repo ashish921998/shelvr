@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatRecentDate, trialTimelineVariables } from "./date";
+import { trialReminderAt } from "./trial-reminder-lead";
 
 process.env.TZ = "America/New_York";
 
 vi.mock("./i18n", () => ({ formattingLocale: () => "en-US" }));
+vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 
 const at = (year: number, month: number, day: number) =>
   new Date(year, month - 1, day, 23, 30).getTime();
@@ -56,6 +58,29 @@ describe("trialTimelineVariables", () => {
       trial_day7: text(" · Feb 28"),
       trial_end_day: text("365"),
     });
+  });
+
+  it("dates the reminder on the day the push picked in onboarding fires", () => {
+    const week = { unit: "DAY", count: 7 };
+    const now = new Date(2026, 10, 2, 12, 0).getTime();
+    const lead = (days: 1 | 2 | 3) =>
+      trialTimelineVariables(now, week, (end) =>
+        trialReminderAt(end, now, days),
+      );
+    expect(lead(1)).toMatchObject({
+      trial_remind_date: text("Nov 8"),
+      trial_remind_day: text("6"),
+    });
+    expect(lead(3)).toMatchObject({
+      trial_remind_date: text("Nov 6"),
+      trial_remind_day: text("4"),
+    });
+    const early = new Date(2026, 10, 2, 6, 15).getTime();
+    expect(
+      trialTimelineVariables(early, week, (end) =>
+        trialReminderAt(end, early, 2),
+      ).trial_remind_date,
+    ).toEqual(text("Nov 6"));
   });
 
   it("matches the reminder across a daylight saving change", () => {

@@ -1,13 +1,13 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { formatShortDate } from "@/lib/date";
-import { whenSheetSettled } from "@/lib/entitlement";
 import { useWelcomeSheetVisible, welcomeSave } from "@/lib/welcome-save";
-import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { PillButton } from "@/components/onboarding/parts";
 import { PromptSheet } from "@/components/ui/prompt-sheet";
-import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
+import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
+/** The one-time letter a new account opens Home to. */
 export function WelcomeSaveSheet({
   userId,
   ready,
@@ -18,7 +18,6 @@ export function WelcomeSaveSheet({
   trialEndsAt?: number;
 }) {
   useAppLocale();
-  const router = useRouter();
   const visible = useWelcomeSheetVisible(userId, ready);
   const trial = trialEndsAt !== undefined;
 
@@ -29,34 +28,45 @@ export function WelcomeSaveSheet({
     analytics.capture("welcome_save_shown", { trial });
   }, [visible, trial]);
 
-  const finish = (action: "save" | "dismiss") => {
+  const finish = (action: "explore" | "dismiss") => {
     welcomeSave.finish(userId);
     analytics.capture("welcome_save_action", { action, trial });
-  };
-  const close = () => finish("dismiss");
-  const save = () => {
-    finish("save");
-    // Pushing the add sheet while this modal slides away drops it on iOS.
-    void whenSheetSettled().then(() => router.push("/add"));
   };
 
   return (
     <PromptSheet
       testID="welcome-save-sheet"
       visible={visible}
-      onClose={close}
-      title={t("welcome.title")}
-      body={
-        trial
-          ? t("welcome.trialBody", { date: formatShortDate(trialEndsAt) })
-          : t("welcome.body")
-      }
+      onClose={() => finish("dismiss")}
+      title={t("welcomeLetter.title")}
+      body={t("welcomeLetter.body")}
       actions={
-        <>
-          <CtaButton label={t("welcome.cta")} onPress={save} />
-          <GhostButton label={t("common.notNow")} onPress={close} />
-        </>
+        <PillButton
+          label={t("welcomeLetter.cta")}
+          onPress={() => finish("explore")}
+        />
       }
-    />
+    >
+      <View style={styles.signature}>
+        <Text style={styles.name}>{t("welcomeLetter.signature")}</Text>
+        <Text style={styles.role}>{t("welcomeLetter.role")}</Text>
+      </View>
+    </PromptSheet>
   );
 }
+
+const styles = StyleSheet.create((theme) => ({
+  signature: {
+    gap: 2,
+    paddingBottom: theme.gap(1),
+  },
+  name: {
+    fontFamily: theme.fonts.display,
+    fontSize: 26,
+    color: theme.colors.primaryText,
+  },
+  role: {
+    ...theme.type.caption,
+    color: theme.colors.muted,
+  },
+}));

@@ -1,8 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { ProCard } from "@/components/home/pro-card";
-import { SaveHowTo } from "@/components/home/save-how-to";
-import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
+import { SetupChecklist } from "@/components/home/setup-checklist";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
@@ -14,11 +13,8 @@ import { NextUpCard } from "@/components/home/next-up-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import {
-  hasSavedFirstShare,
-  shouldShowHowTo,
-  weeklyNudge,
-} from "@/lib/first-share";
+import { weeklyNudge } from "@/lib/first-share";
+import { setupProgress, shouldShowSetup } from "@/lib/setup-checklist";
 import { useHomeFeed } from "@/lib/home-feed";
 import { useNextUp } from "@/lib/next-up";
 import {
@@ -154,7 +150,6 @@ export default function HomeScreen() {
   const nextUp = useNextUp(user?._id, entitlement.entitled);
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
-  const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
   const proCard = locked ? (
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : null;
@@ -173,8 +168,20 @@ export default function HomeScreen() {
     return <ScreenLoader label={t("loading.home")} />;
   }
 
-  const progressCard = saveProgressCard(progress);
-  const showHowTo = howToVisible(progress, firstShareSaved, items.length);
+  const setup = setupProgress(items);
+  const progressCard = shouldShowSetup(
+    setup,
+    items.length,
+    progress.card !== null,
+  ) ? (
+    <View style={styles.setupCard}>
+      <SetupChecklist
+        progress={setup}
+        onDismiss={progress.dismiss}
+        onShown={progress.markShown}
+      />
+    </View>
+  ) : null;
   const nudge = user ? (
     <HomeSheets
       userId={user._id}
@@ -195,7 +202,7 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        {emptyFeedStarter(proCard, showHowTo, progressCard) ??
+        {emptyFeedStarter(proCard, progressCard) ??
           (progress.pending ? null : (
             <View style={styles.emptyPlaces}>
               <HomePlacesEmptyCard />
@@ -225,10 +232,9 @@ export default function HomeScreen() {
     />
   ) : undefined;
 
-  const howToHeader =
-    proCard || showHowTo ? (
-      <View style={styles.howToHeader}>{proCard ?? <SaveHowTo />}</View>
-    ) : null;
+  const howToHeader = proCard ? (
+    <View style={styles.howToHeader}>{proCard}</View>
+  ) : null;
 
   return (
     <View style={styles.container}>
@@ -279,28 +285,17 @@ function lastHeader(
   return nextUpCard;
 }
 
-function howToVisible(
-  progress: ReturnType<typeof useSaveProgress>,
-  firstShareSaved: boolean,
-  itemCount: number,
-): boolean {
-  return (
-    !progress.deferLater && shouldShowHowTo({ firstShareSaved, itemCount })
-  );
-}
-
 function emptyFeedStarter(
   proCard: ReactNode,
-  showHowTo: boolean,
   progressCard: ReactNode,
 ): ReactNode {
-  if (proCard || showHowTo) {
+  if (proCard) {
     return (
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.howToOnly}
       >
-        {proCard ?? <SaveHowTo />}
+        {proCard}
       </ScrollView>
     );
   }
@@ -315,23 +310,16 @@ function emptyFeedStarter(
   );
 }
 
-function saveProgressCard(progress: ReturnType<typeof useSaveProgress>) {
-  return progress.card ? (
-    <SaveProgressCard
-      saved={progress.card.saved}
-      goal={progress.card.goal}
-      onDismiss={progress.dismiss}
-      onShown={progress.markShown}
-    />
-  ) : null;
-}
-
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
   },
   howToOnly: {
     padding: theme.gap(2),
+  },
+  setupCard: {
+    paddingHorizontal: theme.gap(2),
+    paddingBottom: theme.gap(1.5),
   },
   progressOnly: {
     paddingVertical: theme.gap(1),

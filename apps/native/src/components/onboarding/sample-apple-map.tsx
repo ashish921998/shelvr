@@ -22,7 +22,14 @@ const cameraFor = (points: LatLng[], size: Size) =>
     centerY: size.height / 2,
   });
 
-export function SampleAppleMap({ trip }: { trip: SampleTrip }) {
+/** `visible` shows only the first that many pins, so they can drop in one by one. */
+export function SampleAppleMap({
+  trip,
+  visible = Infinity,
+}: {
+  trip: SampleTrip;
+  visible?: number;
+}) {
   const { theme, rt } = useUnistyles();
   const reduced = useReducedMotion();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -96,16 +103,18 @@ export function SampleAppleMap({ trip }: { trip: SampleTrip }) {
           }
           uiSettings={{ compassEnabled: false, myLocationButtonEnabled: false }}
           properties={{ pointsOfInterest: { including: [] } }}
-          annotations={days.flatMap((stops, day) =>
-            stops.map((stop, index) => ({
-              id: `${day}:${index}`,
-              coordinates: stop.coordinates,
-              title: stop.name,
-              text: String(firsts[day]! + index + 1),
-              backgroundColor: colors[day % 2]!.pin,
-              textColor: colors[day % 2]!.text,
-            })),
-          )}
+          annotations={days
+            .flatMap((stops, day) =>
+              stops.map((stop, index) => ({
+                id: `${day}:${index}`,
+                coordinates: stop.coordinates,
+                title: stop.name,
+                text: String(firsts[day]! + index + 1),
+                backgroundColor: colors[day % 2]!.pin,
+                textColor: colors[day % 2]!.text,
+              })),
+            )
+            .slice(0, visible)}
           polylines={days.map((stops, day) => ({
             id: `route-${day}`,
             coordinates: stops.map((stop) => stop.coordinates),

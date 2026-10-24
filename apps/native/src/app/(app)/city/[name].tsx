@@ -81,6 +81,14 @@ export default function CityScreen() {
     analytics.capture("city_opened", { count });
   }, [loaded, count]);
 
+  if (items.isError) {
+    return (
+      <EmptyState
+        title={t("errors.unexpectedTitle")}
+        message={t("errors.retrySoon")}
+      />
+    );
+  }
   if (items.data === undefined) return <ScreenLoader />;
   const entry = cities.data?.find((c) => c.city === city);
 
