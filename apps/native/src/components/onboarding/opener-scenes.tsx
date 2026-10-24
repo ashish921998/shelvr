@@ -34,7 +34,16 @@ export function ShareScene({ shown }: SceneProps) {
   return (
     <View style={styles.fill}>
       <Image source={VIDEO} contentFit="cover" style={styles.fill} />
-      <View pointerEvents="none" style={styles.videoShade} />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.videoShade,
+          {
+            // Inline for the same Unistyles theme-change bug as PhoneFrame's fade.
+            experimental_backgroundImage: `linear-gradient(180deg, transparent 0%, ${theme.colors.overlay} 100%)`,
+          },
+        ]}
+      />
       <View style={styles.rail}>
         {RAIL.map((name) => (
           <AppSymbolIcon
@@ -271,7 +280,6 @@ const styles = StyleSheet.create((theme) => ({
     right: 0,
     bottom: 0,
     height: "60%",
-    experimental_backgroundImage: `linear-gradient(180deg, transparent 0%, ${theme.colors.overlay} 100%)`,
   },
   rail: {
     position: "absolute",
