@@ -25,19 +25,10 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   reminder: "reminder_ask",
 };
 
-const NO_BACK: readonly OnboardingStep[] = [
-  "opener",
-  "ahaShare",
-  "ahaSpots",
-  "ahaPlan",
-  "reminder",
-];
-
-/** The step before `step`; none once the sample is showing, so it never replays. */
+/** The step before `step`; none on the opener. */
 export function previousOnboardingStep(
   step: OnboardingStep,
 ): OnboardingStep | null {
-  if (NO_BACK.includes(step)) return null;
   return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) - 1] ?? null;
 }
 
