@@ -259,7 +259,6 @@ export type AnalyticsEventProperties = {
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
   };
-  ai_consent_shown: Record<string, never>;
   ai_consent_answered: {
     granted: boolean;
     surface: "card" | "settings";
