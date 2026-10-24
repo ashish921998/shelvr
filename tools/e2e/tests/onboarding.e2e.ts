@@ -69,10 +69,16 @@ test(
     await walkToSampleReel(screen);
 
     await shareTheSampleReel(screen);
-    // The place is both a map pin's title and a row under it; either proves the spot landed.
-    await expect(screen.getByText("Kampa Park").first()).toBeVisible({
+    // Skipping the city picks Prague, whose Shelvr example names these three. Each name is both a
+    // map pin's title and a row under it, so either one proves the spot landed.
+    await expect(screen.getByText("Prague · 3 places")).toBeVisible({
       timeout: 30_000,
     });
+    for (const place of ["Kampa Park", "Hemingway Bar", "Café Louvre"]) {
+      await expect(screen.getByText(place).first()).toBeVisible({
+        timeout: 10_000,
+      });
+    }
     const commit = screen.getByRole("button", COMMIT);
     await commit.tap();
     await expectPaywall(screen);
