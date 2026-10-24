@@ -358,7 +358,8 @@ Flow, kept to two query round trips per the guidelines' "as few calls as possibl
    rows the caller does not own, hydrates through `enrichItem`, and returns in
    fused order.
 
-Client: the search tab (`(tabs)/(search)/index.tsx:36`) moves from
+Client: the app no longer has a search tab, so this step waits until search
+comes back. When it does, the search screen moves from
 `convexQuery(api.items.searchItems)` to the action. This is the one real
 ergonomic cost of staying native. Results stop being reactive. The screen
 already debounces at 250 ms, so the user-visible change is small, but it is a
@@ -370,7 +371,8 @@ still calling it.
 ## Phase 4: later, once the above is live
 
 - **`similarItems`**: the same query-vs-action problem; add `similarItemsHybrid` as
-  an action and migrate. Sequenced last because it runs on every item-detail
+  an action and migrate. The save page no longer shows similar saves, so only old
+  builds call it today. Sequenced last because it ran on every item-detail
   open, so it trades reactive caching for a per-open action call. Measure before
   committing.
 - **Ask your shelf**: Phase 3 already builds the retrieval, so this is a prompt,

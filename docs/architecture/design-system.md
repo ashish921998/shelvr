@@ -49,13 +49,14 @@ are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `primaryText`, `border`, `imageBorder`, `frame`, `danger`, `overlay`,
 `onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, and the Trip Reveal
 globe's `globeOcean`, `globeLand` and `globeLandEdge`. `frame` is the mat
-around a saved picture (feed cards, space covers, the detail hero): paper
+around a saved picture (the save page's hero and the onboarding collage): paper
 white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` is the tab bar tint. iOS `NativeTabs` paints the selected tab's icon
-and its label with it, so it carries normal-size text: the light theme darkens
+`tabTint` was the tab bar tint. The app has no tab bar now, so nothing reads it.
+iOS `NativeTabs` painted the selected tab's icon and its label with it, so it
+carried normal-size text: the light theme darkens
 it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
 4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the
