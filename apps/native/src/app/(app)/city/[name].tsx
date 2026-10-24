@@ -1,16 +1,16 @@
-import { CityCover } from "@/components/city/city-cover";
+import { CityMap } from "@/components/city/city-map";
 import { SaveRow } from "@/components/city/save-row";
 import { EmptyState } from "@/components/empty-state";
-import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
+import { cityPins, numberSaves } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,9 +18,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const COVER_HEIGHT = 220;
+const MAP_SHARE = 0.4;
 
 function PlanButton({
   kind,
@@ -66,11 +66,14 @@ function PlanButton({
 
 export default function CityScreen() {
   useAppLocale();
+  const router = useRouter();
+  const { theme, rt } = useUnistyles();
   const { name } = useLocalSearchParams<{ name: string }>();
   const city = name ?? "";
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
-  const cities = useQuery(convexQuery(api.items.listCities, {}));
   const { busy, start } = useCityPlan(city);
+  const list = useRef<FlatList>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const loaded = items.data !== undefined;
   const count = items.data?.length ?? 0;
 
@@ -81,6 +84,13 @@ export default function CityScreen() {
     analytics.capture("city_opened", { count });
   }, [loaded, count]);
 
+  // Stable while the query data is, so the map keeps the camera the person moved.
+  const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
+  const numbers = useMemo(
+    () => numberSaves(items.data ?? [], pins),
+    [items.data, pins],
+  );
+
   if (items.isError) {
     return (
       <EmptyState
@@ -90,61 +100,142 @@ export default function CityScreen() {
     );
   }
   if (items.data === undefined) return <ScreenLoader />;
-  const entry = cities.data?.find((c) => c.city === city);
+
+  const saves = items.data;
+  const mapHeight = rt.screen.height * MAP_SHARE;
+
+  const select = (itemId: string) => {
+    setSelected(itemId);
+    const index = saves.findIndex((save) => save._id === itemId);
+    if (index >= 0) {
+      list.current?.scrollToIndex({ index, viewPosition: 0.3 });
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={items.data}
-        keyExtractor={(item) => item._id}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <CityCover
-              city={city}
-              count={entry?.count ?? count}
-              cover={entry?.cover ?? null}
-              height={COVER_HEIGHT}
-            />
-            {count > 0 ? (
-              <View style={styles.plans}>
-                <PlanButton
-                  kind="date"
-                  busy={busy}
-                  onPress={() => void start("date")}
-                />
-                <PlanButton
-                  kind="trip"
-                  busy={busy}
-                  onPress={() => void start("trip")}
-                />
-              </View>
-            ) : null}
-          </View>
-        }
-        renderItem={({ item }) => <SaveRow item={item} />}
-        ListEmptyComponent={
-          <EmptyState
-            title={t("homePlaces.emptyTitle")}
-            message={t("homePlaces.emptyBody")}
+      {pins.length > 0 ? (
+        <View style={[styles.map, { height: mapHeight }]}>
+          <CityMap
+            pins={pins}
+            numbers={numbers}
+            selected={selected}
+            height={mapHeight}
+            onSelect={select}
           />
-        }
-      />
-      <HeaderScrim />
+        </View>
+      ) : null}
+      <View
+        style={[
+          styles.sheet,
+          pins.length > 0 ? { marginTop: mapHeight - theme.gap(3) } : null,
+        ]}
+      >
+        <FlatList
+          ref={list}
+          data={saves}
+          keyExtractor={(item) => item._id}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+          onScrollToIndexFailed={(info) =>
+            list.current?.scrollToOffset({
+              offset: info.averageItemLength * info.index,
+            })
+          }
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <Text style={styles.name} numberOfLines={2}>
+                {city}
+              </Text>
+              <Text style={styles.count}>
+                {t("cityMap.placesFromSaves", { count })}
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const number = numbers.get(item._id);
+            return (
+              <SaveRow
+                item={item}
+                number={number}
+                selected={selected === item._id}
+                // A save with a pin: the first tap selects the pin, a second tap on the selected row opens it.
+                onPress={
+                  number !== undefined && selected !== item._id
+                    ? () => select(item._id)
+                    : () =>
+                        router.push({
+                          pathname: "/item/[id]",
+                          params: { id: item._id },
+                        })
+                }
+              />
+            );
+          }}
+          ListEmptyComponent={
+            <EmptyState
+              title={t("homePlaces.emptyTitle")}
+              message={t("homePlaces.emptyBody")}
+            />
+          }
+        />
+      </View>
+      {count > 0 ? (
+        <View style={styles.plans}>
+          <PlanButton
+            kind="date"
+            busy={busy}
+            onPress={() => void start("date")}
+          />
+          <PlanButton
+            kind="trip"
+            busy={busy}
+            onPress={() => void start("trip")}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
+  map: { position: "absolute", top: 0, left: 0, right: 0 },
+  sheet: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    borderCurve: "continuous",
+    overflow: "hidden",
+  },
   content: {
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
-    paddingBottom: theme.gap(4),
+    // Clears the plan bar pinned below.
+    paddingBottom: rt.insets.bottom + theme.gap(12),
   },
-  header: { gap: theme.gap(1.5), paddingBottom: theme.gap(1) },
-  plans: { flexDirection: "row", gap: theme.gap(1.5) },
+  header: {
+    gap: theme.gap(0.25),
+    paddingTop: theme.gap(2.5),
+    paddingBottom: theme.gap(1),
+  },
+  name: { ...theme.type.largeTitle, color: theme.colors.foreground },
+  count: { ...theme.type.footnote, color: theme.colors.muted },
+  plans: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    gap: theme.gap(1.5),
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(1.5),
+    paddingBottom: rt.insets.bottom + theme.gap(1),
+    backgroundColor: theme.colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
+  },
   planButton: {
     flex: 1,
     minHeight: theme.control.minHeight,

@@ -742,6 +742,7 @@
   "goal.citySomewhere": "Ailleurs",
   "goal.citySearch": "Rechercher une ville",
   "homePlaces.yourCities": "Vos villes",
+  "homePlaces.citiesHint": "Les lieux des reels et TikToks que tu as enregistrés",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} adresse",
     "many": "%{formattedCount} adresses",
@@ -759,6 +760,11 @@
   "homePlaces.planDateHint": "Une soirée, quelques étapes",
   "homePlaces.planTrip": "Planifier un voyage",
   "homePlaces.planTripHint": "Jour par jour",
+  "cityMap.placesFromSaves": {
+    "one": "%{formattedCount} lieu de vos enregistrements",
+    "many": "%{formattedCount} lieux de vos enregistrements",
+    "other": "%{formattedCount} lieux de vos enregistrements"
+  },
   "opener.tagline": "Enregistrez les adresses. On planifie le rendez-vous ou le voyage.",
   "onboardingQ.skip": "Passer",
   "onboardingQ.savedTitle": "Combien d'adresses avez-vous déjà enregistrées ?",

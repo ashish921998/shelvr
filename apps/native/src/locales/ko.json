@@ -704,6 +704,7 @@
   "goal.citySomewhere": "다른 곳",
   "goal.citySearch": "도시 검색",
   "homePlaces.yourCities": "내 도시",
+  "homePlaces.citiesHint": "저장한 릴스와 틱톡에 나온 장소",
   "homePlaces.spotCount": {
     "other": "장소 %{formattedCount}곳"
   },
@@ -719,6 +720,9 @@
   "homePlaces.planDateHint": "하룻밤, 몇 군데 들르기",
   "homePlaces.planTrip": "여행 계획하기",
   "homePlaces.planTripHint": "하루씩",
+  "cityMap.placesFromSaves": {
+    "other": "저장한 장소 %{formattedCount}곳"
+  },
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "지금까지 장소를 얼마나 저장했나요?",
