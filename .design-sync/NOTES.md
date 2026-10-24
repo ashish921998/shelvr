@@ -120,7 +120,7 @@ What can go stale without failing loudly:
 
 - `build-web.mjs` patches exact strings in dependencies: `export default Appearance;`
   and `var defaultId = 'react-native-stylesheet';` in react-native-web. A version bump
-  that changes either makes the `.replace` a silent no-op. The `expo/src/async-require`
+  that changes either makes the `.replace` a silent no-op. The `expo/(src|build)/async-require`
   stub matches by path the same way; if the `ws://hot/` console errors return, the
   files moved. Symptoms: every card fails
   `[RENDER] root empty` (stylesheet id), or the bundle throws
@@ -133,8 +133,9 @@ What can go stale without failing loudly:
   `--colors-background` on its card.
 - `dtsPropsFor` icon and type-ramp unions are guarded by `build-web.mjs`. The `NAMES` list in
   `previews/AppSymbolIcon.tsx` is not; update it when `SF_TO_MATERIAL` changes.
-- The `StitchMark` stub reads `MARK_PATH` from `stitch-mark.tsx`. If the mark stops
-  being one path string, the build throws.
+- The `StitchMark` stub reads the path, `MARK_BOX`, stroke width, cap and dash from
+  `stitch-mark.tsx` and fails by name when one can no longer be read. It does not
+  follow a change to the colors (`primarySoft` fill, `primary` stroke).
 - Preview copy mirrors app strings that can change: EmptyState titles and messages
   (tab screens), feedback invitation and cancel survey copy, `CANCEL_REASON_LABELS`,
   and the Profile and Settings rows (`src/locales/en.json`).
