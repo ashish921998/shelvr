@@ -9,6 +9,10 @@ import { formattingLocale, t } from "@/lib/i18n";
 import { getPurchases } from "@/lib/revenuecat-module";
 import { restoreFoundAccess } from "@/lib/paywall-result";
 import { goalPaywallVariables, type GoalProgress } from "@/lib/paywall-goal";
+import {
+  trialReminderAt,
+  trialReminderLeadDays,
+} from "@/lib/trial-reminder-lead";
 
 type ActiveEntitlementStatus = "trialing" | "pro" | "lifetime";
 
@@ -190,7 +194,10 @@ export function paywallVariables(
   onboarding?: GoalProgress,
 ) {
   const variables = {
-    ...(trial && trialTimelineVariables(now, trial)),
+    ...(trial &&
+      trialTimelineVariables(now, trial, (end) =>
+        trialReminderAt(end, now, trialReminderLeadDays()),
+      )),
     ...trialOfferVariables(products, eligibility),
     ...(onboarding && goalPaywallVariables(onboarding)),
   };

@@ -14,21 +14,22 @@ import { useQuery } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import {
+  DAY_MS,
+  MIN_LEAD_MS,
+  RENEWAL_WINDOW_MS,
+  trialReminderAt,
+  trialReminderLeadDays,
+} from "@/lib/trial-reminder-lead";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 export const TRIAL_REMINDER_ID = "shelvr.trial-ending";
 export const TRIAL_LAST_DAY_ID = "shelvr.trial-last-day";
 const CHANNEL_ID = "trial-reminder";
-const LEAD_MS = 2 * 24 * 60 * 60 * 1000;
-const RENEWAL_WINDOW_MS = 25 * 60 * 60 * 1000;
-const MIN_LEAD_MS = 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 const TRIAL_MS = 7 * DAY_MS;
 const NUDGE_EARLIEST_HOUR = 10;
 const NUDGE_LATEST_HOUR = 19;
-const BILLING_EARLIEST_HOUR = 9;
-const BILLING_LATEST_HOUR = 20;
 
 type TrialNudge = {
   id: string;
@@ -63,17 +64,6 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
 }
 
 const askedKey = (userId: string) => `shelvr.trialReminderAsked.${userId}`;
-
-export function trialReminderAt(expiresAt: number, now: number): number | null {
-  const at = new Date(expiresAt - LEAD_MS);
-  // A billing warning may come early but never late, so night moves back to 8 pm.
-  const hour = at.getHours();
-  if (hour < BILLING_EARLIEST_HOUR) at.setDate(at.getDate() - 1);
-  if (hour < BILLING_EARLIEST_HOUR || hour >= BILLING_LATEST_HOUR)
-    at.setHours(BILLING_LATEST_HOUR, 0, 0, 0);
-  const fireAt = at.getTime();
-  return fireAt - now > MIN_LEAD_MS ? fireAt : null;
-}
 
 export function trialLastDayAt(expiresAt: number, now: number): number | null {
   const at = new Date(expiresAt - RENEWAL_WINDOW_MS);
@@ -136,8 +126,10 @@ export async function scheduleTrialReminder(
   isCurrent: () => boolean = () => true,
   nudges = false,
 ): Promise<boolean> {
-  const fireAt = trialReminderAt(expiresAt, now);
-  const lastDayAt = trialLastDayAt(expiresAt, now);
+  const leadDays = trialReminderLeadDays();
+  const fireAt = trialReminderAt(expiresAt, now, leadDays);
+  // A day's lead already is the last-day warning.
+  const lastDayAt = leadDays === 1 ? null : trialLastDayAt(expiresAt, now);
   if (fireAt === null && lastDayAt === null) {
     await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
     await cancelTrialNudges();
@@ -164,7 +156,7 @@ export async function scheduleTrialReminder(
     await Notifications.scheduleNotificationAsync({
       identifier: TRIAL_REMINDER_ID,
       content: {
-        title: t("notifications.trialEndingTitle"),
+        title: t("notifications.trialEndingTitle", { count: leadDays }),
         body: t("notifications.trialEndingBody"),
         data: {
           url: "/profile",

@@ -22,6 +22,7 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
+import { cityKey, countCities } from "./model/trip";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -78,6 +79,11 @@ import { safeDeleteStorage } from "./model/storage";
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 
 const LIST_CAP = 1000;
+// ponytail: cities come from the newest 1000 ready saves only; past that, keep a
+// per-user city count table updated in finalizeItem and deleteItem.
+export const CITY_SCAN_ROWS = 1000;
+const CITY_SCAN_BYTES = 4 * 1024 * 1024;
+export const CITY_ITEMS_MAX = 200;
 
 export const LIST_PAGE_MAX = 100;
 const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
@@ -254,6 +260,77 @@ async function toItemCard(
   } = await enrichItem(ctx, item);
   return recipe ? { ...card, hasRecipe: true } : card;
 }
+
+async function readySavesNewestFirst(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<Doc<"items">[]> {
+  const { rows } = await takeWithinBytes(
+    ctx.db
+      .query("items")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", "ready"),
+      )
+      .order("desc"),
+    { maxRows: CITY_SCAN_ROWS, maxBytes: CITY_SCAN_BYTES },
+  );
+  return rows;
+}
+
+/** The user's ready saves in one city, newest first, capped at `limit`. */
+export async function readyCitySaves(
+  ctx: QueryCtx,
+  userId: string,
+  city: string,
+  limit = CITY_ITEMS_MAX,
+): Promise<Doc<"items">[]> {
+  const wanted = cityKey(city);
+  if (wanted === "") return [];
+  return (await readySavesNewestFirst(ctx, userId))
+    .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
+    .slice(0, limit);
+}
+
+export const listCities = authedQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      city: v.string(),
+      count: v.number(),
+      cover: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const items = await readySavesNewestFirst(ctx, ctx.userId);
+    const covers = new Map<string, string>();
+    for (const item of items) {
+      const keys = new Set((item.cities ?? []).map(cityKey));
+      for (const key of keys) {
+        if (key === "" || covers.has(key)) continue;
+        const url = item.storageId
+          ? await ctx.storage.getUrl(item.storageId)
+          : (item.heroImageUrl ?? null);
+        if (url !== null && url !== undefined) covers.set(key, url);
+      }
+    }
+    return countCities(items)
+      .map(({ city, count }) => ({
+        city,
+        count,
+        cover: covers.get(cityKey(city)) ?? null,
+      }))
+      .sort((a, b) => b.count - a.count || (a.city < b.city ? -1 : 1));
+  },
+});
+
+export const listCityItems = authedQuery({
+  args: { city: v.string() },
+  returns: v.array(enrichedItemValidator),
+  handler: async (ctx, args) => {
+    const items = await readyCitySaves(ctx, ctx.userId, args.city);
+    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+  },
+});
 
 export const listItems = authedQuery({
   args: {},

@@ -72,7 +72,11 @@ function isNothingToSwap(error: unknown): boolean {
 
 export default function TripScreen() {
   const locale = useAppLocale();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `city` is set when the City screen opened this trip, so the form starts on it.
+  const { id, city: tappedCity } = useLocalSearchParams<{
+    id: string;
+    city?: string;
+  }>();
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
   const { data: space } = useQuery(
@@ -244,9 +248,11 @@ export default function TripScreen() {
                     days: trip.days.length,
                     pace: trip.pace,
                     startDate: trip.startDate,
-                    city: trip.city,
+                    city: tappedCity ?? trip.city,
                   }
-                : undefined)
+                : tappedCity
+                  ? { city: tappedCity }
+                  : undefined)
             }
             onBuild={onBuild}
             onCancel={trip ? () => setEditing(false) : undefined}

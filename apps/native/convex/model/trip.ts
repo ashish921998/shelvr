@@ -45,6 +45,34 @@ export function cityKey(city: string): string {
   return tidyCity(city).toLowerCase();
 }
 
+export function countCities(
+  items: { cities?: string[] }[],
+): { city: string; count: number }[] {
+  const counts = new Map<
+    string,
+    { count: number; spellings: Map<string, number> }
+  >();
+  for (const item of items) {
+    const seen = new Set<string>();
+    for (const city of item.cities ?? []) {
+      const key = cityKey(city);
+      if (key === "" || seen.has(key)) continue;
+      seen.add(key);
+      const entry = counts.get(key) ?? { count: 0, spellings: new Map() };
+      const spelling = tidyCity(city);
+      entry.count++;
+      entry.spellings.set(spelling, (entry.spellings.get(spelling) ?? 0) + 1);
+      counts.set(key, entry);
+    }
+  }
+  return [...counts.values()]
+    .map(({ count, spellings }) => ({
+      city: [...spellings].sort((a, b) => b[1] - a[1])[0][0],
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
 export const TRIP_SLOTS = [
   "morning",
   "lunch",
