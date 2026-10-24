@@ -44,8 +44,9 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After each paywall close "Not now" is back and `dev-login-button` stays
-hidden; a cold relaunch returns to "Not now" with the splash gone. No
+After each paywall close "Save your own spots" is back and
+`dev-login-button` stays hidden; a cold relaunch returns to "Save your own
+spots" with the splash gone. No
 purchase is made.
 
 ## Charters
