@@ -546,7 +546,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   stopSlot: {
     ...theme.type.badge,
-    width: 72,
+    // Wide enough to line the English names up; a longer translation takes
+    // the room it needs and the place name shrinks instead.
+    minWidth: 72,
+    maxWidth: "50%",
     letterSpacing: 0.6,
     textTransform: "uppercase",
     color: theme.colors.primaryText,

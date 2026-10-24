@@ -44,7 +44,7 @@ const STOPS: SceneStop[] = [
 const REELS = [
   CITY_PICTURES.lisbon.view,
   CITY_PICTURES.lisbon.food,
-  require("../../assets/onboarding/prague.jpg"),
+  CITY_PICTURES.prague.view,
 ];
 
 // The splash's thread: thin, a little unsteady, drawn end to end once.
@@ -53,12 +53,21 @@ const THREAD_MS = 1400;
 const THREAD_DELAY_MS = 300;
 const SAMPLES_PER_LEG = 36;
 
+type Thread = {
+  path: SkPath;
+  /** How far along the path, 0 to 1, the thread reaches each pin. */
+  reachedAt: number[];
+};
+
 /** A thread through the pins: each leg bows a little and trembles like the splash's. */
-function threadPath(points: Point[], { width, height }: MapSize): SkPath {
+function threadPath(points: Point[], { width, height }: MapSize): Thread {
   const path = Skia.PathBuilder.Make();
   const at = points.map((p) => ({ x: p.x * width, y: p.y * height }));
   path.moveTo(at[0].x, at[0].y);
   let step = 0;
+  let last = at[0];
+  let length = 0;
+  const lengths = [0];
   for (let leg = 1; leg < at.length; leg++) {
     const from = at[leg - 1];
     const to = at[leg];
@@ -69,25 +78,36 @@ function threadPath(points: Point[], { width, height }: MapSize): SkPath {
     };
     for (let i = 1; i <= SAMPLES_PER_LEG; i++, step++) {
       const k = i / SAMPLES_PER_LEG;
-      const x =
-        (1 - k) ** 2 * from.x + 2 * (1 - k) * k * control.x + k ** 2 * to.x;
-      const y =
-        (1 - k) ** 2 * from.y + 2 * (1 - k) * k * control.y + k ** 2 * to.y;
-      path.lineTo(x + threadJitter(step), y);
+      const point = {
+        x:
+          (1 - k) ** 2 * from.x +
+          2 * (1 - k) * k * control.x +
+          k ** 2 * to.x +
+          threadJitter(step),
+        y: (1 - k) ** 2 * from.y + 2 * (1 - k) * k * control.y + k ** 2 * to.y,
+      };
+      path.lineTo(point.x, point.y);
+      length += Math.hypot(point.x - last.x, point.y - last.y);
+      last = point;
     }
+    lengths.push(length);
   }
-  return path.detach();
+  return {
+    path: path.detach(),
+    reachedAt: lengths.map((l) => (length > 0 ? l / length : 0)),
+  };
 }
 
 /** A pin that pops in as the thread reaches it. */
 function ThreadPin({
   index,
+  reachedAt,
   drawn,
 }: {
   index: number;
+  reachedAt: number;
   drawn: SharedValue<number>;
 }) {
-  const reachedAt = index / (PINS.length - 1);
   const style = useAnimatedStyle(() => {
     const shown = span(drawn.get(), reachedAt - 0.1, reachedAt);
     return { opacity: shown, transform: [{ scale: 0.6 + 0.4 * shown }] };
@@ -95,15 +115,14 @@ function ThreadPin({
   return <MapPin number={index + 1} point={PINS[index]} style={style} />;
 }
 
-function Thread({
-  size,
+function ThreadLine({
+  path,
   drawn,
 }: {
-  size: MapSize;
+  path: SkPath;
   drawn: SharedValue<number>;
 }) {
   const { rt } = useUnistyles();
-  const path = useMemo(() => threadPath(PINS, size), [size]);
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
       <Path
@@ -117,6 +136,29 @@ function Thread({
         end={drawn}
       />
     </Canvas>
+  );
+}
+
+function RouteThread({
+  size,
+  drawn,
+}: {
+  size: MapSize;
+  drawn: SharedValue<number>;
+}) {
+  const thread = useMemo(() => threadPath(PINS, size), [size]);
+  return (
+    <>
+      <ThreadLine path={thread.path} drawn={drawn} />
+      {thread.reachedAt.map((reachedAt, index) => (
+        <ThreadPin
+          key={index}
+          index={index}
+          reachedAt={reachedAt}
+          drawn={drawn}
+        />
+      ))}
+    </>
   );
 }
 
@@ -137,14 +179,7 @@ function RouteMap() {
 
   return (
     <SceneMap style={styles.map}>
-      {(size) => (
-        <>
-          <Thread size={size} drawn={drawn} />
-          {PINS.map((_, index) => (
-            <ThreadPin key={index} index={index} drawn={drawn} />
-          ))}
-        </>
-      )}
+      {(size) => <RouteThread size={size} drawn={drawn} />}
     </SceneMap>
   );
 }
