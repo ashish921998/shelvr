@@ -848,6 +848,11 @@ export const setMembershipIntentsInternal = internalMutation({
       return null;
     }
     await ctx.db.patch(row._id, { intents: args.intents });
+    if (args.intents.some((i) => i.kind === "open_maps")) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     return null;
   },
 });

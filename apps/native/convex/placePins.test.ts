@@ -178,6 +178,38 @@ describe("placePins", () => {
     expect(await pins()).toHaveLength(1);
   });
 
+  it("a steered space intent schedules the lookup", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([]);
+    const spaceId = await t.run(async (ctx) => {
+      const item = (await ctx.db.get(itemId))!;
+      const spaceId = await ctx.db.insert("spaces", {
+        userId: item.userId,
+        name: "Trip",
+        dynamic: false,
+      });
+      await ctx.db.insert("spaceItems", {
+        userId: item.userId,
+        spaceId,
+        itemId,
+        status: "saved",
+      });
+      return spaceId;
+    });
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.spaces.setMembershipIntentsInternal, {
+        itemId,
+        spaceId,
+        intents: [maps("Pink Street")],
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await pins()).toHaveLength(1);
+  });
+
   it("backfill queues only ready saves that name a place and have no pins", async () => {
     await withMaps();
     const { t, itemId } = await setup(["Pink Street"]);

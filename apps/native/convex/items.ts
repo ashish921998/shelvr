@@ -2044,7 +2044,13 @@ export const finalizeItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
+    const patch = completionPatch(item, args, allowed);
+    await ctx.db.patch(args.itemId, patch);
+    if (allowed && patch.intents?.some((i) => i.kind === "open_maps")) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     const { storageId, enrichment } = args.reading;
     if (
       storageId !== undefined &&
