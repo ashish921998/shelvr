@@ -47,6 +47,10 @@ export async function walkToSampleReel(screen: Screen): Promise<void> {
     timeout: 30_000,
   });
   await skip.tap();
+  await expect(
+    screen.getByText("Your saves, turned into date nights"),
+  ).toBeVisible({ timeout: 30_000 });
+  await next.tap();
   await expect(screen.getByText("Pick a city to try it with")).toBeVisible({
     timeout: 30_000,
   });

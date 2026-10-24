@@ -38,6 +38,7 @@ import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
 import { OpenerStep } from "@/components/onboarding/opener";
+import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
 import {
   GoalStep,
@@ -58,9 +59,10 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
   savedCount: 0.12,
   goal: 0.25,
-  planner: 0.38,
-  city: 0.5,
-  ahaShare: 0.65,
+  planner: 0.36,
+  chart: 0.46,
+  city: 0.56,
+  ahaShare: 0.68,
   ahaSpots: 0.8,
   ahaPlan: 1,
 };
@@ -298,6 +300,8 @@ export default function OnboardingScreen() {
             onContinue={advance}
           />
         );
+      case "chart":
+        return <ProgressChartStep kind={kind} onContinue={advance} />;
       case "city":
         return (
           <CityStep
