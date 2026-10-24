@@ -308,7 +308,7 @@
   "plan.make": "プランを作る",
   "plan.button": "プラン",
   "plan.pickerTitle": "何を計画しますか？",
-  "plan.pickerBody": "あなたの保存だけから作ります。作り話はなし。",
+  "plan.pickerBody": "あなたの保存から作ります。",
   "plan.goOut": "出かける",
   "plan.goOutBody": "デートや食事、ひとりの時間にぴったりの場所を選ぶ",
   "plan.title": "候補リスト",
@@ -353,7 +353,7 @@
   "trip.planTitle": "%{city}旅行を計画",
   "trip.planTitleNoCity": "旅行を計画",
   "trip.planBody": {
-    "other": "保存した%{formattedCount}件だけから作ります。作り話はなし。"
+    "other": "どのスポットも、保存した%{formattedCount}件のどれかから。"
   },
   "trip.whichCity": "どの都市？",
   "trip.howManyDays": "日数",

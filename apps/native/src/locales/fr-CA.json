@@ -306,7 +306,7 @@
   "plan.make": "Faire un plan",
   "plan.button": "Planifier",
   "plan.pickerTitle": "Qu’est-ce que vous prévoyez?",
-  "plan.pickerBody": "Créé uniquement à partir de vos enregistrements. Rien d’inventé.",
+  "plan.pickerBody": "Créé à partir de vos enregistrements.",
   "plan.goOut": "Sortir",
   "plan.goOutBody": "Un endroit pour un rendez-vous, un repas ou un moment à vous",
   "plan.title": "Votre sélection",
@@ -355,9 +355,9 @@
   "trip.planTitle": "Planifiez votre voyage à %{city}",
   "trip.planTitleNoCity": "Planifiez votre voyage",
   "trip.planBody": {
-    "one": "Créé uniquement à partir de votre %{formattedCount} enregistrement. Rien d’inventé.",
-    "many": "Créé uniquement à partir de vos %{formattedCount} enregistrements. Rien d’inventé.",
-    "other": "Créé uniquement à partir de vos %{formattedCount} enregistrements. Rien d’inventé."
+    "one": "Chaque étape vient de votre %{formattedCount} enregistrement.",
+    "many": "Chaque étape vient de l’un de vos %{formattedCount} enregistrements.",
+    "other": "Chaque étape vient de l’un de vos %{formattedCount} enregistrements."
   },
   "trip.whichCity": "Quelle ville ?",
   "trip.howManyDays": "Combien de jours",
