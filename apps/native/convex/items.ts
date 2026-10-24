@@ -2046,7 +2046,11 @@ export const finalizeItem = internalMutation({
     }
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
-    if (allowed && patch.intents?.some((i) => i.kind === "open_maps")) {
+    if (
+      allowed &&
+      (patch.intents?.some((i) => i.kind === "open_maps") ||
+        (item.placePins?.length ?? 0) > 0)
+    ) {
       await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
         itemId: args.itemId,
       });

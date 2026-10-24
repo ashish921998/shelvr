@@ -98,6 +98,15 @@ describe("placePins", () => {
     expect(queries()).toContain("Time Out Market, Lisbon");
   });
 
+  it("clears a pin once the save no longer names its place, without a Maps key", async () => {
+    const { t, itemId, pins } = await setup(["Time Out Market"], {
+      pins: true,
+    });
+    await t.run(async (ctx) => ctx.db.patch(itemId, { intents: [] }));
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toEqual([]);
+  });
+
   it("does not look up a name that is already pinned", async () => {
     const { queries } = await withMaps();
     const { t, itemId, pins } = await setup(

@@ -76,7 +76,7 @@ export const toLocate = internalQuery({
       .filter(([key]) => !pinned.has(key))
       .map(([, name]) => name)
       .slice(0, MAX_PINS);
-    return names.length === 0 ? null : { names, city: item.cities?.[0] };
+    return { names, city: item.cities?.[0] };
   },
 });
 
@@ -116,13 +116,20 @@ export const locateItem = internalAction({
   args: { itemId: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const todo = await ctx.runQuery(internal.placePins.toLocate, args);
+    if (todo === null) return null;
+    if (todo.names.length === 0) {
+      await ctx.runMutation(internal.placePins.storePins, {
+        itemId: args.itemId,
+        found: [],
+      });
+      return null;
+    }
     const config = appleMapsConfig(env);
     if (config === null) {
       logEvent("info", "place_pins_unconfigured", {});
       return null;
     }
-    const todo = await ctx.runQuery(internal.placePins.toLocate, args);
-    if (todo === null) return null;
     const token = await appleMapsAccessToken(config);
     if (token === null) {
       logEvent("warn", "place_pins_token_failed", {});
@@ -141,12 +148,10 @@ export const locateItem = internalAction({
     const found = looked.flatMap(({ name, at }) =>
       at === null ? [] : [{ name, lat: at.lat, lng: at.lng }],
     );
-    if (found.length > 0) {
-      await ctx.runMutation(internal.placePins.storePins, {
-        itemId: args.itemId,
-        found,
-      });
-    }
+    await ctx.runMutation(internal.placePins.storePins, {
+      itemId: args.itemId,
+      found,
+    });
     return null;
   },
 });
