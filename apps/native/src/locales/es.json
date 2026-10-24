@@ -839,7 +839,6 @@
   "setup.instagramBody": "Comparte un reel o guarda una captura de un sitio.",
   "setup.paste": "Pega una lista",
   "setup.pasteBody": "¿Tienes sitios en tus Notas? Pégalos aquí.",
-  "onboarding.startYours": "Empieza la tuya",
   "onboarding.openerSaveTitle": "Deja de perder tus sitios guardados",
   "onboarding.openerSaveAccent": "cuando viajas.",
   "onboarding.openerSaveBody": "Cuando aterrizas, esa cafetería de TikTok ya se ha perdido entre cientos de publicaciones. Compártela con Shelvr en dos toques y no se pierde.",
@@ -864,5 +863,6 @@
   "onboarding.sceneMorning": "Mañana",
   "onboarding.sceneLunch": "Comida",
   "onboarding.sceneAfternoon": "Tarde",
-  "onboarding.sceneEvening": "Noche"
+  "onboarding.sceneEvening": "Noche",
+  "opener.getStarted": "Empezar"
 }

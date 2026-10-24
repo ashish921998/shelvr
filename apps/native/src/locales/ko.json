@@ -797,7 +797,6 @@
   "setup.instagramBody": "릴스를 공유하거나 장소 스크린샷을 저장하세요.",
   "setup.paste": "목록 붙여넣기",
   "setup.pasteBody": "메모에 장소가 있나요? 여기에 붙여넣으세요.",
-  "onboarding.startYours": "시작하기",
   "onboarding.openerSaveTitle": "여행 갈 때 저장한 장소를",
   "onboarding.openerSaveAccent": "더는 잃지 마세요.",
   "onboarding.openerSaveBody": "TikTok에서 본 카페, 도착할 즈음엔 수백 개 게시물에 묻혀 있죠. 두 번만 탭해 Shelvr에 공유하면 다시 찾을 수 있어요.",
@@ -822,5 +821,6 @@
   "onboarding.sceneMorning": "아침",
   "onboarding.sceneLunch": "점심",
   "onboarding.sceneAfternoon": "오후",
-  "onboarding.sceneEvening": "저녁"
+  "onboarding.sceneEvening": "저녁",
+  "opener.getStarted": "시작하기"
 }

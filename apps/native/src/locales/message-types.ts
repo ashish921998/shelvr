@@ -756,7 +756,6 @@ export type MessageParams = {
   "setup.instagramBody": undefined;
   "setup.paste": undefined;
   "setup.pasteBody": undefined;
-  "onboarding.startYours": undefined;
   "onboarding.openerSaveTitle": undefined;
   "onboarding.openerSaveAccent": undefined;
   "onboarding.openerSaveBody": undefined;
@@ -782,6 +781,7 @@ export type MessageParams = {
   "onboarding.sceneLunch": undefined;
   "onboarding.sceneAfternoon": undefined;
   "onboarding.sceneEvening": undefined;
+  "opener.getStarted": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

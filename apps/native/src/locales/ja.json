@@ -797,7 +797,6 @@
   "setup.instagramBody": "リールを共有するか、スポットのスクリーンショットを保存します。",
   "setup.paste": "リストを貼り付ける",
   "setup.pasteBody": "メモにスポットがある？ここに貼り付けましょう。",
-  "onboarding.startYours": "はじめる",
   "onboarding.openerSaveTitle": "旅先で、保存したスポットが",
   "onboarding.openerSaveAccent": "見つからない？",
   "onboarding.openerSaveBody": "TikTokで見たカフェも、着く頃には何百もの投稿に埋もれてしまう。2タップでShelvrに共有すれば、もう見失いません。",
@@ -822,5 +821,6 @@
   "onboarding.sceneMorning": "朝",
   "onboarding.sceneLunch": "昼食",
   "onboarding.sceneAfternoon": "午後",
-  "onboarding.sceneEvening": "夜"
+  "onboarding.sceneEvening": "夜",
+  "opener.getStarted": "はじめる"
 }

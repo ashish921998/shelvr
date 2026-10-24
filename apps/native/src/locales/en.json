@@ -818,7 +818,6 @@
   "setup.instagramBody": "Share a reel, or save a screenshot of a spot.",
   "setup.paste": "Paste a list",
   "setup.pasteBody": "Got spots in your Notes? Paste them in.",
-  "onboarding.startYours": "Start yours",
   "onboarding.openerSaveTitle": "Stop losing your saves",
   "onboarding.openerSaveAccent": "when you travel.",
   "onboarding.openerSaveBody": "That café from TikTok is lost in hundreds of posts by the time you land. Share it to Shelvr in two taps and it stays found.",
@@ -843,5 +842,6 @@
   "onboarding.sceneMorning": "Morning",
   "onboarding.sceneLunch": "Lunch",
   "onboarding.sceneAfternoon": "Afternoon",
-  "onboarding.sceneEvening": "Evening"
+  "onboarding.sceneEvening": "Evening",
+  "opener.getStarted": "Get started"
 }

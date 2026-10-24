@@ -818,7 +818,6 @@
   "setup.instagramBody": "Teile ein Reel oder speichere einen Screenshot von einem Ort.",
   "setup.paste": "Füge eine Liste ein",
   "setup.pasteBody": "Orte in deinen Notizen? Füge sie hier ein.",
-  "onboarding.startYours": "Leg los",
   "onboarding.openerSaveTitle": "Verlier deine gespeicherten Orte nicht",
   "onboarding.openerSaveAccent": "auf Reisen.",
   "onboarding.openerSaveBody": "Das Café von TikTok ist unter Hunderten Posts verschwunden, wenn du landest. Zwei Tipps, und es ist in Shelvr, wo du es wiederfindest.",
@@ -843,5 +842,6 @@
   "onboarding.sceneMorning": "Morgens",
   "onboarding.sceneLunch": "Mittags",
   "onboarding.sceneAfternoon": "Nachmittags",
-  "onboarding.sceneEvening": "Abends"
+  "onboarding.sceneEvening": "Abends",
+  "opener.getStarted": "Los geht's"
 }
