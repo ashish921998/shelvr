@@ -74,8 +74,11 @@ function unplacedLabel(save: UnplacedSave): string {
 export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
   useAppLocale();
   const router = useRouter();
-  const unplaced = unplacedSaves(saves).slice(0, MAX_UNPLACED_ROWS);
-  if (unplaced.length === 0) return null;
+  const [expanded, setExpanded] = useState(false);
+  const all = unplacedSaves(saves);
+  const unplaced = expanded ? all : all.slice(0, MAX_UNPLACED_ROWS);
+  const hidden = all.length - unplaced.length;
+  if (all.length === 0) return null;
   return (
     <View style={styles.unplaced}>
       <Text style={styles.sectionLabel}>{t("homePlaces.noPlaceTitle")}</Text>
@@ -100,6 +103,17 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
           <Text style={styles.muted}>{unplacedLabel(save)}</Text>
         </Pressable>
       ))}
+      {hidden > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setExpanded(true)}
+          style={({ pressed }) => [styles.showAll, pressed && styles.pressed]}
+        >
+          <Text style={styles.moreLabel}>
+            {t("homePlaces.moreCities", { n: String(hidden) })}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -185,6 +199,7 @@ const styles = StyleSheet.create((theme) => ({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.border,
   },
+  showAll: { paddingVertical: theme.gap(1.25) },
   unplacedTitle: {
     ...theme.type.subheadStrong,
     color: theme.colors.foreground,
