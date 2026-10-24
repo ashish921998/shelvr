@@ -6,7 +6,6 @@ import {
   PIN_SIZE,
   SAMPLE_CROPS,
   SAMPLE_MAP,
-  SAMPLE_SLOT_LABELS,
   sampleStops,
   samplePlan,
   sampleTrip,
@@ -179,7 +178,6 @@ describe.each(PLANS)("the %s sample in %s", (kind, city) => {
   it("uses only copy the English catalog has", () => {
     const keys = [
       trip.name,
-      ...Object.values(SAMPLE_SLOT_LABELS),
       ...trip.days.map((day) => day.title),
       ...trip.saves.map((save) => save.source),
     ];

@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
+import { ahaReel, ahaReelUrl } from "@/lib/aha-reels";
 import { ONBOARDING_STEPS } from "@/lib/onboarding-steps";
 
 type Children = { children?: ReactNode };
@@ -17,6 +18,7 @@ type Sample = { kind: string; city: string };
 const mocks = vi.hoisted(() => ({
   setOnboardingProgress: vi.fn(),
   setPendingSpaces: vi.fn(),
+  queueDemoUrl: vi.fn(),
   completeOnboarding: vi.fn(),
   capture: vi.fn(),
   ask: vi.fn(),
@@ -70,6 +72,7 @@ vi.mock("@/lib/onboarding-paywall", () => ({
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
   getOnboardingProgress: () => mocks.progress,
+  queueDemoUrl: mocks.queueDemoUrl,
   resolveOnboardingSpaceName: (name: string) => name,
   setOnboardingProgress: mocks.setOnboardingProgress,
   setPendingSpaces: mocks.setPendingSpaces,
@@ -134,6 +137,12 @@ vi.mock("@/components/onboarding/questions", () => ({
     ),
   ),
 }));
+vi.mock("@/components/onboarding/progress-chart", () => ({
+  ProgressChartStep: vi.fn(
+    ({ kind, onContinue }: { kind: string; onContinue: () => void }) =>
+      button(`chart:${kind}`, onContinue),
+  ),
+}));
 vi.mock("@/components/onboarding/city-step", () => ({
   CityStep: vi.fn(
     ({
@@ -159,11 +168,6 @@ vi.mock("@/components/onboarding/aha-share", () => ({
 vi.mock("@/components/onboarding/aha-spots", () => ({
   AhaSpotsStep: vi.fn(({ onContinue }: { onContinue: () => void }) =>
     button("aha:spots", onContinue),
-  ),
-}));
-vi.mock("@/components/onboarding/aha-plan", () => ({
-  AhaPlanStep: vi.fn(({ onContinue }: { onContinue: () => void }) =>
-    button("aha:plan", onContinue),
   ),
 }));
 vi.mock("convex/react", () => ({
@@ -222,6 +226,7 @@ it("walks the questions into a sample for the goal that leads, and keeps every a
   tap("goal:continue");
   tap("planner:explorer");
   tap("planner:continue");
+  tap("chart:trip");
   tap("city:trip:lisbon");
   expect(saved()).toMatchObject({
     goals: ["food", "travel"],
@@ -266,17 +271,17 @@ it("moves one step on a double tap", () => {
   expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
 });
 
-it("opens the paywall from the sample plan", async () => {
-  startAt("ahaPlan");
+it("opens the paywall from the sample spots", async () => {
+  startAt("ahaSpots");
   render(<OnboardingScreen />);
-  await act(async () => tap("aha:plan"));
+  await act(async () => tap("aha:spots"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
 });
 
 it("hands the goals' spaces to the replay and reports the answers when onboarding ends", () => {
   mocks.progress = {
     ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("ahaPlan"),
+    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
     goals: ["date"],
     savedCount: "few",
     planner: "planner",
@@ -285,6 +290,7 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.setPendingSpaces).toHaveBeenCalledWith(["Date nights"]);
+  expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",
@@ -295,5 +301,19 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
       planner: "planner",
       sample_city: "paris",
     }),
+  );
+});
+
+it("queues the real reel it played as the first save when onboarding ends", () => {
+  mocks.progress = {
+    ...mocks.progress,
+    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
+    goals: ["date"],
+    travelCity: "austin",
+  };
+  render(<OnboardingScreen />);
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("date", "austin")!),
   );
 });

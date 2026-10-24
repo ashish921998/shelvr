@@ -1,8 +1,10 @@
 # Shelvr
 
-Shelvr is a save-for-later hub. Capture links, images, and notes; Convex + an LLM
-classify each item (title, description, tags, spaces). Everything lands in a
-searchable feed, organized into themed **spaces**.
+Shelvr is a save-for-later hub. Save a reel, TikTok or link; Convex + an LLM
+classify it (title, description, tags, cities, places). Its places land under
+their city on Home, and each city page has a map of them with Plan a date and
+Plan a trip. Themed **spaces** stay in the backend for old builds and behind
+each city's plans; the app no longer shows them.
 
 The product is **mobile-first**: the native app is the full experience. The web
 site is marketing only.
@@ -178,17 +180,21 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 `tools/e2e` drives the development build through the app's one flow with the
 [e2e](https://github.com/tester-army/e2e) framework: Home lists the seeded
 "Your cities" (`tests/home-cities.e2e.ts`), onboarding, the paywall, and saving
-a pasted link, which lands under "No place found" when it names no place.
+a pasted link, which lands under "No place found" when it names no place, and
+planning a date from a city (`tests/plan-city-date.e2e.ts`): it saves a Lisbon
+fixture page, opens Lisbon from Home and checks Plan a date returns a shortlist.
 Home-cities, onboarding and the paywall use plain locators and make no model
 call from the test. The paywall flow relaunches the app with `-E2EHidePro YES`,
 which makes a development build show its always-Pro dev user as not Pro.
 `save-link` reads a real page and uses one model call to read the result. It
 is not part of `pnpm run check`. The `e2e ios` workflow runs two shards on main
 and on pull requests that touch the app and carry the `run-e2e` label: a
-(home-cities, onboarding) and b (paywall, save-link-fixture), against a local
+(home-cities, onboarding) and b (paywall, plan-city-date, save-link-fixture), against a local
 Convex backend and with no real model, as a check that is not required yet.
-save-link-fixture saves a fixture page that the deterministic fake in
-`apps/native/convex/model/fakeAi.ts` serves and classifies; only a local
+save-link-fixture and plan-city-date save fixture pages that the deterministic
+fake in `apps/native/convex/model/fakeAi.ts` serves and classifies (with a city
+and places for the Lisbon page), and the fake also answers the plan call;
+plan-city-date skips itself without that fake. Only a local
 backend with the e2e switch, dev sign-in and the placeholder key turns that
 fake on. Every flow launches with `-E2EHideLogBox YES`, which keeps the
 development error banner from covering the controls the flows tap.
@@ -220,8 +226,8 @@ recordings are gitignored for now, so each machine makes its own.
 `pnpm exec e2e run --no-cache` forces every step back through the model.
 
 Checks use plain locators wherever the label is known in advance; seeded
-saves carry `fixture-item-*` test IDs. Only the count of saves after a new link
-or photo, whose title the model writes, is judged from a screenshot
+saves carry `fixture-item-*` test IDs. Only the save a real link makes, whose
+title the model writes, is judged from a screenshot
 (`agent.waitFor` with `vision`), at one model call per run.
 
 ## Domain model (Convex)

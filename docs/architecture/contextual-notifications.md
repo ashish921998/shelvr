@@ -590,7 +590,8 @@ recommended". Ranking a housekeeping notification above the contextual one was
 not defensible.
 
 Suggestions stay in-app: a count on the Spaces tab and a card inside the
-space. Revisit a push only if in-app data shows suggestions systematically go
+space. The app no longer has either, since spaces left the UI; the backend
+still writes suggestions for old builds. Revisit a push only if in-app data shows suggestions systematically go
 unseen **and** users who triage them show better retention. Even then it
 competes for the same two slots.
 

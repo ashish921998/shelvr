@@ -18,11 +18,10 @@ after it.
 - "Pick a city to try it with" is a photo grid; "Skip" or "Somewhere else"
   uses Prague.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to
-  "Found 3 spots in that reel" (Continue enables once the pins land), then
-  "Your date night in Prague" and "Save your own spots", which asks for the
-  paywall. Notification permission is asked after a trial starts, not here.
-- The paywall has no close. A relaunch comes back to the sample plan,
-  signed out, and "Save your own spots" opens the paywall again.
+  the spots screen, "Prague · 3 places" under a full-width map (Continue
+  enables once the pins land), whose Continue asks for the paywall. Notification permission is asked after a trial starts, not here.
+- A relaunch from the paywall comes back to the spots screen, signed out,
+  and its Continue opens the paywall again.
 
 ## How to get to it (user POV)
 
@@ -44,15 +43,15 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After a relaunch from the paywall, "Save your own spots" is back with the
-splash gone and `dev-login-button` hidden, and it opens the paywall again.
-No purchase is made.
+After a relaunch from the paywall the spots screen ("Prague · 3 places") is
+back with the splash gone and `dev-login-button` hidden, and its Continue
+opens the paywall again. No purchase is made.
 
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the sample plan and the paywall; relaunch, and check the step is kept, nothing signs in, and the paywall opens again
-onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots and the date-night plan show before the paywall
+onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to its spots and the paywall; relaunch, and check the step is kept, nothing signs in, and the paywall opens again
+onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check its three spots show on the map before the paywall
 ```
 
 ## Gotchas

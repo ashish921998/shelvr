@@ -13,7 +13,7 @@ import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 9;
+const PROGRESS_VERSION = 11;
 
 export type PendingDemo = {
   url: string;

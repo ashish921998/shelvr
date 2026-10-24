@@ -6,6 +6,7 @@ import {
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
 import { openPaywall } from "@/lib/entitlement";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -215,7 +216,7 @@ function AndroidAddSheet() {
       index={0}
       enableDynamicSizing
       enablePanDownToClose
-      onClose={() => router.back()}
+      onClose={() => backOrHome(router)}
       backgroundStyle={{ backgroundColor: theme.colors.background }}
     >
       <BottomSheetView>
@@ -228,7 +229,7 @@ function AndroidAddSheet() {
 export default function AddScreen() {
   const router = useRouter();
   if (Platform.OS === "android") return <AndroidAddSheet />;
-  return <AddContent close={() => router.back()} />;
+  return <AddContent close={() => backOrHome(router)} />;
 }
 
 const styles = StyleSheet.create((theme) => ({

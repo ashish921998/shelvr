@@ -70,9 +70,7 @@ looks off.
 Taps that can be lost (Home's `Add` and `Profile`, the paywall's `Continue`
 and `See plans`) go through `tapUntilVisible` in `tests/seeded-home.ts`: it
 taps again only when the result has not appeared after a wait an accepted tap
-never needs. Onboarding's `Save your own spots` on the sample plan goes
-through `openPaywall` in `tests/onboarding.e2e.ts`, which taps until the plan
-gives way to the paywall. Each tap
+never needs. Each tap
 is its own step in `.e2e/report.json`, so count them there: more than one tap
 on one of those controls in a test means a tap was lost. A flow that still
 fails is a failure to explain, not a flake to rerun away.

@@ -2,7 +2,8 @@ import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
-import { PhotoCollage } from "@/components/onboarding/collage";
+import { SignInHero } from "@/components/sign-in-hero";
+import { useLargeText } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
@@ -31,6 +32,8 @@ export function SignInView({
     interrupted,
   } = useOAuthSignIn("sign_in_view");
   const colorScheme = useColorScheme();
+  // At large text sizes the buttons and the consent text need the room.
+  const showHero = !useLargeText();
   const { theme } = useUnistyles();
 
   const handleOAuth = async (provider: OAuthProvider) => {
@@ -60,7 +63,7 @@ export function SignInView({
           />
         </Pressable>
       ) : null}
-      <PhotoCollage />
+      {showHero ? <SignInHero /> : null}
       <View style={styles.center}>
         <View style={styles.header}>
           <Text style={styles.title} accessibilityRole="header">
@@ -136,7 +139,6 @@ export function SignInView({
         </View>
       </View>
 
-      <Text style={styles.terms}>{t("aiConsent.signInNote")}</Text>
       <Text style={styles.terms}>
         {t("legal.consent", {
           terms: "\uE000",
@@ -182,10 +184,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flexGrow: 1,
     padding: theme.gap(2.5),
-    paddingTop: rt.insets.top + theme.gap(3),
-    paddingBottom: rt.insets.bottom + theme.gap(2),
+    paddingTop: rt.insets.top + theme.gap(2),
+    paddingBottom: rt.insets.bottom + theme.gap(1),
     alignItems: "stretch",
-    gap: theme.gap(3),
+    gap: theme.gap(2),
   },
   back: {
     position: "absolute",
@@ -196,26 +198,28 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   center: {
     alignSelf: "stretch",
-    gap: theme.gap(3),
+    gap: theme.gap(2.5),
   },
   header: {
-    gap: theme.gap(1),
+    gap: theme.gap(0.75),
+    alignItems: "center",
   },
   title: {
     fontFamily: theme.fonts.display,
-    fontSize: 48,
-    lineHeight: 52,
+    fontSize: 32,
+    lineHeight: 36,
     color: theme.colors.primaryText,
   },
   tagline: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 24,
-    lineHeight: 30,
-    letterSpacing: -0.3,
+    fontFamily: theme.fonts.display,
+    fontSize: 30,
+    lineHeight: 34,
+    textAlign: "center",
     color: theme.colors.foreground,
   },
   subtitle: {
     ...theme.type.subhead,
+    textAlign: "center",
     color: theme.colors.muted,
   },
   buttons: {
@@ -269,8 +273,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   terms: {
     fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 17,
     color: theme.colors.faint,
     textAlign: "center",
     paddingHorizontal: theme.gap(2),

@@ -11,8 +11,8 @@ its See plans opens the RevenueCat paywall.
 - See plans opens RevenueCat's 3-step paywall: an intro (Continue), the
   trial timeline (See plans), then the plans: Yearly with a 7-day trial
   ("Try for $0.00, then …/year") and Weekly with none ("Subscribe for
-  …/week"), plus Restore. It has no close control: a hard paywall, left by
-  buying, restoring or relaunching. A relaunch lands on the plan gate again.
+  …/week"), plus Restore. The tests leave it by relaunching, which lands on
+  the plan gate again.
 - Settings opens over the gate, with restore and account deletion.
 
 ## How to get to it (user POV)

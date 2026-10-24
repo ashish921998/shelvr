@@ -13,8 +13,11 @@ for a module.
 
 **Shelvr** is a "save-it-for-later" hub. Users capture links, images, and notes; a Convex
 backend action fetches/extracts content and an LLM classifies each item (title, description,
-tags, and which "spaces" it belongs to). Clients render a feed of saves. Items can be
-organized into **spaces** (themed collections). Creating a new space runs one recommendation
+tags, cities, places, and which "spaces" it belongs to). The app today has one flow: save a
+reel, TikTok or link, and its places show under its city on Home; a city page has a map of
+those places and Plan a date / Plan a trip. Items can be organized into **spaces** (themed
+collections). The app no longer shows spaces, but the backend keeps them for old builds and
+for the hidden space behind each city's plans. Creating a new space runs one recommendation
 pass over existing items. That pass writes `suggested` memberships only. The user accepts or
 dismisses each suggestion.
 
@@ -124,7 +127,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   full-text search index (filtered by `userId`).
 
 - **`items.ts`**: public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
-  `photoUsage`, and `getImportOperation`. Image saves run a three-step, idempotent import:
+  `photoUsage`, `getImportOperation`, and `listCities` / `listCityItems` (the cities Home
+  lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
+  is the shared helper). Image saves run a three-step, idempotent import:
   `beginImageImport`, then `attachImageUpload`, then `finalizeImageImport`, all keyed on a
   client-generated `operationId` in `itemOperations`.
   The returned upload URL now targets `/image-upload`, which claims a single
@@ -134,8 +139,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   work. Successful upload retries return the same storage ID.
   Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
-  `reprocessItem` (retry a failed or partially enriched save), `listCities` and `listCityItems`
-  (the cities Home and the City screen show), `deleteItem`, and the share
+  `reprocessItem` (retry a failed or partially enriched save), `deleteItem`, and the share
   link pair `createShareLink` / `settleShareLink` (a cancelled share sheet withdraws a
   fresh, never-confirmed link). The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
@@ -144,8 +148,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`spaces.ts`**: public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
   `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
-  `acceptAllSuggestions`), `ensureCitySpace` (the space "Plan a date" / "Plan a trip" on the City
-  screen files a city's saves into), plus internal join helpers.
+  `acceptAllSuggestions`), `ensureCitySpace`, plus internal join helpers. `ensureCitySpace`
+  finds or makes a hidden space named for a city and files that city's ready saves into it
+  as `saved`; the city page calls it before Plan a date / Plan a trip, and plan shares and
+  stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
+  functions stay for old builds.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
@@ -253,28 +260,35 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   JavaScript app and so have no JWT. The app mints a per-device capture token
   (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
   user and run the same save helpers, gates and limits as the app's own mutations.
-- **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` reads a space's saved
-  items and makes one model call that returns a shortlist of up to five places the saves
-  name, each with a reason and its source item. Nothing is stored. `spaces.claimPlanInternal`
-  claims Pro, AI consent and the `makePlan` rate limit first; the pure prompt and sanitizing
-  half (which drops a place no save names) is `model/plan.ts`. Places marked "We went"
-  (`placeVisits.ts`, `setVisited`) go into the prompt and come back last, tagged `been`.
+- **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` takes a space and an
+  optional `city`. With a city (sent from the city page) it plans that city's ready saves as
+  the page lists them (`readyCitySaves`), not the space's memberships; old builds send no
+  city and plan their space's saved items. One model call asks for up to ten candidates
+  (`MAX_PLAN_CANDIDATES`) the saves name, each with a reason and its source item; five
+  remain. Nothing is stored. `spaces.claimPlanInternal` claims Pro, AI consent and the
+  `makePlan` rate limit first; the pure prompt and sanitizing half (which drops a place no
+  save names) is `model/plan.ts`. Places marked "We went" (`placeVisits.ts`, `setVisited`)
+  go into the prompt and drop out of the shortlist, unless that would leave nothing; then
+  they stay, tagged `been`.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
-  travel space's saves (one city's, when they span several), makes one model call that lists
+  space's saved items, kept to one city (the one the city page sends, or else the most common), makes one model call that lists
   the places they name with a time of day each, looks each up in the Apple Maps Server API
   (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
   with no saved place shows as a gap; the trip never adds a place the saves do not name.
   `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
   reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
-- **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names. `locateItem` looks each
-  `open_maps` intent value (the save's own and its spaces') up in Apple Maps and `storePins` writes at most five,
-  dropping any place no longer named. Scheduled from `finalizeItem` and from steering; `backfillPage` fills
-  older saves, run by hand. Skipped when AI is declined or the Maps key is unset.
+- **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
+  city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
+  (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
+  and `storePins` writes at most five, dropping any place no longer named. Scheduled from
+  `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
+  membership carrying a Maps intent is removed or dismissed; `backfillPage` fills older saves, run by hand. Skipped
+  when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
@@ -350,8 +364,12 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
 - `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities" and a "No place
-  found" section for saves with no city. Old deep links, pushes and Siri shortcuts to removed
-  screens open Home
+  found" section for saves with no city. It loads more saves on scroll, and on its own only
+  until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
+  shortcuts to removed screens (spaces, search, map, digest, camera) open Home, through
+  `src/lib/home-href.ts` and `src/app/+native-intent.ts`
+- `city/[name]` is the city page: a map of the city's pinned places on top and a sheet of the
+  city's saves, with Plan a date and Plan a trip
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
@@ -446,7 +464,8 @@ needed at runtime by the features that use them:
   `@ai-sdk/google`, no gateway). The only required entry
 - `E2E_FAKE_AI`: set to `local-v1` only by the `e2e ios` workflow's local backend. It swaps
   Gemini for the deterministic fake in `model/fakeAi.ts` (which also serves its fixture pages
-  at `https://fixtures.e2e.invalid/` to link saves), and only when the backend is on
+  at `https://fixtures.e2e.invalid/` to link saves, reads cities and places off them, and
+  answers plan calls), and only when the backend is on
   127.0.0.1, `AUTH_ENABLE_ANONYMOUS` is `"true"` and the model key is the `ci-no-model`
   placeholder. Anywhere else it is refused and logged as `fake_ai_refused`
 - `POSTHOG_PROJECT_TOKEN`: server-side PostHog ingestion key. All backend capture is skipped
