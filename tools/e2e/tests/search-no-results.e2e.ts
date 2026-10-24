@@ -10,7 +10,7 @@ test("says so when no save matches the search", async ({ screen }) => {
   await tapTab(screen, "Search", search);
   await fillField(search, "zzyzxq");
 
-  await expect(screen.getByText("Nothing yet")).toBeVisible({
+  await expect(screen.getByText("Nothing found")).toBeVisible({
     timeout: 30_000,
   });
   for (const seeded of [

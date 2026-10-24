@@ -525,7 +525,7 @@
   "search.placeholder": "Search your saves",
   "search.emptyTitle": "Find anything",
   "search.emptyBody": "Search goes through your notes and the\ntitles, tags, and descriptions Shelvr wrote.",
-  "search.noResultsTitle": "Nothing yet",
+  "search.noResultsTitle": "Nothing found",
   "navigation.spacesHeader": "spaces",
   "spaces.addFirst": "Add first save",
   "spaces.waitingTitle": "Still empty",

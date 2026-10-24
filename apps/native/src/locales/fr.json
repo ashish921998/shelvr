@@ -534,7 +534,7 @@
   "search.placeholder": "Rechercher dans vos contenus",
   "search.emptyTitle": "Retrouvez tout",
   "search.emptyBody": "La recherche parcourt vos notes et les titres,\nétiquettes et descriptions créés par Shelvr.",
-  "search.noResultsTitle": "Rien pour le moment",
+  "search.noResultsTitle": "Rien trouvé",
   "navigation.spacesHeader": "collections",
   "spaces.addFirst": "Ajouter le premier contenu",
   "spaces.waitingTitle": "Encore vides",
