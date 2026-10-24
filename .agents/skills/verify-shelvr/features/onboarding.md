@@ -2,7 +2,8 @@
 
 A new account answers three short questions, picks a city, sees one sample
 reel turned into a plan, answers the trial reminder, then meets the paywall.
-The opener is three pages that swipe on their own, each with "Get started"
+The opener is three pages that swipe (on their own until a swipe, never with
+Reduce Motion), each with "Get started"
 and an "Already have an account? Sign in" link for returning
 people; a new account stays signed out through the paywall and signs in
 after it.

@@ -13,7 +13,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Onboarding
 
-1. **Opener:** three pages that swipe sideways on their own, each over a drawn phone, with headlines that open "Stop losing your saves", "No more scrolling" and "No more planning". Under every page are a **Get started** button and an **Already have an account? Sign in** link.
+1. **Opener:** three pages that swipe sideways, each over a drawn phone, with headlines that open "Stop losing your saves", "No more scrolling" and "No more planning". The pages move on every few seconds until the user swipes, and stay put with Reduce Motion on. Under every page are a **Get started** button and an **Already have an account? Sign in** link.
 2. **How many spots have you saved already?:** one answer of **Just a few**, **10 to 50**, **50 to 200**, **Hundreds** or **I've lost count**. **Continue** waits for an answer; **Skip** at the top right moves on without one.
 3. **What do you want to plan?:** any of **Date nights**, **Trips** and **Places to eat**, or **A bit of everything** for all three. Each starts the shelf with one space (Date nights, Travel, Restaurants to try). **Continue** waits for at least one; **Skip** picks all three.
 4. **How do you like to plan?:** one of **Planner**, **Flexible**, **Spontaneous** or **Explorer**. The answer is recorded in analytics and changes nothing else yet. **Skip** moves on.
