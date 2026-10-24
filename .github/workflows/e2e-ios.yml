@@ -7,12 +7,10 @@ name: e2e ios
 #
 # No secrets: the backend is a throwaway local deployment (CONVEX_AGENT_MODE
 # anonymous), so a fork's pull request runs it the same way. The backend's
-# model is the deterministic fake in convex/model/fakeAi.ts, which classifies
-# a note from its own words, so save-note runs here, and serves the fixture
-# pages in the same file, so save-link-fixture saves a link with no network
-# read. It also suggests the saves that share a word with a new space's name,
-# so space-suggestions sees a seeded save suggested. Two flows are left out because the fake cannot stand in for them:
-# save-link and save-image judge the screen with a real model.
+# model is the deterministic fake in convex/model/fakeAi.ts, which serves the
+# fixture pages in the same file, so save-link-fixture saves a link with no
+# network read. save-link is left out because it judges the screen with a
+# real model.
 
 # On a pull request it runs only once the PR carries the `run-e2e` label:
 # adding the label starts a run, and while it stays on, every push re-runs
@@ -70,30 +68,24 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 90
     # The flows split over two runners, each with its own simulator and
-    # backend. The split is the one main runs green. Onboarding must follow
-    # item-detail on shard a: run 40075893390 moved it up to follow
-    # create-space and two onboarding tests failed on a duplicate "Kampa Park"
-    # and a missing paywall sheet. One shard failing does not stop the other.
+    # backend, balanced on the 2026-10-21 timings: 7 to 10 minutes of flows
+    # each once setup is done. One shard failing does not stop the other.
     # A shard runs its files in name order. Onboarding stays behind
-    # create-space, as on a single runner: as the first flow on a fresh
-    # simulator it lost the driver twice ("Daemon request timed out").
+    # home-cities: as the first flow on a fresh simulator it lost the driver
+    # twice ("Daemon request timed out").
     strategy:
       fail-fast: false
       matrix:
         shard:
           - name: a
             tests: >-
-              tests/create-space.e2e.ts
-              tests/item-detail.e2e.ts
+              tests/home-cities.e2e.ts
               tests/onboarding.e2e.ts
-              tests/paywall.e2e.ts
           - name: b
             tests: >-
+              tests/paywall.e2e.ts
+              tests/plan-city-date.e2e.ts
               tests/save-link-fixture.e2e.ts
-              tests/save-note.e2e.ts
-              tests/search.e2e.ts
-              tests/search-no-results.e2e.ts
-              tests/space-suggestions.e2e.ts
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -114,7 +106,6 @@ jobs:
 
       # Booting takes 2 to 4 minutes and needs nothing from this checkout, so
       # it starts here and runs under the install and cache restores. The
-      # picker taps in save-image are measured on an iPhone 17, and the other
       # flows run on any iPhone; the runtime is the newest the image has.
       - name: Create a simulator and start it booting
         run: |
@@ -300,8 +291,8 @@ jobs:
         id: flows
         continue-on-error: true
         working-directory: tools/e2e
-        # Tells the flows that need the fake (save-link-fixture,
-        # space-suggestions) that the backend runs it. E2E_FIXTURE_RESET has
+        # Tells the flows that need the fake (plan-city-date,
+        # save-link-fixture) that the backend runs it. E2E_FIXTURE_RESET has
         # the seeded flows reset their data with `convex run` against this
         # local backend instead of through Settings (startOnSeededHome), which
         # cost each flow about 50 seconds of taps and a relaunch.
@@ -363,7 +354,7 @@ jobs:
           node -e '
             if (!require("fs").existsSync(".e2e/report.json")) process.exit(0);
             const report = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8"));
-            const watched = /name: "(Profile|Add|New space|Spaces|Search)"/;
+            const watched = /name: "(Profile|Add)"/;
             const walk = (node) => {
               if (Array.isArray(node)) return node.forEach(walk);
               if (!node || typeof node !== "object") return;

@@ -20,9 +20,15 @@ finding twice across reruns, and do not count two reviewers agreeing as proof: c
 
 Backend (`apps/native/convex`):
 
-- [ ] Every public function derives the user with `requireUserId(ctx)` (`model/auth.ts`).
-      No `userId` argument from the client. Code that acts for an account checks it is
-      still live (`liveOwner`), not mid-deletion.
+- [ ] A public query or mutation is built with `authedQuery` / `authedMutation`
+      (`model/auth.ts`) and reads `ctx.userId`, or is listed in `PUBLIC_ON_PURPOSE`
+      (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails an unlisted one,
+      and a built one that does not refuse a signed-out or deleting caller before its
+      handler runs. A `PUBLIC_ON_PURPOSE` entry's reason is yours to check against its
+      handler. A public action still derives the user with
+      `requireUserId(ctx)` inside the internal function it runs. No `userId` argument from
+      the client. Code that acts for an account checks it is still live (`liveOwner`), not
+      mid-deletion.
 - [ ] Every save and Pro feature calls `requireProEntitlement(ctx, userId)`.
 - [ ] Anything that sends user content to Gemini, SerpAPI or Treg checks AI
       consent first (`aiAllowed` in `aiConsent.ts`, `internal.aiConsent.isAllowed`
@@ -44,8 +50,12 @@ Native app (`apps/native/src`):
 
 - [ ] New visible copy is in every locale catalog, with generated files regenerated, not
       hand-edited.
-- [ ] A change to native modules, config plugins, `app.json` or `app.config.js` moves the
-      fingerprint: it needs the `Native-Fingerprint: changed` trailer and a store build.
+- [ ] A change to a native module, a config plugin, `app.json` or `app.config.js` may move
+      the fingerprint. CI's `native fingerprint` job reports it: when it says CHANGED, the
+      PR needs the `Native-Fingerprint: changed` trailer and a store build. The job checks
+      the production variant only, never blocks, and cannot see `eas.json` build fields,
+      `.easignore` edits or pnpm patches, so decide those by hand
+      ([what the fingerprint hashes](docs/architecture/push-notifications.md#what-the-fingerprint-hashes)).
 - [ ] No test file under `src/app`.
 - [ ] Handled failures report through `analytics.captureError`.
 

@@ -159,9 +159,6 @@ vi.mock("@/lib/home-feed", () => ({
 }));
 vi.mock("@/lib/use-item-open", () => ({ useItemOpen: vi.fn() }));
 vi.mock("@/lib/use-item-share", () => ({ useItemShare: () => mock.mutation }));
-vi.mock("@/lib/use-find-links", () => ({
-  useFindLinks: () => ({ findLinks: mock.mutation, disabled: false }),
-}));
 vi.mock("@/lib/share/share-store", () => ({
   forgetDeletedSharedItem: mock.forget,
 }));
@@ -210,6 +207,22 @@ function selected(id: string) {
 }
 async function press(label: string) {
   await act(async () => fireEvent.click(screen.getByText(label)));
+}
+type AlertButton = { style?: string; onPress?: () => void };
+async function answerDelete(style: "destructive" | "cancel") {
+  const [title, , buttons] = mock.alert.mock.calls.at(-1) as [
+    string,
+    string,
+    AlertButton[],
+  ];
+  expect(title).toBe("item.deleteTitle");
+  await act(async () =>
+    buttons.find((button) => button.style === style)?.onPress?.(),
+  );
+}
+async function pressDelete() {
+  await press("common.delete");
+  await answerDelete("destructive");
 }
 function deferred() {
   let resolve!: () => void;
@@ -307,7 +320,7 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
       const pending = deferred();
       mock.delete.mockReturnValue(pending.promise);
       render(<ItemScreen />);
-      await press("common.delete");
+      await pressDelete();
       expect(mock.delete).toHaveBeenCalledWith({ id });
       selected(id);
       expect(mock.scroll).not.toHaveBeenCalled();
@@ -324,13 +337,24 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
     },
   );
 
+  it("asks before deleting, and Cancel leaves the save and the page alone", async () => {
+    render(<ItemScreen />);
+    await press("common.delete");
+    expect(mock.delete).not.toHaveBeenCalled();
+    await answerDelete("cancel");
+    expect(mock.delete).not.toHaveBeenCalled();
+    selected("b");
+    expect(mock.scroll).not.toHaveBeenCalled();
+    expect(mock.navigation.setParams).not.toHaveBeenCalled();
+  });
+
   it.each([true, false])(
     "deletes a singleton with canGoBack=%s",
     async (back) => {
       mock.items = [item("b")];
       mock.router.canGoBack.mockReturnValue(back);
       render(<ItemScreen />);
-      await press("common.delete");
+      await pressDelete();
       expect(mock.delete).toHaveBeenCalledWith({ id: "b" });
       expect(mock.scroll).not.toHaveBeenCalled();
       expect(mock.navigation.setParams).not.toHaveBeenCalled();
@@ -350,7 +374,7 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
     const pending = deferred();
     mock.delete.mockReturnValue(pending.promise);
     render(<ItemScreen />);
-    await press("common.delete");
+    await pressDelete();
     await act(async () => pending.reject(new Error("fixture failure")));
     expect(mock.alert).toHaveBeenCalledWith(
       "item.deleteFailed",
@@ -375,7 +399,7 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
           mock.viewable?.({ viewableItems: [{ item: mock.items[1]! }] }),
         );
         selected("b");
-        await press(label);
+        await (label === "common.delete" ? pressDelete() : press(label));
         selected("c");
         expect(mock.navigation.setParams).toHaveBeenCalledExactlyOnceWith({
           id: "c",

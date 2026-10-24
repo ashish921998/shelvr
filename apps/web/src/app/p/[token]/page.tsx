@@ -25,8 +25,16 @@ export async function generateMetadata({
   return {
     title: `${title} — Shelvr`,
     description,
+    // Without its own canonical and og:url the page inherits "/", and Facebook and Messenger preview the homepage.
+    alternates: { canonical: `/p/${token}` },
     robots: { index: false, follow: false },
-    openGraph: { title, description, siteName: "Shelvr", type: "website" },
+    openGraph: {
+      title,
+      description,
+      url: `/p/${token}`,
+      siteName: "Shelvr",
+      type: "website",
+    },
     twitter: { card: "summary", title, description },
   };
 }

@@ -244,9 +244,22 @@ function PlanFooter({
   );
 }
 
+/** A shared shortlist reopens from a city only when every place on it is one of that city's saves. */
+function sharedForCity<T extends { places: { itemId: string }[] }>(
+  shared: T | null | undefined,
+  city: string | undefined,
+  citySaves: { _id: string }[] | undefined,
+): T | null | undefined {
+  if (!city || !shared) return shared;
+  if (citySaves === undefined) return undefined;
+  const ids = new Set(citySaves.map((save) => save._id));
+  return shared.places.every((place) => ids.has(place.itemId)) ? shared : null;
+}
+
 export default function PlanScreen() {
   const locale = useAppLocale();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `city` is set when a city page opened this plan, so it plans that city's saves.
+  const { id, city } = useLocalSearchParams<{ id: string; city?: string }>();
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -256,10 +269,18 @@ export default function PlanScreen() {
   const { data: latestLink, isError: linkFailed } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
   );
+  const { data: citySaves } = useQuery(
+    convexQuery(api.items.listCityItems, city ? { city } : "skip"),
+  );
   const { state, retry } = useMakePlan(
     spaceId,
     locale,
-    linkFailed ? null : latestLink,
+    sharedForCity<NonNullable<typeof latestLink>>(
+      linkFailed ? null : latestLink,
+      city,
+      citySaves,
+    ),
+    city,
   );
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];

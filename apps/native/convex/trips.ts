@@ -12,7 +12,6 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsLookup,
-  type LatLng,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
 import {
@@ -30,6 +29,7 @@ import {
   MIN_TRIP_DAYS,
   tripPaceValidator,
   tripPlaceCap,
+  type LatLng,
   type TripCandidate,
 } from "./model/trip";
 

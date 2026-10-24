@@ -71,6 +71,15 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
 - `tintColor` accepts `var(--colors-*)` strings on web once the variables exist.
 - `src/components/symbol.tsx` passes `{ android, web }` names. Before this fix every
   icon rendered blank on web, because `expo-symbols` reads the `web` key in browsers.
+- SDK 58 added three more:
+  - `expo-asset` and `expo-image` import `AssetRegistry` from `react-native`. The
+    react-native-web patch exports a two-function registry.
+  - `expo-modules-core/build/ts-declarations/global.js` imports names its siblings
+    declare only as types. It is stubbed empty.
+  - `expo` resolves to `build/async-require/*.js` instead of `src/*.ts`; the stub
+    matches both.
+- `StitchMark` (the mark in `ScreenLoader`) draws with Skia, which on web needs the
+  CanvasKit wasm. The build swaps it for a still SVG of the same path and colors.
 - react-native-mmkv works on web (the appearance store reads without error).
 
 ## Contracts and previews
@@ -111,7 +120,7 @@ What can go stale without failing loudly:
 
 - `build-web.mjs` patches exact strings in dependencies: `export default Appearance;`
   and `var defaultId = 'react-native-stylesheet';` in react-native-web. A version bump
-  that changes either makes the `.replace` a silent no-op. The `expo/src/async-require`
+  that changes either makes the `.replace` a silent no-op. The `expo/(src|build)/async-require`
   stub matches by path the same way; if the `ws://hot/` console errors return, the
   files moved. Symptoms: every card fails
   `[RENDER] root empty` (stylesheet id), or the bundle throws
@@ -124,6 +133,9 @@ What can go stale without failing loudly:
   `--colors-background` on its card.
 - `dtsPropsFor` icon and type-ramp unions are guarded by `build-web.mjs`. The `NAMES` list in
   `previews/AppSymbolIcon.tsx` is not; update it when `SF_TO_MATERIAL` changes.
+- The `StitchMark` stub reads the path, `MARK_BOX`, stroke width, cap and dash from
+  `stitch-mark.tsx` and fails by name when one can no longer be read. It does not
+  follow a change to the colors (`primarySoft` fill, `primary` stroke).
 - Preview copy mirrors app strings that can change: EmptyState titles and messages
   (tab screens), feedback invitation and cancel survey copy, `CANCEL_REASON_LABELS`,
   and the Profile and Settings rows (`src/locales/en.json`).

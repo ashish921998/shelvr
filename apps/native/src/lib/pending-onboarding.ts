@@ -1,13 +1,19 @@
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
-import { isGoal, type Goal } from "@/lib/onboarding-goals";
+import {
+  isPlanner,
+  isSavedCount,
+  readGoals,
+  type Goal,
+  type Planner,
+  type SavedCount,
+} from "@/lib/onboarding-goals";
 import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
-import { isEveningAfter, type EveningAfter } from "@/lib/sample-trip";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 8;
+const PROGRESS_VERSION = 9;
 
 export type PendingDemo = {
   url: string;
@@ -25,17 +31,38 @@ type PendingRecord = {
   step: number | null;
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
-  goal?: Goal | null;
-  eveningAfter?: EveningAfter | null;
+  goals?: Goal[];
+  savedCount?: SavedCount | null;
+  planner?: Planner | null;
 };
 
-type OnboardingProgress = {
-  spaces: string[];
+type OnboardingAnswers = {
   travelCity: SampleCityId | null;
-  goal: Goal | null;
-  eveningAfter: EveningAfter | null;
+  goals: Goal[];
+  savedCount: SavedCount | null;
+  planner: Planner | null;
+};
+
+type OnboardingProgress = OnboardingAnswers & {
+  spaces: string[];
   step: number | null;
 };
+
+const NO_ANSWERS: OnboardingAnswers = {
+  travelCity: null,
+  goals: [],
+  savedCount: null,
+  planner: null,
+};
+
+function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
+  return {
+    travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
+    goals: readGoals(record.goals),
+    savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
+    planner: isPlanner(record.planner) ? record.planner : null,
+  };
+}
 
 let revision = 0;
 const listeners = new Set<() => void>();
@@ -98,11 +125,7 @@ function readPendingRecord(): PendingRecord | null {
           : null,
       step,
       spaceNames: readSpaceNames(record.spaceNames),
-      travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
-      goal: isGoal(record.goal) ? record.goal : null,
-      eveningAfter: isEveningAfter(record.eveningAfter)
-        ? record.eveningAfter
-        : null,
+      ...answersOf(record),
     };
   } catch {
     return null;
@@ -159,9 +182,7 @@ function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
     progressVersion: existing?.progressVersion ?? null,
     step: existing?.step ?? null,
     spaceNames: existing?.spaceNames ?? {},
-    travelCity: existing?.travelCity ?? null,
-    goal: existing?.goal ?? null,
-    eveningAfter: existing?.eveningAfter ?? null,
+    ...answersOf(existing ?? {}),
   });
   notifyChanged();
 }
@@ -232,30 +253,14 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return {
-      spaces: [],
-      travelCity: null,
-      goal: null,
-      eveningAfter: null,
-      step: null,
-    };
+    return { ...NO_ANSWERS, spaces: [], step: null };
   }
-  return {
-    spaces: record.spaces,
-    travelCity: record.travelCity ?? null,
-    goal: record.goal ?? null,
-    eveningAfter: record.eveningAfter ?? null,
-    step: record.step,
-  };
+  return { ...answersOf(record), spaces: record.spaces, step: record.step };
 }
 
-export function setOnboardingProgress(progress: {
-  spaces: string[];
-  travelCity?: SampleCityId | null;
-  goal?: Goal | null;
-  eveningAfter?: EveningAfter | null;
-  step: number;
-}) {
+export function setOnboardingProgress(
+  progress: Partial<OnboardingAnswers> & { spaces: string[]; step: number },
+) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
   writePendingRecord({
@@ -267,9 +272,7 @@ export function setOnboardingProgress(progress: {
     progressVersion: PROGRESS_VERSION,
     step: progress.step,
     spaceNames: existing?.spaceNames ?? {},
-    travelCity: progress.travelCity ?? null,
-    goal: progress.goal ?? null,
-    eveningAfter: progress.eveningAfter ?? null,
+    ...answersOf(progress),
   });
   notifyChanged();
 }

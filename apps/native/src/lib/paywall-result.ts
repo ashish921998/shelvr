@@ -8,10 +8,16 @@ export type RevenueCatPaywallResult =
   | "RESTORED"
   | string;
 
+/** presentPaywallIfNeeded answers NOT_PRESENTED when RevenueCat already shows Pro. */
 export function mapPaywallResult(
   result: RevenueCatPaywallResult | null | undefined,
 ): PaywallOutcome {
-  if (result === "PURCHASED" || result === "RESTORED") return "success";
+  if (
+    result === "PURCHASED" ||
+    result === "RESTORED" ||
+    result === "NOT_PRESENTED"
+  )
+    return "success";
   if (result === "CANCELLED") return "cancelled";
   return "unavailable";
 }

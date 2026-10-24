@@ -134,7 +134,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   work. Successful upload retries return the same storage ID.
   Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
-  `reprocessItem` (retry a failed or partially enriched save), `deleteItem`, and the share
+  `reprocessItem` (retry a failed or partially enriched save), `listCities` and `listCityItems`
+  (the cities Home and the City screen show), `deleteItem`, and the share
   link pair `createShareLink` / `settleShareLink` (a cancelled share sheet withdraws a
   fresh, never-confirmed link). The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
@@ -143,7 +144,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`spaces.ts`**: public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
   `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
-  `acceptAllSuggestions`), plus internal join helpers.
+  `acceptAllSuggestions`), `ensureCitySpace` (the space "Plan a date" / "Plan a trip" on the City
+  screen files a city's saves into), plus internal join helpers.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
@@ -221,9 +223,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships (`saved` in a space set to auto-file). A cooking
-  TikTok or reel whose caption and linked page gave no recipe has its speech read through Treg
-  (`model/videoTranscript.ts`) for a second, recipe-only call. The file also holds
+  matches become `suggested` memberships (`saved` in a space set to auto-file). The model
+  also lists every place a save names into `items.places` (server-only: `enrichItem` strips
+  it; plans and trips read it through `toPlanSource`). A short video's speech is read once
+  through Treg (`model/videoTranscript.ts`) when the model flags it as a cooking video whose
+  caption and linked page gave no recipe, or as a video that recommends or visits places;
+  a second call then lifts the recipe, the spoken places, or both. The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
@@ -266,6 +271,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   with no saved place shows as a gap; the trip never adds a place the saves do not name.
   `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
   reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
+- **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names. `locateItem` looks each
+  `open_maps` intent value (the save's own and its spaces') up in Apple Maps and `storePins` writes at most five,
+  dropping any place no longer named. Scheduled from `finalizeItem` and from steering; `backfillPage` fills
+  older saves, run by hand. Skipped when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
@@ -276,9 +285,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`**: `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
-  argument.** It takes a query or mutation context; an action derives the caller through the
-  internal mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`),
-  so authorization and the write stay in one transaction.
+  argument.** A public query or mutation gets it through `authedQuery` or `authedMutation`, which
+  run `requireUserId` before the handler and pass the id as `ctx.userId`. The few that must answer
+  a caller with no live account skip the builders and are listed, each with a reason, in
+  `PUBLIC_ON_PURPOSE` (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails on any
+  public query or mutation that is neither built nor listed, and calls every built one as a
+  signed-out caller and as a deleting account, failing unless it throws "Not authenticated"
+  before the handler runs. So a function moved onto the builders adds no refusal test of its own.
+  `.github/CODEOWNERS` names the owner for the list.
+  Public actions have no builder yet; an action derives the caller through the internal
+  mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`), so
+  authorization and the write stay in one transaction.
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
@@ -296,6 +313,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `finalizeItem.grid.test.ts` replays every scenario through the real mutation and
   `model/settlement.test.ts` through the pure function, both against `testdata/settlement/rows.json`.
   Re-record that file only for a change you intend, and review its diff.
+  A run that fails writes `failurePatch(reason)` from the same module: only the status and
+  reason, so the save keeps what earlier runs gave it. A save the run already settled ready
+  stays ready, and `failItem` answers `settled`. `failItem` and the stale-processing cron are
+  its adapters, and `failItem.test.ts` tests them directly.
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
 (auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var, an AI Studio API key).
@@ -311,7 +332,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 
 ### Native (`apps/native`)
 
-- UI localization uses `expo-localization` and i18n-js. Read
+- UI localization uses `expo-localization` and the in-house `translate` in `src/lib/i18n-core.ts`,
+  which falls back from the locale to its language to English, fills `%{name}` placeholders, and
+  picks plural forms with the CLDR rules in `convex/model/localization.ts`. Read
   [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
   update all catalogs and run `pnpm localization:generate` after translation changes. It is a
   root script, so run it from the repo root. It writes `src/locales/catalogs.ts`,
@@ -326,11 +349,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
-  `NativeTabs` from `expo-router/native-tabs`; other platforms fall back to `AppTabs`
-- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `plan-gate`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
-  `digest/[id]`
+- `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities" and a "No place
+  found" section for saves with no city. Old deep links, pushes and Siri shortcuts to removed
+  screens open Home
+- Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
   entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
 - `(auth)` holds a single `sign-in` route
@@ -384,8 +407,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
     this is set, so a build without it keeps working and uploads switch on the moment the EAS
     secret is added. The upload runs inside the native build and needs `@posthog/cli` available
     there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
-    variables rather than in `eas.json`, which the native fingerprint hashes. Turning the upload
-    on adds a config plugin, so it moves the fingerprint and needs a store build.
+    variables. Turning the upload on adds a config plugin, so it moves the fingerprint and needs a
+    store build.
     `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
@@ -447,7 +470,8 @@ needed at runtime by the features that use them:
   Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
   oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
 - `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
-  cooking TikTok or reel whose caption has no recipe (`model/videoTranscript.ts`, about $0.002
+  cooking TikTok or reel whose caption has no recipe, or one that recommends or visits places
+  (`model/videoTranscript.ts`, about $0.002
   each, rate limited per user and globally). Transcripts are fetched only while the switch is
   `"true"` and the key is set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
@@ -467,7 +491,10 @@ needed at runtime by the features that use them:
 - Do not reintroduce the old notes-app domain (`notes` table, OpenAI summary action, `/notes`
   routes). The product domain is **items + spaces**. `GLOSSARY.md` names the domain's terms: say
   "save" in copy and docs while tables and code keep `items`.
-- Never pass `userId` from the client into Convex public functions.
+- Never pass `userId` from the client into Convex public functions. Build a public query or
+  mutation with `authedQuery` or `authedMutation` from `model/auth.ts` and read `ctx.userId`. A
+  function that must answer a signed-out or deleting caller goes in `PUBLIC_ON_PURPOSE` in
+  `model/publicFunctions.ts` with a reason.
 - Keep `returns:` validators accurate. Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
 - Public Convex functions are contracts with every app build in the wild, and the backend
@@ -505,9 +532,9 @@ needed at runtime by the features that use them:
   expand/contract: deploy the tolerant version first, tighten once old
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A
-  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
-  `app.config.js`) strands every later OTA until a store build ships, and the diff does
-  not say so. Two layers cover it. On a pull request CI runs
+  change to a native module, a config plugin, `app.json` or `app.config.js` may move the
+  fingerprint, and a moved fingerprint strands every later OTA until a store build ships.
+  The diff does not say so. Two layers cover it. On a pull request CI runs
   `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
   and never fails the check; acknowledge an intended move with the
   `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
@@ -516,8 +543,11 @@ needed at runtime by the features that use them:
   `apps/native/released-builds.json` and blocks the publish on anything but a match,
   including a profile or platform with no recorded release. A blocked publish means
   nothing published from this tree reaches the recorded binary, so the usual fix is a
-  store build, and recording the release afterwards. See
-  [push notification builds and updates](docs/architecture/push-notifications.md).
+  store build, and recording the release afterwards. Do not predict a move: run
+  `pnpm run verify:fingerprint origin/main HEAD`. The warning checks the production variant
+  only, and it cannot see `eas.json` build fields, `.easignore` edits or pnpm patches, so
+  decide those by hand. What the fingerprint hashes, and what it cannot see, is in
+  [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 - Adding a field to a table is a one-way door once rows carry it. Convex validates
   every existing document against the new schema on deploy, and a table validator
   rejects a field it does not declare, failing with an "Unexpected field" error
@@ -528,8 +558,10 @@ needed at runtime by the features that use them:
   the evidence, and what was not verified. Never call work "done" or "verified" without evidence
   a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
   assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
-  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
-  never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
+  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. When those files
+  changed but nothing on screen did, the author (an agent included) says why under Evidence and
+  adds the `no-ui-change` label when opening the pull request (`gh pr create --label no-ui-change`);
+  a visible change never takes the label. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
   branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.

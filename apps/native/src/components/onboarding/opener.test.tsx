@@ -253,11 +253,11 @@ describe("OpenerStep", () => {
         viewedPages={new Set()}
       />,
     );
-    fireEvent.click(screen.getByText("onboarding.startYours"));
+    fireEvent.click(screen.getByText("opener.getStarted"));
     swipeTo(1);
-    fireEvent.click(screen.getByText("onboarding.startYours"));
+    fireEvent.click(screen.getByText("opener.getStarted"));
     swipeTo(2);
-    fireEvent.click(screen.getByText("onboarding.startYours"));
+    fireEvent.click(screen.getByText("opener.getStarted"));
     expect(onStart).toHaveBeenCalledTimes(3);
   });
 
@@ -347,7 +347,7 @@ describe("OpenerStep", () => {
       />,
     );
     expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(3);
-    expect(screen.getByText("onboarding.startYours")).toBeTruthy();
+    expect(screen.getByText("opener.getStarted")).toBeTruthy();
   });
 
   it("advances a page every four seconds and stops on the last", () => {

@@ -27,6 +27,9 @@ describe("onboardingCompletedProperties", () => {
       custom_space_count: 1,
       sample_city: null,
       goal: null,
+      goals: [],
+      saved_count: null,
+      planner: null,
       $set: { save_pileup: [] },
     });
   });
@@ -41,15 +44,20 @@ describe("onboardingCompletedProperties", () => {
     });
   });
 
-  it("names the goal picked first", () => {
+  it("sends every survey answer, with the goal that leads", () => {
     expect(
-      onboardingCompletedProperties(["Date nights"], "paris", "date"),
-    ).toMatchObject({ goal: "date", sample_city: "paris" });
-  });
-
-  it("names the sample trip's city when one was picked", () => {
-    expect(onboardingCompletedProperties(["Travel"], "tokyo")).toMatchObject({
-      sample_city: "tokyo",
+      onboardingCompletedProperties(["Date nights", "Travel"], {
+        travelCity: "paris",
+        goals: ["date", "travel"],
+        savedCount: "fiftyToTwoHundred",
+        planner: "spontaneous",
+      }),
+    ).toMatchObject({
+      goal: "date",
+      goals: ["date", "travel"],
+      saved_count: "fiftyToTwoHundred",
+      planner: "spontaneous",
+      sample_city: "paris",
     });
   });
 });

@@ -7,7 +7,6 @@ import StoreButton from "./home/StoreButton";
 const navigation = [
   { name: "Spaces", href: "/#shelves" },
   { name: "Search", href: "/#find" },
-  { name: "Photo tidy", href: "/#tidy" },
   { name: "FAQ", href: "/#faq" },
 ];
 

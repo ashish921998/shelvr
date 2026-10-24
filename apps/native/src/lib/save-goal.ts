@@ -1,5 +1,4 @@
 import { analytics } from "@/lib/analytics";
-import type { TextMessageKey } from "@/locales/message-types";
 import * as SecureStore from "expo-secure-store";
 
 const saveGoalKey = (userId: string) => `shelvr.saveGoal.${userId}`;
@@ -63,11 +62,4 @@ export function trackSaveGoal(
   } catch (error) {
     analytics.captureError("save_goal_track_failed", error);
   }
-}
-
-export function progressTitleKey(saved: number, goal: number): TextMessageKey {
-  const left = goal - saved;
-  if (left <= 1) return "home.progressTitleLast";
-  if (left === 2) return "home.progressTitleNext";
-  return "home.progressTitleFirst";
 }

@@ -34,9 +34,10 @@ export function useMakePlan(
   spaceId: Id<"spaces">,
   locale: string,
   shared: SharedShortlist | null | undefined,
+  city?: string,
 ) {
   const makePlan = useAction(api.plans.makePlan);
-  const key = `${spaceId}:${locale}`;
+  const key = `${spaceId}:${locale}:${city ?? ""}`;
   const sharedRef = useRef(shared);
   useEffect(() => {
     sharedRef.current = shared;
@@ -51,7 +52,7 @@ export function useMakePlan(
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
-        const plan = await makePlan({ spaceId, locale });
+        const plan = await makePlan({ spaceId, locale, city });
         analytics.capture("plan_made", {
           considered: plan.considered,
           place_count: plan.places.length,
@@ -66,7 +67,7 @@ export function useMakePlan(
         return { status: aiOff ? "ai_off" : "error" };
       }
     },
-    [makePlan, spaceId, locale],
+    [makePlan, spaceId, locale, city],
   );
 
   useEffect(() => {
@@ -90,11 +91,24 @@ export function useMakePlan(
     };
   }, [load, key, linkLoaded]);
 
+  const resultRef = useRef(result);
+  useEffect(() => {
+    resultRef.current = result;
+  });
+
   const retry = useCallback(async () => {
     const current = ++run.current;
+    const shown =
+      resultRef.current?.key === key ? resultRef.current.state : null;
     setResult(null);
     const next = await load(current);
-    if (current === run.current) setResult({ key, state: next });
+    if (current !== run.current) return;
+    if (next.status === "error" && shown?.status === "ready") {
+      setResult({ key, state: shown });
+      Alert.alert(t("plan.failedTitle"), t("errors.retrySoon"));
+      return;
+    }
+    setResult({ key, state: next });
   }, [load, key]);
 
   const state = result?.key === key ? result.state : LOADING;
@@ -198,6 +212,8 @@ export function usePlanPicker(
       timers.current.forEach(clearTimeout);
       timers.current = [];
       spinningPlan.current = null;
+      // A failed shuffle brings the same plan back; a spin cut short must not come back with it.
+      setPick((shown) => (shown?.spinning ? null : shown));
     },
     [planId],
   );

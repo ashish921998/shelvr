@@ -12,17 +12,9 @@ import type { TextMessageKey } from "@/locales/message-types";
 /** What a goal's sample plan is; travel is the existing day-by-day trip. */
 export type PlanKind = "trip" | "date" | "weekend";
 
-/** The one place each plan's sample post links to, so the post shared in onboarding is a stop in the plan. */
-type PlanPost = {
-  name: string;
-  url: string;
-  picture: "food" | "view";
-};
-
 type PlanCity = {
   saves: readonly SampleSave[];
   days: readonly SampleDay[];
-  post: PlanPost;
 };
 
 type Stop = [
@@ -43,8 +35,6 @@ function evening(title: TextMessageKey, stops: readonly Stop[]): SampleDay {
     ),
   };
 }
-
-const wiki = (page: string) => `https://en.wikipedia.org/wiki/${page}`;
 
 const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
   prague: {
@@ -76,11 +66,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Charles Bridge", 50.0865, 14.4114, true],
       ]),
     ],
-    post: {
-      name: "Charles Bridge",
-      url: wiki("Charles_Bridge"),
-      picture: "view",
-    },
   },
   "new-york": {
     saves: [
@@ -111,11 +96,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Brooklyn Bridge", 40.7061, -73.9969, true],
       ]),
     ],
-    post: {
-      name: "Brooklyn Bridge",
-      url: wiki("Brooklyn_Bridge"),
-      picture: "view",
-    },
   },
   london: {
     saves: [
@@ -146,7 +126,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "South Bank", 51.5065, -0.1165],
       ]),
     ],
-    post: { name: "Dishoom", url: wiki("Dishoom"), picture: "food" },
   },
   paris: {
     saves: [
@@ -177,11 +156,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Pont des Arts", 48.8583, 2.3375, true],
       ]),
     ],
-    post: {
-      name: "Pont des Arts",
-      url: wiki("Pont_des_Arts"),
-      picture: "view",
-    },
   },
   chicago: {
     saves: [
@@ -212,11 +186,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "North Avenue Beach", 41.9172, -87.627],
       ]),
     ],
-    post: {
-      name: "Cafe Ba-Ba-Reeba!",
-      url: "https://maps.apple.com/?q=Cafe%20Ba-Ba-Reeba%21&ll=41.919%2C-87.6487",
-      picture: "food",
-    },
   },
   seattle: {
     saves: [
@@ -247,11 +216,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Cal Anderson Park", 47.617, -122.3191],
       ]),
     ],
-    post: {
-      name: "Momiji Capitol Hill",
-      url: "https://maps.apple.com/?q=Momiji%20Capitol%20Hill&ll=47.6148%2C-122.3165",
-      picture: "food",
-    },
   },
   austin: {
     saves: [
@@ -287,11 +251,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ],
       ]),
     ],
-    post: {
-      name: "Perla's",
-      url: "https://maps.apple.com/?q=Perla%27s&ll=30.25%2C-97.7501",
-      picture: "food",
-    },
   },
   dallas: {
     saves: [
@@ -322,11 +281,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Klyde Warren Park", 32.7894, -96.8016],
       ]),
     ],
-    post: {
-      name: "Mexican Sugar",
-      url: "https://maps.apple.com/?q=Mexican%20Sugar&ll=32.7912%2C-96.8044",
-      picture: "food",
-    },
   },
   vancouver: {
     saves: [
@@ -357,11 +311,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "English Bay Beach", 49.2863, -123.1435],
       ]),
     ],
-    post: {
-      name: "Alouette Bistro",
-      url: "https://maps.apple.com/?q=Alouette%20Bistro&ll=49.2853%2C-123.1183",
-      picture: "food",
-    },
   },
   montreal: {
     saves: [
@@ -392,11 +341,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "La Fontaine Park", 45.5273, -73.5704],
       ]),
     ],
-    post: {
-      name: "L'Express",
-      url: "https://maps.apple.com/?q=L%27Express&ll=45.5203%2C-73.5744",
-      picture: "food",
-    },
   },
   madrid: {
     saves: [
@@ -427,11 +371,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Cibeles Fountain", 40.4193, -3.6931],
       ]),
     ],
-    post: {
-      name: "Saona",
-      url: "https://maps.apple.com/?q=Saona&ll=40.4253%2C-3.7137",
-      picture: "food",
-    },
   },
   berlin: {
     saves: [
@@ -462,11 +401,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Feuerwehrbrunnen", 52.502, 13.4243],
       ]),
     ],
-    post: {
-      name: "3 Sisters",
-      url: "https://maps.apple.com/?q=3%20Sisters&ll=52.5039%2C13.4244",
-      picture: "food",
-    },
   },
   florence: {
     saves: [
@@ -497,11 +431,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Boboli Gardens", 43.7625, 11.2484],
       ]),
     ],
-    post: {
-      name: "En cucina casalinga giapponese",
-      url: "https://maps.apple.com/?q=En%20cucina%20casalinga%20giapponese&ll=43.7707%2C11.2665",
-      picture: "food",
-    },
   },
   amsterdam: {
     saves: [
@@ -532,11 +461,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Vondelpark", 52.358, 4.8686],
       ]),
     ],
-    post: {
-      name: "Foodhallen",
-      url: "https://maps.apple.com/?q=Foodhallen&ll=52.3668%2C4.8679",
-      picture: "food",
-    },
   },
   rome: {
     saves: [
@@ -567,11 +491,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Giardino degli Aranci", 41.8851, 12.4804],
       ]),
     ],
-    post: {
-      name: "Retrobottega",
-      url: "https://maps.apple.com/?q=Retrobottega&ll=41.8891%2C12.4825",
-      picture: "food",
-    },
   },
   copenhagen: {
     saves: [
@@ -602,11 +521,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Garden of the Royal Library", 55.6746, 12.5812],
       ]),
     ],
-    post: {
-      name: "Juju",
-      url: "https://maps.apple.com/?q=Juju&ll=55.6899%2C12.5751",
-      picture: "food",
-    },
   },
   milan: {
     saves: [
@@ -637,11 +551,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Duomo di Milano", 45.4641, 9.1919],
       ]),
     ],
-    post: {
-      name: "Pescherie Riunite - Montenero",
-      url: "https://maps.apple.com/?q=Pescherie%20Riunite%20-%20Montenero&ll=45.4562%2C9.2045",
-      picture: "food",
-    },
   },
   "los-angeles": {
     saves: [
@@ -672,11 +581,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Echo Park Lake", 34.0729, -118.2605],
       ]),
     ],
-    post: {
-      name: "Donna's",
-      url: "https://maps.apple.com/?q=Donna%27s&ll=34.0763%2C-118.2566",
-      picture: "food",
-    },
   },
   "san-francisco": {
     saves: [
@@ -707,11 +611,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Saturn Street Steps", 37.7627, -122.4405],
       ]),
     ],
-    post: {
-      name: "Good Good Culture Club",
-      url: "https://maps.apple.com/?q=Good%20Good%20Culture%20Club&ll=37.7618%2C-122.423",
-      picture: "food",
-    },
   },
   toronto: {
     saves: [
@@ -742,11 +641,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Ontario Place", 43.6311, -79.4127],
       ]),
     ],
-    post: {
-      name: "Pizzeria Badiali",
-      url: "https://maps.apple.com/?q=Pizzeria%20Badiali&ll=43.6461%2C-79.4233",
-      picture: "food",
-    },
   },
   barcelona: {
     saves: [
@@ -777,11 +671,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Muñoz Ramonet Gardens", 41.3964, 2.147],
       ]),
     ],
-    post: {
-      name: "Feroz Barcelona",
-      url: "https://maps.apple.com/?q=Feroz%20Barcelona&ll=41.3965%2C2.1509",
-      picture: "food",
-    },
   },
   lisbon: {
     saves: [
@@ -812,11 +701,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Jardim do Torel", 38.7192, -9.1412],
       ]),
     ],
-    post: {
-      name: "Plano Restaurante",
-      url: "https://maps.apple.com/?q=Plano%20Restaurante&ll=38.7197%2C-9.1266",
-      picture: "food",
-    },
   },
   seoul: {
     saves: [
@@ -847,11 +731,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Seoul Plaza", 37.5656, 126.978],
       ]),
     ],
-    post: {
-      name: "Tosokchon Samgyetang",
-      url: "https://maps.apple.com/?q=Tosokchon%20Samgyetang&ll=37.5778%2C126.9716",
-      picture: "food",
-    },
   },
   tokyo: {
     saves: [
@@ -882,11 +761,6 @@ const DATE_NIGHTS: Partial<Record<SampleCityId, PlanCity>> = {
         ["walk", "Shibuya Fureai Botanical Center", 35.6533, 139.7077],
       ]),
     ],
-    post: {
-      name: "Menchirashi",
-      url: "https://maps.apple.com/?q=Menchirashi&ll=35.6665%2C139.7051",
-      picture: "food",
-    },
   },
 };
 
@@ -922,7 +796,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Kavárna Slavia", 50.0814, 14.4135],
       ]),
     ],
-    post: { name: "U Fleků", url: wiki("U_Fleků"), picture: "food" },
   },
   "new-york": {
     saves: [
@@ -955,11 +828,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Caffe Reggio", 40.7302, -74.0003],
       ]),
     ],
-    post: {
-      name: "Katz's Delicatessen",
-      url: wiki("Katz%27s_Delicatessen"),
-      picture: "food",
-    },
   },
   london: {
     saves: [
@@ -992,11 +860,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Monmouth Coffee", 51.5054, -0.0915],
       ]),
     ],
-    post: {
-      name: "Borough Market",
-      url: wiki("Borough_Market"),
-      picture: "food",
-    },
   },
   paris: {
     saves: [
@@ -1029,11 +892,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Café de Flore", 48.8541, 2.3326],
       ]),
     ],
-    post: {
-      name: "Bouillon Chartier",
-      url: wiki("Bouillon_Chartier"),
-      picture: "food",
-    },
   },
   chicago: {
     saves: [
@@ -1066,11 +924,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Sawada Coffee", 41.8836, -87.6487],
       ]),
     ],
-    post: {
-      name: "Au Cheval",
-      url: "https://maps.apple.com/?q=Au%20Cheval&ll=41.8846%2C-87.6476",
-      picture: "food",
-    },
   },
   seattle: {
     saves: [
@@ -1103,11 +956,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Pegasus Coffee Bar", 47.6037, -122.3325],
       ]),
     ],
-    post: {
-      name: "Umi Sake House",
-      url: "https://maps.apple.com/?q=Umi%20Sake%20House&ll=47.6133%2C-122.3461",
-      picture: "food",
-    },
   },
   austin: {
     saves: [
@@ -1140,11 +988,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "The Buzz Mill", 30.2417, -97.7269],
       ]),
     ],
-    post: {
-      name: "Este",
-      url: "https://maps.apple.com/?q=Este&ll=30.2839%2C-97.7195",
-      picture: "food",
-    },
   },
   dallas: {
     saves: [
@@ -1177,11 +1020,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "San Martin Bakery and Restaurant", 32.8022, -96.7999],
       ]),
     ],
-    post: {
-      name: "The Mexican",
-      url: "https://maps.apple.com/?q=The%20Mexican&ll=32.7964%2C-96.8227",
-      picture: "food",
-    },
   },
   vancouver: {
     saves: [
@@ -1219,11 +1057,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ],
       ]),
     ],
-    post: {
-      name: "Le Crocodile by Rob Feenie",
-      url: "https://maps.apple.com/?q=Le%20Crocodile%20by%20Rob%20Feenie&ll=49.2825%2C-123.1252",
-      picture: "food",
-    },
   },
   montreal: {
     saves: [
@@ -1256,11 +1089,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Café Castel", 45.5021, -73.5766],
       ]),
     ],
-    post: {
-      name: "Chez Victoire",
-      url: "https://maps.apple.com/?q=Chez%20Victoire&ll=45.5311%2C-73.5765",
-      picture: "food",
-    },
   },
   madrid: {
     saves: [
@@ -1293,11 +1121,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "FELIZ COFFEE TO STAY", 40.4153, -3.6991],
       ]),
     ],
-    post: {
-      name: "Castizo Velázquez",
-      url: "https://maps.apple.com/?q=Castizo%20Vel%C3%A1zquez&ll=40.4352%2C-3.6836",
-      picture: "food",
-    },
   },
   berlin: {
     saves: [
@@ -1330,11 +1153,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Zeit für Brot", 52.528, 13.4086],
       ]),
     ],
-    post: {
-      name: "Holzmarkt 25",
-      url: "https://maps.apple.com/?q=Holzmarkt%2025&ll=52.5113%2C13.4268",
-      picture: "food",
-    },
   },
   florence: {
     saves: [
@@ -1367,11 +1185,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "La Cité", 43.7693, 11.2458],
       ]),
     ],
-    post: {
-      name: "RamenGirl by ENOTECALUCA Firenze",
-      url: "https://maps.apple.com/?q=RamenGirl%20by%20ENOTECALUCA%20Firenze&ll=43.7735%2C11.214",
-      picture: "food",
-    },
   },
   amsterdam: {
     saves: [
@@ -1404,11 +1217,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Back to Black", 52.3611, 4.8885],
       ]),
     ],
-    post: {
-      name: "Staring at Jacob",
-      url: "https://maps.apple.com/?q=Staring%20at%20Jacob&ll=52.3623%2C4.8618",
-      picture: "food",
-    },
   },
   rome: {
     saves: [
@@ -1441,11 +1249,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Ciampini Roma", 41.9037, 12.478],
       ]),
     ],
-    post: {
-      name: "Ristorante Tullio",
-      url: "https://maps.apple.com/?q=Ristorante%20Tullio&ll=41.9044%2C12.4899",
-      picture: "food",
-    },
   },
   copenhagen: {
     saves: [
@@ -1478,11 +1281,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Coffee Collective Bernikow", 55.6801, 12.5825],
       ]),
     ],
-    post: {
-      name: "SSAM Korean Food Bar",
-      url: "https://maps.apple.com/?q=SSAM%20Korean%20Food%20Bar&ll=55.6726%2C12.5621",
-      picture: "food",
-    },
   },
   milan: {
     saves: [
@@ -1515,11 +1313,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "NOWHERE - CAFE", 45.456, 9.1817],
       ]),
     ],
-    post: {
-      name: "Langosteria",
-      url: "https://maps.apple.com/?q=Langosteria&ll=45.4556%2C9.1684",
-      picture: "food",
-    },
   },
   "los-angeles": {
     saves: [
@@ -1552,11 +1345,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Gjusta", 33.9952, -118.4745],
       ]),
     ],
-    post: {
-      name: "Felix Trattoria",
-      url: "https://maps.apple.com/?q=Felix%20Trattoria&ll=33.9922%2C-118.4719",
-      picture: "food",
-    },
   },
   "san-francisco": {
     saves: [
@@ -1589,11 +1377,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Kopiku Indonesian Coffee", 37.8009, -122.4253],
       ]),
     ],
-    post: {
-      name: "SAN HO WON",
-      url: "https://maps.apple.com/?q=SAN%20HO%20WON&ll=37.7596%2C-122.4102",
-      picture: "food",
-    },
   },
   toronto: {
     saves: [
@@ -1626,11 +1409,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Carbonic Coffee (Baldwin)", 43.6558, -79.3935],
       ]),
     ],
-    post: {
-      name: "Raku",
-      url: "https://maps.apple.com/?q=Raku&ll=43.6482%2C-79.3994",
-      picture: "food",
-    },
   },
   barcelona: {
     saves: [
@@ -1663,11 +1441,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Soul Cafe Barcelona", 41.3804, 2.1798],
       ]),
     ],
-    post: {
-      name: "FUGAZ",
-      url: "https://maps.apple.com/?q=FUGAZ&ll=41.3886%2C2.1559",
-      picture: "food",
-    },
   },
   lisbon: {
     saves: [
@@ -1700,11 +1473,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Brotéria", 38.7134, -9.1436],
       ]),
     ],
-    post: {
-      name: "Loco",
-      url: "https://maps.apple.com/?q=Loco&ll=38.7125%2C-9.1606",
-      picture: "food",
-    },
   },
   seoul: {
     saves: [
@@ -1737,11 +1505,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "Koriko Cafe", 37.565, 126.9247],
       ]),
     ],
-    post: {
-      name: "Geumdwaeji Sikdang",
-      url: "https://maps.apple.com/?q=Geumdwaeji%20Sikdang&ll=37.5571%2C127.0117",
-      picture: "food",
-    },
   },
   tokyo: {
     saves: [
@@ -1779,11 +1542,6 @@ const WEEKENDS: Partial<Record<SampleCityId, PlanCity>> = {
         ["coffee", "ATELIER MATCHA", 35.6661, 139.7652],
       ]),
     ],
-    post: {
-      name: "Nihonbashi Kaisen Donburi Tsujihan Nihonbashi",
-      url: "https://maps.apple.com/?q=Nihonbashi%20Kaisen%20Donburi%20Tsujihan%20Nihonbashi&ll=35.6807%2C139.7716",
-      picture: "food",
-    },
   },
 };
 
@@ -1806,20 +1564,6 @@ export function planAsCity(
   const plan = (kind === "date" ? DATE_NIGHTS : WEEKENDS)[id]!;
   const city = SAMPLE_CITIES[id];
   return { ...city, saves: plan.saves, days: plan.days };
-}
-
-/** Every plan's post link, so a held practice share of one is recognised as practice. */
-export function isPlanPost(url: string): boolean {
-  return [DATE_NIGHTS, WEEKENDS].some((plans) =>
-    Object.values(plans).some((plan) => plan.post.url === url),
-  );
-}
-
-export function planPost(
-  kind: Exclude<PlanKind, "trip">,
-  id: SampleCityId,
-): PlanPost {
-  return (kind === "date" ? DATE_NIGHTS : WEEKENDS)[id]!.post;
 }
 
 /** The cities a plan is written for, so the city step offers only those. */

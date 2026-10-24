@@ -1,6 +1,7 @@
 import { internal } from "../_generated/api";
 import { env, type ActionCtx } from "../_generated/server";
-import { parseRevenueCatSnapshot } from "./revenuecat";
+import { isDevDeployment } from "./deployment";
+import { grantedByTestStore, parseRevenueCatSnapshot } from "./revenuecat";
 
 export async function reconcileRevenueCatCustomers(
   ctx: ActionCtx,
@@ -14,6 +15,7 @@ export async function reconcileRevenueCatCustomers(
   if (owners.length === 0) return;
   const apiKey = env.REVENUECAT_API_KEY;
   if (!apiKey) throw new Error("RevenueCat API key not configured");
+  const entitlement = env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro";
   const snapshots = [];
   for (const userId of owners) {
     const response = await fetch(
@@ -25,11 +27,9 @@ export async function reconcileRevenueCatCustomers(
     );
     if (!response.ok) throw new Error("RevenueCat customer lookup failed");
     const body: unknown = await response.json();
-    const snapshot = parseRevenueCatSnapshot(
-      body,
-      env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro",
-    );
-    snapshots.push({ userId, ...snapshot });
+    // A Test Store purchase says nothing about paid access, so this customer's row stays as it is.
+    if (!isDevDeployment() && grantedByTestStore(body, entitlement)) continue;
+    snapshots.push({ userId, ...parseRevenueCatSnapshot(body, entitlement) });
   }
   await ctx.runMutation(internal.subscriptions.applySnapshots, {
     snapshots,

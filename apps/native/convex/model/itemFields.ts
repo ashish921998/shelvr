@@ -23,6 +23,10 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const placePinsValidator = v.array(
+  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+);
+
 export const postMediaValidator = v.object({
   kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
   imageUrl: v.string(),
@@ -110,4 +114,28 @@ export function normalizeCities(raw: readonly string[] | undefined): string[] {
     if (cities.length === MAX_ITEM_CITIES) break;
   }
   return cities;
+}
+
+export const MAX_ITEM_PLACES = 30;
+
+const MAX_PLACE_CHARS = 80;
+
+export function normalizePlaces(raw: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const places: string[] = [];
+  for (const entry of raw ?? []) {
+    const place = entry
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[.,;:!?]+$/, "")
+      .trim();
+    const key = place.toLowerCase();
+    if (place === "" || place.length > MAX_PLACE_CHARS || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    places.push(place);
+    if (places.length === MAX_ITEM_PLACES) break;
+  }
+  return places;
 }

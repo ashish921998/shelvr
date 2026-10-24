@@ -3,12 +3,10 @@ import { internal } from "./_generated/api";
 import {
   internalMutation,
   internalQuery,
-  mutation,
-  query,
   type QueryCtx,
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_SWEEP_PAGE,
@@ -85,7 +83,7 @@ export const revalidateEmbeddingBatch = internalQuery({
   },
 });
 
-export const getStatus = query({
+export const getStatus = authedQuery({
   args: {},
   returns: v.object({
     status: v.union(
@@ -96,7 +94,7 @@ export const getStatus = query({
     version: v.number(),
   }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await consentRow(ctx, userId);
     return {
       status:
@@ -108,11 +106,11 @@ export const getStatus = query({
   },
 });
 
-export const setConsent = mutation({
+export const setConsent = authedMutation({
   args: { granted: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await consentRow(ctx, userId);
     const values = {
       status: args.granted ? ("granted" as const) : ("declined" as const),

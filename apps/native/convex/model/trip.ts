@@ -1,6 +1,21 @@
 import { type Infer, v } from "convex/values";
-import { distanceKm, MAX_CITY_DISTANCE_KM, type LatLng } from "./appleMaps";
 import type { PlanPlace } from "./plan";
+
+// Geometry lives here, not beside the Apple Maps client, because the app
+// imports this module: anything it imports ships in the app bundle.
+const MAX_CITY_DISTANCE_KM = 80;
+
+export type LatLng = { lat: number; lng: number };
+
+export function distanceKm(a: LatLng, b: LatLng): number {
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 export const MIN_TRIP_DAYS = 1;
 export const MAX_TRIP_DAYS = 15;
@@ -28,6 +43,34 @@ export function tidyCity(city: string): string {
 
 export function cityKey(city: string): string {
   return tidyCity(city).toLowerCase();
+}
+
+export function countCities(
+  items: { cities?: string[] }[],
+): { city: string; count: number }[] {
+  const counts = new Map<
+    string,
+    { count: number; spellings: Map<string, number> }
+  >();
+  for (const item of items) {
+    const seen = new Set<string>();
+    for (const city of item.cities ?? []) {
+      const key = cityKey(city);
+      if (key === "" || seen.has(key)) continue;
+      seen.add(key);
+      const entry = counts.get(key) ?? { count: 0, spellings: new Map() };
+      const spelling = tidyCity(city);
+      entry.count++;
+      entry.spellings.set(spelling, (entry.spellings.get(spelling) ?? 0) + 1);
+      counts.set(key, entry);
+    }
+  }
+  return [...counts.values()]
+    .map(({ count, spellings }) => ({
+      city: [...spellings].sort((a, b) => b[1] - a[1])[0][0],
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export const TRIP_SLOTS = [

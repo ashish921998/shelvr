@@ -1,12 +1,12 @@
 import {
-  SAFE_ERROR_MESSAGES,
   posthog,
   resetIfIdentified as resetClientIfIdentified,
+  safeExceptionValue,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
-import type { Goal } from "@/lib/onboarding-goals";
+import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
 import Constants from "expo-constants";
 
@@ -80,6 +80,7 @@ export type AnalyticsEventProperties = {
     duration_ms: number;
   };
   onboarding_opener_page_viewed: { page_index: number };
+  onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
     method: AuthMethod;
@@ -190,6 +191,8 @@ export type AnalyticsEventProperties = {
     made: boolean;
   };
   trip_failed: { reason: "ai_consent" | "error" };
+  city_opened: { count: number };
+  city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };
@@ -199,6 +202,9 @@ export type AnalyticsEventProperties = {
     travel_vibes: string[];
     sample_city: SampleCityId | null;
     goal: Goal | null;
+    goals: Goal[];
+    saved_count: SavedCount | null;
+    planner: Planner | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
@@ -245,7 +251,7 @@ export type AnalyticsEventProperties = {
   trial_reminder_permission: { granted: boolean };
   trial_reminder_primer: { outcome: "accepted" | "declined" };
   welcome_save_shown: { trial: boolean };
-  welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
+  welcome_save_action: { action: "explore" | "dismiss"; trial: boolean };
   notification_permission_result: {
     outcome: "granted" | "provisional" | "denied";
   };
@@ -311,10 +317,16 @@ function captureError(
 
   try {
     const original = error instanceof Error ? error : new Error(typeof error);
+    const message =
+      error instanceof Error
+        ? (safeExceptionValue(error.message) ??
+          safeExceptionValue((error as { code?: unknown }).code) ??
+          error.name)
+        : original.message;
     const reported =
-      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+      message === original.message
         ? original
-        : Object.assign(new Error(original.name), {
+        : Object.assign(new Error(message), {
             name: original.name,
             stack: original.stack,
           });

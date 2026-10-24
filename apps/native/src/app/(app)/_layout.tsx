@@ -11,7 +11,6 @@ import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
-import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import {
   useAwaitingOnboardingPurchase,
   useReplayOnboarding,
@@ -129,35 +128,15 @@ function AppStack() {
             }}
           />
           <Stack.Screen
-            name="digest/[id]"
-            options={{
-              title: t("notifications.weeklyShelf"),
-              headerBackButtonDisplayMode: "minimal",
-              headerBackVisible: true,
-              headerLeft: ({ canGoBack }) =>
-                canGoBack ? null : (
-                  <HeaderIconButton
-                    icon="house.fill"
-                    label={t("digest.backHome")}
-                    onPress={() => router.replace("/(app)/(tabs)/(home)")}
-                  />
-                ),
-            }}
-          />
-          <Stack.Screen
-            name="space/[id]"
-            options={{
-              scrollEdgeEffects: { top: "soft" },
-              title: "",
-              headerBackButtonDisplayMode: "minimal",
-            }}
-          />
-          <Stack.Screen
             name="plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
             name="trip/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
+            name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
         </Stack.Protected>
@@ -193,34 +172,6 @@ function AppStack() {
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
             }
-          />
-          <Stack.Screen
-            name="new-space"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-          <Stack.Screen
-            name="manage-spaces"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-          <Stack.Screen
-            name="camera"
-            options={{
-              presentation: "fullScreenModal",
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">

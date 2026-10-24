@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { goalFlow } from "./onboarding-goals";
 import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
+  nextOnboardingStep,
   previousOnboardingStep,
   restoreOnboardingStep,
+  type OnboardingStep,
 } from "./onboarding-steps";
 
 describe("restoreOnboardingStep", () => {
@@ -25,24 +26,30 @@ describe("restoreOnboardingStep", () => {
 
 describe("previousOnboardingStep", () => {
   it.each([
-    ["travel", "goal", "opener"],
-    ["travel", "city", "goal"],
-    ["food", "share", "city"],
-    ["other", "interests", "goal"],
-    ["other", "share", "interests"],
-  ] as const)(
-    "in the %s flow goes back from %s to %s",
-    (goal, step, expected) => {
-      expect(previousOnboardingStep(step, goalFlow(goal))).toBe(expected);
-    },
-  );
+    ["savedCount", "opener"],
+    ["goal", "savedCount"],
+    ["planner", "goal"],
+    ["city", "planner"],
+    ["ahaShare", "city"],
+    ["ahaSpots", "ahaShare"],
+    ["ahaPlan", "ahaSpots"],
+  ] as const)("goes back from %s to %s", (step, expected) => {
+    expect(previousOnboardingStep(step)).toBe(expected);
+  });
 
-  it.each(["opener", "tripBuild", "tripReveal", "promise"] as const)(
-    "leaves %s without a step to go back to, so the sample is never rebuilt",
-    (step) => {
-      expect(previousOnboardingStep(step, goalFlow("date"))).toBeNull();
-    },
-  );
+  it("leaves the opener without a step to go back to", () => {
+    expect(previousOnboardingStep("opener")).toBeNull();
+  });
+});
+
+describe("nextOnboardingStep", () => {
+  it("walks the questions, the city and the sample, and stays on the sample plan", () => {
+    const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
+    while (walked.length < ONBOARDING_STEPS.length)
+      walked.push(nextOnboardingStep(walked[walked.length - 1]));
+    expect(walked).toEqual([...ONBOARDING_STEPS]);
+    expect(nextOnboardingStep("ahaPlan")).toBe("ahaPlan");
+  });
 });
 
 describe("ONBOARDING_STEP_IDS", () => {

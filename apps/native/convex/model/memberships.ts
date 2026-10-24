@@ -1,3 +1,4 @@
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
@@ -199,6 +200,18 @@ export async function insertMembership(
   return id;
 }
 
+/** A place steered onto a save through this space may be its only source; recheck its pins. */
+async function refreshPinsFor(
+  ctx: MutationCtx,
+  row: Doc<"spaceItems">,
+): Promise<void> {
+  if ((row.intents ?? []).some((intent) => intent.kind === "open_maps")) {
+    await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+      itemId: row.itemId,
+    });
+  }
+}
+
 export async function setMembershipStatus(
   ctx: MutationCtx,
   row: Doc<"spaceItems">,
@@ -209,6 +222,7 @@ export async function setMembershipStatus(
     await ctx.db.patch(row._id, { status });
   } else {
     await ctx.db.patch(row._id, { status, intents: undefined });
+    await refreshPinsFor(ctx, row);
   }
   await applyTransition(ctx, row.spaceId, row.itemId, from, status);
 }
@@ -218,6 +232,7 @@ export async function deleteMembership(
   row: Doc<"spaceItems">,
 ): Promise<void> {
   await ctx.db.delete(row._id);
+  await refreshPinsFor(ctx, row);
   await applyTransition(
     ctx,
     row.spaceId,
@@ -251,6 +266,7 @@ export async function deleteMembershipsForSpace(
     .take(limit + 1);
   for (const join of joins.slice(0, limit)) {
     await ctx.db.delete(join._id);
+    await refreshPinsFor(ctx, join);
   }
   return joins.length > limit;
 }

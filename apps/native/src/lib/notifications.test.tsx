@@ -28,6 +28,8 @@ const mock = vi.hoisted(() => ({
   appState: null as null | ((state: string) => void),
   tapped: null as null | ((response: unknown) => void),
   rotated: null as null | ((token: { type: string; data: string }) => void),
+  secure: new Map<string, string>(),
+  permission: vi.fn(async () => "granted"),
 }));
 vi.mock("@/lib/i18n", () => ({
   currentLocale: () => mock.locale,
@@ -39,7 +41,10 @@ vi.mock("expo-localization", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
 }));
-vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
+vi.mock("./notification-token", () => ({
+  getExpoPushToken: mock.token,
+  notificationPermissionState: mock.permission,
+}));
 vi.mock("@/lib/first-save-reminder", () => ({
   clearFirstSaveReminder: mock.clearFirstSave,
 }));
@@ -75,6 +80,8 @@ vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("expo-secure-store", () => ({
   getItemAsync: async () => "[]",
   setItemAsync: vi.fn(),
+  getItem: (key: string) => mock.secure.get(key) ?? null,
+  setItem: (key: string, value: string) => mock.secure.set(key, value),
 }));
 vi.mock("react-native", () => ({
   Platform: { OS: "android" },
@@ -118,6 +125,8 @@ beforeEach(() => {
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
+  mock.secure.clear();
+  mock.permission.mockReset().mockResolvedValue("granted");
 });
 
 function renderSession() {
@@ -187,6 +196,26 @@ describe("notification session lifecycle", () => {
       expect(mock.clearFirstSave).toHaveBeenCalled();
     },
   );
+  it("turns on the weekly shelf onboarding queued, once the session has started", async () => {
+    mock.secure.set("shelvr.pending.weeklyShelf", "1");
+    renderSession();
+    await waitFor(() =>
+      expect(mock.otherMutation).toHaveBeenCalledWith(
+        expect.objectContaining({ weeklyShelfEnabled: true }),
+      ),
+    );
+    expect(mock.secure.get("shelvr.pending.weeklyShelf")).toBe("");
+    expect(mock.captureError).not.toHaveBeenCalled();
+  });
+  it("leaves the weekly shelf alone when onboarding queued nothing", async () => {
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    expect(mock.otherMutation).not.toHaveBeenCalledWith(
+      expect.objectContaining({ weeklyShelfEnabled: true }),
+    );
+  });
   it("turning save reminders off also clears the first-save reminder", async () => {
     const { result } = renderSession();
     await waitFor(() =>
@@ -348,7 +377,7 @@ describe("notification opens", () => {
       notification_kind: "weekly_shelf",
       notification_id: "abc",
     });
-    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+    expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
   it("holds a tap while the plan loads, in the queue deep links share", () => {
@@ -375,7 +404,7 @@ describe("notification opens", () => {
       notification_kind: "unknown",
       notification_id: "",
     });
-    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+    expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
   it("handles a tap once, however often the observer remounts", () => {

@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 const firstShareKey = (userId: string) => `shelvr.firstShareSaved.${userId}`;
 
-export const weeklyNudge = oncePerAccount("weeklyNudge");
+const weeklyNudge = oncePerAccount("weeklyNudge");
 
 export function recordShareSaved(userId: string): void {
   SecureStore.setItem(firstShareKey(userId), "1");
@@ -50,14 +50,4 @@ export function isSaveProgressCardDismissed(userId: string): boolean {
 
 export function dismissSaveProgressCard(userId: string): void {
   SecureStore.setItem(progressCardKey(userId), "1");
-}
-
-export function shouldShowHowTo({
-  firstShareSaved,
-  itemCount,
-}: {
-  firstShareSaved: boolean;
-  itemCount: number;
-}): boolean {
-  return !firstShareSaved && itemCount <= 1;
 }

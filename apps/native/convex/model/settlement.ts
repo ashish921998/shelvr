@@ -8,6 +8,7 @@ import {
 import {
   articleMediaValidator,
   enrichmentValidator,
+  failureReasonValidator,
   intentValidator,
   postMediaValidator,
   recipeValidator,
@@ -36,6 +37,8 @@ const classificationValidator = v.object({
   tags: v.array(v.string()),
   intents: v.optional(v.array(intentValidator)),
   cities: v.optional(v.array(v.string())),
+  places: v.optional(v.array(v.string())),
+  placesHeard: v.optional(v.boolean()),
   recipe: v.optional(recipeValidator),
   embedding: v.optional(
     v.object({ text: v.string(), vector: v.array(v.float64()) }),
@@ -61,6 +64,8 @@ type Words = {
   tags: string[];
   intents: Doc<"items">["intents"];
   cities: string[] | undefined;
+  places: string[] | undefined;
+  placesHeard: boolean | undefined;
   recipe: Recipe | undefined;
 };
 
@@ -76,6 +81,8 @@ function readingWords(item: Doc<"items">, reading: Reading): Words {
     tags: item.tags,
     intents: item.intents ?? [],
     cities: item.cities,
+    places: item.places,
+    placesHeard: item.placesHeard,
     recipe: reading.recipe ?? item.recipe,
   };
 }
@@ -90,6 +97,8 @@ function classifiedWords(
     tags: classification.tags,
     intents: classification.intents,
     cities: classification.cities,
+    places: classification.places,
+    placesHeard: classification.placesHeard,
     recipe: reading.recipe ?? classification.recipe,
   };
 }
@@ -175,6 +184,10 @@ export function completionPatch(
     aspectRatio: reading.aspectRatio,
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
+    ...(words.places !== undefined ? { places: words.places } : {}),
+    ...(words.placesHeard !== undefined
+      ? { placesHeard: words.placesHeard }
+      : {}),
     status: "ready",
     enrichment: reading.enrichment,
     failureReason: undefined,
@@ -188,4 +201,17 @@ export function completionPatch(
     }),
     ...embeddingPatch(item, run, aiAllowed),
   };
+}
+
+/**
+ * A failed run writes only how it ended; the save keeps what earlier runs gave it.
+ * Null once the run has settled the save ready: a later step's error is not the save's.
+ */
+export function failurePatch(
+  item: Doc<"items">,
+  reason: Infer<typeof failureReasonValidator>,
+): ItemPatch | null {
+  return item.status === "ready"
+    ? null
+    : { status: "failed", failureReason: reason };
 }

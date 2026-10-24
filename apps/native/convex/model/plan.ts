@@ -2,6 +2,8 @@ import { type Infer, v } from "convex/values";
 
 export const MAX_PLAN_ITEMS = 60;
 export const MAX_PLAN_PLACES = 5;
+/** The model offers twice the shortlist, so places already visited can drop out and five fresh ones remain. */
+export const MAX_PLAN_CANDIDATES = MAX_PLAN_PLACES * 2;
 export const PLAN_CONTENT_CHARS = 600;
 const MAX_NAME_CHARS = 80;
 export const MAX_AREA_CHARS = 60;
@@ -274,7 +276,7 @@ function withoutAddress(name: string, evidence: Evidence): string {
   return short !== "" && namesPlace(short, evidence) ? short : name;
 }
 
-/** Keeps deduped picks that point at a real save naming the place; places in `been` go last, tagged. */
+/** Keeps deduped picks that point at a real save naming the place; places in `been` are left out unless nothing else is left, then kept tagged. */
 export function sanitizePicks<T extends RawPlanPlace>(
   raw: T[],
   sources: PlanSource[],
@@ -307,10 +309,8 @@ export function sanitizePicks<T extends RawPlanPlace>(
       },
     });
   }
-  return [
-    ...kept.filter(({ place }) => !place.been),
-    ...kept.filter(({ place }) => place.been),
-  ].slice(0, limit);
+  const fresh = kept.filter(({ place }) => !place.been);
+  return (fresh.length > 0 ? fresh : kept).slice(0, limit);
 }
 
 export function sanitizePlan(

@@ -1,6 +1,6 @@
 ---
 name: verify-shelvr
-description: Launch, check, drive, and prove the Shelvr iOS app (apps/native development build on the iOS simulator) with the e2e suite in tools/e2e. Use before claiming a change to saving, search, spaces, or the paywall works on a device, when asked to verify or screenshot the app, or to bug bash it.
+description: Launch, check, drive, and prove the Shelvr iOS app (apps/native development build on the iOS simulator) with the e2e suite in tools/e2e. Use before claiming a change to saving a link, Home's cities, or the paywall works on a device, when asked to verify or screenshot the app, or to bug bash it.
 ---
 
 # Verify Shelvr
@@ -27,41 +27,34 @@ nothing is started by hand. Before a run:
   simulator that has `app.shelvr.save.dev`; boot one only when none is booted.
   A simulator or a Metro on 8081 from another project is not yours: leave it.
   `E2E_DEVICE=<name or udid>` picks the simulator when more than one is booted.
-- **Screen size.** `save-image.e2e.ts` taps the photo picker by position and
-  stops unless the screen is 402 x 874 points (iPhone 17). The other flows run
-  on any iPhone.
 - **Port.** 8091 by default; `E2E_METRO_PORT` moves it. A Metro already on the
   port makes the run fail to start its own.
 - **Env.** `apps/native/.env.local` copied from the main checkout, pointing at
   the dev Convex deployment, with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true`.
   The dev deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
   `GOOGLE_GENERATIVE_AI_API_KEY` (an AI Studio key, never committed) is needed
-  by `save-link` and `save-image`, which call the model from the test, and by
-  `save-note`, whose note is searchable only after the backend's model pass.
-  The `e2e ios` CI job runs `save-note` with no key: its local backend sets
-  `E2E_FAKE_AI=local-v1`, and the fake in `convex/model/fakeAi.ts` classifies
-  the note instead. It also runs `save-link-fixture`, which saves a fixture
-  page the fake serves (`https://fixtures.e2e.invalid/...`), and
-  `space-suggestions`, whose new space gets the seeded save that shares a word
-  with its name. Both skip themselves unless the runner has
-  `E2E_FAKE_AI=local-v1`. The fake refuses every
+  by `save-link`, which saves a real page. The `e2e ios` CI job runs with no
+  key: its local backend sets `E2E_FAKE_AI=local-v1`, and the fake in
+  `convex/model/fakeAi.ts` serves a fixture page
+  (`https://fixtures.e2e.invalid/...`) for `save-link-fixture`, which skips
+  itself unless the runner has `E2E_FAKE_AI=local-v1`. The fake refuses every
   deployment but a local one.
 - **Data.** Every test's `beforeEach` (`startOnSeededHome` in
   `tests/seeded-home.ts`) signs in as the anonymous dev user and taps Settings >
-  "Reset flow fixtures": 4 saves (`fixture-item-ramen`, `-belem-tower`,
-  `-apartment-checklist`, `-value-of-craft`), 3 spaces, and Pro. That wipes the
+  "Reset flow fixtures": a set of saves that group into cities
+  (a Lisbon card is one), and Pro. That wipes the
   dev user's data, so never point it at an account you care about. The CI job
   sets `E2E_FIXTURE_RESET=backend`, which resets through
   `npx convex run devFixtures:resetAnonymousUsersForE2e` instead; that mutation
   refuses any backend but the local fake-model one, so leave it unset locally.
   `tests/onboarding.e2e.ts` does not start on the seeded Home: it launches
-  with `-E2EFreshInstall YES` and starts from "Start yours".
+  with `-E2EFreshInstall YES` and starts from "Get started".
 
 ## Doctor
 
 ```bash
 pnpm exec e2e list                          # loads the config, starts nothing; exit 0, one line per test file
-pnpm exec e2e run tests/smoke.e2e.ts        # Metro up, app opens, dev sign-in, fixture reset, Home lists the ramen save; exit 0
+pnpm exec e2e run tests/home-cities.e2e.ts  # Metro up, app opens, dev sign-in, fixture reset, Home lists "Your cities" with a Lisbon card; exit 0
 ```
 
 `list` failing is the config or a dependency (`pnpm install` from the
@@ -71,10 +64,10 @@ Debug dev client (local-qa.md, "Confirm the bundle is yours"). No
 `dev-login-button` means the build is not the development variant or
 `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` is not `true` in `.env.local`
 (`src/lib/anonymous-auth.ts`). A button that shows but never signs in is
-`AUTH_ENABLE_ANONYMOUS` missing on the dev deployment. The smoke test needs no model. Run Doctor first whenever anything
+`AUTH_ENABLE_ANONYMOUS` missing on the dev deployment. The home-cities test needs no model. Run Doctor first whenever anything
 looks off.
 
-Taps that can be lost (Home's `Add` and `Profile`, Spaces' `New space`) go
+Taps that can be lost (Home's `Add` and `Profile`) go
 through `tapUntilVisible` in `tests/seeded-home.ts`: it taps again only when
 the result has not appeared after a wait an accepted tap never needs. Each tap
 is its own step in `.e2e/report.json`, so count them there: more than one tap
@@ -85,13 +78,12 @@ fails is a failure to explain, not a flake to rerun away.
 
 Scripted, the normal lane: each core feature has a test under `tests/`
 (see [features/](features/README.md)). Write new ones the same way:
-`startOnSeededHome()` at the top, `chooseAddOption` to open an Add option,
+`startOnSeededHome()` at the top, `openAddSheet` to open the Add sheet,
 plain `screen` locators, and `agent.waitFor` with `vision: "only"` only where
-the model writes the label (a link's or photo's title). Stable handles in this
-app: test ids `add-option-note`, `add-option-article`, `add-note-input`,
-`add-article-input`, `fixture-item-*`, `dev-login-button`,
-`reset-flow-fixtures`; tabs by role (`Search`, `Spaces`); the `Profile` and
-`Add` buttons on Home.
+the model writes the label (a link's title). Stable handles in this
+app: test ids `add-article-input`, `dev-login-button`, `reset-flow-fixtures`;
+the city cards on Home (buttons named `<City>, ...`); the `Profile` and `Add`
+buttons on Home. There is no tab bar.
 
 Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for
 your client with `--config tools/e2e/e2e.config.ts` (topic `mcp`), then
@@ -112,11 +104,11 @@ that touches UI files still needs a screenshot or recording embedded in its
 description (`tools/verify-pr-evidence.mjs`): upload it there, quote the run's
 summary lines beside it, then delete the local copy.
 
-A proof goes through the user's path: Home's Add, the tab bar, the labelled
+A proof goes through the user's path: Home's Add, the city cards, the labelled
 fields and buttons, never a Convex function called directly. It captures the
 action and the state after it. Side effects live in the dev Convex deployment
 (`items`, `spaces`, `spaceItems`), and the flows read them back through the app:
-a saved note is found by Search, a new space shows in the Spaces list. Nothing
+a saved link shows under its city or under "No place found". Nothing
 is mocked; link reads and titles go through the real backend and model.
 
 ## Bug bash

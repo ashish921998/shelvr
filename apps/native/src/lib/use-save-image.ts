@@ -30,7 +30,7 @@ export type LocalImage = {
   longitude?: number;
 };
 
-export type ImageSaveRequest = {
+type ImageSaveRequest = {
   image: LocalImage;
   operationId?: string;
 };

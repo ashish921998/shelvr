@@ -10,8 +10,6 @@ import {
 import { planAsCity, planCity, type PlanKind } from "@/lib/sample-plans";
 import type { TextMessageKey } from "@/locales/message-types";
 
-export { isSampleCity };
-
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
 
 export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
@@ -251,7 +249,7 @@ export function sampleTrip(city?: string | null): SampleTrip {
   return samplePlan("trip", city);
 }
 
-export type NumberedStop = {
+type NumberedStop = {
   stop: SampleStop;
   day: number;
   number: number;
@@ -263,38 +261,4 @@ export function sampleStops(trip: SampleTrip): NumberedStop[] {
       day.stops.map((stop) => ({ stop, day: dayIndex })),
     )
     .map((entry, index) => ({ ...entry, number: index + 1 }));
-}
-
-export type SampleRow =
-  | { kind: "day"; day: number; title: TextMessageKey; places: number }
-  | { kind: "stop"; entry: NumberedStop };
-
-export function sampleRows(trip: SampleTrip): SampleRow[] {
-  const stops = sampleStops(trip);
-  return trip.days.flatMap(({ title, stops: places }, day) => [
-    { kind: "day" as const, day, title, places: places.length },
-    ...stops
-      .filter((entry) => entry.day === day)
-      .map((entry) => ({ kind: "stop" as const, entry })),
-  ]);
-}
-
-export const EVENING_AFTER = ["walk", "drinks", "dessert"] as const;
-export type EveningAfter = (typeof EVENING_AFTER)[number];
-
-export const isEveningAfter = (value: unknown): value is EveningAfter =>
-  EVENING_AFTER.some((after) => after === value);
-
-/** A date night cut to dinner and the one stop picked for after it; other plans pass through. */
-export function eveningWith(trip: SampleTrip, after: EveningAfter): SampleTrip {
-  if (trip.kind !== "date") return trip;
-  return {
-    ...trip,
-    days: trip.days.map((day) => ({
-      ...day,
-      stops: day.stops.filter(
-        (stop) => stop.slot === "dinner" || stop.slot === after,
-      ),
-    })),
-  };
 }

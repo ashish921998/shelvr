@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { pageMetadata } from "@/lib/siteMetadata";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — Shelvr",
-  description: "How Shelvr collects, uses, and protects your data.",
-};
+export const metadata: Metadata = pageMetadata(
+  "/privacy",
+  "Privacy Policy — Shelvr",
+  "How Shelvr collects, uses, and protects your data.",
+);
 
 export default function PrivacyPage() {
   return (
@@ -42,8 +44,7 @@ export default function PrivacyPage() {
             save, including URLs, note text, extracted page content, titles,
             descriptions, tags, and space assignments, are stored in our backend
             (Convex) so they sync to your devices. Images are only imported when
-            you capture them or pick them from your camera or photo library
-            (including Tidy).
+            you capture them or pick them from your camera or photo library.
           </li>
           <li>
             <strong>Photo metadata.</strong> When you import a photo, EXIF
