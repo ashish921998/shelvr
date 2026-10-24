@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { closeScreen, type ClosingScreen } from "./screen-dismiss";
+import { backOrHome, closeScreen, type ClosingScreen } from "./screen-dismiss";
 
 type Listener = (e: { data?: { closing?: boolean } }) => void;
 
@@ -57,4 +57,18 @@ it("gives up when the closing event never comes", async () => {
   await vi.advanceTimersByTimeAsync(2500);
   expect(resolved).toHaveBeenCalledOnce();
   expect(listeners.size).toBe(0);
+});
+
+it("goes back when a screen lies beneath", () => {
+  const router = { canGoBack: () => true, back: vi.fn(), replace: vi.fn() };
+  backOrHome(router);
+  expect(router.back).toHaveBeenCalledOnce();
+  expect(router.replace).not.toHaveBeenCalled();
+});
+
+it("opens Home when the screen was opened on its own", () => {
+  const router = { canGoBack: () => false, back: vi.fn(), replace: vi.fn() };
+  backOrHome(router);
+  expect(router.back).not.toHaveBeenCalled();
+  expect(router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
 });

@@ -8,7 +8,11 @@ import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
 import { useAppearanceMode } from "@/lib/appearance-runtime";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { manageSubscription } from "@/lib/manage-subscription";
-import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
+import {
+  backOrHome,
+  closeScreen,
+  type ClosingScreen,
+} from "@/lib/screen-dismiss";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useNotificationSession } from "@/lib/notifications";
@@ -36,13 +40,7 @@ export default function ProfileScreen() {
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
 
-  const closeProfile = () => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    router.replace("/(app)/(tabs)/(home)");
-  };
+  const closeProfile = () => backOrHome(router);
 
   const proLabel =
     status === "trialing"
@@ -89,18 +87,14 @@ export default function ProfileScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
-      {process.env.EXPO_OS === "android" ? (
-        <View style={styles.sheetHeader}>
-          <Wordmark size={30} />
-          <HeaderIconButton
-            icon="xmark"
-            label={t("profile.close")}
-            onPress={closeProfile}
-          />
-        </View>
-      ) : (
+      <View style={styles.sheetHeader}>
         <Wordmark size={30} />
-      )}
+        <HeaderIconButton
+          icon="xmark"
+          label={t("profile.close")}
+          onPress={closeProfile}
+        />
+      </View>
       <Text style={styles.slogan}>{t("brand.tagline")}</Text>
 
       <View style={styles.card}>

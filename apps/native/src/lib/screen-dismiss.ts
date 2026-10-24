@@ -32,3 +32,18 @@ export function closeScreen(
     close();
   });
 }
+
+type BackRouter = {
+  canGoBack: () => boolean;
+  back: () => void;
+  replace: (href: "/(app)/(tabs)/(home)") => void;
+};
+
+/** Goes back, or Home when the screen opened with nothing beneath it (a link, widget or notification). */
+export function backOrHome(router: BackRouter): void {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+  router.replace("/(app)/(tabs)/(home)");
+}

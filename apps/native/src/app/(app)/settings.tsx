@@ -11,7 +11,11 @@ import { useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
-import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
+import {
+  backOrHome,
+  closeScreen,
+  type ClosingScreen,
+} from "@/lib/screen-dismiss";
 import { useNotificationSession } from "@/lib/notifications";
 import { useNotificationPermission } from "@/lib/use-notification-permission";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
@@ -24,7 +28,6 @@ import { useState } from "react";
 import {
   Alert,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -68,13 +71,7 @@ export default function SettingsScreen() {
   );
   const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
 
-  const close = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(app)/(tabs)/(home)");
-    }
-  };
+  const close = () => backOrHome(router);
 
   const closeAllSheets = () => {
     const profileIsRoot = navigation.getState().routes[0]?.name === "profile";
@@ -212,13 +209,11 @@ export default function SettingsScreen() {
         <Text accessibilityRole="header" style={styles.title}>
           {t("profile.settings")}
         </Text>
-        {Platform.OS === "android" ? (
-          <HeaderIconButton
-            icon="xmark"
-            label={t("common.close")}
-            onPress={close}
-          />
-        ) : null}
+        <HeaderIconButton
+          icon="xmark"
+          label={t("common.close")}
+          onPress={close}
+        />
       </View>
 
       <SettingCard

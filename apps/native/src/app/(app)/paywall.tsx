@@ -1,7 +1,11 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { openPaywall } from "@/lib/entitlement";
 import { LEGAL_URLS } from "@/lib/legal";
-import { closeScreen, type ClosingScreen } from "@/lib/screen-dismiss";
+import {
+  backOrHome,
+  closeScreen,
+  type ClosingScreen,
+} from "@/lib/screen-dismiss";
 import { useNavigation, useRouter } from "expo-router";
 import { Linking, Pressable, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,7 +23,7 @@ export default function PaywallScreen() {
         style={({ pressed }) => [styles.button, pressed && { opacity: 0.8 }]}
         onPress={() => {
           void (async () => {
-            await closeScreen(navigation, () => router.back());
+            await closeScreen(navigation, () => backOrHome(router));
             await openPaywall(router, "retry");
           })();
         }}
@@ -28,7 +32,7 @@ export default function PaywallScreen() {
       </Pressable>
       <Pressable
         style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
-        onPress={() => router.back()}
+        onPress={() => backOrHome(router)}
       >
         <Text style={styles.secondaryText}>{t("common.notNow")}</Text>
       </Pressable>
