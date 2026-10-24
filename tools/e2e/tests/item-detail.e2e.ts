@@ -12,6 +12,8 @@ startOnSeededHome();
 test("opens a note and keeps an edit to its text", async ({ screen }) => {
   const card = screen.getByTestId("fixture-item-apartment-checklist");
   const text = screen.getByRole("textbox", "Note text");
+  // The card starts under the floating tab bar, which refuses a tap on it.
+  await screen.swipe({ direction: "down" });
   await tapUntilVisible(card, text, { waitMs: 5000, timeout: 60_000 });
   await expect(text).toHaveValue("Lamp, shelves, linen, and a reading chair.");
 
