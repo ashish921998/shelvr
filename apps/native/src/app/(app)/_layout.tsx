@@ -1,5 +1,3 @@
-import { AiConsentCard } from "@/components/ai-consent";
-import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
@@ -24,40 +22,10 @@ import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
 import { useEffect } from "react";
-import { Platform, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { Platform } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 
 export default function AppLayout() {
-  useAppLocale();
-  const { onboarded } = useOnboarding();
-  const consent = useAiConsent();
-  const { asking } = consent;
-
-  if (onboarded && consent.savesBlocked) {
-    return asking ? (
-      <AiConsentCard />
-    ) : (
-      <ScreenLoader label={t("loading.app")} />
-    );
-  }
-
-  return (
-    <>
-      <AppStack />
-      {asking ? (
-        <View style={styles.cover}>
-          <AiConsentCard />
-        </View>
-      ) : null}
-    </>
-  );
-}
-
-const styles = StyleSheet.create({
-  cover: { ...StyleSheet.absoluteFillObject },
-});
-
-function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();

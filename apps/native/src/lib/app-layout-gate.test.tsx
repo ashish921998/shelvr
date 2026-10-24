@@ -7,7 +7,6 @@ import AppLayout from "@/app/(app)/_layout";
 const mocks = vi.hoisted(() => ({
   onboarded: true,
   status: "unset",
-  grantOnItsWay: false,
   entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
@@ -16,16 +15,6 @@ const mocks = vi.hoisted(() => ({
 }));
 const nothing = vi.hoisted(() => () => null);
 
-vi.mock("@/lib/ai-consent", () => ({
-  useAiConsent: () => ({
-    status: mocks.status,
-    savesBlocked: mocks.status === "loading" || mocks.status === "unset",
-    asking: mocks.status === "unset" && !mocks.grantOnItsWay,
-  }),
-}));
-vi.mock("@/components/ai-consent", () => ({
-  AiConsentCard: vi.fn(() => <div>consent-card</div>),
-}));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: mocks.onboarded }),
 }));
@@ -116,63 +105,13 @@ beforeEach(() => {
   mocks.entitlement = { entitled: true, loading: false };
 });
 
-it.each(["unset", "loading"] as const)(
-  "mounts no save screen or self-saving hook for an existing user whose answer is %s",
-  (status) => {
-    mocks.status = status;
-    render(<AppLayout />);
-    expect(shows("app-stack")).toBe(false);
-    expect(mocks.replay).not.toHaveBeenCalled();
-    expect(mocks.resumeShare).not.toHaveBeenCalled();
-    expect(shows("consent-card")).toBe(status === "unset");
-    expect(shows("loader")).toBe(status === "loading");
-  },
-);
-
-it("opens the app once the answer lands, whichever it was", () => {
-  const { rerender } = render(<AppLayout />);
-  for (const status of ["granted", "declined"]) {
-    mocks.status = status;
-    rerender(<AppLayout />);
-    expect(shows("app-stack")).toBe(true);
-    expect(shows("consent-card")).toBe(false);
-  }
-});
-
-it("keeps onboarding mounted under the card, so the flow keeps its place", () => {
-  mocks.onboarded = false;
+it("opens the app for an account that has not answered the AI question", () => {
   render(<AppLayout />);
   expect(shows("app-stack")).toBe(true);
-  expect(shows("consent-card")).toBe(true);
-});
-
-it("shows a signed-out user no card", () => {
-  mocks.status = "signed-out";
-  mocks.onboarded = false;
-  render(<AppLayout />);
-  expect(shows("app-stack")).toBe(true);
-  expect(shows("consent-card")).toBe(false);
-});
-
-it("shows no card while the yes given at sign-in is being recorded", () => {
-  mocks.status = "unset";
-  mocks.grantOnItsWay = true;
-  mocks.onboarded = true;
-  try {
-    render(<AppLayout />);
-    expect(shows("consent-card")).toBe(false);
-    expect(shows("app-stack")).toBe(false);
-    expect(shows("loader")).toBe(true);
-  } finally {
-    mocks.grantOnItsWay = false;
-  }
+  expect(mocks.replay).toHaveBeenCalled();
 });
 
 describe("plan gate", () => {
-  beforeEach(() => {
-    mocks.status = "granted";
-  });
-
   it("shows only the plan gate, Profile, Settings and the paywall without a plan", () => {
     mocks.entitlement = { entitled: false, loading: false };
     render(<AppLayout />);
