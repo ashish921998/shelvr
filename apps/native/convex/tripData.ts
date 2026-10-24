@@ -28,6 +28,7 @@ import {
 } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
+import { readyCitySaves } from "./items";
 
 const MAX_CITY_CHARS = 80;
 
@@ -60,6 +61,22 @@ export async function loadReadySaves(
   return saves;
 }
 
+type PlanSave = { item: Doc<"items">; join?: Doc<"spaceItems"> };
+
+/** A plan's saves: the city's as its page lists them, newest first; without a city, the space's. */
+export async function planSaves(
+  ctx: QueryCtx,
+  spaceId: Id<"spaces">,
+  userId: string,
+  city: string | undefined,
+): Promise<PlanSave[]> {
+  if (city === undefined || cityKey(city) === "") {
+    return await loadReadySaves(ctx, spaceId, userId);
+  }
+  const items = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
+  return items.map((item) => ({ item }));
+}
+
 export async function claimSpaceForModel(
   ctx: MutationCtx,
   spaceId: Id<"spaces">,
@@ -90,7 +107,7 @@ export async function beenPlaces(
 
 export function toPlanSource(
   item: Doc<"items">,
-  join: Doc<"spaceItems">,
+  join?: Doc<"spaceItems">,
 ): PlanSource {
   return {
     itemId: item._id,
@@ -105,7 +122,7 @@ export function toPlanSource(
     siteName: item.siteName,
     author: item.author,
     places: [
-      ...[...(item.intents ?? []), ...(join.intents ?? [])]
+      ...[...(item.intents ?? []), ...(join?.intents ?? [])]
         .filter((intent) => intent.kind === "open_maps")
         .map((intent) => intent.value),
       ...(item.places ?? []),

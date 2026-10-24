@@ -30,7 +30,7 @@ function mapsNames(intents: Doc<"items">["intents"]): string[] {
     .map((intent) => intent.value.trim());
 }
 
-/** Distinct place names by key, the save's own intents first, then every space's. */
+/** Distinct place names by key: the places read off the save, its Maps intents, then every space's. */
 async function wantedPlaces(
   ctx: QueryCtx,
   item: Doc<"items">,
@@ -40,6 +40,7 @@ async function wantedPlaces(
     .withIndex("by_item", (q) => q.eq("itemId", item._id))
     .collect();
   const names = [
+    ...(item.places ?? []),
     ...mapsNames(item.intents),
     ...joins
       .filter((join) => effectiveStatus(join) !== "dismissed")

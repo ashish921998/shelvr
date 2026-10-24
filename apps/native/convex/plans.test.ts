@@ -22,6 +22,9 @@ type Save = {
   itemStatus?: "ready" | "processing";
   maps?: string;
   spaceMaps?: string;
+  cities?: string[];
+  /** False leaves the save out of the space. */
+  member?: boolean;
 };
 
 async function setup(
@@ -64,10 +67,15 @@ async function setup(
         url: "https://www.tiktok.com/@someone/video/1",
         tags: [],
         searchText: save.title,
+        cities: save.cities,
         intents: save.maps
           ? [{ kind: "open_maps", label: "Open in Maps", value: save.maps }]
           : undefined,
       });
+      if (save.member === false) {
+        itemIds.push(itemId);
+        continue;
+      }
       await ctx.db.insert("spaceItems", {
         userId,
         spaceId,
@@ -100,6 +108,32 @@ beforeEach(() => {
 });
 
 describe("makePlan", () => {
+  it("plans the city's saves, not the space's, when opened from a city", async () => {
+    const { t, spaceId } = await setup([
+      { title: "Lisbon tasca", cities: ["Lisbon"], member: false },
+      { title: "Paris bistro", cities: ["Paris"] },
+      { title: "Graça rooftop", cities: ["lisbon"], status: "dismissed" },
+    ]);
+    generateObject.mockResolvedValue({ object: { places: [] } });
+
+    const plan = await t.action(api.plans.makePlan, {
+      spaceId,
+      city: "Lisbon",
+    });
+
+    expect(plan.considered).toBe(2);
+    expect(promptOf()).toContain("Lisbon tasca");
+    expect(promptOf()).toContain("Graça rooftop");
+    expect(promptOf()).not.toContain("Paris bistro");
+  });
+
+  it("asks for twice the shortlist, so visited places can drop out", async () => {
+    const { t, spaceId } = await setup([{ title: "Somewhere" }]);
+    generateObject.mockResolvedValue({ object: { places: [] } });
+    await t.action(api.plans.makePlan, { spaceId });
+    expect(promptOf()).toContain("pick the 10 best");
+  });
+
   it("returns the model's places that a save actually names", async () => {
     const { t, spaceId, itemIds } = await setup([
       { title: "Best vodka pasta in SoHo", content: "Go to Balthazar tonight" },

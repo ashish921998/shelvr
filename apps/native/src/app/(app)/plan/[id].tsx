@@ -246,7 +246,8 @@ function PlanFooter({
 
 export default function PlanScreen() {
   const locale = useAppLocale();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `city` is set when a city page opened this plan, so it plans that city's saves.
+  const { id, city } = useLocalSearchParams<{ id: string; city?: string }>();
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -260,6 +261,7 @@ export default function PlanScreen() {
     spaceId,
     locale,
     linkFailed ? null : latestLink,
+    city,
   );
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];

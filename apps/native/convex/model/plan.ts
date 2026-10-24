@@ -2,6 +2,8 @@ import { type Infer, v } from "convex/values";
 
 export const MAX_PLAN_ITEMS = 60;
 export const MAX_PLAN_PLACES = 5;
+/** The model offers twice the shortlist, so places already visited can drop out and five fresh ones remain. */
+export const MAX_PLAN_CANDIDATES = MAX_PLAN_PLACES * 2;
 export const PLAN_CONTENT_CHARS = 600;
 const MAX_NAME_CHARS = 80;
 export const MAX_AREA_CHARS = 60;
