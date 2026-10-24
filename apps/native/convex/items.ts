@@ -42,6 +42,7 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
   recipeValidator,
@@ -137,6 +138,7 @@ const itemFields = {
   capturedAt: v.optional(v.number()),
   latitude: v.optional(v.number()),
   longitude: v.optional(v.number()),
+  placePins: v.optional(placePinsValidator),
   isSticker: v.optional(v.boolean()),
   tags: v.array(v.string()),
   content: v.optional(v.string()),
@@ -2042,7 +2044,18 @@ export const finalizeItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
+    const patch = completionPatch(item, args, allowed);
+    await ctx.db.patch(args.itemId, patch);
+    if (
+      allowed &&
+      ((patch.places?.length ?? 0) > 0 ||
+        patch.intents?.some((i) => i.kind === "open_maps") ||
+        (item.placePins?.length ?? 0) > 0)
+    ) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     const { storageId, enrichment } = args.reading;
     if (
       storageId !== undefined &&

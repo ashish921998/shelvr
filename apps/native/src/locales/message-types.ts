@@ -65,6 +65,7 @@ export type MessageParams = {
   "capture.title": undefined;
   "common.back": undefined;
   "capture.linkPlaceholder": undefined;
+  "capture.linkHint": undefined;
   "capture.notePlaceholder": undefined;
   "item.note": undefined;
   "item.article": undefined;
@@ -667,6 +668,11 @@ export type MessageParams = {
   "goal.citySomewhere": undefined;
   "goal.citySearch": undefined;
   "homePlaces.yourCities": undefined;
+  "homePlaces.citiesHint": undefined;
+  "homePlaces.noPlaceTitle": undefined;
+  "homePlaces.noPlaceReading": undefined;
+  "homePlaces.noPlaceFailed": undefined;
+  "homePlaces.noPlaceNone": undefined;
   "homePlaces.spotCount": { count: number };
   "homePlaces.moreCities": { n: string };
   "homePlaces.yourSpaces": undefined;
@@ -680,6 +686,7 @@ export type MessageParams = {
   "homePlaces.planDateHint": undefined;
   "homePlaces.planTrip": undefined;
   "homePlaces.planTripHint": undefined;
+  "cityMap.placesFromSaves": { count: number };
   "opener.tagline": undefined;
   "onboardingQ.skip": undefined;
   "onboardingQ.savedTitle": undefined;

@@ -196,7 +196,7 @@ describe("plan gate", () => {
     mocks.entitlement = { entitled: false, loading: true };
     render(<AppLayout />);
     expect(shows("screen:item/[id]")).toBe(true);
-    expect(shows("screen:digest/[id]")).toBe(true);
+    expect(shows("screen:city/[name]")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
     expect(shows("plan-loading-cover")).toBe(true);
     expect(shows("screen:camera")).toBe(false);

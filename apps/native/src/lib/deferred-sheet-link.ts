@@ -1,4 +1,4 @@
-const SHEETS = new Set(["/add", "/camera", "/new-space", "/manage-spaces"]);
+const SHEETS = new Set(["/add"]);
 
 type PendingLink = { route: string; sheet: boolean };
 

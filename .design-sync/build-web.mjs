@@ -43,9 +43,51 @@ const babel = createRequire(join(NATIVE, 'package.json'))('@babel/core');
 // (its REPLACE_WITH_UNISTYLES_PATHS), which is what styles Animated.View.
 const APP_BABEL_FILTER =
   /([\\/]apps[\\/]native[\\/]src[\\/].*\.[jt]sx?|[\\/]react-native-reanimated[\\/]lib[\\/]module[\\/]component[\\/][^\\/]+\.js)$/;
+// The still StitchMark copies these from stitch-mark.tsx. Fail by name when one
+// can no longer be read, rather than drawing a mark that has drifted.
+function stitchMarkSpec(src) {
+  // MARK_BOX values are sums such as `224 - 24`: digits, spaces, + and - only.
+  const arith = (expr) => [...expr.matchAll(/([+-]?)\s*(\d+)/g)].reduce((t, [, op, n]) => t + (op === '-' ? -n : +n), 0);
+  const box = /MARK_BOX = \{ origin: ([\d +-]+), size: ([\d +-]+) \}/.exec(src);
+  const dash = /intervals=\{\[(\d+), (\d+)\]\}/.exec(src);
+  const spec = {
+    path: /MARK_PATH =\s*"([^"]+)"/.exec(src)?.[1],
+    origin: box && arith(box[1]),
+    size: box && arith(box[2]),
+    strokeWidth: /strokeWidth=\{(\d+)\}/.exec(src)?.[1],
+    cap: /strokeCap="(\w+)"/.exec(src)?.[1],
+    dash: dash && `${dash[1]} ${dash[2]}`,
+  };
+  const missing = Object.keys(spec).filter((k) => spec[k] == null || Number.isNaN(spec[k]));
+  if (missing.length) {
+    console.error(`build-web: could not read ${missing.join(', ')} from components/ui/stitch-mark.tsx; update stitchMarkSpec`);
+    process.exit(1);
+  }
+  return spec;
+}
+
 const appBabel = {
   name: 'app-babel',
   setup(b) {
+    // StitchMark (ScreenLoader's mark) draws with Skia, which on web needs the
+    // CanvasKit wasm loaded first. A design gets the same mark as a still SVG,
+    // sewn: no animation. Registered before the babel onLoad below, because
+    // esbuild takes the first onLoad that matches.
+    b.onLoad({ filter: /[\\/]components[\\/]ui[\\/]stitch-mark\.tsx$/ }, (args) => {
+      const m = stitchMarkSpec(readFileSync(args.path, 'utf8'));
+      return {
+        contents: `import { createElement } from 'react';
+const MARK_PATH = ${JSON.stringify(m.path)};
+export function StitchMark({ size = 64 }) {
+  return createElement('svg', { width: size, height: size, viewBox: '${m.origin} ${m.origin} ${m.size} ${m.size}' },
+    createElement('path', { d: MARK_PATH, style: { fill: 'var(--colors-primary-soft)' } }),
+    createElement('path', { d: MARK_PATH, fill: 'none', strokeWidth: ${m.strokeWidth}, strokeLinecap: '${m.cap}',
+      strokeDasharray: '${m.dash}', style: { stroke: 'var(--colors-primary)' } }));
+}`,
+        loader: 'js',
+        resolveDir: dirname(args.path),
+      };
+    });
     b.onLoad({ filter: APP_BABEL_FILTER }, async (args) => {
       const out = await babel.transformAsync(await readFile(args.path, 'utf8'), {
         filename: args.path,
@@ -84,7 +126,13 @@ const webGaps = {
     // loader and, under __DEV__, its fast-refresh, HMR and message sockets.
     // There is no Metro server behind a design, so the sockets only log
     // connection errors.
-    b.onLoad({ filter: /[\\/]expo[\\/]src[\\/]async-require[\\/](index|setup)\.ts$/ }, () => ({
+    b.onLoad({ filter: /[\\/]expo[\\/](?:src|build)[\\/]async-require[\\/](index|setup)\.[jt]s$/ }, () => ({
+      contents: '',
+      loader: 'js',
+    }));
+    // SDK 58's expo-modules-core ships ts-declarations/global.js with value imports
+    // of names its sibling files only declare as types.
+    b.onLoad({ filter: /[\\/]expo-modules-core[\\/]build[\\/]ts-declarations[\\/]global\.js$/ }, () => ({
       contents: '',
       loader: 'js',
     }));
@@ -94,10 +142,15 @@ const webGaps = {
     b.onResolve({ filter: /^react-native-unistyles\/components\/native\/[A-Za-z]+$/ }, (args) => ({
       path: join(UNISTYLES_NATIVE, `${args.path.split('/').pop()}.js`),
     }));
-    // expo-symbols imports PlatformColor (Android-only call site); react-native-web
-    // doesn't export it, and esbuild rejects the missing named import.
+    // expo-symbols imports PlatformColor (Android-only call site), and since SDK 58
+    // expo-asset and expo-image import AssetRegistry; react-native-web exports
+    // neither, and esbuild rejects the missing named import. The registry is
+    // @react-native/assets-registry's two functions.
     b.onLoad({ filter: /react-native-web[\\/]dist[\\/]index\.js$/ }, async (args) => ({
-      contents: `${await readFile(args.path, 'utf8')}\nexport const PlatformColor = (...names) => names[0];\n`,
+      contents:
+        `${await readFile(args.path, 'utf8')}\nexport const PlatformColor = (...names) => names[0];\n` +
+        'const assets = [];\n' +
+        'export const AssetRegistry = { registerAsset: (a) => assets.push(a), getAssetByID: (id) => assets[id - 1] };\n',
       loader: 'js',
       resolveDir: dirname(args.path),
     }));

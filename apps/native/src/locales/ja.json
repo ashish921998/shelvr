@@ -66,6 +66,7 @@
   "capture.title": "何かを保存",
   "common.back": "戻る",
   "capture.linkPlaceholder": "リンクを貼り付けるか入力…",
+  "capture.linkHint": "場所が出てくるリール、TikTok、ページ。Shelvrが都市ごとに整理します。",
   "capture.notePlaceholder": "メモを書く…",
   "item.note": "メモ",
   "item.article": "リンク",
@@ -704,6 +705,11 @@
   "goal.citySomewhere": "その他の場所",
   "goal.citySearch": "都市を検索",
   "homePlaces.yourCities": "あなたの都市",
+  "homePlaces.citiesHint": "保存したリールやTikTokに出てくる場所",
+  "homePlaces.noPlaceTitle": "場所が見つからない保存",
+  "homePlaces.noPlaceReading": "読み込み中…",
+  "homePlaces.noPlaceFailed": "読み込めませんでした",
+  "homePlaces.noPlaceNone": "場所の記載がありません",
   "homePlaces.spotCount": {
     "other": "%{formattedCount}スポット"
   },
@@ -719,6 +725,9 @@
   "homePlaces.planDateHint": "ある夜、いくつかのスポット",
   "homePlaces.planTrip": "旅行を計画",
   "homePlaces.planTripHint": "日ごとに",
+  "cityMap.placesFromSaves": {
+    "other": "保存からの%{formattedCount}か所"
+  },
   "opener.tagline": "スポットを保存しよう。デートも旅行もプランはおまかせ。",
   "onboardingQ.skip": "スキップ",
   "onboardingQ.savedTitle": "これまでにいくつのスポットを保存しましたか？",

@@ -1,22 +1,16 @@
 import { CityCover } from "@/components/city/city-cover";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
-import {
-  type City,
-  spacesWithoutCities,
-  visibleCities,
-} from "@/lib/home-places";
+import { type City, unplacedSaves, visibleCities } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-const CITY_HEIGHT = 120;
+const CITY_HEIGHT = 150;
 
 function CityGrid({ cities }: { cities: City[] }) {
   const router = useRouter();
@@ -60,63 +54,66 @@ function CityGrid({ cities }: { cities: City[] }) {
   );
 }
 
-type SpaceEntry = {
-  _id: Id<"spaces">;
-  name: string;
-  itemCount: number;
-  previews: { url: string }[];
+const MAX_UNPLACED_ROWS = 5;
+
+type UnplacedSave = {
+  _id: string;
+  status: "processing" | "ready" | "failed";
+  cities?: string[];
+  title?: string;
+  url?: string;
 };
 
-function SpaceRow({ space }: { space: SpaceEntry }) {
-  const router = useRouter();
-  const thumb = space.previews[0]?.url;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={space.name}
-      onPress={() =>
-        router.push({ pathname: "/space/[id]", params: { id: space._id } })
-      }
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-    >
-      {thumb ? (
-        <Image
-          source={{ uri: thumb }}
-          style={styles.thumb}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={styles.thumb} />
-      )}
-      <View style={styles.rowText}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
-          {space.name}
-        </Text>
-        <Text style={styles.muted}>
-          {t("spaces.saveCount", { count: space.itemCount })}
-        </Text>
-      </View>
-    </Pressable>
-  );
+function unplacedLabel(save: UnplacedSave): string {
+  if (save.status === "processing") return t("homePlaces.noPlaceReading");
+  if (save.status === "failed") return t("homePlaces.noPlaceFailed");
+  return t("homePlaces.noPlaceNone");
 }
 
-function SpaceList({ spaces }: { spaces: SpaceEntry[] }) {
+/** Saves no city card shows, so nothing shared disappears; each opens its save to retry or delete. */
+export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
+  useAppLocale();
   const router = useRouter();
-  if (spaces.length === 0) return null;
+  const [expanded, setExpanded] = useState(false);
+  const all = unplacedSaves(saves);
+  const unplaced = expanded ? all : all.slice(0, MAX_UNPLACED_ROWS);
+  const hidden = all.length - unplaced.length;
+  if (all.length === 0) return null;
   return (
-    <View style={styles.section}>
-      <Text style={styles.label}>{t("homePlaces.yourSpaces")}</Text>
-      {spaces.map((space) => (
-        <SpaceRow key={space._id} space={space} />
+    <View style={styles.unplaced}>
+      <Text style={styles.sectionLabel}>{t("homePlaces.noPlaceTitle")}</Text>
+      {unplaced.map((save) => (
+        <Pressable
+          key={save._id}
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/item/[id]",
+              params: { id: save._id, from: "home" },
+            })
+          }
+          style={({ pressed }) => [
+            styles.unplacedRow,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.unplacedTitle} numberOfLines={1}>
+            {save.title ?? save.url ?? ""}
+          </Text>
+          <Text style={styles.muted}>{unplacedLabel(save)}</Text>
+        </Pressable>
       ))}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("homePlaces.seeAll")}
-        onPress={() => router.push("/(app)/(tabs)/(spaces)")}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        <Text style={styles.seeAll}>{t("homePlaces.seeAll")}</Text>
-      </Pressable>
+      {hidden > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setExpanded(true)}
+          style={({ pressed }) => [styles.showAll, pressed && styles.pressed]}
+        >
+          <Text style={styles.moreLabel}>
+            {t("homePlaces.moreCities", { n: String(hidden) })}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -147,42 +144,32 @@ export function HomePlaces() {
   const cities = useQuery(
     convexQuery(api.items.listCities, entitled ? {} : "skip"),
   );
-  const spaces = useQuery(
-    convexQuery(api.spaces.listSpaces, entitled ? {} : "skip"),
-  );
-  if (!entitled || cities.data === undefined || spaces.data === undefined) {
-    return null;
+  if (!entitled || cities.data === undefined) return null;
+  if (cities.data.length === 0) {
+    return (
+      <View style={styles.container}>
+        <HomePlacesEmptyCard />
+      </View>
+    );
   }
-  const otherSpaces = spacesWithoutCities(spaces.data, cities.data);
-  if (cities.data.length === 0 && otherSpaces.length === 0) return null;
   return (
     <View style={styles.container}>
-      {cities.data.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.label}>{t("homePlaces.yourCities")}</Text>
-          <CityGrid cities={cities.data} />
-        </View>
-      ) : null}
-      <SpaceList spaces={otherSpaces} />
+      <Text style={styles.title}>{t("homePlaces.yourCities")}</Text>
+      <Text style={styles.muted}>{t("homePlaces.citiesHint")}</Text>
+      <CityGrid cities={cities.data} />
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: {
-    gap: theme.gap(2.5),
+    gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(1.5),
   },
-  section: { gap: theme.gap(1.5) },
-  label: {
-    ...theme.type.labelStrong,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.faint,
-  },
+  title: { ...theme.type.title, color: theme.colors.foreground },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: theme.gap(1.5) },
-  cell: { width: "47.5%", flexGrow: 1 },
+  cell: { width: "100%" },
   pressed: { opacity: theme.opacity.pressed },
   more: {
     height: CITY_HEIGHT,
@@ -193,18 +180,30 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surfaceMuted,
   },
   moreLabel: { ...theme.type.subheadStrong, color: theme.colors.foreground },
-  row: { flexDirection: "row", alignItems: "center", gap: theme.gap(1.5) },
-  thumb: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  rowText: { flex: 1, gap: theme.gap(0.25) },
-  rowTitle: { ...theme.type.subheadStrong, color: theme.colors.foreground },
+
   muted: { ...theme.type.footnote, color: theme.colors.muted },
-  seeAll: { ...theme.type.subheadLabel, color: theme.colors.primaryText },
+  unplaced: {
+    gap: theme.gap(0.5),
+    paddingHorizontal: theme.gap(2),
+    paddingTop: theme.gap(2),
+  },
+  sectionLabel: {
+    ...theme.type.labelStrong,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.faint,
+  },
+  unplacedRow: {
+    gap: theme.gap(0.25),
+    paddingVertical: theme.gap(1),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  showAll: { paddingVertical: theme.gap(1.25) },
+  unplacedTitle: {
+    ...theme.type.subheadStrong,
+    color: theme.colors.foreground,
+  },
   card: {
     gap: theme.gap(1.5),
     padding: theme.gap(2),

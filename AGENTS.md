@@ -31,19 +31,19 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   so search for the hook name, not the filename. Subfolders exist only for
   `src/lib/share` and `src/lib/splash`.
 - **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
-  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
-  `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.
+  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
   `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
   The server side is `convex/subscriptions.ts`.
-- **Home feed:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`);
-  cards in `src/components/item-card.tsx` and `src/components/home`.
+- **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
+  cities list and "No place found" section are in `src/components/home`
+  (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`.
+  the Add sheet (`src/app/(app)/add.tsx`) takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.

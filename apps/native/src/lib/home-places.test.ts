@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { spacesWithoutCities, visibleCities } from "@/lib/home-places";
+import { unplacedSaves, visibleCities } from "@/lib/home-places";
 
 const city = (name: string, count = 1) => ({
   city: name,
@@ -26,25 +26,20 @@ describe("visibleCities", () => {
   });
 });
 
-describe("spacesWithoutCities", () => {
-  it("drops a space named like a city, ignoring case and inner spacing", () => {
-    const spaces = [
-      { name: " lisbon " },
-      { name: "new  york" },
-      { name: "Recipes" },
-      { name: "Porto" },
+describe("unplacedSaves", () => {
+  it("keeps saves still reading, failed, or ready without a city", () => {
+    const saves = [
+      { _id: "a", status: "ready" as const, cities: ["Lisbon"] },
+      { _id: "b", status: "ready" as const, cities: [] },
+      { _id: "c", status: "ready" as const },
+      { _id: "d", status: "processing" as const },
+      { _id: "e", status: "failed" as const, cities: ["Porto"] },
     ];
-    expect(
-      spacesWithoutCities(spaces, [
-        city("Lisbon"),
-        city("PORTO"),
-        city("New York"),
-      ]),
-    ).toEqual([{ name: "Recipes" }]);
-  });
-
-  it("keeps at most six", () => {
-    const spaces = Array.from({ length: 9 }, (_, i) => ({ name: `S${i}` }));
-    expect(spacesWithoutCities(spaces, [])).toHaveLength(6);
+    expect(unplacedSaves(saves).map((s) => s._id)).toEqual([
+      "b",
+      "c",
+      "d",
+      "e",
+    ]);
   });
 });

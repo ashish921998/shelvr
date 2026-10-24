@@ -70,15 +70,6 @@ describe("redirectSystemPath", () => {
     expect(markPendingShareOnDevice).toHaveBeenCalledOnce();
   });
 
-  it.each(["shelvr:///", "shelvr-dev:///"])(
-    "opens Home for the app root %s",
-    (path) => {
-      expect(redirectSystemPath({ path, initial: false })).toBe(
-        "/(app)/(tabs)/(home)",
-      );
-    },
-  );
-
   it("leaves unrelated deep links untouched", () => {
     const path = "shelvr:///add";
     expect(redirectSystemPath({ path, initial: false })).toBe(path);

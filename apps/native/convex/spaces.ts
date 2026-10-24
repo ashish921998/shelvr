@@ -37,7 +37,7 @@ import {
   beenPlaces,
   claimSpaceForModel,
   deleteTripsForSpace,
-  loadReadySaves,
+  planSaves,
   toPlanSource,
 } from "./tripData";
 
@@ -765,7 +765,7 @@ export const survivingCandidates = internalQuery({
 });
 
 export const claimPlanInternal = internalMutation({
-  args: { spaceId: v.id("spaces") },
+  args: { spaceId: v.id("spaces"), city: v.optional(v.string()) },
   returns: v.object({
     spaceName: v.string(),
     sources: v.array(planSourceValidator),
@@ -773,7 +773,7 @@ export const claimPlanInternal = internalMutation({
   }),
   handler: async (ctx, args) => {
     const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
-    const sources = (await loadReadySaves(ctx, args.spaceId, userId)).map(
+    const sources = (await planSaves(ctx, args.spaceId, userId, args.city)).map(
       ({ item, join }) => toPlanSource(item, join),
     );
     if (sources.length === 0) {
@@ -847,7 +847,13 @@ export const setMembershipIntentsInternal = internalMutation({
     if (!(await aiAllowed(ctx, row.userId))) {
       return null;
     }
+    const hadPlace = (row.intents ?? []).some((i) => i.kind === "open_maps");
     await ctx.db.patch(row._id, { intents: args.intents });
+    if (hadPlace || args.intents.some((i) => i.kind === "open_maps")) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     return null;
   },
 });
