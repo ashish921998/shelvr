@@ -35,11 +35,13 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
   `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
-  `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
+  `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
 - **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
   cities list and "No place found" section are in `src/components/home`
-  (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`.
+  (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`, with its
+  map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
+  Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
@@ -71,8 +73,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
-- **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
-  and `convex/model/pageReadCore.ts` (about 550). Embedding and recommendation actions
+- **Large files:** `convex/items.ts` (about 2,500 lines), `convex/ai.ts` (about 1,400)
+  and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro

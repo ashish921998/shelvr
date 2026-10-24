@@ -53,7 +53,7 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
   distinguishes a post-purchase retry from a later independent visit. The
   memory is one action deep (a new block replaces it), and a resume is only
   reported where a `usePaywallGuard` backs the placement: a screen-level gate
-  (Map) blocks through its Pro gate CTA, and no guard runs there after
+  (Map, in builds that still have it) blocks through its Pro gate CTA, and no guard runs there after
   the purchase, so those placements report requests and outcomes but never a
   resume.
 - Purchase and restore outcomes add `product_id` when RevenueCat returns the
