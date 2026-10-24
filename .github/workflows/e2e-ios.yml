@@ -70,10 +70,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 90
     # The flows split over two runners, each with its own simulator and
-    # backend, balanced on run 39919713009 (2026-10-23): about 12 minutes of
-    # flows each (a 732 s, b 731 s) when create-space passes first time. A
-    # create-space retry adds about 5.5 minutes to shard a. One shard failing
-    # does not stop the other.
+    # backend. The split is the one main runs green. Onboarding must follow
+    # item-detail on shard a: run 40075893390 moved it up to follow
+    # create-space and two onboarding tests failed on a duplicate "Kampa Park"
+    # and a missing paywall sheet. One shard failing does not stop the other.
     # A shard runs its files in name order. Onboarding stays behind
     # create-space, as on a single runner: as the first flow on a fresh
     # simulator it lost the driver twice ("Daemon request timed out").
@@ -84,14 +84,14 @@ jobs:
           - name: a
             tests: >-
               tests/create-space.e2e.ts
+              tests/item-detail.e2e.ts
               tests/onboarding.e2e.ts
-              tests/save-note.e2e.ts
-              tests/search.e2e.ts
+              tests/paywall.e2e.ts
           - name: b
             tests: >-
-              tests/item-detail.e2e.ts
-              tests/paywall.e2e.ts
               tests/save-link-fixture.e2e.ts
+              tests/save-note.e2e.ts
+              tests/search.e2e.ts
               tests/search-no-results.e2e.ts
               tests/space-suggestions.e2e.ts
     steps:
