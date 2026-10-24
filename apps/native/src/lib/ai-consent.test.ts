@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { markAiDisclosedAtSignIn, useAiConsent } from "./ai-consent";
+import { useAiConsent } from "./ai-consent";
 
 const mocks = vi.hoisted(() => ({
   authenticated: true,
@@ -62,72 +62,6 @@ it("asks with the card when someone already signed in has not answered", () => {
   const { result } = renderHook(() => useAiConsent());
   expect(result.current.asking).toBe(true);
   expect(mocks.setConsent).not.toHaveBeenCalled();
-});
-
-it("records a yes, with no card, for someone who just signed in past the disclosure", async () => {
-  mocks.setConsent.mockResolvedValue(null);
-  markAiDisclosedAtSignIn();
-  mocks.data = { status: "unset", version: 1 };
-  const { result, rerender } = renderHook(() => useAiConsent());
-  expect(result.current.asking).toBe(false);
-  expect(result.current.savesBlocked).toBe(true);
-  await vi.waitFor(() =>
-    expect(mocks.capture).toHaveBeenCalledWith("ai_consent_answered", {
-      granted: true,
-      surface: "sign_in",
-    }),
-  );
-  expect(mocks.setConsent).toHaveBeenCalledExactlyOnceWith({ granted: true });
-
-  mocks.data = { status: "granted", version: 1 };
-  rerender();
-  mocks.data = { status: "unset", version: 1 };
-  rerender();
-  expect(result.current.asking).toBe(true);
-});
-
-it("writes the sign-in yes once when two screens watch for it", async () => {
-  let recorded: (value: null) => void = () => {};
-  mocks.setConsent.mockReturnValue(
-    new Promise<null>((resolve) => {
-      recorded = resolve;
-    }),
-  );
-  markAiDisclosedAtSignIn();
-  mocks.data = { status: "unset", version: 1 };
-  renderHook(() => useAiConsent());
-  renderHook(() => useAiConsent());
-  expect(mocks.setConsent).toHaveBeenCalledTimes(1);
-
-  recorded(null);
-  await vi.waitFor(() => expect(mocks.capture).toHaveBeenCalledTimes(1));
-});
-
-it("shows the card on every screen when the sign-in yes could not be saved", async () => {
-  mocks.setConsent.mockRejectedValue(new Error("offline"));
-  markAiDisclosedAtSignIn();
-  mocks.data = { status: "unset", version: 1 };
-  renderHook(() => useAiConsent());
-  const layout = renderHook(() => useAiConsent());
-  expect(layout.result.current.asking).toBe(false);
-
-  await vi.waitFor(() => expect(layout.result.current.asking).toBe(true));
-  expect(mocks.setConsent).toHaveBeenCalledTimes(1);
-});
-
-it("never overrides a no: signing in again keeps AI off", () => {
-  markAiDisclosedAtSignIn();
-  mocks.data = { status: "declined", version: 1 };
-  renderHook(() => useAiConsent());
-  expect(mocks.setConsent).not.toHaveBeenCalled();
-});
-
-it("falls back to the card when the yes could not be recorded", async () => {
-  mocks.setConsent.mockRejectedValue(new Error("offline"));
-  markAiDisclosedAtSignIn();
-  mocks.data = { status: "unset", version: 1 };
-  const { result } = renderHook(() => useAiConsent());
-  await vi.waitFor(() => expect(result.current.asking).toBe(true));
 });
 
 it.each([

@@ -644,7 +644,6 @@ export type MessageParams = {
   "aiConsent.setting": undefined;
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
-  "aiConsent.signInNote": undefined;
   "updates.title": undefined;
   "updates.check": undefined;
   "updates.checking": undefined;

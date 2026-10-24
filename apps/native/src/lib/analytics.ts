@@ -262,7 +262,7 @@ export type AnalyticsEventProperties = {
   ai_consent_shown: Record<string, never>;
   ai_consent_answered: {
     granted: boolean;
-    surface: "card" | "settings" | "sign_in";
+    surface: "card" | "settings";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;

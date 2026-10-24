@@ -681,7 +681,6 @@
   "aiConsent.setting": "AI によるタイトル、タグ、提案",
   "aiConsent.settingHelp": "保存した内容を Google の Gemini AI に送信します。オフの場合、保存にはページ自体のタイトルだけが残ります。",
   "aiConsent.findLinksOff": "リンクを検索するには「設定」で AI をオンにしてください。",
-  "aiConsent.signInNote": "Shelvr は Google の Gemini AI を使って、保存した内容にタイトルを付けて整理します。続けると、これを許可したことになります。設定でいつでもオフにできます。",
   "updates.title": "アプリのアップデート",
   "updates.check": "アップデートを確認",
   "updates.checking": "確認中…",
