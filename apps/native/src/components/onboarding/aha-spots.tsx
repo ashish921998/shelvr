@@ -66,9 +66,9 @@ export function AhaSpotsStep({
             {t("aha.cityPlaces", { city })}
           </Text>
           <Text style={styles.credit}>
-            {sample.creator === null
-              ? t("aha.shelvrExample")
-              : t("aha.fromReel", { handle: sample.creator })}
+            {sample.source === "reel"
+              ? t("aha.fromReel", { handle: sample.creator })
+              : t("aha.shelvrExample")}
           </Text>
         </View>
         {/* With large text the rows scroll, after the map has given up its room. */}
@@ -86,11 +86,13 @@ export function AhaSpotsStep({
               <PinBadge number={index + 1} day={0} />
               <View style={styles.spotText}>
                 <Text style={styles.spotName}>{spot.name}</Text>
-                {spot.quote === null ? null : (
+                {sample.source === "example" ? (
                   <Text style={styles.quote}>
-                    {t("aha.quoted", { quote: t(spot.quote) })}
+                    {t("aha.quoted", {
+                      quote: t(sample.spots[index].quote),
+                    })}
                   </Text>
-                )}
+                ) : null}
               </View>
             </Animated.View>
           ))}

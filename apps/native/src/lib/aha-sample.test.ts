@@ -37,12 +37,11 @@ describe("ahaSample", () => {
   it("credits no one on Shelvr's own example, and gives it our caption and a line per spot", () => {
     const sample = ahaSample("date", "prague");
     expect(sample).toMatchObject({
-      creator: null,
-      videoCode: null,
+      source: "example",
       caption: "aha.captionDate",
-      firstSaveUrl: null,
     });
-    expect(sample.spots.every((spot) => spot.quote !== null)).toBe(true);
+    expect(sample).not.toHaveProperty("creator");
+    expect(sample.spots.every((spot) => "quote" in spot)).toBe(true);
   });
 
   it.each(reels.map((entry) => [entry.kind, entry.city, entry]))(
@@ -50,12 +49,13 @@ describe("ahaSample", () => {
     (kind, city, { reel }) => {
       const sample = ahaSample(kind, city);
       expect(sample).toMatchObject({
+        source: "reel",
         creator: `@${reel.handle}`,
         videoCode: reel.code,
-        caption: null,
         firstSaveUrl: ahaReelUrl(reel),
       });
-      expect(sample.spots.every((spot) => spot.quote === null)).toBe(true);
+      expect(sample).not.toHaveProperty("caption");
+      expect(sample.spots.some((spot) => "quote" in spot)).toBe(false);
       expect(sample.spots.map((spot) => spot.name)).toEqual(
         reel.places.slice(0, AHA_SPOTS).map(([, name]) => name),
       );

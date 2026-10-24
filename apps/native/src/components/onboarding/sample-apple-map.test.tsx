@@ -105,6 +105,19 @@ describe("SampleAppleMap", () => {
     expect(latitude).toBeGreaterThan(mid);
   });
 
+  it("leaves the first camera to cameraPosition instead of moving there at mount", () => {
+    render(<SampleAppleMap trip={TRIP} visible={1} />);
+    measure(402, 340);
+    expect(mock.moves).toEqual([]);
+  });
+
+  it("keeps the camera still while the pins drop in", () => {
+    const { rerender } = render(<SampleAppleMap trip={TRIP} visible={1} />);
+    measure(402, 340);
+    rerender(<SampleAppleMap trip={TRIP} visible={3} />);
+    expect(mock.moves).toEqual([]);
+  });
+
   it("moves the camera when the map's size changes", () => {
     render(<SampleAppleMap trip={TRIP} />);
     measure(402, 170);

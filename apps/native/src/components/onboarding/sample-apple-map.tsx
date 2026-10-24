@@ -61,9 +61,14 @@ export function SampleAppleMap({
     );
   const cameraKey = JSON.stringify(camera);
 
-  // The map takes cameraPosition once, so a later size moves the camera itself.
+  // The map mounts at the first camera through cameraPosition and refuses a move there right away, so only a later size moves it.
+  const mounted = useRef(false);
   useEffect(() => {
     if (!camera) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     ref.current
       ?.setCameraPosition(camera)
       .catch((error: unknown) =>

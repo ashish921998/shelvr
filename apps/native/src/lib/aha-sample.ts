@@ -40,28 +40,31 @@ const CAPTIONS: Record<PlanKind, CaptionKey> = {
   weekend: "aha.captionWeekend",
 };
 
-type AhaSpot = {
-  name: string;
-  /** A line about the spot, only on Shelvr's own example: a real creator gets no words they did not say. */
-  quote: TextMessageKey | null;
-};
-
 /** What the onboarding reel shows, decided here so the screens only render it. */
 export type AhaSample = {
   kind: PlanKind;
   city: SampleCityId;
   /** The spots as one day on the city's map. */
   trip: SampleTrip;
-  spots: AhaSpot[];
-  /** The real reel's creator, as "@handle"; null on Shelvr's own example, which credits no one. */
-  creator: string | null;
-  /** The real reel to play over the photo, or null where only the photo shows. */
-  videoCode: string | null;
-  /** Our caption (takes the city's name), only on Shelvr's own example. */
-  caption: CaptionKey | null;
-  /** The real reel's link, queued as the first save once the account has Pro. */
-  firstSaveUrl: string | null;
-};
+} & (
+  | {
+      /** A real public reel, credited to its creator and queued as the first save once the account has Pro. */
+      source: "reel";
+      /** "@handle". */
+      creator: string;
+      videoCode: string;
+      firstSaveUrl: string;
+      /** Only the names: a real creator gets no words they did not say. */
+      spots: { name: string }[];
+    }
+  | {
+      /** Shelvr's own example over the city photo, credited to no one. */
+      source: "example";
+      /** Our caption, which takes the city's name. */
+      caption: CaptionKey;
+      spots: { name: string; quote: TextMessageKey }[];
+    }
+);
 
 const REEL_TRIPS = new Map<AhaReel, SampleTrip>();
 
@@ -98,18 +101,29 @@ export function ahaSample(
 ): AhaSample {
   const plan = samplePlan(kind, city);
   const reel = ahaReel(kind, plan.city);
-  const trip = reel === null ? exampleTrip(plan) : reelTrip(plan, reel);
+  if (reel === null) {
+    const trip = exampleTrip(plan);
+    return {
+      kind,
+      city: plan.city,
+      trip,
+      source: "example",
+      caption: CAPTIONS[kind],
+      spots: trip.days[0].stops.map((stop) => ({
+        name: stop.name,
+        quote: SLOT_QUOTES[stop.slot],
+      })),
+    };
+  }
+  const trip = reelTrip(plan, reel);
   return {
     kind,
     city: plan.city,
     trip,
-    spots: trip.days[0].stops.map((stop) => ({
-      name: stop.name,
-      quote: reel === null ? SLOT_QUOTES[stop.slot] : null,
-    })),
-    creator: reel === null ? null : `@${reel.handle}`,
-    videoCode: reel?.code ?? null,
-    caption: reel === null ? CAPTIONS[kind] : null,
-    firstSaveUrl: reel === null ? null : ahaReelUrl(reel),
+    source: "reel",
+    creator: `@${reel.handle}`,
+    videoCode: reel.code,
+    firstSaveUrl: ahaReelUrl(reel),
+    spots: trip.days[0].stops.map((stop) => ({ name: stop.name })),
   };
 }

@@ -28,18 +28,17 @@ export function AhaReel({
   onShare?: () => void;
   dimmed?: boolean;
 }) {
-  const caption =
-    sample.caption === null
-      ? null
-      : t(sample.caption, { city: t(SAMPLE_CITIES[sample.city].name) });
   const [playing, setPlaying] = useState(false);
+  const reel = sample.source === "reel";
+  const caption = reel
+    ? null
+    : t(sample.caption, { city: t(SAMPLE_CITIES[sample.city].name) });
   // A creator is named only over their own video, never over the city photo it falls back to.
-  const credit =
-    sample.creator === null
-      ? t("aha.shelvrExample")
-      : playing
-        ? sample.creator
-        : null;
+  const credit = !reel
+    ? t("aha.shelvrExample")
+    : playing
+      ? sample.creator
+      : null;
   return (
     <View style={styles.reel}>
       {/* The picture is one image to VoiceOver, apart from the Share button, which stays reachable. */}
@@ -48,7 +47,7 @@ export function AhaReel({
         accessible
         accessibilityRole="image"
         accessibilityLabel={
-          sample.creator === null
+          !reel
             ? `${credit}: ${caption}`
             : credit === null
               ? t("aha.sampleBadge")
@@ -60,9 +59,9 @@ export function AhaReel({
           contentFit="cover"
           style={StyleSheet.absoluteFill}
         />
-        {sample.videoCode === null ? null : (
+        {sample.source === "reel" ? (
           <ReelVideo reelCode={sample.videoCode} onPlaying={setPlaying} />
-        )}
+        ) : null}
         <View style={styles.scrim} />
       </View>
       {dimmed ? <View style={styles.dim} /> : null}
