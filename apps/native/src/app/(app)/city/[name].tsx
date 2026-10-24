@@ -10,7 +10,7 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -84,6 +84,13 @@ export default function CityScreen() {
     analytics.capture("city_opened", { count });
   }, [loaded, count]);
 
+  // Stable while the query data is, so the map keeps the camera the person moved.
+  const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
+  const numbers = useMemo(
+    () => numberSaves(items.data ?? [], pins),
+    [items.data, pins],
+  );
+
   if (items.isError) {
     return (
       <EmptyState
@@ -95,8 +102,6 @@ export default function CityScreen() {
   if (items.data === undefined) return <ScreenLoader />;
 
   const saves = items.data;
-  const pins = cityPins(saves);
-  const numbers = numberSaves(saves, pins);
   const mapHeight = rt.screen.height * MAP_SHARE;
 
   const select = (itemId: string) => {
