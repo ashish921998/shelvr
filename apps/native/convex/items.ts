@@ -277,17 +277,18 @@ async function readySavesNewestFirst(
   return rows;
 }
 
-/** The user's ready saves in one city, newest first, capped at CITY_ITEMS_MAX. */
+/** The user's ready saves in one city, newest first, capped at `limit`. */
 export async function readyCitySaves(
   ctx: QueryCtx,
   userId: string,
   city: string,
+  limit = CITY_ITEMS_MAX,
 ): Promise<Doc<"items">[]> {
   const wanted = cityKey(city);
   if (wanted === "") return [];
   return (await readySavesNewestFirst(ctx, userId))
     .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
-    .slice(0, CITY_ITEMS_MAX);
+    .slice(0, limit);
 }
 
 export const listCities = authedQuery({

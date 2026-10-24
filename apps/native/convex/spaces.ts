@@ -29,6 +29,7 @@ import {
   enrichItem,
   enrichedItemValidator,
   intentValidator,
+  CITY_SCAN_ROWS,
   readyCitySaves,
 } from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
@@ -297,7 +298,7 @@ export const ensureCitySpace = authedMutation({
     const { userId } = ctx;
     const name = validateSpaceName(tidyCity(args.city));
     await requireProEntitlement(ctx, userId);
-    const saves = await readyCitySaves(ctx, userId, args.city);
+    const saves = await readyCitySaves(ctx, userId, args.city, CITY_SCAN_ROWS);
     if (saves.length === 0) {
       throw new ConvexError({
         code: "city_empty",
