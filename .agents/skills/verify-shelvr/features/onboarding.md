@@ -20,7 +20,7 @@ after it.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to
   the spots screen, "Prague · 3 places" under a full-width map (Continue
   enables once the pins land), whose Continue asks for the paywall. Notification permission is asked after a trial starts, not here.
-- Closing the paywall keeps the person on the sample plan, signed out; a
+- Closing the paywall keeps the person on the spots screen, signed out; a
   cold launch comes back to the same step.
 
 ## How to get to it (user POV)
@@ -43,16 +43,15 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After each paywall close "Save your own spots" is back and
-`dev-login-button` stays hidden; a cold relaunch returns to "Save your own
-spots" with the splash gone. No
-purchase is made.
+After each paywall close the spots screen ("Prague · 3 places") is back
+and `dev-login-button` stays hidden; a cold relaunch returns to the spots
+screen with the splash gone. No purchase is made.
 
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to the sample plan; close the paywall, relaunch, and check the step is kept and nothing signs in
-onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check the three spots, and the date-night plan show before the paywall
+onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to its spots; close the paywall, relaunch, and check the step is kept and nothing signs in
+onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check its three spots show on the map before the paywall
 ```
 
 ## Gotchas

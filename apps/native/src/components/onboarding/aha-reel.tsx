@@ -7,6 +7,7 @@ import type { AhaSample } from "@/lib/aha-sample";
 import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { Image } from "expo-image";
+import { useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -31,7 +32,14 @@ export function AhaReel({
     sample.caption === null
       ? null
       : t(sample.caption, { city: t(SAMPLE_CITIES[sample.city].name) });
-  const credit = sample.creator ?? t("aha.shelvrExample");
+  const [playing, setPlaying] = useState(false);
+  // A creator is named only over their own video, never over the city photo it falls back to.
+  const credit =
+    sample.creator === null
+      ? t("aha.shelvrExample")
+      : playing
+        ? sample.creator
+        : null;
   return (
     <View style={styles.reel}>
       {/* The picture is one image to VoiceOver, apart from the Share button, which stays reachable. */}
@@ -42,7 +50,9 @@ export function AhaReel({
         accessibilityLabel={
           sample.creator === null
             ? `${credit}: ${caption}`
-            : t("aha.reelBy", { handle: sample.creator })
+            : credit === null
+              ? t("aha.sampleBadge")
+              : t("aha.reelBy", { handle: credit })
         }
       >
         <Image
@@ -51,7 +61,7 @@ export function AhaReel({
           style={StyleSheet.absoluteFill}
         />
         {sample.videoCode === null ? null : (
-          <ReelVideo reelCode={sample.videoCode} />
+          <ReelVideo reelCode={sample.videoCode} onPlaying={setPlaying} />
         )}
         <View style={styles.scrim} />
       </View>
@@ -98,7 +108,7 @@ export function AhaReel({
         importantForAccessibility="no-hide-descendants"
         accessibilityElementsHidden
       >
-        <Text style={styles.handle}>{credit}</Text>
+        {credit === null ? null : <Text style={styles.handle}>{credit}</Text>}
         {caption === null ? null : (
           <Text style={styles.caption} numberOfLines={3}>
             {caption}
