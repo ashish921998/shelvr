@@ -549,3 +549,18 @@ it("does not guess alias identity without pins or merge nearby or co-located dis
   ];
   expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(4);
 });
+
+it("keeps co-located venues distinct when only part of their name matches", () => {
+  const names = [
+    "National Art Museum",
+    "National Air Museum",
+    "National Design Museum",
+  ];
+  const sources = [
+    source({
+      places: names,
+      pins: names.map((name) => ({ name, lat: 38.6916, lng: -9.216 })),
+    }),
+  ];
+  expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(3);
+});

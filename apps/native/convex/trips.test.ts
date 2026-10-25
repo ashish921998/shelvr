@@ -554,3 +554,37 @@ it("filters street-only recommendations and folds map-confirmed aliases without 
   );
   expect(generateObject).not.toHaveBeenCalled();
 });
+
+it("deduplicates supported aliases after Maps resolves previously unpinned places", async () => {
+  vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+  vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) =>
+      new URL(input).pathname === "/v1/token"
+        ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+        : Response.json({
+            results: [{ coordinate: { latitude: 38.6916, longitude: -9.216 } }],
+          }),
+    ),
+  );
+  const { t, spaceId } = await setup([
+    {
+      title: "Lisbon sights",
+      cities: ["Lisbon"],
+      places: ["Belém Tower", "Torre de Belén", "Belém Cafe"],
+    },
+  ]);
+  await t.action(api.trips.makeTrip, {
+    spaceId,
+    city: "Lisbon",
+    days: 1,
+    pace: "packed",
+  });
+  const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+  expect(trip?.days[0].stops).toHaveLength(2);
+  expect(trip?.days[0].stops.some((stop) => stop.name === "Belém Cafe")).toBe(
+    true,
+  );
+});

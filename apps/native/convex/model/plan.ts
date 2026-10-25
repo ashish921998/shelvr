@@ -365,13 +365,20 @@ function aliasKind(name: string): string {
 }
 
 function aliasWords(name: string): string[] {
-  return wordsOf(name).filter(
-    (word) =>
-      word.length >= 4 && !GENERIC_WORDS.has(word) && !LANDMARK_WORDS.has(word),
-  );
+  return [
+    ...new Set(
+      wordsOf(name).filter(
+        (word) =>
+          word.length >= 3 &&
+          !GENERIC_WORDS.has(word) &&
+          !LANDMARK_WORDS.has(word),
+      ),
+    ),
+  ].sort();
 }
 
 function oneEditApart(a: string, b: string): boolean {
+  if (a.length < 4 || b.length < 4) return a === b;
   if (Math.abs(a.length - b.length) > 1) return false;
   let i = 0;
   let j = 0;
@@ -402,13 +409,13 @@ function pinKey(place: PlanPlace, sources: PlanSource[]): string | undefined {
 }
 
 /** Merge only matching saved map positions with supporting name similarity; never nearby businesses or name-only guesses. */
-function uniqueUnvisitedPlaces(
-  places: PlanPlace[],
+export function uniqueUnvisitedPlaces<T extends PlanPlace>(
+  places: T[],
   sources: PlanSource[],
   been: ReadonlySet<string>,
-): PlanPlace[] {
+): T[] {
   const groups: {
-    place: PlanPlace;
+    place: T;
     position?: string;
     words: string[];
     kind: string;
@@ -426,8 +433,10 @@ function uniqueUnvisitedPlaces(
             (group) =>
               group.position === position &&
               (kind === "" || group.kind === "" || kind === group.kind) &&
-              words.some((word) =>
-                group.words.some((other) => oneEditApart(word, other)),
+              words.length > 0 &&
+              words.length === group.words.length &&
+              words.every((word, index) =>
+                oneEditApart(word, group.words[index]),
               ),
           );
     if (existing) existing.visited ||= visited;

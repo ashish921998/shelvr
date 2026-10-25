@@ -10,7 +10,12 @@ import {
   appleMapsLookup,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
-import { placeKey, suggestSavedPlaces, type PlanSource } from "./model/plan";
+import {
+  placeKey,
+  suggestSavedPlaces,
+  uniqueUnvisitedPlaces,
+  type PlanSource,
+} from "./model/plan";
 import {
   buildTrip,
   dropStrays,
@@ -131,7 +136,20 @@ export const makeTrip = action({
       const location = found[i];
       return location ? { ...candidate, location } : candidate;
     });
-    const trip = buildTrip(located, { days, pace: args.pace });
+    const locatedSources = sources.map((source) => ({
+      ...source,
+      pins: located
+        .filter((place) => place.itemId === source.itemId)
+        .flatMap((place) =>
+          place.location ? [{ name: place.name, ...place.location }] : [],
+        ),
+    }));
+    const unique = uniqueUnvisitedPlaces(
+      located,
+      locatedSources,
+      new Set(been.map(placeKey)),
+    );
+    const trip = buildTrip(unique, { days, pace: args.pace });
     const tripId: Id<"trips"> = await ctx.runMutation(
       internal.tripData.saveTripInternal,
       {
@@ -146,7 +164,7 @@ export const makeTrip = action({
     logEvent("info", "make_trip_succeeded", {
       space_id: args.spaceId,
       considered: sources.length,
-      places: candidates.length,
+      places: unique.length,
       located: found.filter((place) => place !== null).length,
       days,
     });
