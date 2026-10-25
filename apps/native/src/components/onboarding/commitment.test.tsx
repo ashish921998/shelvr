@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   reduced: false,
   stateChange: (_state: string) => {},
   accessibilityTap: () => {},
+  longPress: () => {},
+  delayLongPress: 0,
   remove: vi.fn(),
 }));
 
@@ -39,11 +41,15 @@ vi.mock("react-native", () => ({
         onPressIn: () => void;
         onPressOut: () => void;
         onAccessibilityTap: () => void;
+        onLongPress: () => void;
+        delayLongPress: number;
         disabled: boolean;
         accessibilityLabel: string;
       },
     ) => {
       mocks.accessibilityTap = props.onAccessibilityTap;
+      mocks.longPress = props.onLongPress;
+      mocks.delayLongPress = props.delayLongPress;
       return (
         <button
           type="button"
@@ -143,6 +149,7 @@ afterEach(() => {
 
 const holdButton = () => screen.getByRole("button", { name: "Hold to commit" });
 const advanceTime = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+const recognizeLongPress = () => act(() => mocks.longPress());
 const renderStep = (
   goals: Goal[] = ["travel"],
   city: "lisbon" | null = "lisbon",
@@ -183,13 +190,16 @@ it("uses the demo's fallback city when the city question was skipped", () => {
   ).toBeTruthy();
 });
 
-it("confirms after a full hold in place, then waits for Continue before the paywall", () => {
+it("delegates the one-second threshold to Pressable, confirms in place, and waits for Continue", () => {
   const { onContinue } = renderStep();
   const map = screen.getByTestId("map");
+  expect(mocks.delayLongPress).toBe(1000);
   fireEvent.mouseDown(holdButton());
   advanceTime(999);
   expect(screen.queryByText("You’re in.")).toBeNull();
   advanceTime(1);
+  expect(screen.queryByText("You’re in.")).toBeNull();
+  recognizeLongPress();
   fireEvent.mouseUp(holdButton());
   expect(screen.getByText("You’re in.")).toBeTruthy();
   expect(screen.getByTestId("map")).toBe(map);
@@ -208,12 +218,14 @@ it("resets early releases and requires a fresh full hold", () => {
   advanceTime(800);
   fireEvent.mouseUp(holdButton());
   advanceTime(1000);
+  recognizeLongPress();
   expect(screen.queryByText("You’re in.")).toBeNull();
   expect(mocks.progress.value).toBe(0);
   fireEvent.mouseDown(holdButton());
   advanceTime(999);
   expect(screen.queryByText("You’re in.")).toBeNull();
   advanceTime(1);
+  recognizeLongPress();
   expect(screen.getByText("You’re in.")).toBeTruthy();
 });
 
@@ -225,6 +237,7 @@ it.each(["inactive", "background"])(
     advanceTime(500);
     act(() => mocks.stateChange(state));
     advanceTime(1000);
+    recognizeLongPress();
     expect(screen.queryByText("You’re in.")).toBeNull();
   },
 );
@@ -234,6 +247,7 @@ it("cleans up an unfinished hold when leaving the screen", () => {
   fireEvent.mouseDown(holdButton());
   unmount();
   advanceTime(1000);
+  recognizeLongPress();
   expect(mocks.haptic).not.toHaveBeenCalled();
   expect(mocks.remove).toHaveBeenCalledOnce();
 });
@@ -261,6 +275,7 @@ it("allows skipping without making a promise", () => {
   advanceTime(500);
   fireEvent.click(screen.getByRole("button", { name: "Maybe later" }));
   advanceTime(1000);
+  recognizeLongPress();
   expect(onContinue).toHaveBeenCalledOnce();
   expect(screen.queryByText("You’re in.")).toBeNull();
   expect(mocks.haptic).not.toHaveBeenCalled();
@@ -273,6 +288,7 @@ it("keeps the hold duration under Reduce Motion and disables Continue while open
   advanceTime(999);
   expect(mocks.progress.value).toBe(0);
   advanceTime(1);
+  recognizeLongPress();
   expect(screen.getByText("You’re in.")).toBeTruthy();
   rerender(<CommitmentStep sample={sample} leaving onContinue={onContinue} />);
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));

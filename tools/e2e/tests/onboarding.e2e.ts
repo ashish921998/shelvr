@@ -83,10 +83,14 @@ test(
     }
     await app.screenshot("lisbon-commitment-before");
     const hold = screen.getByRole("button", "Hold to commit");
-    await hold.longPress({ duration: 300 });
-    await expect(
-      screen.getByRole("button", "Tap to commit instead"),
-    ).toBeVisible();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await hold.longPress({ duration: 600 });
+      await expect(
+        screen.getByRole("button", "Tap to commit instead"),
+      ).toBeVisible();
+      await expect(screen.getByText("You’re in.")).toBeHidden();
+      await expect(screen.getByRole("button", "Continue")).toBeHidden();
+    }
     await hold.longPress({ duration: 1200 });
     await expect(screen.getByText("You’re in.")).toBeVisible();
     await expect(promise).toBeVisible();

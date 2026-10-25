@@ -33,13 +33,12 @@ const RING = Skia.PathBuilder.Make()
 function useCommitmentHold() {
   const [confirmed, setConfirmed] = useState(false);
   const done = useRef(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holding = useRef(false);
   const progress = useSharedValue(0);
   const reduced = useReducedMotion();
 
   const cancel = useCallback(() => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = null;
+    holding.current = false;
     cancelAnimation(progress);
     if (!done.current) progress.set(0);
   }, [progress]);
@@ -58,6 +57,7 @@ function useCommitmentHold() {
   const start = () => {
     if (done.current || AppState.currentState !== "active") return;
     cancel();
+    holding.current = true;
     if (!reduced) {
       progress.set(
         withTiming(1, {
@@ -66,7 +66,10 @@ function useCommitmentHold() {
         }),
       );
     }
-    timer.current = setTimeout(confirm, HOLD_MS);
+  };
+
+  const completeHold = () => {
+    if (holding.current && AppState.currentState === "active") confirm();
   };
 
   useEffect(() => {
@@ -79,7 +82,7 @@ function useCommitmentHold() {
     };
   }, [cancel]);
 
-  return { confirmed, progress, start, cancel, confirm };
+  return { confirmed, progress, start, cancel, confirm, completeHold };
 }
 
 export function CommitmentStep({
@@ -156,6 +159,8 @@ export function CommitmentStep({
           disabled={hold.confirmed || leaving}
           onPressIn={hold.start}
           onPressOut={hold.cancel}
+          delayLongPress={HOLD_MS}
+          onLongPress={hold.completeHold}
           onAccessibilityTap={hold.confirm}
           style={styles.hold}
           testID="commitment-hold"
