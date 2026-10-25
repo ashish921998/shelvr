@@ -15,10 +15,9 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
-          Shelvr is a save-it-for-later app: you capture links, images, and
-          notes, and Shelvr organizes them into spaces so you can find them
-          again. This policy explains what data is collected to make that work,
-          who handles it, and what you can control.
+          Shelvr helps you turn saved reels, TikToks, and links into places to
+          visit and plans for trips or nights out. This policy explains what
+          data we collect, how we use it, who handles it, and your choices.
         </p>
       </section>
 
@@ -106,18 +105,15 @@ export default function PrivacyPage() {
           What is sent: link addresses, up to about 8,000 characters of
           extracted page text, a reel’s or TikTok’s caption, and what is said in
           the video. When you make a plan, Shelvr also sends your saved places
-          and the ones you marked “We went”. Notes and photos saved with earlier
-          versions of the app are processed the same way.
+          and the ones you marked “We went”. Saved notes and images may also be
+          processed to organize your content.
         </p>
         <p className="mt-2">
-          AI processing runs automatically unless your account has a recorded
-          opt-out. The app no longer includes a separate AI permission prompt or
-          an AI switch in Settings. If you previously chose not to use AI, we
-          continue to honor that choice: your links still save, but AI place
-          extraction and plans remain unavailable. Older app versions may still
-          display the earlier AI permission controls. To request a change to
-          your AI processing preference, use Contact Support in the app or email{" "}
-          <strong>{SUPPORT_EMAIL}</strong>.
+          AI processing is part of saving content and making plans in Shelvr. It
+          runs automatically unless it is disabled for your account. With AI
+          disabled, links still save, but AI place extraction and plans are
+          unavailable. To request a change to your AI processing preference, use
+          Contact Support in the app or email <strong>{SUPPORT_EMAIL}</strong>.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that
@@ -198,14 +194,14 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p className="mt-3">
-          If you opt in through Shelvr’s updated-terms screen, RevenueCat may
-          share purchase identifiers, delivery status, and whether sample
-          content was provided with Apple to help review a refund request. This
-          does not include your saved links, notes, photos, or product analytics
-          events. We record your choice, the accepted terms version, and the
-          time of your decision. You can turn sharing off in Profile. Changes
-          are sent to RevenueCat; the app shows when an update is pending.
-          Previously shared information cannot be recalled.
+          If you opt in to Apple refund data sharing, RevenueCat may share
+          purchase identifiers, delivery status, and whether sample content was
+          provided with Apple to help review a refund request. This does not
+          include your saved links, notes, photos, or product analytics events.
+          We record your choice, the accepted terms version, and the time of
+          your decision. You can turn sharing off in Profile. Changes are sent
+          to RevenueCat; the app shows when an update is pending. Previously
+          shared information cannot be recalled.
         </p>
       </section>
 
