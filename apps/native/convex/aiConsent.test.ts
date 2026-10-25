@@ -205,6 +205,23 @@ describe("a user who has not answered", () => {
   });
 });
 
+describe("an unanswered account that then taps Allow", () => {
+  it("gets the saves it made before answering embedded", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    const itemId = await ready(t);
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).not.toHaveBeenCalled();
+
+    await t.mutation(api.aiConsent.setConsent, { granted: true });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).toHaveBeenCalledTimes(1);
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.embedding).toHaveLength(
+      EMBEDDING_DIMENSIONS,
+    );
+  });
+});
+
 describe("a save that is gone", () => {
   it("is not allowed to be sent, whatever the consent answer", async () => {
     const t = await signedIn();

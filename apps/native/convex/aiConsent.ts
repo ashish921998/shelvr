@@ -122,7 +122,8 @@ export const setConsent = authedMutation({
     } else {
       await ctx.db.patch(row._id, values);
     }
-    if ((row?.status === "declined") !== !args.granted) {
+    // An account that never answered counted as declined, so its first Allow re-syncs too.
+    if ((row?.status === "granted") !== args.granted) {
       await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
         userId,
         cursor: null,
