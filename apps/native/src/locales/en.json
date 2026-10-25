@@ -726,8 +726,8 @@
   "homePlaces.noPlaceFailed": "Couldn't read this one",
   "homePlaces.noPlaceNone": "No place in this one",
   "homePlaces.spotCount": {
-    "one": "%{formattedCount} spot",
-    "other": "%{formattedCount} spots"
+    "one": "%{formattedCount} place",
+    "other": "%{formattedCount} places"
   },
   "homePlaces.moreCities": "+ %{n} more",
   "homePlaces.yourSpaces": "Your spaces",

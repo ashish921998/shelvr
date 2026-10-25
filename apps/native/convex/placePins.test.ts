@@ -98,13 +98,14 @@ describe("placePins", () => {
     ).toBeNull();
   });
 
-  it("does not bias a multi-city save's lookups to its first city", async () => {
+  it("keeps city context for multi-city saves without imposing one search centre", async () => {
     const { t, itemId } = await setup(["Lisbon", "Porto", "Faro"]);
     await t.run(async (ctx) =>
       ctx.db.patch(itemId, { cities: ["Lisbon", "Porto", "Faro"] }),
     );
     const todo = await t.query(internal.placePins.toLocate, { itemId });
-    expect(todo?.city).toBeUndefined();
+    expect(todo?.city).toBe("Lisbon");
+    expect(todo?.singleCity).toBe(false);
     expect(todo?.centre).toBeNull();
     expect(todo?.names).toHaveLength(3);
   });
@@ -331,7 +332,11 @@ describe("placePins", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries()).toEqual(["E5, Lisbon", "F6, Lisbon", "G7, Lisbon"]);
+    expect([...new Set(queries())]).toEqual([
+      "E5, Lisbon",
+      "F6, Lisbon",
+      "G7, Lisbon",
+    ]);
   });
 
   it("does not look up places once five are already pinned", async () => {

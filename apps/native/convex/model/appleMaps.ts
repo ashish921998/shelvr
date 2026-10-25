@@ -60,18 +60,37 @@ const replySchema = z.object({
   results: z.array(z.unknown()),
 });
 const placeSchema = z.object({
+  name: z.string().optional(),
+  structuredAddress: z
+    .object({
+      locality: z.string().optional(),
+      thoroughfare: z.string().optional(),
+    })
+    .optional(),
   coordinate: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
 });
 
-export function firstPlace(body: unknown, near?: LatLng): LatLng | null {
+export function firstPlace(
+  body: unknown,
+  near?: LatLng,
+  skipCityOnly = false,
+): LatLng | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
+      const { name, structuredAddress: address } = place.data;
+      if (
+        skipCityOnly &&
+        address?.locality &&
+        !address.thoroughfare &&
+        name?.trim().toLowerCase() === address.locality.trim().toLowerCase()
+      )
+        continue;
       const { latitude, longitude } = place.data.coordinate;
       const point = { lat: latitude, lng: longitude };
       if (near && keepNearby([point], near)[0] === null) continue;
@@ -89,18 +108,27 @@ export async function appleMapsLookup(
   fetchImpl: typeof fetch = fetch,
 ): Promise<LatLng | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
-  // A restaurant lookup must not silently return the city centre as an address match.
-  if (kind === "search") params.set("resultTypeFilter", "Poi");
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
   try {
-    const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-    return firstPlace(await response.json().catch(() => null), near);
+    // Preserve exact street addresses. If Apple answers with only a city centre,
+    // retry as a point of interest instead of pretending that centre is the place.
+    for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
+      if (filter) params.set("resultTypeFilter", filter);
+      const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+      });
+      if (!response.ok) return null;
+      const found = firstPlace(
+        await response.json().catch(() => null),
+        near,
+        kind === "search",
+      );
+      if (found) return found;
+    }
+    return null;
   } catch {
     return null;
   }

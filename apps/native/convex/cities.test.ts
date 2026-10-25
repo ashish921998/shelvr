@@ -11,6 +11,7 @@ type Save = {
   cities?: string[];
   status?: "ready" | "processing" | "failed";
   heroImageUrl?: string;
+  placePins?: { name: string; lat: number; lng: number }[];
 };
 
 async function setup(options: { pro?: boolean } = {}) {
@@ -38,6 +39,7 @@ async function setup(options: { pro?: boolean } = {}) {
         title: s.title,
         cities: s.cities,
         heroImageUrl: s.heroImageUrl,
+        placePins: s.placePins ?? [{ name: s.title, lat: 38.7, lng: -9.1 }],
         tags: [],
         searchText: s.title,
       }),
@@ -46,6 +48,30 @@ async function setup(options: { pro?: boolean } = {}) {
 }
 
 describe("listCities", () => {
+  it("counts five mapped places in one reel, deduplicates repeat saves, and excludes unlocated saves", async () => {
+    const { t, save, userId } = await setup();
+    const placePins = ["PNY", "Blend", "Bomaye", "Micho", "El Nopal"].map(
+      (name, i) => ({ name, lat: 48.86 + i / 1000, lng: 2.35 }),
+    );
+    await save(userId, {
+      title: "Five restaurants",
+      cities: ["Paris"],
+      placePins,
+    });
+    await save(userId, {
+      title: "Another reel",
+      cities: ["Paris"],
+      placePins: [placePins[0]],
+    });
+    await save(userId, {
+      title: "No coordinates yet",
+      cities: ["Paris"],
+      placePins: [],
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Paris", count: 5, cover: null },
+    ]);
+  });
   it("groups spellings, orders by count then name, and picks the newest cover", async () => {
     const { t, save, userId, otherId } = await setup();
     await save(userId, {

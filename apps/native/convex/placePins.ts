@@ -83,6 +83,7 @@ export const toLocate = internalQuery({
     v.object({
       names: v.array(v.string()),
       city: v.optional(v.string()),
+      singleCity: v.boolean(),
       centre: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
     }),
   ),
@@ -101,7 +102,8 @@ export const toLocate = internalQuery({
     const pins = nearEachOther(item.placePins ?? [], item.cities ?? []);
     return {
       names,
-      city: item.cities?.length === 1 ? item.cities[0] : undefined,
+      city: item.cities?.[0],
+      singleCity: item.cities?.length === 1,
       centre: item.cities?.length === 1 ? lookupCentre(pins) : null,
     };
   },
@@ -146,6 +148,7 @@ async function lookUp(
   names: string[],
   city: string | undefined,
   centre: LatLng | null,
+  singleCity: boolean,
 ): Promise<Pin[]> {
   const config = appleMapsConfig(env);
   if (config === null) {
@@ -172,7 +175,7 @@ async function lookUp(
   const points = looked.map(({ at }) => at);
   const kept = dropStrays(points).filter((point) => point !== null);
   const anchor =
-    centre ?? (city && kept.length >= 3 ? lookupCentre(kept) : null);
+    centre ?? (singleCity && kept.length >= 3 ? lookupCentre(kept) : null);
   if (anchor && !centre) {
     await Promise.all(
       looked.map(async (place) => {
@@ -200,7 +203,7 @@ export const locateItem = internalAction({
     const found =
       todo.names.length === 0
         ? []
-        : await lookUp(todo.names, todo.city, todo.centre);
+        : await lookUp(todo.names, todo.city, todo.centre, todo.singleCity);
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,

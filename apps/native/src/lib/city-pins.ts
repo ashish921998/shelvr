@@ -1,4 +1,5 @@
 import { linkSource, type LinkSource } from "@convex/model/externalUrl";
+import { uniquePlacePins } from "@convex/model/trip";
 
 export type CityPin = {
   itemId: string;
@@ -14,8 +15,10 @@ export function cityPins(
     placePins?: { name: string; lat: number; lng: number }[];
   }[],
 ): CityPin[] {
-  return saves.flatMap((save) =>
-    (save.placePins ?? []).map((pin) => ({ itemId: save._id, ...pin })),
+  return uniquePlacePins(
+    saves.flatMap((save) =>
+      (save.placePins ?? []).map((pin) => ({ itemId: save._id, ...pin })),
+    ),
   );
 }
 

@@ -119,6 +119,74 @@ describe("firstPlace", () => {
 });
 
 describe("appleMapsLookup", () => {
+  it("preserves a street address instead of substituting a similarly named business", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "205 E Houston St",
+            structuredAddress: {
+              locality: "New York",
+              thoroughfare: "E Houston St",
+            },
+            coordinate: { latitude: 40.7221936, longitude: -73.9875081 },
+          },
+        ],
+      }),
+    );
+    expect(
+      await appleMapsLookup(
+        "tok",
+        "search",
+        "205 East Houston Street, New York, NY",
+        { lat: 40.72, lng: -73.98 },
+        fetchImpl as typeof fetch,
+      ),
+    ).toEqual({ lat: 40.7221936, lng: -73.9875081 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a city-centre address match as a place-name search", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          results: [
+            {
+              name: "Paris",
+              structuredAddress: { locality: "Paris" },
+              coordinate: { latitude: 48.8567879, longitude: 2.3510768 },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          results: [
+            {
+              name: "Micho",
+              structuredAddress: {
+                locality: "Paris",
+                thoroughfare: "Rue de Richelieu",
+              },
+              coordinate: { latitude: 48.8660723, longitude: 2.3371738 },
+            },
+          ],
+        }),
+      );
+    expect(
+      await appleMapsLookup(
+        "tok",
+        "search",
+        "Micho, Paris",
+        { lat: 48.86, lng: 2.35 },
+        fetchImpl,
+      ),
+    ).toEqual({ lat: 48.8660723, lng: 2.3371738 });
+    expect(
+      new URL(fetchImpl.mock.calls[1][0]).searchParams.get("resultTypeFilter"),
+    ).toBe("Poi");
+  });
   it("searches near a point with the access token", async () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({
@@ -139,7 +207,7 @@ describe("appleMapsLookup", () => {
     ];
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/v1/search");
-    expect(parsed.searchParams.get("resultTypeFilter")).toBe("Poi");
+    expect(parsed.searchParams.get("resultTypeFilter")).toBe("Poi,Address");
     expect(parsed.searchParams.get("q")).toBe("Pastéis de Belém, Lisbon");
     expect(parsed.searchParams.get("searchLocation")).toBe("38.7,-9.1");
     expect(init.headers.Authorization).toBe("Bearer tok");

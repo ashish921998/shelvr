@@ -22,7 +22,7 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
-import { cityKey, countCities } from "./model/trip";
+import { cityKey, countCities, uniquePlacePins } from "./model/trip";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -316,9 +316,18 @@ export const listCities = authedQuery({
       }
     }
     return countCities(items)
-      .map(({ city, count }) => ({
+      .map(({ city }) => ({
         city,
-        count,
+        count: uniquePlacePins(
+          items
+            .filter((item) =>
+              (item.cities ?? []).some(
+                (name) => cityKey(name) === cityKey(city),
+              ),
+            )
+            .slice(0, CITY_ITEMS_MAX)
+            .flatMap((item) => item.placePins ?? []),
+        ).length,
         cover: covers.get(cityKey(city)) ?? null,
       }))
       .sort((a, b) => b.count - a.count || (a.city < b.city ? -1 : 1));

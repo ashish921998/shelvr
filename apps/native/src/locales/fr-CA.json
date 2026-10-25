@@ -745,9 +745,9 @@
   "homePlaces.noPlaceFailed": "Impossible de le lire",
   "homePlaces.noPlaceNone": "Aucun lieu dans celui-ci",
   "homePlaces.spotCount": {
-    "one": "%{formattedCount} adresse",
-    "many": "%{formattedCount} adresses",
-    "other": "%{formattedCount} adresses"
+    "one": "%{formattedCount} lieu",
+    "many": "%{formattedCount} lieux",
+    "other": "%{formattedCount} lieux"
   },
   "homePlaces.moreCities": "+ %{n} de plus",
   "homePlaces.yourSpaces": "Vos collections",
