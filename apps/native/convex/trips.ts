@@ -88,7 +88,12 @@ async function locate(
   city: string | undefined,
   pins: SavedPin[],
 ): Promise<(LatLng | null)[]> {
-  const saved = candidates.map((candidate) => savedPinFor(candidate, pins));
+  const reused = candidates.map((candidate) => savedPinFor(candidate, pins));
+  // An older pin can still be a stray from before storePins dropped them; with three to compare, it is looked up again.
+  const saved =
+    reused.filter((place) => place !== null).length >= 3
+      ? keepNearby(reused, null)
+      : reused;
   if (saved.every((place) => place !== null)) return saved;
   const config = appleMapsConfig(env);
   if (config === null) return saved;

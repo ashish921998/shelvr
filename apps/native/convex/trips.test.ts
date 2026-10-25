@@ -370,6 +370,50 @@ describe("makeTrip", () => {
     expect(looked[0].searchParams.get("q")).toBe("Anne Frank House, Amsterdam");
   });
 
+  it("does not reuse an old stray pin far from the trip's other stops", async () => {
+    const { base, t, spaceId, itemIds } = await setup([
+      {
+        title: "Paris eats",
+        cities: ["Paris"],
+        places: ["PNY", "Blend", "Bomaye", "Micho"],
+      },
+    ]);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        placePins: [
+          { name: "PNY", lat: 48.8638, lng: 2.3627 },
+          { name: "Blend", lat: 48.8685, lng: 2.3256 },
+          { name: "Bomaye", lat: 48.8748, lng: 2.3539 },
+          { name: "Micho", lat: 43.7858, lng: -85.5028 },
+        ],
+      });
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: ["PNY", "Blend", "Bomaye", "Micho"].map((name) => ({
+          saveNumber: 1,
+          name,
+          area: "",
+          why: "Food",
+          slot: "dinner",
+        })),
+      },
+    });
+
+    await t.action(api.trips.makeTrip, {
+      spaceId,
+      city: "Paris",
+      days: 1,
+      pace: "easy",
+    });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const stops = [...(trip?.days[0].stops ?? []), ...(trip?.wishlist ?? [])];
+    const micho = stops.find((stop) => stop.name === "Micho");
+    expect(micho?.lat).toBeUndefined();
+    expect(stops.find((stop) => stop.name === "PNY")?.lat).toBe(48.8638);
+  });
+
   it("reads only the chosen city's saves, and saves that name no city", async () => {
     const { t, spaceId } = await setup([
       { title: "Porto francesinha spot", cities: ["Porto"] },
