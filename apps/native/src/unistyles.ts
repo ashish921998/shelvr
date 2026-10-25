@@ -18,6 +18,7 @@ const shared = {
   fonts,
   type: {
     hero: { fontFamily: fonts.display, fontSize: 48 },
+    displayTitle: { fontFamily: fonts.display, fontSize: 34 },
     largeTitle: { fontFamily: fonts.display, fontSize: 26 },
     sheetTitle: { fontFamily: fonts.display, fontSize: 24 },
     title: { fontFamily: fonts.display, fontSize: 22 },

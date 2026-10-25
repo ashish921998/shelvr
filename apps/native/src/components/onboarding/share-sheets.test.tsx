@@ -1,19 +1,60 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AppsSheet } from "./share-sheets";
+import { AhaShareStep } from "./aha-share";
+import { AhaReel } from "./aha-reel";
+import { ahaSample } from "@/lib/aha-sample";
+import en from "@/locales/en.json";
 
 type Children = { children?: ReactNode };
 
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-vi.mock("@/lib/motion", () => ({ sheetIn: () => undefined }));
+vi.mock("@/lib/i18n", () => ({
+  t: (key: string, params?: Record<string, string>) =>
+    key === "aha.exampleDescription"
+      ? en[key].replace(
+          /%\{(\w+)\}/g,
+          (_, name: string) => params?.[name] ?? "",
+        )
+      : key,
+  useAppLocale: () => {},
+}));
+vi.mock("@/lib/motion", () => ({ sheetIn: () => undefined, fadeIn: {} }));
 vi.mock("@/lib/color", () => ({ withAlpha: (color: string) => color }));
-vi.mock("expo-haptics", () => ({ selectionAsync: vi.fn() }));
+vi.mock("expo-haptics", () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  ImpactFeedbackStyle: { Medium: "medium" },
+}));
+vi.mock("@/components/onboarding/reel-video", () => ({
+  ReelVideo: vi.fn(() => null),
+}));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: Children) => <div>{children}</div>),
+  View: vi.fn(
+    ({
+      children,
+      accessibilityRole,
+      accessibilityLabel,
+    }: Children & {
+      accessibilityRole?: string;
+      accessibilityLabel?: string;
+    }) => (
+      <div role={accessibilityRole} aria-label={accessibilityLabel}>
+        {children}
+      </div>
+    ),
+  ),
+  ScrollView: vi.fn(({ children }: Children) => <div>{children}</div>),
+  ActivityIndicator: vi.fn(() => null),
   Text: vi.fn(({ children }: Children) => <span>{children}</span>),
 }));
 vi.mock("react-native-reanimated", () => ({
@@ -25,6 +66,7 @@ vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: { colors: {} } }),
 }));
 vi.mock("@/components/onboarding/parts", () => ({
+  QuestionTitle: vi.fn(({ title }: { title: string }) => <h1>{title}</h1>),
   ScalePressable: vi.fn(
     ({
       children,
@@ -56,38 +98,60 @@ const enabled = () =>
     .filter((button) => !(button as HTMLButtonElement).disabled)
     .map((button) => button.getAttribute("aria-label") ?? button.textContent);
 
-/** The section Shelvr's row sits under: the nearest section title before it. */
-const shelvrSection = () => {
-  const text = document.body.textContent ?? "";
-  const at = text.indexOf("Shelvr", text.indexOf("aha.sheetApps"));
-  return text.lastIndexOf("aha.sheetFavorites", at) >
-    text.lastIndexOf("aha.sheetSuggestions", at)
-    ? "favorites"
-    : "suggestions";
-};
-
-it("walks Edit, the plus, Done, then Shelvr, one live target at a time", () => {
+it("offers Shelvr immediately after More, without a pinning interaction", () => {
   const onPick = vi.fn();
   render(<AppsSheet onPick={onPick} />);
-
-  expect(screen.getByText("aha.coachEdit")).toBeTruthy();
-  expect(enabled()).toEqual(["aha.sheetEdit"]);
-  expect(shelvrSection()).toBe("suggestions");
-  fireEvent.click(screen.getByText("aha.sheetEdit"));
-
-  expect(screen.getByText("aha.coachAdd")).toBeTruthy();
-  expect(enabled()).toEqual(["aha.pinShelvr"]);
-  fireEvent.click(screen.getByLabelText("aha.pinShelvr"));
-
-  expect(screen.getByText("aha.coachDone")).toBeTruthy();
-  expect(enabled()).toEqual(["aha.sheetDone"]);
-  expect(shelvrSection()).toBe("favorites");
-  fireEvent.click(screen.getByText("aha.sheetDone"));
-
   expect(screen.getByText("aha.coachShelvr")).toBeTruthy();
   expect(enabled()).toEqual(["Shelvr"]);
-  expect(shelvrSection()).toBe("favorites");
-  expect(onPick).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByLabelText("Shelvr"));
+  expect(screen.queryByText("aha.sheetEdit")).toBeNull();
+  expect(screen.queryByLabelText("aha.pinShelvr")).toBeNull();
+  expect(screen.queryByText("aha.sheetDone")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Shelvr" }));
   expect(onPick).toHaveBeenCalledOnce();
+});
+
+it.each(["date", "trip", "weekend"] as const)(
+  "shows the same three %s places in the example post and its map data",
+  (kind) => {
+    const sample = ahaSample(kind, "lisbon");
+    render(<AhaReel sample={sample} onShare={vi.fn()} />);
+    const image = screen.getByRole("image");
+    expect(image.getAttribute("aria-label")).toBe(
+      `Shelvr example. aha.caption${kind === "date" ? "Date" : kind === "trip" ? "Trip" : "Weekend"}. Places: ${sample.spots[0].name}, ${sample.spots[1].name}, and ${sample.spots[2].name}.`,
+    );
+    expect(sample.spots.map((spot) => spot.name)).toEqual(
+      sample.trip.days[0].stops.map((stop) => stop.name),
+    );
+    for (const spot of sample.spots) {
+      expect(screen.getByText(spot.name)).toBeTruthy();
+      expect(image.getAttribute("aria-label")).toContain(spot.name);
+    }
+  },
+);
+
+it("reaches the map callback after only Share, Share to…, More and Shelvr", () => {
+  vi.useFakeTimers();
+  try {
+    const onShared = vi.fn();
+    render(
+      <AhaShareStep sample={ahaSample("trip", "lisbon")} onShared={onShared} />,
+    );
+    for (const label of [
+      "common.share",
+      "aha.sheetShareTo",
+      "aha.sheetMore",
+      "Shelvr",
+    ]) {
+      expect(enabled()).toEqual([label]);
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      expect(onShared).not.toHaveBeenCalled();
+    }
+    expect(screen.getByText("aha.reading")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1200));
+    expect(onShared).toHaveBeenCalledOnce();
+    act(() => vi.advanceTimersByTime(5000));
+    expect(onShared).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -4,11 +4,12 @@ import { ReelVideo } from "@/components/onboarding/reel-video";
 import { Coach } from "@/components/onboarding/share-sheets";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { AhaSample } from "@/lib/aha-sample";
+import { withAlpha } from "@/lib/color";
 import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 function reelPicture(sample: AhaSample): number {
@@ -48,7 +49,12 @@ export function AhaReel({
         accessibilityRole="image"
         accessibilityLabel={
           !reel
-            ? `${credit}: ${caption}`
+            ? t("aha.exampleDescription", {
+                caption: caption ?? "",
+                first: sample.spots[0].name,
+                second: sample.spots[1].name,
+                third: sample.spots[2].name,
+              })
             : credit === null
               ? t("aha.sampleBadge")
               : t("aha.reelBy", { handle: credit })
@@ -114,6 +120,22 @@ export function AhaReel({
           </Text>
         )}
       </View>
+      {!reel ? (
+        <ScrollView
+          style={styles.examplePlaces}
+          contentContainerStyle={styles.placeRows}
+          showsVerticalScrollIndicator={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
+          {sample.spots.map((spot, index) => (
+            <View key={spot.name} style={styles.placeRow}>
+              <Text style={styles.placeNumber}>{index + 1}</Text>
+              <Text style={styles.placeName}>{spot.name}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -202,5 +224,26 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.footnote,
     lineHeight: 19,
     color: "#FFFFFF",
+  },
+  examplePlaces: {
+    position: "absolute",
+    left: theme.gap(2),
+    right: theme.gap(7),
+    bottom: theme.gap(2),
+    maxHeight: "45%",
+    borderRadius: theme.radius.lg,
+    backgroundColor: withAlpha(theme.colors.bezel, 0.8),
+  },
+  placeRows: { padding: theme.gap(1.5), gap: theme.gap(1) },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.gap(1),
+  },
+  placeNumber: { ...theme.type.subheadStrong, color: theme.colors.primary },
+  placeName: {
+    ...theme.type.subheadStrong,
+    color: theme.colors.onOverlay,
+    flex: 1,
   },
 }));

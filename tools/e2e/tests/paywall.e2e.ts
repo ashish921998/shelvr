@@ -3,6 +3,7 @@ import { expect, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import {
+  closePaywallTo,
   expectPaywall,
   openPaywallPlans,
   paywallTitle,
@@ -12,7 +13,7 @@ import { scrollSettingsTo, startOnSeededHome } from "./seeded-home.ts";
 startOnSeededHome();
 
 async function closePaywall(screen: Screen): Promise<void> {
-  await screen.getByRole("button", "Close").first().tap();
+  await closePaywallTo(screen, screen.getByRole("button", "See plans"));
   await expect(paywallTitle(screen)).toBeHidden({
     timeout: 30_000,
   });

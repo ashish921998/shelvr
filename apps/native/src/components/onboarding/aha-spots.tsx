@@ -29,14 +29,12 @@ function useDroppedPins(count: number): number {
   return dropped;
 }
 
-/** The last step: the shared reel's spots dropping onto a preview of the city page they land on, then the paywall. */
+/** The shared reel's spots dropping onto a preview of the city page they land on. */
 export function AhaSpotsStep({
   sample,
-  leaving,
   onContinue,
 }: {
   sample: AhaSample;
-  leaving: boolean;
   onContinue: () => void;
 }) {
   useAppLocale();
@@ -119,7 +117,6 @@ export function AhaSpotsStep({
         label={t("common.continue")}
         onPress={onContinue}
         disabled={dropped < sample.spots.length}
-        busy={leaving}
       />
     </View>
   );
