@@ -222,6 +222,20 @@ describe("placePins", () => {
     expect(await pins()).toHaveLength(3);
   });
 
+  it("keeps every pin when no majority agrees where the save is", async () => {
+    const { t, itemId, pins } = await setup(["P1", "P2", "R1", "R2"]);
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [
+        { name: "P1", lat: 48.86, lng: 2.35 },
+        { name: "P2", lat: 48.87, lng: 2.33 },
+        { name: "R1", lat: 41.9, lng: 12.5 },
+        { name: "R2", lat: 41.89, lng: 12.48 },
+      ],
+    });
+    expect(await pins()).toHaveLength(4);
+  });
+
   it("keeps two far-apart pins, with nothing to say which is wrong", async () => {
     const { t, itemId, pins } = await setup(["Here", "There"]);
     await t.mutation(internal.placePins.storePins, {

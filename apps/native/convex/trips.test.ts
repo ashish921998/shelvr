@@ -368,6 +368,60 @@ describe("makeTrip", () => {
       .filter((url) => url.pathname !== "/v1/token");
     expect(looked.map((url) => url.pathname)).toEqual(["/v1/search"]);
     expect(looked[0].searchParams.get("q")).toBe("Anne Frank House, Amsterdam");
+    expect(looked[0].searchParams.get("searchLocation")).toBe("52.36,4.8854");
+  });
+
+  it("keeps a stop's saved pin when another stop needs a search", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input).pathname === "/v1/token"
+          ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+          : Response.json({
+              results: [{ coordinate: { latitude: 48.86, longitude: 2.35 } }],
+            }),
+      ),
+    );
+    const { base, t, spaceId, itemIds } = await setup([
+      {
+        title: "Two cities",
+        cities: ["Paris"],
+        places: ["Here", "There", "New"],
+      },
+    ]);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        placePins: [
+          { name: "Here", lat: 48.86, lng: 2.35 },
+          { name: "There", lat: 41.9, lng: 12.5 },
+        ],
+      });
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: ["Here", "There", "New"].map((name) => ({
+          saveNumber: 1,
+          name,
+          area: "",
+          why: "Go",
+          slot: "any",
+        })),
+      },
+    });
+
+    await t.action(api.trips.makeTrip, {
+      spaceId,
+      city: "Paris",
+      days: 1,
+      pace: "easy",
+    });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const stops = [...(trip?.days[0].stops ?? []), ...(trip?.wishlist ?? [])];
+    expect(stops.find((stop) => stop.name === "There")?.lat).toBe(41.9);
   });
 
   it("does not reuse an old stray pin far from the trip's other stops", async () => {

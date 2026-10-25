@@ -17,7 +17,7 @@ import {
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
-import { keepNearby } from "./model/trip";
+import { dropStrays } from "./model/trip";
 
 const MAX_PINS = 5;
 const BACKFILL_PAGE = 100;
@@ -25,11 +25,10 @@ const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number };
 
-/** In a one-city save with three or more pins, one far from the rest is a wrong match for a same-named place elsewhere. */
+/** In a one-city save, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
 function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
-  if (pins.length < 3 || cities.length > 1) return pins;
-  const kept = keepNearby(pins, null);
-  return pins.filter((_, i) => kept[i] !== null);
+  if (cities.length > 1) return pins;
+  return dropStrays(pins).filter((pin) => pin !== null);
 }
 
 function mapsNames(intents: Doc<"items">["intents"]): string[] {

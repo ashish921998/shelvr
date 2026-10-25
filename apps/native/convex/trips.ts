@@ -24,6 +24,7 @@ import {
 } from "./model/plan";
 import {
   buildTrip,
+  dropStrays,
   keepNearby,
   MAX_TRIP_DAYS,
   middleOf,
@@ -88,12 +89,10 @@ async function locate(
   city: string | undefined,
   pins: SavedPin[],
 ): Promise<(LatLng | null)[]> {
-  const reused = candidates.map((candidate) => savedPinFor(candidate, pins));
-  // An older pin can still be a stray from before storePins dropped them; with three to compare, it is looked up again.
-  const saved =
-    reused.filter((place) => place !== null).length >= 3
-      ? keepNearby(reused, null)
-      : reused;
+  // An older pin can still be a stray from before storePins dropped them; that stop is looked up again.
+  const saved = dropStrays(
+    candidates.map((candidate) => savedPinFor(candidate, pins)),
+  );
   if (saved.every((place) => place !== null)) return saved;
   const config = appleMapsConfig(env);
   if (config === null) return saved;
@@ -107,18 +106,19 @@ async function locate(
     middleOf(saved.filter((place): place is LatLng => place !== null)) ??
     (city ? await appleMapsLookup(token, "geocode", city) : null);
   const found = await Promise.all(
-    candidates.map(
-      (candidate, i) =>
-        saved[i] ??
-        appleMapsLookup(
-          token,
-          "search",
-          lookupQuery(candidate, city),
-          centre ?? undefined,
-        ),
+    candidates.map((candidate, i) =>
+      saved[i] !== null
+        ? null
+        : appleMapsLookup(
+            token,
+            "search",
+            lookupQuery(candidate, city),
+            centre ?? undefined,
+          ),
     ),
   );
-  return keepNearby(found, centre);
+  const near = keepNearby(found, centre);
+  return saved.map((place, i) => place ?? near[i]);
 }
 
 /** A null `tripId` leaves the old trip intact; `considered` tells an empty space from saves that named no places. */

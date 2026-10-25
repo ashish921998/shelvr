@@ -327,6 +327,19 @@ export function keepNearby(
   );
 }
 
+/** Drops points far from the rest, but only when three or more agree on where "the rest" is. */
+export function dropStrays<T extends LatLng>(
+  points: (T | null)[],
+): (T | null)[] {
+  const before = points.filter((p) => p !== null).length;
+  if (before < 3) return points;
+  const kept = keepNearby(points, null);
+  const after = kept.filter((p) => p !== null).length;
+  return after * 2 > before
+    ? points.map((p, i) => (kept[i] ? p : null))
+    : points;
+}
+
 export type SavedPin = { itemId: Id<"items">; name: string } & LatLng;
 
 /** The map pin the save already has for this place, so a trip never looks it up again. */
