@@ -760,6 +760,12 @@ export type MessageParams = {
   "aha.fromReel": { handle: string };
   "aha.shelvrExample": undefined;
   "aha.reelBy": { handle: string };
+  "aha.exampleDescription": {
+    caption: string;
+    first: string;
+    second: string;
+    third: string;
+  };
   "aha.quoted": { quote: string };
   "aha.quoteCoffee": undefined;
   "aha.quoteMorning": undefined;

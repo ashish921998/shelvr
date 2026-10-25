@@ -106,7 +106,7 @@ export function CommitmentStep({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.head}>
-          <Text style={styles.eyebrow} accessibilityLiveRegion="polite">
+          <Text style={styles.eyebrow}>
             {t(hold.confirmed ? "commitment.made" : "commitment.eyebrow")}
           </Text>
           <Text style={styles.title} accessibilityRole="header">
@@ -240,7 +240,7 @@ const styles = StyleSheet.create((theme) => ({
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-  title: { ...theme.type.hero, fontSize: 34, color: theme.colors.foreground },
+  title: { ...theme.type.displayTitle, color: theme.colors.foreground },
   card: {
     borderWidth: 1,
     borderColor: theme.colors.border,

@@ -801,6 +801,7 @@
   "aha.fromReel": "%{handle}のリールから",
   "aha.shelvrExample": "Shelvrのサンプル",
   "aha.reelBy": "%{handle}のサンプルリール",
+  "aha.exampleDescription": "Shelvrの例。%{caption}。スポット：%{first}、%{second}、%{third}。",
   "aha.quoted": "「%{quote}」",
   "aha.quoteCoffee": "並んででも飲みたいフラットホワイト",
   "aha.quoteMorning": "混む前に朝早く行くのがおすすめ",

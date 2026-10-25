@@ -34,7 +34,14 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: Children) => <div>{children}</div>),
   ScrollView: vi.fn(({ children }: Children) => <div>{children}</div>),
-  Text: vi.fn(({ children }: Children) => <span>{children}</span>),
+  Text: vi.fn(
+    ({
+      children,
+      accessibilityLiveRegion,
+    }: Children & {
+      accessibilityLiveRegion?: "polite";
+    }) => <span aria-live={accessibilityLiveRegion}>{children}</span>,
+  ),
   Pressable: vi.fn(
     (
       props: Children & {
@@ -161,6 +168,17 @@ const renderStep = (
   );
   return { ...result, sample, onContinue };
 };
+
+it("has one live confirmation announcement", () => {
+  const { container } = renderStep();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Tap to commit instead" }),
+  );
+  const announcements = container.querySelectorAll('[aria-live="polite"]');
+  expect(announcements).toHaveLength(1);
+  expect(announcements[0].textContent).toBe(en["commitment.confirmed"]);
+  expect(screen.getByText(en["commitment.made"])).toBeTruthy();
+});
 
 it.each<Goal[]>([
   ["travel"],

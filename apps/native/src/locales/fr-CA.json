@@ -843,6 +843,7 @@
   "aha.fromReel": "Du reel de %{handle}",
   "aha.shelvrExample": "Exemple Shelvr",
   "aha.reelBy": "Reel d’exemple de %{handle}",
+  "aha.exampleDescription": "Exemple Shelvr. %{caption}. Lieux : %{first}, %{second} et %{third}.",
   "aha.quoted": "« %{quote} »",
   "aha.quoteCoffee": "Le flat white vaut bien la file",
   "aha.quoteMorning": "Allez-y tôt, avant la foule",

@@ -822,6 +822,7 @@
   "aha.fromReel": "From %{handle}'s reel",
   "aha.shelvrExample": "Shelvr example",
   "aha.reelBy": "Sample reel by %{handle}",
+  "aha.exampleDescription": "Shelvr example. %{caption}. Places: %{first}, %{second}, and %{third}.",
   "aha.quoted": "“%{quote}”",
   "aha.quoteCoffee": "The flat white here is worth the queue",
   "aha.quoteMorning": "Go early, before the crowds",

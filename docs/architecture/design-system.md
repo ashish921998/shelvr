@@ -9,14 +9,14 @@ touch a file for other reasons, not in bulk.
 
 ## Type
 
-The type ramp is `theme.type`: 23 named steps from `hero` (48) down to `badge`
+The type ramp is `theme.type`: 24 named steps from `hero` (48) down to `badge`
 (10), each pairing a font family with a size. The steps were not invented.
 Each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
 from those literals later. The display face (`CrimsonProRoman-Regular`) carries titles
-(`hero`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
+(`hero`, `displayTitle`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
 Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.

@@ -4,6 +4,7 @@ import { ReelVideo } from "@/components/onboarding/reel-video";
 import { Coach } from "@/components/onboarding/share-sheets";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { AhaSample } from "@/lib/aha-sample";
+import { withAlpha } from "@/lib/color";
 import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { Image } from "expo-image";
@@ -48,7 +49,12 @@ export function AhaReel({
         accessibilityRole="image"
         accessibilityLabel={
           !reel
-            ? `${credit}: ${caption}. ${sample.spots.map((spot) => spot.name).join(", ")}`
+            ? t("aha.exampleDescription", {
+                caption: caption ?? "",
+                first: sample.spots[0].name,
+                second: sample.spots[1].name,
+                third: sample.spots[2].name,
+              })
             : credit === null
               ? t("aha.sampleBadge")
               : t("aha.reelBy", { handle: credit })
@@ -226,7 +232,7 @@ const styles = StyleSheet.create((theme) => ({
     bottom: theme.gap(2),
     maxHeight: "45%",
     borderRadius: theme.radius.lg,
-    backgroundColor: "rgba(43, 36, 24, 0.8)",
+    backgroundColor: withAlpha(theme.colors.bezel, 0.8),
   },
   placeRows: { padding: theme.gap(1.5), gap: theme.gap(1) },
   placeRow: {
@@ -235,5 +241,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1),
   },
   placeNumber: { ...theme.type.subheadStrong, color: theme.colors.primary },
-  placeName: { ...theme.type.subheadStrong, color: "#FFFFFF", flex: 1 },
+  placeName: {
+    ...theme.type.subheadStrong,
+    color: theme.colors.onOverlay,
+    flex: 1,
+  },
 }));
