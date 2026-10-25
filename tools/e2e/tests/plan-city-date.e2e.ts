@@ -7,7 +7,9 @@ startOnSeededHome();
 
 const FIXTURE_URL = "https://fixtures.e2e.invalid/lisbon-date-night";
 const TITLE = "Date night in Lisbon";
-const FIRST_PLACE = "Taberna da Rua das Flores";
+// The shortlist is shuffled, and only its front card is accessible.
+const SAVED_PLACE =
+  /^(?:Taberna da Rua das Flores|Miradouro da Graça|Manteigaria)$/;
 
 test(
   "saves a Lisbon page, finds it under Lisbon and plans a date from it",
@@ -29,8 +31,8 @@ test(
     await expect(screen.getByText("Your shortlist")).toBeVisible({
       timeout: 60_000,
     });
-    await expect(
-      screen.getByRole("button", new RegExp(`^${FIRST_PLACE}`)),
-    ).toBeVisible({ timeout: 30_000 });
+    const frontCard = screen.getByRole("button", SAVED_PLACE);
+    await expect(frontCard).toBeVisible({ timeout: 30_000 });
+    await expect(frontCard).toHaveCount(1);
   },
 );
