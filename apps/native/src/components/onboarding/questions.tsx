@@ -19,7 +19,6 @@ type Choice<Id extends string> = {
   id: Id;
   emoji: string;
   title: TextMessageKey;
-  subtitle?: TextMessageKey;
 };
 
 const SAVED_COUNT_CHOICES: readonly Choice<SavedCount>[] = [
@@ -39,19 +38,16 @@ const GOAL_CHOICES: readonly Choice<Goal>[] = [
     id: "date",
     emoji: "🍷",
     title: "onboardingQ.goalDate",
-    subtitle: "onboardingQ.goalDateBody",
   },
   {
     id: "travel",
     emoji: "✈️",
     title: "onboardingQ.goalTravel",
-    subtitle: "onboardingQ.goalTravelBody",
   },
   {
     id: "food",
     emoji: "🍜",
     title: "onboardingQ.goalFood",
-    subtitle: "onboardingQ.goalFoodBody",
   },
 ];
 
@@ -60,25 +56,21 @@ const PLANNER_CHOICES: readonly Choice<Planner>[] = [
     id: "planner",
     emoji: "🗓️",
     title: "onboardingQ.planner",
-    subtitle: "onboardingQ.plannerBody",
   },
   {
     id: "flexible",
     emoji: "🧭",
     title: "onboardingQ.flexible",
-    subtitle: "onboardingQ.flexibleBody",
   },
   {
     id: "spontaneous",
     emoji: "🎲",
     title: "onboardingQ.spontaneous",
-    subtitle: "onboardingQ.spontaneousBody",
   },
   {
     id: "explorer",
     emoji: "💎",
     title: "onboardingQ.explorer",
-    subtitle: "onboardingQ.explorerBody",
   },
 ];
 
@@ -136,7 +128,6 @@ function SingleChoice<Id extends string>({
           key={choice.id}
           emoji={choice.emoji}
           title={t(choice.title)}
-          subtitle={choice.subtitle && t(choice.subtitle)}
           selected={picked === choice.id}
           onPress={() => onPick(choice.id)}
         />
@@ -216,7 +207,6 @@ export function GoalStep({
           multi
           emoji={choice.emoji}
           title={t(choice.title)}
-          subtitle={choice.subtitle && t(choice.subtitle)}
           selected={picked.includes(choice.id)}
           onPress={() => toggle(choice.id)}
         />

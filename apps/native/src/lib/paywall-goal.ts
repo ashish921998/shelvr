@@ -54,10 +54,7 @@ const GOAL_COPY: Record<Goal, GoalCopy> = {
     benefitBody: () => t("paywallGoal.travelBenefitBody"),
   },
   food: {
-    headline: withCity(
-      (city) => t("paywallGoal.foodHeadline", { city }),
-      () => t("paywallGoal.foodHeadlineNoCity"),
-    ),
+    headline: () => t("paywallGoal.foodHeadline"),
     subline: () => t("paywallGoal.foodSubline"),
     photoTag: () => t("paywallGoal.foodPhotoTag"),
     answer1: () => t("paywallGoal.foodAnswerOne"),
@@ -69,10 +66,7 @@ const GOAL_COPY: Record<Goal, GoalCopy> = {
       (city) => t("paywallGoal.foodToday", { city }),
       () => t("paywallGoal.foodTodayNoCity"),
     ),
-    planTitle: withCity(
-      (city) => t("paywallGoal.foodPlanTitle", { city }),
-      () => t("paywallGoal.foodPlanTitleNoCity"),
-    ),
+    planTitle: () => t("paywallGoal.foodPlanTitle"),
     benefitTitle: () => t("paywallGoal.foodBenefitTitle"),
     benefitBody: () => t("paywallGoal.foodBenefitBody"),
   },

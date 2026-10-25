@@ -24,22 +24,16 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const COPY: Record<
-  PlanKind,
-  { accent: TextMessageKey; goal: TextMessageKey; when: TextMessageKey }
-> = {
+const COPY: Record<PlanKind, { goal: TextMessageKey; when: TextMessageKey }> = {
   date: {
-    accent: "onboardingChart.accentDate",
     goal: "onboardingChart.goalDate",
     when: "onboardingChart.whenWeekend",
   },
   trip: {
-    accent: "onboardingChart.accentTrip",
     goal: "onboardingChart.goalTrip",
     when: "onboardingChart.whenTrip",
   },
   weekend: {
-    accent: "onboardingChart.accentWeekend",
     goal: "onboardingChart.goalWeekend",
     when: "onboardingChart.whenWeekend",
   },
@@ -56,9 +50,6 @@ const LABEL_FIT = {
   adjustsFontSizeToFit: true,
   maxFontSizeMultiplier: 1.3,
 } as const;
-// Splits the translated title around the accent, whatever the word order.
-const ACCENT_MARK = "⁣";
-
 function chartPoints(width: number) {
   return {
     start: { x: width * 0.14, y: BASELINE * 0.71 },
@@ -66,19 +57,14 @@ function chartPoints(width: number) {
   };
 }
 
-function ChartTitle({ kind }: { kind: PlanKind }) {
-  const [before = "", after = ""] = t("onboardingChart.title", {
-    accent: ACCENT_MARK,
-  }).split(ACCENT_MARK);
+function ChartTitle() {
   return (
     <Text
       style={styles.title}
       maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
       accessibilityRole="header"
     >
-      {before}
-      <Text style={styles.accent}>{t(COPY[kind].accent)}</Text>
-      {after}
+      {t("onboardingChart.title")}
     </Text>
   );
 }
@@ -238,9 +224,8 @@ export function ProgressChartStep({
   return (
     <View style={styles.wrap}>
       <View style={styles.body}>
-        <ChartTitle kind={kind} />
+        <ChartTitle />
         <Chart kind={kind} />
-        <Text style={styles.copy}>{t("onboardingChart.body")}</Text>
       </View>
       <PillButton
         label={t("common.continue")}
@@ -305,12 +290,5 @@ const styles = StyleSheet.create((theme) => ({
   },
   when: {
     color: theme.colors.primaryText,
-  },
-  copy: {
-    ...theme.type.subhead,
-    lineHeight: 22,
-    textAlign: "center",
-    color: theme.colors.muted,
-    paddingHorizontal: theme.gap(1),
   },
 }));
