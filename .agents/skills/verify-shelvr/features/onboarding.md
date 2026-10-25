@@ -10,12 +10,12 @@ after it.
 
 ## Sub-features
 
-- "Get started" opens "How many spots have you saved already?"; then "What
+- "Get started" opens "How many places have you saved?"; then "What
   do you want to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
   `A bit of everything`) and "How do you like to plan?". Each has Continue
   (disabled until an answer) and "Skip" in the header. Every step after the
   opener has a back button.
-- "Pick a city to try it with" is a photo grid; "Skip" or "Somewhere else"
+- "Pick a city to try." is a photo grid; "Skip" or "Somewhere else"
   uses Prague.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to
   the spots screen, "Prague · 3 places" under a full-width map (Continue
@@ -58,8 +58,7 @@ onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, 
 
 - Each test can take several minutes (timeout 600 s): two cold launches
   through the dev client.
-- Answer cards read their title and subtitle ("Date nights, Dinners,
-  drinks, surprises"); match them by prefix. Text styled in capitals reads
+- Answer cards now read their short titles ("Date nights", "Trips", "Places to eat"). Text styled in capitals reads
   in capitals ("SAMPLE").
 - The fresh launch signs the dev user out; the next seeded test signs in
   again through `dev-login-button`.

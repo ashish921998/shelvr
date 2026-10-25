@@ -39,19 +39,19 @@ describe("goalPaywallVariables", () => {
     expect(values(progress("travel", "lisbon"))).toEqual({
       goal: "travel",
       goal_city: "lisbon",
-      goal_headline: "Let’s plan Lisbon\nfrom your saves.",
-      goal_subline: "Every place you save, on one map, day by day.",
+      goal_headline: "Plan Lisbon from your saves.",
+      goal_subline: "Turn saved places into a day-by-day trip.",
       goal_photo_tag: "Your sample trip",
-      goal_answer_1: "Travel ideas",
-      goal_answer_2: "Next trip: Lisbon",
+      goal_answer_1: "Trips",
+      goal_answer_2: "Lisbon",
       goal_today: "Your Lisbon saves become a day-by-day plan.",
       goal_plan_title: "Plan Lisbon from your saves",
-      goal_benefit_title: "Trips from your saves",
+      goal_benefit_title: "Build a trip from your saves",
       goal_benefit_body: "Saved places become a day-by-day plan.",
     });
     expect(values(progress("travel"))).toMatchObject({
       goal_city: "",
-      goal_headline: "Let’s plan your next trip\nfrom your saves.",
+      goal_headline: "Plan your next trip from your saves.",
       goal_answer_2: "",
       goal_today: "Your saves become a day-by-day plan.",
       goal_plan_title: "Plan your next trip from your saves",
@@ -61,32 +61,32 @@ describe("goalPaywallVariables", () => {
   it("covers food with and without a city", () => {
     expect(values(progress("food", "paris"))).toMatchObject({
       goal: "food",
-      goal_headline: "Let’s find your next\nParis favorite.",
-      goal_photo_tag: "Your sample weekend",
-      goal_answer_1: "Food places",
-      goal_answer_2: "Lives in Paris",
+      goal_headline: "Know where to eat next.",
+      goal_photo_tag: "Your sample places",
+      goal_answer_1: "Places to eat",
+      goal_answer_2: "Paris",
       goal_today: "Your Paris spots, narrowed to this weekend.",
-      goal_plan_title: "Know where to eat in Paris",
-      goal_benefit_title: "Weekend shortlists",
+      goal_plan_title: "Know where to eat next",
+      goal_benefit_title: "Choose somewhere to eat",
     });
     expect(values(progress("food"))).toMatchObject({
-      goal_headline: "Let’s find your next\nfavorite spot.",
+      goal_headline: "Know where to eat next.",
       goal_answer_2: "",
       goal_today: "Your spots, narrowed to this weekend.",
-      goal_plan_title: "Know where to eat this weekend",
+      goal_plan_title: "Know where to eat next",
       goal_benefit_body: "A few of your saved spots, picked for this weekend.",
     });
   });
 
   it("covers date with and without a city", () => {
     expect(values(progress("date", "london"))).toMatchObject({
-      goal_headline: "Let’s make date night\nthe easy part.",
+      goal_headline: "Make date night easy.",
       goal_photo_tag: "Your sample date night",
-      goal_answer_1: "Date-night spots",
-      goal_answer_2: "Lives in London",
+      goal_answer_1: "Date nights",
+      goal_answer_2: "London",
       goal_today: "Your saved spots become a whole evening.",
-      goal_plan_title: "Plan a whole evening from your saves",
-      goal_benefit_title: "A whole evening",
+      goal_plan_title: "Make date night easy",
+      goal_benefit_title: "Pick your next date-night spot",
     });
     expect(values(progress("date")).goal_answer_2).toBe("");
   });

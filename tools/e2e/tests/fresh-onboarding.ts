@@ -31,12 +31,12 @@ const FRESH_INSTALL_ARGUMENTS = [
 export async function walkToSampleReel(screen: Screen): Promise<void> {
   await tapUntilVisible(
     screen.getByRole("button", "Get started"),
-    screen.getByText("How many spots have you saved already?"),
+    screen.getByText("How many places have you saved?"),
     { waitMs: 5_000, timeout: 60_000 },
   );
   const skip = screen.getByRole("button", "Skip");
   await skip.tap();
-  await expect(screen.getByText("What do you want to plan?")).toBeVisible({
+  await expect(screen.getByText("What would you like to plan?")).toBeVisible({
     timeout: 30_000,
   });
   await screen.getByRole("checkbox", /^Date nights/).tap();
@@ -47,11 +47,11 @@ export async function walkToSampleReel(screen: Screen): Promise<void> {
     timeout: 30_000,
   });
   await skip.tap();
-  await expect(
-    screen.getByText("Your saves, turned into date nights"),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
+    timeout: 30_000,
+  });
   await next.tap();
-  await expect(screen.getByText("Pick a city to try it with")).toBeVisible({
+  await expect(screen.getByText("Pick a city to try.")).toBeVisible({
     timeout: 30_000,
   });
   await skip.tap();
