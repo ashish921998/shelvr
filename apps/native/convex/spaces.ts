@@ -35,7 +35,7 @@ import {
 import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
-  claimSpaceForModel,
+  claimSpaceForPlanning,
   deleteTripsForSpace,
   planSaves,
   toPlanSource,
@@ -772,9 +772,9 @@ export const claimPlanInternal = internalMutation({
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
+    const { userId, space } = await claimSpaceForPlanning(ctx, args.spaceId);
     const sources = (await planSaves(ctx, args.spaceId, userId, args.city)).map(
-      ({ item, join }) => toPlanSource(item, join),
+      ({ item, join }) => toPlanSource(item, join, args.city),
     );
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };
@@ -786,7 +786,7 @@ export const claimPlanInternal = internalMutation({
     return {
       spaceName: space.name,
       sources,
-      been: await beenPlaces(ctx, userId),
+      been: await beenPlaces(ctx, userId, sources),
     };
   },
 });

@@ -184,7 +184,7 @@ export type AnalyticsEventProperties = {
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
   plan_made: { considered: number; place_count: number };
-  plan_failed: { reason: "ai_consent" | "error" };
+  plan_failed: { reason: "error" };
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
@@ -197,7 +197,7 @@ export type AnalyticsEventProperties = {
     pace: "easy" | "balanced" | "packed";
     made: boolean;
   };
-  trip_failed: { reason: "ai_consent" | "error" };
+  trip_failed: { reason: "error" };
   city_opened: { count: number };
   city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
@@ -265,11 +265,6 @@ export type AnalyticsEventProperties = {
   notification_opened: { notification_kind: string; notification_id: string };
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
-  };
-  ai_consent_shown: Record<string, never>;
-  ai_consent_answered: {
-    granted: boolean;
-    surface: "card" | "settings";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;

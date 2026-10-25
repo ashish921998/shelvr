@@ -428,7 +428,7 @@ describe("AI dispatch uses fresh live ownership", () => {
       ).toBe(false);
     },
   );
-  it("refuses an account that never answered and allows one that chose Allow", async () => {
+  it("allows an account by default but honors an explicit opt-out", async () => {
     const f = await fixture();
     await f.t.run(async (ctx) => {
       const rows = await ctx.db.query("aiConsents").collect();
@@ -439,9 +439,9 @@ describe("AI dispatch uses fresh live ownership", () => {
         userId: f.userId,
         itemId: f.itemId,
       }),
-    ).toBe(false);
-    await f.t.run((ctx) => setTestConsent(ctx, f.userId, "granted"));
-    expect(await f.t.run((ctx) => aiAllowed(ctx, f.userId))).toBe(true);
+    ).toBe(true);
+    await f.t.run((ctx) => setTestConsent(ctx, f.userId, "declined"));
+    expect(await f.t.run((ctx) => aiAllowed(ctx, f.userId))).toBe(false);
   });
 
   it.each([

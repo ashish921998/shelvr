@@ -7,7 +7,6 @@ import AppLayout from "@/app/(app)/_layout";
 const mocks = vi.hoisted(() => ({
   onboarded: true,
   status: "unset",
-  grantOnItsWay: false,
   entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
@@ -16,16 +15,6 @@ const mocks = vi.hoisted(() => ({
 }));
 const nothing = vi.hoisted(() => () => null);
 
-vi.mock("@/lib/ai-consent", () => ({
-  useAiConsent: () => ({
-    status: mocks.status,
-    savesBlocked: mocks.status === "loading" || mocks.status === "unset",
-    asking: mocks.status === "unset" && !mocks.grantOnItsWay,
-  }),
-}));
-vi.mock("@/components/ai-consent", () => ({
-  AiConsentCard: vi.fn(() => <div>consent-card</div>),
-}));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: mocks.onboarded }),
 }));
@@ -116,66 +105,18 @@ beforeEach(() => {
   mocks.entitlement = { entitled: true, loading: false };
 });
 
-it.each(["unset", "loading"] as const)(
-  "mounts no save screen or self-saving hook for an existing user whose answer is %s",
+it.each(["unset", "loading", "granted", "declined"])(
+  "opens Home and resumes saves without a consent screen when permission is %s",
   (status) => {
     mocks.status = status;
     render(<AppLayout />);
-    expect(shows("app-stack")).toBe(false);
-    expect(mocks.replay).not.toHaveBeenCalled();
-    expect(mocks.resumeShare).not.toHaveBeenCalled();
-    expect(shows("consent-card")).toBe(status === "unset");
-    expect(shows("loader")).toBe(status === "loading");
+    expect(shows("app-stack")).toBe(true);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(shows("consent-card")).toBe(false);
+    expect(mocks.replay).toHaveBeenCalled();
+    expect(mocks.resumeShare).toHaveBeenCalled();
   },
 );
-
-it("opens the app once the answer lands, whichever it was", () => {
-  const { rerender } = render(<AppLayout />);
-  for (const status of ["granted", "declined"]) {
-    mocks.status = status;
-    rerender(<AppLayout />);
-    expect(shows("app-stack")).toBe(true);
-    expect(shows("consent-card")).toBe(false);
-  }
-});
-
-it("waits for onboarding and its paywall to finish before asking", () => {
-  mocks.onboarded = false;
-  render(<AppLayout />);
-  expect(shows("app-stack")).toBe(true);
-  expect(shows("consent-card")).toBe(false);
-});
-
-it("shows the plan gate, not the ask, to someone who finished onboarding without Pro", () => {
-  mocks.status = "unset";
-  mocks.onboarded = true;
-  mocks.entitlement = { entitled: false, loading: false };
-  render(<AppLayout />);
-  expect(shows("consent-card")).toBe(false);
-  expect(shows("app-stack")).toBe(true);
-});
-
-it("shows a signed-out user no card", () => {
-  mocks.status = "signed-out";
-  mocks.onboarded = false;
-  render(<AppLayout />);
-  expect(shows("app-stack")).toBe(true);
-  expect(shows("consent-card")).toBe(false);
-});
-
-it("shows no card while the yes given at sign-in is being recorded", () => {
-  mocks.status = "unset";
-  mocks.grantOnItsWay = true;
-  mocks.onboarded = true;
-  try {
-    render(<AppLayout />);
-    expect(shows("consent-card")).toBe(false);
-    expect(shows("app-stack")).toBe(false);
-    expect(shows("loader")).toBe(true);
-  } finally {
-    mocks.grantOnItsWay = false;
-  }
-});
 
 describe("plan gate", () => {
   beforeEach(() => {

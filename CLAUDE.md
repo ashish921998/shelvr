@@ -161,15 +161,22 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
-- **`aiConsent.ts`**: consent to third-party AI processing (App Store guideline 5.1.2(i)):
-  `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
-  every path sending user content to Gemini or SerpAPI asks first. It refuses an owner whose
-  row is missing or `deleting` before it reads consent, and item-aware checks also require an
-  existing owned save. Among live owners, only an explicit Allow lets content go out; an
-  account that never answered counts as declined. The app asks once, full screen, right
-  after onboarding and its paywall, before anything is saved. A declined user's saves still finish `ready` from what Shelvr read
-  itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
-  client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+- **`aiConsent.ts`**: legacy AI preferences and ownership checks. `getStatus` and
+  `setConsent` remain compatible with installed clients. Every path sending content to
+  Gemini, SerpAPI or Treg checks `aiAllowed` / `isAllowed`: missing or deleting owners,
+  missing or unowned saves, and explicit legacy declines are refused. Accounts with no
+  preference record use AI automatically; no grant record is fabricated. The current
+  client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
+  reports `unset` for an unanswered account, so old clients retain their existing UI.
+  `repairUnansweredEmbeddings` is a bounded, resumable one-time repair for older ready
+  saves stamped at the current embedding version but missing a vector. It clears the
+  stamp only for live owners with no preference row; the normal embedding sweep then
+  fills them. After deploying this change, run from `apps/native`:
+  `pnpm exec convex run --prod aiConsent:repairUnansweredEmbeddings '{"cursor":null}'`.
+  The function schedules its remaining pages. Rerunning it preserves existing vectors
+  and all explicit preferences; it does not reclassify saves or manufacture consent.
+  A declined user's saves still finish `ready` from what Shelvr read itself, without AI.
+  `model/aiConsent.ts` retains `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
   and `survivingCandidates` (up to 100 candidate saves, loaded and checked again before
   classification). The embedding sweep checks each cached save again in one batch and maps
@@ -266,27 +273,36 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
   user and run the same save helpers, gates and limits as the app's own mutations.
 - **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` takes a space and an
-  optional `city`. With a city (sent from the city page) it plans that city's ready saves as
-  the page lists them (`readyCitySaves`), not the space's memberships; old builds send no
-  city and plan their space's saved items. One model call asks for up to ten candidates
-  (`MAX_PLAN_CANDIDATES`) the saves name, each with a reason and its source item; five
-  remain. Nothing is stored. `spaces.claimPlanInternal` claims Pro, AI consent and the
-  `makePlan` rate limit first; the pure prompt and sanitizing half (which drops a place no
-  save names) is `model/plan.ts`. Places marked "We went" (`placeVisits.ts`, `setVisited`)
-  go into the prompt and drop out of the shortlist, unless that would leave nothing; then
-  they stay, tagged `been`.
+  optional `city`. With a city it reads that city's ready saves; otherwise it reads saved
+  space memberships. `spaces.claimPlanInternal` enforces ownership, Pro and the rate
+  limit, then looks up each candidate's visit status using an index (no recent-visit cap).
+  `model/plan.ts` deduplicates and shuffles already-extracted places, returning at most
+  five with text from their source save. Street-address-only labels are excluded from
+  recommendations (saved pins remain intact). Alias merging requires the same saved map
+  point plus compatible name/type evidence; unlocated or conflicting aliases stay separate.
+  No AI call or AI permission is needed to plan.
+  "We went" places never return as fallback picks. A multi-city save contributes only
+  place labels explicitly carrying the chosen city; ambiguous labels are skipped.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
+  and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
-- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
-  space's saved items, kept to one city (the one the city page sends, or else the most common), makes one model call that lists
-  the places they name with a time of day each, looks each up in the Apple Maps Server API
-  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
-  with no saved place shows as a gap; the trip never adds a place the saves do not name.
-  `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
-  reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
+- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
+  the chosen city's ready saves (or the most common city in a space), shuffles stored
+  unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),
+  and groups nearby stops into days at the selected pace (`model/trip.ts`, pure).
+  It does not send saves or visit history to Gemini or infer new places from raw text.
+  Without a stored time-of-day category, stops use the existing "any"/afternoon slot;
+  lunch and dinner remain open gaps. An empty selection leaves the previous trip intact.
+  `tripData.ts` stores the trip and serves `getSpaceTrip` / `tripCities`; swaps also skip
+  wishlist places marked visited after the trip was made. Explicit non-saved memberships
+  are excluded from selection, display and swaps. Stored city-less stops still use their
+  saved membership to remain visible, while city-matching saves need no membership row.
+  Without the Maps key, trips
+  still work using stored pins where available.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),

@@ -19,13 +19,13 @@ async function consentRow(ctx: QueryCtx, userId: string) {
     .unique();
 }
 
-/** Only an explicit Allow lets content go to Gemini; an account that never answered is treated as declined. */
+/** AI is available by default for live owners; explicit legacy opt-outs remain authoritative. */
 export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
 ): Promise<boolean> {
   if ((await liveOwner(ctx, userId)) === null) return false;
-  return (await consentRow(ctx, userId))?.status === "granted";
+  return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
 export const isAllowed = internalQuery({
@@ -135,6 +135,47 @@ export const setConsent = authedMutation({
 });
 
 const SYNC_BATCH = 50;
+
+/** One-time repair after deploying automatic AI: convex run aiConsent:repairUnansweredEmbeddings '{"cursor":null}' */
+export const repairUnansweredEmbeddings = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.object({ repaired: v.number(), done: v.boolean() }),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("items")
+      .withIndex("by_status_and_embeddingVersion", (q) =>
+        q
+          .eq("status", "ready")
+          .eq("embeddingVersion", CURRENT_EMBEDDING_VERSION),
+      )
+      .paginate({
+        numItems: SYNC_BATCH,
+        cursor: args.cursor,
+        maximumBytesRead: 1_000_000,
+      });
+    let repaired = 0;
+    for (const item of page) {
+      if (item.embedding !== undefined) continue;
+      if ((await liveOwner(ctx, item.userId)) === null) continue;
+      if ((await consentRow(ctx, item.userId)) !== null) continue;
+      await ctx.db.patch(item._id, {
+        embeddingVersion: undefined,
+        embeddingAttempts: undefined,
+      });
+      repaired++;
+    }
+    if (!isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.aiConsent.repairUnansweredEmbeddings,
+        {
+          cursor: continueCursor,
+        },
+      );
+    }
+    return { repaired, done: isDone };
+  },
+});
 
 export const syncEmbeddings = internalMutation({
   args: { userId: v.string(), cursor: v.union(v.string(), v.null()) },
