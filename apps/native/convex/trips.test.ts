@@ -7,7 +7,7 @@ import {
   insertConsentingUser,
   setTestConsent,
 } from "./test.setup";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 const generateObject = vi.hoisted(() => vi.fn());
@@ -443,4 +443,114 @@ describe("makeTrip without AI", () => {
     expect(micho?.lat).toBeUndefined();
     expect(stops.find((stop) => stop.name === "PNY")?.lat).toBe(48.8638);
   });
+});
+
+it("keeps stored city-less stops and wishlist entries when their space membership is saved", async () => {
+  const { t, spaceId, itemIds } = await setup([
+    { title: "Old stop" },
+    { title: "Old reserve" },
+  ]);
+  const tripId = await t.mutation(internal.tripData.saveTripInternal, {
+    spaceId,
+    city: "Lisbon",
+    pace: "easy",
+    days: [
+      {
+        areas: [],
+        gaps: [],
+        stops: [
+          {
+            itemId: itemIds[0],
+            name: "Old stop",
+            why: "Saved",
+            slot: "afternoon",
+          },
+        ],
+      },
+    ],
+    wishlist: [
+      {
+        itemId: itemIds[1],
+        name: "Old reserve",
+        why: "Saved",
+        slot: "afternoon",
+      },
+    ],
+  });
+  const shown = await t.query(api.tripData.getSpaceTrip, { spaceId });
+  expect(shown?.days[0].stops.map((s) => s.name)).toEqual(["Old stop"]);
+  expect(shown?.wishlist.map((s) => s.name)).toEqual(["Old reserve"]);
+  expect(
+    await t.mutation(api.tripData.swapTripStop, {
+      tripId,
+      itemId: itemIds[0],
+      name: "Old stop",
+    }),
+  ).toEqual({ itemId: itemIds[1], name: "Old reserve" });
+});
+
+it("hides dismissed city stops and refuses dismissed wishlist replacements", async () => {
+  const { t, spaceId, itemIds } = await setup(LISBON_SAVES);
+  const stop = (index: number) => ({
+    itemId: itemIds[index],
+    name: `Stop ${index}`,
+    why: "Saved",
+    slot: "afternoon" as const,
+  });
+  const tripId = await t.mutation(internal.tripData.saveTripInternal, {
+    spaceId,
+    city: "Lisbon",
+    pace: "easy",
+    days: [{ areas: [], gaps: [], stops: [stop(0), stop(1)] }],
+    wishlist: [stop(2)],
+  });
+  await t.mutation(api.spaces.removeItemFromSpace, {
+    spaceId,
+    itemId: itemIds[0],
+  });
+  await t.mutation(api.spaces.removeItemFromSpace, {
+    spaceId,
+    itemId: itemIds[2],
+  });
+  const shown = await t.query(api.tripData.getSpaceTrip, { spaceId });
+  expect(shown?.days[0].stops.map((s) => s.itemId)).toEqual([itemIds[1]]);
+  expect(shown?.wishlist).toEqual([]);
+  await expect(
+    t.mutation(api.tripData.swapTripStop, {
+      tripId,
+      itemId: itemIds[1],
+      name: "Stop 1",
+    }),
+  ).rejects.toMatchObject({ data: { code: "nothing_to_swap" } });
+});
+
+it("filters street-only recommendations and folds map-confirmed aliases without changing saved pins", async () => {
+  const { base, t, spaceId, itemIds } = await setup([
+    {
+      title: "Lisbon places",
+      cities: ["Lisbon"],
+      places: ["80 Spring Street", "Belém Tower", "Torre de Belén"],
+    },
+  ]);
+  const pins = [
+    { name: "80 Spring Street", lat: 38.7, lng: -9.2 },
+    { name: "Belém Tower", lat: 38.6916, lng: -9.216 },
+    { name: "Torre de Belén", lat: 38.6916, lng: -9.216 },
+  ];
+  await base.run((ctx) => ctx.db.patch(itemIds[0], { placePins: pins }));
+  const plan = await t.action(api.plans.makePlan, { spaceId, city: "Lisbon" });
+  expect(plan.places).toHaveLength(1);
+  await t.action(api.trips.makeTrip, {
+    spaceId,
+    city: "Lisbon",
+    days: 1,
+    pace: "packed",
+  });
+  expect(
+    (await t.query(api.tripData.getSpaceTrip, { spaceId }))?.days[0].stops,
+  ).toHaveLength(1);
+  expect((await base.run((ctx) => ctx.db.get(itemIds[0])))?.placePins).toEqual(
+    pins,
+  );
+  expect(generateObject).not.toHaveBeenCalled();
 });

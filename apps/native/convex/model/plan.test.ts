@@ -494,3 +494,58 @@ it("shuffles the stored places without inventing or dropping candidates", () => 
     random.mockRestore();
   }
 });
+
+it("excludes street-address labels without discarding numbered business names", () => {
+  const sources = [
+    source({
+      places: [
+        "80 Spring Street, New York, NY",
+        "205 East Houston Street, New York",
+        "12 rue de Richelieu, Paris",
+        "Rue de Richelieu, Paris",
+        "5 Guys, New York",
+        "7th Street Burger, New York",
+      ],
+    }),
+  ];
+  expect(
+    suggestSavedPlaces(sources, new Set(), 10)
+      .map((p) => p.name)
+      .sort(),
+  ).toEqual(["5 Guys", "7th Street Burger"]);
+});
+
+it("merges supported aliases at the same saved map point and excludes the group when either name was visited", () => {
+  const sources = [
+    source({
+      places: ["Belém Tower", "Torre de Belén"],
+      pins: [
+        { name: "Belém Tower", lat: 38.6916, lng: -9.216 },
+        { name: "Torre de Belén", lat: 38.6916, lng: -9.216 },
+      ],
+    }),
+  ];
+  expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(1);
+  expect(
+    suggestSavedPlaces(sources, new Set([placeKey("Torre de Belén")]), 10),
+  ).toEqual([]);
+});
+
+it("does not guess alias identity without pins or merge nearby or co-located distinct businesses", () => {
+  const names = ["Belém Tower", "Torre de Belén"];
+  expect(
+    suggestSavedPlaces([source({ places: names })], new Set(), 10),
+  ).toHaveLength(2);
+  const sources = [
+    source({
+      places: [...names, "Belém Cafe", "Other Restaurant"],
+      pins: [
+        { name: names[0], lat: 38.6916, lng: -9.216 },
+        { name: names[1], lat: 38.692, lng: -9.216 },
+        { name: "Belém Cafe", lat: 38.6916, lng: -9.216 },
+        { name: "Other Restaurant", lat: 38.6916, lng: -9.216 },
+      ],
+    }),
+  ];
+  expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(4);
+});

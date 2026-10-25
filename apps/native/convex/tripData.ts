@@ -73,7 +73,13 @@ export async function planSaves(
     return await loadReadySaves(ctx, spaceId, userId);
   }
   const items = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
-  return items.map((item) => ({ item }));
+  const saves: PlanSave[] = [];
+  for (const item of items) {
+    const join = await getMembership(ctx, item._id, spaceId);
+    if (join !== null && effectiveStatus(join) !== "saved") continue;
+    saves.push({ item, ...(join === null ? {} : { join }) });
+  }
+  return saves;
 }
 
 export async function claimSpaceForPlanning(
@@ -127,6 +133,7 @@ export function toPlanSource(
     url: item.url,
     siteName: item.siteName,
     author: item.author,
+    pins: item.placePins,
     places: [
       ...[...(item.intents ?? []), ...(join?.intents ?? [])]
         .filter((intent) => intent.kind === "open_maps")
@@ -206,13 +213,15 @@ async function liveSave(
 ): Promise<Doc<"items"> | null> {
   const item = await ctx.db.get(stop.itemId);
   if (item === null || item.userId !== userId) return null;
-  if (city !== undefined) {
+  const membership = await getMembership(ctx, stop.itemId, spaceId);
+  if (membership !== null && effectiveStatus(membership) !== "saved")
+    return null;
+  if (city !== undefined && (item.cities ?? []).length > 0) {
     return item.status === "ready" &&
       (item.cities ?? []).some((value) => cityKey(value) === cityKey(city))
       ? item
       : null;
   }
-  const membership = await getMembership(ctx, stop.itemId, spaceId);
   return membership !== null && effectiveStatus(membership) === "saved"
     ? item
     : null;

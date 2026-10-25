@@ -277,7 +277,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   space memberships. `spaces.claimPlanInternal` enforces ownership, Pro and the rate
   limit, then looks up each candidate's visit status using an index (no recent-visit cap).
   `model/plan.ts` deduplicates and shuffles already-extracted places, returning at most
-  five with text from their source save. No AI call or AI permission is needed to plan.
+  five with text from their source save. Street-address-only labels are excluded from
+  recommendations (saved pins remain intact). Alias merging requires the same saved map
+  point plus compatible name/type evidence; unlocated or conflicting aliases stay separate.
+  No AI call or AI permission is needed to plan.
   "We went" places never return as fallback picks. A multi-city save contributes only
   place labels explicitly carrying the chosen city; ambiguous labels are skipped.
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
@@ -295,7 +298,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Without a stored time-of-day category, stops use the existing "any"/afternoon slot;
   lunch and dinner remain open gaps. An empty selection leaves the previous trip intact.
   `tripData.ts` stores the trip and serves `getSpaceTrip` / `tripCities`; swaps also skip
-  wishlist places marked visited after the trip was made. Without the Maps key, trips
+  wishlist places marked visited after the trip was made. Explicit non-saved memberships
+  are excluded from selection, display and swaps. Stored city-less stops still use their
+  saved membership to remain visible, while city-matching saves need no membership row.
+  Without the Maps key, trips
   still work using stored pins where available.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save

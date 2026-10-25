@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   share: vi.fn(),
   alert: vi.fn(),
   capture: vi.fn(),
+  captureError: vi.fn(),
 }));
 vi.mock("convex/react", () => ({
   useAction: () => mocks.makePlan,
@@ -30,7 +31,7 @@ vi.mock("react-native", () => ({
   Share: { share: mocks.share, sharedAction: "sharedAction" },
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: mocks.capture, captureError: vi.fn() },
+  analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 
 const SPACE = "space1" as Id<"spaces">;
@@ -53,6 +54,7 @@ afterEach(() => {
   mocks.share.mockReset();
   mocks.alert.mockReset();
   mocks.capture.mockReset();
+  mocks.captureError.mockReset();
 });
 
 describe("usePlaceVisits", () => {
@@ -146,7 +148,7 @@ describe("useMakePlan", () => {
     expect(state.status === "ready" && state.places[0].name).toBe("Beta");
   });
 
-  it("waits for the vote link, then shows its shortlist without the model", async () => {
+  it("waits for the vote link, then shows its shortlist without requesting a new plan", async () => {
     const shared = {
       expiresAt: Date.now() + 60_000,
       places: [
@@ -178,7 +180,7 @@ describe("useMakePlan", () => {
     expect(result.current.state).toMatchObject({ places: [place("Alpha")] });
   });
 
-  it("asks the model when the link has closed", async () => {
+  it("requests a new plan when the link has closed", async () => {
     mocks.makePlan.mockResolvedValue({
       places: [place("Alpha")],
       considered: 3,
@@ -238,7 +240,8 @@ describe("useMakePlan", () => {
   });
 
   it("shows the error screen when the first plan fails and its retry fails", async () => {
-    mocks.makePlan.mockRejectedValue(new Error("down"));
+    const failure = new Error("down");
+    mocks.makePlan.mockRejectedValue(failure);
     const { result } = renderHook(() => useMakePlan(SPACE, "en", null));
     await waitFor(() => expect(result.current.state.status).toBe("error"));
 
@@ -246,6 +249,13 @@ describe("useMakePlan", () => {
 
     expect(result.current.state.status).toBe("error");
     expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledWith("plan_failed", {
+      reason: "error",
+    });
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "make_plan_failed",
+      failure,
+    );
   });
 });
 

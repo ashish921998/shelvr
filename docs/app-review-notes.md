@@ -139,7 +139,7 @@ Share extension, Siri and widget:
 
 Third-party AI:
 
-To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini. Date and trip planning happens within Shelvr using places already saved in the selected city and excluding places marked "We went". The saved collection and visit history are not sent to Gemini for planning; Apple Maps still resolves trip stops. Home opens after onboarding and its paywall without an AI permission prompt or Settings switch. Accounts without a recorded preference use AI automatically for incoming saves; previously recorded opt-outs remain honored. Plans can still use previously saved places when AI processing is disabled. No explicit AI permission is collected by this client. This needs review against App Store guideline 5.1.2(i), which requires explicit permission before personal data is shared with third-party AI.
+To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini. Date and trip planning happens within Shelvr using places already saved in the selected city and excluding places marked "We went". The saved collection and visit history are not sent to Gemini for planning; Apple Maps still resolves trip stops. Home opens after onboarding and its paywall without an AI permission prompt or Settings switch. Accounts without a recorded preference use AI automatically for incoming saves; previously recorded opt-outs remain honored. Plans can still use previously saved places when AI processing is disabled.
 
 Account and support controls:
 

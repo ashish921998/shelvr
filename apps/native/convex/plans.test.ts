@@ -133,14 +133,9 @@ describe("makePlan", () => {
       spaceId,
       city: "Lisbon",
     });
-    expect(result.considered).toBe(2);
-    expect(result.places.map((place) => place.name).sort()).toEqual([
-      "Graça Rooftop",
-      "Taberna",
-    ]);
-    expect(result.places.map((place) => place.itemId).sort()).toEqual(
-      [itemIds[0], itemIds[2]].sort(),
-    );
+    expect(result.considered).toBe(1);
+    expect(result.places.map((place) => place.name)).toEqual(["Taberna"]);
+    expect(result.places.map((place) => place.itemId)).toEqual([itemIds[0]]);
     expect(generateObject).not.toHaveBeenCalled();
   });
 
