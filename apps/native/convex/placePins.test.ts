@@ -202,6 +202,26 @@ describe("placePins", () => {
     ]);
   });
 
+  it("keeps far-apart pins on a save that names several cities", async () => {
+    const { t, itemId, pins } = await setup([
+      "Time Out",
+      "Majestic",
+      "Faro Marina",
+    ]);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, { cities: ["Lisbon", "Porto", "Faro"] });
+    });
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [
+        { name: "Time Out", lat: 38.707, lng: -9.1457 },
+        { name: "Majestic", lat: 41.1468, lng: -8.6066 },
+        { name: "Faro Marina", lat: 37.0144, lng: -7.9351 },
+      ],
+    });
+    expect(await pins()).toHaveLength(3);
+  });
+
   it("keeps two far-apart pins, with nothing to say which is wrong", async () => {
     const { t, itemId, pins } = await setup(["Here", "There"]);
     await t.mutation(internal.placePins.storePins, {

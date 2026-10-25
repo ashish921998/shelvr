@@ -25,9 +25,9 @@ const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number };
 
-/** With three or more pins, one far from the rest is a wrong match for a same-named place elsewhere. */
-function nearEachOther(pins: Pin[]): Pin[] {
-  if (pins.length < 3) return pins;
+/** In a one-city save with three or more pins, one far from the rest is a wrong match for a same-named place elsewhere. */
+function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
+  if (pins.length < 3 || cities.length > 1) return pins;
   const kept = keepNearby(pins, null);
   return pins.filter((_, i) => kept[i] !== null);
 }
@@ -108,7 +108,10 @@ export const storePins = internalMutation({
       const key = placeKey(pin.name);
       if (wanted.has(key) && !next.has(key)) next.set(key, pin);
     }
-    const pins = nearEachOther([...next.values()]).slice(0, MAX_PINS);
+    const pins = nearEachOther([...next.values()], item.cities ?? []).slice(
+      0,
+      MAX_PINS,
+    );
     const before = item.placePins ?? [];
     const same =
       pins.length === before.length &&
