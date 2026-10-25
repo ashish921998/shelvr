@@ -228,7 +228,7 @@ const styles = StyleSheet.create((theme) => ({
   examplePlaces: {
     position: "absolute",
     left: theme.gap(2),
-    right: theme.gap(2),
+    right: theme.gap(7),
     bottom: theme.gap(2),
     maxHeight: "45%",
     borderRadius: theme.radius.lg,

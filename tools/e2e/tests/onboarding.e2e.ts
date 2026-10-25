@@ -1,5 +1,5 @@
 import { afterEach, test } from "@e2e-dev/mobile";
-import { expect } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
 
 import {
   SHARE_ON_REEL,
@@ -10,7 +10,17 @@ import {
   walkToCommitment,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
+import {
+  closePaywallTo,
+  expectPaywall,
+  paywallTitle,
+} from "./paywall-sheet.ts";
+
+async function closeToCommitment(screen: Screen, commitment: Locator) {
+  await closePaywallTo(screen, commitment);
+  await expect(screen.getByTestId("dev-login-button")).toBeHidden();
+  await expect(screen.getByRole("button", "Add")).toBeHidden();
+}
 
 // Leave the app signed out at the opener, not mid-onboarding, for the next test.
 afterEach(async ({ device, screen }) => {
@@ -40,13 +50,12 @@ test(
     await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
-    await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
+    await closeToCommitment(screen, commit);
     await expect(commit).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
     await commit.tap();
     await expectPaywall(screen);
-    await screen.getByRole("button", "Close").first().tap();
+    await closeToCommitment(screen, commit);
     await expect(commit).toBeVisible({ timeout: 30_000 });
 
     await device.openApp(BUNDLE_ID, {
@@ -147,8 +156,7 @@ test(
     const commit = screen.getByRole("button", "Continue");
     await commit.tap();
     await expectPaywall(screen);
-    await screen.getByRole("button", "Close").first().tap();
-    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
+    await closeToCommitment(screen, commit);
     await expect(commit).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },

@@ -237,7 +237,6 @@ export default function OnboardingScreen() {
 
   const paywall = useOnboardingPaywall({
     onPro: finish,
-    onDecline: finish,
     onUnavailable: finish,
   });
 

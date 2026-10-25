@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   reduced: false,
   stateChange: (_state: string) => {},
   accessibilityTap: () => {},
+  accessibilityAction: (_event: { nativeEvent: { actionName: string } }) => {},
+  accessibilityActions: [] as { name: string }[],
   longPress: () => {},
   delayLongPress: 0,
   remove: vi.fn(),
@@ -54,6 +56,10 @@ vi.mock("react-native", () => ({
         onPressIn: () => void;
         onPressOut: () => void;
         onAccessibilityTap: () => void;
+        onAccessibilityAction: (event: {
+          nativeEvent: { actionName: string };
+        }) => void;
+        accessibilityActions: { name: string }[];
         onLongPress: () => void;
         delayLongPress: number;
         disabled: boolean;
@@ -61,6 +67,8 @@ vi.mock("react-native", () => ({
       },
     ) => {
       mocks.accessibilityTap = props.onAccessibilityTap;
+      mocks.accessibilityAction = props.onAccessibilityAction;
+      mocks.accessibilityActions = props.accessibilityActions;
       mocks.longPress = props.onLongPress;
       mocks.delayLongPress = props.delayLongPress;
       return (
@@ -322,6 +330,26 @@ it("allows screen-reader activation directly", () => {
       flow_version: ONBOARDING_FLOW_VERSION,
     },
   );
+});
+
+it("supports TalkBack activation without holding, and ignores unrelated actions", () => {
+  vi.stubEnv("EXPO_OS", "android");
+  const { onContinue } = renderStep();
+  expect(mocks.accessibilityActions).toEqual([{ name: "activate" }]);
+  act(() =>
+    mocks.accessibilityAction({ nativeEvent: { actionName: "longpress" } }),
+  );
+  expect(mocks.capture).not.toHaveBeenCalled();
+  act(() =>
+    mocks.accessibilityAction({ nativeEvent: { actionName: "activate" } }),
+  );
+  act(() =>
+    mocks.accessibilityAction({ nativeEvent: { actionName: "activate" } }),
+  );
+  expect(screen.getByText("You’re in.")).toBeTruthy();
+  expect(mocks.capture).toHaveBeenCalledTimes(1);
+  expect(mocks.haptic).not.toHaveBeenCalled();
+  expect(onContinue).not.toHaveBeenCalled();
 });
 
 it("allows skipping without making a promise", () => {

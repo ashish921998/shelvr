@@ -182,6 +182,10 @@ export function CommitmentStep({
           delayLongPress={HOLD_MS}
           onLongPress={hold.completeHold}
           onAccessibilityTap={hold.confirm}
+          accessibilityActions={[{ name: "activate" }]}
+          onAccessibilityAction={({ nativeEvent }) => {
+            if (nativeEvent.actionName === "activate") hold.confirm();
+          }}
           style={styles.hold}
           testID="commitment-hold"
         >

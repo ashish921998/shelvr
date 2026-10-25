@@ -1,4 +1,24 @@
-import { expect, type Screen } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
+import { pollUntil } from "./poll.ts";
+
+export async function closePaywallTo(
+  screen: Screen,
+  destination: Locator,
+): Promise<void> {
+  // The underlying screen can remain visible in AX during native presentation.
+  // Send Close, then require the paywall itself to disappear before returning.
+  await pollUntil(
+    async () => {
+      await screen.getByRole("button", "Close").first().tap();
+      return expect(paywallTitle(screen))
+        .toBeHidden({ timeout: 2000 })
+        .then(() => true)
+        .catch(() => false);
+    },
+    { timeout: 30_000 },
+  );
+  await expect(destination).toBeVisible({ timeout: 30_000 });
+}
 
 export function paywallTitle(screen: Screen) {
   return screen
