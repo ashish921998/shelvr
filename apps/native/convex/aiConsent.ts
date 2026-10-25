@@ -19,13 +19,13 @@ async function consentRow(ctx: QueryCtx, userId: string) {
     .unique();
 }
 
-/** Only an explicit decline blocks; unset stays allowed so builds without the consent card keep working. */
+/** Only an explicit Allow lets content go to Gemini; an account that never answered is treated as declined. */
 export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
 ): Promise<boolean> {
   if ((await liveOwner(ctx, userId)) === null) return false;
-  return (await consentRow(ctx, userId))?.status !== "declined";
+  return (await consentRow(ctx, userId))?.status === "granted";
 }
 
 export const isAllowed = internalQuery({

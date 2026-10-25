@@ -10,7 +10,12 @@ import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_DIMENSIONS,
 } from "./model/embedding";
-import { newConvexTest, signedInUser } from "./test.setup";
+import {
+  insertConsentingUser,
+  newConvexTest,
+  setTestConsent,
+  signedInUser,
+} from "./test.setup";
 import { aiAllowed } from "./aiConsent";
 
 const embedMany = vi.hoisted(() => vi.fn());
@@ -35,8 +40,11 @@ const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
 
 type T = TestConvexForDataModel<DataModel>;
 
-async function signedIn(backend = newConvexTest()): Promise<T> {
-  const { t, userId } = await signedInUser(backend);
+async function signedIn(
+  backend = newConvexTest(),
+  aiConsent: "granted" | "unset" = "granted",
+): Promise<T> {
+  const { t, userId } = await signedInUser(backend, { aiConsent });
   USER = userId;
   return t;
 }
@@ -127,7 +135,7 @@ afterEach(() => {
 
 describe("getStatus and setConsent", () => {
   it("reads unset until the user answers, then their answer", async () => {
-    const t = await signedIn();
+    const t = await signedIn(newConvexTest(), "unset");
     const unset = { status: "unset", version: AI_CONSENT_VERSION };
     expect(await t.query(api.aiConsent.getStatus, {})).toEqual(unset);
 
@@ -147,7 +155,7 @@ describe("getStatus and setConsent", () => {
   });
 
   it("asks again when the answer was to an older disclosure", async () => {
-    const t = await signedIn();
+    const t = await signedIn(newConvexTest(), "unset");
     await t.run((ctx) =>
       ctx.db.insert("aiConsents", {
         userId: USER,
@@ -166,11 +174,13 @@ describe("getStatus and setConsent", () => {
     ).mutation(api.aiConsent.setConsent, {
       granted: false,
     });
-    const { t: other, userId: otherId } = await signedInUser(backend);
+    const { t: other, userId: otherId } = await signedInUser(backend, {
+      aiConsent: "unset",
+    });
     expect((await other.query(api.aiConsent.getStatus, {})).status).toBe(
       "unset",
     );
-    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(true);
+    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(false);
   });
 
   it("requires a signed-in user", async () => {
@@ -183,16 +193,14 @@ describe("getStatus and setConsent", () => {
 });
 
 describe("a user who has not answered", () => {
-  it("is still classified, so builds without the consent card keep working", async () => {
-    const t = await signedIn();
+  it("is treated as declined: nothing goes to Gemini until they choose Allow", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    expect(generateObject).toHaveBeenCalledTimes(1);
-    expect(embedMany).toHaveBeenCalledTimes(1);
+    await expectNoThirdPartyCall();
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       status: "ready",
-      title: "Model title",
-      tags: ["model"],
+      title: "Buy lentils",
     });
   });
 });
@@ -357,7 +365,7 @@ describe("a user who declined", () => {
   it("gets no steering when filing an item into a space", async () => {
     const t = newConvexTest();
     const { itemId, spaceId, userId } = await t.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("subscriptions", {
         userId,
         status: "pro",
@@ -442,14 +450,7 @@ describe("a user who declined", () => {
   it("is skipped by a sweep that reaches an item before the cleanup does", async () => {
     const t = await signedIn();
     const itemId = await ready(t);
-    await t.run((ctx) =>
-      ctx.db.insert("aiConsents", {
-        userId: USER,
-        status: "declined",
-        version: AI_CONSENT_VERSION,
-        updatedAt: 1,
-      }),
-    );
+    await t.run((ctx) => setTestConsent(ctx, USER, "declined"));
     expect(await t.action(internal.ai.sweepItemEmbeddings, {})).toEqual({
       scanned: 1,
       written: 0,

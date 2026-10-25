@@ -2,7 +2,11 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import {
+  newConvexTest,
+  insertConsentingUser,
+  setTestConsent,
+} from "./test.setup";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
@@ -28,7 +32,7 @@ async function setup(
 ) {
   const base = newConvexTest();
   const seeded = await base.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", {});
+    const userId = await insertConsentingUser(ctx);
     if (options.pro !== false) {
       await ctx.db.insert("subscriptions", {
         userId,
@@ -38,12 +42,7 @@ async function setup(
       });
     }
     if (options.consent) {
-      await ctx.db.insert("aiConsents", {
-        userId,
-        status: options.consent,
-        version: 1,
-        updatedAt: Date.now(),
-      });
+      await setTestConsent(ctx, userId, options.consent);
     }
     const spaceId = await ctx.db.insert("spaces", {
       userId,
@@ -555,7 +554,7 @@ describe("makeTrip", () => {
 
   it("does not show another user's trip", async () => {
     const { base, spaceId } = await setup(LISBON_SAVES);
-    const strangerId = await base.run((ctx) => ctx.db.insert("users", {}));
+    const strangerId = await base.run((ctx) => insertConsentingUser(ctx));
     const stranger = base.withIdentity({ subject: `${strangerId}|s` });
 
     expect(

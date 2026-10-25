@@ -367,8 +367,8 @@ describe("the tables", () => {
 describe("deleting an account", () => {
   async function deleteBesideBystander() {
     const backend = newConvexTest();
-    const doomedUser = await signedInUser(backend);
-    const bystanderUser = await signedInUser(backend);
+    const doomedUser = await signedInUser(backend, { aiConsent: "unset" });
+    const bystanderUser = await signedInUser(backend, { aiConsent: "unset" });
     const doomed = await seedAccount(backend, doomedUser.userId);
     const bystander = await seedAccount(backend, bystanderUser.userId);
     const bystanderBefore = await readRows(backend, bystander);
@@ -378,7 +378,7 @@ describe("deleting an account", () => {
 
   it("seeds a row in every table the account owns", async () => {
     const backend = newConvexTest();
-    const { userId } = await signedInUser(backend);
+    const { userId } = await signedInUser(backend, { aiConsent: "unset" });
     const seeded = await seedAccount(backend, userId);
     expect(seeded.rows.map((row) => row.table).sort()).toEqual(
       [...ACCOUNT_TABLES].sort(),
@@ -456,7 +456,7 @@ describe("deleting an account", () => {
 
   it.each(MULTI_ROW_TABLES)("drains %s across batches", async (table) => {
     const backend = newConvexTest();
-    const { userId, t } = await signedInUser(backend);
+    const { userId, t } = await signedInUser(backend, { aiConsent: "unset" });
     const seeded = await seedAccount(backend, userId, {
       [table]: DELETE_BATCH + 1,
     });
@@ -810,7 +810,7 @@ async function newUniverse(recipe: Recipe) {
     vi.stubEnv(name, value);
   }
   const backend = newConvexTest();
-  const { userId, t } = await signedInUser(backend);
+  const { userId, t } = await signedInUser(backend, { aiConsent: "unset" });
   const now = Date.now() + (recipe.advanceMs ?? 0);
   await seedNotes(backend, userId, recipe.padding);
   await recipe.seed(backend, userId, now);

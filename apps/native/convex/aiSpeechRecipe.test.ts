@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "@convex/_generated/api";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
@@ -74,7 +74,7 @@ function transcript(text: string) {
 }
 
 async function tiktok(t: ReturnType<typeof newConvexTest>) {
-  const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+  const userId = await t.run((ctx) => insertConsentingUser(ctx));
   return await t.run((ctx) =>
     ctx.db.insert("items", {
       userId,
@@ -203,7 +203,7 @@ describe("processItem recipe from a video's speech", () => {
     model(true);
     transcript("Butter and cream.");
     const t = newConvexTest();
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
         userId,
@@ -225,7 +225,7 @@ describe("processItem recipe from a video's speech", () => {
   it("keeps the save ready when the transcript claim throws", async () => {
     model(true);
     const t = newConvexTest();
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
         userId,
@@ -255,7 +255,7 @@ describe("processItem recipe from a video's speech", () => {
     model(true);
     transcript("Butter and cream.");
     const t = newConvexTest();
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     for (let i = 0; i < 11; i++) {
       const itemId = await t.run((ctx) =>
         ctx.db.insert("items", {

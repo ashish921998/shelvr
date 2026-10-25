@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "@convex/_generated/api";
 import * as safeFetchModule from "./model/safeFetch";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 
 const generateObject = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (original) => ({
@@ -48,7 +48,7 @@ async function photo(
   blob = new Blob([bytes], { type: "image/png" }),
 ) {
   return t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", {});
+    const userId = await insertConsentingUser(ctx);
     const storageId = await ctx.storage.store(blob);
     const itemId = await ctx.db.insert("items", {
       userId,

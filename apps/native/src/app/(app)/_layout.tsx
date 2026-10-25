@@ -1,3 +1,5 @@
+import { AiConsentCard } from "@/components/ai-consent";
+import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
@@ -26,6 +28,22 @@ import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
 export default function AppLayout() {
+  useAppLocale();
+  const { onboarded } = useOnboarding();
+  const consent = useAiConsent();
+
+  // Past onboarding and its paywall, nothing is saved until the person answers the Gemini ask.
+  if (onboarded && consent.savesBlocked) {
+    return consent.asking ? (
+      <AiConsentCard />
+    ) : (
+      <ScreenLoader label={t("loading.app")} />
+    );
+  }
+  return <AppStack />;
+}
+
+function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
