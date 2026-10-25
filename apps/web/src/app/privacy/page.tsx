@@ -101,17 +101,20 @@ export default function PrivacyPage() {
           How your content is processed
         </h2>
         <p className="mt-2">
-          To organize your saves, Shelvr sends content from its server to
-          Google’s Gemini API (a generation model and Gemini embeddings). This
-          is used to write titles, descriptions, and tags, suggest spaces, and
-          power search. What is sent: link addresses and up to about 8,000
-          characters of extracted page text, note text, saved photos (the image
-          content), and the names and descriptions of your spaces.
+          To find the places in your saves, Shelvr sends content from its server
+          to Google’s Gemini API (a generation model and Gemini embeddings).
+          What is sent: link addresses, up to about 8,000 characters of
+          extracted page text, a reel’s or TikTok’s caption, and what is said in
+          the video. When you make a plan, Shelvr also sends your saved places
+          and the ones you marked “We went”. Notes and photos saved with earlier
+          versions of the app are processed the same way.
         </p>
         <p className="mt-2">
-          The app tells you this when you sign in, and signing in allows it. You
-          can turn AI processing off at any time in Settings. If you decline,
-          saves are stored without AI titles and tags.
+          Before anything is sent, the app asks whether Shelvr may use Google’s
+          Gemini AI to find the places in your saves, and nothing goes to Gemini
+          until you tap Allow. You can change this at any time in Settings
+          (“Find places with AI”). If you choose Not now, your links are still
+          saved, but without places or plans.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that

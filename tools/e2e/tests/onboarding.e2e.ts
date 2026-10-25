@@ -9,7 +9,9 @@ import {
   walkToSampleReel,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
-import { expectPaywall } from "./paywall-sheet.ts";
+import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
+
+const COMMIT = "Continue";
 
 // Leave the app signed out at the opener, not mid-onboarding, for the next test.
 afterEach(async ({ device, screen }) => {
@@ -18,7 +20,7 @@ afterEach(async ({ device, screen }) => {
 });
 
 test(
-  "asks for the paywall at the end of onboarding, and a relaunch comes back to it",
+  "asks for the paywall at the end of onboarding, and a close keeps it there",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
     await startFreshOnboarding({ device, screen });
@@ -33,22 +35,29 @@ test(
     );
 
     await shareTheSampleReel(screen);
-    // The spots screen's Continue opens the paywall; expectPaywall taps it. A
-    // relaunch leaves the paywall and lands back on the spots, still signed out.
-    const spots = screen.getByText("Prague · 3 places");
-    await expect(spots).toBeVisible({ timeout: 30_000 });
+    // The sample spots open the paywall, and stay put when the paywall closes.
+    const commit = screen.getByRole("button", COMMIT);
+    await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
+
+    await screen.getByRole("button", "Close").first().tap();
+    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
+    await expect(commit).toBeVisible({ timeout: 30_000 });
+    await expect(screen.getByTestId("dev-login-button")).toBeHidden();
+    await commit.tap();
+    await expectPaywall(screen);
+    await screen.getByRole("button", "Close").first().tap();
+    await expect(commit).toBeVisible({ timeout: 30_000 });
 
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    await expect(spots).toBeVisible({ timeout: 180_000 });
+    await expect(commit).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByTestId("SplashScreenLogo")).toBeHidden({
       timeout: 30_000,
     });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
-    await expectPaywall(screen);
   },
 );
 
@@ -70,10 +79,12 @@ test(
         timeout: 10_000,
       });
     }
-    await expect(screen.getByRole("button", "Continue")).toBeEnabled({
-      timeout: 10_000,
-    });
+    const commit = screen.getByRole("button", COMMIT);
+    await commit.tap();
     await expectPaywall(screen);
+    await screen.getByRole("button", "Close").first().tap();
+    await expect(paywallTitle(screen)).toBeHidden({ timeout: 30_000 });
+    await expect(commit).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );

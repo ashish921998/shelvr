@@ -137,6 +137,14 @@ export const claimTripInternal = internalMutation({
     city: v.optional(v.string()),
     sources: v.array(planSourceValidator),
     been: v.array(v.string()),
+    pins: v.array(
+      v.object({
+        itemId: v.id("items"),
+        name: v.string(),
+        lat: v.number(),
+        lng: v.number(),
+      }),
+    ),
   }),
   handler: async (ctx, args) => {
     const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
@@ -157,7 +165,7 @@ export const claimTripInternal = internalMutation({
         : countCities(saves.map(({ item }) => item))[0]?.city;
     const sources = saves.map(({ item, join }) => toPlanSource(item, join));
     if (sources.length === 0) {
-      return { spaceName: space.name, city, sources, been: [] };
+      return { spaceName: space.name, city, sources, been: [], pins: [] };
     }
     await rateLimiter.limit(ctx, "makeTrip", { key: userId, throws: true });
     return {
@@ -165,6 +173,9 @@ export const claimTripInternal = internalMutation({
       city,
       sources,
       been: await beenPlaces(ctx, userId),
+      pins: saves.flatMap(({ item }) =>
+        (item.placePins ?? []).map((pin) => ({ itemId: item._id, ...pin })),
+      ),
     };
   },
 });

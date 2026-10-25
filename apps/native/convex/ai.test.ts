@@ -30,7 +30,11 @@ import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
 import type { ArticleMedia, PostMedia } from "./model/itemFields";
-import { newConvexTest, signedInUser } from "./test.setup";
+import {
+  newConvexTest,
+  signedInUser,
+  insertConsentingUser,
+} from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const parseJson = vi.hoisted(() => vi.fn());
@@ -1245,7 +1249,7 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
         userId,

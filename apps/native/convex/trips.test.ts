@@ -2,7 +2,11 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import {
+  newConvexTest,
+  insertConsentingUser,
+  setTestConsent,
+} from "./test.setup";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
@@ -28,7 +32,7 @@ async function setup(
 ) {
   const base = newConvexTest();
   const seeded = await base.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", {});
+    const userId = await insertConsentingUser(ctx);
     if (options.pro !== false) {
       await ctx.db.insert("subscriptions", {
         userId,
@@ -38,12 +42,7 @@ async function setup(
       });
     }
     if (options.consent) {
-      await ctx.db.insert("aiConsents", {
-        userId,
-        status: options.consent,
-        version: 1,
-        updatedAt: Date.now(),
-      });
+      await setTestConsent(ctx, userId, options.consent);
     }
     const spaceId = await ctx.db.insert("spaces", {
       userId,
@@ -303,6 +302,172 @@ describe("makeTrip", () => {
     expect(queries).toContain("Pastéis de Belém, Belém, Lisbon");
   });
 
+  it("reuses the save's map pins and centres the search on them, not on a namesake city", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token") {
+        return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+      }
+      // A bare "Amsterdam" resolves to Amsterdam, New York.
+      const coordinate =
+        url.pathname === "/v1/geocode"
+          ? { latitude: 42.9387, longitude: -74.1882 }
+          : { latitude: 52.3752, longitude: 4.8841 };
+      return Response.json({ results: [{ coordinate }] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { base, t, spaceId, itemIds } = await setup([
+      {
+        title: "Amsterdam museums",
+        cities: ["Amsterdam"],
+        places: ["Rijksmuseum", "Anne Frank House"],
+      },
+    ]);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        placePins: [{ name: "Rijksmuseum", lat: 52.36, lng: 4.8854 }],
+      });
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          {
+            saveNumber: 1,
+            name: "Rijksmuseum",
+            area: "Museumplein",
+            why: "Art",
+            slot: "morning",
+          },
+          {
+            saveNumber: 1,
+            name: "Anne Frank House",
+            area: "",
+            why: "History",
+            slot: "afternoon",
+          },
+        ],
+      },
+    });
+
+    await t.action(api.trips.makeTrip, {
+      spaceId,
+      city: "Amsterdam",
+      days: 1,
+      pace: "easy",
+    });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const [museum, house] = trip?.days[0].stops ?? [];
+    expect([museum.lat, museum.lng]).toEqual([52.36, 4.8854]);
+    expect(house.lat).toBe(52.3752);
+    const looked = fetchMock.mock.calls
+      .map(([input]) => new URL(input))
+      .filter((url) => url.pathname !== "/v1/token");
+    expect(looked.map((url) => url.pathname)).toEqual(["/v1/search"]);
+    expect(looked[0].searchParams.get("q")).toBe("Anne Frank House, Amsterdam");
+    expect(looked[0].searchParams.get("searchLocation")).toBe("52.36,4.8854");
+  });
+
+  it("keeps a stop's saved pin when another stop needs a search", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input).pathname === "/v1/token"
+          ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+          : Response.json({
+              results: [{ coordinate: { latitude: 48.86, longitude: 2.35 } }],
+            }),
+      ),
+    );
+    const { base, t, spaceId, itemIds } = await setup([
+      {
+        title: "Two cities",
+        cities: ["Paris"],
+        places: ["Here", "There", "New"],
+      },
+    ]);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        placePins: [
+          { name: "Here", lat: 48.86, lng: 2.35 },
+          { name: "There", lat: 41.9, lng: 12.5 },
+        ],
+      });
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: ["Here", "There", "New"].map((name) => ({
+          saveNumber: 1,
+          name,
+          area: "",
+          why: "Go",
+          slot: "any",
+        })),
+      },
+    });
+
+    await t.action(api.trips.makeTrip, {
+      spaceId,
+      city: "Paris",
+      days: 1,
+      pace: "easy",
+    });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const stops = [...(trip?.days[0].stops ?? []), ...(trip?.wishlist ?? [])];
+    expect(stops.find((stop) => stop.name === "There")?.lat).toBe(41.9);
+  });
+
+  it("does not reuse an old stray pin far from the trip's other stops", async () => {
+    const { base, t, spaceId, itemIds } = await setup([
+      {
+        title: "Paris eats",
+        cities: ["Paris"],
+        places: ["PNY", "Blend", "Bomaye", "Micho"],
+      },
+    ]);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        placePins: [
+          { name: "PNY", lat: 48.8638, lng: 2.3627 },
+          { name: "Blend", lat: 48.8685, lng: 2.3256 },
+          { name: "Bomaye", lat: 48.8748, lng: 2.3539 },
+          { name: "Micho", lat: 43.7858, lng: -85.5028 },
+        ],
+      });
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: ["PNY", "Blend", "Bomaye", "Micho"].map((name) => ({
+          saveNumber: 1,
+          name,
+          area: "",
+          why: "Food",
+          slot: "dinner",
+        })),
+      },
+    });
+
+    await t.action(api.trips.makeTrip, {
+      spaceId,
+      city: "Paris",
+      days: 1,
+      pace: "easy",
+    });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const stops = [...(trip?.days[0].stops ?? []), ...(trip?.wishlist ?? [])];
+    const micho = stops.find((stop) => stop.name === "Micho");
+    expect(micho?.lat).toBeUndefined();
+    expect(stops.find((stop) => stop.name === "PNY")?.lat).toBe(48.8638);
+  });
+
   it("reads only the chosen city's saves, and saves that name no city", async () => {
     const { t, spaceId } = await setup([
       { title: "Porto francesinha spot", cities: ["Porto"] },
@@ -555,7 +720,7 @@ describe("makeTrip", () => {
 
   it("does not show another user's trip", async () => {
     const { base, spaceId } = await setup(LISBON_SAVES);
-    const strangerId = await base.run((ctx) => ctx.db.insert("users", {}));
+    const strangerId = await base.run((ctx) => insertConsentingUser(ctx));
     const stranger = base.withIdentity({ subject: `${strangerId}|s` });
 
     expect(

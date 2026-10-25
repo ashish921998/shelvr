@@ -8,11 +8,9 @@ its See plans opens the RevenueCat paywall.
 
 - The plan gate shows See plans, Restore Purchases, Sign out, Settings, Terms
   and Privacy; Home, its saves and `Add` are not reachable.
-- See plans opens RevenueCat's 3-step paywall: an intro (Continue), the
-  trial timeline (See plans), then the plans: Yearly with a 7-day trial
-  ("Try for $0.00, then …/year") and Weekly with none ("Subscribe for
-  …/week"), plus Restore. The tests leave it by relaunching, which lands on
-  the plan gate again.
+- See plans opens the paywall (v3, trial timeline): "How free trial works",
+  the 7-day trial plan card, "View all plans", "Start 7-day free trial" and
+  "Restore purchases"; closing it returns to the plan gate.
 - Settings opens over the gate, with restore and account deletion.
 
 ## How to get to it (user POV)
@@ -26,29 +24,28 @@ which makes a development build show them as not Pro
 
 `tests/paywall.e2e.ts`, no model: `device.openApp` with the extra launch
 argument, waits for the plan gate, taps `screen.getByRole("button", "See plans")`,
-then `expectPaywall` (`tests/paywall-sheet.ts`) walks the three steps by
-their buttons, which are the same for every onboarding goal: `Continue`, then
-`See plans` (with `Go back`), then the `/^Yearly, /` and `/^Weekly, /` plan
-buttons, the `/^Try for /` trial button and `Restore`. The intro's copy
-follows the goal, so `expectPaywall` never waits on it. No assertion matches
-a price. The test leaves the paywall by relaunching.
+then `expectPaywall` (`tests/paywall-sheet.ts`): `getByText("How free trial
+works")`, `/Shelvr Pro/`, the `/^7-day trial, /` plan button, `View all plans`,
+`Start 7-day free trial` and `/^Restore purchases$/i`; the close control is the
+button named `Close` (provided by the upgraded native SDK). No assertion matches a price.
 
-Plan switching has its own test: from the plans step it selects Weekly,
-checks the `Subscribe for …/week` button and the "…/week from today" line,
-then selects Yearly and checks the trial button comes back. The paywall at
-the end of onboarding has its own feature file, [onboarding](onboarding.md).
+Plan switching has its own test: it opens "View all plans", selects Monthly,
+checks the billed-today disclosure, then selects Annual and checks the trial
+CTA. `expectPaywall` only observes the initial paywall, so the entry and
+dismissal tests never need to switch plans. The paywall at the end of
+onboarding has its own feature file, [onboarding](onboarding.md).
 
 ## Proof
 
-The gate shows instead of Home; See plans walks the paywall to its plans;
-after a relaunch the gate is back and `Add` and the seeded saves stay hidden;
-Settings opens with Delete account. No purchase is made; the server
-entitlement is untouched.
+The gate shows instead of Home; See plans shows the paywall with its trial
+plan and the way to all plans; after each close the gate is back and `Add`
+and the seeded saves stay hidden; Settings opens with Delete account. No
+purchase is made; the server entitlement is untouched.
 
 ## Charters
 
 ```
-paywall-flow|ios|skeptic|Launched with -E2EHidePro YES, check the plan gate shows instead of Home, walk the paywall from See plans to its plans and relaunch; check the gate is back, Home and Add stay unreachable, and Settings opens
+paywall-flow|ios|skeptic|Launched with -E2EHidePro YES, check the plan gate shows instead of Home, open the paywall from See plans and close it; check the gate is back, Home and Add stay unreachable, and Settings opens
 ```
 
 ## Gotchas
@@ -57,6 +54,3 @@ paywall-flow|ios|skeptic|Launched with -E2EHidePro YES, check the plan gate show
   the App Store prices.
 - Purchases cannot be proved here. The dev user is Pro on the server whatever
   the client shows.
-- The paywall is whatever the development RevenueCat project serves as its
-  current offering. When that offering changes, these tests change with it;
-  a failure that waits on paywall copy is usually that, not the app.

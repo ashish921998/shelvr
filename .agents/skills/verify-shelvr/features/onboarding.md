@@ -10,18 +10,18 @@ after it.
 
 ## Sub-features
 
-- "Get started" opens "How many spots have you saved already?"; then "What
+- "Get started" opens "How many places have you saved?"; then "What
   do you want to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
   `A bit of everything`) and "How do you like to plan?". Each has Continue
   (disabled until an answer) and "Skip" in the header. Every step after the
   opener has a back button.
-- "Pick a city to try it with" is a photo grid; "Skip" or "Somewhere else"
+- "Pick a city to try." is a photo grid; "Skip" or "Somewhere else"
   uses Prague.
 - The sample reel has a drawn share sheet; the `Shelvr` button moves on to
   the spots screen, "Prague · 3 places" under a full-width map (Continue
   enables once the pins land), whose Continue asks for the paywall. Notification permission is asked after a trial starts, not here.
-- A relaunch from the paywall comes back to the spots screen, signed out,
-  and its Continue opens the paywall again.
+- Closing the paywall keeps the person on the spots screen, signed out; a
+  cold launch comes back to the same step.
 
 ## How to get to it (user POV)
 
@@ -43,14 +43,14 @@ next test starts signed out at the opener. It does not use
 
 ## Proof
 
-After a relaunch from the paywall the spots screen ("Prague · 3 places") is
-back with the splash gone and `dev-login-button` hidden, and its Continue
-opens the paywall again. No purchase is made.
+After each paywall close the spots screen ("Prague · 3 places") is back
+and `dev-login-button` stays hidden; a cold relaunch returns to the spots
+screen with the splash gone. No purchase is made.
 
 ## Charters
 
 ```
-onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to its spots and the paywall; relaunch, and check the step is kept, nothing signs in, and the paywall opens again
+onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions and the sample reel to its spots; close the paywall, relaunch, and check the step is kept and nothing signs in
 onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, tap Shelvr on the sample reel, and check its three spots show on the map before the paywall
 ```
 
@@ -58,8 +58,7 @@ onboarding-sample|ios|skeptic|From a fresh install, plan date nights in Prague, 
 
 - Each test can take several minutes (timeout 600 s): two cold launches
   through the dev client.
-- Answer cards read their title and subtitle ("Date nights, Dinners,
-  drinks, surprises"); match them by prefix. Text styled in capitals reads
+- Answer cards now read their short titles ("Date nights", "Trips", "Places to eat"). Text styled in capitals reads
   in capitals ("SAMPLE").
 - The fresh launch signs the dev user out; the next seeded test signs in
   again through `dev-login-button`.

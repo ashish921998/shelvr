@@ -68,7 +68,7 @@ export function AhaSpotsStep({
           <Text style={styles.credit}>
             {sample.source === "reel"
               ? t("aha.fromReel", { handle: sample.creator })
-              : t("aha.shelvrExample")}
+              : t("aha.sampleSource")}
           </Text>
         </View>
         {/* With large text the rows scroll, after the map has given up its room. */}
