@@ -632,6 +632,12 @@ export type MessageParams = {
   "refundConsent.syncPending": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
+  "aiConsent.title": undefined;
+  "aiConsent.body": undefined;
+  "aiConsent.changeLater": undefined;
+  "aiConsent.without": undefined;
+  "aiConsent.allow": undefined;
+  "aiConsent.notNow": undefined;
   "aiConsent.setting": undefined;
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;

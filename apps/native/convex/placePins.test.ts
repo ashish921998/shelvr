@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { deleteMembership } from "./model/memberships";
-import { newConvexTest } from "./test.setup";
+import {
+  newConvexTest,
+  insertConsentingUser,
+  setTestConsent,
+} from "./test.setup";
 
 async function testKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey(
@@ -54,14 +58,9 @@ async function setup(
 ) {
   const t = newConvexTest();
   const itemId = await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", {});
+    const userId = await insertConsentingUser(ctx);
     if (options.declined) {
-      await ctx.db.insert("aiConsents", {
-        userId,
-        status: "declined",
-        version: 1,
-        updatedAt: Date.now(),
-      });
+      await setTestConsent(ctx, userId, "declined");
     }
     return await ctx.db.insert("items", {
       userId,

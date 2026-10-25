@@ -25,9 +25,10 @@ Use these notes in App Store Connect when submitting Shelvr for review.
    - Both screens have a back button to the screen before.
    - Where the reel was real, its link is kept on the device and saved to the account as its first save once the account has Pro, as if the user had shared it.
 8. **Paywall:** the RevenueCat paywall, which has three screens. The opener, "Save the link. Shelvr does the filing.", shows a short carousel of what Shelvr does and has **Continue**. The trial explainer, "Get a heads-up before you pay", describes the 7-day trial on the Annual plan, which the paywall labels Yearly: Today, a reminder before the trial ends that is sent only if the user turns it on, and Day 7, when annual billing begins. It says to cancel at least 24 hours before the trial ends to avoid a charge, and where to cancel (Settings > your name > Subscriptions). **See plans** continues. The plan picker, "Pick a plan", offers **Yearly** (7-day trial, then the yearly price) and **Weekly** (no trial), each with its localized price. The buy button reads "Try for $0.00, then <price>/year" for Yearly with the trial (the zero is shown in the storefront's currency), and "Subscribe for <price>/week" for Weekly. The renewal line above the button, **Restore**, **Terms**, and **Privacy** are on this screen. These three screens are the offering for an account that can still start the trial, which includes a fresh sandbox account. An account that has already used its trial is shown a separate no-trial offering instead, which this note does not cover. The paywall fills the screen and has no close button. Its second and third screens can go back to the screen before. Anyone whose paywall cannot load goes on to Home (then the app asks again once Home is up), and an account that already has Pro skips the paywall. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves anything the user shared to Shelvr meanwhile. Once a trial has started, a sheet titled "Want a heads-up before you're charged?" offers the trial reminder, and only its **Remind me** button asks for the iOS notification permission.
-9. **Home:** a one-time letter, "Plan less, go out more", with **Explore Shelvr** to close it, then "Your cities" and "No place found".
-10. Camera and Photo Library are **not** requested, during onboarding or after. This build has no camera or photo import.
-11. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
+9. **Let Shelvr find the places in your saves?:** a full-screen ask before anything is saved, shown once the account has Pro (straight after a purchase or restore, or at once for an account that already has it). It shows the Prague example's three places, says Shelvr sends Google's Gemini AI the caption and spoken words of each reel or TikTok saved, plus saved places and the ones marked "We went" when making a plan, and links the Privacy Policy. **Allow** turns it on; **Not now** keeps links saving with no places or plans. Either way Home opens, and Settings can change the answer. Any link kept from the sample reel is saved only after this answer.
+10. **Home:** a one-time letter, "Plan less, go out more", with **Explore Shelvr** to close it, then "Your cities" and "No place found".
+11. Camera and Photo Library are **not** requested, during onboarding or after. This build has no camera or photo import.
+12. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
 
 ## Core save loop
 
@@ -75,7 +76,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 ## Privacy disclosures (summary)
 
 - Account email via Apple/Google.
-- Saved URLs, extracted page content, AI titles/tags/classifications and the places found.
+- Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (only after the person taps Allow on the Gemini ask).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
@@ -139,7 +140,7 @@ Share extension, Siri and widget:
 
 Third-party AI:
 
-Saves are sent to Google Gemini to generate titles, summaries, and tags. The sign-in screen says so and that continuing allows it, so permission is given before the first save. People who were already signed in when this shipped are asked once on launch instead. Settings has a switch, "AI titles, tags and suggestions", to turn it off.
+To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini; making a plan also sends the person's saved places and the ones they marked "We went". Once the account has Pro, after onboarding and its paywall and before anything is saved, a full-screen ask titled "Let Shelvr find the places in your saves?" names Google's Gemini AI and what is sent, with "Allow" and "Not now". Nothing goes to Gemini until the person taps Allow; with Not now, links still save, with no places or plans. Settings has a switch, "Find places with AI", to change the answer.
 
 Account and support controls:
 

@@ -1,3 +1,5 @@
+import { AiConsentCard } from "@/components/ai-consent";
+import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
@@ -26,6 +28,24 @@ import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
 export default function AppLayout() {
+  useAppLocale();
+  const { onboarded } = useOnboarding();
+  const consent = useAiConsent();
+  const { entitled } = useEntitlement();
+
+  // Once past onboarding and the paywall (with Pro, so saves are possible), nothing
+  // is saved until the person answers the Gemini ask; before that the plan gate shows.
+  if (onboarded && entitled && consent.savesBlocked) {
+    return consent.asking ? (
+      <AiConsentCard />
+    ) : (
+      <ScreenLoader label={t("loading.app")} />
+    );
+  }
+  return <AppStack />;
+}
+
+function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();

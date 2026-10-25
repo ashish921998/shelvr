@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -45,7 +45,7 @@ type SeedItem = {
 async function seed(items: SeedItem[]) {
   const t = newConvexTest();
   const ids = await t.run(async (ctx) => {
-    USER = await ctx.db.insert("users", {});
+    USER = await insertConsentingUser(ctx);
     const spaceId = await ctx.db.insert("spaces", {
       userId: USER,
       name: "Pasta",

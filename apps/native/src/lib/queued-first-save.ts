@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { isRateLimitedError } from "@convex/model/demoErrors";
+import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import { useCurrentUser } from "@/lib/current-user";
@@ -59,13 +60,20 @@ export function getQueuedFirstSaveUrl(): string | null {
 export function useQueuedFirstSave() {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
+  const { savesBlocked } = useAiConsent();
   const { data: user } = useCurrentUser();
   const userId = user?._id ?? null;
   const createDemoItem = useMutation(api.demo.createDemoItem);
   const ranRef = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || userId === null || !onboarded || ranRef.current) {
+    if (
+      !isAuthenticated ||
+      userId === null ||
+      !onboarded ||
+      savesBlocked ||
+      ranRef.current
+    ) {
       return;
     }
     const queued = readQueued();
@@ -102,5 +110,5 @@ export function useQueuedFirstSave() {
         }
       },
     );
-  }, [isAuthenticated, userId, onboarded, createDemoItem]);
+  }, [isAuthenticated, userId, onboarded, savesBlocked, createDemoItem]);
 }
