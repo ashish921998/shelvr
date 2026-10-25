@@ -17,12 +17,19 @@ import {
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
+import { dropStrays } from "./model/trip";
 
 const MAX_PINS = 5;
 const BACKFILL_PAGE = 100;
 const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number };
+
+/** In a save that names exactly one city, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
+function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
+  if (cities.length !== 1) return pins;
+  return dropStrays(pins).filter((pin) => pin !== null);
+}
 
 function mapsNames(intents: Doc<"items">["intents"]): string[] {
   return (intents ?? [])
@@ -78,7 +85,8 @@ export const toLocate = internalQuery({
     const names = wanted
       .filter(([key]) => !pinned.has(key))
       .map(([, name]) => name)
-      .slice(0, Math.max(0, MAX_PINS - kept));
+      // Look past the free slots: a stray match storePins drops must not keep the next place from a pin.
+      .slice(0, kept >= MAX_PINS ? 0 : MAX_PINS);
     return { names, city: item.cities?.[0] };
   },
 });
@@ -100,7 +108,10 @@ export const storePins = internalMutation({
       const key = placeKey(pin.name);
       if (wanted.has(key) && !next.has(key)) next.set(key, pin);
     }
-    const pins = [...next.values()].slice(0, MAX_PINS);
+    const pins = nearEachOther([...next.values()], item.cities ?? []).slice(
+      0,
+      MAX_PINS,
+    );
     const before = item.placePins ?? [];
     const same =
       pins.length === before.length &&
