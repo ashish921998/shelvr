@@ -166,8 +166,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   every path sending user content to Gemini or SerpAPI asks first. It refuses an owner whose
   row is missing or `deleting` before it reads consent, and item-aware checks also require an
   existing owned save. Among live owners, only an explicit Allow lets content go out; an
-  account that never answered counts as declined. The app asks once, full screen, right
-  after onboarding and its paywall, before anything is saved. A declined user's saves still finish `ready` from what Shelvr read
+  account that never answered counts as declined. The app opens Home after onboarding and its paywall without a consent screen.
+  Users enable AI explicitly through Settings; new accounts keep AI off until then. A declined user's saves still finish `ready` from what Shelvr read
   itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
   client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
