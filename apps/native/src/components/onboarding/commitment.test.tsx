@@ -11,12 +11,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ahaSample } from "@/lib/aha-sample";
 import { planKindFor, type Goal } from "@/lib/onboarding-goals";
 import en from "@/locales/en.json";
+import { ONBOARDING_FLOW_VERSION } from "@/lib/onboarding-steps";
 import { CommitmentStep } from "./commitment";
 
 type Children = { children?: ReactNode };
 const mocks = vi.hoisted(() => ({
   map: vi.fn(),
   haptic: vi.fn(),
+  capture: vi.fn(),
   progress: { value: 0, set: vi.fn() },
   reduced: false,
   stateChange: (_state: string) => {},
@@ -24,6 +26,10 @@ const mocks = vi.hoisted(() => ({
   longPress: () => {},
   delayLongPress: 0,
   remove: vi.fn(),
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: mocks.capture },
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -225,9 +231,19 @@ it("delegates the one-second threshold to Pressable, confirms in place, and wait
     screen.getByText("I’ll visit one saved place on my Lisbon trip."),
   ).toBeTruthy();
   expect(mocks.haptic).toHaveBeenCalledTimes(1);
+  expect(mocks.capture).toHaveBeenCalledExactlyOnceWith(
+    "onboarding_commitment",
+    {
+      action: "confirmed",
+      plan_kind: "trip",
+      sample_city: "lisbon",
+      flow_version: ONBOARDING_FLOW_VERSION,
+    },
+  );
   expect(onContinue).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(onContinue).toHaveBeenCalledTimes(1);
+  expect(mocks.capture).toHaveBeenCalledTimes(1);
 });
 
 it("resets early releases and requires a fresh full hold", () => {
@@ -239,6 +255,7 @@ it("resets early releases and requires a fresh full hold", () => {
   recognizeLongPress();
   expect(screen.queryByText("You’re in.")).toBeNull();
   expect(mocks.progress.value).toBe(0);
+  expect(mocks.capture).not.toHaveBeenCalled();
   fireEvent.mouseDown(holdButton());
   advanceTime(999);
   expect(screen.queryByText("You’re in.")).toBeNull();
@@ -257,6 +274,7 @@ it.each(["inactive", "background"])(
     advanceTime(1000);
     recognizeLongPress();
     expect(screen.queryByText("You’re in.")).toBeNull();
+    expect(mocks.capture).not.toHaveBeenCalled();
   },
 );
 
@@ -267,6 +285,7 @@ it("cleans up an unfinished hold when leaving the screen", () => {
   advanceTime(1000);
   recognizeLongPress();
   expect(mocks.haptic).not.toHaveBeenCalled();
+  expect(mocks.capture).not.toHaveBeenCalled();
   expect(mocks.remove).toHaveBeenCalledOnce();
 });
 
@@ -278,6 +297,15 @@ it("offers a tap alternative and accessibility activation without opening the pa
   act(() => mocks.accessibilityTap());
   expect(screen.getByText("You’re in.")).toBeTruthy();
   expect(mocks.haptic).toHaveBeenCalledOnce();
+  expect(mocks.capture).toHaveBeenCalledExactlyOnceWith(
+    "onboarding_commitment",
+    {
+      action: "confirmed",
+      plan_kind: "trip",
+      sample_city: "lisbon",
+      flow_version: ONBOARDING_FLOW_VERSION,
+    },
+  );
   expect(onContinue).not.toHaveBeenCalled();
 });
 
@@ -285,6 +313,15 @@ it("allows screen-reader activation directly", () => {
   renderStep();
   act(() => mocks.accessibilityTap());
   expect(screen.getByText("You’re in.")).toBeTruthy();
+  expect(mocks.capture).toHaveBeenCalledExactlyOnceWith(
+    "onboarding_commitment",
+    {
+      action: "confirmed",
+      plan_kind: "trip",
+      sample_city: "lisbon",
+      flow_version: ONBOARDING_FLOW_VERSION,
+    },
+  );
 });
 
 it("allows skipping without making a promise", () => {
@@ -297,6 +334,43 @@ it("allows skipping without making a promise", () => {
   expect(onContinue).toHaveBeenCalledOnce();
   expect(screen.queryByText("You’re in.")).toBeNull();
   expect(mocks.haptic).not.toHaveBeenCalled();
+  expect(mocks.capture).toHaveBeenCalledExactlyOnceWith(
+    "onboarding_commitment",
+    {
+      action: "skipped",
+      plan_kind: "trip",
+      sample_city: "lisbon",
+      flow_version: ONBOARDING_FLOW_VERSION,
+    },
+  );
+});
+
+it("does not count paywall retries as new skips, and can record a later confirmation", () => {
+  const { onContinue } = renderStep(["food"], null);
+  const later = screen.getByRole("button", { name: "Maybe later" });
+  fireEvent.click(later);
+  fireEvent.click(later);
+  expect(onContinue).toHaveBeenCalledTimes(2);
+  expect(mocks.capture).toHaveBeenCalledExactlyOnceWith(
+    "onboarding_commitment",
+    {
+      action: "skipped",
+      plan_kind: "weekend",
+      sample_city: "prague",
+      flow_version: ONBOARDING_FLOW_VERSION,
+    },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Tap to commit instead" }),
+  );
+  act(() => mocks.accessibilityTap());
+  expect(mocks.capture).toHaveBeenCalledTimes(2);
+  expect(mocks.capture).toHaveBeenLastCalledWith("onboarding_commitment", {
+    action: "confirmed",
+    plan_kind: "weekend",
+    sample_city: "prague",
+    flow_version: ONBOARDING_FLOW_VERSION,
+  });
 });
 
 it("keeps the hold duration under Reduce Motion and disables Continue while opening the paywall", () => {

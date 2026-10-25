@@ -8,6 +8,7 @@ import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
 import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
+import type { PlanKind } from "@/lib/sample-plans";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -80,6 +81,12 @@ export type AnalyticsEventProperties = {
     duration_ms: number;
   };
   onboarding_opener_page_viewed: { page_index: number };
+  onboarding_commitment: {
+    action: "confirmed" | "skipped";
+    plan_kind: PlanKind;
+    sample_city: SampleCityId;
+    flow_version: number;
+  };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;

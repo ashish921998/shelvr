@@ -6,7 +6,9 @@ import {
 } from "@/components/onboarding/sample-trip-map";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { AhaSample } from "@/lib/aha-sample";
+import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
+import { ONBOARDING_FLOW_VERSION } from "@/lib/onboarding-steps";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { SAMPLE_CROPS } from "@/lib/sample-trip";
 import { Canvas, Circle, Group, Path, Skia } from "@shopify/react-native-skia";
@@ -30,10 +32,20 @@ const RING = Skia.PathBuilder.Make()
   .addCircle(RING_CENTER, RING_CENTER, RING_RADIUS)
   .detach();
 
-function useCommitmentHold() {
+function recordCommitment(sample: AhaSample, action: "confirmed" | "skipped") {
+  analytics.capture("onboarding_commitment", {
+    action,
+    plan_kind: sample.kind,
+    sample_city: sample.city,
+    flow_version: ONBOARDING_FLOW_VERSION,
+  });
+}
+
+function useCommitmentHold(sample: AhaSample) {
   const [confirmed, setConfirmed] = useState(false);
   const done = useRef(false);
   const holding = useRef(false);
+  const skipped = useRef(false);
   const progress = useSharedValue(0);
   const reduced = useReducedMotion();
 
@@ -49,10 +61,18 @@ function useCommitmentHold() {
     done.current = true;
     progress.set(1);
     setConfirmed(true);
+    recordCommitment(sample, "confirmed");
     if (process.env.EXPO_OS === "ios") {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [cancel, progress]);
+  }, [cancel, progress, sample]);
+
+  const skip = () => {
+    cancel();
+    if (done.current || skipped.current) return;
+    skipped.current = true;
+    recordCommitment(sample, "skipped");
+  };
 
   const start = () => {
     if (done.current || AppState.currentState !== "active") return;
@@ -82,7 +102,7 @@ function useCommitmentHold() {
     };
   }, [cancel]);
 
-  return { confirmed, progress, start, cancel, confirm, completeHold };
+  return { confirmed, progress, start, cancel, confirm, completeHold, skip };
 }
 
 export function CommitmentStep({
@@ -96,7 +116,7 @@ export function CommitmentStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const hold = useCommitmentHold();
+  const hold = useCommitmentHold(sample);
   const city = t(SAMPLE_CITIES[sample.city].name);
   return (
     <View style={styles.wrap}>
@@ -217,7 +237,7 @@ export function CommitmentStep({
             <GhostButton
               label={t("commitment.later")}
               onPress={() => {
-                hold.cancel();
+                hold.skip();
                 onContinue();
               }}
               disabled={leaving}
