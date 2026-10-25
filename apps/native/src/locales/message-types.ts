@@ -132,7 +132,7 @@ export type MessageParams = {
   "paywallGoal.travelPlanTitleNoCity": undefined;
   "paywallGoal.travelBenefitTitle": undefined;
   "paywallGoal.travelBenefitBody": undefined;
-  "paywallGoal.foodHeadline": { city: string };
+  "paywallGoal.foodHeadline": undefined;
   "paywallGoal.foodHeadlineNoCity": undefined;
   "paywallGoal.foodSubline": undefined;
   "paywallGoal.foodPhotoTag": undefined;
@@ -140,7 +140,7 @@ export type MessageParams = {
   "paywallGoal.foodAnswerTwo": { city: string };
   "paywallGoal.foodToday": { city: string };
   "paywallGoal.foodTodayNoCity": undefined;
-  "paywallGoal.foodPlanTitle": { city: string };
+  "paywallGoal.foodPlanTitle": undefined;
   "paywallGoal.foodPlanTitleNoCity": undefined;
   "paywallGoal.foodBenefitTitle": undefined;
   "paywallGoal.foodBenefitBody": undefined;
@@ -710,7 +710,7 @@ export type MessageParams = {
   "onboardingQ.explorerBody": undefined;
   "onboardingQ.cityTitle": undefined;
   "onboardingQ.cityBody": undefined;
-  "onboardingChart.title": { accent: string };
+  "onboardingChart.title": undefined;
   "onboardingChart.accentDate": undefined;
   "onboardingChart.accentTrip": undefined;
   "onboardingChart.accentWeekend": undefined;
@@ -809,6 +809,7 @@ export type MessageParams = {
   "signInScene.dinner": undefined;
   "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
+  "aha.sampleSource": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
