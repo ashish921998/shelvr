@@ -147,9 +147,11 @@ export default function CityScreen() {
               <Text style={styles.name} numberOfLines={2}>
                 {city}
               </Text>
-              <Text style={styles.count}>
-                {t("cityMap.placesFromSaves", { count: pins.length })}
-              </Text>
+              {pins.length > 0 ? (
+                <Text style={styles.count}>
+                  {t("cityMap.placesFromSaves", { count: pins.length })}
+                </Text>
+              ) : null}
             </View>
           }
           renderItem={({ item }) => {

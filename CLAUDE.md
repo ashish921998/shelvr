@@ -129,8 +129,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`items.ts`**: public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
   `photoUsage`, `getImportOperation`, and `listCities` / `listCityItems` (the cities Home
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
-  is the shared helper). Image saves run a three-step, idempotent import:
-  `beginImageImport`, then `attachImageUpload`, then `finalizeImageImport`, all keyed on a
+  is the shared helper).
+  `listCities.count` retains the legacy save count for installed apps; optional
+  `placeCount` is the distinct mapped-place count. New clients hide an absent or
+  zero place count while retaining the city and its saves.
+  Image saves run a three-step, idempotent import: `beginImageImport`, then
+  `attachImageUpload`, then `finalizeImageImport`, all keyed on a
   client-generated `operationId` in `itemOperations`.
   The returned upload URL now targets `/image-upload`, which claims a single
   receiver, caps the streamed body at the image limit, and records its storage ID

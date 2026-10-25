@@ -299,6 +299,7 @@ export const listCities = authedQuery({
     v.object({
       city: v.string(),
       count: v.number(),
+      placeCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
     }),
   ),
@@ -316,9 +317,11 @@ export const listCities = authedQuery({
       }
     }
     return countCities(items)
-      .map(({ city }) => ({
+      .map(({ city, count }) => ({
         city,
-        count: uniquePlacePins(
+        // Older installed clients use count as the number of saves.
+        count,
+        placeCount: uniquePlacePins(
           items
             .filter((item) =>
               (item.cities ?? []).some(
@@ -330,7 +333,9 @@ export const listCities = authedQuery({
         ).length,
         cover: covers.get(cityKey(city)) ?? null,
       }))
-      .sort((a, b) => b.count - a.count || (a.city < b.city ? -1 : 1));
+      .sort(
+        (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
+      );
   },
 });
 

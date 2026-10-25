@@ -1,6 +1,11 @@
 const VISIBLE_CITIES = 4;
 
-export type City = { city: string; count: number; cover: string | null };
+export type City = {
+  city: string;
+  count: number;
+  placeCount?: number;
+  cover: string | null;
+};
 
 /** The cities to draw now, and how many the "+ n more" tile stands for. */
 export function visibleCities(

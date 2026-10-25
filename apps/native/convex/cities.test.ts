@@ -69,7 +69,7 @@ describe("listCities", () => {
       placePins: [],
     });
     expect(await t.query(api.items.listCities, {})).toEqual([
-      { city: "Paris", count: 5, cover: null },
+      { city: "Paris", count: 3, placeCount: 5, cover: null },
     ]);
   });
   it("groups spellings, orders by count then name, and picks the newest cover", async () => {
@@ -97,16 +97,39 @@ describe("listCities", () => {
     await save(otherId, { title: "x", cities: ["Rome", "Rome", "Lisbon"] });
 
     expect(await t.query(api.items.listCities, {})).toEqual([
-      { city: "Lisbon", count: 3, cover: "https://img/new.jpg" },
-      { city: "Faro", count: 1, cover: null },
-      { city: "Madrid", count: 1, cover: null },
-      { city: "Porto", count: 1, cover: null },
+      { city: "Lisbon", count: 3, placeCount: 3, cover: "https://img/new.jpg" },
+      { city: "Faro", count: 1, placeCount: 1, cover: null },
+      { city: "Madrid", count: 1, placeCount: 1, cover: null },
+      { city: "Porto", count: 1, placeCount: 1, cover: null },
     ]);
   });
 
   it("refuses unauthenticated callers", async () => {
     const { base } = await setup();
     await expect(base.query(api.items.listCities, {})).rejects.toThrow();
+  });
+
+  it("keeps the legacy save count positive before pins arrive and reports pins separately", async () => {
+    const { base, t, save, userId } = await setup();
+    const id = await save(userId, {
+      title: "Paris reel",
+      cities: ["Paris"],
+      placePins: [],
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Paris", count: 1, placeCount: 0, cover: null },
+    ]);
+    await base.run(async (ctx) =>
+      ctx.db.patch(id, {
+        placePins: [
+          { name: "Micho", lat: 48.866, lng: 2.337 },
+          { name: "PNY", lat: 48.864, lng: 2.363 },
+        ],
+      }),
+    );
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Paris", count: 1, placeCount: 2, cover: null },
+    ]);
   });
 });
 
