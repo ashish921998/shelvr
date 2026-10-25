@@ -168,6 +168,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   preference record use AI automatically; no grant record is fabricated. The current
   client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
   reports `unset` for an unanswered account, so old clients retain their existing UI.
+  `repairUnansweredEmbeddings` is a bounded, resumable one-time repair for older ready
+  saves stamped at the current embedding version but missing a vector. It clears the
+  stamp only for live owners with no preference row; the normal embedding sweep then
+  fills them. After deploying this change, run from `apps/native`:
+  `pnpm exec convex run --prod aiConsent:repairUnansweredEmbeddings '{"cursor":null}'`.
+  The function schedules its remaining pages. Rerunning it preserves existing vectors
+  and all explicit preferences; it does not reclassify saves or manufacture consent.
   A declined user's saves still finish `ready` from what Shelvr read itself, without AI.
   `model/aiConsent.ts` retains `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
