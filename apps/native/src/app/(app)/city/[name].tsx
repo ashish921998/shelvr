@@ -148,7 +148,7 @@ export default function CityScreen() {
                 {city}
               </Text>
               <Text style={styles.count}>
-                {t("cityMap.placesFromSaves", { count })}
+                {t("spaces.saveCount", { count })}
               </Text>
             </View>
           }

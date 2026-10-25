@@ -585,7 +585,10 @@ function speechWants(
       result.cookingVideo === true &&
       read.page.recipe === undefined &&
       sanitizeRecipe(result.recipe) === undefined,
-    places: result.placesVideo === true && item.placesHeard !== true,
+    places:
+      (result.placesVideo === true ||
+        (read.page.incomplete === true && !read.page.content)) &&
+      item.placesHeard !== true,
   };
 }
 

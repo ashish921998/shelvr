@@ -401,6 +401,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   - `EXPO_PUBLIC_CONVEX_URL`: the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL`: the deployment's HTTP Actions origin
+  - `EXPO_PUBLIC_WEB_URL`: optional web origin for plan voting links. Local QA uses
+    a web server connected to the same development Convex backend; unset uses the
+    production website.
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`: optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
     to show the passwordless dev-login button and fixture reset on development builds
     (release-mode included); preview and production builds never show either

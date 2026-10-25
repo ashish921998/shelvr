@@ -32,7 +32,7 @@ export function CityCover({
           {city}
         </Text>
         <Text style={[styles.count, onPhoto && styles.onPhoto]}>
-          {t("homePlaces.spotCount", { count })}
+          {t("spaces.saveCount", { count })}
         </Text>
       </View>
     </View>

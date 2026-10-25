@@ -135,6 +135,14 @@ describe("votesFor", () => {
 });
 
 describe("planVoteUrl and daysLeft", () => {
+  it("routes development votes to the web app using the same backend", () => {
+    vi.stubEnv("EXPO_PUBLIC_WEB_URL", "http://localhost:3000");
+    try {
+      expect(planVoteUrl("k8Q2")).toBe("http://localhost:3000/p/k8Q2");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it("builds the vote page and counts whole days, never below one", () => {
     expect(planVoteUrl("k8Q2")).toBe("https://shelvr-web.vercel.app/p/k8Q2");
     const day = 24 * 60 * 60 * 1000;

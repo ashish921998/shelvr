@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
-import type { LatLng } from "./trip";
+import { keepNearby, type LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
@@ -66,14 +66,16 @@ const placeSchema = z.object({
   }),
 });
 
-export function firstPlace(body: unknown): LatLng | null {
+export function firstPlace(body: unknown, near?: LatLng): LatLng | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
       const { latitude, longitude } = place.data.coordinate;
-      return { lat: latitude, lng: longitude };
+      const point = { lat: latitude, lng: longitude };
+      if (near && keepNearby([point], near)[0] === null) continue;
+      return point;
     }
   }
   return null;
@@ -87,6 +89,8 @@ export async function appleMapsLookup(
   fetchImpl: typeof fetch = fetch,
 ): Promise<LatLng | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
+  // A restaurant lookup must not silently return the city centre as an address match.
+  if (kind === "search") params.set("resultTypeFilter", "Poi");
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
@@ -96,7 +100,7 @@ export async function appleMapsLookup(
       signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    return firstPlace(await response.json().catch(() => null));
+    return firstPlace(await response.json().catch(() => null), near);
   } catch {
     return null;
   }

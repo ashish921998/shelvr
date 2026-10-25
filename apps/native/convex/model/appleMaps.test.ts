@@ -86,6 +86,15 @@ describe("appleMapsAccessToken", () => {
 });
 
 describe("firstPlace", () => {
+  it("skips a distant namesake and accepts the nearby result", () => {
+    const paris = { lat: 48.86, lng: 2.35 };
+    const results = [
+      { coordinate: { latitude: 43.7858, longitude: -85.5028 } },
+      { coordinate: { latitude: 48.866, longitude: 2.338 } },
+    ];
+    expect(firstPlace({ results }, paris)).toEqual({ lat: 48.866, lng: 2.338 });
+    expect(firstPlace({ results: results.slice(0, 1) }, paris)).toBeNull();
+  });
   it("reads the first result with a usable coordinate", () => {
     expect(
       firstPlace({
@@ -113,7 +122,7 @@ describe("appleMapsLookup", () => {
   it("searches near a point with the access token", async () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({
-        results: [{ coordinate: { latitude: 1, longitude: 2 } }],
+        results: [{ coordinate: { latitude: 38.71, longitude: -9.13 } }],
       }),
     );
     const place = await appleMapsLookup(
@@ -123,13 +132,14 @@ describe("appleMapsLookup", () => {
       { lat: 38.7, lng: -9.1 },
       fetchImpl as unknown as typeof fetch,
     );
-    expect(place).toEqual({ lat: 1, lng: 2 });
+    expect(place).toEqual({ lat: 38.71, lng: -9.13 });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [
       string,
       { headers: Record<string, string> },
     ];
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/v1/search");
+    expect(parsed.searchParams.get("resultTypeFilter")).toBe("Poi");
     expect(parsed.searchParams.get("q")).toBe("Pastéis de Belém, Lisbon");
     expect(parsed.searchParams.get("searchLocation")).toBe("38.7,-9.1");
     expect(init.headers.Authorization).toBe("Bearer tok");

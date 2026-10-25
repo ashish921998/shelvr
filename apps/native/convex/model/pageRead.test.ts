@@ -840,6 +840,18 @@ describe("readPage for Instagram posts", () => {
 });
 
 describe("readPage for TikTok videos", () => {
+  it("keeps an empty oEmbed response retryable", async () => {
+    const url = "https://www.tiktok.com/@cook/video/7350000000000000000";
+    const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+    serve({
+      [endpoint]: json(endpoint, { status_msg: "temporarily unavailable" }),
+    });
+    const read = await readPage(url);
+    expect(read.status).toBe("ok");
+    expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+      "partial",
+    );
+  });
   it("titles the save with the caption's first line and keeps the rest as content", async () => {
     const videoUrl = "https://www.tiktok.com/@cook/video/7350000000000000000";
     const caption = `${"Crispy chilli oil noodles ".repeat(6)}\n\n#noodles #recipe`;

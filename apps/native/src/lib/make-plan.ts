@@ -318,7 +318,9 @@ export function spinSteps(
 }
 
 export function planVoteUrl(token: string): string {
-  return `https://shelvr-web.vercel.app/p/${token}`;
+  const origin =
+    process.env.EXPO_PUBLIC_WEB_URL || "https://shelvr-web.vercel.app";
+  return new URL(`/p/${encodeURIComponent(token)}`, origin).href;
 }
 
 export function usePlanAsk(
