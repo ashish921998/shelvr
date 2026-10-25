@@ -9,7 +9,7 @@ export const ONBOARDING_STEPS = [
   "ahaSpots",
   "commitment",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 21;
+export const ONBOARDING_FLOW_VERSION = 22;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 

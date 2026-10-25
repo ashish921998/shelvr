@@ -73,18 +73,15 @@ export async function walkToSampleReel(
   });
 }
 
-/** Shares the sample reel the way the walk teaches (Share, Share to…, More, pinning Shelvr with Edit, + and Done, then Shelvr) and waits for its spots, ready to tap Continue. */
+/** Shares the sample reel through Share, Share to…, More and Shelvr, then waits for its mapped spots. */
 export async function shareTheSampleReel(screen: Screen): Promise<void> {
-  for (const step of [
-    SHARE_ON_REEL,
-    "Share to…",
-    "More",
-    "Edit",
-    "Add Shelvr to Favorites",
-    "Done",
-  ]) {
+  for (const step of [SHARE_ON_REEL, "Share to…", "More"]) {
     await screen.getByRole("button", step).tap({ timeout: 30_000 });
   }
+  await expect(screen.getByRole("button", "Edit")).toBeHidden();
+  await expect(
+    screen.getByRole("button", "Add Shelvr to Favorites"),
+  ).toBeHidden();
   await screen.getByRole("button", SHARE_TO_SHELVR).tap({ timeout: 30_000 });
   await expect(screen.getByText(/· 3 places$/)).toBeVisible({
     timeout: 30_000,

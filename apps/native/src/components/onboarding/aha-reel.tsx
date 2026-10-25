@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 function reelPicture(sample: AhaSample): number {
@@ -48,7 +48,7 @@ export function AhaReel({
         accessibilityRole="image"
         accessibilityLabel={
           !reel
-            ? `${credit}: ${caption}`
+            ? `${credit}: ${caption}. ${sample.spots.map((spot) => spot.name).join(", ")}`
             : credit === null
               ? t("aha.sampleBadge")
               : t("aha.reelBy", { handle: credit })
@@ -114,6 +114,22 @@ export function AhaReel({
           </Text>
         )}
       </View>
+      {!reel ? (
+        <ScrollView
+          style={styles.examplePlaces}
+          contentContainerStyle={styles.placeRows}
+          showsVerticalScrollIndicator={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
+          {sample.spots.map((spot, index) => (
+            <View key={spot.name} style={styles.placeRow}>
+              <Text style={styles.placeNumber}>{index + 1}</Text>
+              <Text style={styles.placeName}>{spot.name}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -203,4 +219,21 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 19,
     color: "#FFFFFF",
   },
+  examplePlaces: {
+    position: "absolute",
+    left: theme.gap(2),
+    right: theme.gap(2),
+    bottom: theme.gap(2),
+    maxHeight: "45%",
+    borderRadius: theme.radius.lg,
+    backgroundColor: "rgba(43, 36, 24, 0.8)",
+  },
+  placeRows: { padding: theme.gap(1.5), gap: theme.gap(1) },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.gap(1),
+  },
+  placeNumber: { ...theme.type.subheadStrong, color: theme.colors.primary },
+  placeName: { ...theme.type.subheadStrong, color: "#FFFFFF", flex: 1 },
 }));

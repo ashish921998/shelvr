@@ -745,11 +745,6 @@ export type MessageParams = {
   "aha.coachShare": undefined;
   "aha.coachMore": undefined;
   "aha.coachShelvr": undefined;
-  "aha.coachEdit": undefined;
-  "aha.coachAdd": undefined;
-  "aha.coachDone": undefined;
-  "aha.sheetDone": undefined;
-  "aha.pinShelvr": undefined;
   "aha.reading": undefined;
   "aha.sheetSearch": undefined;
   "aha.sheetStory": undefined;
@@ -758,7 +753,6 @@ export type MessageParams = {
   "aha.sheetNotes": undefined;
   "aha.sheetMore": undefined;
   "aha.sheetApps": undefined;
-  "aha.sheetEdit": undefined;
   "aha.sheetFavorites": undefined;
   "aha.sheetSuggestions": undefined;
   "aha.addedTo": { city: string };

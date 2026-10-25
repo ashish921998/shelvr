@@ -67,6 +67,14 @@ test(
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
+    for (const place of [
+      "Castelo de São Jorge",
+      "As Bifanas do Afonso",
+      "Praça do Comércio",
+    ]) {
+      await expect(screen.getByRole("image", new RegExp(place))).toBeVisible();
+    }
+    await app.screenshot("lisbon-example-post");
     await shareTheSampleReel(screen);
     await expect(screen.getByText("Lisbon · 3 places")).toBeVisible();
     await walkToCommitment(screen);
@@ -106,6 +114,11 @@ test(
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen);
+
+    for (const place of ["Kampa Park", "Hemingway Bar", "Café Louvre"]) {
+      await expect(screen.getByRole("image", new RegExp(place))).toBeVisible();
+    }
+    await app.screenshot("prague-example-post");
 
     await shareTheSampleReel(screen);
     // Skipping the city picks Prague, whose Shelvr example names these three. Each name is both a
