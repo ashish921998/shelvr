@@ -7,11 +7,10 @@ import {
   shareTheSampleReel,
   startFreshOnboarding,
   walkToSampleReel,
+  walkToCommitment,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { expectPaywall, paywallTitle } from "./paywall-sheet.ts";
-
-const COMMIT = "Continue";
 
 // Leave the app signed out at the opener, not mid-onboarding, for the next test.
 afterEach(async ({ device, screen }) => {
@@ -35,8 +34,9 @@ test(
     );
 
     await shareTheSampleReel(screen);
-    // The sample spots open the paywall, and stay put when the paywall closes.
-    const commit = screen.getByRole("button", COMMIT);
+    await walkToCommitment(screen);
+    // Skipping the optional promise opens the paywall; closing returns to this screen.
+    const commit = screen.getByRole("button", "Maybe later");
     await commit.tap({ timeout: 30_000 });
     await expectPaywall(screen);
 
@@ -62,9 +62,44 @@ test(
 );
 
 test(
+  "personalizes the commitment to the Lisbon trip and keeps confirmation on the same screen",
+  { retries: 0, timeout: 600_000 },
+  async ({ device, screen, app }) => {
+    await startFreshOnboarding({ device, screen });
+    await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
+    await shareTheSampleReel(screen);
+    await expect(screen.getByText("Lisbon · 3 places")).toBeVisible();
+    await walkToCommitment(screen);
+    const promise = screen.getByText(
+      "I’ll visit one saved place on my Lisbon trip.",
+    );
+    await expect(promise).toBeVisible();
+    for (const place of [
+      "Castelo de São Jorge",
+      "As Bifanas do Afonso",
+      "Praça do Comércio",
+    ]) {
+      await expect(screen.getByText(place).first()).toBeVisible();
+    }
+    await app.screenshot("lisbon-commitment-before");
+    const hold = screen.getByRole("button", "Hold to commit");
+    await hold.longPress({ duration: 300 });
+    await expect(
+      screen.getByRole("button", "Tap to commit instead"),
+    ).toBeVisible();
+    await hold.longPress({ duration: 1200 });
+    await expect(screen.getByText("You’re in.")).toBeVisible();
+    await expect(promise).toBeVisible();
+    await expect(screen.getByRole("button", "Continue")).toBeVisible();
+    await expect(paywallTitle(screen)).toBeHidden();
+    await app.screenshot("lisbon-commitment-confirmed");
+  },
+);
+
+test(
   "turns one sample reel into a date night's spots, then asks for the paywall",
   { retries: 0, timeout: 600_000 },
-  async ({ device, screen }) => {
+  async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen);
 
@@ -79,7 +114,20 @@ test(
         timeout: 10_000,
       });
     }
-    const commit = screen.getByRole("button", COMMIT);
+    await walkToCommitment(screen);
+    await expect(
+      screen.getByText("I’ll visit one place I saved in Prague this week."),
+    ).toBeVisible();
+    for (const place of ["Kampa Park", "Hemingway Bar", "Café Louvre"]) {
+      await expect(screen.getByText(place).first()).toBeVisible();
+    }
+    await app.screenshot("commitment-before");
+    const hold = screen.getByRole("button", "Hold to commit");
+    await hold.longPress({ duration: 1200 });
+    await expect(screen.getByText("You’re in.")).toBeVisible();
+    await expect(paywallTitle(screen)).toBeHidden();
+    await app.screenshot("commitment-confirmed");
+    const commit = screen.getByRole("button", "Continue");
     await commit.tap();
     await expectPaywall(screen);
     await screen.getByRole("button", "Close").first().tap();

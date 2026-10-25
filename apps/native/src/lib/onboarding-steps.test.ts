@@ -34,6 +34,7 @@ describe("previousOnboardingStep", () => {
     ["city", "chart"],
     ["ahaShare", "city"],
     ["ahaSpots", "ahaShare"],
+    ["commitment", "ahaSpots"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
@@ -44,12 +45,13 @@ describe("previousOnboardingStep", () => {
 });
 
 describe("nextOnboardingStep", () => {
-  it("walks the questions, the city and the sample, and stays on the sample spots", () => {
+  it("walks the questions, city, sample and commitment, and stays on the commitment", () => {
     const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
     while (walked.length < ONBOARDING_STEPS.length)
       walked.push(nextOnboardingStep(walked[walked.length - 1]));
     expect(walked).toEqual([...ONBOARDING_STEPS]);
-    expect(nextOnboardingStep("ahaSpots")).toBe("ahaSpots");
+    expect(nextOnboardingStep("ahaSpots")).toBe("commitment");
+    expect(nextOnboardingStep("commitment")).toBe("commitment");
   });
 });
 
@@ -61,7 +63,7 @@ describe("ONBOARDING_STEP_IDS", () => {
 });
 
 describe("onboardingProgress", () => {
-  it("has no bar on the opener and fills evenly to the sample spots", () => {
+  it("has no bar on the opener and fills evenly to the commitment", () => {
     expect(onboardingProgress("opener")).toBeNull();
     const bars = ONBOARDING_STEPS.slice(1).map(onboardingProgress);
     expect(bars.at(-1)).toBe(1);

@@ -27,8 +27,11 @@ const FRESH_INSTALL_ARGUMENTS = [
   "YES",
 ];
 
-/** From the opener to the sample reel, planning date nights in the sample's own city (Prague). */
-export async function walkToSampleReel(screen: Screen): Promise<void> {
+/** From the opener to the sample reel; defaults to date nights in the sample's own city (Prague). */
+export async function walkToSampleReel(
+  screen: Screen,
+  options: { goal?: "date" | "travel"; city?: string } = {},
+): Promise<void> {
   await tapUntilVisible(
     screen.getByRole("button", "Get started"),
     screen.getByText("How many places have you saved?"),
@@ -39,7 +42,12 @@ export async function walkToSampleReel(screen: Screen): Promise<void> {
   await expect(screen.getByText("What would you like to plan?")).toBeVisible({
     timeout: 30_000,
   });
-  await screen.getByRole("checkbox", /^Date nights/).tap();
+  await screen
+    .getByRole(
+      "checkbox",
+      options.goal === "travel" ? /^Trips/ : /^Date nights/,
+    )
+    .tap();
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
@@ -54,7 +62,12 @@ export async function walkToSampleReel(screen: Screen): Promise<void> {
   await expect(screen.getByText("Pick a city to try.")).toBeVisible({
     timeout: 30_000,
   });
-  await skip.tap();
+  if (options.city) {
+    await screen.getByPlaceholder("Search cities").fill(options.city);
+    await screen.getByRole("radio", options.city).tap();
+  } else {
+    await skip.tap();
+  }
   await expect(screen.getByRole("button", SHARE_ON_REEL)).toBeVisible({
     timeout: 30_000,
   });
@@ -77,6 +90,17 @@ export async function shareTheSampleReel(screen: Screen): Promise<void> {
     timeout: 30_000,
   });
   await expect(screen.getByRole("button", "Continue")).toBeEnabled({
+    timeout: 10_000,
+  });
+}
+
+/** The map reveal leads to one commitment screen; confirming never opens the paywall on its own. */
+export async function walkToCommitment(screen: Screen): Promise<void> {
+  await screen.getByRole("button", "Continue").tap();
+  await expect(screen.getByText("Visit a place you’ve saved.")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(screen.getByRole("button", "Hold to commit")).toBeVisible({
     timeout: 10_000,
   });
 }

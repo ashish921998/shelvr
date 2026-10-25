@@ -38,6 +38,7 @@ import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
+import { CommitmentStep } from "@/components/onboarding/commitment";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
@@ -240,7 +241,7 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
   });
 
-  const askAfterSpots = () => {
+  const askAfterCommitment = () => {
     recordCurrentStep();
     paywall.ask();
   };
@@ -307,11 +308,13 @@ export default function OnboardingScreen() {
       case "ahaShare":
         return <AhaShareStep sample={sample} onShared={advance} />;
       case "ahaSpots":
+        return <AhaSpotsStep sample={sample} onContinue={advance} />;
+      case "commitment":
         return (
-          <AhaSpotsStep
+          <CommitmentStep
             sample={sample}
             leaving={paywall.asked}
-            onContinue={askAfterSpots}
+            onContinue={askAfterCommitment}
           />
         );
     }
