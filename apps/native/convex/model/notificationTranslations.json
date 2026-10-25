@@ -23,6 +23,10 @@
       "cook": {
         "title": "Aus deinen gespeicherten Rezepten",
         "body": "Lust, heute „%{title}“ zu kochen?"
+      },
+      "visit": {
+        "title": "Aus deinen gespeicherten Orten",
+        "body": "Willst du noch zu „%{title}“?"
       }
     }
   },
@@ -50,6 +54,10 @@
       "cook": {
         "title": "From your saved recipes",
         "body": "Want to make “%{title}” today?"
+      },
+      "visit": {
+        "title": "From your saved places",
+        "body": "Still want to go to “%{title}”?"
       }
     }
   },
@@ -80,6 +88,10 @@
       "cook": {
         "title": "De tus recetas guardadas",
         "body": "¿Te apetece preparar «%{title}» hoy?"
+      },
+      "visit": {
+        "title": "De tus lugares guardados",
+        "body": "¿Aún quieres ir a «%{title}»?"
       }
     }
   },
@@ -110,6 +122,10 @@
       "cook": {
         "title": "De tus recetas guardadas",
         "body": "¿Se te antoja preparar «%{title}» hoy?"
+      },
+      "visit": {
+        "title": "De tus lugares guardados",
+        "body": "¿Todavía quieres ir a «%{title}»?"
       }
     }
   },
@@ -140,6 +156,10 @@
       "cook": {
         "title": "Parmi vos recettes enregistrées",
         "body": "Envie de préparer « %{title} » aujourd'hui ?"
+      },
+      "visit": {
+        "title": "Parmi vos lieux enregistrés",
+        "body": "Toujours envie d'aller à « %{title} » ?"
       }
     }
   },
@@ -170,6 +190,10 @@
       "cook": {
         "title": "Parmi vos recettes enregistrées",
         "body": "Envie de préparer « %{title} » aujourd'hui ?"
+      },
+      "visit": {
+        "title": "Parmi vos lieux enregistrés",
+        "body": "Toujours envie d'aller à « %{title} » ?"
       }
     }
   },
@@ -194,6 +218,10 @@
       "cook": {
         "title": "保存したレシピから",
         "body": "今日は「%{title}」を作ってみませんか？"
+      },
+      "visit": {
+        "title": "保存した場所から",
+        "body": "「%{title}」、まだ行ってみたいですか？"
       }
     }
   },
@@ -218,6 +246,10 @@
       "cook": {
         "title": "저장한 레시피에서",
         "body": "오늘 '%{title}' 만들어 볼까요?"
+      },
+      "visit": {
+        "title": "저장한 장소에서",
+        "body": "'%{title}', 아직 가 보고 싶나요?"
       }
     }
   },
@@ -248,6 +280,10 @@
       "cook": {
         "title": "Das suas receitas salvas",
         "body": "Que tal fazer “%{title}” hoje?"
+      },
+      "visit": {
+        "title": "Dos seus lugares salvos",
+        "body": "Ainda quer ir a “%{title}”?"
       }
     }
   }

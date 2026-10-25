@@ -396,7 +396,7 @@ export default defineSchema({
   saveReminders: defineTable({
     userId: v.string(),
     itemId: v.id("items"),
-    kind: v.union(v.literal("read"), v.literal("cook")),
+    kind: v.union(v.literal("read"), v.literal("cook"), v.literal("visit")),
     createdAt: v.number(),
     deliveredAt: v.optional(v.number()),
     deliveryStatus: v.union(

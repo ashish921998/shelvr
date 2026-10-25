@@ -12,12 +12,13 @@ record.
 
 Every notification about saves names one of them, or it is not sent.
 
-| Kind            | Example                                                  | When                                                             | Switch         |
-| --------------- | -------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
-| `weekly_shelf`  | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf   |
-| `read_reminder` | _"Why bread rises" is ready when you are._               | An article unopened for a day or more (up to 90 days)            | Save reminders |
-| `cook_reminder` | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week          | Save reminders |
-| trial reminder  | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`)     | OS permission  |
+| Kind             | Example                                                  | When                                                             | Switch         |
+| ---------------- | -------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
+| `weekly_shelf`   | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf   |
+| `read_reminder`  | _"Why bread rises" is ready when you are._               | An article unopened for a day or more (up to 90 days)            | Save reminders |
+| `cook_reminder`  | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week          | Save reminders |
+| `visit_reminder` | _Still want to go to "As Bifanas do Afonso"?_            | A save naming a place not marked "We went", saved 3+ days ago    | Save reminders |
+| trial reminder   | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`)     | OS permission  |
 
 ### Weekly shelf
 
@@ -39,14 +40,18 @@ The server pushes are `convex/notifications.ts` (`prepareSaveReminder`) and
 `convex/notificationDelivery.ts` (`sendReminder`). The rules are pure
 functions in `convex/model/saveReminders.ts`, with tests next to them.
 
-- **Which save.** An article is a link with a readable body and no social
-  `media`. A recipe is a save with a `recipe`. Anything else never gets a
-  reminder, because a vague "remember this?" is the notification people
+- **Which save.** A place is the first of a save's `places` the user has not
+  marked "We went" (`placeVisits`), unless the save is a recipe; a place on a
+  stored trip is left to the trip. An article is a link with a readable body
+  and no social `media`. A recipe is a save with a `recipe`. Anything else
+  never gets a reminder, because a vague "remember this?" is the notification people
   turn off. The notification names a recipe by `recipe.name` (the dish), and
   anything else by its title. Each save is reminded about at most once; a
   reminder that never reached the user (paused, expired, no device) does not
-  count, up to two tries. The two kinds take turns, newest save first within
-  each kind.
+  count, up to two tries. Places go first, and the kind sent last waits its
+  turn behind the other two, newest save first within each kind. A place
+  reminder names its place again at send time, so a "We went" in between
+  moves it to the save's next place, or drops it.
 - **When.** At the local hour the user saved the most over the past 30 days,
   clamped to 10:00 to 19:00. It stays at 18:00 until there are 5 saves to go
   on. Most saves come from the share sheet while the user is scrolling
