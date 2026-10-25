@@ -104,16 +104,23 @@ export default function PrivacyPage() {
           to Google’s Gemini API (a generation model and Gemini embeddings).
           What is sent: link addresses, up to about 8,000 characters of
           extracted page text, a reel’s or TikTok’s caption, and what is said in
-          the video. When you make a plan, Shelvr also sends your saved places
-          and the ones you marked “We went”. Saved notes and images may also be
-          processed to organize your content.
+          the video. Saved notes and images may also be processed to organize
+          your content.
         </p>
         <p className="mt-2">
-          AI processing is part of saving content and making plans in Shelvr. It
-          runs automatically unless it is disabled for your account. With AI
-          disabled, links still save, but AI place extraction and plans are
-          unavailable. To request a change to your AI processing preference, use
-          Contact Support in the app or email <strong>{SUPPORT_EMAIL}</strong>.
+          Date and trip plans are selected within Shelvr from places already
+          saved in your chosen city. Places marked “We went” are excluded. Your
+          saved collection and visit history are not sent to Gemini to make
+          these plans. Shelvr sends place names to Apple Maps to locate trip
+          stops; it does not track your live location.
+        </p>
+        <p className="mt-2">
+          AI processing is part of saving content in Shelvr. It runs
+          automatically unless it is disabled for your account. With AI
+          disabled, links still save, but AI place extraction is unavailable.
+          Plans can still use places already saved in your account. To request a
+          change to your AI processing preference, use Contact Support in the
+          app or email <strong>{SUPPORT_EMAIL}</strong>.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that

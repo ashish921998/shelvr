@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
-import { isGrounded, placeKey, sanitizePlan, type PlanSource } from "./plan";
+import {
+  isGrounded,
+  placeKey,
+  sanitizePlan,
+  suggestSavedPlaces,
+  type PlanSource,
+} from "./plan";
 
 function source(fields: Partial<PlanSource>): PlanSource {
   return { itemId: "item1" as Id<"items">, places: [], ...fields };
@@ -442,11 +448,11 @@ describe("sanitizePlan", () => {
     expect(places[0].been).toBeUndefined();
   });
 
-  it("keeps visited places, tagged, when every pick is one", () => {
+  it("returns no places when every pick was visited", () => {
     const sources = [source({ title: "Spot0 dinner" })];
     const raw = [{ saveNumber: 1, name: "Spot0", area: "", why: "Good" }];
     const places = sanitizePlan(raw, sources, new Set([placeKey("Spot0")]));
-    expect(places).toEqual([expect.objectContaining({ been: true })]);
+    expect(places).toEqual([]);
   });
 
   it("keeps the address when the name before it proves nothing alone", () => {
@@ -471,4 +477,20 @@ describe("sanitizePlan", () => {
     );
     expect(place.why.length).toBeLessThanOrEqual(140);
   });
+});
+
+it("shuffles the stored places without inventing or dropping candidates", () => {
+  const sources = [source({ places: ["Place A", "Place B", "Place C"] })];
+  const random = vi.spyOn(Math, "random");
+  try {
+    random.mockReturnValue(0);
+    const first = suggestSavedPlaces(sources, new Set(), 5).map((p) => p.name);
+    random.mockReturnValue(0.99);
+    const second = suggestSavedPlaces(sources, new Set(), 5).map((p) => p.name);
+    expect(first).not.toEqual(second);
+    expect([...first].sort()).toEqual([...second].sort());
+    expect(first).toHaveLength(3);
+  } finally {
+    random.mockRestore();
+  }
 });

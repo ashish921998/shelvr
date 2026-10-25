@@ -127,7 +127,7 @@ Core review flow:
 
 1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear under a city in "Your cities". A link that names no place shows under "No place found".
 2. Tap a city to open its page: a map with a pin per place, and a sheet listing the places.
-3. On the city page, tap "Plan a date" or "Plan a trip" to get a shortlist or a day-by-day trip made from those saves.
+3. On the city page, tap "Plan a date" or "Plan a trip" to get a shortlist or a day-by-day trip selected within Shelvr from places already saved in that city. Places marked "We went" are excluded; planning does not send the saved collection or visit history to Gemini. Apple Maps locates trip stops.
 4. Tap a save to see its detail; the source link opens the original post.
 5. Shelvr does not request camera or photo access, and does not request or track live device location.
 
@@ -139,7 +139,7 @@ Share extension, Siri and widget:
 
 Third-party AI:
 
-To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini; making a plan also sends the person's saved places and the ones they marked "We went". Home opens after onboarding and its paywall without an AI permission prompt or Settings switch. Accounts without a recorded preference use AI automatically; previously recorded opt-outs remain honored. No explicit AI permission is collected by this client. This needs review against App Store guideline 5.1.2(i), which requires explicit permission before personal data is shared with third-party AI.
+To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini. Date and trip planning happens within Shelvr using places already saved in the selected city and excluding places marked "We went". The saved collection and visit history are not sent to Gemini for planning; Apple Maps still resolves trip stops. Home opens after onboarding and its paywall without an AI permission prompt or Settings switch. Accounts without a recorded preference use AI automatically for incoming saves; previously recorded opt-outs remain honored. Plans can still use previously saved places when AI processing is disabled. No explicit AI permission is collected by this client. This needs review against App Store guideline 5.1.2(i), which requires explicit permission before personal data is shared with third-party AI.
 
 Account and support controls:
 

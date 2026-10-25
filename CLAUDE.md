@@ -273,27 +273,30 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
   user and run the same save helpers, gates and limits as the app's own mutations.
 - **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` takes a space and an
-  optional `city`. With a city (sent from the city page) it plans that city's ready saves as
-  the page lists them (`readyCitySaves`), not the space's memberships; old builds send no
-  city and plan their space's saved items. One model call asks for up to ten candidates
-  (`MAX_PLAN_CANDIDATES`) the saves name, each with a reason and its source item; five
-  remain. Nothing is stored. `spaces.claimPlanInternal` claims Pro, AI consent and the
-  `makePlan` rate limit first; the pure prompt and sanitizing half (which drops a place no
-  save names) is `model/plan.ts`. Places marked "We went" (`placeVisits.ts`, `setVisited`)
-  go into the prompt and drop out of the shortlist, unless that would leave nothing; then
-  they stay, tagged `been`.
+  optional `city`. With a city it reads that city's ready saves; otherwise it reads saved
+  space memberships. `spaces.claimPlanInternal` enforces ownership, Pro and the rate
+  limit, then looks up each candidate's visit status using an index (no recent-visit cap).
+  `model/plan.ts` deduplicates and shuffles already-extracted places, returning at most
+  five with text from their source save. No AI call or AI permission is needed to plan.
+  "We went" places never return as fallback picks. A multi-city save contributes only
+  place labels explicitly carrying the chosen city; ambiguous labels are skipped.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
+  and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
-- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
-  space's saved items, kept to one city (the one the city page sends, or else the most common), makes one model call that lists
-  the places they name with a time of day each, looks each up in the Apple Maps Server API
-  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
-  with no saved place shows as a gap; the trip never adds a place the saves do not name.
-  `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
-  reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
+- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
+  the chosen city's ready saves (or the most common city in a space), shuffles stored
+  unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),
+  and groups nearby stops into days at the selected pace (`model/trip.ts`, pure).
+  It does not send saves or visit history to Gemini or infer new places from raw text.
+  Without a stored time-of-day category, stops use the existing "any"/afternoon slot;
+  lunch and dinner remain open gaps. An empty selection leaves the previous trip intact.
+  `tripData.ts` stores the trip and serves `getSpaceTrip` / `tripCities`; swaps also skip
+  wishlist places marked visited after the trip was made. Without the Maps key, trips
+  still work using stored pins where available.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
