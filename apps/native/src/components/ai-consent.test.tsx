@@ -15,6 +15,40 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/ai-consent", () => ({
   useAiConsent: () => ({ status: mocks.status, answer: mocks.answer }),
 }));
+vi.mock("@/components/ui/button", () => ({
+  Button: vi.fn(
+    ({
+      title,
+      onPress,
+      loading,
+    }: {
+      title: string;
+      onPress: () => void;
+      loading?: boolean;
+    }) => (
+      <button onClick={onPress} disabled={loading}>
+        {title}
+      </button>
+    ),
+  ),
+}));
+vi.mock("@/components/onboarding/parts", () => ({
+  GhostButton: vi.fn(
+    ({
+      label,
+      onPress,
+      disabled,
+    }: {
+      label: string;
+      onPress: () => void;
+      disabled?: boolean;
+    }) => (
+      <button onClick={onPress} disabled={disabled}>
+        {label}
+      </button>
+    ),
+  ),
+}));
 vi.mock("@/lib/aha-sample", () => ({
   ahaSample: () => ({
     city: "prague",

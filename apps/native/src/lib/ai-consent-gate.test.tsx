@@ -146,6 +146,15 @@ it("waits for onboarding and its paywall to finish before asking", () => {
   expect(shows("consent-card")).toBe(false);
 });
 
+it("shows the plan gate, not the ask, to someone who finished onboarding without Pro", () => {
+  mocks.status = "unset";
+  mocks.onboarded = true;
+  mocks.entitlement = { entitled: false, loading: false };
+  render(<AppLayout />);
+  expect(shows("consent-card")).toBe(false);
+  expect(shows("app-stack")).toBe(true);
+});
+
 it("shows a signed-out user no card", () => {
   mocks.status = "signed-out";
   mocks.onboarded = false;

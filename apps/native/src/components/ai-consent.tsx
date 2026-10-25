@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, Switch, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { GhostButton } from "@/components/onboarding/parts";
 import { PinBadge } from "@/components/onboarding/sample-trip-map";
+import { Button } from "@/components/ui/button";
 import { SettingCard } from "@/components/ui/setting-card";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useAiConsent } from "@/lib/ai-consent";
@@ -93,32 +95,16 @@ export function AiConsentCard() {
           {t("legal.privacy")}
         </ThemedText>
       </Pressable>
-      {(
-        [
-          [true, "aiConsent.allow"],
-          [false, "aiConsent.notNow"],
-        ] as const
-      ).map(([granted, label]) => (
-        <Pressable
-          key={label}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: pending }}
-          disabled={pending}
-          onPress={() => void choose(granted)}
-          style={({ pressed }) => [
-            styles.choice,
-            granted && styles.choiceFilled,
-            (pressed || pending) && styles.dimmed,
-          ]}
-        >
-          <ThemedText
-            variant="button"
-            style={granted ? styles.onFilled : undefined}
-          >
-            {t(label)}
-          </ThemedText>
-        </Pressable>
-      ))}
+      <Button
+        title={t("aiConsent.allow")}
+        loading={pending}
+        onPress={() => void choose(true)}
+      />
+      <GhostButton
+        label={t("aiConsent.notNow")}
+        disabled={pending}
+        onPress={() => void choose(false)}
+      />
       {failed ? (
         <ThemedText
           variant="caption"
@@ -196,21 +182,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.primaryText,
     textDecorationLine: "underline",
   },
-  choice: {
-    minHeight: theme.control.minHeight,
-    padding: theme.gap(1.5),
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  choiceFilled: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  onFilled: { color: theme.colors.primaryForeground },
-  dimmed: { opacity: theme.opacity.pressed },
   error: { color: theme.colors.danger },
 }));
