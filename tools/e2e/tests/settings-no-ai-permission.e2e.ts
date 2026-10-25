@@ -4,7 +4,7 @@ import { expect } from "e2e";
 import { startFreshOnboarding } from "./fresh-onboarding.ts";
 import { scrollSettingsTo, tapUntilVisible } from "./seeded-home.ts";
 
-test("a new account reaches Home without a consent screen and keeps AI off in Settings", async ({
+test("a new account reaches Home without AI permission prompts or a Settings switch", async ({
   device,
   screen,
 }) => {
@@ -25,6 +25,9 @@ test("a new account reaches Home without a consent screen and keeps AI off in Se
   await tapUntilVisible(profile, settings, { waitMs: 15_000, timeout: 60_000 });
   await settings.tap();
   const permission = screen.getByRole("switch", "Find places with AI");
-  await scrollSettingsTo(screen, permission);
-  await expect(permission).toHaveValue("0");
+  await scrollSettingsTo(
+    screen,
+    screen.getByText("Privacy Policy", { exact: true }),
+  );
+  await expect(permission).toHaveCount(0);
 });

@@ -75,7 +75,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 ## Privacy disclosures (summary)
 
 - Account email via Apple/Google.
-- Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (only after the person enables Find places with AI in Settings).
+- Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
@@ -139,7 +139,7 @@ Share extension, Siri and widget:
 
 Third-party AI:
 
-To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini; making a plan also sends the person's saved places and the ones they marked "We went". Home opens after onboarding and its paywall without a separate consent screen. AI is off for new accounts until the person enables "Find places with AI" in Settings. Existing choices remain intact. Without permission, links still save, but Gemini place extraction and AI plans are unavailable.
+To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini; making a plan also sends the person's saved places and the ones they marked "We went". Home opens after onboarding and its paywall without an AI permission prompt or Settings switch. Accounts without a recorded preference use AI automatically; previously recorded opt-outs remain honored. No explicit AI permission is collected by this client. This needs review against App Store guideline 5.1.2(i), which requires explicit permission before personal data is shared with third-party AI.
 
 Account and support controls:
 

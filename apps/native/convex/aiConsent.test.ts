@@ -180,7 +180,7 @@ describe("getStatus and setConsent", () => {
     expect((await other.query(api.aiConsent.getStatus, {})).status).toBe(
       "unset",
     );
-    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(false);
+    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(true);
   });
 
   it("requires a signed-in user", async () => {
@@ -193,21 +193,26 @@ describe("getStatus and setConsent", () => {
 });
 
 describe("a user who has not answered", () => {
-  it("is treated as declined: nothing goes to Gemini until they choose Allow", async () => {
+  it("uses AI by default without writing a consent record", async () => {
     const t = await signedIn(newConvexTest(), "unset");
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    await expectNoThirdPartyCall();
+    expect(generateObject).toHaveBeenCalledOnce();
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       status: "ready",
-      title: "Buy lentils",
+      title: "Model title",
     });
+    expect(await t.run((ctx) => ctx.db.query("aiConsents").collect())).toEqual(
+      [],
+    );
   });
 });
 
-describe("an unanswered account that then taps Allow", () => {
+describe("a previously declined account that then allows AI through a legacy client", () => {
   it("gets the saves it made before answering embedded", async () => {
     const t = await signedIn(newConvexTest(), "unset");
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
     const itemId = await ready(t);
     await t.action(internal.ai.sweepItemEmbeddings, {});
     expect(embedMany).not.toHaveBeenCalled();

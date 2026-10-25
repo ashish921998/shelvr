@@ -15,16 +15,6 @@ const mocks = vi.hoisted(() => ({
 }));
 const nothing = vi.hoisted(() => () => null);
 
-vi.mock("@/lib/ai-consent", () => ({
-  useAiConsent: () => ({
-    status: mocks.status,
-    savesBlocked: mocks.status === "loading" || mocks.status === "unset",
-    asking: mocks.status === "unset",
-  }),
-}));
-vi.mock("@/components/ai-consent", () => ({
-  AiConsentCard: vi.fn(() => <div>consent-card</div>),
-}));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: mocks.onboarded }),
 }));

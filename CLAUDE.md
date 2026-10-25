@@ -161,15 +161,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
-- **`aiConsent.ts`**: consent to third-party AI processing (App Store guideline 5.1.2(i)):
-  `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
-  every path sending user content to Gemini or SerpAPI asks first. It refuses an owner whose
-  row is missing or `deleting` before it reads consent, and item-aware checks also require an
-  existing owned save. Among live owners, only an explicit Allow lets content go out; an
-  account that never answered counts as declined. The app opens Home after onboarding and its paywall without a consent screen.
-  Users enable AI explicitly through Settings; new accounts keep AI off until then. A declined user's saves still finish `ready` from what Shelvr read
-  itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
-  client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+- **`aiConsent.ts`**: legacy AI preferences and ownership checks. `getStatus` and
+  `setConsent` remain compatible with installed clients. Every path sending content to
+  Gemini, SerpAPI or Treg checks `aiAllowed` / `isAllowed`: missing or deleting owners,
+  missing or unowned saves, and explicit legacy declines are refused. Accounts with no
+  preference record use AI automatically; no grant record is fabricated. The current
+  client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
+  reports `unset` for an unanswered account, so old clients retain their existing UI.
+  A declined user's saves still finish `ready` from what Shelvr read itself, without AI.
+  `model/aiConsent.ts` retains `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
   and `survivingCandidates` (up to 100 candidate saves, loaded and checked again before
   classification). The embedding sweep checks each cached save again in one batch and maps

@@ -19,13 +19,13 @@ async function consentRow(ctx: QueryCtx, userId: string) {
     .unique();
 }
 
-/** Only an explicit Allow lets content go to Gemini; an account that never answered is treated as declined. */
+/** AI is available by default for live owners; explicit legacy opt-outs remain authoritative. */
 export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
 ): Promise<boolean> {
   if ((await liveOwner(ctx, userId)) === null) return false;
-  return (await consentRow(ctx, userId))?.status === "granted";
+  return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
 export const isAllowed = internalQuery({
