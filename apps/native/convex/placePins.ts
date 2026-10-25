@@ -86,7 +86,8 @@ export const toLocate = internalQuery({
     const names = wanted
       .filter(([key]) => !pinned.has(key))
       .map(([, name]) => name)
-      .slice(0, Math.max(0, MAX_PINS - kept));
+      // Look past the free slots: a stray match storePins drops must not keep the next place from a pin.
+      .slice(0, kept >= MAX_PINS ? 0 : MAX_PINS);
     return { names, city: item.cities?.[0] };
   },
 });

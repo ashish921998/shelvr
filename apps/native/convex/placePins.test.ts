@@ -244,6 +244,19 @@ describe("placePins", () => {
     expect(await pins()).toHaveLength(5);
   });
 
+  it("looks past the last free slot, so a dropped stray does not block the next place", async () => {
+    const { queries } = await withMaps();
+    const names = ["A1", "B2", "C3", "D4", "E5", "F6", "G7"];
+    const { t, itemId } = await setup(names);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: names.slice(0, 4).map((name) => ({ name, lat: 1, lng: 1 })),
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries()).toEqual(["E5, Lisbon", "F6, Lisbon", "G7, Lisbon"]);
+  });
+
   it("does not look up places once five are already pinned", async () => {
     const { queries } = await withMaps();
     const names = ["A1", "B2", "C3", "D4", "E5", "F6", "G7"];
