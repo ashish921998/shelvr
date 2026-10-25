@@ -222,6 +222,18 @@ describe("an unanswered account that then taps Allow", () => {
   });
 });
 
+describe("an unanswered account that then taps Not now", () => {
+  it("has vectors stored before answering removed", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    const itemId = await ready(t, { embedding: VECTOR });
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(
+      (await t.run((ctx) => ctx.db.get(itemId)))?.embedding,
+    ).toBeUndefined();
+  });
+});
+
 describe("a save that is gone", () => {
   it("is not allowed to be sent, whatever the consent answer", async () => {
     const t = await signedIn();

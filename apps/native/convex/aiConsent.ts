@@ -122,8 +122,9 @@ export const setConsent = authedMutation({
     } else {
       await ctx.db.patch(row._id, values);
     }
-    // An account that never answered counted as declined, so its first Allow re-syncs too.
-    if ((row?.status === "granted") !== args.granted) {
+    // A first answer always syncs: an account with no row may hold vectors from
+    // before unanswered counted as declined, and needs them cleared or refreshed.
+    if (row === null || (row.status === "granted") !== args.granted) {
       await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
         userId,
         cursor: null,
