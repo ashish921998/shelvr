@@ -1,5 +1,6 @@
 import { type Infer, v } from "convex/values";
-import type { PlanPlace } from "./plan";
+import type { Id } from "../_generated/dataModel";
+import { placeKey, type PlanPlace } from "./plan";
 
 // Geometry lives here, not beside the Apple Maps client, because the app
 // imports this module: anything it imports ships in the app bundle.
@@ -301,23 +302,43 @@ export function buildTrip(
   };
 }
 
-export function keepNearby(
-  found: (LatLng | null)[],
-  centre: LatLng | null,
-): (LatLng | null)[] {
-  const points = found.filter((p): p is LatLng => p !== null);
-  if (points.length === 0) return found;
+/** The median point: one stray place cannot drag it away from the rest. */
+export function middleOf(points: LatLng[]): LatLng | null {
+  if (points.length === 0) return null;
   const median = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
     return sorted[Math.floor(sorted.length / 2)];
   };
-  const anchor = centre ?? {
+  return {
     lat: median(points.map((p) => p.lat)),
     lng: median(points.map((p) => p.lng)),
   };
+}
+
+export function keepNearby(
+  found: (LatLng | null)[],
+  centre: LatLng | null,
+): (LatLng | null)[] {
+  const anchor =
+    centre ?? middleOf(found.filter((p): p is LatLng => p !== null));
+  if (anchor === null) return found;
   return found.map((p) =>
     p !== null && distanceKm(p, anchor) <= MAX_CITY_DISTANCE_KM ? p : null,
   );
+}
+
+export type SavedPin = { itemId: Id<"items">; name: string } & LatLng;
+
+/** The map pin the save already has for this place, so a trip never looks it up again. */
+export function savedPinFor(
+  candidate: TripCandidate,
+  pins: SavedPin[],
+): LatLng | null {
+  const key = placeKey(candidate.name);
+  const pin = pins.find(
+    (p) => p.itemId === candidate.itemId && placeKey(p.name) === key,
+  );
+  return pin ? { lat: pin.lat, lng: pin.lng } : null;
 }
 
 export function swapStop(

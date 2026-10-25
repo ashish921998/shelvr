@@ -302,6 +302,74 @@ describe("makeTrip", () => {
     expect(queries).toContain("Pastéis de Belém, Belém, Lisbon");
   });
 
+  it("reuses the save's map pins and centres the search on them, not on a namesake city", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token") {
+        return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+      }
+      // A bare "Amsterdam" resolves to Amsterdam, New York.
+      const coordinate =
+        url.pathname === "/v1/geocode"
+          ? { latitude: 42.9387, longitude: -74.1882 }
+          : { latitude: 52.3752, longitude: 4.8841 };
+      return Response.json({ results: [{ coordinate }] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { base, t, spaceId, itemIds } = await setup([
+      {
+        title: "Amsterdam museums",
+        cities: ["Amsterdam"],
+        places: ["Rijksmuseum", "Anne Frank House"],
+      },
+    ]);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        placePins: [{ name: "Rijksmuseum", lat: 52.36, lng: 4.8854 }],
+      });
+    });
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          {
+            saveNumber: 1,
+            name: "Rijksmuseum",
+            area: "Museumplein",
+            why: "Art",
+            slot: "morning",
+          },
+          {
+            saveNumber: 1,
+            name: "Anne Frank House",
+            area: "",
+            why: "History",
+            slot: "afternoon",
+          },
+        ],
+      },
+    });
+
+    await t.action(api.trips.makeTrip, {
+      spaceId,
+      city: "Amsterdam",
+      days: 1,
+      pace: "easy",
+    });
+
+    const trip = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    const [museum, house] = trip?.days[0].stops ?? [];
+    expect([museum.lat, museum.lng]).toEqual([52.36, 4.8854]);
+    expect(house.lat).toBe(52.3752);
+    const looked = fetchMock.mock.calls
+      .map(([input]) => new URL(input))
+      .filter((url) => url.pathname !== "/v1/token");
+    expect(looked.map((url) => url.pathname)).toEqual(["/v1/search"]);
+    expect(looked[0].searchParams.get("q")).toBe("Anne Frank House, Amsterdam");
+  });
+
   it("reads only the chosen city's saves, and saves that name no city", async () => {
     const { t, spaceId } = await setup([
       { title: "Porto francesinha spot", cities: ["Porto"] },

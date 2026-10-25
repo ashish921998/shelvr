@@ -17,12 +17,20 @@ import {
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
+import { keepNearby } from "./model/trip";
 
 const MAX_PINS = 5;
 const BACKFILL_PAGE = 100;
 const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number };
+
+/** With three or more pins, one far from the rest is a wrong match for a same-named place elsewhere. */
+function nearEachOther(pins: Pin[]): Pin[] {
+  if (pins.length < 3) return pins;
+  const kept = keepNearby(pins, null);
+  return pins.filter((_, i) => kept[i] !== null);
+}
 
 function mapsNames(intents: Doc<"items">["intents"]): string[] {
   return (intents ?? [])
@@ -100,7 +108,7 @@ export const storePins = internalMutation({
       const key = placeKey(pin.name);
       if (wanted.has(key) && !next.has(key)) next.set(key, pin);
     }
-    const pins = [...next.values()].slice(0, MAX_PINS);
+    const pins = nearEachOther([...next.values()]).slice(0, MAX_PINS);
     const before = item.placePins ?? [];
     const same =
       pins.length === before.length &&

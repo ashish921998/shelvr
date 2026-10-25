@@ -183,6 +183,37 @@ describe("placePins", () => {
     expect(await pins()).toEqual([{ name: "Pink Street", lat: 2, lng: 2 }]);
   });
 
+  it("drops a pin far from the save's other places, a same-named place elsewhere", async () => {
+    const names = ["PNY", "Blend", "Bomaye", "Micho"];
+    const { t, itemId, pins } = await setup(names);
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [
+        { name: "PNY", lat: 48.8638, lng: 2.3627 },
+        { name: "Blend", lat: 48.8685, lng: 2.3256 },
+        { name: "Bomaye", lat: 48.8748, lng: 2.3539 },
+        { name: "Micho", lat: 43.7858, lng: -85.5028 },
+      ],
+    });
+    expect((await pins())?.map((p) => p.name)).toEqual([
+      "PNY",
+      "Blend",
+      "Bomaye",
+    ]);
+  });
+
+  it("keeps two far-apart pins, with nothing to say which is wrong", async () => {
+    const { t, itemId, pins } = await setup(["Here", "There"]);
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [
+        { name: "Here", lat: 48.86, lng: 2.36 },
+        { name: "There", lat: 43.79, lng: -85.5 },
+      ],
+    });
+    expect(await pins()).toHaveLength(2);
+  });
+
   it("keeps at most five pins", async () => {
     const names = ["A1", "B2", "C3", "D4", "E5", "F6", "G7"];
     const { t, itemId, pins } = await setup(names);

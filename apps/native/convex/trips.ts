@@ -26,10 +26,13 @@ import {
   buildTrip,
   keepNearby,
   MAX_TRIP_DAYS,
+  middleOf,
   MIN_TRIP_DAYS,
   tripPaceValidator,
   tripPlaceCap,
+  savedPinFor,
   type LatLng,
+  type SavedPin,
   type TripCandidate,
 } from "./model/trip";
 
@@ -83,25 +86,31 @@ function lookupQuery(
 async function locate(
   candidates: TripCandidate[],
   city: string | undefined,
-): Promise<(LatLng | null)[] | null> {
+  pins: SavedPin[],
+): Promise<(LatLng | null)[]> {
+  const saved = candidates.map((candidate) => savedPinFor(candidate, pins));
+  if (saved.every((place) => place !== null)) return saved;
   const config = appleMapsConfig(env);
-  if (config === null || candidates.length === 0) return null;
+  if (config === null) return saved;
   const token = await appleMapsAccessToken(config);
   if (token === null) {
     logEvent("warn", "trip_map_token_failed", {});
-    return null;
+    return saved;
   }
-  const centre: LatLng | null = city
-    ? await appleMapsLookup(token, "geocode", city)
-    : null;
+  // The save's own pins say where the city is; a bare city name can resolve to a namesake elsewhere.
+  const centre: LatLng | null =
+    middleOf(saved.filter((place): place is LatLng => place !== null)) ??
+    (city ? await appleMapsLookup(token, "geocode", city) : null);
   const found = await Promise.all(
-    candidates.map((candidate) =>
-      appleMapsLookup(
-        token,
-        "search",
-        lookupQuery(candidate, city),
-        centre ?? undefined,
-      ),
+    candidates.map(
+      (candidate, i) =>
+        saved[i] ??
+        appleMapsLookup(
+          token,
+          "search",
+          lookupQuery(candidate, city),
+          centre ?? undefined,
+        ),
     ),
   );
   return keepNearby(found, centre);
@@ -135,11 +144,12 @@ export const makeTrip = action({
       city?: string;
       sources: PlanSource[];
       been: string[];
+      pins: SavedPin[];
     } = await ctx.runMutation(internal.tripData.claimTripInternal, {
       spaceId: args.spaceId,
       ...(args.city !== undefined ? { city: args.city } : {}),
     });
-    const { spaceName, city, sources, been } = claim;
+    const { spaceName, city, sources, been, pins } = claim;
     if (sources.length === 0) {
       return { tripId: null, considered: 0 };
     }
@@ -187,9 +197,9 @@ export const makeTrip = action({
       return { tripId: null, considered: sources.length };
     }
 
-    const found = await locate(candidates, city);
+    const found = await locate(candidates, city, pins);
     const located = candidates.map((candidate, i) => {
-      const location = found?.[i];
+      const location = found[i];
       return location ? { ...candidate, location } : candidate;
     });
     const trip = buildTrip(located, { days, pace: args.pace });
@@ -208,7 +218,7 @@ export const makeTrip = action({
       space_id: args.spaceId,
       considered: sources.length,
       places: candidates.length,
-      located: found?.filter((place) => place !== null).length ?? 0,
+      located: found.filter((place) => place !== null).length,
       days,
     });
     return { tripId, considered: sources.length };
