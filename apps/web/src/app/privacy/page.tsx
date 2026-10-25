@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 14, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 25, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -110,11 +110,14 @@ export default function PrivacyPage() {
           versions of the app are processed the same way.
         </p>
         <p className="mt-2">
-          Before anything is sent, the app asks whether Shelvr may use Google’s
-          Gemini AI to find the places in your saves, and nothing goes to Gemini
-          until you tap Allow. You can change this at any time in Settings
-          (“Find places with AI”). If you choose Not now, your links are still
-          saved, but without places or plans.
+          AI processing runs automatically unless your account has a recorded
+          opt-out. The app no longer includes a separate AI permission prompt or
+          an AI switch in Settings. If you previously chose not to use AI, we
+          continue to honor that choice: your links still save, but AI place
+          extraction and plans remain unavailable. Older app versions may still
+          display the earlier AI permission controls. To request a change to
+          your AI processing preference, use Contact Support in the app or email{" "}
+          <strong>{SUPPORT_EMAIL}</strong>.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that
@@ -128,10 +131,11 @@ export default function PrivacyPage() {
           only happens when you tap it.
         </p>
         <p className="mt-2">
-          If you save a cooking TikTok or Instagram reel whose caption has no
-          recipe, its public link is sent to Treg (treg.to), which uses
-          ScrapeCreators to return what is said in the video. That transcript is
-          then sent to Gemini to write the recipe.
+          To find places or recipes in a TikTok or Instagram reel, including
+          videos with no caption, Shelvr may send its public link to Treg
+          (treg.to), which uses ScrapeCreators to return what is said in the
+          video. That transcript is then sent to Gemini to extract the places or
+          recipe.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
@@ -168,7 +172,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Treg and ScrapeCreators:</strong> video transcripts for
-            recipes from cooking TikToks and reels.
+            finding places and recipes in TikToks and reels.
           </li>
           <li>
             <strong>Convex:</strong> database, file storage, and backend
@@ -239,7 +243,10 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">Your choices</h2>
         <ul className="mt-2 list-disc pl-5 space-y-2">
-          <li>Turn AI processing on or off in Settings.</li>
+          <li>
+            Request a change to your AI processing preference through Contact
+            Support in the app or by emailing <strong>{SUPPORT_EMAIL}</strong>.
+          </li>
           <li>
             Turn notifications on or off in Settings, including the weekly shelf
             and save reminders.
