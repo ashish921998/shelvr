@@ -309,7 +309,6 @@ export type MessageParams = {
   "plan.emptyTitle": undefined;
   "plan.emptyBody": undefined;
   "plan.emptySpaceBody": undefined;
-  "plan.aiOff": undefined;
   "plan.failedTitle": undefined;
   "plan.shareIntro": { space: string };
   "plan.shareFooter": { url: string };
@@ -371,7 +370,6 @@ export type MessageParams = {
   "trip.swap": undefined;
   "trip.emptyTitle": undefined;
   "trip.emptyBody": undefined;
-  "trip.aiOff": undefined;
   "trip.failedTitle": undefined;
   "tripTeaser.cityBarcelona": undefined;
   "tripTeaser.cityLisbon": undefined;
@@ -632,14 +630,6 @@ export type MessageParams = {
   "refundConsent.syncPending": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
-  "aiConsent.title": undefined;
-  "aiConsent.body": undefined;
-  "aiConsent.changeLater": undefined;
-  "aiConsent.without": undefined;
-  "aiConsent.allow": undefined;
-  "aiConsent.notNow": undefined;
-  "aiConsent.setting": undefined;
-  "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
   "updates.title": undefined;
   "updates.check": undefined;

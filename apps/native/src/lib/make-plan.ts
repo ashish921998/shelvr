@@ -2,7 +2,6 @@ import { t } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { isAiConsentRequired } from "@convex/model/aiConsent";
 import { placeKey, type PlanPlace } from "@convex/model/plan";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,7 +17,6 @@ type PlanState =
       considered: number;
       planId: number;
     }
-  | { status: "ai_off" }
   | { status: "error" };
 
 export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
@@ -59,12 +57,9 @@ export function useMakePlan(
         });
         return { status: "ready", ...plan, planId };
       } catch (error) {
-        const aiOff = isAiConsentRequired(error);
-        analytics.capture("plan_failed", {
-          reason: aiOff ? "ai_consent" : "error",
-        });
-        if (!aiOff) analytics.captureError("make_plan_failed", error);
-        return { status: aiOff ? "ai_off" : "error" };
+        analytics.capture("plan_failed", { reason: "error" });
+        analytics.captureError("make_plan_failed", error);
+        return { status: "error" };
       }
     },
     [makePlan, spaceId, locale, city],

@@ -27,6 +27,7 @@ type Save = {
   maps?: string;
   spaceMaps?: string;
   cities?: string[];
+  places?: string[];
   /** False leaves the save out of the space. */
   member?: boolean;
 };
@@ -67,6 +68,7 @@ async function setup(
         tags: [],
         searchText: save.title,
         cities: save.cities,
+        places: save.places,
         intents: save.maps
           ? [{ kind: "open_maps", label: "Open in Maps", value: save.maps }]
           : undefined,
@@ -98,234 +100,194 @@ async function setup(
   return { base, t, ...seeded };
 }
 
-function promptOf(call = 0): string {
-  return (generateObject.mock.calls[call][0] as { prompt: string }).prompt;
-}
-
 beforeEach(() => {
-  generateObject.mockReset();
+  generateObject
+    .mockReset()
+    .mockRejectedValue(new Error("Planning must not call AI"));
 });
 
 describe("makePlan", () => {
-  it("plans the city's saves, not the space's, when opened from a city", async () => {
-    const { t, spaceId } = await setup([
-      { title: "Lisbon tasca", cities: ["Lisbon"], member: false },
-      { title: "Paris bistro", cities: ["Paris"] },
-      { title: "Graça rooftop", cities: ["lisbon"], status: "dismissed" },
+  it("suggests only stored places from the selected city's ready saves", async () => {
+    const { t, spaceId, itemIds } = await setup([
+      {
+        title: "Lisbon tasca",
+        places: ["Taberna"],
+        cities: ["Lisbon"],
+        member: false,
+      },
+      { title: "Paris bistro", places: ["Micho"], cities: ["Paris"] },
+      {
+        title: "Graça rooftop",
+        maps: "Graça Rooftop, Lisbon",
+        cities: ["lisbon"],
+        status: "dismissed",
+      },
+      {
+        title: "Still processing",
+        places: ["Not ready"],
+        cities: ["Lisbon"],
+        itemStatus: "processing",
+      },
     ]);
-    generateObject.mockResolvedValue({ object: { places: [] } });
-
-    const plan = await t.action(api.plans.makePlan, {
+    const result = await t.action(api.plans.makePlan, {
       spaceId,
       city: "Lisbon",
     });
-
-    expect(plan.considered).toBe(2);
-    expect(promptOf()).toContain("Lisbon tasca");
-    expect(promptOf()).toContain("Graça rooftop");
-    expect(promptOf()).not.toContain("Paris bistro");
+    expect(result.considered).toBe(1);
+    expect(result.places.map((place) => place.name)).toEqual(["Taberna"]);
+    expect(result.places.map((place) => place.itemId)).toEqual([itemIds[0]]);
+    expect(generateObject).not.toHaveBeenCalled();
   });
 
-  it("asks for twice the shortlist, so visited places can drop out", async () => {
-    const { t, spaceId } = await setup([{ title: "Somewhere" }]);
-    generateObject.mockResolvedValue({ object: { places: [] } });
-    await t.action(api.plans.makePlan, { spaceId });
-    expect(promptOf()).toContain("pick the 10 best");
-  });
-
-  it("returns the model's places that a save actually names", async () => {
-    const { t, spaceId, itemIds } = await setup([
-      { title: "Best vodka pasta in SoHo", content: "Go to Balthazar tonight" },
-      { title: "Cutest wine bar", content: "@barlola_nyc is a vibe" },
-      { title: "Pasta night", content: "no place named here" },
+  it("does not guess places from unstructured text", async () => {
+    const { t, spaceId } = await setup([
+      { title: "Book Le Coucou", content: "Restaurant ideas" },
     ]);
-    generateObject.mockResolvedValue({
-      object: {
-        places: [
-          {
-            saveNumber: 3,
-            name: "Balthazar",
-            area: "SoHo, NYC",
-            why: "The vodka pasta",
-          },
-          { saveNumber: 1, name: "Carbone", area: "", why: "Famous pasta" },
-          { saveNumber: 2, name: "Bar Lola", area: "", why: "Wine bar vibe" },
-          { saveNumber: 3, name: "balthazar", area: "", why: "Again" },
-          { saveNumber: 9, name: "Nowhere", area: "", why: "Nope" },
-        ],
-      },
+    expect(await t.action(api.plans.makePlan, { spaceId })).toEqual({
+      places: [],
+      considered: 1,
     });
-
-    const plan = await t.action(api.plans.makePlan, { spaceId });
-
-    expect(plan).toEqual({
-      considered: 3,
-      places: [
-        {
-          name: "Balthazar",
-          area: "SoHo",
-          why: "The vodka pasta",
-          itemId: itemIds[0],
-        },
-        { name: "Bar Lola", why: "Wine bar vibe", itemId: itemIds[1] },
-      ],
-    });
+    expect(generateObject).not.toHaveBeenCalled();
   });
 
-  it("leaves out a place the user marked We went", async () => {
+  it("deduplicates stored places and caps the shortlist at five", async () => {
+    const { t, spaceId } = await setup([
+      {
+        title: "List",
+        places: Array.from({ length: 10 }, (_, i) => `Place${i}`),
+      },
+      { title: "Another save", places: ["PLACE0"] },
+    ]);
+    const result = await t.action(api.plans.makePlan, { spaceId });
+    expect(result.places).toHaveLength(5);
+    expect(
+      new Set(result.places.map((place) => place.name.toLowerCase())).size,
+    ).toBe(5);
+    expect(generateObject).not.toHaveBeenCalled();
+  });
+
+  it("excludes visited places even if all places have been visited", async () => {
     const { t, spaceId, itemIds } = await setup([
-      { title: "Tigre is the moodiest bar in town" },
-      { title: "Sweet Linda for natural wine" },
-      { title: "Third save" },
+      { title: "Tigre", places: ["Tigre, Lisbon"] },
     ]);
     await t.mutation(api.placeVisits.setVisited, {
       itemId: itemIds[0],
       name: "Tigre",
       visited: true,
     });
-    generateObject.mockResolvedValue({
-      object: {
-        places: [
-          { saveNumber: 3, name: "TIGRE", area: "", why: "Moody" },
-          { saveNumber: 2, name: "Sweet Linda", area: "", why: "Wine" },
-        ],
-      },
+    expect(await t.action(api.plans.makePlan, { spaceId })).toEqual({
+      places: [],
+      considered: 1,
     });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: itemIds[0],
+      name: "Tigre",
+      visited: false,
+    });
+    expect(
+      (await t.action(api.plans.makePlan, { spaceId })).places[0].name,
+    ).toBe("Tigre");
+    expect(generateObject).not.toHaveBeenCalled();
+  });
 
-    const plan = await t.action(api.plans.makePlan, { spaceId });
-
-    expect(promptOf()).toContain(
-      "They have already been to the places inside <visited>Tigre</visited>.",
+  it("recognizes a visit recorded with a city-qualified name even if another save has the bare name", async () => {
+    const { t, spaceId, itemIds } = await setup([
+      { title: "Places", places: ["Taberna", "Taberna, Lisbon"] },
+    ]);
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: itemIds[0],
+      name: "Taberna, Lisbon",
+      visited: true,
+    });
+    expect((await t.action(api.plans.makePlan, { spaceId })).places).toEqual(
+      [],
     );
-    expect(plan.places).toEqual([
-      { name: "Sweet Linda", why: "Wine", itemId: itemIds[1] },
+  });
+
+  it("checks visits beyond the last 100 marks", async () => {
+    const { t, spaceId, userId, itemIds } = await setup([
+      { title: "Tigre", places: ["Tigre"] },
     ]);
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: itemIds[0],
+      name: "Tigre",
+      visited: true,
+    });
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 101; i++)
+        await ctx.db.insert("placeVisits", {
+          userId,
+          itemId: itemIds[0],
+          key: `other${i}`,
+          name: `Other${i}`,
+          visitedAt: Date.now() + i + 1000,
+        });
+    });
+    expect((await t.action(api.plans.makePlan, { spaceId })).places).toEqual(
+      [],
+    );
   });
 
-  it("asks for reasons in the app's language", async () => {
-    const { t, spaceId } = await setup([{ title: "Reel" }]);
-    generateObject.mockResolvedValue({ object: { places: [] } });
-
-    await t.action(api.plans.makePlan, { spaceId, locale: "ja" });
-    await t.action(api.plans.makePlan, { spaceId, locale: "xx" });
-
-    expect(promptOf(0)).toContain('Write each "why" in Japanese');
-    expect(promptOf(1)).toContain('Write each "why" in English');
-  });
-
-  it("reads only saved, ready items, with their map places", async () => {
+  it("keeps only explicitly city-labelled places from a multi-city save", async () => {
     const { t, spaceId } = await setup([
-      { title: "Filed reel", maps: "Par Ici Café, Chicago" },
-      { title: "Suggested reel", status: "suggested" },
-      { title: "Dismissed reel", status: "dismissed" },
-      { title: "Still reading", itemStatus: "processing" },
+      {
+        title: "Two cities",
+        cities: ["Paris", "Lisbon"],
+        places: ["Micho, Paris", "Taberna, Lisbon", "Unassigned Cafe"],
+      },
     ]);
-    generateObject.mockResolvedValue({ object: { places: [] } });
-
-    const plan = await t.action(api.plans.makePlan, { spaceId });
-
-    expect(plan).toEqual({ places: [], considered: 1 });
-    const prompt = promptOf();
-    expect(prompt).toContain("Filed reel");
-    expect(prompt).toContain("Places: Par Ici Café, Chicago");
-    expect(prompt).not.toContain("Suggested reel");
-    expect(prompt).not.toContain("Dismissed reel");
-    expect(prompt).not.toContain("Still reading");
+    expect(
+      (
+        await t.action(api.plans.makePlan, { spaceId, city: "Lisbon" })
+      ).places.map((p) => p.name),
+    ).toEqual(["Taberna"]);
   });
 
-  it("reads a place steered for this space", async () => {
+  it("uses a saved map label filed for the space", async () => {
     const { t, spaceId } = await setup([
       { title: "Date idea", spaceMaps: "Tigre, Brooklyn" },
     ]);
-    generateObject.mockResolvedValue({ object: { places: [] } });
-
-    await t.action(api.plans.makePlan, { spaceId });
-
-    expect(promptOf()).toContain("Places: Tigre, Brooklyn");
+    expect(
+      (await t.action(api.plans.makePlan, { spaceId })).places[0],
+    ).toMatchObject({ name: "Tigre", area: "Brooklyn", why: "Date idea" });
   });
 
-  it("reads a note's own text", async () => {
-    const { t, spaceId, itemIds } = await setup([
-      { title: "Anniversary ideas", note: "Book Le Coucou for Friday" },
-    ]);
-    generateObject.mockResolvedValue({
-      object: {
-        places: [
-          { saveNumber: 1, name: "Le Coucou", area: "", why: "Our pick" },
-        ],
-      },
-    });
-
-    const plan = await t.action(api.plans.makePlan, { spaceId });
-
-    expect(promptOf()).toContain("Book Le Coucou for Friday");
-    expect(plan.places).toEqual([
-      { name: "Le Coucou", why: "Our pick", itemId: itemIds[0] },
-    ]);
-  });
-
-  it("skips the model for a space with nothing saved", async () => {
-    const { t, spaceId } = await setup([
-      { title: "Only a suggestion", status: "suggested" },
-    ]);
-
-    expect(await t.action(api.plans.makePlan, { spaceId })).toEqual({
-      places: [],
-      considered: 0,
-    });
+  it("works with AI disabled because planning sends nothing to a model", async () => {
+    const { t, spaceId } = await setup(
+      [{ title: "Tigre", places: ["Tigre"] }],
+      { consent: "declined" },
+    );
+    expect(
+      (await t.action(api.plans.makePlan, { spaceId })).places,
+    ).toHaveLength(1);
     expect(generateObject).not.toHaveBeenCalled();
   });
 
   it("requires Pro", async () => {
-    const { t, spaceId } = await setup([{ title: "Reel" }], { pro: false });
-
+    const { t, spaceId } = await setup([{ title: "Reel", places: ["Tigre"] }], {
+      pro: false,
+    });
     await expect(
       t.action(api.plans.makePlan, { spaceId }),
     ).rejects.toMatchObject({ data: { code: "pro_required" } });
-    expect(generateObject).not.toHaveBeenCalled();
   });
 
-  it("sends nothing after the user declined AI processing", async () => {
-    const { t, spaceId } = await setup([{ title: "Reel" }], {
-      consent: "declined",
-    });
-
+  it("refuses another account's space", async () => {
+    const { base, spaceId } = await setup([
+      { title: "Tigre", places: ["Tigre"] },
+    ]);
+    const stranger = await base.run((ctx) => insertConsentingUser(ctx));
     await expect(
-      t.action(api.plans.makePlan, { spaceId }),
-    ).rejects.toMatchObject({ data: { code: "ai_consent_required" } });
-    expect(generateObject).not.toHaveBeenCalled();
-  });
-
-  it("refuses a space the caller does not own", async () => {
-    const { base, spaceId } = await setup([{ title: "Reel" }]);
-    const strangerId = await base.run((ctx) => insertConsentingUser(ctx));
-    const stranger = base.withIdentity({
-      subject: `${strangerId}|session-1`,
-    });
-
-    await expect(
-      stranger.action(api.plans.makePlan, { spaceId }),
+      base
+        .withIdentity({ subject: `${stranger}|session-1` })
+        .action(api.plans.makePlan, { spaceId }),
     ).rejects.toThrow("Space not found");
-    expect(generateObject).not.toHaveBeenCalled();
   });
 
-  it("reports a model failure as plan_failed", async () => {
-    const { t, spaceId } = await setup([{ title: "Reel" }]);
-    generateObject.mockRejectedValue(new Error("provider down"));
-
-    await expect(
-      t.action(api.plans.makePlan, { spaceId }),
-    ).rejects.toMatchObject({ data: { code: "plan_failed" } });
-  });
-
-  it("is rate limited", async () => {
-    const { t, spaceId } = await setup([{ title: "Reel" }]);
-    generateObject.mockResolvedValue({ object: { places: [] } });
-
-    for (let i = 0; i < 8; i++) {
-      await t.action(api.plans.makePlan, { spaceId });
-    }
+  it("remains rate limited", async () => {
+    const { t, spaceId } = await setup([{ title: "Reel", places: ["Tigre"] }]);
+    for (let i = 0; i < 8; i++) await t.action(api.plans.makePlan, { spaceId });
     await expect(t.action(api.plans.makePlan, { spaceId })).rejects.toThrow();
-    expect(generateObject).toHaveBeenCalledTimes(8);
+    expect(generateObject).not.toHaveBeenCalled();
   });
 });

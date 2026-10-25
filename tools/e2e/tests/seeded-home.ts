@@ -46,7 +46,7 @@ export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
       });
     const wasSignedIn = await profile.isVisible();
     if (!wasSignedIn) await devLogin.tap({ timeout: 30_000 });
-    await answerAiConsent(screen, profile);
+    await expect(profile).toBeVisible({ timeout: 60_000 });
     if (fromBackend && wasSignedIn) return;
 
     if (fromBackend) await resetFixturesFromBackend();
@@ -99,31 +99,15 @@ async function openApp(
 ): Promise<void> {
   // The dev launcher shows its server list when Metro is slow to answer for the bundle.
   const launcher = screen.getByText("Searching for development servers...");
-  const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
   await app.open();
   await pollUntil(
     async () => {
       if (await ready()) return true;
       if (await launcher.isVisible()) await app.open();
-      else if (await keepAi.isVisible()) await keepAi.tap();
       return false;
     },
     { timeout: BUNDLE_TIMEOUT },
   );
-}
-
-const AI_CONSENT_ALLOW = "Allow";
-
-async function answerAiConsent(screen: Screen, home: Locator): Promise<void> {
-  const keepAi = screen.getByRole("button", AI_CONSENT_ALLOW);
-  await pollUntil(
-    async () => (await home.isVisible()) || (await keepAi.isVisible()),
-    { timeout: 60_000 },
-  );
-  if (await keepAi.isVisible()) {
-    await keepAi.tap();
-    await expect(home).toBeVisible({ timeout: 30_000 });
-  }
 }
 
 export async function scrollSettingsTo(
