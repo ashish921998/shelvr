@@ -25,9 +25,9 @@ const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number };
 
-/** In a one-city save, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
+/** In a save that names exactly one city, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
 function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
-  if (cities.length > 1) return pins;
+  if (cities.length !== 1) return pins;
   return dropStrays(pins).filter((pin) => pin !== null);
 }
 
