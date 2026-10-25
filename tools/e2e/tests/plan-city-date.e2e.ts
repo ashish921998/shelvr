@@ -22,7 +22,7 @@ test(
     await screen.getByRole("button", "Save").tap();
     await expect(input).toBeHidden({ timeout: 30_000 });
 
-    await screen.getByRole("button", /^Lisbon,/).tap();
+    await screen.getByRole("button", /^Lisbon(?:,|$)/).tap();
     await expect(screen.getByText(TITLE)).toBeVisible({ timeout: 60_000 });
 
     await screen.getByRole("button", "Plan a date").tap();

@@ -707,7 +707,7 @@
   "homePlaces.noPlaceFailed": "読み込めませんでした",
   "homePlaces.noPlaceNone": "場所の記載がありません",
   "homePlaces.spotCount": {
-    "other": "%{formattedCount}スポット"
+    "other": "%{formattedCount}か所"
   },
   "homePlaces.moreCities": "ほか%{n}件",
   "homePlaces.yourSpaces": "あなたのスペース",

@@ -22,7 +22,11 @@ function CityGrid({ cities }: { cities: City[] }) {
         <Pressable
           key={entry.city}
           accessibilityRole="button"
-          accessibilityLabel={`${entry.city}, ${t("homePlaces.spotCount", { count: entry.count })}`}
+          accessibilityLabel={
+            entry.placeCount
+              ? `${entry.city}, ${t("homePlaces.spotCount", { count: entry.placeCount })}`
+              : entry.city
+          }
           onPress={() =>
             router.push({
               pathname: "/city/[name]",

@@ -41,7 +41,7 @@ export async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   const width = Number(data.thumbnail_width);
   const height = Number(data.thumbnail_height);
   const handle = str("author_unique_id");
-  const caption = str("title");
+  const caption = str("title")?.trim() || undefined;
   return {
     ...postField(tikTokPostUrl(handle, str("embed_product_id"))),
     // Like Instagram's: the caption's first line, not its hashtags and paragraphs.
@@ -54,5 +54,7 @@ export async function fetchTikTokOEmbed(url: string): Promise<PageData> {
     heroImageUrl: str("thumbnail_url"),
     heroAspectRatio: width > 0 && height > 0 ? width / height : 9 / 16,
     content: caption,
+    // An empty oEmbed response is not evidence that the video names no places.
+    ...(caption === undefined ? { incomplete: true } : {}),
   };
 }

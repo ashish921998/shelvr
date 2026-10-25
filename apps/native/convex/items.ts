@@ -22,7 +22,7 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
-import { cityKey, countCities } from "./model/trip";
+import { cityKey, countCities, uniquePlacePins } from "./model/trip";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -299,6 +299,7 @@ export const listCities = authedQuery({
     v.object({
       city: v.string(),
       count: v.number(),
+      placeCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
     }),
   ),
@@ -318,10 +319,23 @@ export const listCities = authedQuery({
     return countCities(items)
       .map(({ city, count }) => ({
         city,
+        // Older installed clients use count as the number of saves.
         count,
+        placeCount: uniquePlacePins(
+          items
+            .filter((item) =>
+              (item.cities ?? []).some(
+                (name) => cityKey(name) === cityKey(city),
+              ),
+            )
+            .slice(0, CITY_ITEMS_MAX)
+            .flatMap((item) => item.placePins ?? []),
+        ).length,
         cover: covers.get(cityKey(city)) ?? null,
       }))
-      .sort((a, b) => b.count - a.count || (a.city < b.city ? -1 : 1));
+      .sort(
+        (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
+      );
   },
 });
 

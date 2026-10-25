@@ -8,6 +8,19 @@ const MAX_CITY_DISTANCE_KM = 80;
 
 export type LatLng = { lat: number; lng: number };
 
+/** Count and draw the same mapped place once even when several saves mention it. */
+export function uniquePlacePins<T extends LatLng & { name: string }>(
+  pins: T[],
+): T[] {
+  const seen = new Set<string>();
+  return pins.filter((pin) => {
+    const key = `${placeKey(pin.name)}:${pin.lat.toFixed(4)}:${pin.lng.toFixed(4)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function distanceKm(a: LatLng, b: LatLng): number {
   const rad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = rad(b.lat - a.lat);

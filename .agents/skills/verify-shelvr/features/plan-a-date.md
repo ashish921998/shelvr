@@ -14,7 +14,8 @@ then `Plan a date`. Needs Pro (seeded).
 elsewhere. It saves the fixture page `/lisbon-date-night` from
 `convex/model/fakeAi.ts`. The fake model reads Lisbon and three places off
 it, and answers the plan call with every place the saves list, in order.
-Locators: the city card is a button labelled `Lisbon, N spots`; the plan
+Locators: the city card is a button labelled `Lisbon` before pins arrive, or
+`Lisbon, N places` once mapped; match `/^Lisbon(?:,|$)/`. The plan
 button is `Plan a date`; the plan screen says `Your shortlist`, and each card
 is a button whose label starts with the place name.
 

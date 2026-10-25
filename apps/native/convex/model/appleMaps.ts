@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
-import type { LatLng } from "./trip";
+import { keepNearby, type LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
@@ -60,20 +60,41 @@ const replySchema = z.object({
   results: z.array(z.unknown()),
 });
 const placeSchema = z.object({
+  name: z.string().optional(),
+  structuredAddress: z
+    .object({
+      locality: z.string().optional(),
+      thoroughfare: z.string().optional(),
+    })
+    .optional(),
   coordinate: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
 });
 
-export function firstPlace(body: unknown): LatLng | null {
+export function firstPlace(
+  body: unknown,
+  near?: LatLng,
+  skipCityOnly = false,
+): LatLng | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
+      const { name, structuredAddress: address } = place.data;
+      if (
+        skipCityOnly &&
+        address?.locality &&
+        !address.thoroughfare &&
+        name?.trim().toLowerCase() === address.locality.trim().toLowerCase()
+      )
+        continue;
       const { latitude, longitude } = place.data.coordinate;
-      return { lat: latitude, lng: longitude };
+      const point = { lat: latitude, lng: longitude };
+      if (near && keepNearby([point], near)[0] === null) continue;
+      return point;
     }
   }
   return null;
@@ -91,12 +112,23 @@ export async function appleMapsLookup(
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
   try {
-    const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-    return firstPlace(await response.json().catch(() => null));
+    // Preserve exact street addresses. If Apple answers with only a city centre,
+    // retry as a point of interest instead of pretending that centre is the place.
+    for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
+      if (filter) params.set("resultTypeFilter", filter);
+      const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+      });
+      if (!response.ok) return null;
+      const found = firstPlace(
+        await response.json().catch(() => null),
+        near,
+        kind === "search",
+      );
+      if (found) return found;
+    }
+    return null;
   } catch {
     return null;
   }

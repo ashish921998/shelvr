@@ -5,12 +5,12 @@ import { StyleSheet } from "react-native-unistyles";
 
 export function CityCover({
   city,
-  count,
+  placeCount,
   cover,
   height,
 }: {
   city: string;
-  count: number;
+  placeCount?: number;
   cover: string | null;
   height: number;
 }) {
@@ -31,9 +31,11 @@ export function CityCover({
         >
           {city}
         </Text>
-        <Text style={[styles.count, onPhoto && styles.onPhoto]}>
-          {t("homePlaces.spotCount", { count })}
-        </Text>
+        {placeCount ? (
+          <Text style={[styles.count, onPhoto && styles.onPhoto]}>
+            {t("homePlaces.spotCount", { count: placeCount })}
+          </Text>
+        ) : null}
       </View>
     </View>
   );

@@ -726,8 +726,8 @@
   "homePlaces.noPlaceFailed": "Konnte nicht gelesen werden",
   "homePlaces.noPlaceNone": "Hier wird kein Ort genannt",
   "homePlaces.spotCount": {
-    "one": "%{formattedCount} Spot",
-    "other": "%{formattedCount} Spots"
+    "one": "%{formattedCount} Ort",
+    "other": "%{formattedCount} Orte"
   },
   "homePlaces.moreCities": "+ %{n} weitere",
   "homePlaces.yourSpaces": "Deine Sammlungen",

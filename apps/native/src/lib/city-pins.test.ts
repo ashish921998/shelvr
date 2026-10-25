@@ -13,6 +13,15 @@ describe("numberSaves", () => {
 });
 
 describe("cityPins", () => {
+  it("shows a place once when two reels name the same mapped restaurant", () => {
+    const pin = { name: "Micho", lat: 48.8660723, lng: 2.3371738 };
+    expect(
+      cityPins([
+        { _id: "newer", placePins: [pin] },
+        { _id: "older", placePins: [pin] },
+      ]),
+    ).toEqual([{ ...pin, itemId: "newer" }]);
+  });
   it("tags each stored pin with its save and skips saves without pins", () => {
     const saves = [
       {

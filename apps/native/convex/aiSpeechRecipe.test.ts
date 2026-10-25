@@ -320,6 +320,23 @@ function speechPlacesPrompt(): string | undefined {
 }
 
 describe("processItem places from a video's speech", () => {
+  it("tries speech when TikTok has no caption to classify", async () => {
+    safeFetch.mockResolvedValue({
+      ok: true,
+      finalUrl: TIKTOK,
+      status: 200,
+      contentType: "application/json",
+      bytes: new TextEncoder().encode("{}"),
+    });
+    placesModel(["Santelmo"], { placesVideo: false, spokenCities: ["Lisbon"] });
+    transcript("In Lisbon, try Santelmo.");
+    const item = await process(newConvexTest());
+    expect(item).toMatchObject({
+      places: ["Santelmo"],
+      cities: ["Lisbon"],
+      placesHeard: true,
+    });
+  });
   it("adds the places a travel video says out loud to the caption's", async () => {
     placesModel(["Santelmo", "antiga", "Intenso"], { caption: ["Antiga"] });
     transcript("First up, Antiga. Next up is Santelmo. Then we have Intenso.");

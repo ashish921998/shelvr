@@ -82,7 +82,8 @@ Scripted, the normal lane: each core feature has a test under `tests/`
 plain `screen` locators, and `agent.waitFor` with `vision: "only"` only where
 the model writes the label (a link's title). Stable handles in this
 app: test ids `add-article-input`, `dev-login-button`, `reset-flow-fixtures`;
-the city cards on Home (buttons named `<City>, ...`); the `Profile` and `Add`
+the city cards on Home (buttons named `<City>` without pins, or `<City>, N places`
+once mapped; do not require the comma); the `Profile` and `Add`
 buttons on Home. There is no tab bar.
 
 Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for

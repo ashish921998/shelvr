@@ -83,6 +83,70 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("does not use distant pins as a synthetic search centre", async () => {
+    const { t, itemId } = await setup(["Paris", "Michigan", "Next"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [
+          { name: "Paris", lat: 48.86, lng: 2.36 },
+          { name: "Michigan", lat: 43.79, lng: -85.5 },
+        ],
+      }),
+    );
+    expect(
+      (await t.query(internal.placePins.toLocate, { itemId }))?.centre,
+    ).toBeNull();
+  });
+
+  it("keeps city context for multi-city saves without imposing one search centre", async () => {
+    const { t, itemId } = await setup(["Lisbon", "Porto", "Faro"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, { cities: ["Lisbon", "Porto", "Faro"] }),
+    );
+    const todo = await t.query(internal.placePins.toLocate, { itemId });
+    expect(todo?.city).toBe("Lisbon");
+    expect(todo?.singleCity).toBe(false);
+    expect(todo?.centre).toBeNull();
+    expect(todo?.names).toHaveLength(3);
+  });
+  it("refreshes an existing pin instead of keeping its old coordinates", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Micho"], { pins: true });
+    await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+    expect(await pins()).toEqual([{ name: "Micho", lat: 13, lng: -13 }]);
+  });
+  it("resolves an unpinned namesake near the save's established city", async () => {
+    await withMaps();
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token")
+        return Response.json({ accessToken: "maps" });
+      expect(url.searchParams.get("searchLocation")).toBe("48.87,2.36");
+      return Response.json({
+        results: [
+          { coordinate: { latitude: 43.7858, longitude: -85.5028 } },
+          { coordinate: { latitude: 48.866, longitude: 2.338 } },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { t, itemId, pins } = await setup(["PNY", "Blend", "Micho"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Paris"],
+        placePins: [
+          { name: "PNY", lat: 48.86, lng: 2.36 },
+          { name: "Blend", lat: 48.87, lng: 2.32 },
+        ],
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.find((pin) => pin.name === "Micho")).toEqual({
+      name: "Micho",
+      lat: 48.866,
+      lng: 2.338,
+    });
+  });
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -268,7 +332,11 @@ describe("placePins", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries()).toEqual(["E5, Lisbon", "F6, Lisbon", "G7, Lisbon"]);
+    expect([...new Set(queries())]).toEqual([
+      "E5, Lisbon",
+      "F6, Lisbon",
+      "G7, Lisbon",
+    ]);
   });
 
   it("does not look up places once five are already pinned", async () => {

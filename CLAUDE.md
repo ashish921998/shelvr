@@ -129,8 +129,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`items.ts`**: public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
   `photoUsage`, `getImportOperation`, and `listCities` / `listCityItems` (the cities Home
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
-  is the shared helper). Image saves run a three-step, idempotent import:
-  `beginImageImport`, then `attachImageUpload`, then `finalizeImageImport`, all keyed on a
+  is the shared helper).
+  `listCities.count` retains the legacy save count for installed apps; optional
+  `placeCount` is the distinct mapped-place count. New clients hide an absent or
+  zero place count while retaining the city and its saves.
+  Image saves run a three-step, idempotent import: `beginImageImport`, then
+  `attachImageUpload`, then `finalizeImageImport`, all keyed on a
   client-generated `operationId` in `itemOperations`.
   The returned upload URL now targets `/image-upload`, which claims a single
   receiver, caps the streamed body at the image limit, and records its storage ID
@@ -401,6 +405,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   - `EXPO_PUBLIC_CONVEX_URL`: the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL`: the deployment's HTTP Actions origin
+  - `EXPO_PUBLIC_WEB_URL`: optional web origin for plan voting links. Local QA uses
+    a web server connected to the same development Convex backend; unset uses the
+    production website.
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`: optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
     to show the passwordless dev-login button and fixture reset on development builds
     (release-mode included); preview and production builds never show either
