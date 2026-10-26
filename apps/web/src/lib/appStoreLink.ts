@@ -13,7 +13,8 @@ type AppStoreLinkSource =
   | "share"
   | "oracle"
   | "plan"
-  | "bio";
+  | "bio"
+  | "place_tool";
 
 export function useArrivalCampaign(fallback: string) {
   return useBrowserValue(
