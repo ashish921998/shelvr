@@ -11,6 +11,11 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceVisits } from "@/lib/make-plan";
+import {
+  TRIP_SIDE_PANEL_MARGIN,
+  TRIP_SIDE_PANEL_WIDTH,
+  useTripSidePanel,
+} from "@/lib/wide-layout";
 import { motion } from "@/lib/motion";
 import {
   directionsUrl,
@@ -37,6 +42,7 @@ import Animated, {
   FadeOut,
   LinearTransition,
   SlideInDown,
+  SlideInLeft,
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
@@ -54,9 +60,9 @@ function rise() {
   };
 }
 
-const PANEL_IN = SlideInDown.duration(300).easing(
-  Easing.bezier(0.32, 0.72, 0, 1),
-);
+const PANEL_EASING = Easing.bezier(0.32, 0.72, 0, 1);
+const PANEL_IN = SlideInDown.duration(300).easing(PANEL_EASING);
+const SIDE_PANEL_IN = SlideInLeft.duration(300).easing(PANEL_EASING);
 const PANEL_RESIZE = LinearTransition.duration(motion.duration.enter).easing(
   motion.easing.inOut,
 );
@@ -356,17 +362,24 @@ function TripSheet({
   footer: ReactNode;
   children: ReactNode;
 }) {
+  const side = useTripSidePanel() && overMap;
   return (
     <Animated.View
-      entering={PANEL_IN}
+      entering={side ? SIDE_PANEL_IN : PANEL_IN}
       layout={PANEL_RESIZE}
-      style={[
-        styles.panel,
-        overMap ? styles.panelOverMap : styles.panelFull,
-        fixed && (overMap ? styles.panelOverMapFixed : styles.panelFullFixed),
-      ]}
+      style={
+        side
+          ? [styles.panel, styles.panelSide]
+          : [
+              styles.panel,
+              styles.panelBottom,
+              overMap ? styles.panelOverMap : styles.panelFull,
+              fixed &&
+                (overMap ? styles.panelOverMapFixed : styles.panelFullFixed),
+            ]
+      }
     >
-      <View style={styles.grabber} />
+      {side ? null : <View style={styles.grabber} />}
       <ScrollView
         contentContainerStyle={[
           styles.panelContent,
@@ -399,15 +412,28 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   panel: {
     position: "absolute",
+    backgroundColor: theme.colors.background,
+    borderCurve: "continuous",
+    paddingTop: theme.gap(1),
+  },
+  panelBottom: {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    paddingTop: theme.gap(1),
     boxShadow: "0 -8px 30px rgba(0,0,0,0.18)",
+  },
+  // A wide, short screen (an unfolded iPhone Duo held sideways) floats the
+  // panel at the left so the map keeps its height.
+  panelSide: {
+    left: rt.insets.left + TRIP_SIDE_PANEL_MARGIN,
+    top: rt.insets.top + theme.gap(7),
+    // The content and footer already pad for the bottom inset.
+    bottom: TRIP_SIDE_PANEL_MARGIN,
+    width: TRIP_SIDE_PANEL_WIDTH,
+    borderRadius: theme.radius.xl,
+    boxShadow: "0 8px 30px rgba(0,0,0,0.25)",
   },
   panelOverMap: {
     maxHeight: rt.screen.height * 0.56,
