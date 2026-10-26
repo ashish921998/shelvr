@@ -9,6 +9,7 @@ import {
   cancelPlaceDetails,
   openPlaceDetails,
 } from "@/lib/apple-place-card";
+import { framedPins } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
 import { busiestCityPlaces, filterPlaces, mapFilters } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
@@ -62,7 +63,8 @@ export default function MapScreen() {
   );
   const framed = useMemo(
     () =>
-      busiestCityPlaces(all ?? []).map((place) => ({
+      // As on the city page, a pin far out of town stays on the map but does not set the zoom.
+      framedPins(busiestCityPlaces(all ?? [])).map((place) => ({
         ...place,
         id: placeId(place),
       })),
