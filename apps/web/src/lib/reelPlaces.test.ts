@@ -15,6 +15,11 @@ describe("parseReelLink", () => {
     ],
     ["  instagram.com/reel/C8abc123  ", "https://instagram.com/reel/C8abc123"],
     ["https://vm.tiktok.com/ZMabc/", "https://vm.tiktok.com/ZMabc/"],
+    ["https://instagr.am/reel/C8abc123/", "https://instagr.am/reel/C8abc123/"],
+    [
+      "https://www.instagram.com/someone/p/C8abc123/",
+      "https://www.instagram.com/someone/p/C8abc123/",
+    ],
   ])("accepts %s", (input, expected) => {
     expect(parseReelLink(input)).toBe(expected);
   });
@@ -25,6 +30,9 @@ describe("parseReelLink", () => {
     "https://notinstagram.com/reel/1",
     "https://instagram.com.evil.example/reel/1",
     "javascript:alert(1)",
+    "https://www.instagram.com/someone/",
+    "https://www.instagram.com/explore/",
+    "https://www.instagram.com/reels/audio/123/",
     `https://www.instagram.com/${"a".repeat(600)}`,
   ])("refuses %s", (input) => {
     expect(parseReelLink(input)).toBeUndefined();

@@ -35,12 +35,13 @@ export const find = internalAction({
   returns: placesValidator,
   handler: async (_ctx, { url }) => {
     const startedAt = Date.now();
+    let budget: ReturnType<typeof setTimeout> | undefined;
     const read = await Promise.race([
       readPage(url),
-      new Promise<undefined>((resolve) =>
-        setTimeout(resolve, PAGE_READ_BUDGET_MS, undefined),
-      ),
-    ]);
+      new Promise<undefined>((resolve) => {
+        budget = setTimeout(resolve, PAGE_READ_BUDGET_MS, undefined);
+      }),
+    ]).finally(() => clearTimeout(budget));
     if (read?.status !== "ok") {
       logEvent("info", "reel_places_found", {
         outcome: read === undefined ? "read_timeout" : "unreadable",

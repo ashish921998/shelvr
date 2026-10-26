@@ -139,8 +139,18 @@ describe("settleReelPlaces", () => {
     ).toEqual([{ name: "Time Out Market" }]);
   });
 
-  it("names the city only when most places agree", () => {
-    const text = "Time Out Market, Manteigaria, Le Bernardin";
+  it("names the city only when every place shares it", () => {
+    const text =
+      "Time Out Market and Manteigaria in Lisbon, Le Bernardin in New York";
+    expect(
+      settleReelPlaces(
+        raw([
+          ["Time Out Market", "Lisbon"],
+          ["Manteigaria", "Lisbon"],
+        ]),
+        text,
+      ).city,
+    ).toBe("Lisbon");
     expect(
       settleReelPlaces(
         raw([
@@ -150,16 +160,22 @@ describe("settleReelPlaces", () => {
         ]),
         text,
       ).city,
-    ).toBe("Lisbon");
+    ).toBeUndefined();
     expect(
       settleReelPlaces(
-        raw([
-          ["Time Out Market", "Lisbon"],
-          ["Le Bernardin", "New York"],
-        ]),
+        raw([["Time Out Market", "Lisbon"], ["Manteigaria"]]),
         text,
       ).city,
     ).toBeUndefined();
+  });
+
+  it("drops a city the caption never names but keeps the place", () => {
+    const settled = settleReelPlaces(
+      raw([["Time Out Market", "Porto"]]),
+      "Time Out Market is a must",
+    );
+    expect(settled.places).toEqual([{ name: "Time Out Market" }]);
+    expect(settled.city).toBeUndefined();
   });
 
   it("caps the list at thirty places", () => {

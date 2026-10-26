@@ -10,7 +10,17 @@ export type ReelPlaces = {
 
 const MAX_PLACES = 30;
 
-const REEL_HOSTS = ["instagram.com", "tiktok.com"];
+// Mirrors convex/model/externalUrl.ts (`instagramMedia`, `isTikTokUrl`), so a link
+// the browser accepts is one the backend can read.
+const INSTAGRAM_HOSTS = new Set([
+  "instagram.com",
+  "www.instagram.com",
+  "m.instagram.com",
+  "instagr.am",
+  "www.instagr.am",
+]);
+const INSTAGRAM_MEDIA_PATH =
+  /^\/(?:[A-Za-z0-9._]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)(?:\/.*)?$/;
 
 /** The link as the visitor pasted it, when it is an Instagram or TikTok page. */
 export function parseReelLink(raw: string): string | undefined {
@@ -25,10 +35,11 @@ export function parseReelLink(raw: string): string | undefined {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
   const host = url.hostname.toLowerCase();
-  const onReelHost = REEL_HOSTS.some(
-    (known) => host === known || host.endsWith(`.${known}`),
-  );
-  return onReelHost ? url.toString() : undefined;
+  const tiktok = host === "tiktok.com" || host.endsWith(".tiktok.com");
+  const match = url.pathname.match(INSTAGRAM_MEDIA_PATH);
+  const instagram =
+    INSTAGRAM_HOSTS.has(host) && match !== null && match[2] !== "audio";
+  return tiktok || instagram ? url.toString() : undefined;
 }
 
 function cleanText(value: unknown, max: number): string | undefined {

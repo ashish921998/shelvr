@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Logo from "@/components/common/Logo";
 import Footer from "@/components/home/Footer";
 import ReelPlaceFinder from "@/components/tools/ReelPlaceFinder";
+import { pageMetadata } from "@/lib/siteMetadata";
 
 const PATH = "/reel-place-finder";
 const TITLE = "Find the Places in an Instagram Reel or TikTok | Shelvr";
@@ -10,16 +11,7 @@ const DESCRIPTION =
   "Paste an Instagram reel or TikTok link and get the restaurants, cafés and sights it names, with a Maps link for each. No login, nothing to install.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
-    url: PATH,
-    siteName: "Shelvr",
-    type: "website",
-  },
+  ...pageMetadata(PATH, TITLE, DESCRIPTION),
   twitter: { card: "summary", title: TITLE, description: DESCRIPTION },
 };
 

@@ -108,14 +108,14 @@ function clean(value: string, max: number): string {
   return value.replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-/** The most common city, when more than half the places agree on it. */
+/** The city every place shares, so a heading never names one city over another. */
 function sharedCity(places: ReelPlace[]): string | undefined {
-  const counts = new Map<string, number>();
-  for (const { city } of places) {
-    if (city) counts.set(city, (counts.get(city) ?? 0) + 1);
-  }
-  const [top] = [...counts].sort((a, b) => b[1] - a[1]);
-  return top && top[1] * 2 > places.length ? top[0] : undefined;
+  const [first] = places;
+  if (!first?.city) return undefined;
+  const city = first.city.toLowerCase();
+  return places.every((place) => place.city?.toLowerCase() === city)
+    ? first.city
+    : undefined;
 }
 
 export function settleReelPlaces(
@@ -127,7 +127,9 @@ export function settleReelPlaces(
   const places: ReelPlace[] = [];
   for (const entry of raw.places) {
     const name = clean(entry.name, MAX_NAME_CHARS);
-    const city = clean(entry.city, MAX_CITY_CHARS);
+    const named = clean(entry.city, MAX_CITY_CHARS);
+    // A city the caption never names is dropped; the place itself stays.
+    const city = named !== "" && isInText(named, foldedText) ? named : "";
     const key = `${name.toLowerCase()}|${city.toLowerCase()}`;
     if (name === "" || seen.has(key) || !isInText(name, foldedText)) continue;
     seen.add(key);
