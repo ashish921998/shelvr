@@ -2,11 +2,15 @@ import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
+import { planGateOffer } from "@/lib/plan-gate";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
+import { convexQuery } from "@convex-dev/react-query";
+import { api } from "@convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,6 +21,12 @@ export default function PlanGateScreen() {
   const router = useRouter();
   const { session, operation } = useNotificationSession();
   const { restoring, restore } = useRestorePurchases();
+  const { status } = useEntitlement();
+  const lapsed = status === "lapsed";
+  const cities = useQuery(
+    convexQuery(api.items.listCities, lapsed ? {} : "skip"),
+  );
+  const offer = planGateOffer(status, cities.data);
 
   const signOut = async () => {
     try {
@@ -33,15 +43,25 @@ export default function PlanGateScreen() {
         <Wordmark size={30} />
         <View style={styles.middle}>
           <ThemedText variant="largeTitle" style={styles.title}>
-            {t("planGate.title")}
+            {offer.kind === "winback"
+              ? t("planGate.winbackTitle")
+              : t("planGate.title")}
           </ThemedText>
           <ThemedText variant="body" style={styles.body}>
-            {t("planGate.body")}
+            {offer.kind === "winback"
+              ? offer.places > 0
+                ? t("planGate.winbackBody", { count: offer.places })
+                : t("planGate.winbackBodyEmpty")
+              : t("planGate.body")}
           </ThemedText>
         </View>
         <Button
-          title={t("planGate.seePlans")}
-          onPress={() => void openPaywall(router, "plan_gate")}
+          title={
+            offer.kind === "winback"
+              ? t("planGate.winbackCta")
+              : t("planGate.seePlans")
+          }
+          onPress={() => void openPaywall(router, offer.placement)}
           style={styles.button}
         />
         <Pressable

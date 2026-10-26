@@ -133,6 +133,14 @@
   "planGate.title": "Choisissez un forfait pour ouvrir Shelvr",
   "planGate.body": "Vos contenus enregistrés restent là où vous les avez laissés.",
   "planGate.seePlans": "Voir les forfaits",
+  "planGate.winbackTitle": "Vos villes sont toujours là",
+  "planGate.winbackBody": {
+    "one": "Votre %{formattedCount} lieu enregistré est là où vous l’avez laissé. Revenez pour planifier votre prochaine sortie ou votre prochain voyage.",
+    "many": "Vos %{formattedCount} lieux enregistrés sont là où vous les avez laissés. Revenez pour planifier votre prochaine sortie ou votre prochain voyage.",
+    "other": "Vos %{formattedCount} lieux enregistrés sont là où vous les avez laissés. Revenez pour planifier votre prochaine sortie ou votre prochain voyage."
+  },
+  "planGate.winbackBodyEmpty": "Tout ce que vous avez enregistré est là où vous l’avez laissé. Revenez pour planifier votre prochaine sortie ou votre prochain voyage.",
+  "planGate.winbackCta": "Voir mon offre de retour",
   "paywall.trialOffer": "Commencez pour %{zero}, puis %{price}/an.",
   "paywallGoal.travelHeadline": "Prépare %{city} avec tes lieux enregistrés.",
   "paywallGoal.travelHeadlineNoCity": "Prépare ton prochain voyage avec tes lieux enregistrés.",

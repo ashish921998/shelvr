@@ -131,6 +131,12 @@
   "planGate.title": "Shelvr를 열려면 플랜을 선택하세요",
   "planGate.body": "저장한 항목은 그대로 남아 있어요.",
   "planGate.seePlans": "플랜 보기",
+  "planGate.winbackTitle": "저장한 도시가 그대로 있어요",
+  "planGate.winbackBody": {
+    "other": "저장한 장소 %{formattedCount}곳이 그대로 있어요. 돌아와서 다음 데이트나 여행을 계획해 보세요."
+  },
+  "planGate.winbackBodyEmpty": "저장한 모든 것이 그대로 있어요. 돌아와서 다음 데이트나 여행을 계획해 보세요.",
+  "planGate.winbackCta": "컴백 혜택 보기",
   "paywall.trialOffer": "%{zero}로 시작하고, 이후 %{price}/년.",
   "paywallGoal.travelHeadline": "저장한 장소로 %{city} 여행을 계획하세요.",
   "paywallGoal.travelHeadlineNoCity": "저장한 장소로 다음 여행을 계획하세요.",

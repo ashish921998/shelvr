@@ -133,6 +133,14 @@
   "planGate.title": "Elige un plan para abrir Shelvr",
   "planGate.body": "Tus contenidos guardados siguen justo donde los dejaste.",
   "planGate.seePlans": "Ver planes",
+  "planGate.winbackTitle": "Tus ciudades siguen aquí",
+  "planGate.winbackBody": {
+    "one": "Tu %{formattedCount} lugar guardado sigue donde lo dejaste. Vuelve para planear tu próxima cita o viaje.",
+    "many": "Tus %{formattedCount} lugares guardados siguen donde los dejaste. Vuelve para planear tu próxima cita o viaje.",
+    "other": "Tus %{formattedCount} lugares guardados siguen donde los dejaste. Vuelve para planear tu próxima cita o viaje."
+  },
+  "planGate.winbackBodyEmpty": "Todo lo que guardaste sigue donde lo dejaste. Vuelve para planear tu próxima cita o viaje.",
+  "planGate.winbackCta": "Ver mi oferta de regreso",
   "paywall.trialOffer": "Empieza por %{zero}, luego %{price}/año.",
   "paywallGoal.travelHeadline": "Planea %{city} con tus lugares guardados.",
   "paywallGoal.travelHeadlineNoCity": "Planea tu próximo viaje con tus lugares guardados.",

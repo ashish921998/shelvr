@@ -350,7 +350,7 @@ async function presentPaywallImpl(
   }
   try {
     const [{ offering, trial, eligibility }, customerRead] = await Promise.all([
-      readPaywallOffering(),
+      readPaywallOffering(placement),
       refreshCustomerInfo(),
     ]);
     if (!customerRead) {
