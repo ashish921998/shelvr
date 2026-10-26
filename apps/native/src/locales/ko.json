@@ -725,9 +725,7 @@
   "cityMap.placesFromSaves": {
     "other": "저장한 장소 %{formattedCount}곳"
   },
-  "cityMap.fromYourSave": "저장한 항목에서",
-  "cityMap.openSave": "저장 항목 열기",
-  "cityMap.placeDetails": "장소 정보",
+  "cityMap.placeDetails": "%{name} 장소 정보",
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "장소를 얼마나 저장했나요?",

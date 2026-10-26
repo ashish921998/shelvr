@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { openPlaceOrSave } from "./apple-place-card";
+import { canOpenPlaceCard, openPlaceDetails } from "./apple-place-card";
 
 const mocks = vi.hoisted(() => ({
   available: true,
@@ -11,7 +11,6 @@ vi.mock("../../modules/apple-place-card", () => ({
   openPlaceCard: mocks.openPlaceCard,
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: mocks }));
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 
 beforeEach(() => {
   mocks.available = true;
@@ -19,34 +18,35 @@ beforeEach(() => {
   mocks.captureError.mockReset();
 });
 
-describe("openPlaceOrSave", () => {
-  it("shows the card with the save's title and the localized strip text", async () => {
+describe("canOpenPlaceCard", () => {
+  it("needs both an Apple place id and the native card", () => {
+    expect(canOpenPlaceCard("I1")).toBe(true);
+    expect(canOpenPlaceCard(undefined)).toBe(false);
+    mocks.available = false;
+    expect(canOpenPlaceCard("I1")).toBe(false);
+  });
+});
+
+describe("openPlaceDetails", () => {
+  it("shows the card for the place and leaves the save closed when dismissed", async () => {
     mocks.openPlaceCard.mockResolvedValue("dismissed");
     const openSave = vi.fn();
-    await openPlaceOrSave("I1", "Best cafes", openSave);
-    expect(mocks.openPlaceCard).toHaveBeenCalledWith({
-      appleId: "I1",
-      saveTitle: "Best cafes",
-      fromYourSave: "cityMap.fromYourSave",
-      openSave: "cityMap.openSave",
-    });
+    await openPlaceDetails("I1", openSave);
+    expect(mocks.openPlaceCard).toHaveBeenCalledWith("I1");
     expect(openSave).not.toHaveBeenCalled();
   });
 
-  it.each(["openSave", "unavailable"])(
-    "opens the save when the card answers %s",
-    async (result) => {
-      mocks.openPlaceCard.mockResolvedValue(result);
-      const openSave = vi.fn();
-      await openPlaceOrSave("I1", "Best cafes", openSave);
-      expect(openSave).toHaveBeenCalledOnce();
-    },
-  );
+  it("opens the save when the card cannot be shown", async () => {
+    mocks.openPlaceCard.mockResolvedValue("unavailable");
+    const openSave = vi.fn();
+    await openPlaceDetails("I1", openSave);
+    expect(openSave).toHaveBeenCalledOnce();
+  });
 
   it("opens the save when the card throws, and reports it", async () => {
     mocks.openPlaceCard.mockRejectedValue(new Error("boom"));
     const openSave = vi.fn();
-    await openPlaceOrSave("I1", "Best cafes", openSave);
+    await openPlaceDetails("I1", openSave);
     expect(openSave).toHaveBeenCalledOnce();
     expect(mocks.captureError).toHaveBeenCalledWith(
       "place_card_failed",
@@ -54,32 +54,18 @@ describe("openPlaceOrSave", () => {
     );
   });
 
-  it("opens the save without asking Apple when the pin has no place id", async () => {
-    const openSave = vi.fn();
-    await openPlaceOrSave(undefined, "Best cafes", openSave);
-    expect(mocks.openPlaceCard).not.toHaveBeenCalled();
-    expect(openSave).toHaveBeenCalledOnce();
-  });
-
-  it("opens the save when the module is missing or the OS is too old", async () => {
-    mocks.available = false;
-    const openSave = vi.fn();
-    await openPlaceOrSave("I1", "Best cafes", openSave);
-    expect(mocks.openPlaceCard).not.toHaveBeenCalled();
-    expect(openSave).toHaveBeenCalledOnce();
-  });
-
-  it("ignores a second tap while a card request is in flight", async () => {
+  it("ignores a second tap while a card is open", async () => {
     let finish: (result: string) => void = () => {};
     mocks.openPlaceCard.mockReturnValue(
       new Promise<string>((resolve) => (finish = resolve)),
     );
     const openSave = vi.fn();
-    const first = openPlaceOrSave("I1", "Best cafes", openSave);
-    await openPlaceOrSave("I1", "Best cafes", openSave);
+    const first = openPlaceDetails("I1", openSave);
+    await openPlaceDetails("I1", openSave);
     expect(mocks.openPlaceCard).toHaveBeenCalledOnce();
     finish("dismissed");
     await first;
-    expect(openSave).not.toHaveBeenCalled();
+    await openPlaceDetails("I1", openSave);
+    expect(mocks.openPlaceCard).toHaveBeenCalledTimes(2);
   });
 });

@@ -767,9 +767,7 @@
     "many": "%{formattedCount} lugares de tus guardados",
     "other": "%{formattedCount} lugares de tus guardados"
   },
-  "cityMap.fromYourSave": "De tu guardado",
-  "cityMap.openSave": "Abrir guardado",
-  "cityMap.placeDetails": "Detalles del lugar",
+  "cityMap.placeDetails": "Detalles de %{name}",
   "opener.tagline": "Guarda los lugares. Nosotros planeamos la cita o el viaje.",
   "onboardingQ.skip": "Omitir",
   "onboardingQ.savedTitle": "¿Cuántos lugares has guardado?",

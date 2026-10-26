@@ -1,23 +1,11 @@
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { Platform } from "react-native";
 
-export type PlaceCardResult = "openSave" | "dismissed" | "unavailable";
-
-type PresentArgs = {
-  appleId: string;
-  saveTitle: string;
-  fromYourSave: string;
-  openSave: string;
-};
+export type PlaceCardResult = "dismissed" | "unavailable";
 
 type ApplePlaceCardNativeModule = {
   isSupported: boolean;
-  present: (
-    appleId: string,
-    saveTitle: string,
-    fromYourSave: string,
-    openSave: string,
-  ) => Promise<PlaceCardResult>;
+  present: (appleId: string) => Promise<PlaceCardResult>;
 };
 
 const nativeModule =
@@ -30,14 +18,7 @@ export function placeCardAvailable(): boolean {
   return nativeModule?.isSupported === true;
 }
 
-export async function openPlaceCard(
-  args: PresentArgs,
-): Promise<PlaceCardResult> {
+export async function openPlaceCard(appleId: string): Promise<PlaceCardResult> {
   if (nativeModule == null || !nativeModule.isSupported) return "unavailable";
-  return nativeModule.present(
-    args.appleId,
-    args.saveTitle,
-    args.fromYourSave,
-    args.openSave,
-  );
+  return nativeModule.present(appleId);
 }
