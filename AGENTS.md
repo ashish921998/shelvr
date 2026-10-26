@@ -42,6 +42,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
   Retired routes redirect to Home through `src/lib/home-href.ts`.
+- **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map and filter chips in
+  `src/components/map`, filter rules in `src/lib/map-filters.ts` and
+  `convex/model/placeKinds.ts`, data from `convex/mapPlaces.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

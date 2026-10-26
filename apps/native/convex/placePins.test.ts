@@ -36,7 +36,7 @@ async function withMaps(ids = false) {
     return Response.json({
       results: [
         {
-          ...(ids ? { id: `ID${q.length}` } : {}),
+          ...(ids ? { id: `ID${q.length}`, poiCategory: "Cafe" } : {}),
           coordinate: { latitude: q.length, longitude: -q.length },
         },
       ],
@@ -365,12 +365,19 @@ describe("placePins", () => {
     expect(queries()).toContain("Time Out Market, Lisbon");
   });
 
-  it("stores Apple's place id on a looked-up pin and adds it to an existing pin on refresh", async () => {
+  it("stores Apple's place id and category on a looked-up pin and adds them to an existing pin on refresh", async () => {
     await withMaps(true);
     const { t, itemId, pins } = await setup(["Micho"]);
     await t.action(internal.placePins.locateItem, { itemId });
     expect(await pins()).toEqual([
-      { name: "Micho", lat: 13, lng: -13, city: "Lisbon", appleId: "ID13" },
+      {
+        name: "Micho",
+        lat: 13,
+        lng: -13,
+        city: "Lisbon",
+        appleId: "ID13",
+        category: "Cafe",
+      },
     ]);
 
     await t.run(async (ctx) =>
@@ -379,7 +386,23 @@ describe("placePins", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId, refresh: true });
-    expect((await pins())?.[0].appleId).toBe("ID13");
+    expect((await pins())?.[0]).toMatchObject({
+      appleId: "ID13",
+      category: "Cafe",
+    });
+  });
+
+  it("keeps a stored category when a refresh finds the same pin without one", async () => {
+    const { t, itemId, pins } = await setup([]);
+    const pin = { name: "Cafe", lat: 38.7, lng: -9.1, city: "Lisbon" };
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        places: ["Cafe"],
+        placePins: [{ ...pin, category: "Cafe" }],
+      }),
+    );
+    await t.mutation(internal.placePins.storePins, { itemId, found: [pin] });
+    expect(await pins()).toEqual([{ ...pin, category: "Cafe" }]);
   });
 
   it("keeps a stored id when a refresh finds the same pin without one, but not when the pin moves", async () => {
@@ -789,5 +812,23 @@ describe("placePins", () => {
     ]);
     expect(rows[0]).toHaveLength(1);
     expect(rows[1]).toBeNull();
+  });
+
+  it("backfill refreshes a located pin that has no category yet", async () => {
+    await withMaps(true);
+    const { t, itemId, pins } = await setup(["Micho"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [{ name: "Micho", lat: 13, lng: -13, city: "Lisbon" }],
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.placePins.backfillPage, { cursor: null });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((await pins())?.[0].category).toBe("Cafe");
   });
 });

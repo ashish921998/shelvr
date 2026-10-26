@@ -2,7 +2,7 @@ const HOME = "/(app)/(tabs)/(home)";
 
 // Screens the app no longer has; old links, scheduled pushes and shortcuts to them open Home.
 const RETIRED_ROUTE =
-  /^\/(?:\(app\)\/)?(?:\(tabs\)\/)?(?:\((?:spaces|search|map)\)|spaces|search|map|space|digest|new-space|manage-spaces|camera)(?=[/?#]|$)/;
+  /^\/(?:\(app\)\/)?(?:\(tabs\)\/)?(?:\((?:spaces|search)\)|spaces|search|space|digest|new-space|manage-spaces|camera)(?=[/?#]|$)/;
 
 /**
  * Since Expo Router 58, "/" matches the index of every tab group and the

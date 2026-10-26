@@ -43,6 +43,7 @@ type Pin = {
   lng: number;
   city?: string;
   appleId?: string;
+  category?: string;
 };
 
 /** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
@@ -68,6 +69,7 @@ function inSourceCity(pin: Pin, cities: string[]): Pin {
     lng: pin.lng,
     ...(city ? { city } : {}),
     ...(pin.appleId ? { appleId: pin.appleId } : {}),
+    ...(pin.category ? { category: pin.category } : {}),
   };
 }
 
@@ -162,14 +164,23 @@ export const toLocate = internalQuery({
   },
 });
 
-/** A lookup that finds the same spot without an id keeps the stored one; a moved pin does not. */
+/** A lookup that finds the same spot without an id or category keeps the stored one; a moved pin does not. */
 function keepAppleId(stored: Pin | undefined, found: Pin): Pin {
-  return found.appleId === undefined &&
-    stored?.appleId !== undefined &&
-    stored.lat === found.lat &&
-    stored.lng === found.lng
-    ? { ...found, appleId: stored.appleId }
-    : found;
+  if (
+    stored === undefined ||
+    stored.lat !== found.lat ||
+    stored.lng !== found.lng
+  )
+    return found;
+  return {
+    ...found,
+    ...(found.appleId === undefined && stored.appleId !== undefined
+      ? { appleId: stored.appleId }
+      : {}),
+    ...(found.category === undefined && stored.category !== undefined
+      ? { category: stored.category }
+      : {}),
+  };
 }
 
 export const storePins = internalMutation({
@@ -202,7 +213,8 @@ export const storePins = internalMutation({
           pin.lat === before[i].lat &&
           pin.lng === before[i].lng &&
           pin.city === before[i].city &&
-          pin.appleId === before[i].appleId,
+          pin.appleId === before[i].appleId &&
+          pin.category === before[i].category,
       );
     const places =
       item.places === undefined
@@ -283,6 +295,7 @@ async function lookUp(
             lng: at.lng,
             ...(city ? { city } : at.city ? { city: at.city } : {}),
             ...(at.appleId ? { appleId: at.appleId } : {}),
+            ...(at.category ? { category: at.category } : {}),
           },
         ],
   );
@@ -319,7 +332,8 @@ export const backfillPage = internalMutation({
         (item) =>
           item.status === "ready" &&
           (item.placePins === undefined ||
-            (item.placePins ?? []).some((pin) => !pin.city)) &&
+            // A pin without a category predates the Map tab's filters.
+            (item.placePins ?? []).some((pin) => !pin.city || !pin.category)) &&
           (mapsNames(item.intents).length > 0 ||
             (item.places?.length ?? 0) > 0),
       )

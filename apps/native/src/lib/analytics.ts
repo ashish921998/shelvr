@@ -199,6 +199,9 @@ export type AnalyticsEventProperties = {
   };
   trip_failed: { reason: "error" };
   city_opened: { count: number };
+  map_opened: { count: number; located: boolean };
+  map_filter_selected: { kind: string };
+  map_place_opened: { card: boolean };
   city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };

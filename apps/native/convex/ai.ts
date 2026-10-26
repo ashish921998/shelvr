@@ -222,7 +222,9 @@ const itemAnalysisSchema = z.object({
     .describe("A 1-2 sentence summary of what this item is"),
   tags: z
     .array(z.string())
-    .describe("4-8 lowercase tags, each one or two words"),
+    .describe(
+      "4-8 lowercase tags, each one or two words. For places, include what kind they are and the occasion they suit when the item says so, e.g. 'dessert', 'coffee', 'cocktails', 'date night'",
+    ),
   spaceNames: z
     .array(z.string())
     .describe(

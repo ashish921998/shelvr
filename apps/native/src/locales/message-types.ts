@@ -793,6 +793,16 @@ export type MessageParams = {
   "signInScene.dinner": undefined;
   "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
+  "map.filterAll": undefined;
+  "map.kindFood": undefined;
+  "map.kindCoffee": undefined;
+  "map.kindDessert": undefined;
+  "map.kindDrinks": undefined;
+  "map.kindDateNight": undefined;
+  "map.kindActivities": undefined;
+  "map.kindShopping": undefined;
+  "map.kindStay": undefined;
+  "map.filters": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -299,6 +299,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   No AI call or AI permission is needed to plan.
   "We went" places never return as fallback picks. A multi-city save contributes only
   place labels explicitly carrying the chosen city; ambiguous labels are skipped.
+- **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
+  (newest first, one entry per spot) for the Map tab, each with its filter kinds from
+  `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
+  the save's tags; "date night" always comes from the tags.
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
   and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
@@ -323,14 +327,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
   and `storePins` writes at most 30, dropping any place no longer named.
-  Each pin also keeps Apple's place id (`appleId`) when the search result carried one.
+  Each pin also keeps Apple's place id (`appleId`) and point-of-interest `category` when the
+  search result carried them; the Map tab's filters read the category.
   Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,
   Apple locality is used only when it matches a source-declared city; unmatched pins remain unassigned.
   Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
   Only source cities can disable single-city outlier rejection; returned localities cannot.
   Pin lookup never expands `items.cities`; Home creates entries for the cities extracted from the source (up to 30). Scheduled from
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
-  membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older unlabelled pins, run by hand after deployment:
+  membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older pins with no city or no category, run by hand after deployment:
   `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
   when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
@@ -412,11 +417,15 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities",
+- `(app)/(tabs)` holds two native tabs, `(home)` and `(map)`. `(map)` is every mapped place on
+  one full-screen map, opening on the person's location (iOS asks once; otherwise the city with
+  the most places), with filter chips for the kinds that have three or more places
+  (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
+  `(home)` is Home. It lists "Your cities",
   "Finding places…" for processing saves, "Couldn't read these saves" for failed reads,
   and "No place found" only for finished saves without a city. It loads more saves on scroll, and on its own only
   until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
-  shortcuts to removed screens (spaces, search, map, digest, camera) open Home, through
+  shortcuts to removed screens (spaces, search, digest, camera) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
   city's saves, plus a row for every save not represented by a place row, with Plan a date
