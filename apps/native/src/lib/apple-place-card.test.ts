@@ -1,20 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canOpenPlaceCard, openPlaceDetails } from "./apple-place-card";
+import {
+  canOpenPlaceCard,
+  cancelPlaceDetails,
+  openPlaceDetails,
+} from "./apple-place-card";
 
 const mocks = vi.hoisted(() => ({
   available: true,
   openPlaceCard: vi.fn(),
+  cancelPlaceCard: vi.fn(),
   captureError: vi.fn(),
 }));
 vi.mock("../../modules/apple-place-card", () => ({
   placeCardAvailable: () => mocks.available,
   openPlaceCard: mocks.openPlaceCard,
+  cancelPlaceCard: mocks.cancelPlaceCard,
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: mocks }));
 
 beforeEach(() => {
   mocks.available = true;
   mocks.openPlaceCard.mockReset();
+  mocks.cancelPlaceCard.mockReset();
   mocks.captureError.mockReset();
 });
 
@@ -34,6 +41,18 @@ describe("openPlaceDetails", () => {
     await openPlaceDetails("I1", openSave);
     expect(mocks.openPlaceCard).toHaveBeenCalledWith("I1");
     expect(openSave).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the lookup was cancelled because the screen went away", async () => {
+    mocks.openPlaceCard.mockResolvedValue("cancelled");
+    const openSave = vi.fn();
+    await openPlaceDetails("I1", openSave);
+    expect(openSave).not.toHaveBeenCalled();
+  });
+
+  it("asks the native card to cancel a pending lookup", () => {
+    cancelPlaceDetails();
+    expect(mocks.cancelPlaceCard).toHaveBeenCalledOnce();
   });
 
   it("opens the save when the card cannot be shown", async () => {

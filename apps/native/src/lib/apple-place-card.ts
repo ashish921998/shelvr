@@ -1,5 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import {
+  cancelPlaceCard,
   openPlaceCard,
   placeCardAvailable,
 } from "../../modules/apple-place-card";
@@ -26,4 +27,9 @@ export async function openPlaceDetails(
     cardOpen = false;
   }
   if (result === "unavailable") openSave();
+}
+
+/** The screen that asked for a card is going away; a card not yet shown never appears. */
+export function cancelPlaceDetails(): void {
+  cancelPlaceCard();
 }

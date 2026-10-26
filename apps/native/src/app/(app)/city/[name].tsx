@@ -3,7 +3,11 @@ import { SaveRow } from "@/components/city/save-row";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
-import { canOpenPlaceCard, openPlaceDetails } from "@/lib/apple-place-card";
+import {
+  canOpenPlaceCard,
+  cancelPlaceDetails,
+  openPlaceDetails,
+} from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -70,13 +74,14 @@ export default function CityScreen() {
   const router = useRouter();
   const { theme, rt } = useUnistyles();
   const { name } = useLocalSearchParams<{ name: string }>();
-  // The place card's fallback opens the save after an Apple lookup; skip it once the user has left.
+  // A place card's Apple lookup can finish after the user has left; it must not present or navigate then.
   const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
       return () => {
         focused.current = false;
+        cancelPlaceDetails();
       };
     }, []),
   );
