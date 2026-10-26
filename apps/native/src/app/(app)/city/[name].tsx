@@ -25,7 +25,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSharedValue } from "react-native-reanimated";
+import Animated, { useSharedValue } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.4;
@@ -94,6 +94,8 @@ export default function CityScreen() {
   const list = useRef<FlatList>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const { height: screenHeight } = rt.screen;
+  const [headerHeight, setHeaderHeight] = useState<number | null>(null);
+  const [plansHeight, setPlansHeight] = useState<number | null>(null);
   const snaps = useMemo(
     () =>
       sheetSnaps({
@@ -101,8 +103,11 @@ export default function CityScreen() {
         insetTop: rt.insets.top,
         insetBottom: rt.insets.bottom,
         middle: screenHeight * MAP_SHARE - theme.gap(3),
+        ...(headerHeight !== null && plansHeight !== null
+          ? { collapsedVisible: headerHeight + plansHeight - rt.insets.bottom }
+          : {}),
       }),
-    [screenHeight, rt.insets.top, rt.insets.bottom, theme],
+    [screenHeight, rt.insets, theme, headerHeight, plansHeight],
   );
   const sheetTop = useSharedValue(snaps.middle);
   const loaded = items.data !== undefined;
@@ -169,6 +174,7 @@ export default function CityScreen() {
       ) : null}
       <CitySheet
         snaps={restingSnaps}
+        onHeaderHeight={setHeaderHeight}
         top={sheetTop}
         header={
           <View style={styles.header}>
@@ -182,58 +188,67 @@ export default function CityScreen() {
             ) : null}
           </View>
         }
-      >
-        <FlatList
-          ref={list}
-          data={rows}
-          keyExtractor={(row) => row.id}
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={styles.content}
-          onScrollToIndexFailed={(info) =>
-            list.current?.scrollToOffset({
-              offset: info.averageItemLength * info.index,
-            })
-          }
-          renderItem={({ item: row }) => {
-            const { item } = row;
-            const appleId = row.kind === "place" ? row.pin.appleId : undefined;
-            const openSave = () => {
-              if (!focused.current) return;
-              router.push({
-                pathname: "/item/[id]",
-                params: { id: item._id },
-              });
-            };
-            return (
-              <SaveRow
-                item={item}
-                placeName={row.kind === "place" ? row.name : undefined}
-                number={row.kind === "place" ? row.number : undefined}
-                selected={selected === row.id}
-                // First select the place's pin; a second tap opens its source save.
-                onPress={
-                  row.kind === "place" && selected !== row.id
-                    ? () => select(row.id)
-                    : openSave
-                }
-                onPlaceDetails={
-                  appleId !== undefined && canOpenPlaceCard(appleId)
-                    ? () => void openPlaceDetails(appleId, openSave)
-                    : undefined
-                }
+        list={(scroll) => (
+          <Animated.FlatList
+            ref={list}
+            scrollEnabled={scroll.scrollEnabled}
+            onScroll={scroll.onScroll}
+            scrollEventThrottle={16}
+            bounces={scroll.bounces}
+            data={rows}
+            keyExtractor={(row) => row.id}
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={styles.content}
+            onScrollToIndexFailed={(info) =>
+              list.current?.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+              })
+            }
+            renderItem={({ item: row }) => {
+              const { item } = row;
+              const appleId =
+                row.kind === "place" ? row.pin.appleId : undefined;
+              const openSave = () => {
+                if (!focused.current) return;
+                router.push({
+                  pathname: "/item/[id]",
+                  params: { id: item._id },
+                });
+              };
+              return (
+                <SaveRow
+                  item={item}
+                  placeName={row.kind === "place" ? row.name : undefined}
+                  number={row.kind === "place" ? row.number : undefined}
+                  selected={selected === row.id}
+                  // First select the place's pin; a second tap opens its source save.
+                  onPress={
+                    row.kind === "place" && selected !== row.id
+                      ? () => select(row.id)
+                      : openSave
+                  }
+                  onPlaceDetails={
+                    appleId !== undefined && canOpenPlaceCard(appleId)
+                      ? () => void openPlaceDetails(appleId, openSave)
+                      : undefined
+                  }
+                />
+              );
+            }}
+            ListEmptyComponent={
+              <EmptyState
+                title={t("homePlaces.emptyTitle")}
+                message={t("homePlaces.emptyBody")}
               />
-            );
-          }}
-          ListEmptyComponent={
-            <EmptyState
-              title={t("homePlaces.emptyTitle")}
-              message={t("homePlaces.emptyBody")}
-            />
-          }
-        />
-      </CitySheet>
+            }
+          />
+        )}
+      />
       {count > 0 ? (
-        <View style={styles.plans}>
+        <View
+          style={styles.plans}
+          onLayout={(event) => setPlansHeight(event.nativeEvent.layout.height)}
+        >
           <PlanButton
             kind="date"
             busy={busy}

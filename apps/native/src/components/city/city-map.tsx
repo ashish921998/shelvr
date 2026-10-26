@@ -53,13 +53,20 @@ export function CityMap({
   );
   const focus = useMemo(() => {
     const pin = pins.find((place) => cityPinId(place) === selected);
-    return pin
-      ? {
-          coordinates: { latitude: pin.lat, longitude: pin.lng },
-          zoom: SELECTED_ZOOM,
-        }
-      : undefined;
-  }, [pins, selected]);
+    if (!pin) return undefined;
+    // Centre the pin in the map the sheet leaves showing, not behind the sheet.
+    const top = rt.insets.top + theme.gap(6);
+    const shownMiddle = (top + height - coveredBottom) / 2;
+    const cos = Math.cos((pin.lat * Math.PI) / 180);
+    const latPerPoint = (360 * cos) / (256 * 2 ** SELECTED_ZOOM);
+    return {
+      coordinates: {
+        latitude: pin.lat - (height / 2 - shownMiddle) * latPerPoint,
+        longitude: pin.lng,
+      },
+      zoom: SELECTED_ZOOM,
+    };
+  }, [pins, selected, height, coveredBottom, rt.insets.top, theme]);
   const standard = focus ?? fit;
   const camera = useMemo(
     () =>

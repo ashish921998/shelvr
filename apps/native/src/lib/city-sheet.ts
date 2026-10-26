@@ -7,8 +7,8 @@ export type SheetSnaps = {
 
 // The back button's bottom edge, below the safe area.
 const EXPANDED_BELOW_INSET = 52;
-// The grabber, city name and place count, above the plan buttons.
-const COLLAPSED_VISIBLE = 190;
+// The grabber, city name, place count and plan buttons, until they are measured.
+const COLLAPSED_VISIBLE = 176;
 // How far a flick carries the sheet past where the finger let go, in seconds of its speed.
 const FLICK_SECONDS = 0.2;
 
@@ -17,11 +17,15 @@ export function sheetSnaps(view: {
   insetTop: number;
   insetBottom: number;
   middle: number;
+  /** The measured height of what stays showing when the sheet is down, above the bottom inset. */
+  collapsedVisible?: number;
 }): SheetSnaps {
   const expanded = view.insetTop + EXPANDED_BELOW_INSET;
   const collapsed = Math.max(
     expanded,
-    view.height - view.insetBottom - COLLAPSED_VISIBLE,
+    view.height -
+      view.insetBottom -
+      (view.collapsedVisible ?? COLLAPSED_VISIBLE),
   );
   return {
     expanded,
