@@ -81,6 +81,11 @@ export function PlacesMap({
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
+  // The opening check reads these when it fires, so a filter picked while it waits is the one it frames.
+  const latest = useRef({ pins, fit });
+  useEffect(() => {
+    latest.current = { pins, fit };
+  }, [pins, fit]);
   const centredOnUser = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -95,6 +100,7 @@ export function PlacesMap({
     if (!showsUser || centredOnUser.current) return;
     centredOnUser.current = true;
     const showCity = () => {
+      const { fit } = latest.current;
       if (fit)
         map()
           ?.setCameraPosition(fit)
@@ -104,7 +110,7 @@ export function PlacesMap({
     };
     checkNearby.current = () => {
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, pins)) showCity();
+      if (!hasPlaceNear(centre.current, latest.current.pins)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
@@ -126,7 +132,6 @@ export function PlacesMap({
       checkNearby.current = undefined;
       centredOnUser.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per grant; a new filter must not move the camera again
   }, [showsUser]);
   useEffect(() => () => clearTimeout(settle.current), []);
   useEffect(() => {
@@ -143,8 +148,9 @@ export function PlacesMap({
     );
   }, [focus]);
 
-  // A new filter whose places are all out of reach brings them into view, unless the opening move
-  // is still deciding where to go. Search does not refit: picking a result flies to it.
+  // A new filter whose places are all out of reach brings them into view. While the opening move is
+  // still deciding where to go, its check frames the new filter instead. Search does not refit:
+  // picking a result flies to it.
   const fitted = useRef(fit);
   useEffect(() => {
     if (fit === fitted.current) return;
