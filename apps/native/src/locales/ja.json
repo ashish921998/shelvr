@@ -569,7 +569,6 @@
   "pro.notFoundBody": "この%{store}アカウントで有効なShelvr Proの購入が見つかりません。",
   "pro.restoreFailedBody": "接続を確認して再試行してください。%{store}でプランを管理することもできます。",
   "profile.appearanceLabel": "外観：%{appearance}",
-  "profile.photoUsage": "保存した写真：%{limit}枚中%{count}枚",
   "share.progress": "%{total}件中%{saved}件を保存しました…",
   "share.failureCount": {
     "other": "%{formattedCount}件の項目を保存できませんでした"
