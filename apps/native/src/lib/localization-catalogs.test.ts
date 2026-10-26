@@ -215,9 +215,7 @@ describe("shipped localization resources", () => {
           "utf8",
         ),
       );
-      expect(native.ios.NSCameraUsageDescription).toBe(
-        messages["permissions.cameraUsage"],
-      );
+      expect(native.ios.NSCameraUsageDescription).toBeUndefined();
       expect(native.ios.NSPhotoLibraryUsageDescription).toBe(
         messages["permissions.photosUsage"],
       );

@@ -603,7 +603,6 @@
   "errors.saveFallback": "保存に失敗しました。もう一度お試しください。",
   "widget.title": "最近の保存",
   "widget.description": "最近保存したものをひと目で確認。",
-  "permissions.cameraUsage": "Shelvrはカメラを使って、あとで見たいものを撮影します。",
   "permissions.photosUsage": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
   "permissions.calendarUsage": "Shelvrは保存した内容からカレンダーに予定を追加します。",
   "permissions.locationUsage": "Shelvrは位置情報を使って、保存した場所を地図に表示します。",
