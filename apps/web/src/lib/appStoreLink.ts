@@ -14,7 +14,8 @@ type AppStoreLinkSource =
   | "oracle"
   | "plan"
   | "bio"
-  | "place_tool";
+  | "place_tool"
+  | "place_banner";
 
 export function useArrivalCampaign(fallback: string) {
   return useBrowserValue(
