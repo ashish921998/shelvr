@@ -17,10 +17,18 @@ type Props = {
   pins: CityPin[];
   selected: string | null;
   height: number;
+  /** How much of the map's bottom the places sheet covers when the page opens. */
+  coveredBottom: number;
   onSelect: (id: string) => void;
 };
 
-export function CityMap({ pins, selected, height, onSelect }: Props) {
+export function CityMap({
+  pins,
+  selected,
+  height,
+  coveredBottom,
+  onSelect,
+}: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const { width } = rt.screen;
@@ -36,13 +44,12 @@ export function CityMap({ pins, selected, height, onSelect }: Props) {
           width,
           height,
           top: rt.insets.top + theme.gap(6),
-          // The sheet below overlaps the map's bottom edge.
-          bottom: theme.gap(6),
+          bottom: coveredBottom + theme.gap(3),
           worldWidth: 256,
           centerY: height / 2,
         },
       ),
-    [pins, width, height, rt.insets.top, theme],
+    [pins, width, height, coveredBottom, rt.insets.top, theme],
   );
   const focus = useMemo(() => {
     const pin = pins.find((place) => cityPinId(place) === selected);

@@ -739,6 +739,7 @@
     "one": "%{formattedCount} Ort aus deinen Inhalten",
     "other": "%{formattedCount} Orte aus deinen Inhalten"
   },
+  "cityMap.placesList": "Ortsliste",
   "cityMap.placeDetails": "Ortsdetails zu %{name}",
   "opener.tagline": "Speichere die Orte. Wir planen das Date oder die Reise.",
   "onboardingQ.skip": "Überspringen",

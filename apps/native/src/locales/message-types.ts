@@ -677,6 +677,7 @@ export type MessageParams = {
   "homePlaces.planTrip": undefined;
   "homePlaces.planTripHint": undefined;
   "cityMap.placesFromSaves": { count: number };
+  "cityMap.placesList": undefined;
   "cityMap.placeDetails": { name: string };
   "opener.tagline": undefined;
   "onboardingQ.skip": undefined;

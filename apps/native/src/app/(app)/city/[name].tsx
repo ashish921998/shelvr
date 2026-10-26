@@ -1,4 +1,5 @@
 import { CityMap } from "@/components/city/city-map";
+import { CitySheet, moveSheet } from "@/components/city/city-sheet";
 import { SaveRow } from "@/components/city/save-row";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -10,6 +11,7 @@ import {
 } from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
+import { sheetSnaps } from "@/lib/city-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -23,6 +25,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSharedValue } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.4;
@@ -90,6 +93,18 @@ export default function CityScreen() {
   const { busy, start } = useCityPlan(city);
   const list = useRef<FlatList>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const { height: screenHeight } = rt.screen;
+  const snaps = useMemo(
+    () =>
+      sheetSnaps({
+        height: screenHeight,
+        insetTop: rt.insets.top,
+        insetBottom: rt.insets.bottom,
+        middle: screenHeight * MAP_SHARE - theme.gap(3),
+      }),
+    [screenHeight, rt.insets.top, rt.insets.bottom, theme],
+  );
+  const sheetTop = useSharedValue(snaps.middle);
   const loaded = items.data !== undefined;
   const count = items.data?.length ?? 0;
 
@@ -102,6 +117,18 @@ export default function CityScreen() {
 
   // Stable while the query data is, so the map keeps the camera the person moved.
   const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
+  const hasMap = pins.length > 0;
+  // With no map behind it, the list stays open and does not drag.
+  const restingSnaps = useMemo(
+    () =>
+      hasMap
+        ? snaps
+        : { ...snaps, middle: snaps.expanded, collapsed: snaps.expanded },
+    [hasMap, snaps],
+  );
+  useEffect(() => {
+    if (loaded) sheetTop.set(restingSnaps.middle);
+  }, [loaded, restingSnaps, sheetTop]);
   const rows = useMemo(
     () => cityRows(items.data ?? [], pins),
     [items.data, pins],
@@ -117,10 +144,10 @@ export default function CityScreen() {
   }
   if (items.data === undefined) return <ScreenLoader />;
 
-  const mapHeight = rt.screen.height * MAP_SHARE;
-
   const select = (id: string) => {
     setSelected(id);
+    // A pin tapped with the list pulled down brings its row back into view.
+    if (sheetTop.get() > snaps.middle) moveSheet(sheetTop, snaps.middle);
     const index = rows.findIndex((row) => row.id === id);
     if (index >= 0) {
       list.current?.scrollToIndex({ index, viewPosition: 0.3 });
@@ -130,20 +157,31 @@ export default function CityScreen() {
   return (
     <View style={styles.container}>
       {pins.length > 0 ? (
-        <View style={[styles.map, { height: mapHeight }]}>
+        <View style={styles.map}>
           <CityMap
             pins={pins}
             selected={selected}
-            height={mapHeight}
+            height={screenHeight}
+            coveredBottom={screenHeight - snaps.middle}
             onSelect={select}
           />
         </View>
       ) : null}
-      <View
-        style={[
-          styles.sheet,
-          pins.length > 0 ? { marginTop: mapHeight - theme.gap(3) } : null,
-        ]}
+      <CitySheet
+        snaps={restingSnaps}
+        top={sheetTop}
+        header={
+          <View style={styles.header}>
+            <Text style={styles.name} numberOfLines={2}>
+              {city}
+            </Text>
+            {pins.length > 0 ? (
+              <Text style={styles.count}>
+                {t("cityMap.placesFromSaves", { count: pins.length })}
+              </Text>
+            ) : null}
+          </View>
+        }
       >
         <FlatList
           ref={list}
@@ -155,18 +193,6 @@ export default function CityScreen() {
             list.current?.scrollToOffset({
               offset: info.averageItemLength * info.index,
             })
-          }
-          ListHeaderComponent={
-            <View style={styles.header}>
-              <Text style={styles.name} numberOfLines={2}>
-                {city}
-              </Text>
-              {pins.length > 0 ? (
-                <Text style={styles.count}>
-                  {t("cityMap.placesFromSaves", { count: pins.length })}
-                </Text>
-              ) : null}
-            </View>
           }
           renderItem={({ item: row }) => {
             const { item } = row;
@@ -205,7 +231,7 @@ export default function CityScreen() {
             />
           }
         />
-      </View>
+      </CitySheet>
       {count > 0 ? (
         <View style={styles.plans}>
           <PlanButton
@@ -226,15 +252,7 @@ export default function CityScreen() {
 
 const styles = StyleSheet.create((theme, rt) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  map: { position: "absolute", top: 0, left: 0, right: 0 },
-  sheet: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    overflow: "hidden",
-  },
+  map: { ...StyleSheet.absoluteFillObject },
   content: {
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
@@ -243,8 +261,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   header: {
     gap: theme.gap(0.25),
-    paddingTop: theme.gap(2.5),
-    paddingBottom: theme.gap(1),
+    paddingTop: theme.gap(1),
+    paddingBottom: theme.gap(1.5),
   },
   name: { ...theme.type.largeTitle, color: theme.colors.foreground },
   count: { ...theme.type.footnote, color: theme.colors.muted },

@@ -760,6 +760,7 @@
     "many": "%{formattedCount} lugares de tus guardados",
     "other": "%{formattedCount} lugares de tus guardados"
   },
+  "cityMap.placesList": "Lista de lugares",
   "cityMap.placeDetails": "Detalles de %{name}",
   "opener.tagline": "Guarda los sitios. Nosotros planeamos la cita o el viaje.",
   "onboardingQ.skip": "Omitir",
