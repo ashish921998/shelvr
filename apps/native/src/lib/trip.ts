@@ -3,12 +3,7 @@ import { formattingLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { MAX_PLAN_ITEMS } from "@convex/model/plan";
-import {
-  cityKey,
-  STOPS_PER_DAY,
-  type TripPace,
-  type TripSlot,
-} from "@convex/model/trip";
+import { cityKey, STOPS_PER_DAY, type TripPace } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import type { FunctionReturnType } from "convex/server";
@@ -16,7 +11,7 @@ import { useAction } from "convex/react";
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
-export type { TripPace, TripSlot };
+export type { TripPace };
 export { MAX_TRIP_DAYS, MIN_TRIP_DAYS } from "@convex/model/trip";
 
 export type Trip = NonNullable<
