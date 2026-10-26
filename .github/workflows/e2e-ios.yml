@@ -81,7 +81,7 @@ jobs:
             tests: >-
               tests/home-cities.e2e.ts
               tests/onboarding.e2e.ts
-              tests/settings-no-ai-permission.e2e.ts
+              tests/settings-ai-permission.e2e.ts
           - name: b
             tests: >-
               tests/paywall.e2e.ts

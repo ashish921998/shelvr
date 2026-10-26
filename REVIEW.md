@@ -32,8 +32,8 @@ Backend (`apps/native/convex`):
 - [ ] Every save and Pro feature calls `requireProEntitlement(ctx, userId)`.
 - [ ] Anything that sends user content to Gemini, SerpAPI or Treg checks AI
       eligibility first (`aiAllowed` in `aiConsent.ts`, `internal.aiConsent.isAllowed`
-      from actions): live ownership and legacy opt-outs remain enforced. New accounts
-      default to AI enabled; do not describe this as collected consent.
+      from actions): live ownership and declines are enforced. The client asks once
+      before the first save; an account with no answer stays allowed for old builds.
 - [ ] Public `args` / `returns` shapes are unchanged, or the change is expand-first with a
       `Convex-Api: changed` trailer. Validators match what the function really returns.
 - [ ] AI passes only create or remove `suggested` memberships. Documented exceptions: the

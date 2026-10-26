@@ -179,9 +179,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `setConsent` remain compatible with installed clients. Every path sending content to
   Gemini, SerpAPI or Treg checks `aiAllowed` / `isAllowed`: missing or deleting owners,
   missing or unowned saves, and explicit legacy declines are refused. Accounts with no
-  preference record use AI automatically; no grant record is fabricated. The current
-  client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
-  reports `unset` for an unanswered account, so old clients retain their existing UI.
+  preference record use AI automatically; no grant record is fabricated. The client
+  asks once (`src/components/ai-consent.tsx`, gated in `(app)/_layout.tsx`) when
+  `getStatus` reports `unset` for a signed-in, onboarded account with Pro: Allow records
+  `granted`, Not now records `declined`, and nothing is saved before the answer. The
+  Settings switch "Find places with AI" changes it later. Installed clients without
+  the ask keep working, since an unanswered account stays allowed.
   `repairUnansweredEmbeddings` is a bounded, resumable one-time repair for older ready
   saves stamped at the current embedding version but missing a vector. It clears the
   stamp only for live owners with no preference row; the normal embedding sweep then

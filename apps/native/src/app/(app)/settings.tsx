@@ -1,3 +1,4 @@
+import { AiConsentSetting } from "@/components/ai-consent";
 import { LegalConsentPreference } from "@/components/legal-consent";
 import { UpdateSetting } from "@/components/update-setting";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -262,6 +263,8 @@ export default function SettingsScreen() {
       />
 
       <UpdateSetting />
+
+      <AiConsentSetting />
 
       <LegalConsentPreference />
 

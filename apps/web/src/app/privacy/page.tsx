@@ -118,12 +118,11 @@ export default function PrivacyPage() {
           stops; it does not track your live location.
         </p>
         <p className="mt-2">
-          AI processing is part of saving content in Shelvr. It runs
-          automatically unless it is disabled for your account. With AI
-          disabled, links still save, but AI place extraction is unavailable.
-          Plans can still use places already saved in your account. To request a
-          change to your AI processing preference, use Contact Support in the
-          app or email <strong>{SUPPORT_EMAIL}</strong>.
+          Before anything is saved, the app asks whether Shelvr may send this
+          content to Gemini, and nothing is sent until you tap Allow. You can
+          change your answer at any time with the “Find places with AI” switch
+          in Settings. With it off, saves still work, but AI place extraction is
+          unavailable. Plans can still use places already saved in your account.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that
@@ -250,8 +249,8 @@ export default function PrivacyPage() {
         <h2 className="font-semibold text-ink text-lg">Your choices</h2>
         <ul className="mt-2 list-disc pl-5 space-y-2">
           <li>
-            Request a change to your AI processing preference through Contact
-            Support in the app or by emailing <strong>{SUPPORT_EMAIL}</strong>.
+            Turn AI processing on or off with the “Find places with AI” switch
+            in Settings.
           </li>
           <li>
             Turn notifications on or off in Settings, including the weekly shelf
