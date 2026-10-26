@@ -168,7 +168,9 @@ function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
         size={15}
         tintColor={theme.colors.foreground}
       />
-      <ThemedText variant="button">{t("plan.ask")}</ThemedText>
+      <ThemedText variant="button" style={styles.actionLabel}>
+        {t("plan.ask")}
+      </ThemedText>
     </Pressable>
   );
 }
@@ -231,12 +233,25 @@ function PlanFooter({
         </>
       ) : (
         <View style={styles.actions}>
-          <Button
-            title={t("plan.pick")}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: spinning }}
             onPress={onDeal}
             disabled={spinning}
-            style={styles.deal}
-          />
+            style={({ pressed }) => [
+              styles.action,
+              styles.actionFilled,
+              spinning && styles.actionBusy,
+              pressed && styles.pressed,
+            ]}
+          >
+            <ThemedText
+              variant="button"
+              style={[styles.actionLabel, styles.onTint]}
+            >
+              {t("plan.pick")}
+            </ThemedText>
+          </Pressable>
           {askButton}
         </View>
       )}
@@ -558,6 +573,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: "center",
     gap: theme.gap(1),
     minHeight: theme.control.minHeight + theme.gap(0.5),
+    paddingHorizontal: theme.gap(1.5),
+    paddingVertical: theme.gap(1),
     borderRadius: 999,
     borderWidth: 2,
     borderColor: "transparent",
@@ -574,8 +591,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   actionBusy: {
     opacity: theme.opacity.disabled,
   },
-  deal: {
-    flex: 1,
+  actionLabel: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   onTint: {
     color: theme.colors.onTint,

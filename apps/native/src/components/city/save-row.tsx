@@ -18,19 +18,21 @@ type SaveRowItem = {
 
 type Props = {
   item: SaveRowItem;
-  /** The number on this save's map pin; a save with no located place has none. */
+  placeName?: string;
+  /** The matching map number when this row represents a located place. */
   number?: number;
   selected?: boolean;
-  /** A place the user marked "We went": the badge fades like its pin. */
   /** Replaces opening the save, so the city page can select its pin first. */
   onPress?: () => void;
 };
 
-export function SaveRow({ item, number, selected, onPress }: Props) {
+export function SaveRow({ item, placeName, number, selected, onPress }: Props) {
   const router = useRouter();
   const image = item.imageUrl ?? item.heroImageUrl;
-  const source = saveSource(item);
-  const title = item.title ?? t("homePlaces.untitled");
+  const source = placeName
+    ? (item.title ?? saveSource(item))
+    : saveSource(item);
+  const title = placeName ?? item.title ?? t("homePlaces.untitled");
   return (
     <Pressable
       accessibilityRole="button"
@@ -52,15 +54,17 @@ export function SaveRow({ item, number, selected, onPress }: Props) {
           <Text style={styles.badgeText}>{number}</Text>
         </View>
       ) : null}
-      {image ? (
-        <Image
-          source={{ uri: image }}
-          style={styles.thumb}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={styles.thumb} />
-      )}
+      {!placeName ? (
+        image ? (
+          <Image
+            source={{ uri: image }}
+            style={styles.thumb}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={styles.thumb} />
+        )
+      ) : null}
       <View style={styles.text}>
         <Text style={styles.title} numberOfLines={2}>
           {title}
@@ -77,6 +81,7 @@ export function SaveRow({ item, number, selected, onPress }: Props) {
 
 const styles = StyleSheet.create((theme) => ({
   row: {
+    minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1.5),

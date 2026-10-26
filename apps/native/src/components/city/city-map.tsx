@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
-import { appleZoom, type CityPin } from "@/lib/city-pins";
+import { appleZoom, cityPinId, type CityPin } from "@/lib/city-pins";
 import { fitCamera } from "@/lib/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,19 +10,15 @@ const SELECTED_ZOOM = 15;
 
 type Props = {
   pins: CityPin[];
-  /** The number each save with a pin shows on its pin and its row. */
-  numbers: Map<string, number>;
   selected: string | null;
   height: number;
-  onSelect: (itemId: string) => void;
+  onSelect: (id: string) => void;
 };
 
-export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
+export function CityMap({ pins, selected, height, onSelect }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const { width } = rt.screen;
-  // A save can name several places; a tapped pin focuses itself, a row its save's first pin.
-  const [tappedPin, setTappedPin] = useState<number | null>(null);
 
   const fit = useMemo(
     () =>
@@ -41,18 +37,14 @@ export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
     [pins, width, height, rt.insets.top, theme],
   );
   const focus = useMemo(() => {
-    const tapped = tappedPin === null ? undefined : pins[tappedPin];
-    const pin =
-      tapped?.itemId === selected
-        ? tapped
-        : pins.find((p) => p.itemId === selected);
+    const pin = pins.find((place) => cityPinId(place) === selected);
     return pin
       ? {
           coordinates: { latitude: pin.lat, longitude: pin.lng },
           zoom: SELECTED_ZOOM,
         }
       : undefined;
-  }, [pins, selected, tappedPin]);
+  }, [pins, selected]);
   const standard = focus ?? fit;
   const camera = useMemo(
     () =>
@@ -83,12 +75,13 @@ export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
   }, [camera, firstCamera]);
 
   const annotations = pins.map((pin, i) => {
-    const isSelected = pin.itemId === selected;
+    const id = cityPinId(pin);
+    const isSelected = id === selected;
     return {
-      id: `${pin.itemId}:${i}`,
+      id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
-      text: String(numbers.get(pin.itemId) ?? ""),
+      text: String(i + 1),
       backgroundColor: isSelected
         ? theme.colors.foreground
         : theme.colors.primary,
@@ -96,10 +89,7 @@ export function CityMap({ pins, numbers, selected, height, onSelect }: Props) {
     };
   });
   const select = (id: string | undefined) => {
-    const [itemId, index] = (id ?? "").split(":");
-    if (!itemId) return;
-    setTappedPin(Number(index));
-    onSelect(itemId);
+    if (id) onSelect(id);
   };
 
   if (process.env.EXPO_OS === "ios") {

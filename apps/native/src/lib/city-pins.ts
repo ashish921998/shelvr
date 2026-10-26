@@ -8,6 +8,10 @@ export type CityPin = {
   lng: number;
 };
 
+export function cityPinId(pin: CityPin): string {
+  return `${pin.itemId}:${pin.name}:${pin.lat}:${pin.lng}`;
+}
+
 /** Every place pin the city's saves carry, tagged with the save it came from. */
 export function cityPins(
   saves: {
@@ -22,17 +26,28 @@ export function cityPins(
   );
 }
 
-/** Number each save that has a pin, in list order, so a row's badge matches its pins. */
-export function numberSaves(
-  saves: { _id: string }[],
-  pins: Pick<CityPin, "itemId">[],
-): Map<string, number> {
-  const located = new Set(pins.map((pin) => pin.itemId));
-  const numbers = new Map<string, number>();
-  for (const save of saves) {
-    if (located.has(save._id)) numbers.set(save._id, numbers.size + 1);
-  }
-  return numbers;
+/** One row per mapped place, plus saves that have no mapped places. */
+export function cityRows<T extends { _id: string; placePins?: unknown[] }>(
+  saves: T[],
+  pins: CityPin[],
+) {
+  const items = new Map(saves.map((save) => [save._id, save]));
+  return [
+    ...pins.flatMap((pin, index) => {
+      const item = items.get(pin.itemId);
+      return item
+        ? [{ id: cityPinId(pin), number: index + 1, name: pin.name, item }]
+        : [];
+    }),
+    ...saves
+      .filter((save) => !save.placePins?.length)
+      .map((item) => ({
+        id: item._id,
+        number: undefined,
+        name: undefined,
+        item,
+      })),
+  ];
 }
 
 const SOURCE_NAMES: Record<LinkSource, string> = {

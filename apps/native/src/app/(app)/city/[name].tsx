@@ -3,7 +3,7 @@ import { SaveRow } from "@/components/city/save-row";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
-import { cityPins, numberSaves } from "@/lib/city-pins";
+import { cityPins, cityRows } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
@@ -86,8 +86,8 @@ export default function CityScreen() {
 
   // Stable while the query data is, so the map keeps the camera the person moved.
   const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
-  const numbers = useMemo(
-    () => numberSaves(items.data ?? [], pins),
+  const rows = useMemo(
+    () => cityRows(items.data ?? [], pins),
     [items.data, pins],
   );
 
@@ -101,12 +101,11 @@ export default function CityScreen() {
   }
   if (items.data === undefined) return <ScreenLoader />;
 
-  const saves = items.data;
   const mapHeight = rt.screen.height * MAP_SHARE;
 
-  const select = (itemId: string) => {
-    setSelected(itemId);
-    const index = saves.findIndex((save) => save._id === itemId);
+  const select = (id: string) => {
+    setSelected(id);
+    const index = rows.findIndex((row) => row.id === id);
     if (index >= 0) {
       list.current?.scrollToIndex({ index, viewPosition: 0.3 });
     }
@@ -118,7 +117,6 @@ export default function CityScreen() {
         <View style={[styles.map, { height: mapHeight }]}>
           <CityMap
             pins={pins}
-            numbers={numbers}
             selected={selected}
             height={mapHeight}
             onSelect={select}
@@ -133,8 +131,8 @@ export default function CityScreen() {
       >
         <FlatList
           ref={list}
-          data={saves}
-          keyExtractor={(item) => item._id}
+          data={rows}
+          keyExtractor={(row) => row.id}
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
           onScrollToIndexFailed={(info) =>
@@ -154,17 +152,18 @@ export default function CityScreen() {
               ) : null}
             </View>
           }
-          renderItem={({ item }) => {
-            const number = numbers.get(item._id);
+          renderItem={({ item: row }) => {
+            const { item, number } = row;
             return (
               <SaveRow
                 item={item}
+                placeName={row.name}
                 number={number}
-                selected={selected === item._id}
-                // A save with a pin: the first tap selects the pin, a second tap on the selected row opens it.
+                selected={selected === row.id}
+                // First select the place's pin; a second tap opens its source save.
                 onPress={
-                  number !== undefined && selected !== item._id
-                    ? () => select(item._id)
+                  number !== undefined && selected !== row.id
+                    ? () => select(row.id)
                     : () =>
                         router.push({
                           pathname: "/item/[id]",

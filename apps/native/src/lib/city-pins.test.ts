@@ -1,14 +1,52 @@
 import { describe, expect, it } from "vitest";
-import { appleZoom, cityPins, numberSaves, saveSource } from "./city-pins";
+import { appleZoom, cityPins, cityRows, saveSource } from "./city-pins";
 
-describe("numberSaves", () => {
-  it("numbers only saves with a pin, in list order", () => {
-    const saves = [{ _id: "a" }, { _id: "b" }, { _id: "c" }];
-    const pins = [{ itemId: "c" }, { itemId: "a" }, { itemId: "a" }];
-    expect([...numberSaves(saves, pins)]).toEqual([
-      ["a", 1],
-      ["c", 2],
+describe("cityRows", () => {
+  it("lists and numbers each place from a single reel separately", () => {
+    const saves = [
+      {
+        _id: "a",
+        placePins: [
+          { name: "Jo's Coffee", lat: 30.25, lng: -97.75 },
+          { name: "June's", lat: 30.24, lng: -97.75 },
+        ],
+      },
+    ];
+    expect(cityRows(saves, cityPins(saves))).toEqual([
+      {
+        id: "a:Jo's Coffee:30.25:-97.75",
+        number: 1,
+        name: "Jo's Coffee",
+        item: saves[0],
+      },
+      {
+        id: "a:June's:30.24:-97.75",
+        number: 2,
+        name: "June's",
+        item: saves[0],
+      },
     ]);
+  });
+
+  it("deduplicates shared places without leaving duplicate save rows, and keeps unlocated saves", () => {
+    const pin = { name: "Micho", lat: 48.866, lng: 2.337 };
+    const saves = [
+      { _id: "newer", placePins: [pin] },
+      { _id: "older", placePins: [pin] },
+      { _id: "unlocated" },
+      { _id: "empty", placePins: [] },
+    ];
+    expect(cityRows(saves, cityPins(saves))).toEqual([
+      {
+        id: "newer:Micho:48.866:2.337",
+        number: 1,
+        name: "Micho",
+        item: saves[0],
+      },
+      { id: "unlocated", number: undefined, name: undefined, item: saves[2] },
+      { id: "empty", number: undefined, name: undefined, item: saves[3] },
+    ]);
+    expect(cityRows([], [])).toEqual([]);
   });
 });
 
