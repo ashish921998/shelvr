@@ -126,4 +126,17 @@ describe("listMapPlaces", () => {
     ]);
     expect(places[0].kinds).toEqual(["dateNight"]);
   });
+
+  it("joins a later pin under a venue's other name even without an Apple id", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, [{ name: "The Bean", lat: 41.8829, lng: -87.6235 }]);
+    await save(userId, [
+      { name: "The Bean", lat: 41.8827, lng: -87.6233, appleId: "BEAN" },
+    ]);
+    await save(userId, [
+      { name: "Cloud Gate", lat: 41.8827, lng: -87.6233, appleId: "BEAN" },
+    ]);
+    const places = await t.query(api.mapPlaces.listMapPlaces, {});
+    expect(places.map((place) => place.name)).toEqual(["Cloud Gate"]);
+  });
 });

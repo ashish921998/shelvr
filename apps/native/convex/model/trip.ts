@@ -26,12 +26,14 @@ export function uniquePlacePins<
   for (const pin of pins) {
     const sameVenue =
       pin.appleId === undefined ? undefined : byApple.get(pin.appleId);
+    const key = placeKey(pin.name);
+    const named = byName.get(key) ?? [];
     if (sameVenue !== undefined) {
+      // Another name for a kept venue: a later pin under it without an Apple id joins it too.
+      if (!named.includes(sameVenue)) byName.set(key, [...named, sameVenue]);
       absorb(sameVenue, pin);
       continue;
     }
-    const key = placeKey(pin.name);
-    const named = byName.get(key) ?? [];
     const same = named.find(
       (index) =>
         !otherVenue(kept[index], pin) &&
