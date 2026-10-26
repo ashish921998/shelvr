@@ -38,7 +38,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
 - **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
-  cities list and "No place found" section are in `src/components/home`
+  cities list and processing, failed-read and "No place found" sections are in `src/components/home`
   (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
   Retired routes redirect to Home through `src/lib/home-href.ts`.

@@ -233,26 +233,15 @@ function PlanFooter({
         </>
       ) : (
         <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: spinning }}
-            onPress={onDeal}
-            disabled={spinning}
-            style={({ pressed }) => [
-              styles.action,
-              styles.actionFilled,
-              spinning && styles.actionBusy,
-              pressed && styles.pressed,
-            ]}
-          >
-            <ThemedText
-              variant="button"
-              style={[styles.actionLabel, styles.onTint]}
-            >
-              {t("plan.pick")}
-            </ThemedText>
-          </Pressable>
-          {askButton}
+          <View style={styles.actionSlot}>
+            <Button
+              title={t("plan.pick")}
+              onPress={onDeal}
+              loading={spinning}
+              style={styles.pick}
+            />
+          </View>
+          <View style={styles.actionSlot}>{askButton}</View>
         </View>
       )}
     </View>
@@ -572,13 +561,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.gap(1),
-    minHeight: theme.control.minHeight + theme.gap(0.5),
+    minHeight: theme.control.minHeight,
     paddingHorizontal: theme.gap(1.5),
     paddingVertical: theme.gap(1),
     borderRadius: 999,
     borderWidth: 2,
     borderColor: "transparent",
   },
+  actionSlot: { flex: 1 },
+  pick: { minHeight: theme.control.minHeight },
   actionFilled: {
     backgroundColor: theme.colors.primary,
   },

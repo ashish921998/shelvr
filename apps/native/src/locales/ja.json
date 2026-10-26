@@ -705,7 +705,7 @@
   "homePlaces.citiesHint": "保存したリールやTikTokに出てくる場所",
   "homePlaces.noPlaceTitle": "場所が見つからない保存",
   "homePlaces.noPlaceReading": "場所を検索中…",
-  "homePlaces.noPlaceFailed": "読み込めませんでした",
+  "homePlaces.noPlaceFailed": "これらの保存を読み取れませんでした",
   "homePlaces.noPlaceNone": "場所の記載がありません",
   "homePlaces.spotCount": {
     "other": "%{formattedCount}か所"
@@ -767,9 +767,6 @@
   "onboardingChart.chartLabel": "今の%{lost}から%{goal}へのカーブ。%{when}",
   "aha.shareTitle": "このリールを保存してみよう。",
   "aha.sampleBadge": "サンプル",
-  "aha.captionDate": "%{city}で最高のデートができる3つのスポット 🍷",
-  "aha.captionTrip": "%{city}での最高の1日目に行きたい3つのスポット ✈️",
-  "aha.captionWeekend": "今週%{city}で食べたい3つのスポット 🍜",
   "aha.shareMessages": "メッセージ",
   "aha.shareCopyLink": "リンクをコピー",
   "aha.coachTapThis": "ここをタップ →",
@@ -789,19 +786,7 @@
   "aha.addedTo": "%{city}に追加しました",
   "aha.cityPlaces": "%{city}・3スポット",
   "aha.fromReel": "%{handle}のリールから",
-  "aha.shelvrExample": "Shelvrのサンプル",
   "aha.reelBy": "%{handle}のサンプルリール",
-  "aha.exampleDescription": "Shelvrの例。%{caption}。スポット：%{first}、%{second}、%{third}。",
-  "aha.quoted": "「%{quote}」",
-  "aha.quoteCoffee": "並んででも飲みたいフラットホワイト",
-  "aha.quoteMorning": "混む前に朝早く行くのがおすすめ",
-  "aha.quoteBrunch": "卵料理を頼んで。絶対満足するから",
-  "aha.quoteLunch": "街でいちばんお得なランチ",
-  "aha.quoteAfternoon": "何時間でもいられる場所",
-  "aha.quoteDinner": "窓際の席をリクエストして",
-  "aha.quoteDrinks": "ここのカクテルは最高",
-  "aha.quoteDessert": "これのためにお腹をあけておいて",
-  "aha.quoteWalk": "ここの夕暮れは魔法みたい",
   "welcomeLetter.title": "計画は少なく、お出かけは多く",
   "welcomeLetter.body": "Shelvrへようこそ。いつか行きたいと思っているスポットのためのアプリです。リールや投稿を共有すると、Shelvrが場所を見つけて地図にピン留めし、デートや旅行のプランにします。まずは今週保存したものから始めてみましょう。",
   "welcomeLetter.signature": "Ashish",
@@ -845,6 +830,5 @@
   "signInScene.sunset": "夕日",
   "signInScene.dinner": "ディナー",
   "signInScene.dessert": "デザート",
-  "opener.getStarted": "はじめる",
-  "aha.sampleSource": "このサンプルリールから。"
+  "opener.getStarted": "はじめる"
 }

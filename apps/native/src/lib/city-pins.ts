@@ -26,12 +26,13 @@ export function cityPins(
   );
 }
 
-/** One row per mapped place, plus saves that have no mapped places. */
+/** One row per mapped place, plus every save not represented by a place row. */
 export function cityRows<T extends { _id: string; placePins?: unknown[] }>(
   saves: T[],
   pins: CityPin[],
 ) {
   const items = new Map(saves.map((save) => [save._id, save]));
+  const pinnedIds = new Set(pins.map((pin) => pin.itemId));
   return [
     ...pins.flatMap((pin, index) => {
       const item = items.get(pin.itemId);
@@ -40,7 +41,7 @@ export function cityRows<T extends { _id: string; placePins?: unknown[] }>(
         : [];
     }),
     ...saves
-      .filter((save) => !save.placePins?.length)
+      .filter((save) => !pinnedIds.has(save._id))
       .map((item) => ({
         id: item._id,
         number: undefined,

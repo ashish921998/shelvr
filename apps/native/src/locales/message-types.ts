@@ -726,9 +726,6 @@ export type MessageParams = {
   "onboardingChart.chartLabel": { lost: string; goal: string; when: string };
   "aha.shareTitle": undefined;
   "aha.sampleBadge": undefined;
-  "aha.captionDate": { city: string };
-  "aha.captionTrip": { city: string };
-  "aha.captionWeekend": { city: string };
   "aha.shareMessages": undefined;
   "aha.shareCopyLink": undefined;
   "aha.coachTapThis": undefined;
@@ -748,24 +745,7 @@ export type MessageParams = {
   "aha.addedTo": { city: string };
   "aha.cityPlaces": { city: string };
   "aha.fromReel": { handle: string };
-  "aha.shelvrExample": undefined;
   "aha.reelBy": { handle: string };
-  "aha.exampleDescription": {
-    caption: string;
-    first: string;
-    second: string;
-    third: string;
-  };
-  "aha.quoted": { quote: string };
-  "aha.quoteCoffee": undefined;
-  "aha.quoteMorning": undefined;
-  "aha.quoteBrunch": undefined;
-  "aha.quoteLunch": undefined;
-  "aha.quoteAfternoon": undefined;
-  "aha.quoteDinner": undefined;
-  "aha.quoteDrinks": undefined;
-  "aha.quoteDessert": undefined;
-  "aha.quoteWalk": undefined;
   "welcomeLetter.title": undefined;
   "welcomeLetter.body": undefined;
   "welcomeLetter.signature": undefined;
@@ -810,7 +790,6 @@ export type MessageParams = {
   "signInScene.dinner": undefined;
   "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
-  "aha.sampleSource": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

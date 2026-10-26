@@ -32,7 +32,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Core save loop
 
-- **Link:** tap Add, paste an Instagram Reel or TikTok link (any page link is accepted), and save. Processing saves appear under "Finding places…"; failed reads appear in their own "Couldn't read this one" section. Once processing finishes, saves with a city appear in Home's "Your cities", and only finished saves without a city appear under "No place found". Notes, photos and the camera are not part of this build.
+- **Link:** tap Add, paste an Instagram Reel or TikTok link (any page link is accepted), and save. Processing saves appear under "Finding places…"; failed reads appear in their own "Couldn't read these saves" section. Once processing finishes, saves with a city appear in Home's "Your cities", and only finished saves without a city appear under "No place found". Notes, photos and the camera are not part of this build.
 - **Share Sheet:** From Safari, Instagram or TikTok, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Pro / subscriptions (RevenueCat sandbox)

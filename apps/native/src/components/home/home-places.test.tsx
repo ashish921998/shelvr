@@ -37,7 +37,7 @@ describe("unplaced save states", () => {
         saves={[{ _id: "new", status: "processing", title: "New reel" }]}
       />,
     );
-    expect(screen.getAllByText("Finding places…").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Finding places…")).toHaveLength(1);
     expect(screen.queryByText("No place found")).toBeNull();
 
     rerender(
@@ -78,9 +78,10 @@ describe("unplaced save states", () => {
     expect(within(emptySection).getByText("Empty reel")).toBeTruthy();
     expect(within(emptySection).queryByText("Pending reel")).toBeNull();
     expect(within(emptySection).queryByText("Failed reel")).toBeNull();
-    expect(
-      screen.getAllByText("Couldn't read this one").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Finding places…")).toHaveLength(1);
+    expect(screen.getAllByText("Couldn't read these saves")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Pending reel" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Failed reel" })).toBeTruthy();
   });
 
   it("expands processing saves without labeling them as missing places", () => {

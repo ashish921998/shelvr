@@ -28,7 +28,7 @@ describe("cityRows", () => {
     ]);
   });
 
-  it("deduplicates shared places without leaving duplicate save rows, and keeps unlocated saves", () => {
+  it("deduplicates shared places while keeping every source save reachable", () => {
     const pin = { name: "Micho", lat: 48.866, lng: 2.337 };
     const saves = [
       { _id: "newer", placePins: [pin] },
@@ -43,6 +43,7 @@ describe("cityRows", () => {
         name: "Micho",
         item: saves[0],
       },
+      { id: "older", number: undefined, name: undefined, item: saves[1] },
       { id: "unlocated", number: undefined, name: undefined, item: saves[2] },
       { id: "empty", number: undefined, name: undefined, item: saves[3] },
     ]);

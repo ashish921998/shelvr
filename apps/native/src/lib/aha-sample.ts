@@ -14,8 +14,6 @@ export type AhaSample = {
   city: SampleCityId;
   /** The spots as one day on the city's map. */
   trip: SampleTrip;
-  /** A real public reel, credited to its creator and queued as the first save once the account has Pro. */
-  source: "reel";
   /** "@handle". */
   creator: string;
   videoCode: string;
@@ -59,7 +57,6 @@ export function ahaSample(
     kind,
     city: plan.city,
     trip,
-    source: "reel",
     creator: `@${reel.handle}`,
     videoCode: reel.code,
     firstSaveUrl: ahaReelUrl(reel),
