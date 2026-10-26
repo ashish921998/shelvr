@@ -88,11 +88,12 @@ export default function MapScreen() {
   const framed = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
-      framedPins(busiestCityPlaces(all ?? [])).map((place) => ({
+      // Framed from the filter's places, so a filter with none in view can bring them in.
+      framedPins(busiestCityPlaces(shown)).map((place) => ({
         ...place,
         id: placeId(place),
       })),
-    [all],
+    [shown],
   );
 
   const reported = useRef(false);

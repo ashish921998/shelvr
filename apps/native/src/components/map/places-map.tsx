@@ -48,7 +48,10 @@ export function PlacesMap({
   onSelect,
 }: Props) {
   const { theme, rt } = useUnistyles();
-  const ref = useRef<AppleMaps.MapView>(null);
+  const appleRef = useRef<AppleMaps.MapView>(null);
+  const googleRef = useRef<GoogleMaps.MapView>(null);
+  // Whichever map this platform rendered.
+  const map = () => appleRef.current ?? googleRef.current;
   const { width, height } = rt.screen;
 
   const fit = useMemo(() => {
@@ -93,7 +96,7 @@ export function PlacesMap({
     centredOnUser.current = true;
     const showCity = () => {
       if (fit)
-        ref.current
+        map()
           ?.setCameraPosition(fit)
           .catch((error: unknown) =>
             analytics.captureError("places_map_camera_failed", error),
@@ -106,7 +109,7 @@ export function PlacesMap({
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
     const cancel = moveCamera(
-      () => ref.current?.setCameraPosition().then(waitForRest),
+      () => map()?.setCameraPosition().then(waitForRest),
       (error) => {
         checkNearby.current = undefined;
         analytics.captureError("places_map_camera_failed", error);
@@ -132,7 +135,7 @@ export function PlacesMap({
     checkNearby.current = undefined;
     return moveCamera(
       () =>
-        ref.current?.setCameraPosition({
+        map()?.setCameraPosition({
           coordinates: { latitude: focus.lat, longitude: focus.lng },
           zoom: FOCUS_ZOOM,
         }),
@@ -140,14 +143,40 @@ export function PlacesMap({
     );
   }, [focus]);
 
+  // A new filter whose places are all out of reach brings them into view, unless the opening move
+  // is still deciding where to go. Search does not refit: picking a result flies to it.
+  const fitted = useRef(fit);
+  useEffect(() => {
+    if (fit === fitted.current) return;
+    fitted.current = fit;
+    if (!fit || checkNearby.current || hasPlaceNear(centre.current, pins))
+      return;
+    map()
+      ?.setCameraPosition(fit)
+      .catch((error: unknown) =>
+        analytics.captureError("places_map_camera_failed", error),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new framing moves the camera; search narrowing pins must not
+  }, [fit]);
+
   const select = (id: string | undefined) => {
     if (id) onSelect(id);
+  };
+  const trackCamera = (event: {
+    coordinates: { latitude?: number; longitude?: number };
+  }) => {
+    const { latitude, longitude } = event.coordinates;
+    centre.current =
+      latitude !== undefined && longitude !== undefined
+        ? { lat: latitude, lng: longitude }
+        : undefined;
+    if (checkNearby.current) waitForRest();
   };
 
   if (process.env.EXPO_OS === "ios") {
     return (
       <AppleMaps.View
-        ref={ref}
+        ref={appleRef}
         style={styles.map}
         cameraPosition={firstCamera}
         colorScheme={
@@ -167,19 +196,13 @@ export function PlacesMap({
           tintColor: theme.colors.primary,
         }))}
         onMarkerClick={(marker) => select(marker.id)}
-        onCameraMove={(event) => {
-          const { latitude, longitude } = event.coordinates;
-          centre.current =
-            latitude !== undefined && longitude !== undefined
-              ? { lat: latitude, lng: longitude }
-              : undefined;
-          if (checkNearby.current) waitForRest();
-        }}
+        onCameraMove={trackCamera}
       />
     );
   }
   return (
     <GoogleMaps.View
+      ref={googleRef}
       style={styles.map}
       cameraPosition={firstCamera}
       markers={pins.map((pin) => ({
@@ -188,6 +211,7 @@ export function PlacesMap({
         title: pin.name,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
+      onCameraMove={trackCamera}
     />
   );
 }
