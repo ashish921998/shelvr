@@ -29,7 +29,8 @@ export function tripSaveCount(
   let count = saveCount;
   if (city !== undefined) {
     const named = cities.reduce((sum, c) => sum + c.count, 0);
-    const own = cities.find((c) => c.city === city)?.count ?? 0;
+    const own =
+      cities.find((c) => cityKey(c.city) === cityKey(city))?.count ?? 0;
     count = Math.min(saveCount, own + Math.max(0, saveCount - named));
   }
   return Math.min(count, MAX_PLAN_ITEMS);
