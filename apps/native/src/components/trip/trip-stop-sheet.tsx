@@ -1,5 +1,4 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { slotLabel } from "@/components/trip/trip-day-panel";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn, motion } from "@/lib/motion";
@@ -143,10 +142,7 @@ export function TripStopSheet({
           style={styles.text}
         >
           <ThemedText variant="captionStrong" style={{ color }}>
-            {t("trip.stopEyebrow", {
-              number: String(index + 1),
-              slot: slotLabel(stop.slot),
-            })}
+            {t("trip.stopEyebrow", { number: String(index + 1) })}
           </ThemedText>
           <ThemedText variant="title" numberOfLines={2}>
             {stop.name}

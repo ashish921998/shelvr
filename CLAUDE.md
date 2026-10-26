@@ -312,7 +312,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   and groups nearby stops into days at the selected pace (`model/trip.ts`, pure).
   It does not send saves or visit history to Gemini or infer new places from raw text.
   Without a stored time-of-day category, stops use the existing "any"/afternoon slot;
-  lunch and dinner remain open gaps. An empty selection leaves the previous trip intact.
+  the app shows neither that slot nor the lunch and dinner gaps, since neither is known. An empty selection leaves the previous trip intact.
   `tripData.ts` stores the trip and serves `getSpaceTrip` / `tripCities`; swaps also skip
   wishlist places marked visited after the trip was made. Explicit non-saved memberships
   are excluded from selection, display and swaps. Stored city-less stops still use their

@@ -19,6 +19,7 @@ import {
   TRIP_PANEL_SHARE,
   useBuildTrip,
   type StopPick,
+  useCityPlaceCount,
   type TripRequest,
 } from "@/lib/trip";
 import { api } from "@convex/_generated/api";
@@ -88,6 +89,7 @@ export default function TripScreen() {
   const { data: cities } = useQuery(
     convexQuery(api.tripData.tripCities, { spaceId }),
   );
+  const placeCount = useCityPlaceCount(tappedCity);
   const { state, build, reset } = useBuildTrip(spaceId, locale);
   const swapTripStop = useMutation(api.tripData.swapTripStop);
   const { isVisited, toggle: toggleVisited } = usePlaceVisits();
@@ -230,6 +232,8 @@ export default function TripScreen() {
           <TripPlanForm
             saveCount={savedCount}
             cities={cities}
+            fixedCity={tappedCity}
+            placeCount={placeCount}
             initial={
               lastRequest ??
               (trip

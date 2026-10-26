@@ -7,14 +7,12 @@ import {
   tripDayDate,
   type Trip,
   type TripDayView,
-  type TripSlot,
   type TripStopView,
 } from "@/lib/trip";
 import { Image } from "expo-image";
 import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeOut,
   LinearTransition,
@@ -32,28 +30,6 @@ const rowIn = (index: number) =>
   FadeInDown.duration(motion.duration.enter)
     .delay(index * STAGGER_MS)
     .easing(motion.easing.out);
-
-export function slotLabel(slot: TripSlot): string {
-  switch (slot) {
-    case "morning":
-      return t("trip.slotMorning");
-    case "lunch":
-      return t("trip.slotLunch");
-    case "afternoon":
-      return t("trip.slotAfternoon");
-    case "dinner":
-      return t("trip.slotDinner");
-    case "evening":
-      return t("trip.slotEvening");
-  }
-}
-
-function gapLabel(gap: TripSlot, area: string | undefined): string {
-  if (gap === "lunch") {
-    return area ? t("trip.gapLunchNear", { area }) : t("trip.gapLunch");
-  }
-  return area ? t("trip.gapDinnerNear", { area }) : t("trip.gapDinner");
-}
 
 function dayTitle(day: TripDayView, index: number): string {
   const number = String(index + 1);
@@ -84,7 +60,7 @@ function StopRow({
     <Animated.View entering={entering} exiting={ROW_OUT} layout={REFLOW}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${index + 1}. ${stop.name}, ${slotLabel(stop.slot)}`}
+        accessibilityLabel={`${index + 1}. ${stop.name}`}
         onPress={onPress}
         style={({ pressed }) => [styles.stop, pressed && styles.pressed]}
       >
@@ -98,7 +74,7 @@ function StopRow({
             {stop.name}
           </ThemedText>
           <ThemedText variant="caption" numberOfLines={1} style={styles.muted}>
-            {`${slotLabel(stop.slot)} · ${stop.why}`}
+            {stop.why}
           </ThemedText>
         </View>
         {stop.cover ? (
@@ -173,20 +149,6 @@ export function TripDayPanel({
               onPress={() => onSelectStop(index)}
             />
           ))}
-          {day.gaps.map((gap, i) => (
-            <Animated.View
-              key={`gap-${activeDay}-${gap}`}
-              entering={FadeIn.duration(motion.duration.enter)
-                .delay((day.stops.length + i) * STAGGER_MS)
-                .easing(motion.easing.out)}
-              layout={REFLOW}
-              style={styles.gap}
-            >
-              <ThemedText variant="caption" style={styles.muted}>
-                {gapLabel(gap, day.areas[0])}
-              </ThemedText>
-            </Animated.View>
-          ))}
         </Animated.View>
       ) : null}
     </View>
@@ -241,15 +203,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   thumbEmpty: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-  },
-  gap: {
-    marginTop: theme.gap(1),
-    paddingVertical: theme.gap(1.25),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderStyle: "dashed",
     borderColor: theme.colors.border,
   },
   pressed: {

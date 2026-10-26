@@ -385,21 +385,12 @@
     "other": "%{formattedCount} stops"
   },
   "trip.emptyDay": "Nothing saved fits this day yet. Save a few more places and plan again.",
-  "trip.slotMorning": "Morning",
-  "trip.slotLunch": "Lunch",
-  "trip.slotAfternoon": "Afternoon",
-  "trip.slotDinner": "Dinner",
-  "trip.slotEvening": "Evening",
-  "trip.gapLunch": "No saved lunch spot for this day",
-  "trip.gapLunchNear": "No saved lunch spot near %{area}",
-  "trip.gapDinner": "No saved dinner spot for this day",
-  "trip.gapDinnerNear": "No saved dinner spot near %{area}",
   "trip.wishlistCount": {
     "one": "%{formattedCount} more saved place didn't fit",
     "other": "%{formattedCount} more saved places didn't fit"
   },
   "trip.change": "Change trip",
-  "trip.stopEyebrow": "Stop %{number} · %{slot}",
+  "trip.stopEyebrow": "Stop %{number}",
   "trip.yourSave": "Your save",
   "trip.yourSaveBy": "Your save · %{creator}",
   "trip.openSave": "Open the save",

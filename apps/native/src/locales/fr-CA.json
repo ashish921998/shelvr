@@ -393,22 +393,13 @@
     "other": "%{formattedCount} étapes"
   },
   "trip.emptyDay": "Rien d’enregistré ne convient encore à ce jour. Enregistrez quelques lieux de plus et replanifiez.",
-  "trip.slotMorning": "Matin",
-  "trip.slotLunch": "Déjeuner",
-  "trip.slotAfternoon": "Après-midi",
-  "trip.slotDinner": "Dîner",
-  "trip.slotEvening": "Soirée",
-  "trip.gapLunch": "Aucune adresse enregistrée pour déjeuner ce jour-là",
-  "trip.gapLunchNear": "Aucune adresse enregistrée pour déjeuner près de %{area}",
-  "trip.gapDinner": "Aucune adresse enregistrée pour dîner ce jour-là",
-  "trip.gapDinnerNear": "Aucune adresse enregistrée pour dîner près de %{area}",
   "trip.wishlistCount": {
     "one": "%{formattedCount} autre lieu enregistré n’a pas trouvé de place",
     "many": "%{formattedCount} autres lieux enregistrés n’ont pas trouvé de place",
     "other": "%{formattedCount} autres lieux enregistrés n’ont pas trouvé de place"
   },
   "trip.change": "Modifier le voyage",
-  "trip.stopEyebrow": "Étape %{number} · %{slot}",
+  "trip.stopEyebrow": "Étape %{number}",
   "trip.yourSave": "Votre enregistrement",
   "trip.yourSaveBy": "Votre enregistrement · %{creator}",
   "trip.openSave": "Ouvrir l’enregistrement",
