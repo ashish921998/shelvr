@@ -383,6 +383,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Design tokens live in `src/unistyles.ts` (type, spacing, color, controls) and motion in
   `src/lib/motion.ts`. Read [design system](docs/architecture/design-system.md) before adding
   UI, and [display font](docs/architecture/display-font.md) before touching the title face.
+- `modules/place-card` hosts Google Places UI Kit cards below the numbered city rows on iOS,
+  retaining Apple Maps and Google's built-in photo attribution. `GOOGLE_PLACES_IOS_API_KEY`
+  is an optional build-time iOS-restricted key with Places API (New) enabled; absent keys,
+  older binaries, and unmatched venues retain the text row. The native module requires a fresh build.
 - To run a branch or worktree on a simulator (Metro port, dev client link, sign-in, fixtures,
   forcing onboarding or the paywall), read [local QA](docs/architecture/local-qa.md) first.
 - Expo Router under `src/app`, with `(auth)` and `(app)` groups

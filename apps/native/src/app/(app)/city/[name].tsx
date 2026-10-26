@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { GooglePlaceCard } from "../../../../modules/place-card";
 
 const MAP_SHARE = 0.4;
 
@@ -154,23 +155,34 @@ export default function CityScreen() {
           }
           renderItem={({ item: row }) => {
             const { item, number } = row;
+            const pin = number === undefined ? undefined : pins[number - 1];
             return (
-              <SaveRow
-                item={item}
-                placeName={row.name}
-                number={number}
-                selected={selected === row.id}
-                // First select the place's pin; a second tap opens its source save.
-                onPress={
-                  number !== undefined && selected !== row.id
-                    ? () => select(row.id)
-                    : () =>
-                        router.push({
-                          pathname: "/item/[id]",
-                          params: { id: item._id },
-                        })
-                }
-              />
+              <View>
+                <SaveRow
+                  item={item}
+                  placeName={row.name}
+                  number={number}
+                  selected={selected === row.id}
+                  // First select the place's pin; a second tap opens its source save.
+                  onPress={
+                    number !== undefined && selected !== row.id
+                      ? () => select(row.id)
+                      : () =>
+                          router.push({
+                            pathname: "/item/[id]",
+                            params: { id: item._id },
+                          })
+                  }
+                />
+                {pin ? (
+                  <GooglePlaceCard
+                    key={row.id}
+                    placeName={pin.name}
+                    latitude={pin.lat}
+                    longitude={pin.lng}
+                  />
+                ) : null}
+              </View>
             );
           }}
           ListEmptyComponent={

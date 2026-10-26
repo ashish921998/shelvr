@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 25, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 26, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -113,6 +113,17 @@ export default function PrivacyPage() {
           saved collection and visit history are not sent to Gemini to make
           these plans. Shelvr sends place names to Apple Maps to locate trip
           stops; it does not track your live location.
+        </p>
+        <p className="mt-2">
+          When Google place cards are available on a city page, your device
+          sends the saved place names and their map coordinates to Google Maps
+          Platform to match venues and display their photos and details. These
+          are the saved places’ coordinates, not your live location. Google
+          handles these requests under its{" "}
+          <a href="https://policies.google.com/privacy" className="underline">
+            Privacy Policy
+          </a>
+          .
         </p>
         <p className="mt-2">
           AI processing is part of saving content in Shelvr. It runs

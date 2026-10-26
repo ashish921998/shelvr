@@ -120,6 +120,9 @@ module.exports = ({ config }) => ({
       INAlternativeAppNames: [
         { INAlternativeAppName: appConfig.expo.name ?? "Shelvr" },
       ],
+      ...(process.env.GOOGLE_PLACES_IOS_API_KEY
+        ? { ShelvrGooglePlacesApiKey: process.env.GOOGLE_PLACES_IOS_API_KEY }
+        : {}),
       ...(isProduction
         ? {
             NSAppTransportSecurity: {

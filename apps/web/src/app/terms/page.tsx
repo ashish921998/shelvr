@@ -11,13 +11,28 @@ export const metadata: Metadata = pageMetadata(
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="October 8, 2026">
+    <LegalPage title="Terms of Service" lastUpdated="October 26, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">1. The service</h2>
         <p className="mt-2">
           Shelvr lets you save links, images, and notes and organizes them into
           spaces. By creating an account or using the app you agree to these
           terms.
+        </p>
+        <p className="mt-2">
+          Google place cards are provided by Google Maps Platform. Your use of
+          these cards is also subject to the{" "}
+          <a
+            href="https://maps.google.com/help/terms_maps/"
+            className="underline"
+          >
+            Google Maps/Google Earth Additional Terms of Service
+          </a>{" "}
+          and the{" "}
+          <a href="https://policies.google.com/privacy" className="underline">
+            Google Privacy Policy
+          </a>
+          .
         </p>
       </section>
 

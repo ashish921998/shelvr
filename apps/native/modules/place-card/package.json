@@ -1,0 +1,7 @@
+{
+  "name": "place-card",
+  "version": "1.0.0",
+  "description": "Google Places UI Kit cards alongside the city's Apple map.",
+  "main": "index.tsx",
+  "private": true
+}
