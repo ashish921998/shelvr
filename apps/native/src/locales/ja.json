@@ -490,6 +490,8 @@
   "map.emptyBody": "保存した写真には撮影場所も残ります。\n位置情報のある新しい保存項目がここに表示されます。",
   "navigation.searchHeader": "検索",
   "search.placeholder": "保存した項目を検索",
+  "search.clear": "検索をクリア",
+  "search.resultLimit": "最大50件の結果を表示しています。場所の名前で検索して絞り込んでください。",
   "search.emptyTitle": "何でも見つかる",
   "search.emptyBody": "メモの本文と、Shelvrが付けたタイトル、\nタグ、説明を検索します。",
   "search.noResultsTitle": "まだありません",

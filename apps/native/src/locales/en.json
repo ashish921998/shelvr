@@ -497,6 +497,8 @@
   "map.emptyBody": "Photos you save keep the place they were taken.\nNew saves with location data will show up here.",
   "navigation.searchHeader": "search",
   "search.placeholder": "Search your saves",
+  "search.clear": "Clear search",
+  "search.resultLimit": "Showing up to 50 results. Search a place name to narrow it down.",
   "search.emptyTitle": "Find anything",
   "search.emptyBody": "Search goes through your notes and the\ntitles, tags, and descriptions Shelvr wrote.",
   "search.noResultsTitle": "Nothing yet",

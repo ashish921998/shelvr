@@ -506,6 +506,8 @@
   "map.emptyBody": "As fotos salvas mantêm o local onde foram tiradas.\nNovos conteúdos com localização aparecerão aqui.",
   "navigation.searchHeader": "buscar",
   "search.placeholder": "Busque seus conteúdos",
+  "search.clear": "Limpar busca",
+  "search.resultLimit": "Mostrando até 50 resultados. Busque pelo nome de um lugar para refinar a busca.",
   "search.emptyTitle": "Encontre qualquer coisa",
   "search.emptyBody": "A busca percorre suas notas e os títulos,\netiquetas e descrições escritos pelo Shelvr.",
   "search.noResultsTitle": "Ainda nada",

@@ -506,6 +506,8 @@
   "map.emptyBody": "Vos photos enregistrées conservent leur lieu de prise de vue.\nLes nouveaux contenus géolocalisés apparaîtront ici.",
   "navigation.searchHeader": "recherche",
   "search.placeholder": "Rechercher dans vos contenus",
+  "search.clear": "Effacer la recherche",
+  "search.resultLimit": "Jusqu’à 50 résultats affichés. Recherchez un nom de lieu pour préciser la recherche.",
   "search.emptyTitle": "Retrouvez tout",
   "search.emptyBody": "La recherche parcourt vos notes et les titres,\nétiquettes et descriptions créés par Shelvr.",
   "search.noResultsTitle": "Rien pour le moment",

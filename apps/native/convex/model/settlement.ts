@@ -197,6 +197,9 @@ export function completionPatch(
     failureReason: undefined,
     searchText: buildSearchText({
       title,
+      cities: words.cities ?? item.cities,
+      places: words.places ?? item.places,
+      placePins: item.placePins,
       description: words.description,
       tags: words.tags,
       siteName: reading.siteName,

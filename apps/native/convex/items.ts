@@ -73,7 +73,7 @@ import { aiConsentRequiredError } from "./model/aiConsent";
 import { nextUpKind } from "./model/nextUp";
 import { openedTooRecently, reminderSubject } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
-import { buildSearchText } from "./model/searchText";
+import { buildSearchText, searchQueryText } from "./model/searchText";
 import {
   hasSimilarSignal,
   rankSimilar,
@@ -577,20 +577,55 @@ export const getItem = authedQuery({
 
 export const searchItems = authedQuery({
   args: { query: v.string() },
-  returns: v.array(enrichedItemValidator),
+  returns: v.array(
+    enrichedItemValidator.extend({
+      places: v.optional(v.array(v.string())),
+    }),
+  ),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    const trimmed = args.query.trim();
-    if (trimmed === "") {
+    const query = searchQueryText(args.query);
+    if (query === "") {
       return [];
     }
     const items = await ctx.db
       .query("items")
       .withSearchIndex("search_text", (q) =>
-        q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
+        q.search("searchText", query).eq("userId", userId),
       )
       .take(50);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await Promise.all(
+      items.map(async (item) => ({
+        ...(await enrichItem(ctx, item)),
+        places: item.places,
+      })),
+    );
+  },
+});
+
+/** Run once after deploying city/place search; safe to restart from a null cursor. */
+export const backfillPlaceSearch = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("items").paginate({
+      cursor,
+      numItems: 25,
+      maximumBytesRead: 2 * 1024 * 1024,
+    });
+    for (const item of batch.page) {
+      if (!(await liveOwner(ctx, item.userId))) continue;
+      const searchText = buildSearchText(item);
+      if (searchText !== item.searchText) {
+        await ctx.db.patch(item._id, { searchText });
+      }
+    }
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
   },
 });
 
@@ -1668,7 +1703,10 @@ export const updateNoteItem = authedMutation({
       titleSource: typedTitle !== "" ? "user" : undefined,
       searchText: buildSearchText({
         title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
+        placePins: item.placePins,
         tags: item.tags,
         note: text,
         content: item.content,
@@ -2214,7 +2252,10 @@ export const setEmbeddingsInternal = internalMutation({
 
       const nextSearchText = buildSearchText({
         title: item.title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
+        placePins: item.placePins,
         tags: item.tags,
         siteName: item.siteName,
         note: item.note,
