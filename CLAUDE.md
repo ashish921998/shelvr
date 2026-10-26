@@ -338,6 +338,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
+- **`reelPlaces.ts`** (`"use node"` action): the web reel place finder. The internal `find`
+  action reads one public Instagram or TikTok link with `readPage`, asks the model for the
+  places its caption names, and drops any the text never mentions (`model/reelPlaces.ts`).
+  Nothing is stored. Reached only through the `/reel-places` HTTP route, which
+  `apps/web/src/app/api/reel-places` calls; `oracleLimits.claimReelPlaces` is its rate limit.
 - **`oracle.ts`**, **`oracleLimits.ts`**: the web Oracle. The internal `consult` action reads
   pages and makes one model call inside the web route's deadline; `claim` is its rate limit.
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
@@ -387,6 +392,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Next.js App Router marketing site only (no auth or product UI); server routes may call Convex
   for marketing forms such as platform waitlists
 - Landing page at `/`. The product experience lives in the native app
+- Free tool pages for search traffic, each with one App Store button: `/reel-place-finder`
+  takes a pasted Instagram reel or TikTok link and lists the places its caption names, with
+  Apple Maps and Google Maps links (`src/lib/reelPlaces.ts`). It posts to `/api/reel-places`,
+  which forwards to the Convex `/reel-places` route (`reelPlaces.ts`, the same shared-secret
+  and per-IP limits as the Oracle) and stores nothing
 
 ### Native (`apps/native`)
 

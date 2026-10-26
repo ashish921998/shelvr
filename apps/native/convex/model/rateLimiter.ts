@@ -60,6 +60,13 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   feedbackSubmit: { kind: "token bucket", rate: 6, period: DAY, capacity: 3 },
   oracleIp: { kind: "token bucket", rate: 10, period: HOUR, capacity: 4 },
+  reelPlacesIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  reelPlacesGlobal: {
+    kind: "token bucket",
+    rate: 60,
+    period: MINUTE,
+    capacity: 30,
+  },
   oracleGlobal: {
     kind: "token bucket",
     rate: 120,
