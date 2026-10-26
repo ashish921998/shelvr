@@ -746,6 +746,7 @@
     "one": "%{formattedCount} Ort aus deinen Inhalten",
     "other": "%{formattedCount} Orte aus deinen Inhalten"
   },
+  "cityMap.placeDetails": "Ortsdetails zu %{name}",
   "opener.tagline": "Speichere die Orte. Wir planen das Date oder die Reise.",
   "onboardingQ.skip": "Überspringen",
   "onboardingQ.savedTitle": "Wie viele Orte hast du gespeichert?",

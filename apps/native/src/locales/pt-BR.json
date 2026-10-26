@@ -767,6 +767,7 @@
     "many": "%{formattedCount} lugares dos seus salvos",
     "other": "%{formattedCount} lugares dos seus salvos"
   },
+  "cityMap.placeDetails": "Detalhes de %{name}",
   "opener.tagline": "Salve os lugares. A gente planeja o encontro ou a viagem.",
   "onboardingQ.skip": "Pular",
   "onboardingQ.savedTitle": "Quantos lugares você já salvou?",

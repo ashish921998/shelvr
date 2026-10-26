@@ -3,14 +3,19 @@ import { SaveRow } from "@/components/city/save-row";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
+import {
+  canOpenPlaceCard,
+  cancelPlaceDetails,
+  openPlaceDetails,
+} from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -69,6 +74,17 @@ export default function CityScreen() {
   const router = useRouter();
   const { theme, rt } = useUnistyles();
   const { name } = useLocalSearchParams<{ name: string }>();
+  // A place card's Apple lookup can finish after the user has left; it must not present or navigate then.
+  const focused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      focused.current = true;
+      return () => {
+        focused.current = false;
+        cancelPlaceDetails();
+      };
+    }, []),
+  );
   const city = name ?? "";
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan(city);
@@ -154,6 +170,14 @@ export default function CityScreen() {
           }
           renderItem={({ item: row }) => {
             const { item } = row;
+            const appleId = row.kind === "place" ? row.pin.appleId : undefined;
+            const openSave = () => {
+              if (!focused.current) return;
+              router.push({
+                pathname: "/item/[id]",
+                params: { id: item._id },
+              });
+            };
             return (
               <SaveRow
                 item={item}
@@ -164,11 +188,12 @@ export default function CityScreen() {
                 onPress={
                   row.kind === "place" && selected !== row.id
                     ? () => select(row.id)
-                    : () =>
-                        router.push({
-                          pathname: "/item/[id]",
-                          params: { id: item._id },
-                        })
+                    : openSave
+                }
+                onPlaceDetails={
+                  appleId !== undefined && canOpenPlaceCard(appleId)
+                    ? () => void openPlaceDetails(appleId, openSave)
+                    : undefined
                 }
               />
             );

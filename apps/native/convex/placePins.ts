@@ -36,7 +36,13 @@ const MAX_PINS = MAX_ITEM_PLACES;
 const BACKFILL_PAGE = 100;
 const BACKFILL_STAGGER_MS = 250;
 
-type Pin = { name: string; lat: number; lng: number; city?: string };
+type Pin = {
+  name: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  appleId?: string;
+};
 
 /** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
 function lookupCity(cities: string[]): string | undefined {
@@ -60,6 +66,7 @@ function inSourceCity(pin: Pin, cities: string[]): Pin {
     lat: pin.lat,
     lng: pin.lng,
     ...(city ? { city } : {}),
+    ...(pin.appleId ? { appleId: pin.appleId } : {}),
   };
 }
 
@@ -154,6 +161,16 @@ export const toLocate = internalQuery({
   },
 });
 
+/** A lookup that finds the same spot without an id keeps the stored one; a moved pin does not. */
+function keepAppleId(stored: Pin | undefined, found: Pin): Pin {
+  return found.appleId === undefined &&
+    stored?.appleId !== undefined &&
+    stored.lat === found.lat &&
+    stored.lng === found.lng
+    ? { ...found, appleId: stored.appleId }
+    : found;
+}
+
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -167,7 +184,11 @@ export const storePins = internalMutation({
     const next = new Map<string, Pin>();
     for (const pin of [...(item.placePins ?? []), ...args.found]) {
       const key = placeKey(normalizePlaceName(pin.name, item.cities));
-      if (wanted.has(key)) next.set(key, inSourceCity(pin, item.cities ?? []));
+      if (wanted.has(key))
+        next.set(
+          key,
+          keepAppleId(next.get(key), inSourceCity(pin, item.cities ?? [])),
+        );
     }
     const city = lookupCity(item.cities ?? []);
     const pins = nearEachOther([...next.values()], city).slice(0, MAX_PINS);
@@ -179,7 +200,8 @@ export const storePins = internalMutation({
           pin.name === before[i].name &&
           pin.lat === before[i].lat &&
           pin.lng === before[i].lng &&
-          pin.city === before[i].city,
+          pin.city === before[i].city &&
+          pin.appleId === before[i].appleId,
       );
     const places =
       item.places === undefined
@@ -253,6 +275,7 @@ async function lookUp(
             lat: at.lat,
             lng: at.lng,
             ...(city ? { city } : at.city ? { city: at.city } : {}),
+            ...(at.appleId ? { appleId: at.appleId } : {}),
           },
         ],
   );

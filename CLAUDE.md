@@ -308,6 +308,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
   and `storePins` writes at most 30, dropping any place no longer named.
+  Each pin also keeps Apple's place id (`appleId`) when the search result carried one.
   Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,
   Apple locality is used only when it matches a source-declared city; unmatched pins remain unassigned.
   Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
@@ -404,7 +405,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
   city's saves, plus a row for every save not represented by a place row, with Plan a date
-  and Plan a trip
+  and Plan a trip. A selected place row shows an info button that opens Apple's place card
+  (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active

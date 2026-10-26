@@ -6,6 +6,7 @@ export type CityPin = {
   name: string;
   lat: number;
   lng: number;
+  appleId?: string;
   number: number;
 };
 
@@ -17,7 +18,12 @@ export function cityPinId(pin: Omit<CityPin, "number">): string {
 export function cityPins(
   saves: {
     _id: string;
-    placePins?: { name: string; lat: number; lng: number }[];
+    placePins?: {
+      name: string;
+      lat: number;
+      lng: number;
+      appleId?: string;
+    }[];
   }[],
 ): CityPin[] {
   return uniquePlacePins(
