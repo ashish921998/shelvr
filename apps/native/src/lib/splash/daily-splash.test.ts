@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { claimDailySplash, localDay } from "./daily-splash";
+import {
+  localDay,
+  playedSplashToday,
+  recordSplashPlayed,
+} from "./daily-splash";
 
 const storage = vi.hoisted(() => ({
   values: new Map<string, string>(),
@@ -29,26 +33,32 @@ beforeEach(() => {
   captureError.mockClear();
 });
 
-describe("claimDailySplash", () => {
-  it("plays on the first launch of a day and not again that day", () => {
+describe("daily splash", () => {
+  it("plays until today's splash is recorded, then not again that day", () => {
     const morning = new Date(2026, 9, 22, 8, 0);
     const evening = new Date(2026, 9, 22, 23, 59);
-    expect(claimDailySplash(morning)).toBe(true);
-    expect(claimDailySplash(morning)).toBe(false);
-    expect(claimDailySplash(evening)).toBe(false);
+    expect(playedSplashToday(morning)).toBe(false);
+    expect(playedSplashToday(morning)).toBe(false);
+    recordSplashPlayed(morning);
+    expect(playedSplashToday(morning)).toBe(true);
+    expect(playedSplashToday(evening)).toBe(true);
   });
 
   it("plays again on the next local day", () => {
-    expect(claimDailySplash(new Date(2026, 9, 22, 23, 59))).toBe(true);
-    expect(claimDailySplash(new Date(2026, 9, 23, 0, 1))).toBe(true);
+    recordSplashPlayed(new Date(2026, 9, 22, 23, 59));
+    expect(playedSplashToday(new Date(2026, 9, 23, 0, 1))).toBe(false);
   });
 
   it("plays when storage fails, rather than never", () => {
     storage.failing = true;
-    expect(claimDailySplash(new Date(2026, 9, 22, 8, 0))).toBe(true);
-    expect(claimDailySplash(new Date(2026, 9, 22, 9, 0))).toBe(true);
+    recordSplashPlayed(new Date(2026, 9, 22, 8, 0));
+    expect(playedSplashToday(new Date(2026, 9, 22, 9, 0))).toBe(false);
     expect(captureError).toHaveBeenCalledWith(
-      "splash_daily_claim_failed",
+      "splash_daily_record_failed",
+      expect.any(Error),
+    );
+    expect(captureError).toHaveBeenCalledWith(
+      "splash_daily_read_failed",
       expect.any(Error),
     );
   });

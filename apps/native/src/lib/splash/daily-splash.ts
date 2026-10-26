@@ -18,19 +18,28 @@ export function localDay(now: Date): string {
 }
 
 /**
- * True the first time it is asked on a given local day, and records that day.
- * The splash plays then; later launches that day go straight to the app. If
- * storage fails, it answers true, so the worst case is the old behaviour.
+ * Whether the splash already played today. The splash plays when this is
+ * false. If storage fails it answers false, so the worst case is the old
+ * behaviour of playing on every launch.
  */
-export function claimDailySplash(now = new Date()): boolean {
-  const today = localDay(now);
+export function playedSplashToday(now = new Date()): boolean {
   try {
-    const store = splashStore();
-    if (store.getString(LAST_PLAYED_DAY) === today) return false;
-    store.set(LAST_PLAYED_DAY, today);
+    return splashStore().getString(LAST_PLAYED_DAY) === localDay(now);
   } catch (error) {
-    // Play the splash rather than skip it on a storage error.
-    analytics.captureError("splash_daily_claim_failed", error);
+    analytics.captureError("splash_daily_read_failed", error);
+    return false;
   }
-  return true;
+}
+
+/**
+ * Records today's splash. Called once the splash has finished or been
+ * skipped, so a launch a deep link takes over mid-splash leaves the day's
+ * showing for a later launch.
+ */
+export function recordSplashPlayed(now = new Date()): void {
+  try {
+    splashStore().set(LAST_PLAYED_DAY, localDay(now));
+  } catch (error) {
+    analytics.captureError("splash_daily_record_failed", error);
+  }
 }
