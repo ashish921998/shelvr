@@ -40,10 +40,11 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Content you save.</strong> For each link you save, such as a
-            reel or TikTok, we store the URL, the caption or extracted page
-            text, a copy of its cover image, its title, description and tags,
-            the places found in it with their map locations, and your plans, in
-            our backend (Convex) so they sync to your devices. We do not store
+            reel or TikTok, we store the URL and, when they are available, the
+            caption or extracted page text, a copy of its cover image, its
+            title, description and tags, and the places found in it with their
+            map locations. We also store the plans you make. All of this is kept
+            in our backend (Convex) so it syncs to your devices. We do not store
             the video itself. Earlier versions of the app also let you save
             notes and photos; those stay in your account until you delete them.
           </li>
