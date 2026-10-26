@@ -6,7 +6,7 @@ const SITE = "https://shelvr-web.vercel.app";
 const PAGES = [
   "/",
   "/oracle",
-  "/instagram-saved-posts-viewer",
+  "/reel-place-finder",
   "/support",
   "/privacy",
   "/terms",

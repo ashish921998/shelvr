@@ -14,7 +14,6 @@ type AppStoreLinkSource =
   | "oracle"
   | "plan"
   | "bio"
-  | "ig_tool"
   | "place_tool";
 
 export function useArrivalCampaign(fallback: string) {

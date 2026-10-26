@@ -8,7 +8,7 @@ export type ReelPlaces = {
   city?: string;
 };
 
-export const MAX_PLACES = 30;
+const MAX_PLACES = 30;
 
 const REEL_HOSTS = ["instagram.com", "tiktok.com"];
 

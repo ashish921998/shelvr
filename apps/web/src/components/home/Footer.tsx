@@ -1,10 +1,7 @@
 import Link from "next/link";
 
 const links = [
-  {
-    title: "Instagram saved posts viewer",
-    url: "/instagram-saved-posts-viewer",
-  },
+  { title: "Reel place finder", url: "/reel-place-finder" },
   { title: "Support", url: "/support" },
   { title: "Terms", url: "/terms" },
   { title: "Privacy", url: "/privacy" },
