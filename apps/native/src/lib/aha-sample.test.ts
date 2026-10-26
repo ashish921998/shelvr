@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { ahaReel, ahaReelUrl } from "./aha-reels";
 import { AHA_SPOTS, ahaSample } from "./aha-sample";
 import { SAMPLE_CITY_IDS } from "./sample-cities";
-import { planCities } from "./sample-plans";
 
 const KINDS = ["date", "trip", "weekend"] as const;
 const reels = KINDS.flatMap((kind) =>
@@ -28,20 +27,30 @@ describe("ahaSample", () => {
     },
   );
 
-  it("draws the picked city when the plan covers it, and Prague when not", () => {
-    const [covered] = planCities("date");
-    expect(ahaSample("date", covered).city).toBe(covered);
-    expect(ahaSample("date", null).city).toBe("prague");
-  });
+  it.each(KINDS)(
+    "provides a saveable %s reel even for skipped or unsupported city choices",
+    (kind) => {
+      for (const city of [...SAMPLE_CITY_IDS, null]) {
+        const sample = ahaSample(kind, city);
+        const reel = ahaReel(kind, sample.city);
+        expect(reel).not.toBeNull();
+        expect(sample.firstSaveUrl).toBe(ahaReelUrl(reel!));
+        expect(sample.trip.city).toBe(sample.city);
+        expect(sample.spots.some((spot) => "quote" in spot)).toBe(false);
+      }
+    },
+  );
 
-  it("credits no one on Shelvr's own example, and gives it our caption and a line per spot", () => {
-    const sample = ahaSample("date", "prague");
-    expect(sample).toMatchObject({
-      source: "example",
-      caption: "aha.captionDate",
-    });
-    expect(sample).not.toHaveProperty("creator");
-    expect(sample.spots.every((spot) => "quote" in spot)).toBe(true);
+  it.each([
+    ["lisbon", "austin"],
+    ["prague", "austin"],
+    [null, "austin"],
+    ["new-york", "new-york"],
+    ["chicago", "chicago"],
+  ] as const)("uses %s's expected sample city %s", (selected, expected) => {
+    for (const kind of KINDS) {
+      expect(ahaSample(kind, selected).city).toBe(expected);
+    }
   });
 
   it.each(reels.map((entry) => [entry.kind, entry.city, entry]))(
@@ -49,7 +58,6 @@ describe("ahaSample", () => {
     (kind, city, { reel }) => {
       const sample = ahaSample(kind, city);
       expect(sample).toMatchObject({
-        source: "reel",
         creator: `@${reel.handle}`,
         videoCode: reel.code,
         firstSaveUrl: ahaReelUrl(reel),

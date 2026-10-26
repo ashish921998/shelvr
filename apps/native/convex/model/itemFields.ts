@@ -24,7 +24,12 @@ export const intentValidator = v.object({
 });
 
 export const placePinsValidator = v.array(
-  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+  v.object({
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    city: v.optional(v.string()),
+  }),
 );
 
 export const postMediaValidator = v.object({
@@ -86,7 +91,7 @@ export const MAX_ITEM_TITLE_CHARS = 200;
 
 export const MAX_NOTE_TEXT_CHARS = 100_000;
 
-export const MAX_ITEM_CITIES = 3;
+export const MAX_ITEM_CITIES = 30;
 
 const MAX_CITY_CHARS = 60;
 const NOT_A_CITY = new Set(["unknown", "n/a", "none", "various", "online"]);
@@ -120,15 +125,39 @@ export const MAX_ITEM_PLACES = 30;
 
 const MAX_PLACE_CHARS = 80;
 
-export function normalizePlaces(raw: readonly string[] | undefined): string[] {
+/** A sole source city is lookup context, not part of the venue's name. */
+export function normalizePlaceName(
+  raw: string,
+  cities: readonly string[] = [],
+): string {
+  const place = raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:!?]+$/, "")
+    .trim();
+  const sourceCities = normalizeCities(cities);
+  const comma = place.lastIndexOf(",");
+  if (
+    sourceCities.length === 1 &&
+    comma > 0 &&
+    place
+      .slice(comma + 1)
+      .trim()
+      .toLowerCase() === sourceCities[0].toLowerCase()
+  ) {
+    return place.slice(0, comma).trim();
+  }
+  return place;
+}
+
+export function normalizePlaces(
+  raw: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): string[] {
   const seen = new Set<string>();
   const places: string[] = [];
   for (const entry of raw ?? []) {
-    const place = entry
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/[.,;:!?]+$/, "")
-      .trim();
+    const place = normalizePlaceName(entry, cities);
     const key = place.toLowerCase();
     if (place === "" || place.length > MAX_PLACE_CHARS || seen.has(key)) {
       continue;

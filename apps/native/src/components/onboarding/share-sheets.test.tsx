@@ -12,18 +12,11 @@ import { AppsSheet } from "./share-sheets";
 import { AhaShareStep } from "./aha-share";
 import { AhaReel } from "./aha-reel";
 import { ahaSample } from "@/lib/aha-sample";
-import en from "@/locales/en.json";
 
 type Children = { children?: ReactNode };
 
 vi.mock("@/lib/i18n", () => ({
-  t: (key: string, params?: Record<string, string>) =>
-    key === "aha.exampleDescription"
-      ? en[key].replace(
-          /%\{(\w+)\}/g,
-          (_, name: string) => params?.[name] ?? "",
-        )
-      : key,
+  t: (key: string) => key,
   useAppLocale: () => {},
 }));
 vi.mock("@/lib/motion", () => ({ sheetIn: () => undefined, fadeIn: {} }));
@@ -111,21 +104,16 @@ it("offers Shelvr immediately after More, without a pinning interaction", () => 
 });
 
 it.each(["date", "trip", "weekend"] as const)(
-  "shows the same three %s places in the example post and its map data",
+  "shows a saveable %s reel with matching map data when the selected city has no reel",
   (kind) => {
     const sample = ahaSample(kind, "lisbon");
     render(<AhaReel sample={sample} onShare={vi.fn()} />);
     const image = screen.getByRole("image");
-    expect(image.getAttribute("aria-label")).toBe(
-      `Shelvr example. aha.caption${kind === "date" ? "Date" : kind === "trip" ? "Trip" : "Weekend"}. Places: ${sample.spots[0].name}, ${sample.spots[1].name}, and ${sample.spots[2].name}.`,
-    );
+    expect(image.getAttribute("aria-label")).toBe("aha.sampleBadge");
+    expect(sample.firstSaveUrl).toContain(sample.videoCode);
     expect(sample.spots.map((spot) => spot.name)).toEqual(
       sample.trip.days[0].stops.map((stop) => stop.name),
     );
-    for (const spot of sample.spots) {
-      expect(screen.getByText(spot.name)).toBeTruthy();
-      expect(image.getAttribute("aria-label")).toContain(spot.name);
-    }
   },
 );
 

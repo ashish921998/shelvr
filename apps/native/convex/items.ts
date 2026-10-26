@@ -22,7 +22,12 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
-import { cityKey, countCities, uniquePlacePins } from "./model/trip";
+import {
+  cityKey,
+  countCities,
+  uniquePlacePins,
+  pinsForCity,
+} from "./model/trip";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -329,7 +334,7 @@ export const listCities = authedQuery({
               ),
             )
             .slice(0, CITY_ITEMS_MAX)
-            .flatMap((item) => item.placePins ?? []),
+            .flatMap((item) => pinsForCity(item, city)),
         ).length,
         cover: covers.get(cityKey(city)) ?? null,
       }))
@@ -344,7 +349,11 @@ export const listCityItems = authedQuery({
   returns: v.array(enrichedItemValidator),
   handler: async (ctx, args) => {
     const items = await readyCitySaves(ctx, ctx.userId, args.city);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await Promise.all(
+      items.map((item) =>
+        enrichItem(ctx, { ...item, placePins: pinsForCity(item, args.city) }),
+      ),
+    );
   },
 });
 

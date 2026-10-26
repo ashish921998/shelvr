@@ -131,7 +131,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
   is the shared helper).
   `listCities.count` retains the legacy save count for installed apps; optional
-  `placeCount` is the distinct mapped-place count. New clients hide an absent or
+  `placeCount` is the distinct mapped-place count for that city.
+  City reads filter pins by their resolved city; legacy unlabelled pins are shown only for single-city saves. New clients hide an absent or
   zero place count while retaining the city and its saves.
   Image saves run a three-step, idempotent import: `beginImageImport`, then
   `attachImageUpload`, then `finalizeImageImport`, all keyed on a
@@ -306,9 +307,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
-  and `storePins` writes at most five, dropping any place no longer named. Scheduled from
+  and `storePins` writes at most 30, dropping any place no longer named.
+  Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,
+  Apple locality is used only when it matches a source-declared city; unmatched pins remain unassigned.
+  Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
+  Only source cities can disable single-city outlier rejection; returned localities cannot.
+  Pin lookup never expands `items.cities`; Home creates entries for the cities extracted from the source (up to 30). Scheduled from
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
-  membership carrying a Maps intent is removed or dismissed; `backfillPage` fills older saves, run by hand. Skipped
+  membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older unlabelled pins, run by hand after deployment:
+  `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
   when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
@@ -367,6 +374,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 
 ### Native (`apps/native`)
 
+- The current onboarding share demo always uses a real reel: `src/lib/aha-sample.ts`
+  picks the selected city and goal's reel, or Austin for that goal when no reel exists.
+  Completion queues that exact URL; `useReplayOnboarding` saves it through
+  `createLinkItem` once signed in with Pro, and normal reading and Maps lookup
+  populate Home. The selected city answer stays separate from the sample city.
 - UI localization uses `expo-localization` and the in-house `translate` in `src/lib/i18n-core.ts`,
   which falls back from the locale to its language to English, fills `%{name}` placeholders, and
   picks plural forms with the CLDR rules in `convex/model/localization.ts`. Read
@@ -384,13 +396,15 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities" and a "No place
-  found" section for saves with no city. It loads more saves on scroll, and on its own only
+- `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities",
+  "Finding places…" for processing saves, "Couldn't read these saves" for failed reads,
+  and "No place found" only for finished saves without a city. It loads more saves on scroll, and on its own only
   until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
   shortcuts to removed screens (spaces, search, map, digest, camera) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
-- `city/[name]` is the city page: a map of the city's pinned places on top and a sheet of the
-  city's saves, with Plan a date and Plan a trip
+- `city/[name]` is the city page: a map and numbered rows for distinct places from the
+  city's saves, plus a row for every save not represented by a place row, with Plan a date
+  and Plan a trip
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active

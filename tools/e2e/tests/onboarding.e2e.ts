@@ -71,34 +71,24 @@ test(
 );
 
 test(
-  "personalizes the commitment to the Lisbon trip and keeps confirmation on the same screen",
+  "uses a real Austin trip reel for a city without one and keeps confirmation on the same screen",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
-    for (const place of [
-      "Castelo de São Jorge",
-      "As Bifanas do Afonso",
-      "Praça do Comércio",
-    ]) {
-      await expect(screen.getByRole("image", new RegExp(place))).toBeVisible();
-    }
-    await app.screenshot("lisbon-example-post");
+    await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
+    await app.screenshot("austin-fallback-reel");
     await shareTheSampleReel(screen);
-    await expect(screen.getByText("Lisbon · 3 places")).toBeVisible();
+    await expect(screen.getByText("Austin · 3 places")).toBeVisible();
     await walkToCommitment(screen);
     const promise = screen.getByText(
-      "I’ll visit one saved place on my Lisbon trip.",
+      "I’ll visit one saved place on my Austin trip.",
     );
     await expect(promise).toBeVisible();
-    for (const place of [
-      "Castelo de São Jorge",
-      "As Bifanas do Afonso",
-      "Praça do Comércio",
-    ]) {
+    for (const place of ["Austin Motel", "Heritage Boot Co.", "Jo's Coffee"]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
-    await app.screenshot("lisbon-commitment-before");
+    await app.screenshot("austin-commitment-before");
     const hold = screen.getByRole("button", "Hold to commit");
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await hold.longPress({ duration: 600 });
@@ -113,7 +103,7 @@ test(
     await expect(promise).toBeVisible();
     await expect(screen.getByRole("button", "Continue")).toBeVisible();
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("lisbon-commitment-confirmed");
+    await app.screenshot("austin-commitment-confirmed");
   },
 );
 
@@ -124,27 +114,24 @@ test(
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen);
 
-    for (const place of ["Kampa Park", "Hemingway Bar", "Café Louvre"]) {
-      await expect(screen.getByRole("image", new RegExp(place))).toBeVisible();
-    }
-    await app.screenshot("prague-example-post");
+    await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
+    await app.screenshot("austin-date-reel");
 
     await shareTheSampleReel(screen);
-    // Skipping the city picks Prague, whose Shelvr example names these three. Each name is both a
-    // map pin's title and a row under it, so either one proves the spot landed.
-    await expect(screen.getByText("Prague · 3 places")).toBeVisible({
+    // The skipped city uses a real Austin reel. Each name is both a map pin's title and a row.
+    await expect(screen.getByText("Austin · 3 places")).toBeVisible({
       timeout: 30_000,
     });
-    for (const place of ["Kampa Park", "Hemingway Bar", "Café Louvre"]) {
+    for (const place of ["Eberly", "The Guest House", "Jupiter Supper Club"]) {
       await expect(screen.getByText(place).first()).toBeVisible({
         timeout: 10_000,
       });
     }
     await walkToCommitment(screen);
     await expect(
-      screen.getByText("I’ll visit one place I saved in Prague this week."),
+      screen.getByText("I’ll visit one place I saved in Austin this week."),
     ).toBeVisible();
-    for (const place of ["Kampa Park", "Hemingway Bar", "Café Louvre"]) {
+    for (const place of ["Eberly", "The Guest House", "Jupiter Supper Club"]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
     await app.screenshot("commitment-before");

@@ -704,8 +704,8 @@
   "homePlaces.yourCities": "내 도시",
   "homePlaces.citiesHint": "저장한 릴스와 TikTok에 나온 장소",
   "homePlaces.noPlaceTitle": "장소를 찾지 못한 저장",
-  "homePlaces.noPlaceReading": "읽는 중…",
-  "homePlaces.noPlaceFailed": "읽지 못했어요",
+  "homePlaces.noPlaceReading": "장소 찾는 중…",
+  "homePlaces.noPlaceFailed": "이 저장 항목들을 읽을 수 없어요",
   "homePlaces.noPlaceNone": "장소가 없어요",
   "homePlaces.spotCount": {
     "other": "장소 %{formattedCount}곳"
@@ -767,9 +767,6 @@
   "onboardingChart.chartLabel": "지금의 %{lost}에서 %{goal}까지의 곡선. %{when}",
   "aha.shareTitle": "이 릴스를 저장해 보세요.",
   "aha.sampleBadge": "샘플",
-  "aha.captionDate": "%{city}에서 완벽한 데이트를 위한 3곳 🍷",
-  "aha.captionTrip": "%{city}에서 완벽한 첫날을 위한 3곳 ✈️",
-  "aha.captionWeekend": "이번 주 %{city}에서 먹어볼 3곳 🍜",
   "aha.shareMessages": "메시지",
   "aha.shareCopyLink": "링크 복사",
   "aha.coachTapThis": "여기를 탭하세요 →",
@@ -789,19 +786,7 @@
   "aha.addedTo": "%{city}에 추가했어요",
   "aha.cityPlaces": "%{city} · 3곳",
   "aha.fromReel": "%{handle}님의 릴스에서",
-  "aha.shelvrExample": "Shelvr 예시",
   "aha.reelBy": "%{handle}님의 샘플 릴스",
-  "aha.exampleDescription": "Shelvr 예시. %{caption}. 장소: %{first}, %{second}, %{third}.",
-  "aha.quoted": "“%{quote}”",
-  "aha.quoteCoffee": "줄 서서라도 마실 만한 플랫 화이트",
-  "aha.quoteMorning": "붐비기 전에 일찍 가세요",
-  "aha.quoteBrunch": "달걀 요리 시키세요, 후회 안 해요",
-  "aha.quoteLunch": "동네 최고의 점심 메뉴",
-  "aha.quoteAfternoon": "몇 시간이고 있을 수 있는 곳",
-  "aha.quoteDinner": "창가 자리를 부탁하세요",
-  "aha.quoteDrinks": "여기 칵테일은 정말 최고예요",
-  "aha.quoteDessert": "이건 꼭 배를 남겨두세요",
-  "aha.quoteWalk": "여기 노을은 정말 마법 같아요",
   "welcomeLetter.title": "계획은 덜, 외출은 더",
   "welcomeLetter.body": "Shelvr에 오신 걸 환영해요. 늘 가보고 싶던 장소를 위한 앱이에요. 릴스나 게시물을 공유하면 Shelvr가 장소를 찾아 지도에 핀으로 표시하고 데이트나 여행 계획으로 만들어 드려요. 이번 주에 저장한 곳부터 시작해 보세요.",
   "welcomeLetter.signature": "Ashish",
@@ -845,6 +830,5 @@
   "signInScene.sunset": "노을",
   "signInScene.dinner": "저녁",
   "signInScene.dessert": "디저트",
-  "opener.getStarted": "시작하기",
-  "aha.sampleSource": "이 예시 릴스에서 찾은 장소예요."
+  "opener.getStarted": "시작하기"
 }

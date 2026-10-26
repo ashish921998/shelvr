@@ -6,7 +6,12 @@ export type CityPin = {
   name: string;
   lat: number;
   lng: number;
+  number: number;
 };
+
+export function cityPinId(pin: Omit<CityPin, "number">): string {
+  return `${pin.itemId}:${pin.name}:${pin.lat}:${pin.lng}`;
+}
 
 /** Every place pin the city's saves carry, tagged with the save it came from. */
 export function cityPins(
@@ -19,20 +24,51 @@ export function cityPins(
     saves.flatMap((save) =>
       (save.placePins ?? []).map((pin) => ({ itemId: save._id, ...pin })),
     ),
-  );
+  ).map((pin, index) => ({ ...pin, number: index + 1 }));
 }
 
-/** Number each save that has a pin, in list order, so a row's badge matches its pins. */
-export function numberSaves(
-  saves: { _id: string }[],
-  pins: Pick<CityPin, "itemId">[],
-): Map<string, number> {
-  const located = new Set(pins.map((pin) => pin.itemId));
-  const numbers = new Map<string, number>();
-  for (const save of saves) {
-    if (located.has(save._id)) numbers.set(save._id, numbers.size + 1);
-  }
-  return numbers;
+/** One row per mapped place, plus every save not represented by a place row. */
+type CityRow<T> =
+  | {
+      kind: "place";
+      id: string;
+      number: number;
+      name: string;
+      pin: CityPin;
+      item: T;
+    }
+  | { kind: "save"; id: string; item: T };
+
+export function cityRows<T extends { _id: string; placePins?: unknown[] }>(
+  saves: T[],
+  pins: CityPin[],
+): CityRow<T>[] {
+  const items = new Map(saves.map((save) => [save._id, save]));
+  const pinnedIds = new Set(pins.map((pin) => pin.itemId));
+  return [
+    ...pins.flatMap((pin): CityRow<T>[] => {
+      const item = items.get(pin.itemId);
+      return item
+        ? [
+            {
+              kind: "place",
+              id: cityPinId(pin),
+              number: pin.number,
+              name: pin.name,
+              pin,
+              item,
+            },
+          ]
+        : [];
+    }),
+    ...saves
+      .filter((save) => !pinnedIds.has(save._id))
+      .map((item) => ({
+        kind: "save" as const,
+        id: item._id,
+        item,
+      })),
+  ];
 }
 
 const SOURCE_NAMES: Record<LinkSource, string> = {

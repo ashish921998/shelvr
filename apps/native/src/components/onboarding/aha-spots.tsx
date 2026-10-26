@@ -64,9 +64,7 @@ export function AhaSpotsStep({
             {t("aha.cityPlaces", { city })}
           </Text>
           <Text style={styles.credit}>
-            {sample.source === "reel"
-              ? t("aha.fromReel", { handle: sample.creator })
-              : t("aha.sampleSource")}
+            {t("aha.fromReel", { handle: sample.creator })}
           </Text>
         </View>
         {/* With large text the rows scroll, after the map has given up its room. */}
@@ -82,13 +80,6 @@ export function AhaSpotsStep({
                 <PinBadge number={index + 1} day={0} />
                 <View style={styles.spotText}>
                   <Text style={styles.spotName}>{spot.name}</Text>
-                  {sample.source === "example" ? (
-                    <Text style={styles.quote}>
-                      {t("aha.quoted", {
-                        quote: t(sample.spots[index].quote),
-                      })}
-                    </Text>
-                  ) : null}
                 </View>
               </>
             );
@@ -202,11 +193,5 @@ const styles = StyleSheet.create((theme) => ({
   spotName: {
     ...theme.type.headline,
     color: theme.colors.foreground,
-  },
-  quote: {
-    ...theme.type.subhead,
-    lineHeight: 21,
-    fontStyle: "italic",
-    color: theme.colors.muted,
   },
 }));

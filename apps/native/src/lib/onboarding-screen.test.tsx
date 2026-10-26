@@ -245,7 +245,7 @@ it("walks the questions into a sample for the goal that leads, and keeps every a
   });
   expect(mocks.share.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
-    city: "lisbon",
+    city: "austin",
   });
 });
 
@@ -290,7 +290,7 @@ it("reuses the sample for the commitment after the spots, before opening the pay
   expect(mocks.ask).not.toHaveBeenCalled();
   expect(mocks.commitment.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
-    city: "lisbon",
+    city: "austin",
   });
   expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("commitment"));
   await act(async () => tap("commitment:continue"));
@@ -317,7 +317,9 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.setPendingSpaces).toHaveBeenCalledWith(["Date nights"]);
-  expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("date", "austin")!),
+  );
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",
@@ -342,5 +344,22 @@ it("queues the real reel it played as the first save when onboarding ends", () =
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
     ahaReelUrl(ahaReel("date", "austin")!),
+  );
+});
+
+it("queues the default reel before leaving onboarding when the city question was skipped", () => {
+  mocks.progress = {
+    ...mocks.progress,
+    step: ONBOARDING_STEPS.indexOf("commitment"),
+    goals: ["travel"],
+    travelCity: null,
+  };
+  render(<OnboardingScreen />);
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("trip", "austin")!),
+  );
+  expect(mocks.queueDemoUrl.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.completeOnboarding.mock.invocationCallOrder[0],
   );
 });

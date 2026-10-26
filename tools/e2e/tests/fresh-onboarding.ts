@@ -27,7 +27,7 @@ const FRESH_INSTALL_ARGUMENTS = [
   "YES",
 ];
 
-/** From the opener to the sample reel; defaults to date nights in the sample's own city (Prague). */
+/** From the opener to the sample reel; defaults to date nights in Austin when the city is skipped. */
 export async function walkToSampleReel(
   screen: Screen,
   options: { goal?: "date" | "travel"; city?: string } = {},

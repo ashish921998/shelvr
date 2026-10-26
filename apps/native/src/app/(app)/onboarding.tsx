@@ -230,7 +230,7 @@ export default function OnboardingScreen() {
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     // The reel they shared in the demo becomes their first real save once they have Pro.
-    if (sample.source === "reel") queueDemoUrl(sample.firstSaveUrl);
+    queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };

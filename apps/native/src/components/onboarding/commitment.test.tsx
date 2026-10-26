@@ -205,8 +205,8 @@ it.each<Goal[]>([
   const { sample } = renderStep(goals);
   const promise =
     sample.kind === "trip"
-      ? "I’ll visit one saved place on my Lisbon trip."
-      : "I’ll visit one place I saved in Lisbon this week.";
+      ? "I’ll visit one saved place on my Austin trip."
+      : "I’ll visit one place I saved in Austin this week.";
   expect(screen.getByText(promise)).toBeTruthy();
   for (const spot of sample.spots)
     expect(screen.getByText(spot.name)).toBeTruthy();
@@ -218,7 +218,7 @@ it.each<Goal[]>([
 it("uses the demo's fallback city when the city question was skipped", () => {
   renderStep(["travel"], null);
   expect(
-    screen.getByText("I’ll visit one saved place on my Prague trip."),
+    screen.getByText("I’ll visit one saved place on my Austin trip."),
   ).toBeTruthy();
 });
 
@@ -236,7 +236,7 @@ it("delegates the one-second threshold to Pressable, confirms in place, and wait
   expect(screen.getByText("You’re in.")).toBeTruthy();
   expect(screen.getByTestId("map")).toBe(map);
   expect(
-    screen.getByText("I’ll visit one saved place on my Lisbon trip."),
+    screen.getByText("I’ll visit one saved place on my Austin trip."),
   ).toBeTruthy();
   expect(mocks.haptic).toHaveBeenCalledTimes(1);
   expect(mocks.capture).toHaveBeenCalledExactlyOnceWith(
@@ -244,7 +244,7 @@ it("delegates the one-second threshold to Pressable, confirms in place, and wait
     {
       action: "confirmed",
       plan_kind: "trip",
-      sample_city: "lisbon",
+      sample_city: "austin",
       flow_version: ONBOARDING_FLOW_VERSION,
     },
   );
@@ -310,7 +310,7 @@ it("offers a tap alternative and accessibility activation without opening the pa
     {
       action: "confirmed",
       plan_kind: "trip",
-      sample_city: "lisbon",
+      sample_city: "austin",
       flow_version: ONBOARDING_FLOW_VERSION,
     },
   );
@@ -326,7 +326,7 @@ it("allows screen-reader activation directly", () => {
     {
       action: "confirmed",
       plan_kind: "trip",
-      sample_city: "lisbon",
+      sample_city: "austin",
       flow_version: ONBOARDING_FLOW_VERSION,
     },
   );
@@ -367,7 +367,7 @@ it("allows skipping without making a promise", () => {
     {
       action: "skipped",
       plan_kind: "trip",
-      sample_city: "lisbon",
+      sample_city: "austin",
       flow_version: ONBOARDING_FLOW_VERSION,
     },
   );
@@ -384,7 +384,7 @@ it("does not count paywall retries as new skips, and can record a later confirma
     {
       action: "skipped",
       plan_kind: "weekend",
-      sample_city: "prague",
+      sample_city: "austin",
       flow_version: ONBOARDING_FLOW_VERSION,
     },
   );
@@ -396,7 +396,7 @@ it("does not count paywall retries as new skips, and can record a later confirma
   expect(mocks.capture).toHaveBeenLastCalledWith("onboarding_commitment", {
     action: "confirmed",
     plan_kind: "weekend",
-    sample_city: "prague",
+    sample_city: "austin",
     flow_version: ONBOARDING_FLOW_VERSION,
   });
 });
