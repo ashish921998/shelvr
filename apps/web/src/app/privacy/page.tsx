@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 25, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 26, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -39,19 +39,22 @@ export default function PrivacyPage() {
             <strong>{SUPPORT_EMAIL}</strong>.
           </li>
           <li>
-            <strong>Content you save.</strong> The links, notes, and images you
-            save, including URLs, note text, extracted page content, titles,
-            descriptions, tags, and space assignments, are stored in our backend
-            (Convex) so they sync to your devices. Images are only imported when
-            you capture them or pick them from your camera or photo library.
+            <strong>Content you save.</strong> For each link you save, such as a
+            reel or TikTok, we store the URL and, when they are available, the
+            caption or extracted page text, a copy of its cover image, its
+            title, description and tags, and the places found in it with their
+            map locations. We also store the plans you make. All of this is kept
+            in our backend (Convex) so it syncs to your devices. We do not store
+            the video itself. Earlier versions of the app also let you save
+            notes and photos; those stay in your account until you delete them.
           </li>
           <li>
-            <strong>Photo metadata.</strong> When you import a photo, EXIF
-            metadata is stripped from the uploaded file. Shelvr keeps the
-            capture time and GPS coordinates as fields in its own database so
-            the item can appear on your map and be sorted by when it was taken.
-            These fields are not sent to the AI provider. Shelvr does not track
-            your live device location.
+            <strong>Photo metadata.</strong> When you imported a photo with an
+            earlier version of the app, EXIF metadata is stripped from the
+            uploaded file. Shelvr keeps the capture time and GPS coordinates as
+            fields in its own database so the item can appear on your map and be
+            sorted by when it was taken. These fields are not sent to the AI
+            provider. Shelvr does not track your live device location.
           </li>
           <li>
             <strong>Purchase information.</strong> If you subscribe to Shelvr
@@ -104,8 +107,8 @@ export default function PrivacyPage() {
           to Google’s Gemini API (a generation model and Gemini embeddings).
           What is sent: link addresses, up to about 8,000 characters of
           extracted page text, a reel’s or TikTok’s caption, and what is said in
-          the video. Saved notes and images may also be processed to organize
-          your content.
+          the video. Notes and photos saved with earlier versions of the app may
+          also have been processed this way.
         </p>
         <p className="mt-2">
           Date and trip plans are selected within Shelvr from places already
@@ -204,7 +207,7 @@ export default function PrivacyPage() {
           If you opt in to Apple refund data sharing, RevenueCat may share
           purchase identifiers, delivery status, and whether sample content was
           provided with Apple to help review a refund request. This does not
-          include your saved links, notes, photos, or product analytics events.
+          include your saves, the places in them, or product analytics events.
           We record your choice, the accepted terms version, and the time of
           your decision. You can turn sharing off in Profile. Changes are sent
           to RevenueCat; the app shows when an update is pending. Previously
