@@ -64,7 +64,8 @@ export function hasPlaceNear(
   );
 }
 
-const MAX_SEARCH_RESULTS = 8;
+/** Few enough that the list stays above the keyboard. */
+const MAX_SEARCH_RESULTS = 5;
 
 function folded(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();

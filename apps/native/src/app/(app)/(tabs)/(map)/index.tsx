@@ -66,6 +66,8 @@ export default function MapScreen() {
   const location = useMapLocation(opened);
   const [kind, setKind] = useState<PlaceKind | null>(null);
   const [searchText, setSearchText] = useState("");
+  // Closed once a result is picked, so the map and place card get the room; typing opens it again.
+  const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
 
   const all = places.data;
@@ -146,6 +148,7 @@ export default function MapScreen() {
     const place = matches.find((candidate) => placeId(candidate) === id);
     if (!place) return;
     Keyboard.dismiss();
+    setListOpen(false);
     analytics.capture("map_search_result_opened", {});
     setFocus((previous) => ({
       lat: place.lat,
@@ -190,9 +193,13 @@ export default function MapScreen() {
       >
         <MapSearch
           text={searchText}
-          onChangeText={setSearchText}
+          onChangeText={(text) => {
+            setSearchText(text);
+            setListOpen(true);
+          }}
+          total={matches.length}
           results={
-            searching
+            searching && listOpen
               ? topSearchResults(matches).map((place) => ({
                   id: placeId(place),
                   name: place.name,

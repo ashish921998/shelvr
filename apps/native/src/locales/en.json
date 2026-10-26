@@ -838,5 +838,6 @@
   "map.kindStay": "Stays",
   "map.filters": "Filter places",
   "map.searchPlaceholder": "Search your places",
-  "map.searchNoResults": "No places match “%{query}”."
+  "map.searchNoResults": "No places match “%{query}”.",
+  "map.searchMore": "Showing %{count} of %{total}. Keep typing to narrow it down."
 }

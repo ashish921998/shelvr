@@ -55,6 +55,7 @@ it("lists matches under the field and hands back the one tapped", () => {
     <MapSearch
       text="ram"
       onChangeText={vi.fn()}
+      total={2}
       results={[
         { id: "a", name: "Ramen Tatsu-Ya", city: "Austin" },
         { id: "b", name: "Best Ramen" },
@@ -73,6 +74,7 @@ it("says when nothing matches, and clearing empties the field", () => {
     <MapSearch
       text="sushi "
       onChangeText={onChangeText}
+      total={0}
       results={[]}
       onSelect={vi.fn()}
     />,
@@ -87,10 +89,24 @@ it("shows no list while the field is empty", () => {
     <MapSearch
       text=""
       onChangeText={vi.fn()}
+      total={0}
       results={undefined}
       onSelect={vi.fn()}
     />,
   );
   expect(screen.queryByLabelText("search.clear")).toBeNull();
   expect(screen.getAllByRole("textbox")).toHaveLength(1);
+});
+
+it("says how many more places match than it lists", () => {
+  render(
+    <MapSearch
+      text="chicago"
+      onChangeText={vi.fn()}
+      total={45}
+      results={[{ id: "a", name: "Olio e Più", city: "Chicago" }]}
+      onSelect={vi.fn()}
+    />,
+  );
+  expect(screen.getByText("map.searchMore")).toBeTruthy();
 });

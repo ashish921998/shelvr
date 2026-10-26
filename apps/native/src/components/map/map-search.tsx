@@ -11,12 +11,15 @@ export function MapSearch({
   text,
   onChangeText,
   results,
+  total,
   onSelect,
 }: {
   text: string;
   onChangeText: (text: string) => void;
   /** Undefined while the field is empty. */
   results: Result[] | undefined;
+  /** How many places match, when more than the list shows. */
+  total: number;
   onSelect: (id: string) => void;
 }) {
   const { theme } = useUnistyles();
@@ -74,6 +77,11 @@ export function MapSearch({
               </Pressable>
             ))
           )}
+          {results.length > 0 && total > results.length ? (
+            <Text accessibilityLiveRegion="polite" style={styles.more}>
+              {t("map.searchMore", { count: results.length, total })}
+            </Text>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -116,6 +124,12 @@ const styles = StyleSheet.create((theme) => ({
   title: { ...theme.type.bodyLabel, color: theme.colors.foreground },
   subtitle: { ...theme.type.footnote, color: theme.colors.muted },
   pressed: { opacity: theme.opacity.pressed },
+  more: {
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
+    ...theme.type.footnote,
+    color: theme.colors.muted,
+  },
   empty: {
     padding: theme.gap(2),
     ...theme.type.body,

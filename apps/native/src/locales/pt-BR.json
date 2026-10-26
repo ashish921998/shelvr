@@ -859,5 +859,6 @@
   "map.kindStay": "Hospedagem",
   "map.filters": "Filtrar lugares",
   "map.searchPlaceholder": "Busque seus lugares",
-  "map.searchNoResults": "Nenhum lugar corresponde a «%{query}»."
+  "map.searchNoResults": "Nenhum lugar corresponde a «%{query}».",
+  "map.searchMore": "Mostrando %{count} de %{total}. Continue digitando para filtrar."
 }

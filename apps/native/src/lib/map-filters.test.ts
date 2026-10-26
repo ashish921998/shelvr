@@ -104,9 +104,9 @@ describe("searchPlaces", () => {
     expect(searchPlaces(places, "sushi")).toEqual([]);
   });
 
-  it("lists at most eight results", () => {
+  it("lists at most five results", () => {
     expect(
       topSearchResults(Array.from({ length: 12 }, (_, i) => i)),
-    ).toHaveLength(8);
+    ).toHaveLength(5);
   });
 });

@@ -777,6 +777,7 @@ export type MessageParams = {
   "map.filters": undefined;
   "map.searchPlaceholder": undefined;
   "map.searchNoResults": { query: string };
+  "map.searchMore": { count: number; total: number };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

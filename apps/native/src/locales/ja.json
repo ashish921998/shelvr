@@ -817,5 +817,6 @@
   "map.kindStay": "宿泊",
   "map.filters": "場所を絞り込む",
   "map.searchPlaceholder": "保存した場所を検索",
-  "map.searchNoResults": "「%{query}」に一致する場所はありません。"
+  "map.searchNoResults": "「%{query}」に一致する場所はありません。",
+  "map.searchMore": "%{total}件中%{count}件を表示中。続けて入力すると絞り込めます。"
 }
