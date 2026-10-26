@@ -88,15 +88,20 @@ const WORD = /[\p{L}\p{N}]+/gu;
  * A name the text never mentions is invented. Every word of four letters or
  * more must appear in the text, as part of a longer word too, so a place the
  * text writes as an @handle still counts. A name made only of shorter words
- * must have each of them as a whole word.
+ * must appear as those whole words side by side, so "Ria café, then a bar"
+ * does not vouch for "Ria Bar".
  */
 function isInText(name: string, foldedText: string): boolean {
   const words = fold(name).match(WORD) ?? [];
   if (words.length === 0) return false;
   const long = words.filter((word) => word.length >= 4);
   if (long.length > 0) return long.every((word) => foldedText.includes(word));
-  const textWords = new Set(foldedText.match(WORD));
-  return words.every((word) => textWords.has(word));
+  const gap = "[^\\p{L}\\p{N}]{0,3}";
+  const together = new RegExp(
+    `(?<![\\p{L}\\p{N}])${words.join(gap)}(?![\\p{L}\\p{N}])`,
+    "u",
+  );
+  return together.test(foldedText);
 }
 
 function clean(value: string, max: number): string {

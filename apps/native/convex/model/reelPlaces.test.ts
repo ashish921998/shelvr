@@ -97,6 +97,15 @@ describe("settleReelPlaces", () => {
     ).toHaveLength(1);
   });
 
+  it("needs a short name's words together, not in separate phrases", () => {
+    expect(
+      settleReelPlaces(raw([["Ria Bar"]]), "Ria café, then a bar").places,
+    ).toEqual([]);
+    expect(
+      settleReelPlaces(raw([["Ria Bar"]]), "Drinks at Ria-Bar tonight").places,
+    ).toHaveLength(1);
+  });
+
   it("matches across accents and case", () => {
     const settled = settleReelPlaces(
       raw([["PASTEIS DE BELEM", "Lisbon"]]),
