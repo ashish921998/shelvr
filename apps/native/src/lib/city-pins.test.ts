@@ -161,6 +161,26 @@ describe("cityPins", () => {
     expect(pin).toMatchObject({ itemId: "older", appleId: "I9" });
   });
 
+  it("keeps two nearby branches Apple names as separate places", () => {
+    expect(
+      cityPins([
+        {
+          _id: "a",
+          placePins: [
+            { name: "Starbucks", lat: 41.8827, lng: -87.6233, appleId: "S1" },
+          ],
+        },
+        {
+          _id: "b",
+          placePins: [
+            { name: "Starbucks", lat: 41.8845, lng: -87.6233, appleId: "S2" },
+            { name: "Starbucks", lat: 41.8845, lng: -87.6234, appleId: "S2" },
+          ],
+        },
+      ]).map((pin) => pin.appleId),
+    ).toEqual(["S1", "S2"]);
+  });
+
   it("keeps two branches of one name in different parts of town", () => {
     expect(
       cityPins([
