@@ -145,6 +145,22 @@ describe("cityPins", () => {
     ).toEqual(["a"]);
   });
 
+  it("gives the kept place the Apple id a merged repeat carried", () => {
+    const [pin] = cityPins([
+      {
+        _id: "older",
+        placePins: [{ name: "Cloud Gate", lat: 41.8827, lng: -87.6233 }],
+      },
+      {
+        _id: "newer",
+        placePins: [
+          { name: "Cloud Gate", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+        ],
+      },
+    ]);
+    expect(pin).toMatchObject({ itemId: "older", appleId: "I9" });
+  });
+
   it("keeps two branches of one name in different parts of town", () => {
     expect(
       cityPins([

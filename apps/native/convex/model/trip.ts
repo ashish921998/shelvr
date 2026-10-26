@@ -16,20 +16,32 @@ export function uniquePlacePins<
   T extends LatLng & { name: string; appleId?: string },
 >(pins: T[]): T[] {
   const byApple = new Set<string>();
-  const byName = new Map<string, LatLng[]>();
-  return pins.filter((pin) => {
-    if (pin.appleId !== undefined && byApple.has(pin.appleId)) return false;
+  // Indexes into `kept` of each name's pins, to merge a nearby repeat into.
+  const byName = new Map<string, number[]>();
+  const kept: T[] = [];
+  for (const pin of pins) {
+    if (pin.appleId !== undefined && byApple.has(pin.appleId)) continue;
     const key = placeKey(pin.name);
     const named = byName.get(key) ?? [];
-    if (named.some((seen) => distanceKm(seen, pin) <= SAME_PLACE_KM)) {
-      // A later pin under another name may carry this id for the same venue.
-      if (pin.appleId !== undefined) byApple.add(pin.appleId);
-      return false;
+    const same = named.find(
+      (index) => distanceKm(kept[index], pin) <= SAME_PLACE_KM,
+    );
+    if (same !== undefined) {
+      if (pin.appleId !== undefined) {
+        // A later pin under another name may carry this id for the same venue,
+        // and the kept pin needs it to open Apple's place card.
+        byApple.add(pin.appleId);
+        if (kept[same].appleId === undefined) {
+          kept[same] = { ...kept[same], appleId: pin.appleId };
+        }
+      }
+      continue;
     }
     if (pin.appleId !== undefined) byApple.add(pin.appleId);
-    byName.set(key, [...named, pin]);
-    return true;
-  });
+    byName.set(key, [...named, kept.length]);
+    kept.push(pin);
+  }
+  return kept;
 }
 
 export function distanceKm(a: LatLng, b: LatLng): number {
