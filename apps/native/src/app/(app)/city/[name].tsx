@@ -10,8 +10,8 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -70,6 +70,16 @@ export default function CityScreen() {
   const router = useRouter();
   const { theme, rt } = useUnistyles();
   const { name } = useLocalSearchParams<{ name: string }>();
+  // The place card's fallback opens the save after an Apple lookup; skip it once the user has left.
+  const focused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      focused.current = true;
+      return () => {
+        focused.current = false;
+      };
+    }, []),
+  );
   const city = name ?? "";
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan(city);
@@ -156,11 +166,13 @@ export default function CityScreen() {
           renderItem={({ item: row }) => {
             const { item } = row;
             const appleId = row.kind === "place" ? row.pin.appleId : undefined;
-            const openSave = () =>
+            const openSave = () => {
+              if (!focused.current) return;
               router.push({
                 pathname: "/item/[id]",
                 params: { id: item._id },
               });
+            };
             return (
               <SaveRow
                 item={item}

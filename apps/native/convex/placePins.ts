@@ -161,6 +161,16 @@ export const toLocate = internalQuery({
   },
 });
 
+/** A lookup that finds the same spot without an id keeps the stored one; a moved pin does not. */
+function keepAppleId(stored: Pin | undefined, found: Pin): Pin {
+  return found.appleId === undefined &&
+    stored?.appleId !== undefined &&
+    stored.lat === found.lat &&
+    stored.lng === found.lng
+    ? { ...found, appleId: stored.appleId }
+    : found;
+}
+
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -174,7 +184,11 @@ export const storePins = internalMutation({
     const next = new Map<string, Pin>();
     for (const pin of [...(item.placePins ?? []), ...args.found]) {
       const key = placeKey(normalizePlaceName(pin.name, item.cities));
-      if (wanted.has(key)) next.set(key, inSourceCity(pin, item.cities ?? []));
+      if (wanted.has(key))
+        next.set(
+          key,
+          keepAppleId(next.get(key), inSourceCity(pin, item.cities ?? [])),
+        );
     }
     const city = lookupCity(item.cities ?? []);
     const pins = nearEachOther([...next.values()], city).slice(0, MAX_PINS);

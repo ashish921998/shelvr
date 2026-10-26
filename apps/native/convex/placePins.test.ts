@@ -382,6 +382,36 @@ describe("placePins", () => {
     expect((await pins())?.[0].appleId).toBe("ID13");
   });
 
+  it("keeps a stored id when a refresh finds the same pin without one, but not when the pin moves", async () => {
+    const { t, itemId, pins } = await setup([]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        places: ["Cafe", "Bar"],
+        placePins: [
+          { name: "Cafe", lat: 38.7, lng: -9.1, city: "Lisbon", appleId: "C1" },
+          {
+            name: "Bar",
+            lat: 38.71,
+            lng: -9.14,
+            city: "Lisbon",
+            appleId: "B1",
+          },
+        ],
+      }),
+    );
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [
+        { name: "Cafe", lat: 38.7, lng: -9.1, city: "Lisbon" },
+        { name: "Bar", lat: 38.72, lng: -9.13, city: "Lisbon" },
+      ],
+    });
+    expect(await pins()).toEqual([
+      { name: "Cafe", lat: 38.7, lng: -9.1, city: "Lisbon", appleId: "C1" },
+      { name: "Bar", lat: 38.72, lng: -9.13, city: "Lisbon" },
+    ]);
+  });
+
   it("keeps an id through the source-city rewrite of a multi-city pin", async () => {
     const { t, itemId, pins } = await setup([]);
     await t.run(async (ctx) =>
