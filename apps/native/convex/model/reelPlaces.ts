@@ -96,7 +96,7 @@ function isInText(name: string, foldedText: string): boolean {
   if (words.length === 0) return false;
   const long = words.filter((word) => word.length >= 4);
   if (long.length > 0) return long.every((word) => foldedText.includes(word));
-  const gap = "[^\\p{L}\\p{N}]{0,3}";
+  const gap = "[^\\p{L}\\p{N}]{1,3}";
   const together = new RegExp(
     `(?<![\\p{L}\\p{N}])${words.join(gap)}(?![\\p{L}\\p{N}])`,
     "u",

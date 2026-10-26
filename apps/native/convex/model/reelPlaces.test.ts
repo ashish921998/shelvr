@@ -104,6 +104,9 @@ describe("settleReelPlaces", () => {
     expect(
       settleReelPlaces(raw([["Ria Bar"]]), "Drinks at Ria-Bar tonight").places,
     ).toHaveLength(1);
+    expect(
+      settleReelPlaces(raw([["Ria Bar"]]), "Drinks at RiaBar tonight").places,
+    ).toEqual([]);
   });
 
   it("matches across accents and case", () => {

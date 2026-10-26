@@ -34,6 +34,7 @@ export function parseReelLink(raw: string): string | undefined {
     return undefined;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+  if (url.username || url.password || url.port) return undefined;
   const host = url.hostname.toLowerCase();
   const tiktok = host === "tiktok.com" || host.endsWith(".tiktok.com");
   const match = url.pathname.match(INSTAGRAM_MEDIA_PATH);
