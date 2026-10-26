@@ -19,6 +19,7 @@ import {
   normalizePlaceName,
   normalizePlaces,
   placePinsValidator,
+  withoutCitySuffix,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
@@ -104,6 +105,7 @@ async function wantedPlaces(
 function lookupQuery(name: string, city: string | undefined): string {
   if (
     city &&
+    withoutCitySuffix(name, city) === null &&
     !name
       .split(",")
       .some((part) => part.trim().toLowerCase() === city.trim().toLowerCase())
