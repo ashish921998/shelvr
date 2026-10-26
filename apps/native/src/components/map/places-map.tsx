@@ -1,6 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import { moveCamera } from "@/lib/map-camera";
 import { hasPlaceNear } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
@@ -10,6 +11,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** How long the camera must rest after moving to the person before the map checks what is near. */
 const SETTLE_MS = 600;
+/** After this, the opening check is dropped so it never pulls back a camera the person moved. */
+const DISARM_MS = 3000;
 
 export type MapPin = {
   id: string;
@@ -80,23 +83,40 @@ export function PlacesMap({
   useEffect(() => {
     if (!showsUser || centredOnUser.current) return;
     centredOnUser.current = true;
-    checkNearby.current = () => {
-      checkNearby.current = undefined;
-      if (fit && !hasPlaceNear(centre.current, pins))
+    const showCity = () => {
+      if (fit)
         ref.current
           ?.setCameraPosition(fit)
           .catch((error: unknown) =>
             analytics.captureError("places_map_camera_failed", error),
           );
     };
-    // No position means the person's own location.
-    ref.current
-      ?.setCameraPosition()
-      .then(waitForRest)
-      .catch((error: unknown) =>
-        analytics.captureError("places_map_camera_failed", error),
-      );
-  });
+    checkNearby.current = () => {
+      checkNearby.current = undefined;
+      if (!hasPlaceNear(centre.current, pins)) showCity();
+    };
+    // No position means the person's own location. A map mounted moments ago can refuse its first
+    // move, so it is retried; if every try fails, the map shows the busiest city instead.
+    const cancel = moveCamera(
+      () => ref.current?.setCameraPosition().then(waitForRest),
+      (error) => {
+        checkNearby.current = undefined;
+        analytics.captureError("places_map_camera_failed", error);
+        showCity();
+      },
+    );
+    // Only the opening move may be redirected; a later pan or my-location tap is the person's own.
+    const disarm = setTimeout(() => {
+      checkNearby.current = undefined;
+    }, DISARM_MS);
+    return () => {
+      cancel();
+      clearTimeout(disarm);
+      checkNearby.current = undefined;
+      centredOnUser.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per grant; a new filter must not move the camera again
+  }, [showsUser]);
   useEffect(() => () => clearTimeout(settle.current), []);
 
   const select = (id: string | undefined) => {
