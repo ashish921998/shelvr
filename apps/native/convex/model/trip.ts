@@ -22,6 +22,8 @@ export function uniquePlacePins<
     const key = placeKey(pin.name);
     const named = byName.get(key) ?? [];
     if (named.some((seen) => distanceKm(seen, pin) <= SAME_PLACE_KM)) {
+      // A later pin under another name may carry this id for the same venue.
+      if (pin.appleId !== undefined) byApple.add(pin.appleId);
       return false;
     }
     if (pin.appleId !== undefined) byApple.add(pin.appleId);

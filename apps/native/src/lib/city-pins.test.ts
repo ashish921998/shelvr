@@ -122,6 +122,29 @@ describe("cityPins", () => {
     ).toEqual(["Cloud Gate"]);
   });
 
+  it("remembers the Apple id of a pin merged by name", () => {
+    expect(
+      cityPins([
+        {
+          _id: "a",
+          placePins: [{ name: "Cloud Gate", lat: 41.8827, lng: -87.6233 }],
+        },
+        {
+          _id: "b",
+          placePins: [
+            { name: "Cloud Gate", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+          ],
+        },
+        {
+          _id: "c",
+          placePins: [
+            { name: "The Bean", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+          ],
+        },
+      ]).map((pin) => pin.itemId),
+    ).toEqual(["a"]);
+  });
+
   it("keeps two branches of one name in different parts of town", () => {
     expect(
       cityPins([

@@ -577,7 +577,6 @@
   "pro.notFoundBody": "Für dieses %{store}-Konto wurde kein aktiver Shelvr Pro-Kauf gefunden.",
   "pro.restoreFailedBody": "Prüfe deine Verbindung und versuche es erneut. Du kannst dein Abo auch in %{store} verwalten.",
   "profile.appearanceLabel": "Erscheinungsbild: %{appearance}",
-  "profile.photoUsage": "%{count} von %{limit} Fotos gespeichert",
   "share.progress": "%{saved} von %{total} gespeichert…",
   "share.failureCount": {
     "one": "%{formattedCount} Inhalt konnte nicht gespeichert werden",

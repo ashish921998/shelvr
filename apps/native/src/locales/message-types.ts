@@ -548,7 +548,6 @@ export type MessageParams = {
   "pro.notFoundBody": { store: string };
   "pro.restoreFailedBody": { store: string };
   "profile.appearanceLabel": { appearance: string };
-  "profile.photoUsage": { count: number; limit: number };
   "share.progress": { saved: number; total: number };
   "share.failureCount": { count: number };
   "spaces.saveCount": { count: number };
