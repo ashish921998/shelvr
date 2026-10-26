@@ -61,6 +61,10 @@ describe("tripSaveCount", () => {
     expect(tripSaveCount(10, cities, "Porto")).toBe(4);
   });
 
+  it("matches the city however it is cased or spaced", () => {
+    expect(tripSaveCount(10, cities, " lisbon ")).toBe(7);
+  });
+
   it("stops at the saves a trip reads", () => {
     expect(tripSaveCount(200, [])).toBe(60);
   });
