@@ -64,12 +64,7 @@ export function AhaShareStep({
         />
         {stage === "panel" ? <AppPanel onShare={go("sheet")} /> : null}
         {stage === "sheet" ? (
-          <IosSheet
-            title={
-              sample.source === "reel" ? sample.creator : t("aha.shelvrExample")
-            }
-            onMore={go("apps")}
-          />
+          <IosSheet title={sample.creator} onMore={go("apps")} />
         ) : null}
         {stage === "apps" ? <AppsSheet onPick={pick} /> : null}
         {stage === "reading" ? (

@@ -313,6 +313,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
+  The current share demo always uses a real reel: `src/lib/aha-sample.ts` picks the
+  selected city and goal's reel, or Austin for that goal when no reel exists.
+  Completion queues that exact URL; `useReplayOnboarding` saves it through
+  `createLinkItem` once signed in with Pro, and normal reading and Maps lookup
+  populate Home. The selected city answer stays separate from the sample city.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
 - **`oracle.ts`**, **`oracleLimits.ts`**: the web Oracle. The internal `consult` action reads
