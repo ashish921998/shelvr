@@ -131,9 +131,11 @@ export default function CityScreen() {
         : { ...snaps, middle: snaps.expanded, collapsed: snaps.expanded },
     [hasMap, snaps],
   );
+  // A number, not the snaps object, so a re-render never pulls a dragged sheet back.
+  const restingMiddle = restingSnaps.middle;
   useEffect(() => {
-    if (loaded) sheetTop.set(restingSnaps.middle);
-  }, [loaded, restingSnaps, sheetTop]);
+    if (loaded) sheetTop.set(restingMiddle);
+  }, [loaded, restingMiddle, sheetTop]);
   const rows = useMemo(
     () => cityRows(items.data ?? [], pins),
     [items.data, pins],

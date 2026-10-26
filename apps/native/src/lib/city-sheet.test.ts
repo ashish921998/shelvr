@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { settleSheet, sheetSnaps, stepSheet } from "./city-sheet";
+import { clampSheet, settleSheet, sheetSnaps, stepSheet } from "./city-sheet";
 
 const snaps = sheetSnaps({
   height: 874,
@@ -56,5 +56,13 @@ describe("stepSheet", () => {
     expect(stepSheet(326, 1, snaps)).toBe(664);
     expect(stepSheet(114, -1, snaps)).toBe(114);
     expect(stepSheet(650, 1, snaps)).toBe(664);
+  });
+});
+
+describe("clampSheet", () => {
+  it("keeps a drag between the highest and lowest rest points", () => {
+    expect(clampSheet(50, snaps)).toBe(114);
+    expect(clampSheet(400, snaps)).toBe(400);
+    expect(clampSheet(900, snaps)).toBe(664);
   });
 });

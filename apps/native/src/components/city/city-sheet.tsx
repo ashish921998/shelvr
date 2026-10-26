@@ -1,5 +1,10 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { settleSheet, stepSheet, type SheetSnaps } from "@/lib/city-sheet";
+import {
+  clampSheet,
+  settleSheet,
+  stepSheet,
+  type SheetSnaps,
+} from "@/lib/city-sheet";
 import { motion } from "@/lib/motion";
 import { useMemo, useState, type ReactNode } from "react";
 import { View } from "react-native";
@@ -17,6 +22,21 @@ import { scheduleOnRN } from "react-native-worklets";
 
 export function moveSheet(top: SharedValue<number>, to: number) {
   top.set(withSpring(to, motion.spring.snap));
+}
+
+/** Springs the sheet to the rest point a released drag lands on. */
+function settle(
+  top: SharedValue<number>,
+  velocityY: number,
+  snaps: SheetSnaps,
+) {
+  "worklet";
+  top.set(
+    withSpring(settleSheet(top.get(), velocityY, snaps), {
+      ...motion.spring.snap,
+      velocity: velocityY,
+    }),
+  );
 }
 
 /** What the sheet's list needs so a drag on its rows can move the sheet, as in Apple Maps. */
@@ -59,30 +79,16 @@ export function CitySheet({ snaps, top, header, list, onHeaderHeight }: Props) {
   });
 
   const { headerDrag, listDrag } = useMemo(() => {
-    // Both run inside the gesture callbacks on the UI thread.
-    const clamp = (value: number) => {
-      "worklet";
-      return Math.min(snaps.collapsed, Math.max(snaps.expanded, value));
-    };
-    const settle = (velocityY: number) => {
-      "worklet";
-      top.set(
-        withSpring(settleSheet(top.get(), velocityY, snaps), {
-          ...motion.spring.snap,
-          velocity: velocityY,
-        }),
-      );
-    };
     const headerDrag = Gesture.Pan()
       .activeOffsetY([-6, 6])
       .onStart(() => {
         start.set(top.get());
       })
       .onChange((event) => {
-        top.set(clamp(start.get() + event.translationY));
+        top.set(clampSheet(start.get() + event.translationY, snaps));
       })
       .onEnd((event) => {
-        settle(event.velocityY);
+        settle(top, event.velocityY, snaps);
       });
     const listScroll = Gesture.Native();
     const listDrag = Gesture.Pan()
@@ -100,11 +106,11 @@ export function CitySheet({ snaps, top, header, list, onHeaderHeight }: Props) {
         }
         const from = takeover.get();
         if (from !== null) {
-          top.set(clamp(start.get() + event.translationY - from));
+          top.set(clampSheet(start.get() + event.translationY - from, snaps));
         }
       })
       .onEnd((event) => {
-        if (takeover.get() !== null) settle(event.velocityY);
+        if (takeover.get() !== null) settle(top, event.velocityY, snaps);
         takeover.set(null);
       });
     return { headerDrag, listDrag: Gesture.Simultaneous(listDrag, listScroll) };

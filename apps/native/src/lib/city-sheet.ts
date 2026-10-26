@@ -48,6 +48,12 @@ export function settleSheet(
   );
 }
 
+/** `top` kept between the sheet's highest and lowest rest points. */
+export function clampSheet(top: number, snaps: SheetSnaps): number {
+  "worklet";
+  return Math.min(snaps.collapsed, Math.max(snaps.expanded, top));
+}
+
 /** The next rest point up (`-1`) or down (`1`) from `top`, for assistive technology. */
 export function stepSheet(
   top: number,
