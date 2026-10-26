@@ -1,10 +1,11 @@
+import { AppSymbolIcon } from "@/components/symbol";
 import { saveSource } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type SaveRowItem = {
   _id: Id<"items">;
@@ -22,12 +23,23 @@ type Props = {
   /** The matching map number when this row represents a located place. */
   number?: number;
   selected?: boolean;
+  /** A second tap on the selected row opens Apple's place card. */
+  hasCard?: boolean;
   /** Replaces opening the save, so the city page can select its pin first. */
   onPress?: () => void;
 };
 
-export function SaveRow({ item, placeName, number, selected, onPress }: Props) {
+export function SaveRow({
+  item,
+  placeName,
+  number,
+  selected,
+  hasCard,
+  onPress,
+}: Props) {
   const router = useRouter();
+  const { theme } = useUnistyles();
+  const showCard = selected === true && hasCard === true;
   const image = item.imageUrl ?? item.heroImageUrl;
   const source = placeName
     ? (item.title ?? saveSource(item))
@@ -37,6 +49,7 @@ export function SaveRow({ item, placeName, number, selected, onPress }: Props) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
+      accessibilityHint={showCard ? t("cityMap.placeDetails") : undefined}
       accessibilityState={{ selected: selected === true }}
       onPress={
         onPress ??
@@ -75,6 +88,13 @@ export function SaveRow({ item, placeName, number, selected, onPress }: Props) {
           </Text>
         ) : null}
       </View>
+      {showCard ? (
+        <AppSymbolIcon
+          name="info.circle"
+          size={22}
+          tintColor={theme.colors.foreground}
+        />
+      ) : null}
     </Pressable>
   );
 }

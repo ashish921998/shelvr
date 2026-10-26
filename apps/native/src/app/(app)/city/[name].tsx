@@ -3,6 +3,7 @@ import { SaveRow } from "@/components/city/save-row";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
+import { canOpenPlaceCard, openPlaceOrSave } from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -154,21 +155,30 @@ export default function CityScreen() {
           }
           renderItem={({ item: row }) => {
             const { item } = row;
+            const openSave = () =>
+              router.push({
+                pathname: "/item/[id]",
+                params: { id: item._id },
+              });
             return (
               <SaveRow
                 item={item}
                 placeName={row.kind === "place" ? row.name : undefined}
                 number={row.kind === "place" ? row.number : undefined}
                 selected={selected === row.id}
-                // First select the place's pin; a second tap opens its source save.
+                hasCard={
+                  row.kind === "place" && canOpenPlaceCard(row.pin.appleId)
+                }
+                // First select the place's pin; a second tap opens Apple's place card, else its source save.
                 onPress={
                   row.kind === "place" && selected !== row.id
                     ? () => select(row.id)
                     : () =>
-                        router.push({
-                          pathname: "/item/[id]",
-                          params: { id: item._id },
-                        })
+                        void openPlaceOrSave(
+                          row.kind === "place" ? row.pin.appleId : undefined,
+                          item.title ?? t("homePlaces.untitled"),
+                          openSave,
+                        )
                 }
               />
             );

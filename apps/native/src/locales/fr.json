@@ -767,6 +767,9 @@
     "many": "%{formattedCount} lieux de vos enregistrements",
     "other": "%{formattedCount} lieux de vos enregistrements"
   },
+  "cityMap.fromYourSave": "De votre enregistrement",
+  "cityMap.openSave": "Ouvrir l’enregistrement",
+  "cityMap.placeDetails": "Détails du lieu",
   "opener.tagline": "Enregistrez les adresses. On planifie le rendez-vous ou le voyage.",
   "onboardingQ.skip": "Passer",
   "onboardingQ.savedTitle": "Combien de lieux as-tu enregistrés ?",

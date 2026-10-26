@@ -725,6 +725,9 @@
   "cityMap.placesFromSaves": {
     "other": "保存からの%{formattedCount}か所"
   },
+  "cityMap.fromYourSave": "保存した投稿より",
+  "cityMap.openSave": "保存を開く",
+  "cityMap.placeDetails": "スポットの詳細",
   "opener.tagline": "スポットを保存しよう。デートも旅行もプランはおまかせ。",
   "onboardingQ.skip": "スキップ",
   "onboardingQ.savedTitle": "いくつの場所を保存しましたか？",
