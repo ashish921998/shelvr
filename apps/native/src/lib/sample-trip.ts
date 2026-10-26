@@ -1,6 +1,7 @@
 import {
   SAMPLE_CITIES,
   isSampleCity,
+  type CityStop,
   type LatLng,
   type SampleCity,
   type SampleCityId,
@@ -10,21 +11,7 @@ import {
 import { planAsCity, planCity, type PlanKind } from "@/lib/sample-plans";
 import type { TextMessageKey } from "@/locales/message-types";
 
-export { isSampleCity };
-
 export const DEFAULT_SAMPLE_CITY: SampleCityId = "prague";
-
-export const SAMPLE_SLOT_LABELS: Record<SampleSlot, TextMessageKey> = {
-  morning: "trip.slotMorning",
-  lunch: "trip.slotLunch",
-  afternoon: "trip.slotAfternoon",
-  dinner: "trip.slotDinner",
-  drinks: "trip.slotDrinks",
-  dessert: "trip.slotDessert",
-  walk: "trip.slotWalk",
-  brunch: "trip.slotBrunch",
-  coffee: "trip.slotCoffee",
-};
 
 export const SAMPLE_MAP = { width: 340, height: 168 } as const;
 
@@ -35,7 +22,7 @@ export const SAMPLE_CROPS = {
 
 type Point = { x: number; y: number };
 
-export type SampleStop = {
+type SampleStop = {
   name: string;
   slot: SampleSlot;
   pin: Point;
@@ -247,11 +234,25 @@ export function samplePlan(kind: PlanKind, city?: string | null): SampleTrip {
   return trip;
 }
 
+/** Just these stops on the city's map, as one day: a real reel's places. */
+export function stopsTrip(
+  kind: PlanKind,
+  id: SampleCityId,
+  title: TextMessageKey,
+  stops: readonly CityStop[],
+): SampleTrip {
+  return buildTrip(kind, id, {
+    ...SAMPLE_CITIES[id],
+    saves: [],
+    days: [{ title, stops }],
+  });
+}
+
 export function sampleTrip(city?: string | null): SampleTrip {
   return samplePlan("trip", city);
 }
 
-export type NumberedStop = {
+type NumberedStop = {
   stop: SampleStop;
   day: number;
   number: number;
@@ -263,38 +264,4 @@ export function sampleStops(trip: SampleTrip): NumberedStop[] {
       day.stops.map((stop) => ({ stop, day: dayIndex })),
     )
     .map((entry, index) => ({ ...entry, number: index + 1 }));
-}
-
-export type SampleRow =
-  | { kind: "day"; day: number; title: TextMessageKey; places: number }
-  | { kind: "stop"; entry: NumberedStop };
-
-export function sampleRows(trip: SampleTrip): SampleRow[] {
-  const stops = sampleStops(trip);
-  return trip.days.flatMap(({ title, stops: places }, day) => [
-    { kind: "day" as const, day, title, places: places.length },
-    ...stops
-      .filter((entry) => entry.day === day)
-      .map((entry) => ({ kind: "stop" as const, entry })),
-  ]);
-}
-
-export const EVENING_AFTER = ["walk", "drinks", "dessert"] as const;
-export type EveningAfter = (typeof EVENING_AFTER)[number];
-
-export const isEveningAfter = (value: unknown): value is EveningAfter =>
-  EVENING_AFTER.some((after) => after === value);
-
-/** A date night cut to dinner and the one stop picked for after it; other plans pass through. */
-export function eveningWith(trip: SampleTrip, after: EveningAfter): SampleTrip {
-  if (trip.kind !== "date") return trip;
-  return {
-    ...trip,
-    days: trip.days.map((day) => ({
-      ...day,
-      stops: day.stops.filter(
-        (stop) => stop.slot === "dinner" || stop.slot === after,
-      ),
-    })),
-  };
 }

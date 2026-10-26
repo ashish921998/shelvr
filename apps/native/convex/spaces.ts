@@ -1,20 +1,16 @@
-import { v } from "convex/values";
-import {
-  query,
-  mutation,
-  internalQuery,
-  internalMutation,
-} from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { authedMutation, authedQuery } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
 import { planSourceValidator } from "./model/plan";
 import { RECOMMEND_CANDIDATES } from "./model/embedding";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { cityKey, tidyCity } from "./model/trip";
 import {
   deleteMembershipsForSpace,
   effectiveStatus,
@@ -29,13 +25,19 @@ import {
   toSummaryPatch,
   type MembershipSummary,
 } from "./model/memberships";
-import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
+import {
+  enrichItem,
+  enrichedItemValidator,
+  intentValidator,
+  CITY_SCAN_ROWS,
+  readyCitySaves,
+} from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
-  claimSpaceForModel,
+  claimSpaceForPlanning,
   deleteTripsForSpace,
-  loadReadySaves,
+  planSaves,
   toPlanSource,
 } from "./tripData";
 
@@ -153,7 +155,7 @@ async function loadPreviews(
   return previews;
 }
 
-export const listSpaces = query({
+export const listSpaces = authedQuery({
   args: {},
   returns: v.array(
     v.object({
@@ -175,28 +177,29 @@ export const listSpaces = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const spaces = await ctx.db
       .query("spaces")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
 
-    const results = [];
-    for (const space of spaces) {
-      const summary = await readSummary(ctx, space);
-      results.push({
-        ...space,
-        itemCount: summary.savedCount,
-        suggestionCount: summary.suggestedCount,
-        previews: await loadPreviews(ctx, summary),
-      });
-    }
-    return results;
+    // Each space's reads go out together rather than one space after another.
+    return await Promise.all(
+      spaces.map(async (space) => {
+        const summary = await readSummary(ctx, space);
+        return {
+          ...space,
+          itemCount: summary.savedCount,
+          suggestionCount: summary.suggestedCount,
+          previews: await loadPreviews(ctx, summary),
+        };
+      }),
+    );
   },
 });
 
-export const getSpace = query({
+export const getSpace = authedQuery({
   args: { id: v.id("spaces") },
   returns: v.union(
     v.object({
@@ -212,7 +215,7 @@ export const getSpace = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
       return null;
@@ -238,7 +241,7 @@ export const getSpace = query({
   },
 });
 
-export const createSpace = mutation({
+export const createSpace = authedMutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
@@ -247,7 +250,7 @@ export const createSpace = mutation({
   },
   returns: v.id("spaces"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const name = args.name.trim();
 
     const existing = await ctx.db
@@ -288,7 +291,58 @@ export const createSpace = mutation({
   },
 });
 
-export const updateSpace = mutation({
+export const ensureCitySpace = authedMutation({
+  args: { city: v.string() },
+  returns: v.id("spaces"),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const name = validateSpaceName(tidyCity(args.city));
+    await requireProEntitlement(ctx, userId);
+    const saves = await readyCitySaves(ctx, userId, args.city, CITY_SCAN_ROWS);
+    if (saves.length === 0) {
+      throw new ConvexError({
+        code: "city_empty",
+        message: "No ready saves in this city",
+      });
+    }
+
+    // listCities groups case-insensitively and its display spelling can flip,
+    // so match the space by the same key, not the exact name.
+    const key = cityKey(name);
+    let existing: Doc<"spaces"> | null = null;
+    for await (const space of ctx.db
+      .query("spaces")
+      .withIndex("by_user", (q) => q.eq("userId", userId))) {
+      if (cityKey(space.name) === key) {
+        existing = space;
+        break;
+      }
+    }
+    const spaceId =
+      existing?._id ??
+      (await ctx.db.insert("spaces", {
+        userId,
+        name,
+        dynamic: false,
+        autoFile: false,
+        ...emptySummary(),
+      }));
+    // Oldest first, so planners that read the newest memberships keep the recent saves.
+    for (const item of [...saves].reverse()) {
+      if ((await getMembership(ctx, item._id, spaceId)) === null) {
+        await insertMembership(ctx, {
+          userId,
+          spaceId,
+          itemId: item._id,
+          status: "saved",
+        });
+      }
+    }
+    return spaceId;
+  },
+});
+
+export const updateSpace = authedMutation({
   args: {
     id: v.id("spaces"),
     name: v.optional(v.string()),
@@ -297,7 +351,7 @@ export const updateSpace = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
@@ -350,11 +404,11 @@ export const updateSpace = mutation({
   },
 });
 
-export const deleteSpace = mutation({
+export const deleteSpace = authedMutation({
   args: { id: v.id("spaces") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
@@ -420,7 +474,6 @@ async function scheduleSteering(
   userId: Id<"users">,
   item: Doc<"items">,
   spaceId: Id<"spaces">,
-  options: { throws: boolean },
 ): Promise<boolean> {
   if (item.status !== "ready") {
     return false;
@@ -433,7 +486,6 @@ async function scheduleSteering(
   }
   const { ok } = await rateLimiter.limit(ctx, "steerItem", {
     key: userId,
-    throws: options.throws,
   });
   if (!ok) {
     return false;
@@ -446,11 +498,11 @@ async function scheduleSteering(
   return true;
 }
 
-export const addItemToSpace = mutation({
+export const addItemToSpace = authedMutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const { item } = await requireItemAndSpace(
       ctx,
       userId,
@@ -470,16 +522,16 @@ export const addItemToSpace = mutation({
     } else {
       return null;
     }
-    await scheduleSteering(ctx, userId, item, args.spaceId, { throws: true });
+    await scheduleSteering(ctx, userId, item, args.spaceId);
     return null;
   },
 });
 
-export const removeItemFromSpace = mutation({
+export const removeItemFromSpace = authedMutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row !== null && effectiveStatus(row) === "saved") {
@@ -489,11 +541,11 @@ export const removeItemFromSpace = mutation({
   },
 });
 
-export const acceptSuggestion = mutation({
+export const acceptSuggestion = authedMutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const { item } = await requireItemAndSpace(
       ctx,
       userId,
@@ -505,16 +557,16 @@ export const acceptSuggestion = mutation({
       return false;
     }
     await setMembershipStatus(ctx, row, "saved");
-    await scheduleSteering(ctx, userId, item, args.spaceId, { throws: true });
+    await scheduleSteering(ctx, userId, item, args.spaceId);
     return true;
   },
 });
 
-export const undoAcceptSuggestion = mutation({
+export const undoAcceptSuggestion = authedMutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row !== null && effectiveStatus(row) === "saved") {
@@ -525,11 +577,11 @@ export const undoAcceptSuggestion = mutation({
   },
 });
 
-export const dismissSuggestion = mutation({
+export const dismissSuggestion = authedMutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row === null || effectiveStatus(row) !== "suggested") {
@@ -540,11 +592,11 @@ export const dismissSuggestion = mutation({
   },
 });
 
-export const acceptAllSuggestions = mutation({
+export const acceptAllSuggestions = authedMutation({
   args: { spaceId: v.id("spaces") },
   returns: v.number(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
@@ -558,9 +610,7 @@ export const acceptAllSuggestions = mutation({
       }
       const item = await ctx.db.get(row.itemId);
       if (item !== null && item.status === "ready") {
-        steeringAllowed = await scheduleSteering(ctx, userId, item, space._id, {
-          throws: false,
-        });
+        steeringAllowed = await scheduleSteering(ctx, userId, item, space._id);
       }
     }
     return suggested.length;
@@ -715,16 +765,16 @@ export const survivingCandidates = internalQuery({
 });
 
 export const claimPlanInternal = internalMutation({
-  args: { spaceId: v.id("spaces") },
+  args: { spaceId: v.id("spaces"), city: v.optional(v.string()) },
   returns: v.object({
     spaceName: v.string(),
     sources: v.array(planSourceValidator),
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
-    const sources = (await loadReadySaves(ctx, args.spaceId, userId)).map(
-      ({ item, join }) => toPlanSource(item, join),
+    const { userId, space } = await claimSpaceForPlanning(ctx, args.spaceId);
+    const sources = (await planSaves(ctx, args.spaceId, userId, args.city)).map(
+      ({ item, join }) => toPlanSource(item, join, args.city),
     );
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };
@@ -736,7 +786,7 @@ export const claimPlanInternal = internalMutation({
     return {
       spaceName: space.name,
       sources,
-      been: await beenPlaces(ctx, userId),
+      been: await beenPlaces(ctx, userId, sources),
     };
   },
 });
@@ -797,7 +847,13 @@ export const setMembershipIntentsInternal = internalMutation({
     if (!(await aiAllowed(ctx, row.userId))) {
       return null;
     }
+    const hadPlace = (row.intents ?? []).some((i) => i.kind === "open_maps");
     await ctx.db.patch(row._id, { intents: args.intents });
+    if (hadPlace || args.intents.some((i) => i.kind === "open_maps")) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     return null;
   },
 });

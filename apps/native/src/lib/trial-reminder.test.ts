@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as SecureStore from "expo-secure-store";
 import {
   confirmTrialReminderAsk,
   scheduleTrialReminder,
@@ -8,9 +9,9 @@ import {
   trialLastDayAt,
   trialNudgeAt,
   trialNudgesAllowed,
-  trialReminderAt,
   trialReminderPrimer,
 } from "./trial-reminder";
+import { trialReminderAt, trialReminderLeadDays } from "./trial-reminder-lead";
 
 const mock = vi.hoisted(() => ({
   platform: { OS: "ios" },
@@ -22,7 +23,10 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
 }));
 vi.mock("react-native", () => ({ Platform: mock.platform }));
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/lib/i18n", () => ({
+  t: (key: string, values?: { count?: number }) =>
+    values?.count === undefined ? key : `${key}:${values.count}`,
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: vi.fn() },
 }));
@@ -48,7 +52,7 @@ vi.mock("expo-notifications", () => ({
 }));
 
 const DAY = 24 * 60 * 60 * 1000;
-const NOW = 1_800_000_000_000;
+const NOW = new Date(2027, 0, 15, 12, 0).getTime();
 const granted = { granted: true, canAskAgain: true, ios: { status: 2 } };
 const undetermined = { granted: false, canAskAgain: true, ios: { status: 0 } };
 
@@ -63,9 +67,61 @@ describe("trialReminderAt", () => {
     expect(trialReminderAt(NOW + 7 * DAY, NOW)).toBe(NOW + 5 * DAY);
   });
 
+  it("moves a night reminder earlier into the day, never later", () => {
+    const at = (hour: number, minute: number) => {
+      const start = new Date(2027, 0, 4, hour, minute).getTime();
+      return new Date(trialReminderAt(start + 7 * DAY, start) ?? 0);
+    };
+    expect(at(23, 30)).toEqual(new Date(2027, 0, 9, 20, 0));
+    expect(at(6, 15)).toEqual(new Date(2027, 0, 8, 20, 0));
+    expect(at(20, 0)).toEqual(new Date(2027, 0, 9, 20, 0));
+    expect(at(9, 0)).toEqual(new Date(2027, 0, 9, 9, 0));
+  });
+
   it("skips a trial that ends within two days", () => {
     expect(trialReminderAt(NOW + 2 * DAY, NOW)).toBeNull();
     expect(trialReminderAt(NOW + DAY, NOW)).toBeNull();
+  });
+});
+
+describe("the reminder's lead", () => {
+  it("keeps the days an install already picked, and falls back to two", () => {
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce(null);
+    expect(trialReminderLeadDays()).toBe(2);
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("9");
+    expect(trialReminderLeadDays()).toBe(2);
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("3");
+    expect(trialReminderLeadDays()).toBe(3);
+  });
+
+  it("schedules three days ahead and names the days when three were picked", async () => {
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("3");
+    expect(await scheduleTrialReminder(NOW + 7 * DAY, NOW, false)).toBe(true);
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: TRIAL_REMINDER_ID,
+        content: expect.objectContaining({
+          title: "notifications.trialEndingTitle:3",
+        }),
+        trigger: expect.objectContaining({ date: new Date(NOW + 4 * DAY) }),
+      }),
+    );
+  });
+
+  it("puts a day's lead an hour inside the renewal window, not on its edge", () => {
+    const HOUR = 60 * 60 * 1000;
+    expect(trialReminderAt(NOW + 7 * DAY, NOW, 1)).toBe(NOW + 6 * DAY - HOUR);
+    expect(trialReminderAt(NOW + 7 * DAY, NOW, 2)).toBe(NOW + 5 * DAY);
+    expect(trialReminderAt(NOW + 7 * DAY, NOW, 3)).toBe(NOW + 4 * DAY);
+  });
+
+  it("sends no second last-day warning when the reminder is a day ahead", async () => {
+    vi.mocked(SecureStore.getItem).mockReturnValueOnce("1");
+    expect(await scheduleTrialReminder(NOW + 7 * DAY, NOW, false)).toBe(true);
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
+    );
+    expect(ids).toEqual([TRIAL_REMINDER_ID]);
   });
 });
 

@@ -194,10 +194,12 @@ export function useReplayOnboarding() {
               spaceId,
               operationId: getOrCreatePendingOperationId(),
               analyticsSessionId: analytics.sessionId(),
+              saveSource: "onboarding_demo",
             });
             if (getPendingDemoUrl() === legacyDemoUrl) clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
-          } catch {
+          } catch (error) {
+            analytics.captureError("onboarding_demo_save_failed", error);
             return;
           }
         }

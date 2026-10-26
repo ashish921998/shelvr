@@ -30,6 +30,8 @@ import {
   Circle,
   Group,
   Path,
+  Skia,
+  type SkPath,
 } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -406,6 +408,9 @@ type GlobeFrame = {
 
 const SPIN_FRAME_MS = 1000 / 30;
 
+const toSkPath = (svg: string): SkPath | null =>
+  svg === "" ? null : Skia.Path.MakeFromSVGString(svg);
+
 const HIDDEN: GlobeFrame = {
   paths: { sphere: "", graticule: "", land: "", country: "" },
   light: 0,
@@ -435,7 +440,10 @@ function Globe({
   const width = rt.screen.width;
   const height = rt.screen.height;
 
-  useEffect(warmGlobe, []);
+  useEffect(() => {
+    const id = setTimeout(warmGlobe, 0);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     const aim = lng !== undefined && lat !== undefined ? { lng, lat } : null;
@@ -451,15 +459,16 @@ function Globe({
     const screen = { width, height };
     let handle = 0;
     let shown = false;
-    let drawn = -Infinity;
+    let drawnSlot = -1;
     const tick = () => {
       const t = Date.now() - startedAt;
       const diveAt = dive.current?.at ?? null;
-      if (diveAt === null && t - drawn < SPIN_FRAME_MS) {
+      const slot = Math.floor(t / SPIN_FRAME_MS);
+      if (diveAt === null && slot === drawnSlot) {
         handle = requestAnimationFrame(tick);
         return;
       }
-      drawn = t;
+      drawnSlot = slot;
       const camera = globeCamera({ t, diveAt, ...screen, target: aim });
       const paths = globePaths(camera, screen, dive.current?.region ?? null);
       const framePin =
@@ -479,7 +488,16 @@ function Globe({
     return () => cancelAnimationFrame(handle);
   }, [stage, startedAt, lng, lat, width, height, glow, landing]);
 
-  const { paths, light } = frame;
+  const { light } = frame;
+  const paths = useMemo(
+    () => ({
+      sphere: toSkPath(frame.paths.sphere),
+      graticule: toSkPath(frame.paths.graticule),
+      land: toSkPath(frame.paths.land),
+      country: toSkPath(frame.paths.country),
+    }),
+    [frame.paths],
+  );
   const pin = frame.pin ?? { ...landing, dive: 0 };
   return (
     <>

@@ -26,7 +26,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, Share, View } from "react-native";
 import Animated, {
@@ -168,7 +168,9 @@ function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
         size={15}
         tintColor={theme.colors.foreground}
       />
-      <ThemedText variant="button">{t("plan.ask")}</ThemedText>
+      <ThemedText variant="button" style={styles.actionLabel}>
+        {t("plan.ask")}
+      </ThemedText>
     </Pressable>
   );
 }
@@ -231,24 +233,38 @@ function PlanFooter({
         </>
       ) : (
         <View style={styles.actions}>
-          <Button
-            title={t("plan.pick")}
-            onPress={onDeal}
-            disabled={spinning}
-            style={styles.deal}
-          />
-          {askButton}
+          <View style={styles.actionSlot}>
+            <Button
+              title={t("plan.pick")}
+              onPress={onDeal}
+              loading={spinning}
+              style={styles.pick}
+            />
+          </View>
+          <View style={styles.actionSlot}>{askButton}</View>
         </View>
       )}
     </View>
   );
 }
 
+/** A shared shortlist reopens from a city only when every place on it is one of that city's saves. */
+function sharedForCity<T extends { places: { itemId: string }[] }>(
+  shared: T | null | undefined,
+  city: string | undefined,
+  citySaves: { _id: string }[] | undefined,
+): T | null | undefined {
+  if (!city || !shared) return shared;
+  if (citySaves === undefined) return undefined;
+  const ids = new Set(citySaves.map((save) => save._id));
+  return shared.places.every((place) => ids.has(place.itemId)) ? shared : null;
+}
+
 export default function PlanScreen() {
   const locale = useAppLocale();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `city` is set when a city page opened this plan, so it plans that city's saves.
+  const { id, city } = useLocalSearchParams<{ id: string; city?: string }>();
   const spaceId = id as Id<"spaces">;
-  const router = useRouter();
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: spaceId }),
@@ -256,10 +272,18 @@ export default function PlanScreen() {
   const { data: latestLink, isError: linkFailed } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
   );
+  const { data: citySaves } = useQuery(
+    convexQuery(api.items.listCityItems, city ? { city } : "skip"),
+  );
   const { state, retry } = useMakePlan(
     spaceId,
     locale,
-    linkFailed ? null : latestLink,
+    sharedForCity<NonNullable<typeof latestLink>>(
+      linkFailed ? null : latestLink,
+      city,
+      citySaves,
+    ),
+    city,
   );
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
@@ -436,26 +460,6 @@ export default function PlanScreen() {
           </View>
         ) : null}
 
-        {state.status === "ai_off" ? (
-          <View style={styles.message}>
-            <EmptyState title={t("plan.make")} message={t("plan.aiOff")} />
-            <Button
-              title={t("profile.settings")}
-              onPress={() => router.push("/settings")}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={again}
-              hitSlop={8}
-              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
-            >
-              <ThemedText variant="secondaryLabel" style={styles.muted}>
-                {t("common.tryAgain")}
-              </ThemedText>
-            </Pressable>
-          </View>
-        ) : null}
-
         {state.status === "error" ? (
           <View style={styles.message}>
             <EmptyState
@@ -557,11 +561,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.gap(1),
-    minHeight: theme.control.minHeight + theme.gap(0.5),
+    minHeight: theme.control.minHeight,
+    paddingHorizontal: theme.gap(1.5),
+    paddingVertical: theme.gap(1),
     borderRadius: 999,
     borderWidth: 2,
     borderColor: "transparent",
   },
+  actionSlot: { flex: 1 },
+  pick: { minHeight: theme.control.minHeight },
   actionFilled: {
     backgroundColor: theme.colors.primary,
   },
@@ -574,8 +582,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   actionBusy: {
     opacity: theme.opacity.disabled,
   },
-  deal: {
-    flex: 1,
+  actionLabel: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   onTint: {
     color: theme.colors.onTint,

@@ -3,6 +3,7 @@ import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { env, httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
+import { isDevDeployment } from "./model/deployment";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
@@ -22,6 +23,7 @@ import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
 import { parsePlanVote, type PlanVoteBody } from "./model/planVote";
 import { parseOracleInput } from "./model/oracle";
+import { parseReelPlacesBody } from "./model/reelPlaces";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
 import {
@@ -150,6 +152,13 @@ http.route({
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
       return new Response("Bad payload", { status: 400 });
+    }
+    // Test Store purchases cost nothing, so only the dev deployment may grant Pro for one.
+    if (event.testStore && !isDevDeployment()) {
+      logEvent("warn", "revenuecat_test_store_ignored", {
+        event_type: event.type ?? "unknown",
+      });
+      return new Response(null, { status: 200 });
     }
 
     if (event.type === "TRANSFER") {
@@ -293,7 +302,12 @@ http.route({
     )
       return json({ error: "unauthorized" }, 401);
     const route = req.headers.get("x-shelvr-body-route");
-    if (route !== "oracle" && route !== "waitlist" && route !== "oracle-image")
+    if (
+      route !== "oracle" &&
+      route !== "waitlist" &&
+      route !== "oracle-image" &&
+      route !== "reel-places"
+    )
       return json({ error: "bad_request" }, 400);
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
@@ -367,6 +381,51 @@ http.route({
         error_name: errorName(error),
       });
       return json({ message: "Could not join right now." }, 500);
+    }
+  }),
+});
+
+http.route({
+  path: "/reel-places",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Reel places secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(await readBoundedText(req, 8 * 1024));
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    const url = parseReelPlacesBody(body);
+    if (!url) {
+      return json({ message: "Invalid request." }, 400);
+    }
+
+    try {
+      await ctx.runMutation(internal.oracleLimits.claimReelPlaces, {
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+      });
+      const found = await ctx.runAction(internal.reelPlaces.find, { url });
+      if (found.status === "unreadable") {
+        return json({ message: "That link could not be read." }, 422);
+      }
+      return json({ places: found.places, city: found.city }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "reel_places_request_failed", {
+        error_name: errorName(error),
+      });
+      return json({ message: "The finder could not answer." }, 500);
     }
   }),
 });

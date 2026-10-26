@@ -1,22 +1,43 @@
-import { expect, type Screen } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
+import { pollUntil } from "./poll.ts";
 
-function paywallRestore(screen: Screen) {
-  return screen.getByRole("button", /^Restore purchases$/i);
+export async function closePaywallTo(
+  screen: Screen,
+  destination: Locator,
+): Promise<void> {
+  // The underlying screen can remain visible in AX during native presentation.
+  // Send Close, then require the paywall itself to disappear before returning.
+  await pollUntil(
+    async () => {
+      await screen.getByRole("button", "Close").first().tap();
+      return expect(paywallTitle(screen))
+        .toBeHidden({ timeout: 2000 })
+        .then(() => true)
+        .catch(() => false);
+    },
+    { timeout: 30_000 },
+  );
+  await expect(destination).toBeVisible({ timeout: 30_000 });
 }
 
 export function paywallTitle(screen: Screen) {
-  return screen.getByText("How free trial works");
+  return screen
+    .getByText(
+      /^(Make plans from your saves\.|Make date night easy\.|Plan .+ from your saves\.|Know where to eat next\.)$/,
+    )
+    .first();
 }
 
 export async function expectPaywall(screen: Screen): Promise<void> {
-  await expect(paywallTitle(screen)).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(screen.getByText(/Shelvr Pro/)).toBeVisible();
-  await expect(screen.getByRole("button", /^7-day trial, /)).toBeVisible();
-  await expect(screen.getByRole("button", "View all plans")).toBeVisible();
-  await expect(
-    screen.getByRole("button", "Start 7-day free trial"),
-  ).toBeVisible();
-  await expect(paywallRestore(screen)).toBeVisible();
+  await expect(paywallTitle(screen)).toBeVisible({ timeout: 60_000 });
+  await expect(screen.getByRole("button", "Continue").last()).toBeVisible();
+}
+
+export async function openPaywallPlans(screen: Screen): Promise<void> {
+  await screen.getByRole("button", "Continue").last().tap();
+  await expect(screen.getByText("How your trial works")).toBeVisible();
+  await screen.getByRole("button", "See plans").last().tap();
+  await expect(screen.getByRole("button", /^Yearly, /)).toBeVisible();
+  await expect(screen.getByRole("button", /^Weekly, /)).toBeVisible();
+  await expect(screen.getByRole("button", "Restore")).toBeVisible();
 }

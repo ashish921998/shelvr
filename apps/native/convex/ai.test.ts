@@ -30,7 +30,11 @@ import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
 import type { ArticleMedia, PostMedia } from "./model/itemFields";
-import { newConvexTest, signedInUser } from "./test.setup";
+import {
+  newConvexTest,
+  signedInUser,
+  insertConsentingUser,
+} from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const parseJson = vi.hoisted(() => vi.fn());
@@ -596,6 +600,7 @@ describe("processItem for X posts", () => {
           spaceNames: [],
           intents: [],
           cities: [],
+          places: [],
           recipe: {
             name: "Pancakes",
             servings: "4 servings",
@@ -1244,7 +1249,7 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
         userId,
@@ -1528,6 +1533,28 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     const item = await save(cutAt(microdataHtml(), "the salt."), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
+  });
+
+  function jsonLdHtml(where: "head" | "body"): string {
+    const script = `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Miso butter roast chicken",
+      recipeIngredient: INGREDIENTS,
+      recipeInstructions: STEPS,
+    })}</script>`;
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title>${where === "head" ? script : ""}</head><body>${where === "body" ? script : ""}<p>${"Comments. ".repeat(50)}`;
+  }
+
+  it("keeps a JSON-LD recipe from a whole head when the page was cut", async () => {
+    const item = await save(jsonLdHtml("head"), true);
+    expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    expect(item?.recipe?.steps).toEqual(STEPS);
+  });
+
+  it("refuses a JSON-LD recipe in the body of a cut page", async () => {
+    const item = await save(jsonLdHtml("body"), true);
+    expect(item?.recipe).toBeUndefined();
   });
 
   describe("when the model proposes a recipe too", () => {

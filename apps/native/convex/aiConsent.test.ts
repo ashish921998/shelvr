@@ -9,8 +9,14 @@ import { AI_CONSENT_VERSION, isAiConsentRequired } from "./model/aiConsent";
 import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_DIMENSIONS,
+  EMBEDDING_SWEEP_PAGE,
 } from "./model/embedding";
-import { newConvexTest, signedInUser } from "./test.setup";
+import {
+  insertConsentingUser,
+  newConvexTest,
+  setTestConsent,
+  signedInUser,
+} from "./test.setup";
 import { aiAllowed } from "./aiConsent";
 
 const embedMany = vi.hoisted(() => vi.fn());
@@ -35,8 +41,11 @@ const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
 
 type T = TestConvexForDataModel<DataModel>;
 
-async function signedIn(backend = newConvexTest()): Promise<T> {
-  const { t, userId } = await signedInUser(backend);
+async function signedIn(
+  backend = newConvexTest(),
+  aiConsent: "granted" | "unset" = "granted",
+): Promise<T> {
+  const { t, userId } = await signedInUser(backend, { aiConsent });
   USER = userId;
   return t;
 }
@@ -127,7 +136,7 @@ afterEach(() => {
 
 describe("getStatus and setConsent", () => {
   it("reads unset until the user answers, then their answer", async () => {
-    const t = await signedIn();
+    const t = await signedIn(newConvexTest(), "unset");
     const unset = { status: "unset", version: AI_CONSENT_VERSION };
     expect(await t.query(api.aiConsent.getStatus, {})).toEqual(unset);
 
@@ -147,7 +156,7 @@ describe("getStatus and setConsent", () => {
   });
 
   it("asks again when the answer was to an older disclosure", async () => {
-    const t = await signedIn();
+    const t = await signedIn(newConvexTest(), "unset");
     await t.run((ctx) =>
       ctx.db.insert("aiConsents", {
         userId: USER,
@@ -166,7 +175,9 @@ describe("getStatus and setConsent", () => {
     ).mutation(api.aiConsent.setConsent, {
       granted: false,
     });
-    const { t: other, userId: otherId } = await signedInUser(backend);
+    const { t: other, userId: otherId } = await signedInUser(backend, {
+      aiConsent: "unset",
+    });
     expect((await other.query(api.aiConsent.getStatus, {})).status).toBe(
       "unset",
     );
@@ -183,17 +194,49 @@ describe("getStatus and setConsent", () => {
 });
 
 describe("a user who has not answered", () => {
-  it("is still classified, so builds without the consent card keep working", async () => {
-    const t = await signedIn();
+  it("uses AI by default without writing a consent record", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    expect(generateObject).toHaveBeenCalledTimes(1);
-    expect(embedMany).toHaveBeenCalledTimes(1);
+    expect(generateObject).toHaveBeenCalledOnce();
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       status: "ready",
       title: "Model title",
-      tags: ["model"],
     });
+    expect(await t.run((ctx) => ctx.db.query("aiConsents").collect())).toEqual(
+      [],
+    );
+  });
+});
+
+describe("a previously declined account that then allows AI through a legacy client", () => {
+  it("gets the saves it made before answering embedded", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const itemId = await ready(t);
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).not.toHaveBeenCalled();
+
+    await t.mutation(api.aiConsent.setConsent, { granted: true });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).toHaveBeenCalledTimes(1);
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.embedding).toHaveLength(
+      EMBEDDING_DIMENSIONS,
+    );
+  });
+});
+
+describe("an unanswered account that then taps Not now", () => {
+  it("has vectors stored before answering removed", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    const itemId = await ready(t, { embedding: VECTOR });
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(
+      (await t.run((ctx) => ctx.db.get(itemId)))?.embedding,
+    ).toBeUndefined();
   });
 });
 
@@ -357,7 +400,7 @@ describe("a user who declined", () => {
   it("gets no steering when filing an item into a space", async () => {
     const t = newConvexTest();
     const { itemId, spaceId, userId } = await t.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("subscriptions", {
         userId,
         status: "pro",
@@ -442,14 +485,7 @@ describe("a user who declined", () => {
   it("is skipped by a sweep that reaches an item before the cleanup does", async () => {
     const t = await signedIn();
     const itemId = await ready(t);
-    await t.run((ctx) =>
-      ctx.db.insert("aiConsents", {
-        userId: USER,
-        status: "declined",
-        version: AI_CONSENT_VERSION,
-        updatedAt: 1,
-      }),
-    );
+    await t.run((ctx) => setTestConsent(ctx, USER, "declined"));
     expect(await t.action(internal.ai.sweepItemEmbeddings, {})).toEqual({
       scanned: 1,
       written: 0,
@@ -619,5 +655,152 @@ describe("a decline that lands while a run is still out", () => {
     expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
       [],
     );
+  });
+});
+
+describe("repairing saves skipped before automatic AI", () => {
+  it("makes an old skipped save eligible and embeds it without recording consent", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    const itemId = await ready(t);
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        embeddingVersion: CURRENT_EMBEDDING_VERSION,
+        embeddingAttempts: 3,
+      }),
+    );
+    expect(
+      await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
+        limit: 10,
+      }),
+    ).toEqual([]);
+    expect(
+      await t.mutation(internal.aiConsent.repairUnansweredEmbeddings, {
+        cursor: null,
+      }),
+    ).toEqual({ repaired: 1, done: true });
+    expect(
+      (await t.run((ctx) => ctx.db.get(itemId)))?.embeddingAttempts,
+    ).toBeUndefined();
+    await t.action(internal.ai.sweepItemEmbeddings, {});
+    expect(embedMany).toHaveBeenCalledOnce();
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.embedding).toEqual(
+      VECTOR,
+    );
+    expect(
+      await t.mutation(internal.aiConsent.repairUnansweredEmbeddings, {
+        cursor: null,
+      }),
+    ).toEqual({ repaired: 0, done: true });
+    expect(await t.run((ctx) => ctx.db.query("aiConsents").collect())).toEqual(
+      [],
+    );
+  });
+
+  it("leaves existing vectors, explicit preferences and non-live owners untouched", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    const vectorId = await ready(t, { embedding: VECTOR });
+    const ids = await t.run(async (ctx) => {
+      const ids: Id<"items">[] = [];
+      for (const kind of [
+        "declined",
+        "granted",
+        "deleting",
+        "missing",
+      ] as const) {
+        const userId = await ctx.db.insert("users", {});
+        if (kind === "declined" || kind === "granted")
+          await setTestConsent(ctx, userId, kind);
+        if (kind === "deleting") await ctx.db.patch(userId, { deleting: true });
+        if (kind === "missing") await ctx.db.delete(userId);
+        ids.push(
+          await ctx.db.insert("items", {
+            userId,
+            type: "note",
+            status: "ready",
+            title: "Older save",
+            tags: [],
+            searchText: "older save",
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          }),
+        );
+      }
+      return ids;
+    });
+    const before = await t.run(async (ctx) =>
+      Promise.all([...ids, vectorId].map((id) => ctx.db.get(id))),
+    );
+    expect(
+      await t.mutation(internal.aiConsent.repairUnansweredEmbeddings, {
+        cursor: null,
+      }),
+    ).toEqual({ repaired: 0, done: true });
+    expect(
+      await t.run(async (ctx) =>
+        Promise.all([...ids, vectorId].map((id) => ctx.db.get(id))),
+      ),
+    ).toEqual(before);
+  });
+
+  it("continues across pages and honors an opt-out recorded between batches", async () => {
+    const t = await signedIn(newConvexTest(), "unset");
+    const ids = await t.run(async (ctx) => {
+      const ids: Id<"items">[] = [];
+      for (let i = 0; i < 101; i++)
+        ids.push(
+          await ctx.db.insert("items", {
+            userId: USER,
+            type: "note",
+            status: "ready",
+            title: "Older save",
+            tags: [],
+            searchText: "older save",
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          }),
+        );
+      return ids;
+    });
+    expect(
+      await t.mutation(internal.aiConsent.repairUnansweredEmbeddings, {
+        cursor: null,
+      }),
+    ).toEqual({ repaired: 50, done: false });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(
+      await t.run(async (ctx) =>
+        Promise.all(
+          ids.map(
+            async (id) => (await ctx.db.get(id))?.embeddingVersion ?? null,
+          ),
+        ),
+      ),
+    ).toEqual(ids.map(() => null));
+    await t.run(async (ctx) => {
+      for (const id of ids)
+        await ctx.db.patch(id, { embeddingVersion: CURRENT_EMBEDDING_VERSION });
+    });
+    await t.mutation(internal.aiConsent.repairUnansweredEmbeddings, {
+      cursor: null,
+    });
+    await t.run((ctx) => setTestConsent(ctx, USER, "declined"));
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const eligible = await t.query(
+      internal.items.listItemsNeedingEmbeddingInternal,
+      { limit: 100 },
+    );
+    expect(eligible).toHaveLength(EMBEDDING_SWEEP_PAGE);
+    const cleared = await t.run(async (ctx) => {
+      const items = await Promise.all(ids.map((id) => ctx.db.get(id)));
+      return items.filter((item) => item?.embeddingVersion === undefined)
+        .length;
+    });
+    expect(cleared).toBe(50);
+    expect(eligible.every((item) => item.aiDeclined)).toBe(true);
+    expect(
+      await t.mutation(internal.aiConsent.repairUnansweredEmbeddings, {
+        cursor: null,
+      }),
+    ).toEqual({ repaired: 0, done: false });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await expectNoThirdPartyCall();
   });
 });

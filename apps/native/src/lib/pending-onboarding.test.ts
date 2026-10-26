@@ -57,42 +57,47 @@ describe("onboarding recovery", () => {
       spaces: ["Travel"],
       step: 2,
       travelCity: null,
-      goal: null,
-      eveningAfter: null,
+      goals: [],
+      savedCount: null,
+      planner: null,
     });
   });
 });
 
-describe("the date night's after-dinner pick", () => {
-  it("is kept with the progress through a relaunch", () => {
+describe("the survey answers", () => {
+  it("are kept with the progress through a relaunch and the hand-off to the replay", () => {
     setOnboardingProgress({
       spaces: ["Date nights"],
       step: 5,
-      goal: "date",
-      eveningAfter: "dessert",
-    });
-    expect(getOnboardingProgress().eveningAfter).toBe("dessert");
-  });
-
-  it("is kept when onboarding hands its spaces to the replay", () => {
-    setOnboardingProgress({
-      spaces: ["Date nights"],
-      step: 5,
-      goal: "date",
-      eveningAfter: "dessert",
+      goals: ["date", "food"],
+      savedCount: "hundreds",
+      planner: "explorer",
     });
     setPendingSpaces(["Date nights"]);
-    expect(getOnboardingProgress().eveningAfter).toBe("dessert");
+    expect(getOnboardingProgress()).toMatchObject({
+      goals: ["date", "food"],
+      savedCount: "hundreds",
+      planner: "explorer",
+    });
   });
 
-  it("reads back as none when the stored pick is not one of the chips", () => {
-    setOnboardingProgress({ spaces: [], step: 5, eveningAfter: "drinks" });
+  it("read back as none when stored answers are not ones onboarding asks", () => {
+    setOnboardingProgress({ spaces: [], step: 2 });
     const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
     storage.set(
       "shelvr.pending.onboarding",
-      JSON.stringify({ ...stored, eveningAfter: "karaoke" }),
+      JSON.stringify({
+        ...stored,
+        goals: ["shopping", "travel"],
+        savedCount: "millions",
+        planner: "chaotic",
+      }),
     );
-    expect(getOnboardingProgress().eveningAfter).toBeNull();
+    expect(getOnboardingProgress()).toMatchObject({
+      goals: ["travel"],
+      savedCount: null,
+      planner: null,
+    });
   });
 });
 
@@ -115,23 +120,6 @@ describe("the sample trip's city", () => {
       JSON.stringify({ ...stored, travelCity: "atlantis" }),
     );
     expect(getOnboardingProgress().travelCity).toBeNull();
-  });
-});
-
-describe("the goal", () => {
-  it("is kept with the progress through a relaunch", () => {
-    setOnboardingProgress({ spaces: ["Date nights"], step: 2, goal: "date" });
-    expect(getOnboardingProgress().goal).toBe("date");
-  });
-
-  it("reads back as none when the stored goal is not one onboarding asks", () => {
-    setOnboardingProgress({ spaces: [], step: 1, goal: "food" });
-    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({ ...stored, goal: "shopping" }),
-    );
-    expect(getOnboardingProgress().goal).toBeNull();
   });
 });
 
@@ -172,8 +160,9 @@ describe("progress written by an older onboarding flow", () => {
     spaces: [],
     step: null,
     travelCity: null,
-    goal: null,
-    eveningAfter: null,
+    goals: [],
+    savedCount: null,
+    planner: null,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -204,6 +193,9 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow that had the reveal step", { progressVersion: 5 }],
     ["the flow that had the first save", { progressVersion: 6 }],
     ["the flow that asked topics first", { progressVersion: 7 }],
+    ["the flow that asked one goal", { progressVersion: 8 }],
+    ["the flow without the chart step", { progressVersion: 9 }],
+    ["the flow that had the sample plan step", { progressVersion: 10 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -227,7 +219,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 8,
+        progressVersion: 11,
         step: 2,
         spaceNames: {},
       }),
@@ -236,8 +228,9 @@ describe("progress written by an older onboarding flow", () => {
       spaces: ["Travel"],
       step: 2,
       travelCity: null,
-      goal: null,
-      eveningAfter: null,
+      goals: [],
+      savedCount: null,
+      planner: null,
     });
   });
 
@@ -257,8 +250,9 @@ describe("progress written by an older onboarding flow", () => {
       spaces: [],
       step: 0,
       travelCity: null,
-      goal: null,
-      eveningAfter: null,
+      goals: [],
+      savedCount: null,
+      planner: null,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

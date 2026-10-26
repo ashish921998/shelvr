@@ -220,7 +220,7 @@ export function OpenerStep({
       </View>
 
       <View style={styles.foot}>
-        <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
+        <CtaButton label={t("opener.getStarted")} onPress={onStart} />
         {largeText ? null : signIn}
       </View>
     </View>

@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
-import { isGrounded, placeKey, sanitizePlan, type PlanSource } from "./plan";
+import {
+  isGrounded,
+  placeKey,
+  sanitizePlan,
+  suggestSavedPlaces,
+  type PlanSource,
+} from "./plan";
 
 function source(fields: Partial<PlanSource>): PlanSource {
   return { itemId: "item1" as Id<"items">, places: [], ...fields };
@@ -425,7 +431,7 @@ describe("sanitizePlan", () => {
     expect(street.name).toBe("The Palomar");
   });
 
-  it("caps the shortlist after visited places move last", () => {
+  it("leaves out visited places while an unvisited one is left", () => {
     const sources = Array.from({ length: 6 }, (_, i) =>
       source({ itemId: `item${i}` as Id<"items">, title: `Spot${i} dinner` }),
     );
@@ -437,9 +443,16 @@ describe("sanitizePlan", () => {
     }));
     const been = new Set([0, 1, 2, 3, 4].map((i) => placeKey(`Spot${i}`)));
     const places = sanitizePlan(raw, sources, been);
-    expect(places).toHaveLength(5);
+    expect(places).toHaveLength(1);
     expect(places[0]).toMatchObject({ name: "Spot5" });
     expect(places[0].been).toBeUndefined();
+  });
+
+  it("returns no places when every pick was visited", () => {
+    const sources = [source({ title: "Spot0 dinner" })];
+    const raw = [{ saveNumber: 1, name: "Spot0", area: "", why: "Good" }];
+    const places = sanitizePlan(raw, sources, new Set([placeKey("Spot0")]));
+    expect(places).toEqual([]);
   });
 
   it("keeps the address when the name before it proves nothing alone", () => {
@@ -464,4 +477,90 @@ describe("sanitizePlan", () => {
     );
     expect(place.why.length).toBeLessThanOrEqual(140);
   });
+});
+
+it("shuffles the stored places without inventing or dropping candidates", () => {
+  const sources = [source({ places: ["Place A", "Place B", "Place C"] })];
+  const random = vi.spyOn(Math, "random");
+  try {
+    random.mockReturnValue(0);
+    const first = suggestSavedPlaces(sources, new Set(), 5).map((p) => p.name);
+    random.mockReturnValue(0.99);
+    const second = suggestSavedPlaces(sources, new Set(), 5).map((p) => p.name);
+    expect(first).not.toEqual(second);
+    expect([...first].sort()).toEqual([...second].sort());
+    expect(first).toHaveLength(3);
+  } finally {
+    random.mockRestore();
+  }
+});
+
+it("excludes street-address labels without discarding numbered business names", () => {
+  const sources = [
+    source({
+      places: [
+        "80 Spring Street, New York, NY",
+        "205 East Houston Street, New York",
+        "12 rue de Richelieu, Paris",
+        "Rue de Richelieu, Paris",
+        "5 Guys, New York",
+        "7th Street Burger, New York",
+      ],
+    }),
+  ];
+  expect(
+    suggestSavedPlaces(sources, new Set(), 10)
+      .map((p) => p.name)
+      .sort(),
+  ).toEqual(["5 Guys", "7th Street Burger"]);
+});
+
+it("merges supported aliases at the same saved map point and excludes the group when either name was visited", () => {
+  const sources = [
+    source({
+      places: ["Belém Tower", "Torre de Belén"],
+      pins: [
+        { name: "Belém Tower", lat: 38.6916, lng: -9.216 },
+        { name: "Torre de Belén", lat: 38.6916, lng: -9.216 },
+      ],
+    }),
+  ];
+  expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(1);
+  expect(
+    suggestSavedPlaces(sources, new Set([placeKey("Torre de Belén")]), 10),
+  ).toEqual([]);
+});
+
+it("does not guess alias identity without pins or merge nearby or co-located distinct businesses", () => {
+  const names = ["Belém Tower", "Torre de Belén"];
+  expect(
+    suggestSavedPlaces([source({ places: names })], new Set(), 10),
+  ).toHaveLength(2);
+  const sources = [
+    source({
+      places: [...names, "Belém Cafe", "Other Restaurant"],
+      pins: [
+        { name: names[0], lat: 38.6916, lng: -9.216 },
+        { name: names[1], lat: 38.692, lng: -9.216 },
+        { name: "Belém Cafe", lat: 38.6916, lng: -9.216 },
+        { name: "Other Restaurant", lat: 38.6916, lng: -9.216 },
+      ],
+    }),
+  ];
+  expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(4);
+});
+
+it("keeps co-located venues distinct when only part of their name matches", () => {
+  const names = [
+    "National Art Museum",
+    "National Air Museum",
+    "National Design Museum",
+  ];
+  const sources = [
+    source({
+      places: names,
+      pins: names.map((name) => ({ name, lat: 38.6916, lng: -9.216 })),
+    }),
+  ];
+  expect(suggestSavedPlaces(sources, new Set(), 10)).toHaveLength(3);
 });

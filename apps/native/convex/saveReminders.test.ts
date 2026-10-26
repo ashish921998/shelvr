@@ -272,9 +272,40 @@ describe("choosing a save reminder", () => {
     expect(await reminders()).toHaveLength(2);
   });
 
+  it("skips an article already planned as a trip stop", async () => {
+    const { t, userId, ids, prepare, reminders } = await setup({
+      saves: [
+        [2, article],
+        [3, article],
+      ],
+    });
+    await t.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", { userId, name: "Lisbon" });
+      await ctx.db.insert("spaceItems", { userId, spaceId, itemId: ids[0] });
+      const stop = { name: "Café", why: "saved", slot: "morning" as const };
+      await ctx.db.insert("trips", {
+        userId,
+        spaceId,
+        pace: "easy",
+        days: [{ areas: [], stops: [{ ...stop, itemId: ids[0] }], gaps: [] }],
+        wishlist: [],
+      });
+    });
+    await prepare();
+    expect(await reminders()).toMatchObject([{ itemId: ids[1], kind: "read" }]);
+  });
+
   it("leaves out saves it cannot name an action for", async () => {
     const { prepare, reminders } = await setup({
       saves: [
+        [
+          2,
+          {
+            ...article,
+            url: "https://www.tiktok.com/@lisboa/video/7300000000000000000",
+            content: "Best pastel de nata in Lisbon #lisbon",
+          },
+        ],
         [2, { type: "note", title: "Groceries", content: "eggs" }],
         [
           2,

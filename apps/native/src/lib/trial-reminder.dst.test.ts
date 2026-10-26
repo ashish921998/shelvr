@@ -1,6 +1,7 @@
 import * as fc from "fast-check";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { trialLastDayAt } from "./trial-reminder";
+import { trialReminderAt } from "./trial-reminder-lead";
 
 const originalTz = process.env.TZ;
 afterAll(() => {
@@ -83,6 +84,44 @@ describe("last-day reminder across a clock change", () => {
           },
         ),
         { seed: 20261009, numRuns: 10_000 },
+      );
+    },
+  );
+});
+
+describe("two-day reminder across a clock change", () => {
+  it.each(ZONES)(
+    "in %s, lands between 9 am and 8 pm, never after two days before the end",
+    (zone) => {
+      process.env.TZ = zone;
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 2026, max: 2028 }),
+          fc.constantFrom(2, 3, 9, 10),
+          fc.integer({ min: 1, max: 28 }),
+          fc.integer({ min: 0, max: 23 }),
+          fc.integer({ min: 0, max: 59 }),
+          (year, month, day, hour, minute) => {
+            const expiresAt = new Date(
+              year,
+              month,
+              day,
+              hour,
+              minute,
+            ).getTime();
+            const fireAt = trialReminderAt(expiresAt, expiresAt - 7 * DAY);
+            expect(fireAt).not.toBeNull();
+            const lead = expiresAt - (fireAt ?? 0);
+            expect(lead).toBeGreaterThanOrEqual(2 * DAY);
+            expect(lead).toBeLessThan(3 * DAY);
+            const fire = new Date(fireAt ?? 0);
+            expect(fire.getHours()).toBeGreaterThanOrEqual(9);
+            expect(
+              fire.getHours() * 60 + fire.getMinutes(),
+            ).toBeLessThanOrEqual(20 * 60);
+          },
+        ),
+        { seed: 20261023, numRuns: 10_000 },
       );
     },
   );

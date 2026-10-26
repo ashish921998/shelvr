@@ -77,6 +77,41 @@ describe("a run without the model", () => {
   });
 });
 
+it("stores single-city classification places without city suffixes", () => {
+  const patch = completionPatch(
+    savedItem(),
+    {
+      reading: {},
+      classification: {
+        description: "Austin restaurants",
+        tags: [],
+        cities: ["Austin"],
+        places: ["Guest House, Austin", "Guest House", "Eberly, Austin"],
+      },
+    },
+    true,
+  );
+  expect(patch.places).toEqual(["Guest House", "Eberly"]);
+});
+
+it("preserves multi-city classification qualifiers", () => {
+  const places = ["Cafe, Austin", "Cafe, Dallas"];
+  const patch = completionPatch(
+    savedItem(),
+    {
+      reading: {},
+      classification: {
+        description: "Two cities",
+        tags: [],
+        cities: ["Austin", "Dallas"],
+        places,
+      },
+    },
+    true,
+  );
+  expect(patch.places).toEqual(places);
+});
+
 describe("a decline that lands at commit", () => {
   const item = savedItem({
     title: "Saved title",
@@ -118,6 +153,33 @@ describe("a decline that lands at commit", () => {
     });
     expect(patch.cities).toBeUndefined();
     expect(patch.embeddingVersion).toBeUndefined();
+  });
+});
+
+describe("the places a run brings", () => {
+  const classification = {
+    description: "Where to eat",
+    tags: ["lisbon"],
+    intents: [],
+    places: ["Santelmo", "Intenso"],
+  };
+
+  it("stores the model's places with AI allowed", () => {
+    const patch = completionPatch(
+      savedItem(),
+      { reading: {}, classification },
+      true,
+    );
+    expect(patch.places).toEqual(["Santelmo", "Intenso"]);
+  });
+
+  it("keeps the save's places when AI is declined", () => {
+    const patch = completionPatch(
+      savedItem({ places: ["Antiga"] }),
+      { reading: {}, classification },
+      false,
+    );
+    expect(patch.places).toEqual(["Antiga"]);
   });
 });
 

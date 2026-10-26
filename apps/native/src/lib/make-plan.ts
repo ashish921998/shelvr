@@ -2,7 +2,6 @@ import { t } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { isAiConsentRequired } from "@convex/model/aiConsent";
 import { placeKey, type PlanPlace } from "@convex/model/plan";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,7 +17,6 @@ type PlanState =
       considered: number;
       planId: number;
     }
-  | { status: "ai_off" }
   | { status: "error" };
 
 export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
@@ -34,9 +32,10 @@ export function useMakePlan(
   spaceId: Id<"spaces">,
   locale: string,
   shared: SharedShortlist | null | undefined,
+  city?: string,
 ) {
   const makePlan = useAction(api.plans.makePlan);
-  const key = `${spaceId}:${locale}`;
+  const key = `${spaceId}:${locale}:${city ?? ""}`;
   const sharedRef = useRef(shared);
   useEffect(() => {
     sharedRef.current = shared;
@@ -51,22 +50,19 @@ export function useMakePlan(
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
-        const plan = await makePlan({ spaceId, locale });
+        const plan = await makePlan({ spaceId, locale, city });
         analytics.capture("plan_made", {
           considered: plan.considered,
           place_count: plan.places.length,
         });
         return { status: "ready", ...plan, planId };
       } catch (error) {
-        const aiOff = isAiConsentRequired(error);
-        analytics.capture("plan_failed", {
-          reason: aiOff ? "ai_consent" : "error",
-        });
-        if (!aiOff) analytics.captureError("make_plan_failed", error);
-        return { status: aiOff ? "ai_off" : "error" };
+        analytics.capture("plan_failed", { reason: "error" });
+        analytics.captureError("make_plan_failed", error);
+        return { status: "error" };
       }
     },
-    [makePlan, spaceId, locale],
+    [makePlan, spaceId, locale, city],
   );
 
   useEffect(() => {
@@ -90,11 +86,24 @@ export function useMakePlan(
     };
   }, [load, key, linkLoaded]);
 
+  const resultRef = useRef(result);
+  useEffect(() => {
+    resultRef.current = result;
+  });
+
   const retry = useCallback(async () => {
     const current = ++run.current;
+    const shown =
+      resultRef.current?.key === key ? resultRef.current.state : null;
     setResult(null);
     const next = await load(current);
-    if (current === run.current) setResult({ key, state: next });
+    if (current !== run.current) return;
+    if (next.status === "error" && shown?.status === "ready") {
+      setResult({ key, state: shown });
+      Alert.alert(t("plan.failedTitle"), t("errors.retrySoon"));
+      return;
+    }
+    setResult({ key, state: next });
   }, [load, key]);
 
   const state = result?.key === key ? result.state : LOADING;
@@ -198,6 +207,8 @@ export function usePlanPicker(
       timers.current.forEach(clearTimeout);
       timers.current = [];
       spinningPlan.current = null;
+      // A failed shuffle brings the same plan back; a spin cut short must not come back with it.
+      setPick((shown) => (shown?.spinning ? null : shown));
     },
     [planId],
   );
@@ -302,7 +313,9 @@ export function spinSteps(
 }
 
 export function planVoteUrl(token: string): string {
-  return `https://shelvr-web.vercel.app/p/${token}`;
+  const origin =
+    process.env.EXPO_PUBLIC_WEB_URL || "https://shelvr-web.vercel.app";
+  return new URL(`/p/${encodeURIComponent(token)}`, origin).href;
 }
 
 export function usePlanAsk(

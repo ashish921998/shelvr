@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "@convex/_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 
 const generateObject = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (original) => ({
@@ -60,7 +60,7 @@ async function note(
   t: ReturnType<typeof newConvexTest>,
   runId: string,
 ): Promise<Id<"items">> {
-  const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+  const userId = await t.run((ctx) => insertConsentingUser(ctx));
   return t.run((ctx) =>
     ctx.db.insert("items", {
       userId,

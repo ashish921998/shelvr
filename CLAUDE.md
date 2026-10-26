@@ -13,8 +13,11 @@ for a module.
 
 **Shelvr** is a "save-it-for-later" hub. Users capture links, images, and notes; a Convex
 backend action fetches/extracts content and an LLM classifies each item (title, description,
-tags, and which "spaces" it belongs to). Clients render a feed of saves. Items can be
-organized into **spaces** (themed collections). Creating a new space runs one recommendation
+tags, cities, places, and which "spaces" it belongs to). The app today has one flow: save a
+reel, TikTok or link, and its places show under its city on Home; a city page has a map of
+those places and Plan a date / Plan a trip. Items can be organized into **spaces** (themed
+collections). The app no longer shows spaces, but the backend keeps them for old builds and
+for the hidden space behind each city's plans. Creating a new space runs one recommendation
 pass over existing items. That pass writes `suggested` memberships only. The user accepts or
 dismisses each suggestion.
 
@@ -124,8 +127,28 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   full-text search index (filtered by `userId`).
 
 - **`items.ts`**: public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
-  `photoUsage`, and `getImportOperation`. Image saves run a three-step, idempotent import:
-  `beginImageImport`, then `attachImageUpload`, then `finalizeImageImport`, all keyed on a
+  `photoUsage`, `getImportOperation`, and `listCities` / `listCityItems` (the cities Home
+  lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
+  is the shared helper).
+  Home searches the caller's saved titles, cities and place names through `searchItems`,
+  using the existing account-filtered full-text index (at most 50 matches, with an
+  inline notice asking for a narrower search when that limit is reached). Mapped
+  pin names are indexed too, including pins sourced from Maps intents; storing
+  pins refreshes search text in the same transaction.
+  Its response includes optional `places` so unpinned matches can show their place
+  names; older clients can ignore the field. Query terms are split on punctuation
+  as well as whitespace and capped at 16 before searching. After
+  deploying the city/place search change, run from `apps/native`:
+  `pnpm exec convex run --prod items:backfillPlaceSearch '{"cursor":null}'`.
+  This internal, paginated repair updates only search text for live owners, schedules
+  its remaining pages, and is safe to restart. Deploy and finish it before releasing
+  the search UI so older saves match cities and places too.
+  `listCities.count` retains the legacy save count for installed apps; optional
+  `placeCount` is the distinct mapped-place count for that city.
+  City reads filter pins by their resolved city; legacy unlabelled pins are shown only for single-city saves. New clients hide an absent or
+  zero place count while retaining the city and its saves.
+  Image saves run a three-step, idempotent import: `beginImageImport`, then
+  `attachImageUpload`, then `finalizeImageImport`, all keyed on a
   client-generated `operationId` in `itemOperations`.
   The returned upload URL now targets `/image-upload`, which claims a single
   receiver, caps the streamed body at the image limit, and records its storage ID
@@ -143,19 +166,31 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`spaces.ts`**: public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
   `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
-  `acceptAllSuggestions`), plus internal join helpers.
+  `acceptAllSuggestions`), `ensureCitySpace`, plus internal join helpers. `ensureCitySpace`
+  finds or makes a hidden space named for a city and files that city's ready saves into it
+  as `saved`; the city page calls it before Plan a date / Plan a trip, and plan shares and
+  stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
+  functions stay for old builds.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
-- **`aiConsent.ts`**: consent to third-party AI processing (App Store guideline 5.1.2(i)):
-  `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
-  every path sending user content to Gemini or SerpAPI asks first. It refuses an owner whose
-  row is missing or `deleting` before it reads consent, and item-aware checks also require an
-  existing owned save. Among live owners, only an explicit decline blocks; unset stays
-  allowed, because builds without the consent card must keep working. A declined user's saves still finish `ready` from what Shelvr read
-  itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
-  client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+- **`aiConsent.ts`**: legacy AI preferences and ownership checks. `getStatus` and
+  `setConsent` remain compatible with installed clients. Every path sending content to
+  Gemini, SerpAPI or Treg checks `aiAllowed` / `isAllowed`: missing or deleting owners,
+  missing or unowned saves, and explicit legacy declines are refused. Accounts with no
+  preference record use AI automatically; no grant record is fabricated. The current
+  client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
+  reports `unset` for an unanswered account, so old clients retain their existing UI.
+  `repairUnansweredEmbeddings` is a bounded, resumable one-time repair for older ready
+  saves stamped at the current embedding version but missing a vector. It clears the
+  stamp only for live owners with no preference row; the normal embedding sweep then
+  fills them. After deploying this change, run from `apps/native`:
+  `pnpm exec convex run --prod aiConsent:repairUnansweredEmbeddings '{"cursor":null}'`.
+  The function schedules its remaining pages. Rerunning it preserves existing vectors
+  and all explicit preferences; it does not reclassify saves or manufacture consent.
+  A declined user's saves still finish `ready` from what Shelvr read itself, without AI.
+  `model/aiConsent.ts` retains `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
   and `survivingCandidates` (up to 100 candidate saves, loaded and checked again before
   classification). The embedding sweep checks each cached save again in one batch and maps
@@ -221,9 +256,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
-  matches become `suggested` memberships (`saved` in a space set to auto-file). A cooking
-  TikTok or reel whose caption and linked page gave no recipe has its speech read through Treg
-  (`model/videoTranscript.ts`) for a second, recipe-only call. The file also holds
+  matches become `suggested` memberships (`saved` in a space set to auto-file). The model
+  also lists every place a save names into `items.places`. `enrichItem` strips it
+  from general item reads; `searchItems` explicitly returns it as an optional field
+  so unpinned matches can show their names. Plans and trips read it through
+  `toPlanSource`. A short video's speech is read once
+  through Treg (`model/videoTranscript.ts`) when the model flags it as a cooking video whose
+  caption and linked page gave no recipe, or as a video that recommends or visits places;
+  a second call then lifts the recipe, the spoken places, or both. The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
@@ -248,37 +288,77 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   JavaScript app and so have no JWT. The app mints a per-device capture token
   (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
   user and run the same save helpers, gates and limits as the app's own mutations.
-- **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` reads a space's saved
-  items and makes one model call that returns a shortlist of up to five places the saves
-  name, each with a reason and its source item. Nothing is stored. `spaces.claimPlanInternal`
-  claims Pro, AI consent and the `makePlan` rate limit first; the pure prompt and sanitizing
-  half (which drops a place no save names) is `model/plan.ts`. Places marked "We went"
-  (`placeVisits.ts`, `setVisited`) go into the prompt and come back last, tagged `been`.
+- **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` takes a space and an
+  optional `city`. With a city it reads that city's ready saves; otherwise it reads saved
+  space memberships. `spaces.claimPlanInternal` enforces ownership, Pro and the rate
+  limit, then looks up each candidate's visit status using an index (no recent-visit cap).
+  `model/plan.ts` deduplicates and shuffles already-extracted places, returning at most
+  five with text from their source save. Street-address-only labels are excluded from
+  recommendations (saved pins remain intact). Alias merging requires the same saved map
+  point plus compatible name/type evidence; unlocated or conflicting aliases stay separate.
+  No AI call or AI permission is needed to plan.
+  "We went" places never return as fallback picks. A multi-city save contributes only
+  place labels explicitly carrying the chosen city; ambiguous labels are skipped.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
+  and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
-- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
-  travel space's saves (one city's, when they span several), makes one model call that lists
-  the places they name with a time of day each, looks each up in the Apple Maps Server API
-  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
-  with no saved place shows as a gap; the trip never adds a place the saves do not name.
-  `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
-  reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
+- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
+  the chosen city's ready saves (or the most common city in a space), shuffles stored
+  unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),
+  and groups nearby stops into days at the selected pace (`model/trip.ts`, pure).
+  It does not send saves or visit history to Gemini or infer new places from raw text.
+  Without a stored time-of-day category, stops use the existing "any"/afternoon slot;
+  lunch and dinner remain open gaps. An empty selection leaves the previous trip intact.
+  `tripData.ts` stores the trip and serves `getSpaceTrip` / `tripCities`; swaps also skip
+  wishlist places marked visited after the trip was made. Explicit non-saved memberships
+  are excluded from selection, display and swaps. Stored city-less stops still use their
+  saved membership to remain visible, while city-matching saves need no membership row.
+  Without the Maps key, trips
+  still work using stored pins where available.
+- **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
+  city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
+  (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
+  and `storePins` writes at most 30, dropping any place no longer named.
+  Each pin also keeps Apple's place id (`appleId`) when the search result carried one.
+  Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,
+  Apple locality is used only when it matches a source-declared city; unmatched pins remain unassigned.
+  Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
+  Only source cities can disable single-city outlier rejection; returned localities cannot.
+  Pin lookup never expands `items.cities`; Home creates entries for the cities extracted from the source (up to 30). Scheduled from
+  `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
+  membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older unlabelled pins, run by hand after deployment:
+  `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
+  when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
+- **`reelPlaces.ts`** (`"use node"` action): the web reel place finder. The internal `find`
+  action reads one public Instagram or TikTok link with `readPage`, asks the model for the
+  places its caption names, and drops any the text never mentions (`model/reelPlaces.ts`).
+  Nothing is stored. Reached only through the `/reel-places` HTTP route, which
+  `apps/web/src/app/api/reel-places` calls; `oracleLimits.claimReelPlaces` is its rate limit.
 - **`oracle.ts`**, **`oracleLimits.ts`**: the web Oracle. The internal `consult` action reads
   pages and makes one model call inside the web route's deadline; `claim` is its rate limit.
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`**: `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
-  argument.** It takes a query or mutation context; an action derives the caller through the
-  internal mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`),
-  so authorization and the write stay in one transaction.
+  argument.** A public query or mutation gets it through `authedQuery` or `authedMutation`, which
+  run `requireUserId` before the handler and pass the id as `ctx.userId`. The few that must answer
+  a caller with no live account skip the builders and are listed, each with a reason, in
+  `PUBLIC_ON_PURPOSE` (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails on any
+  public query or mutation that is neither built nor listed, and calls every built one as a
+  signed-out caller and as a deleting account, failing unless it throws "Not authenticated"
+  before the handler runs. So a function moved onto the builders adds no refusal test of its own.
+  `.github/CODEOWNERS` names the owner for the list.
+  Public actions have no builder yet; an action derives the caller through the internal
+  mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`), so
+  authorization and the write stay in one transaction.
 - **`model/log.ts`**: `logEvent(level, event, fields)` structured logging, one JSON line per event
   into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
   `no-console` enforces this).
@@ -312,10 +392,22 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Next.js App Router marketing site only (no auth or product UI); server routes may call Convex
   for marketing forms such as platform waitlists
 - Landing page at `/`. The product experience lives in the native app
+- Free tool pages for search traffic, each with one App Store button: `/reel-place-finder`
+  takes a pasted Instagram reel or TikTok link and lists the places its caption names, with
+  Apple Maps and Google Maps links (`src/lib/reelPlaces.ts`). It posts to `/api/reel-places`,
+  which forwards to the Convex `/reel-places` route (`reelPlaces.ts`, the same shared-secret
+  and per-IP limits as the Oracle) and stores nothing
 
 ### Native (`apps/native`)
 
-- UI localization uses `expo-localization` and i18n-js. Read
+- The current onboarding share demo always uses a real reel: `src/lib/aha-sample.ts`
+  picks the selected city and goal's reel, or Austin for that goal when no reel exists.
+  Completion queues that exact URL; `useReplayOnboarding` saves it through
+  `createLinkItem` once signed in with Pro, and normal reading and Maps lookup
+  populate Home. The selected city answer stays separate from the sample city.
+- UI localization uses `expo-localization` and the in-house `translate` in `src/lib/i18n-core.ts`,
+  which falls back from the locale to its language to English, fills `%{name}` placeholders, and
+  picks plural forms with the CLDR rules in `convex/model/localization.ts`. Read
   [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
   update all catalogs and run `pnpm localization:generate` after translation changes. It is a
   root script, so run it from the repo root. It writes `src/locales/catalogs.ts`,
@@ -330,11 +422,18 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
-  `NativeTabs` from `expo-router/native-tabs`; other platforms fall back to `AppTabs`
-- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `plan-gate`, `profile`,
-  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `plan/[id]`, `trip/[id]`,
-  `digest/[id]`
+- `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities",
+  "Finding places…" for processing saves, "Couldn't read these saves" for failed reads,
+  and "No place found" only for finished saves without a city. It loads more saves on scroll, and on its own only
+  until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
+  shortcuts to removed screens (spaces, search, map, digest, camera) open Home, through
+  `src/lib/home-href.ts` and `src/app/+native-intent.ts`
+- `city/[name]` is the city page: a map and numbered rows for distinct places from the
+  city's saves, plus a row for every save not represented by a place row, with Plan a date
+  and Plan a trip. A selected place row shows an info button that opens Apple's place card
+  (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
+- Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
   entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
 - `(auth)` holds a single `sign-in` route
@@ -363,6 +462,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   - `EXPO_PUBLIC_CONVEX_URL`: the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL`: the deployment's HTTP Actions origin
+  - `EXPO_PUBLIC_WEB_URL`: optional web origin for plan voting links. Local QA uses
+    a web server connected to the same development Convex backend; unset uses the
+    production website.
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`: optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
     to show the passwordless dev-login button and fixture reset on development builds
     (release-mode included); preview and production builds never show either
@@ -388,8 +490,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
     this is set, so a build without it keeps working and uploads switch on the moment the EAS
     secret is added. The upload runs inside the native build and needs `@posthog/cli` available
     there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
-    variables rather than in `eas.json`, which the native fingerprint hashes. Turning the upload
-    on adds a config plugin, so it moves the fingerprint and needs a store build.
+    variables. Turning the upload on adds a config plugin, so it moves the fingerprint and needs a
+    store build.
     `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
@@ -427,7 +529,8 @@ needed at runtime by the features that use them:
   `@ai-sdk/google`, no gateway). The only required entry
 - `E2E_FAKE_AI`: set to `local-v1` only by the `e2e ios` workflow's local backend. It swaps
   Gemini for the deterministic fake in `model/fakeAi.ts` (which also serves its fixture pages
-  at `https://fixtures.e2e.invalid/` to link saves), and only when the backend is on
+  at `https://fixtures.e2e.invalid/` to link saves, reads cities and places off them, and
+  answers plan calls), and only when the backend is on
   127.0.0.1, `AUTH_ENABLE_ANONYMOUS` is `"true"` and the model key is the `ci-no-model`
   placeholder. Anywhere else it is refused and logged as `fake_ai_refused`
 - `POSTHOG_PROJECT_TOKEN`: server-side PostHog ingestion key. All backend capture is skipped
@@ -451,7 +554,8 @@ needed at runtime by the features that use them:
   Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
   oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
 - `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
-  cooking TikTok or reel whose caption has no recipe (`model/videoTranscript.ts`, about $0.002
+  cooking TikTok or reel whose caption has no recipe, or one that recommends or visits places
+  (`model/videoTranscript.ts`, about $0.002
   each, rate limited per user and globally). Transcripts are fetched only while the switch is
   `"true"` and the key is set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
@@ -471,7 +575,10 @@ needed at runtime by the features that use them:
 - Do not reintroduce the old notes-app domain (`notes` table, OpenAI summary action, `/notes`
   routes). The product domain is **items + spaces**. `GLOSSARY.md` names the domain's terms: say
   "save" in copy and docs while tables and code keep `items`.
-- Never pass `userId` from the client into Convex public functions.
+- Never pass `userId` from the client into Convex public functions. Build a public query or
+  mutation with `authedQuery` or `authedMutation` from `model/auth.ts` and read `ctx.userId`. A
+  function that must answer a signed-out or deleting caller goes in `PUBLIC_ON_PURPOSE` in
+  `model/publicFunctions.ts` with a reason.
 - Keep `returns:` validators accurate. Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
 - Public Convex functions are contracts with every app build in the wild, and the backend
@@ -509,9 +616,9 @@ needed at runtime by the features that use them:
   expand/contract: deploy the tolerant version first, tighten once old
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A
-  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
-  `app.config.js`) strands every later OTA until a store build ships, and the diff does
-  not say so. Two layers cover it. On a pull request CI runs
+  change to a native module, a config plugin, `app.json` or `app.config.js` may move the
+  fingerprint, and a moved fingerprint strands every later OTA until a store build ships.
+  The diff does not say so. Two layers cover it. On a pull request CI runs
   `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
   and never fails the check; acknowledge an intended move with the
   `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
@@ -520,8 +627,11 @@ needed at runtime by the features that use them:
   `apps/native/released-builds.json` and blocks the publish on anything but a match,
   including a profile or platform with no recorded release. A blocked publish means
   nothing published from this tree reaches the recorded binary, so the usual fix is a
-  store build, and recording the release afterwards. See
-  [push notification builds and updates](docs/architecture/push-notifications.md).
+  store build, and recording the release afterwards. Do not predict a move: run
+  `pnpm run verify:fingerprint origin/main HEAD`. The warning checks the production variant
+  only, and it cannot see `eas.json` build fields, `.easignore` edits or pnpm patches, so
+  decide those by hand. What the fingerprint hashes, and what it cannot see, is in
+  [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 - Adding a field to a table is a one-way door once rows carry it. Convex validates
   every existing document against the new schema on deploy, and a table validator
   rejects a field it does not declare, failing with an "Unexpected field" error

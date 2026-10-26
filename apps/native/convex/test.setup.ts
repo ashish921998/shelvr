@@ -1,6 +1,8 @@
 import { convexTest } from "convex-test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import schema from "./schema";
 import { vi } from "vitest";
 
@@ -10,12 +12,14 @@ export function revenuecatSnapshot({
   expiresAt = Date.now() + 60_000,
   graceUntil,
   periodType = "normal",
+  store,
 }: {
   entitlement?: string;
   productId?: string;
   expiresAt?: number;
   graceUntil?: number;
   periodType?: string;
+  store?: string;
 } = {}) {
   return {
     request_date_ms: Date.now(),
@@ -36,7 +40,7 @@ export function revenuecatSnapshot({
           }
         : {},
       subscriptions: productId
-        ? { [productId]: { period_type: periodType } }
+        ? { [productId]: { period_type: periodType, store } }
         : {},
     },
   };
@@ -58,19 +62,56 @@ export function newConvexTest() {
 
 export type TestBackend = ReturnType<typeof newConvexTest>;
 
+/** A users row that has chosen Allow on the Gemini ask, as every account must before AI runs. */
+export async function insertConsentingUser(
+  ctx: MutationCtx,
+  fields: { email?: string } = {},
+): Promise<Id<"users">> {
+  const userId = await ctx.db.insert("users", fields);
+  await ctx.db.insert("aiConsents", {
+    userId,
+    status: "granted",
+    version: AI_CONSENT_VERSION,
+    updatedAt: Date.now(),
+  });
+  return userId;
+}
+
+/** Replaces the account's Gemini answer, as setConsent would. */
+export async function setTestConsent(
+  ctx: MutationCtx,
+  userId: string,
+  status: "granted" | "declined",
+  version: number = AI_CONSENT_VERSION,
+): Promise<void> {
+  const row = await ctx.db
+    .query("aiConsents")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const values = { status, version, updatedAt: Date.now() };
+  if (row === null) await ctx.db.insert("aiConsents", { userId, ...values });
+  else await ctx.db.patch(row._id, values);
+}
+
 export async function signedInUser(
   backend: TestBackend,
-  options: { email?: string; pro?: boolean; session?: boolean } = {},
+  options: {
+    email?: string;
+    pro?: boolean;
+    session?: boolean;
+    aiConsent?: "granted" | "unset";
+  } = {},
 ): Promise<{
   userId: Id<"users">;
   sessionId: Id<"authSessions"> | undefined;
   t: ReturnType<TestBackend["withIdentity"]>;
 }> {
   const { userId, sessionId } = await backend.run(async (ctx) => {
-    const userId = await ctx.db.insert(
-      "users",
-      options.email === undefined ? {} : { email: options.email },
-    );
+    const fields = options.email === undefined ? {} : { email: options.email };
+    const userId =
+      options.aiConsent === "unset"
+        ? await ctx.db.insert("users", fields)
+        : await insertConsentingUser(ctx, fields);
     const sessionId =
       options.session === true
         ? await ctx.db.insert("authSessions", {

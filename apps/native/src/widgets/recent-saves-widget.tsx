@@ -83,7 +83,7 @@ const RecentSavesWidget = (
         spacing={6}
         modifiers={[
           containerBackground(c.background, "widget"),
-          widgetURL(`${scheme}:///${locked ? "paywall" : "add"}`),
+          widgetURL(`${scheme}:///${locked ? "" : "add"}`),
         ]}
       >
         <Image

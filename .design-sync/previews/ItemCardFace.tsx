@@ -76,7 +76,7 @@ export function Note() {
   );
 }
 
-/** A link with no image: the muted text face with the link glyph. */
+/** A link with no image: the page's description on the text face, its title below. */
 export function LinkWithoutImage() {
   return (
     <div style={column}>
@@ -85,6 +85,8 @@ export function LinkWithoutImage() {
         item={save("link-text", {
           type: "link",
           title: "The Value of Craft",
+          description:
+            "Why the small, unseen details are what people end up trusting.",
           url: "https://example.com/design/value-of-craft",
           tags: ["design", "reading"],
         })}

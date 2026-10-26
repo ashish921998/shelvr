@@ -3,16 +3,16 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  query,
-  mutation,
-  internalQuery,
-  internalMutation,
-} from "./_generated/server";
+import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { liveOwner, requireUserId, senderFirstName } from "./model/auth";
+import {
+  liveOwner,
+  senderFirstName,
+  authedMutation,
+  authedQuery,
+} from "./model/auth";
 import {
   hasProEntitlement,
   hasProEntitlementAt,
@@ -21,8 +21,13 @@ import {
 } from "./subscriptions";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
-import { RECALL_MIN_AGE_MS } from "./model/recallAge";
 import { takeWithinBytes } from "./model/readBudget";
+import {
+  cityKey,
+  countCities,
+  uniquePlacePins,
+  pinsForCity,
+} from "./model/trip";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -30,12 +35,7 @@ import {
   getMembership,
   insertMembership,
 } from "./model/memberships";
-import {
-  isYouTubeUrl,
-  linkSource,
-  normalizeExternalUrl,
-  shortFormSource,
-} from "./model/externalUrl";
+import { normalizeExternalUrl } from "./model/externalUrl";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -47,6 +47,7 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
   recipeValidator,
@@ -69,22 +70,26 @@ import { saveError } from "./model/saveErrors";
 import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
-import {
-  COOK_MIN_AGE_MS,
-  openedTooRecently,
-  READ_MAX_AGE_MS,
-  READ_MIN_AGE_MS,
-  reminderKind,
-  reminderSubject,
-} from "./model/saveReminders";
+import { nextUpKind } from "./model/nextUp";
+import { openedTooRecently, reminderSubject } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
-import { buildSearchText } from "./model/searchText";
+import { buildSearchText, searchQueryText } from "./model/searchText";
+import {
+  hasSimilarSignal,
+  rankSimilar,
+  similarSearchTerms,
+} from "./model/similarity";
 import { completionPatch, failurePatch, runFields } from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 
 const LIST_CAP = 1000;
+// ponytail: cities come from the newest 1000 ready saves only; past that, keep a
+// per-user city count table updated in finalizeItem and deleteItem.
+export const CITY_SCAN_ROWS = 1000;
+const CITY_SCAN_BYTES = 4 * 1024 * 1024;
+export const CITY_ITEMS_MAX = 200;
 
 export const LIST_PAGE_MAX = 100;
 const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
@@ -94,23 +99,6 @@ export const RECENT_ITEMS_MAX = 20;
 const NEXT_UP_SCAN_ROWS = 100;
 const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
 export const NEXT_UP_SKIP_MAX = 50;
-
-type NextUpKind = "read" | "cook" | "watch" | "open";
-
-function nextUpKind(item: Doc<"items">, now: number): NextUpKind | undefined {
-  const age = now - item._creationTime;
-  const reminder = reminderKind(item);
-  if (reminder === "cook") return age >= COOK_MIN_AGE_MS ? "cook" : undefined;
-  if (age < READ_MIN_AGE_MS || age > READ_MAX_AGE_MS) return undefined;
-  if (
-    isYouTubeUrl(item.url) ||
-    shortFormSource(item.url)?.video ||
-    item.media?.some((media) => media.kind === "video")
-  )
-    return "watch";
-  if (reminder === "read" && linkSource(item.url) === undefined) return "read";
-  return "open";
-}
 
 const itemTypeValidator = v.union(
   v.literal("image"),
@@ -155,6 +143,7 @@ const itemFields = {
   capturedAt: v.optional(v.number()),
   latitude: v.optional(v.number()),
   longitude: v.optional(v.number()),
+  placePins: v.optional(placePinsValidator),
   isSticker: v.optional(v.boolean()),
   tags: v.array(v.string()),
   content: v.optional(v.string()),
@@ -236,8 +225,12 @@ function stripEmbedding(
   | "embeddingVersion"
   | "embeddingAttempts"
   | "productsSearchStartedAt"
+  | "places"
+  | "placesHeard"
 > {
   const {
+    places: _places,
+    placesHeard: _placesHeard,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -275,11 +268,100 @@ async function toItemCard(
   return recipe ? { ...card, hasRecipe: true } : card;
 }
 
-export const listItems = query({
+async function readySavesNewestFirst(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<Doc<"items">[]> {
+  const { rows } = await takeWithinBytes(
+    ctx.db
+      .query("items")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", "ready"),
+      )
+      .order("desc"),
+    { maxRows: CITY_SCAN_ROWS, maxBytes: CITY_SCAN_BYTES },
+  );
+  return rows;
+}
+
+/** The user's ready saves in one city, newest first, capped at `limit`. */
+export async function readyCitySaves(
+  ctx: QueryCtx,
+  userId: string,
+  city: string,
+  limit = CITY_ITEMS_MAX,
+): Promise<Doc<"items">[]> {
+  const wanted = cityKey(city);
+  if (wanted === "") return [];
+  return (await readySavesNewestFirst(ctx, userId))
+    .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
+    .slice(0, limit);
+}
+
+export const listCities = authedQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      city: v.string(),
+      count: v.number(),
+      placeCount: v.optional(v.number()),
+      cover: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const items = await readySavesNewestFirst(ctx, ctx.userId);
+    const covers = new Map<string, string>();
+    for (const item of items) {
+      const keys = new Set((item.cities ?? []).map(cityKey));
+      for (const key of keys) {
+        if (key === "" || covers.has(key)) continue;
+        const url = item.storageId
+          ? await ctx.storage.getUrl(item.storageId)
+          : (item.heroImageUrl ?? null);
+        if (url !== null && url !== undefined) covers.set(key, url);
+      }
+    }
+    return countCities(items)
+      .map(({ city, count }) => ({
+        city,
+        // Older installed clients use count as the number of saves.
+        count,
+        placeCount: uniquePlacePins(
+          items
+            .filter((item) =>
+              (item.cities ?? []).some(
+                (name) => cityKey(name) === cityKey(city),
+              ),
+            )
+            .slice(0, CITY_ITEMS_MAX)
+            .flatMap((item) => pinsForCity(item, city)),
+        ).length,
+        cover: covers.get(cityKey(city)) ?? null,
+      }))
+      .sort(
+        (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
+      );
+  },
+});
+
+export const listCityItems = authedQuery({
+  args: { city: v.string() },
+  returns: v.array(enrichedItemValidator),
+  handler: async (ctx, args) => {
+    const items = await readyCitySaves(ctx, ctx.userId, args.city);
+    return await Promise.all(
+      items.map((item) =>
+        enrichItem(ctx, { ...item, placePins: pinsForCity(item, args.city) }),
+      ),
+    );
+  },
+});
+
+export const listItems = authedQuery({
   args: {},
   returns: v.array(enrichedItemValidator),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const items = await ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -292,11 +374,11 @@ export const listItems = query({
 const SAVE_PROGRESS_GOAL = 3;
 const SAVE_PROGRESS_MAX_READ = 20;
 
-export const saveProgress = query({
+export const saveProgress = authedQuery({
   args: {},
   returns: v.object({ saved: v.number(), goal: v.number() }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const demo = await ctx.db
       .query("onboardingDemos")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -319,11 +401,11 @@ export const saveProgress = query({
   },
 });
 
-export const listItemsPage = query({
+export const listItemsPage = authedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(itemCardValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const opts = args.paginationOpts;
     const result = await ctx.db
       .query("items")
@@ -344,11 +426,11 @@ export const listItemsPage = query({
   },
 });
 
-export const listRecentItems = query({
+export const listRecentItems = authedQuery({
   args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const entitled =
       (await hasProEntitlementStatus(ctx, userId)) &&
       (args.now === undefined ||
@@ -370,7 +452,7 @@ export const listRecentItems = query({
 });
 
 /** `now` is passed in because a Convex query does not rerun as time passes. */
-export const nextUp = query({
+export const nextUp = authedQuery({
   args: { now: v.number(), skip: v.array(v.id("items")) },
   returns: v.union(
     v.null(),
@@ -386,7 +468,7 @@ export const nextUp = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     if (
       !(await hasProEntitlementStatus(ctx, userId)) ||
       !(await hasProEntitlementAt(ctx, userId, args.now))
@@ -426,7 +508,7 @@ export const nextUp = query({
   },
 });
 
-export const listLocatedItems = query({
+export const listLocatedItems = authedQuery({
   args: {},
   returns: v.array(
     v.object({
@@ -438,7 +520,7 @@ export const listLocatedItems = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const photos = await ctx.db
       .query("items")
       .withIndex("by_user_and_type", (q) =>
@@ -464,11 +546,11 @@ export const listLocatedItems = query({
   },
 });
 
-export const getItem = query({
+export const getItem = authedQuery({
   args: { id: v.id("items") },
   returns: v.union(enrichedItemWithSpacesValidator, v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       return null;
@@ -477,37 +559,73 @@ export const getItem = query({
       .query("spaceItems")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
       .collect();
-    const spaces: { _id: Id<"spaces">; name: string }[] = [];
-    for (const join of joins) {
-      if (effectiveStatus(join) !== "saved") {
-        continue;
-      }
-      const space = await ctx.db.get(join.spaceId);
-      if (space !== null) {
-        spaces.push({ _id: space._id, name: space.name });
-      }
-    }
-    const enriched = await enrichItem(ctx, item);
+    // The space reads and the image URL go out together.
+    const [rows, enriched] = await Promise.all([
+      Promise.all(
+        joins
+          .filter((join) => effectiveStatus(join) === "saved")
+          .map((join) => ctx.db.get(join.spaceId)),
+      ),
+      enrichItem(ctx, item),
+    ]);
+    const spaces = rows
+      .filter((space): space is Doc<"spaces"> => space !== null)
+      .map((space) => ({ _id: space._id, name: space.name }));
     return { ...enriched, spaces };
   },
 });
 
-export const searchItems = query({
+export const searchItems = authedQuery({
   args: { query: v.string() },
-  returns: v.array(enrichedItemValidator),
+  returns: v.array(
+    enrichedItemValidator.extend({
+      places: v.optional(v.array(v.string())),
+    }),
+  ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
-    const trimmed = args.query.trim();
-    if (trimmed === "") {
+    const { userId } = ctx;
+    const query = searchQueryText(args.query);
+    if (query === "") {
       return [];
     }
     const items = await ctx.db
       .query("items")
       .withSearchIndex("search_text", (q) =>
-        q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
+        q.search("searchText", query).eq("userId", userId),
       )
       .take(50);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await Promise.all(
+      items.map(async (item) => ({
+        ...(await enrichItem(ctx, item)),
+        places: item.places,
+      })),
+    );
+  },
+});
+
+/** Run once after deploying city/place search; safe to restart from a null cursor. */
+export const backfillPlaceSearch = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("items").paginate({
+      cursor,
+      numItems: 25,
+      maximumBytesRead: 2 * 1024 * 1024,
+    });
+    for (const item of batch.page) {
+      if (!(await liveOwner(ctx, item.userId))) continue;
+      const searchText = buildSearchText(item);
+      if (searchText !== item.searchText) {
+        await ctx.db.patch(item._id, { searchText });
+      }
+    }
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
   },
 });
 
@@ -517,85 +635,17 @@ const SIMILAR_SEARCH_CANDIDATES = 100;
 const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
 const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
 const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
-// Convex caps a full-text query at 16 terms.
-const SIMILAR_SEARCH_TERMS = 16;
-const SIMILAR_LIMIT = 10;
-const SIMILAR_MIN_SCORE = 3;
-const SIMILAR_RESERVED_OLD = 3;
 
-function significantWords(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(
-      (word) =>
-        word.length >= (/^[\p{Script=Latin}\p{N}]*$/u.test(word) ? 4 : 2),
-    );
-}
-
-function summaryText(item: Doc<"items">): string {
-  return buildSearchText({
-    title: item.title,
-    description: item.description,
-    tags: item.tags,
-    siteName: item.siteName,
-    note: item.note,
-  });
-}
-
-function searchTokens(text: string): Set<string> {
-  return new Set(significantWords(text));
-}
-
-const TAG_STOPWORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "at",
-  "for",
-  "how",
-  "in",
-  "of",
-  "on",
-  "or",
-  "the",
-  "to",
-]);
-
-export function tagSearchWords(tag: string): string[] {
-  return tag
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length >= 2 && !TAG_STOPWORDS.has(word));
-}
-
-function similarSearchTerms(item: Doc<"items">): string[] {
-  const terms = new Set<string>();
-  const words = [
-    ...item.tags.flatMap(tagSearchWords),
-    ...significantWords(item.title ?? ""),
-  ];
-  for (const word of words) {
-    terms.add(word);
-    if (terms.size >= SIMILAR_SEARCH_TERMS) {
-      break;
-    }
-  }
-  return [...terms];
-}
-
-export const similarItems = query({
+export const similarItems = authedQuery({
   args: { id: v.id("items") },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.status !== "ready") {
       return [];
     }
-    const tags = new Set(item.tags);
-    const tokens = searchTokens(summaryText(item));
-    if (tags.size === 0 && tokens.size === 0) {
+    if (!hasSimilarSignal(item)) {
       return [];
     }
 
@@ -634,40 +684,10 @@ export const similarItems = query({
       candidates.set(candidate._id, candidate);
     }
 
-    const scored: { item: Doc<"items">; score: number }[] = [];
-    for (const candidate of candidates.values()) {
-      if (candidate._id === item._id || candidate.status !== "ready") {
-        continue;
-      }
-      let score = 0;
-      for (const tag of candidate.tags) {
-        if (tags.has(tag)) {
-          score += 3;
-        }
-      }
-      for (const token of searchTokens(summaryText(candidate))) {
-        if (tokens.has(token)) {
-          score += 1;
-        }
-      }
-      if (score >= SIMILAR_MIN_SCORE) {
-        scored.push({ item: candidate, score });
-      }
-    }
-    scored.sort((a, b) => b.score - a.score);
-
-    const oldCutoff = item._creationTime - RECALL_MIN_AGE_MS;
-    const reservedOld = scored
-      .filter((candidate) => candidate.item._creationTime <= oldCutoff)
-      .slice(0, SIMILAR_RESERVED_OLD);
-    const reservedIds = new Set(reservedOld.map((s) => s.item._id));
-    const rest = scored
-      .filter((candidate) => !reservedIds.has(candidate.item._id))
-      .slice(0, SIMILAR_LIMIT - reservedOld.length);
-    const final = [...reservedOld, ...rest].sort((a, b) => b.score - a.score);
-
     return await Promise.all(
-      final.map(({ item: match }) => toItemCard(ctx, match)),
+      rankSimilar(item, candidates.values()).map((match) =>
+        toItemCard(ctx, match),
+      ),
     );
   },
 });
@@ -769,11 +789,11 @@ async function requirePhotoQuota(
   return count;
 }
 
-export const photoUsage = query({
+export const photoUsage = authedQuery({
   args: {},
   returns: v.object({ count: v.number(), limit: v.number() }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return {
       count: await countPhotos(ctx, userId),
       limit: MAX_PHOTOS_PER_ACCOUNT,
@@ -810,14 +830,14 @@ function validateImageMetadata(args: {
   }
 }
 
-export const beginImageImport = mutation({
+export const beginImageImport = authedMutation({
   args: { operationId: v.string() },
   returns: v.union(
     v.object({ kind: v.literal("upload"), uploadUrl: v.string() }),
     v.object({ kind: v.literal("complete"), itemId: v.id("items") }),
   ),
   handler: async (ctx, args): Promise<BeginImageImportResult> => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return await beginImageImportForUser(ctx, userId, args.operationId);
   },
 });
@@ -923,7 +943,7 @@ export async function beginImageImportForUser(
   };
 }
 
-export const attachImageUpload = mutation({
+export const attachImageUpload = authedMutation({
   args: {
     operationId: v.string(),
     storageId: v.id("_storage"),
@@ -933,7 +953,7 @@ export const attachImageUpload = mutation({
     error: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return await attachImageUploadForUser(ctx, userId, args);
   },
 });
@@ -1103,11 +1123,11 @@ type FinalizeImageImportArgs = Infer<typeof finalizeImageImportArgs> & {
   captureContext?: string;
 };
 
-export const finalizeImageImport = mutation({
+export const finalizeImageImport = authedMutation({
   args: finalizeImageImportArgs.fields,
   returns: v.id("items"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     return await finalizeImageImportForUser(ctx, userId, args);
   },
 });
@@ -1183,7 +1203,7 @@ export async function finalizeImageImportForUser(
   return itemId;
 }
 
-export const getImportOperation = query({
+export const getImportOperation = authedQuery({
   args: { operationId: v.string() },
   returns: v.union(
     v.object({
@@ -1194,7 +1214,7 @@ export const getImportOperation = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const op = await ctx.db
       .query("itemOperations")
       .withIndex("by_user_operation", (q) =>
@@ -1369,7 +1389,10 @@ async function createLinkOrNote(
     ...(kind === "link" && "url" in payload ? { url: payload.url } : {}),
     ...(kind === "note" && "note" in payload ? { note: payload.note } : {}),
     tags: [],
-    searchText: "",
+    searchText:
+      kind === "note" && "note" in payload
+        ? buildSearchText({ tags: [], note: payload.note })
+        : "",
   });
   if (options.spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, options.spaceId);
@@ -1440,7 +1463,7 @@ async function scheduleProcessedTelemetry(
   });
 }
 
-export const createLinkItem = mutation({
+export const createLinkItem = authedMutation({
   args: {
     url: v.string(),
     spaceId: v.optional(v.id("spaces")),
@@ -1450,7 +1473,7 @@ export const createLinkItem = mutation({
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const url = normalizeExternalUrl(args.url);
     return await createItemWithOperation(
@@ -1468,7 +1491,7 @@ export const createLinkItem = mutation({
   },
 });
 
-export const createNoteItem = mutation({
+export const createNoteItem = authedMutation({
   args: {
     text: v.string(),
     spaceId: v.optional(v.id("spaces")),
@@ -1478,7 +1501,7 @@ export const createNoteItem = mutation({
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
@@ -1521,14 +1544,14 @@ async function hasSavedLink(
   return match !== null;
 }
 
-export const importLinks = mutation({
+export const importLinks = authedMutation({
   args: {
     urls: v.array(v.string()),
     staggerOffset: v.optional(v.number()),
   },
   returns: importLinksResultValidator,
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     if (args.urls.length > MAX_IMPORT_BATCH) {
       throw new ConvexError(
@@ -1629,7 +1652,7 @@ async function noteRunDelay(
     : Math.max(NOTE_REFRESH_DELAY_MS, retryAfter ?? 0);
 }
 
-export const updateNoteItem = mutation({
+export const updateNoteItem = authedMutation({
   args: {
     id: v.id("items"),
     title: v.optional(v.string()),
@@ -1637,7 +1660,7 @@ export const updateNoteItem = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.type !== "note") {
@@ -1680,7 +1703,10 @@ export const updateNoteItem = mutation({
       titleSource: typedTitle !== "" ? "user" : undefined,
       searchText: buildSearchText({
         title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
+        placePins: item.placePins,
         tags: item.tags,
         note: text,
         content: item.content,
@@ -1707,11 +1733,11 @@ export const updateNoteItem = mutation({
   },
 });
 
-export const findLinks = mutation({
+export const findLinks = authedMutation({
   args: { id: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
@@ -1769,12 +1795,12 @@ async function freeDemoRetry(
   return demo;
 }
 
-export const reprocessItem = mutation({
+export const reprocessItem = authedMutation({
   args: { id: v.id("items") },
   // True when a new run was scheduled; false when the server does not consider the item retryable.
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const freeDemo = await freeDemoRetry(ctx, userId, args.id);
     if (freeDemo === null) await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
@@ -1813,11 +1839,11 @@ export const reprocessItem = mutation({
   },
 });
 
-export const deleteItem = mutation({
+export const deleteItem = authedMutation({
   args: { id: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1852,7 +1878,7 @@ export const deleteItem = mutation({
   },
 });
 
-export const createShareLink = mutation({
+export const createShareLink = authedMutation({
   args: {
     itemId: v.id("items"),
     // Set by clients that call `settleShareLink` afterwards; without it the link is never withdrawn.
@@ -1860,7 +1886,7 @@ export const createShareLink = mutation({
   },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1896,11 +1922,11 @@ export const createShareLink = mutation({
   },
 });
 
-export const settleShareLink = mutation({
+export const settleShareLink = authedMutation({
   args: { itemId: v.id("items"), shared: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1929,12 +1955,26 @@ function isShareable(item: Doc<"items">): boolean {
   return item.status === "ready" && item.type !== "image";
 }
 
+/** The save as a processing run reads it: with its places, which a rerun keeps. */
 export const getItemInternal = internalQuery({
   args: { itemId: v.id("items") },
-  returns: v.union(v.object(itemFields), v.null()),
+  returns: v.union(
+    v.object({
+      ...itemFields,
+      places: v.optional(v.array(v.string())),
+      placesHeard: v.optional(v.boolean()),
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    return item === null ? null : stripEmbedding(item);
+    if (item === null) return null;
+    const { places, placesHeard } = item;
+    return {
+      ...stripEmbedding(item),
+      ...(places ? { places } : {}),
+      ...(placesHeard !== undefined ? { placesHeard } : {}),
+    };
   },
 });
 
@@ -2065,7 +2105,18 @@ export const finalizeItem = internalMutation({
     if (!ownsRun(item, args.runId)) {
       return "stale_run";
     }
-    await ctx.db.patch(args.itemId, completionPatch(item, args, allowed));
+    const patch = completionPatch(item, args, allowed);
+    await ctx.db.patch(args.itemId, patch);
+    if (
+      allowed &&
+      ((patch.places?.length ?? 0) > 0 ||
+        patch.intents?.some((i) => i.kind === "open_maps") ||
+        (item.placePins?.length ?? 0) > 0)
+    ) {
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: args.itemId,
+      });
+    }
     const { storageId, enrichment } = args.reading;
     if (
       storageId !== undefined &&
@@ -2201,7 +2252,10 @@ export const setEmbeddingsInternal = internalMutation({
 
       const nextSearchText = buildSearchText({
         title: item.title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
+        placePins: item.placePins,
         tags: item.tags,
         siteName: item.siteName,
         note: item.note,

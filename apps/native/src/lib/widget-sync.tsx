@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { t, useAppLocale } from "./i18n";
-import type { FeedItem } from "@/components/item-card";
+import type { FeedItem } from "@/lib/feed-item";
 import { analytics } from "@/lib/analytics";
 import { useEntitlement } from "@/lib/entitlement";
 import { displayHost } from "@/lib/url";

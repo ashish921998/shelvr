@@ -1,7 +1,7 @@
 import { withAlpha } from "@/lib/color";
 import type { ReactNode } from "react";
 import { View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export const PHONE_CUT = 40;
 const FADE_HEIGHT = 72;
@@ -18,6 +18,7 @@ export function PhoneFrame({
   children: ReactNode;
   overlay?: ReactNode;
 }) {
+  const { theme } = useUnistyles();
   return (
     <View
       style={styles.stage}
@@ -30,7 +31,20 @@ export function PhoneFrame({
           <View pointerEvents="none" style={styles.island} />
         </View>
       </View>
-      <View pointerEvents="none" style={styles.fade} />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.fade,
+          {
+            // Inline: Unistyles drops a stylesheet's experimental_backgroundImage
+            // on theme change (jpudysz/react-native-unistyles#1030).
+            experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(
+              theme.colors.background,
+              0,
+            )} 0%, ${theme.colors.background} 100%)`,
+          },
+        ]}
+      />
       {overlay}
     </View>
   );
@@ -78,9 +92,5 @@ const styles = StyleSheet.create((theme) => ({
     right: 0,
     bottom: 0,
     height: FADE_HEIGHT,
-    experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(
-      theme.colors.background,
-      0,
-    )} 0%, ${theme.colors.background} 100%)`,
   },
 }));

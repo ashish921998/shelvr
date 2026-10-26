@@ -21,12 +21,14 @@ const sdkResult = fc.oneof(
 );
 
 describe("mapPaywallResult", () => {
-  it("only counts a purchase or restore as success, whatever else the SDK returns", () => {
+  it("only counts a purchase, restore or existing Pro as success, whatever else the SDK returns", () => {
     fc.assert(
       fc.property(sdkResult, (result) => {
         const outcome = mapPaywallResult(result);
         expect(outcome === "success").toBe(
-          result === "PURCHASED" || result === "RESTORED",
+          result === "PURCHASED" ||
+            result === "RESTORED" ||
+            result === "NOT_PRESENTED",
         );
         expect(outcome === "cancelled").toBe(result === "CANCELLED");
         expect(shouldOpenPaywallFallback(outcome)).toBe(

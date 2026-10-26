@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { goalFlow } from "./onboarding-goals";
 import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
+  nextOnboardingStep,
+  onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
+  type OnboardingStep,
 } from "./onboarding-steps";
 
 describe("restoreOnboardingStep", () => {
@@ -25,29 +27,48 @@ describe("restoreOnboardingStep", () => {
 
 describe("previousOnboardingStep", () => {
   it.each([
-    ["travel", "goal", "opener"],
-    ["travel", "city", "goal"],
-    ["food", "share", "city"],
-    ["other", "interests", "goal"],
-    ["other", "share", "interests"],
-  ] as const)(
-    "in the %s flow goes back from %s to %s",
-    (goal, step, expected) => {
-      expect(previousOnboardingStep(step, goalFlow(goal))).toBe(expected);
-    },
-  );
+    ["savedCount", "opener"],
+    ["goal", "savedCount"],
+    ["planner", "goal"],
+    ["chart", "planner"],
+    ["city", "chart"],
+    ["ahaShare", "city"],
+    ["ahaSpots", "ahaShare"],
+    ["commitment", "ahaSpots"],
+  ] as const)("goes back from %s to %s", (step, expected) => {
+    expect(previousOnboardingStep(step)).toBe(expected);
+  });
 
-  it.each(["opener", "tripBuild", "tripReveal", "promise"] as const)(
-    "leaves %s without a step to go back to, so the sample is never rebuilt",
-    (step) => {
-      expect(previousOnboardingStep(step, goalFlow("date"))).toBeNull();
-    },
-  );
+  it("leaves the opener without a step to go back to", () => {
+    expect(previousOnboardingStep("opener")).toBeNull();
+  });
+});
+
+describe("nextOnboardingStep", () => {
+  it("walks the questions, city, sample and commitment, and stays on the commitment", () => {
+    const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
+    while (walked.length < ONBOARDING_STEPS.length)
+      walked.push(nextOnboardingStep(walked[walked.length - 1]));
+    expect(walked).toEqual([...ONBOARDING_STEPS]);
+    expect(nextOnboardingStep("ahaSpots")).toBe("commitment");
+    expect(nextOnboardingStep("commitment")).toBe("commitment");
+  });
 });
 
 describe("ONBOARDING_STEP_IDS", () => {
   it("names every step once, so funnels can split on it", () => {
     const ids = ONBOARDING_STEPS.map((step) => ONBOARDING_STEP_IDS[step]);
     expect(new Set(ids).size).toBe(ONBOARDING_STEPS.length);
+  });
+});
+
+describe("onboardingProgress", () => {
+  it("has no bar on the opener and fills evenly to the commitment", () => {
+    expect(onboardingProgress("opener")).toBeNull();
+    const bars = ONBOARDING_STEPS.slice(1).map(onboardingProgress);
+    expect(bars.at(-1)).toBe(1);
+    bars.forEach((bar, index) => {
+      if (index > 0) expect(bar).toBeGreaterThan(bars[index - 1] ?? 0);
+    });
   });
 });

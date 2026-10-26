@@ -54,8 +54,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { analytics } from "@/lib/analytics";
-import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
 import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
@@ -416,6 +416,8 @@ function ItemScreenContent() {
         : undefined;
     }
     if (from === "search") return searchQ.data;
+    // On Android a deep start index in the home pager drew an empty page.
+    if (from === "next-up") return undefined;
     return homeFeed.items;
   }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
@@ -505,18 +507,6 @@ function ItemScreenContent() {
     }
   }, [activeItem]);
 
-  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(
-    activeFull ?? activeItem,
-  );
-
-  const openSpaces = useCallback(() => {
-    if (!activeItem) return;
-    router.push({
-      pathname: "/manage-spaces",
-      params: { itemId: activeItem._id },
-    });
-  }, [activeItem, router]);
-
   const activeIsSuggested =
     from === "space" &&
     !!spaceId &&
@@ -587,11 +577,16 @@ function ItemScreenContent() {
     } else {
       router.back();
     }
-    const changed = await dismissSuggestion({
-      itemId: dismissedId,
-      spaceId: spaceId as Id<"spaces">,
-    });
-    if (changed) analytics.capture("suggestion_dismissed");
+    try {
+      const changed = await dismissSuggestion({
+        itemId: dismissedId,
+        spaceId: spaceId as Id<"spaces">,
+      });
+      if (changed) analytics.capture("suggestion_dismissed");
+    } catch (error) {
+      analytics.captureError("suggestion_dismiss_failed", error);
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    }
   }, [
     spaceId,
     activeId,
@@ -605,27 +600,29 @@ function ItemScreenContent() {
     reducedMotion,
   ]);
 
-  const onDelete = useCallback(async () => {
+  const onDelete = useCallback(() => {
     if (!activeItem || !items) return;
-    cancelParamWrite();
-    const idx = items.findIndex((item) => item._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    try {
-      await deleteItem({ id: activeItem._id });
-      forgetDeletedSharedItem(activeItem._id);
-      analytics.itemDeleted(activeItem, "item_detail");
-      if (neighbor) {
-        goTo(neighbor._id);
-        writeParams(neighbor._id);
-        listRef.current?.scrollToIndex({
-          index: Math.min(idx, items.length - 2),
-          animated: !reducedMotion,
-        });
-      } else if (router.canGoBack()) router.back();
-      else router.replace("/(app)/(tabs)/(home)");
-    } catch {
-      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-    }
+    confirmItemDelete(async () => {
+      cancelParamWrite();
+      const idx = items.findIndex((item) => item._id === activeItem._id);
+      const neighbor = items[idx + 1] ?? items[idx - 1];
+      try {
+        await deleteItem({ id: activeItem._id });
+        forgetDeletedSharedItem(activeItem._id);
+        analytics.itemDeleted(activeItem, "item_detail");
+        if (neighbor) {
+          goTo(neighbor._id);
+          writeParams(neighbor._id);
+          listRef.current?.scrollToIndex({
+            index: Math.min(idx, items.length - 2),
+            animated: !reducedMotion,
+          });
+        } else if (router.canGoBack()) router.back();
+        else router.replace("/(app)/(tabs)/(home)");
+      } catch {
+        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+      }
+    });
   }, [
     activeItem,
     items,
@@ -682,22 +679,9 @@ function ItemScreenContent() {
                       activeItem?.title ?? activeItem?.note ?? t("item.actions")
                     }
                     actions={[
-                      ...(activeItem?.status === "ready"
-                        ? [{ label: t("spaces.addItem"), onPress: openSpaces }]
-                        : []),
                       { label: t("common.share"), onPress: shareActive },
                       ...(activeItem?.url
                         ? [{ label: t("item.copyLink"), onPress: copyLink }]
-                        : []),
-                      ...(activeItem?.status === "ready" &&
-                      activeItem.type !== "note"
-                        ? [
-                            {
-                              label: t("products.findLinks"),
-                              onPress: onFindLinks,
-                              disabled: searchDisabled,
-                            },
-                          ]
                         : []),
                       ...removeFromSpace.menuActions,
                       {
@@ -718,14 +702,6 @@ function ItemScreenContent() {
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Menu icon="ellipsis">
-            {activeItem?.status === "ready" ? (
-              <Stack.Toolbar.MenuAction
-                icon="rectangle.stack"
-                onPress={openSpaces}
-              >
-                {t("spaces.addItem")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.up"
               onPress={shareActive}
@@ -735,15 +711,6 @@ function ItemScreenContent() {
             {activeItem?.url ? (
               <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
                 {t("item.copyLink")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-            {activeItem?.status === "ready" && activeItem.type !== "note" ? (
-              <Stack.Toolbar.MenuAction
-                icon="bag"
-                onPress={onFindLinks}
-                disabled={searchDisabled}
-              >
-                {t("products.findLinks")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction

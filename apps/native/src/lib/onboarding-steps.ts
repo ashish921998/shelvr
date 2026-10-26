@@ -1,45 +1,45 @@
 export const ONBOARDING_STEPS = [
   "opener",
+  "savedCount",
   "goal",
+  "planner",
+  "chart",
   "city",
-  "interests",
-  "share",
-  "tripBuild",
-  "tripReveal",
-  "promise",
-  "recipeReveal",
+  "ahaShare",
+  "ahaSpots",
+  "commitment",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 14;
+export const ONBOARDING_FLOW_VERSION = 22;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
+  savedCount: "saved_count",
   goal: "goal",
+  planner: "planner",
+  chart: "progress_chart",
   city: "city",
-  interests: "interests",
-  share: "share_practice",
-  promise: "promise",
-  tripBuild: "trip_build",
-  tripReveal: "trip_reveal",
-  recipeReveal: "recipe_reveal",
+  ahaShare: "aha_share",
+  ahaSpots: "aha_spots",
+  commitment: "commitment",
 };
 
-const NO_BACK: readonly OnboardingStep[] = [
-  "opener",
-  "tripBuild",
-  "tripReveal",
-  "recipeReveal",
-  "promise",
-];
+/** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */
+export function onboardingProgress(step: OnboardingStep): number | null {
+  const index = ONBOARDING_STEPS.indexOf(step);
+  return index === 0 ? null : index / (ONBOARDING_STEPS.length - 1);
+}
 
-/** The step before `step` in `flow`; none once the sample is being built, so the build never replays. */
+/** The step before `step`; none on the opener. */
 export function previousOnboardingStep(
   step: OnboardingStep,
-  flow: readonly OnboardingStep[],
 ): OnboardingStep | null {
-  if (NO_BACK.includes(step)) return null;
-  return flow[flow.indexOf(step) - 1] ?? null;
+  return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) - 1] ?? null;
+}
+
+export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
+  return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) + 1] ?? step;
 }
 
 /** `step` must be an index written by this flow version; getOnboardingProgress drops older flows' records. */

@@ -12,7 +12,7 @@ export async function startFreshOnboarding({
   device: Device;
   screen: Screen;
 }): Promise<void> {
-  const start = screen.getByRole("button", "Start yours");
+  const start = screen.getByRole("button", "Get started");
   await relaunchWith(device, screen, FRESH_INSTALL_ARGUMENTS, () =>
     start.isVisible(),
   );
@@ -27,32 +27,78 @@ const FRESH_INSTALL_ARGUMENTS = [
   "YES",
 ];
 
-export async function walkToSharePractice(
+/** From the opener to the sample reel; defaults to date nights in Austin when the city is skipped. */
+export async function walkToSampleReel(
   screen: Screen,
-  goal: "Something else" | "Travel ideas" = "Something else",
+  options: { goal?: "date" | "travel"; city?: string } = {},
 ): Promise<void> {
   await tapUntilVisible(
-    screen.getByRole("button", "Start yours"),
-    screen.getByText("What do you save?"),
+    screen.getByRole("button", "Get started"),
+    screen.getByText("How many places have you saved?"),
     { waitMs: 5_000, timeout: 60_000 },
   );
-  await screen.getByRole("button", new RegExp(`^${goal}`)).tap();
-  if (goal === "Travel ideas") {
-    // The last option, below the city list on an iPhone 17 screen.
-    const notSure = screen.getByRole("button", /^Not sure yet/);
-    await expect(screen.getByText("Where are you going next?")).toBeVisible({
-      timeout: 30_000,
-    });
-    await screen.scrollUntilVisible(notSure);
-    await notSure.tap();
-  } else {
-    await screen.getByRole("checkbox", /^AI & tech/).tap({ timeout: 30_000 });
-    const next = screen.getByRole("button", "Continue");
-    await expect(next).toBeEnabled({ timeout: 10_000 });
-    await next.tap();
-  }
-  await expect(screen.getByRole("button", SHARE_LATER)).toBeVisible({
+  const skip = screen.getByRole("button", "Skip");
+  await skip.tap();
+  await expect(screen.getByText("What would you like to plan?")).toBeVisible({
     timeout: 30_000,
+  });
+  await screen
+    .getByRole(
+      "checkbox",
+      options.goal === "travel" ? /^Trips/ : /^Date nights/,
+    )
+    .tap();
+  const next = screen.getByRole("button", "Continue");
+  await expect(next).toBeEnabled({ timeout: 10_000 });
+  await next.tap();
+  await expect(screen.getByText("How do you like to plan?")).toBeVisible({
+    timeout: 30_000,
+  });
+  await skip.tap();
+  await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
+    timeout: 30_000,
+  });
+  await screen.getByTestId("onboarding-chart-continue").tap();
+  await expect(screen.getByText("Pick a city to try.")).toBeVisible({
+    timeout: 30_000,
+  });
+  if (options.city) {
+    await screen.getByPlaceholder("Search cities").fill(options.city);
+    await screen.getByRole("radio", options.city).tap();
+  } else {
+    await skip.tap();
+  }
+  await expect(screen.getByRole("button", SHARE_ON_REEL)).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+/** Shares the sample reel through Share, Share to…, More and Shelvr, then waits for its mapped spots. */
+export async function shareTheSampleReel(screen: Screen): Promise<void> {
+  for (const step of [SHARE_ON_REEL, "Share to…", "More"]) {
+    await screen.getByRole("button", step).tap({ timeout: 30_000 });
+  }
+  await expect(screen.getByRole("button", "Edit")).toBeHidden();
+  await expect(
+    screen.getByRole("button", "Add Shelvr to Favorites"),
+  ).toBeHidden();
+  await screen.getByRole("button", SHARE_TO_SHELVR).tap({ timeout: 30_000 });
+  await expect(screen.getByText(/· 3 places$/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(screen.getByRole("button", "Continue")).toBeEnabled({
+    timeout: 10_000,
+  });
+}
+
+/** The map reveal leads to one commitment screen; confirming never opens the paywall on its own. */
+export async function walkToCommitment(screen: Screen): Promise<void> {
+  await screen.getByRole("button", "Continue").tap();
+  await expect(screen.getByText("Visit a place you’ve saved.")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(screen.getByRole("button", "Hold to commit")).toBeVisible({
+    timeout: 10_000,
   });
 }
 
@@ -89,4 +135,7 @@ export async function relaunchWith(
   });
 }
 
-export const SHARE_LATER = "I'll try it later";
+const SHARE_TO_SHELVR = "Shelvr";
+
+// The ringed share button on the sample reel; exact, so it never matches "Share to…".
+export const SHARE_ON_REEL = /^Share$/;

@@ -1,78 +1,82 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
+import { appleZoom } from "@/lib/city-pins";
 import type { SampleTrip } from "@/lib/sample-trip";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { AppleMaps } from "expo-maps";
 import { useEffect, useRef, useState } from "react";
-import { PixelRatio, View, type LayoutChangeEvent } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
+import { View, type LayoutChangeEvent } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const DAY_MS = 3500;
 
 type Size = { width: number; height: number };
 
-// expo-maps on iOS counts zoom against the screen's pixels, so a world tile is 256 pixels, not points.
-const cameraFor = (points: LatLng[], size: Size) =>
-  fitCamera(points, {
+/** Keeps the pins clear of the label over the map's top and the sheet over its bottom. */
+const TOP = 56;
+const BOTTOM = 48;
+
+// Framed the way the city page frames its pins (city-map.tsx), so the preview matches the page.
+function cameraFor(points: LatLng[], size: Size) {
+  const standard = fitCamera(points, {
     ...size,
-    top: 0,
-    bottom: 0,
-    worldWidth: 512 / PixelRatio.get(),
+    top: TOP,
+    bottom: BOTTOM,
+    worldWidth: 256,
     centerY: size.height / 2,
   });
+  return (
+    standard && {
+      coordinates: standard.coordinates,
+      zoom: appleZoom(
+        standard.zoom,
+        standard.coordinates.latitude,
+        size.width,
+        size.height,
+      ),
+    }
+  );
+}
 
-export function SampleAppleMap({ trip }: { trip: SampleTrip }) {
+/** The trip's stops on a map that fills its parent; `visible` shows only the first that many pins, so they can drop in one by one. */
+export function SampleAppleMap({
+  trip,
+  visible = Infinity,
+}: {
+  trip: SampleTrip;
+  visible?: number;
+}) {
   const { theme, rt } = useUnistyles();
-  const reduced = useReducedMotion();
   const ref = useRef<AppleMaps.MapView>(null);
   const [size, setSize] = useState<Size>();
-  const [shown, setShown] = useState(0);
-  const colors = [
-    { pin: theme.colors.primary, text: theme.colors.onTint },
-    { pin: theme.colors.foreground, text: theme.colors.background },
-  ];
-  const days = trip.days.map((day) =>
-    day.stops.map((stop) => ({
+  const stops = trip.days
+    .flatMap((day) => day.stops)
+    .map((stop) => ({
       name: stop.name,
       coordinates: { latitude: stop.at.lat, longitude: stop.at.lng },
-    })),
-  );
-  const firsts = days.map((_, day) =>
-    days.slice(0, day).reduce((count, stops) => count + stops.length, 0),
-  );
-  const dayCount = days.length;
-
-  useEffect(() => {
-    if (reduced || dayCount < 2) return;
-    const timer = setInterval(
-      () => setShown((day) => (day + 1) % dayCount),
-      DAY_MS,
+    }));
+  const camera =
+    size &&
+    cameraFor(
+      stops.map((stop) => stop.coordinates),
+      size,
     );
-    return () => clearInterval(timer);
-  }, [reduced, dayCount]);
+  const cameraKey = JSON.stringify(camera);
 
-  const shownPoints = days[shown]?.map((stop) => stop.coordinates);
-  const shownKey = JSON.stringify(shownPoints);
+  // The map mounts at the first camera through cameraPosition and refuses a move there right away, so only a later size moves it.
+  const mounted = useRef(false);
   useEffect(() => {
-    if (!size || !shownPoints) return;
-    const camera = cameraFor(shownPoints, size);
     if (!camera) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     ref.current
       ?.setCameraPosition(camera)
       .catch((error: unknown) =>
         analytics.captureError("sample_map_camera_failed", error),
       );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- shownKey stands for shownPoints, a new array each render
-  }, [shownKey, size]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cameraKey stands for camera, a new object each render
+  }, [cameraKey]);
 
-  const firstCamera =
-    size &&
-    days[0] &&
-    cameraFor(
-      days[0].map((stop) => stop.coordinates),
-      size,
-    );
   return (
     <View
       style={styles.box}
@@ -84,34 +88,40 @@ export function SampleAppleMap({ trip }: { trip: SampleTrip }) {
         })
       }
     >
-      {firstCamera && (
+      {camera && (
         <AppleMaps.View
           ref={ref}
           style={StyleSheet.absoluteFill}
-          cameraPosition={firstCamera}
+          cameraPosition={camera}
           colorScheme={
             isDarkThemeName(rt.themeName)
               ? AppleMaps.MapColorScheme.DARK
               : AppleMaps.MapColorScheme.LIGHT
           }
-          uiSettings={{ compassEnabled: false, myLocationButtonEnabled: false }}
+          uiSettings={{
+            compassEnabled: false,
+            myLocationButtonEnabled: false,
+            togglePitchEnabled: false,
+          }}
           properties={{ pointsOfInterest: { including: [] } }}
-          annotations={days.flatMap((stops, day) =>
-            stops.map((stop, index) => ({
-              id: `${day}:${index}`,
+          annotations={stops
+            .map((stop, index) => ({
+              id: String(index),
               coordinates: stop.coordinates,
               title: stop.name,
-              text: String(firsts[day]! + index + 1),
-              backgroundColor: colors[day % 2]!.pin,
-              textColor: colors[day % 2]!.text,
-            })),
-          )}
-          polylines={days.map((stops, day) => ({
-            id: `route-${day}`,
-            coordinates: stops.map((stop) => stop.coordinates),
-            color: colors[day % 2]!.pin,
-            width: 3,
-          }))}
+              text: String(index + 1),
+              backgroundColor: theme.colors.primary,
+              textColor: theme.colors.onTint,
+            }))
+            .slice(0, visible)}
+          polylines={[
+            {
+              id: "route",
+              coordinates: stops.map((stop) => stop.coordinates),
+              color: theme.colors.primary,
+              width: 3,
+            },
+          ]}
         />
       )}
     </View>
@@ -120,8 +130,7 @@ export function SampleAppleMap({ trip }: { trip: SampleTrip }) {
 
 const styles = StyleSheet.create((theme) => ({
   box: {
-    width: "100%",
-    aspectRatio: 340 / 170,
+    flex: 1,
     backgroundColor: theme.colors.primarySoft,
   },
 }));

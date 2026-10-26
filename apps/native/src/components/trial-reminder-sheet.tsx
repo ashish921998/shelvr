@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { trialReminderLeadDays } from "@/lib/trial-reminder-lead";
 import {
   trialReminderPrimer,
   useTrialReminderPrimerOpen,
@@ -30,7 +31,9 @@ export function TrialReminderPrimerSheet() {
       }
     >
       <NotificationPreview
-        title={t("notifications.trialEndingTitle")}
+        title={t("notifications.trialEndingTitle", {
+          count: trialReminderLeadDays(),
+        })}
         body={t("notifications.trialEndingBody")}
         when={t("notifications.trialPrimerWhen")}
       />

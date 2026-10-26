@@ -23,6 +23,16 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const placePinsValidator = v.array(
+  v.object({
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    city: v.optional(v.string()),
+    appleId: v.optional(v.string()),
+  }),
+);
+
 export const postMediaValidator = v.object({
   kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
   imageUrl: v.string(),
@@ -82,7 +92,7 @@ export const MAX_ITEM_TITLE_CHARS = 200;
 
 export const MAX_NOTE_TEXT_CHARS = 100_000;
 
-export const MAX_ITEM_CITIES = 3;
+export const MAX_ITEM_CITIES = 30;
 
 const MAX_CITY_CHARS = 60;
 const NOT_A_CITY = new Set(["unknown", "n/a", "none", "various", "online"]);
@@ -110,4 +120,52 @@ export function normalizeCities(raw: readonly string[] | undefined): string[] {
     if (cities.length === MAX_ITEM_CITIES) break;
   }
   return cities;
+}
+
+export const MAX_ITEM_PLACES = 30;
+
+const MAX_PLACE_CHARS = 80;
+
+/** The place without a trailing ", <city>" qualifier, or null when it has none. Compares the whole city, so "Washington, D.C" works. */
+export function withoutCitySuffix(place: string, city: string): string | null {
+  const suffix = city.trim().toLowerCase();
+  if (suffix === "" || !place.toLowerCase().endsWith(suffix)) return null;
+  const head = place.slice(0, place.length - suffix.length).trimEnd();
+  if (!head.endsWith(",")) return null;
+  const name = head.slice(0, -1).trim();
+  return name === "" ? null : name;
+}
+
+/** A sole source city is lookup context, not part of the venue's name. */
+export function normalizePlaceName(
+  raw: string,
+  cities: readonly string[] = [],
+): string {
+  const place = raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:!?]+$/, "")
+    .trim();
+  const sourceCities = normalizeCities(cities);
+  if (sourceCities.length !== 1) return place;
+  return withoutCitySuffix(place, sourceCities[0]) ?? place;
+}
+
+export function normalizePlaces(
+  raw: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): string[] {
+  const seen = new Set<string>();
+  const places: string[] = [];
+  for (const entry of raw ?? []) {
+    const place = normalizePlaceName(entry, cities);
+    const key = place.toLowerCase();
+    if (place === "" || place.length > MAX_PLACE_CHARS || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    places.push(place);
+    if (places.length === MAX_ITEM_PLACES) break;
+  }
+  return places;
 }

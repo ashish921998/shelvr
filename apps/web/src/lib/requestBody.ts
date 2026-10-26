@@ -45,7 +45,7 @@ export async function readBoundedText(
 
 export async function authorizeRequestBody(
   request: Request,
-  route: "oracle" | "waitlist" | "oracle-image",
+  route: "oracle" | "waitlist" | "oracle-image" | "reel-places",
 ): Promise<Response | undefined> {
   const site = convexSiteUrl();
   const secret = process.env.WAITLIST_SHARED_SECRET;
