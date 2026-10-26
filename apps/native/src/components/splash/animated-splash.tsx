@@ -238,7 +238,8 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         testID="splash-skip"
         style={styles.skipLayer}
         onPress={skip}
-        accessible={false}
+        accessibilityRole="button"
+        accessibilityLabel={t("splash.skip")}
       />
     </Animated.View>
   );

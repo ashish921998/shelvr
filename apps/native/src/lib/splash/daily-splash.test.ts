@@ -7,6 +7,9 @@ const storage = vi.hoisted(() => ({
   failing: false,
 }));
 
+const captureError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ analytics: { captureError } }));
+
 vi.mock("react-native-mmkv", () => ({
   createMMKV: () => ({
     getString: (key: string) => {
@@ -23,6 +26,7 @@ vi.mock("react-native-mmkv", () => ({
 beforeEach(() => {
   storage.values.clear();
   storage.failing = false;
+  captureError.mockClear();
 });
 
 describe("claimDailySplash", () => {
@@ -43,6 +47,10 @@ describe("claimDailySplash", () => {
     storage.failing = true;
     expect(claimDailySplash(new Date(2026, 9, 22, 8, 0))).toBe(true);
     expect(claimDailySplash(new Date(2026, 9, 22, 9, 0))).toBe(true);
+    expect(captureError).toHaveBeenCalledWith(
+      "splash_daily_claim_failed",
+      expect.any(Error),
+    );
   });
 
   it("names the local calendar day", () => {

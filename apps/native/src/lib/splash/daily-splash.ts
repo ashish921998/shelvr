@@ -1,5 +1,7 @@
 import { createMMKV } from "react-native-mmkv";
 
+import { analytics } from "@/lib/analytics";
+
 const LAST_PLAYED_DAY = "lastPlayedDay";
 
 let store: ReturnType<typeof createMMKV> | undefined;
@@ -26,8 +28,9 @@ export function claimDailySplash(now = new Date()): boolean {
     const store = splashStore();
     if (store.getString(LAST_PLAYED_DAY) === today) return false;
     store.set(LAST_PLAYED_DAY, today);
-  } catch {
+  } catch (error) {
     // Play the splash rather than skip it on a storage error.
+    analytics.captureError("splash_daily_claim_failed", error);
   }
   return true;
 }

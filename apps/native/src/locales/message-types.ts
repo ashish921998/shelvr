@@ -630,6 +630,7 @@ export type MessageParams = {
   "home.nextUpCook": undefined;
   "home.nextUpWatch": undefined;
   "home.nextUpOpen": undefined;
+  "splash.skip": undefined;
   "splash.tagline": undefined;
   "refundConsent.title": undefined;
   "refundConsent.disclosure": undefined;
