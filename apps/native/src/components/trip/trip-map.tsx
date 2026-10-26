@@ -1,5 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
+import { moveCamera } from "@/lib/map-camera";
 import {
   fitCamera,
   locatedStops,
@@ -95,11 +96,10 @@ export function TripMap({
   if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
   useEffect(() => {
     if (!camera || camera === firstCamera) return;
-    ref.current
-      ?.setCameraPosition(camera)
-      .catch((error: unknown) =>
-        analytics.captureError("trip_map_camera_failed", error),
-      );
+    return moveCamera(
+      () => ref.current?.setCameraPosition(camera),
+      (error) => analytics.captureError("trip_map_camera_failed", error),
+    );
   }, [camera, firstCamera]);
 
   const pins = days.flatMap((stops, day) =>

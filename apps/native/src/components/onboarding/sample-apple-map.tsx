@@ -1,6 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import { moveCamera } from "@/lib/map-camera";
 import type { SampleTrip } from "@/lib/sample-trip";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { AppleMaps } from "expo-maps";
@@ -69,11 +70,10 @@ export function SampleAppleMap({
       mounted.current = true;
       return;
     }
-    ref.current
-      ?.setCameraPosition(camera)
-      .catch((error: unknown) =>
-        analytics.captureError("sample_map_camera_failed", error),
-      );
+    return moveCamera(
+      () => ref.current?.setCameraPosition(camera),
+      (error) => analytics.captureError("sample_map_camera_failed", error),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cameraKey stands for camera, a new object each render
   }, [cameraKey]);
 
