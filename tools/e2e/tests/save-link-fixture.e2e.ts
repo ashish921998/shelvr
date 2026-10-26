@@ -22,7 +22,7 @@ test(
     await expect(input).toBeHidden({ timeout: 30_000 });
 
     await expect(
-      screen.getByRole("button", `${TITLE}, No place in this one`),
+      screen.getByRole("button", `${TITLE}, No place found`),
     ).toHaveCount(1, { timeout: 60_000 });
   },
 );
