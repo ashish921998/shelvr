@@ -153,16 +153,16 @@ export default function CityScreen() {
             </View>
           }
           renderItem={({ item: row }) => {
-            const { item, number } = row;
+            const { item } = row;
             return (
               <SaveRow
                 item={item}
-                placeName={row.name}
-                number={number}
+                placeName={row.kind === "place" ? row.name : undefined}
+                number={row.kind === "place" ? row.number : undefined}
                 selected={selected === row.id}
                 // First select the place's pin; a second tap opens its source save.
                 onPress={
-                  number !== undefined && selected !== row.id
+                  row.kind === "place" && selected !== row.id
                     ? () => select(row.id)
                     : () =>
                         router.push({

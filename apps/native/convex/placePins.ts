@@ -14,20 +14,30 @@ import {
   appleMapsConfig,
   appleMapsLookup,
 } from "./model/appleMaps";
+import {
+  MAX_ITEM_PLACES,
+  normalizeCities,
+  placePinsValidator,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
 import { dropStrays, keepNearby, middleOf, type LatLng } from "./model/trip";
 
-const MAX_PINS = 5;
+const MAX_PINS = MAX_ITEM_PLACES;
 const BACKFILL_PAGE = 100;
 const BACKFILL_STAGGER_MS = 250;
 
-type Pin = { name: string; lat: number; lng: number };
+type Pin = { name: string; lat: number; lng: number; city?: string };
 
 /** In a save that names exactly one city, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
 function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
-  if (cities.length !== 1) return pins;
+  if (
+    cities.length !== 1 ||
+    new Set(pins.flatMap((pin) => (pin.city ? [pin.city.toLowerCase()] : [])))
+      .size > 1
+  )
+    return pins;
   return dropStrays(pins).filter((pin) => pin !== null);
 }
 
@@ -70,7 +80,11 @@ async function wantedPlaces(
 
 /** Mirrors trips.ts: the city narrows a bare name, unless the name already says it. */
 function lookupQuery(name: string, city: string | undefined): string {
-  if (city && !name.toLowerCase().includes(city.trim().toLowerCase())) {
+  if (
+    city &&
+    !name.includes(",") &&
+    !name.toLowerCase().includes(city.trim().toLowerCase())
+  ) {
     return `${name}, ${city.trim()}`;
   }
   return name;
@@ -99,12 +113,26 @@ export const toLocate = internalQuery({
       .map(([, name]) => name)
       // Look past the free slots: a stray match storePins drops must not keep the next place from a pin.
       .slice(0, !args.refresh && kept >= MAX_PINS ? 0 : MAX_PINS);
+    const singleCity =
+      item.cities?.length === 1 &&
+      wanted.every(
+        ([, name]) =>
+          !name.includes(",") ||
+          name
+            .split(",")
+            .slice(1)
+            .some(
+              (part) =>
+                part.trim().toLowerCase() ===
+                item.cities?.[0].trim().toLowerCase(),
+            ),
+      );
     const pins = nearEachOther(item.placePins ?? [], item.cities ?? []);
     return {
       names,
-      city: item.cities?.[0],
-      singleCity: item.cities?.length === 1,
-      centre: item.cities?.length === 1 ? lookupCentre(pins) : null,
+      city: singleCity ? item.cities?.[0] : undefined,
+      singleCity,
+      centre: singleCity ? lookupCentre(pins) : null,
     };
   },
 });
@@ -112,9 +140,7 @@ export const toLocate = internalQuery({
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
-    found: v.array(
-      v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
-    ),
+    found: placePinsValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -137,9 +163,16 @@ export const storePins = internalMutation({
         (pin, i) =>
           pin.name === before[i].name &&
           pin.lat === before[i].lat &&
-          pin.lng === before[i].lng,
+          pin.lng === before[i].lng &&
+          pin.city === before[i].city,
       );
-    if (!same) await ctx.db.patch(item._id, { placePins: pins });
+    const cities = normalizeCities([
+      ...(item.cities ?? []),
+      ...pins.flatMap((pin) => (pin.city ? [pin.city] : [])),
+    ]);
+    if (!same || JSON.stringify(cities) !== JSON.stringify(item.cities ?? [])) {
+      await ctx.db.patch(item._id, { placePins: pins, cities });
+    }
     return null;
   },
 });
@@ -168,6 +201,8 @@ async function lookUp(
         "search",
         lookupQuery(name, city),
         centre ?? undefined,
+        undefined,
+        true,
       ),
     })),
   );
@@ -185,12 +220,23 @@ async function lookUp(
           "search",
           lookupQuery(place.name, city),
           anchor,
+          undefined,
+          true,
         );
       }),
     );
   }
   return looked.flatMap(({ name, at }) =>
-    at === null ? [] : [{ name, lat: at.lat, lng: at.lng }],
+    at === null
+      ? []
+      : [
+          {
+            name,
+            lat: at.lat,
+            lng: at.lng,
+            ...(at.city ? { city: at.city } : city ? { city } : {}),
+          },
+        ],
   );
 }
 
@@ -224,15 +270,17 @@ export const backfillPage = internalMutation({
       .filter(
         (item) =>
           item.status === "ready" &&
-          item.placePins === undefined &&
-          mapsNames(item.intents).length > 0,
+          (item.placePins === undefined ||
+            (item.placePins ?? []).some((pin) => !pin.city)) &&
+          (mapsNames(item.intents).length > 0 ||
+            (item.places?.length ?? 0) > 0),
       )
       .map((item) => item._id);
     for (const [i, itemId] of todo.entries()) {
       await ctx.scheduler.runAfter(
         i * BACKFILL_STAGGER_MS,
         internal.placePins.locateItem,
-        { itemId },
+        { itemId, refresh: true },
       );
     }
     if (!isDone) {

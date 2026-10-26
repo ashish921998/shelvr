@@ -131,7 +131,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
   is the shared helper).
   `listCities.count` retains the legacy save count for installed apps; optional
-  `placeCount` is the distinct mapped-place count. New clients hide an absent or
+  `placeCount` is the distinct mapped-place count for that city.
+  City reads filter pins by their resolved city; legacy unlabelled pins are shown only for single-city saves. New clients hide an absent or
   zero place count while retaining the city and its saves.
   Image saves run a three-step, idempotent import: `beginImageImport`, then
   `attachImageUpload`, then `finalizeImageImport`, all keyed on a
@@ -306,9 +307,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
-  and `storePins` writes at most five, dropping any place no longer named. Scheduled from
+  and `storePins` writes at most 30 with their Apple Maps locality, dropping any place no longer named.
+  Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
+  Resolved cities join `items.cities`, so Home creates an entry for each (up to 30). Scheduled from
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
-  membership carrying a Maps intent is removed or dismissed; `backfillPage` fills older saves, run by hand. Skipped
+  membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older unlabelled pins, run by hand after deployment:
+  `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
   when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the

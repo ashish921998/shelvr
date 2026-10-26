@@ -32,9 +32,11 @@ describe("normalizeCities", () => {
   });
 
   it("caps the list", () => {
-    expect(normalizeCities(["A", "B", "C", "D", "E"])).toHaveLength(
-      MAX_ITEM_CITIES,
-    );
+    expect(
+      normalizeCities(
+        Array.from({ length: MAX_ITEM_CITIES + 2 }, (_, i) => `City ${i}`),
+      ),
+    ).toHaveLength(MAX_ITEM_CITIES);
   });
 
   it("treats a missing answer as no cities", () => {

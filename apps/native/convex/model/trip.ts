@@ -59,6 +59,19 @@ export function cityKey(city: string): string {
   return tidyCity(city).toLowerCase();
 }
 
+/** A pin belongs to its resolved city; legacy unlabelled pins are safe only for single-city saves. */
+export function pinsForCity<T extends LatLng & { name: string; city?: string }>(
+  item: { cities?: string[]; placePins?: T[] },
+  city: string,
+): T[] {
+  const cities = new Set((item.cities ?? []).map(cityKey));
+  return (item.placePins ?? []).filter((pin) =>
+    pin.city
+      ? cityKey(pin.city) === cityKey(city)
+      : cities.size === 1 && cities.has(cityKey(city)),
+  );
+}
+
 export function countCities(
   items: { cities?: string[] }[],
 ): { city: string; count: number }[] {

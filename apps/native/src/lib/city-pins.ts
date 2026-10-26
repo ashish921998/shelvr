@@ -6,9 +6,10 @@ export type CityPin = {
   name: string;
   lat: number;
   lng: number;
+  number: number;
 };
 
-export function cityPinId(pin: CityPin): string {
+export function cityPinId(pin: Omit<CityPin, "number">): string {
   return `${pin.itemId}:${pin.name}:${pin.lat}:${pin.lng}`;
 }
 
@@ -23,29 +24,48 @@ export function cityPins(
     saves.flatMap((save) =>
       (save.placePins ?? []).map((pin) => ({ itemId: save._id, ...pin })),
     ),
-  );
+  ).map((pin, index) => ({ ...pin, number: index + 1 }));
 }
 
 /** One row per mapped place, plus every save not represented by a place row. */
+type CityRow<T> =
+  | {
+      kind: "place";
+      id: string;
+      number: number;
+      name: string;
+      pin: CityPin;
+      item: T;
+    }
+  | { kind: "save"; id: string; item: T };
+
 export function cityRows<T extends { _id: string; placePins?: unknown[] }>(
   saves: T[],
   pins: CityPin[],
-) {
+): CityRow<T>[] {
   const items = new Map(saves.map((save) => [save._id, save]));
   const pinnedIds = new Set(pins.map((pin) => pin.itemId));
   return [
-    ...pins.flatMap((pin, index) => {
+    ...pins.flatMap((pin): CityRow<T>[] => {
       const item = items.get(pin.itemId);
       return item
-        ? [{ id: cityPinId(pin), number: index + 1, name: pin.name, item }]
+        ? [
+            {
+              kind: "place",
+              id: cityPinId(pin),
+              number: pin.number,
+              name: pin.name,
+              pin,
+              item,
+            },
+          ]
         : [];
     }),
     ...saves
       .filter((save) => !pinnedIds.has(save._id))
       .map((item) => ({
+        kind: "save" as const,
         id: item._id,
-        number: undefined,
-        name: undefined,
         item,
       })),
   ];

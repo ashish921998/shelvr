@@ -74,14 +74,14 @@ export function CityMap({ pins, selected, height, onSelect }: Props) {
       );
   }, [camera, firstCamera]);
 
-  const annotations = pins.map((pin, i) => {
+  const annotations = pins.map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
     return {
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
-      text: String(i + 1),
+      text: String(pin.number),
       backgroundColor: isSelected
         ? theme.colors.foreground
         : theme.colors.primary,

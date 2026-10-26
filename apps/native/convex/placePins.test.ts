@@ -98,22 +98,60 @@ describe("placePins", () => {
     ).toBeNull();
   });
 
-  it("keeps city context for multi-city saves without imposing one search centre", async () => {
+  it("does not bias multi-city saves toward the first city", async () => {
     const { t, itemId } = await setup(["Lisbon", "Porto", "Faro"]);
     await t.run(async (ctx) =>
       ctx.db.patch(itemId, { cities: ["Lisbon", "Porto", "Faro"] }),
     );
     const todo = await t.query(internal.placePins.toLocate, { itemId });
-    expect(todo?.city).toBe("Lisbon");
+    expect(todo?.city).toBeUndefined();
     expect(todo?.singleCity).toBe(false);
     expect(todo?.centre).toBeNull();
     expect(todo?.names).toHaveLength(3);
   });
+  it("resolves places independently, stores their cities, and discovers another city", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Cafe, Lisbon", "Tower, Porto"]);
+    // Classification missed Porto; explicit place qualifiers must still win.
+    const queries: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const q = url.searchParams.get("q") ?? "";
+        queries.push(q);
+        const porto = q === "Tower, Porto";
+        return Response.json({
+          results: [
+            {
+              structuredAddress: { locality: porto ? "Porto" : "Lisbon" },
+              coordinate: { latitude: porto ? 41.15 : 38.72, longitude: -9.1 },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries).toEqual(["Cafe, Lisbon", "Tower, Porto"]);
+    expect((await pins())?.map((pin) => pin.city)).toEqual(["Lisbon", "Porto"]);
+    // A resolved place can add a city that classification missed.
+    await t.run(async (ctx) => ctx.db.patch(itemId, { cities: ["Lisbon"] }));
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect((await t.run(async (ctx) => ctx.db.get(itemId)))?.cities).toEqual([
+      "Lisbon",
+      "Porto",
+    ]);
+  });
+
   it("refreshes an existing pin instead of keeping its old coordinates", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup(["Micho"], { pins: true });
     await t.action(internal.placePins.locateItem, { itemId, refresh: true });
-    expect(await pins()).toEqual([{ name: "Micho", lat: 13, lng: -13 }]);
+    expect(await pins()).toEqual([
+      { name: "Micho", lat: 13, lng: -13, city: "Lisbon" },
+    ]);
   });
   it("resolves an unpinned namesake near the save's established city", async () => {
     await withMaps();
@@ -143,6 +181,7 @@ describe("placePins", () => {
     await t.action(internal.placePins.locateItem, { itemId });
     expect((await pins())?.find((pin) => pin.name === "Micho")).toEqual({
       name: "Micho",
+      city: "Paris",
       lat: 48.866,
       lng: 2.338,
     });
@@ -312,14 +351,14 @@ describe("placePins", () => {
     expect(await pins()).toHaveLength(2);
   });
 
-  it("keeps at most five pins", async () => {
-    const names = ["A1", "B2", "C3", "D4", "E5", "F6", "G7"];
+  it("keeps at most thirty pins", async () => {
+    const names = Array.from({ length: 32 }, (_, i) => `Place ${i}`);
     const { t, itemId, pins } = await setup(names);
     await t.mutation(internal.placePins.storePins, {
       itemId,
       found: names.map((name) => ({ name, lat: 1, lng: 1 })),
     });
-    expect(await pins()).toHaveLength(5);
+    expect(await pins()).toHaveLength(30);
   });
 
   it("looks past the last free slot, so a dropped stray does not block the next place", async () => {
@@ -339,13 +378,13 @@ describe("placePins", () => {
     ]);
   });
 
-  it("does not look up places once five are already pinned", async () => {
+  it("does not look up places once thirty are already pinned", async () => {
     const { queries } = await withMaps();
-    const names = ["A1", "B2", "C3", "D4", "E5", "F6", "G7"];
+    const names = Array.from({ length: 32 }, (_, i) => `Place ${i}`);
     const { t, itemId } = await setup(names);
     await t.run(async (ctx) =>
       ctx.db.patch(itemId, {
-        placePins: names.slice(0, 5).map((name) => ({ name, lat: 1, lng: 1 })),
+        placePins: names.slice(0, 30).map((name) => ({ name, lat: 1, lng: 1 })),
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });

@@ -14,12 +14,16 @@ describe("cityRows", () => {
     ];
     expect(cityRows(saves, cityPins(saves))).toEqual([
       {
+        kind: "place",
+        pin: cityPins(saves)[0],
         id: "a:Jo's Coffee:30.25:-97.75",
         number: 1,
         name: "Jo's Coffee",
         item: saves[0],
       },
       {
+        kind: "place",
+        pin: cityPins(saves)[1],
         id: "a:June's:30.24:-97.75",
         number: 2,
         name: "June's",
@@ -38,14 +42,16 @@ describe("cityRows", () => {
     ];
     expect(cityRows(saves, cityPins(saves))).toEqual([
       {
+        kind: "place",
+        pin: cityPins(saves)[0],
         id: "newer:Micho:48.866:2.337",
         number: 1,
         name: "Micho",
         item: saves[0],
       },
-      { id: "older", number: undefined, name: undefined, item: saves[1] },
-      { id: "unlocated", number: undefined, name: undefined, item: saves[2] },
-      { id: "empty", number: undefined, name: undefined, item: saves[3] },
+      { id: "older", kind: "save", item: saves[1] },
+      { id: "unlocated", kind: "save", item: saves[2] },
+      { id: "empty", kind: "save", item: saves[3] },
     ]);
     expect(cityRows([], [])).toEqual([]);
   });
@@ -59,7 +65,7 @@ describe("cityPins", () => {
         { _id: "newer", placePins: [pin] },
         { _id: "older", placePins: [pin] },
       ]),
-    ).toEqual([{ ...pin, itemId: "newer" }]);
+    ).toEqual([{ ...pin, itemId: "newer", number: 1 }]);
   });
   it("tags each stored pin with its save and skips saves without pins", () => {
     const saves = [
@@ -70,7 +76,7 @@ describe("cityPins", () => {
       { _id: "b" },
     ];
     expect(cityPins(saves)).toEqual([
-      { itemId: "a", name: "Time Out Market", lat: 38.7, lng: -9.1 },
+      { itemId: "a", name: "Time Out Market", lat: 38.7, lng: -9.1, number: 1 },
     ]);
   });
 });
