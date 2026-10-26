@@ -707,7 +707,7 @@
   "home.nextUpOpen": "Guardado para después",
   "splash.tagline": "Guárdalo para más tarde",
   "refundConsent.title": "Condiciones actualizadas",
-  "refundConsent.disclosure": "Hemos actualizado nuestras condiciones para las revisiones de reembolsos de Apple. Al aceptar abajo, aceptas las condiciones actualizadas y permites que Shelvr, a través de RevenueCat, comparta información de compra y entrega con Apple cuando solicites un reembolso. Apple toma la decisión final. Tus enlaces, notas y fotos guardados no forman parte de esto.",
+  "refundConsent.disclosure": "Hemos actualizado nuestras condiciones para las revisiones de reembolsos de Apple. Al aceptar abajo, aceptas las condiciones actualizadas y permites que Shelvr, a través de RevenueCat, comparta información de compra y entrega con Apple cuando solicites un reembolso. Apple toma la decisión final. Tus enlaces guardados y los lugares que contienen no forman parte de esto.",
   "refundConsent.optional": "Compartir es opcional. Puedes seguir usando Shelvr y solicitar reembolsos sin aceptar compartir datos. Puedes cambiar tu elección en Perfil.",
   "refundConsent.accept": "Aceptar y permitir compartir",
   "refundConsent.later": "Ahora no",
