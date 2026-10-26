@@ -82,17 +82,21 @@ function fold(value: string): string {
   return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
+const WORD = /[\p{L}\p{N}]+/gu;
+
 /**
- * A name the text never mentions is invented. A word of the name (four letters
- * or more, or any word of a short name) must appear in the text, so a place
- * written as part of an @handle still counts.
+ * A name the text never mentions is invented. Every word of four letters or
+ * more must appear in the text, as part of a longer word too, so a place the
+ * text writes as an @handle still counts. A name made only of shorter words
+ * must have each of them as a whole word.
  */
 function isInText(name: string, foldedText: string): boolean {
-  const words = fold(name).match(/[\p{L}\p{N}]+/gu) ?? [];
+  const words = fold(name).match(WORD) ?? [];
+  if (words.length === 0) return false;
   const long = words.filter((word) => word.length >= 4);
-  return (long.length > 0 ? long : words).some((word) =>
-    foldedText.includes(word),
-  );
+  if (long.length > 0) return long.every((word) => foldedText.includes(word));
+  const textWords = new Set(foldedText.match(WORD));
+  return words.every((word) => textWords.has(word));
 }
 
 function clean(value: string, max: number): string {

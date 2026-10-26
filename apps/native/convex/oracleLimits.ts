@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { rateLimiter } from "./model/rateLimiter";
-import { ipKey } from "./model/clientIp";
+import { ipKey, ipNetwork } from "./model/clientIp";
 
 export const claimRequestBody = internalMutation({
   args: {
@@ -43,7 +43,7 @@ export const claimReelPlaces = internalMutation({
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "reelPlacesGlobal", { throws: true });
     await rateLimiter.limit(ctx, "reelPlacesIp", {
-      key: ipKey(args.ip),
+      key: ipNetwork(args.ip),
       throws: true,
     });
     return null;

@@ -47,6 +47,20 @@ describe("reelPlacesLimits", () => {
     ).resolves.toBeNull();
   });
 
+  it("counts every address in one IPv6 /64 as the same visitor", async () => {
+    const t = newConvexTest();
+    for (let i = 0; i < 8; i++) {
+      await t.mutation(internal.oracleLimits.claimReelPlaces, {
+        ip: `2001:db8:1:2::${i + 1}`,
+      });
+    }
+    await expect(
+      t.mutation(internal.oracleLimits.claimReelPlaces, {
+        ip: "2001:db8:1:2:ffff::9",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("budgets request bodies for the route on its own", async () => {
     const t = newConvexTest();
     await expect(
@@ -136,6 +150,22 @@ describe("reelPlaces.find", () => {
       t.action(internal.reelPlaces.find, { url: REEL }),
     ).resolves.toEqual({ status: "ok", places: [] });
     expect(generateObject).not.toHaveBeenCalled();
+  });
+
+  it("gives up on a page that takes too long to read", async () => {
+    vi.useFakeTimers();
+    try {
+      pageRead.mockReturnValue(new Promise(() => {}));
+      const t = newConvexTest();
+      const result = t.action(internal.reelPlaces.find, { url: REEL });
+      await vi.advanceTimersByTimeAsync(11_000);
+      await expect(result).resolves.toEqual({
+        status: "unreadable",
+        places: [],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports a page it could not read", async () => {

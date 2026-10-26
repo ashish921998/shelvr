@@ -48,12 +48,19 @@ export default function ReelPlaceFinder() {
         captureWebAnalyticsEvent("place_tool_failed", { reason: "busy" });
         return;
       }
+      if (response.status === 400 || response.status === 422) {
+        setProblem("Couldn’t read that link. Check it and try again.");
+        captureWebAnalyticsEvent("place_tool_failed", { reason: "unreadable" });
+        return;
+      }
       const found = response.ok
         ? parseReelPlaces(await response.json())
         : undefined;
       if (!found) {
-        setProblem("Couldn’t read that link. Check it and try again.");
-        captureWebAnalyticsEvent("place_tool_failed", { reason: "unreadable" });
+        setProblem("The finder is having trouble. Try again in a moment.");
+        captureWebAnalyticsEvent("place_tool_failed", {
+          reason: "unavailable",
+        });
         return;
       }
       setLoaded({ found, sample: false });
@@ -77,6 +84,7 @@ export default function ReelPlaceFinder() {
   return (
     <div className="mt-8">
       <form
+        noValidate
         onSubmit={(event) => void find(event)}
         className="rounded-3xl border border-line bg-cream p-5 sm:p-6"
       >
@@ -150,8 +158,7 @@ function Results({ loaded }: { loaded: Loaded }) {
           </h2>
           <p className="mt-2 text-base text-muted">
             The caption doesn’t name any. Many reels only say the place out loud
-            or show it on screen, and the finder reads the caption and the page
-            it links to.
+            or show it on screen, and the finder reads the caption.
           </p>
         </div>
       ) : (

@@ -71,6 +71,32 @@ describe("settleReelPlaces", () => {
     ]);
   });
 
+  it("drops a famous sight in the right city that the caption never names", () => {
+    const settled = settleReelPlaces(
+      raw([
+        ["Lisbon Oceanarium", "Lisbon"],
+        ["Belém Tower", "Lisbon"],
+        ["Time Out Market", "Lisbon"],
+      ]),
+      caption,
+    );
+    expect(settled.places.map((place) => place.name)).toEqual([
+      "Time Out Market",
+    ]);
+  });
+
+  it("matches a short name only as a whole word", () => {
+    expect(
+      settleReelPlaces(
+        raw([["Ria Bar"]]),
+        "Lunch at @manteigaria, then bar hopping",
+      ).places,
+    ).toEqual([]);
+    expect(
+      settleReelPlaces(raw([["Ria Bar"]]), "Drinks at Ria Bar tonight").places,
+    ).toHaveLength(1);
+  });
+
   it("matches across accents and case", () => {
     const settled = settleReelPlaces(
       raw([["PASTEIS DE BELEM", "Lisbon"]]),

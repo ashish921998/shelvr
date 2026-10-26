@@ -15,6 +15,9 @@ import {
 } from "./model/reelPlaces";
 
 const MODEL_TIMEOUT_MS = 15_000;
+// The web route gives up after 30 seconds, so the read gets what is left once
+// the model call has its share.
+const PAGE_READ_BUDGET_MS = 10_000;
 
 const placesValidator = v.object({
   status: v.union(v.literal("ok"), v.literal("unreadable")),
@@ -24,7 +27,7 @@ const placesValidator = v.object({
 
 /**
  * The web reel place finder: reads one public Instagram or TikTok link and lists
- * the places its caption (and the page it links to) names. Nothing is stored.
+ * the places its caption names. Nothing is stored.
  * Reached only through the `/reel-places` HTTP route.
  */
 export const find = internalAction({
@@ -32,10 +35,15 @@ export const find = internalAction({
   returns: placesValidator,
   handler: async (_ctx, { url }) => {
     const startedAt = Date.now();
-    const read = await readPage(url);
-    if (read.status !== "ok") {
+    const read = await Promise.race([
+      readPage(url),
+      new Promise<undefined>((resolve) =>
+        setTimeout(resolve, PAGE_READ_BUDGET_MS, undefined),
+      ),
+    ]);
+    if (read?.status !== "ok") {
       logEvent("info", "reel_places_found", {
-        outcome: "unreadable",
+        outcome: read === undefined ? "read_timeout" : "unreadable",
         duration_ms: Date.now() - startedAt,
       });
       return { status: "unreadable" as const, places: [] };

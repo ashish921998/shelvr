@@ -33,15 +33,15 @@ const STEPS = [
 const FAQS = [
   {
     q: "How do I find the location of an Instagram reel?",
-    a: "Paste the reel’s link above. The finder reads the caption and the page it links to, then lists every restaurant, café, shop or sight it names, with a Maps link for each. If the creator tagged a location, it’s on the reel itself, under their name.",
+    a: "Paste the reel’s link above. The finder reads the caption, then lists every restaurant, café, shop or sight it names, with a Maps link for each. If the creator tagged a location, it’s on the reel itself, under their name.",
   },
   {
     q: "Does it work for TikTok too?",
-    a: "Yes. Paste a TikTok link the same way and it reads the caption and the page the video links to.",
+    a: "Yes. Paste a TikTok link the same way and it reads the caption.",
   },
   {
     q: "Why did it find nothing?",
-    a: "Many reels only say the place out loud or show it on screen. The finder reads written text, the caption and the page the reel links to, so a reel that never writes a place name comes back empty. Check the comments too, since creators often pin the list there.",
+    a: "Many reels only say the place out loud or show it on screen. The finder reads the written caption, so a reel that never writes a place name comes back empty. Check the comments too, since creators often pin the list there.",
   },
   {
     q: "Do I need to log in to Instagram or TikTok?",
