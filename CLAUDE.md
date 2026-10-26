@@ -131,7 +131,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
   is the shared helper).
   Home searches the caller's saved titles, cities and place names through `searchItems`,
-  using the existing account-filtered full-text index (at most 50 matches). After
+  using the existing account-filtered full-text index (at most 50 matches).
+  Its response includes optional `places` so unpinned matches can show their place
+  names; older clients can ignore the field. Query terms are split on punctuation
+  as well as whitespace and capped at 16 before searching. After
   deploying the city/place search change, run from `apps/native`:
   `pnpm exec convex run --prod items:backfillPlaceSearch '{"cursor":null}'`.
   This internal, paginated repair updates only search text for live owners, schedules

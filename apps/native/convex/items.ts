@@ -73,7 +73,7 @@ import { aiConsentRequiredError } from "./model/aiConsent";
 import { nextUpKind } from "./model/nextUp";
 import { openedTooRecently, reminderSubject } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
-import { buildSearchText } from "./model/searchText";
+import { buildSearchText, searchQueryText } from "./model/searchText";
 import {
   hasSimilarSignal,
   rankSimilar,
@@ -577,25 +577,29 @@ export const getItem = authedQuery({
 
 export const searchItems = authedQuery({
   args: { query: v.string() },
-  returns: v.array(enrichedItemValidator),
+  returns: v.array(
+    enrichedItemValidator.extend({
+      places: v.optional(v.array(v.string())),
+    }),
+  ),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    const trimmed = args.query.trim();
-    if (trimmed === "") {
+    const query = searchQueryText(args.query);
+    if (query === "") {
       return [];
     }
     const items = await ctx.db
       .query("items")
       .withSearchIndex("search_text", (q) =>
-        q
-          .search(
-            "searchText",
-            trimmed.toLowerCase().split(/\s+/).slice(0, 16).join(" "),
-          )
-          .eq("userId", userId),
+        q.search("searchText", query).eq("userId", userId),
       )
       .take(50);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await Promise.all(
+      items.map(async (item) => ({
+        ...(await enrichItem(ctx, item)),
+        places: item.places,
+      })),
+    );
   },
 });
 

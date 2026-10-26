@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import { newConvexTest, signedInUser } from "./test.setup";
-import { buildSearchText } from "./model/searchText";
+import { buildSearchText, searchQueryText } from "./model/searchText";
 import { completionPatch } from "./model/settlement";
 
 beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
@@ -37,12 +37,18 @@ it("finds old saves by city, place, and title beyond the Home page, without retu
   });
   await backend.mutation(internal.items.backfillPlaceSearch, { cursor: null });
   await backend.finishAllScheduledFunctions(vi.runAllTimers);
-  for (const query of [" lisbon ", "Belém", "weekend"]) {
+  for (const query of [" lisbon ", "Belém", "weekend", "Lisbon---"]) {
     expect(
       (await t.query(api.items.searchItems, { query })).map((item) => item._id),
     ).toEqual([target]);
   }
+  const [placeMatch] = await t.query(api.items.searchItems, { query: "Belém" });
+  expect(placeMatch.places).toEqual(["Belém Tower"]);
+  expect(placeMatch.placePins).toBeUndefined();
   expect(await t.query(api.items.searchItems, { query: "   " })).toEqual([]);
+  expect(await t.query(api.items.searchItems, { query: "--- / ?!" })).toEqual(
+    [],
+  );
   expect(await t.query(api.items.searchItems, { query: "nowhere" })).toEqual(
     [],
   );
@@ -53,6 +59,18 @@ it("finds old saves by city, place, and title beyond the Home page, without retu
       (item) => item._id,
     ),
   ).toEqual([target]);
+});
+
+it("bounds punctuation-separated and URL-like queries to 16 Unicode terms", () => {
+  const terms = Array.from({ length: 20 }, (_, i) => `place${i}`);
+  for (const separator of ["-", "/", ".", ",", " "]) {
+    expect(searchQueryText(terms.join(separator))).toBe(
+      terms.slice(0, 16).join(" "),
+    );
+  }
+  expect(searchQueryText("BELÉM—東京,서울/123")).toBe("belém 東京 서울 123");
+  expect(searchQueryText("Bele\u0301m")).toBe("belém");
+  expect(searchQueryText("!!!")).toBe("");
 });
 
 it("does not reindex a deleting or missing owner", async () => {

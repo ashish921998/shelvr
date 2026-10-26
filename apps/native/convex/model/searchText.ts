@@ -2,6 +2,18 @@ const MAX_SEARCH_NOTE_CHARS = 8000;
 
 const MAX_SEARCH_CONTENT_CHARS = 8000;
 
+/** Convex tokenizes punctuation too and accepts at most 16 search terms. */
+export function searchQueryText(query: string): string {
+  return (
+    query
+      .normalize("NFC")
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu) ?? []
+  )
+    .slice(0, 16)
+    .join(" ");
+}
+
 export function buildSearchText(parts: {
   title?: string;
   description?: string;

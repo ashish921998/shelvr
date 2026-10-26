@@ -130,12 +130,16 @@ function SearchResults({
           <Text style={styles.title} numberOfLines={2}>
             {save.title ??
               save.placePins?.[0]?.name ??
+              save.places?.[0] ??
               save.url ??
               t("item.untitled")}
           </Text>
-          {save.placePins?.length ? (
+          {save.placePins?.length || save.places?.length ? (
             <Text style={styles.subtitle} numberOfLines={2}>
-              {save.placePins.map((pin) => pin.name).join(" · ")}
+              {(save.placePins?.length
+                ? save.placePins.map((pin) => pin.name)
+                : save.places
+              )?.join(" · ")}
             </Text>
           ) : null}
           {save.cities?.length ? (

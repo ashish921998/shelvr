@@ -10,7 +10,13 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   refetch: vi.fn(),
   result: {
-    data: [] as { _id: string; title: string; cities: string[] }[],
+    data: [] as {
+      _id: string;
+      title: string;
+      cities: string[];
+      places?: string[];
+      placePins?: { name: string }[];
+    }[],
     isPending: false,
     isError: false,
     error: null as Error | null,
@@ -150,4 +156,41 @@ it("reports a search error and offers retry instead of claiming no results", () 
   );
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(mocks.refetch).toHaveBeenCalled();
+});
+
+it.each([undefined, []])(
+  "shows extracted place names when pins are %s",
+  (placePins) => {
+    mocks.result.data = [
+      {
+        _id: "saved-place",
+        title: "Weekend favourites",
+        cities: ["Lisbon"],
+        places: ["Belém Tower"],
+        placePins,
+      },
+    ];
+    home();
+    type("Belém");
+    settle();
+    expect(screen.getByText("Belém Tower")).toBeTruthy();
+    expect(screen.getByText("Lisbon")).toBeTruthy();
+  },
+);
+
+it("prefers resolved pin names over extracted names", () => {
+  mocks.result.data = [
+    {
+      _id: "saved-place",
+      title: "Weekend favourites",
+      cities: ["Lisbon"],
+      places: ["Extracted name"],
+      placePins: [{ name: "Belém Tower" }],
+    },
+  ];
+  home();
+  type("Belém");
+  settle();
+  expect(screen.getByText("Belém Tower")).toBeTruthy();
+  expect(screen.queryByText("Extracted name")).toBeNull();
 });
