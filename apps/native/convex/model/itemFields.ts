@@ -125,6 +125,16 @@ export const MAX_ITEM_PLACES = 30;
 
 const MAX_PLACE_CHARS = 80;
 
+/** The place without a trailing ", <city>" qualifier, or null when it has none. Compares the whole city, so "Washington, D.C" works. */
+export function withoutCitySuffix(place: string, city: string): string | null {
+  const suffix = city.trim().toLowerCase();
+  if (suffix === "" || !place.toLowerCase().endsWith(suffix)) return null;
+  const head = place.slice(0, place.length - suffix.length).trimEnd();
+  if (!head.endsWith(",")) return null;
+  const name = head.slice(0, -1).trim();
+  return name === "" ? null : name;
+}
+
 /** A sole source city is lookup context, not part of the venue's name. */
 export function normalizePlaceName(
   raw: string,
@@ -136,18 +146,8 @@ export function normalizePlaceName(
     .replace(/[.,;:!?]+$/, "")
     .trim();
   const sourceCities = normalizeCities(cities);
-  const comma = place.lastIndexOf(",");
-  if (
-    sourceCities.length === 1 &&
-    comma > 0 &&
-    place
-      .slice(comma + 1)
-      .trim()
-      .toLowerCase() === sourceCities[0].toLowerCase()
-  ) {
-    return place.slice(0, comma).trim();
-  }
-  return place;
+  if (sourceCities.length !== 1) return place;
+  return withoutCitySuffix(place, sourceCities[0]) ?? place;
 }
 
 export function normalizePlaces(

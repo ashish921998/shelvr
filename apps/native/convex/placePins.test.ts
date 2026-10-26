@@ -273,6 +273,16 @@ describe("placePins", () => {
     expect(queries()).toEqual(["Cafe, Downtown, Lisbon"]);
   });
 
+  it("adds a city that contains a comma to the lookup only once", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId } = await setup(["Founding Farmers, Washington, D.C."]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, { cities: ["Washington, D.C"] }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries()).toEqual(["Founding Farmers, Washington, D.C"]);
+  });
+
   it("keeps retained and new single-city pins assigned to their source city", async () => {
     const { t, itemId, pins } = await setup(["Cafe", "Tower"]);
     await t.run(async (ctx) =>

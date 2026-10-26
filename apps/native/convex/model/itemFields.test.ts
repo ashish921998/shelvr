@@ -60,6 +60,15 @@ describe("normalizePlaces", () => {
     ).toEqual(["Guest House", "Cafe, Downtown", "Austin Java", "Cafe, Dallas"]);
   });
 
+  it("removes a sole source city that itself contains a comma", () => {
+    expect(
+      normalizePlaces(
+        ["Founding Farmers, Washington, D.C.", "Founding Farmers", "D.C"],
+        ["Washington, D.C."],
+      ),
+    ).toEqual(["Founding Farmers", "D.C"]);
+  });
+
   it("keeps city qualifiers when the source has multiple cities or no city", () => {
     const places = ["Cafe, Austin", "Cafe, Dallas"];
     expect(normalizePlaces(places, ["Austin", "Dallas"])).toEqual(places);
