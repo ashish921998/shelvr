@@ -8,15 +8,24 @@ const MAX_CITY_DISTANCE_KM = 80;
 
 export type LatLng = { lat: number; lng: number };
 
+// Two lookups of one venue can land a few doors apart.
+const SAME_PLACE_KM = 0.3;
+
 /** Count and draw the same mapped place once even when several saves mention it. */
-export function uniquePlacePins<T extends LatLng & { name: string }>(
-  pins: T[],
-): T[] {
-  const seen = new Set<string>();
+export function uniquePlacePins<
+  T extends LatLng & { name: string; appleId?: string },
+>(pins: T[]): T[] {
+  const byApple = new Set<string>();
+  const byName = new Map<string, LatLng[]>();
   return pins.filter((pin) => {
-    const key = `${placeKey(pin.name)}:${pin.lat.toFixed(4)}:${pin.lng.toFixed(4)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (pin.appleId !== undefined && byApple.has(pin.appleId)) return false;
+    const key = placeKey(pin.name);
+    const named = byName.get(key) ?? [];
+    if (named.some((seen) => distanceKm(seen, pin) <= SAME_PLACE_KM)) {
+      return false;
+    }
+    if (pin.appleId !== undefined) byApple.add(pin.appleId);
+    byName.set(key, [...named, pin]);
     return true;
   });
 }
