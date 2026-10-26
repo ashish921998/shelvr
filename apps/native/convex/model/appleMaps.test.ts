@@ -106,6 +106,19 @@ describe("firstPlace", () => {
     ).toEqual({ lat: 38.71, lng: -9.13 });
   });
 
+  it("returns the result's Apple place id", () => {
+    expect(
+      firstPlace({
+        results: [
+          {
+            id: "I91A40F8387BB823E",
+            coordinate: { latitude: 1, longitude: 2 },
+          },
+        ],
+      }),
+    ).toEqual({ lat: 1, lng: 2, appleId: "I91A40F8387BB823E" });
+  });
+
   it("is null for an empty or malformed reply", () => {
     expect(firstPlace({ results: [] })).toBeNull();
     expect(firstPlace({ results: "x" })).toBeNull();

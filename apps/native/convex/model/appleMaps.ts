@@ -67,6 +67,7 @@ const placeSchema = z.object({
       thoroughfare: z.string().optional(),
     })
     .optional(),
+  id: z.string().min(1).optional(),
   coordinate: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
@@ -78,7 +79,7 @@ export function firstPlace(
   near?: LatLng,
   skipCityOnly = false,
   includeCity = false,
-): (LatLng & { city?: string }) | null {
+): (LatLng & { city?: string; appleId?: string }) | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
@@ -100,6 +101,7 @@ export function firstPlace(
         ...(includeCity && address?.locality?.trim()
           ? { city: address.locality.trim() }
           : {}),
+        ...(place.data.id ? { appleId: place.data.id } : {}),
       };
     }
   }
@@ -113,7 +115,7 @@ export async function appleMapsLookup(
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
   includeCity = false,
-): Promise<(LatLng & { city?: string }) | null> {
+): Promise<(LatLng & { city?: string; appleId?: string }) | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);

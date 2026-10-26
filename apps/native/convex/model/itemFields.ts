@@ -29,6 +29,7 @@ export const placePinsValidator = v.array(
     lat: v.number(),
     lng: v.number(),
     city: v.optional(v.string()),
+    appleId: v.optional(v.string()),
   }),
 );
 

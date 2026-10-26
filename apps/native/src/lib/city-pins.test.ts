@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { appleZoom, cityPins, cityRows, saveSource } from "./city-pins";
 
+describe("appleId", () => {
+  it("flows from a stored pin to its city pin and row", () => {
+    const saves = [
+      {
+        _id: "a",
+        placePins: [{ name: "Jo's", lat: 30.25, lng: -97.75, appleId: "I1" }],
+      },
+    ];
+    const [pin] = cityPins(saves);
+    expect(pin.appleId).toBe("I1");
+    const [row] = cityRows(saves, [pin]);
+    expect(row.kind === "place" && row.pin.appleId).toBe("I1");
+  });
+});
+
 describe("cityRows", () => {
   it("lists and numbers each place from a single reel separately", () => {
     const saves = [

@@ -36,7 +36,13 @@ const MAX_PINS = MAX_ITEM_PLACES;
 const BACKFILL_PAGE = 100;
 const BACKFILL_STAGGER_MS = 250;
 
-type Pin = { name: string; lat: number; lng: number; city?: string };
+type Pin = {
+  name: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  appleId?: string;
+};
 
 /** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
 function lookupCity(cities: string[]): string | undefined {
@@ -60,6 +66,7 @@ function inSourceCity(pin: Pin, cities: string[]): Pin {
     lat: pin.lat,
     lng: pin.lng,
     ...(city ? { city } : {}),
+    ...(pin.appleId ? { appleId: pin.appleId } : {}),
   };
 }
 
@@ -179,7 +186,8 @@ export const storePins = internalMutation({
           pin.name === before[i].name &&
           pin.lat === before[i].lat &&
           pin.lng === before[i].lng &&
-          pin.city === before[i].city,
+          pin.city === before[i].city &&
+          pin.appleId === before[i].appleId,
       );
     const places =
       item.places === undefined
@@ -253,6 +261,7 @@ async function lookUp(
             lat: at.lat,
             lng: at.lng,
             ...(city ? { city } : at.city ? { city: at.city } : {}),
+            ...(at.appleId ? { appleId: at.appleId } : {}),
           },
         ],
   );
