@@ -24,7 +24,9 @@ export function uniquePlacePins<
     const key = placeKey(pin.name);
     const named = byName.get(key) ?? [];
     const same = named.find(
-      (index) => distanceKm(kept[index], pin) <= SAME_PLACE_KM,
+      (index) =>
+        !otherVenue(kept[index], pin) &&
+        distanceKm(kept[index], pin) <= SAME_PLACE_KM,
     );
     if (same !== undefined) {
       if (pin.appleId !== undefined) {
@@ -42,6 +44,15 @@ export function uniquePlacePins<
     kept.push(pin);
   }
   return kept;
+}
+
+/** Apple tells two nearby branches of one name apart; trust it over distance. */
+function otherVenue(a: { appleId?: string }, b: { appleId?: string }): boolean {
+  return (
+    a.appleId !== undefined &&
+    b.appleId !== undefined &&
+    a.appleId !== b.appleId
+  );
 }
 
 export function distanceKm(a: LatLng, b: LatLng): number {
