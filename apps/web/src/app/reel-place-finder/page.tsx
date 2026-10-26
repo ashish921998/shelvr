@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import Logo from "@/components/common/Logo";
 import Footer from "@/components/home/Footer";
+import AppBanner from "@/components/tools/AppBanner";
 import ReelPlaceFinder from "@/components/tools/ReelPlaceFinder";
 import { pageMetadata } from "@/lib/siteMetadata";
 
@@ -77,6 +78,7 @@ const structuredData = {
 export default function ReelPlaceFinderPage() {
   return (
     <div className="min-h-screen overflow-x-clip bg-paper">
+      <AppBanner />
       <header className="mx-auto max-w-2xl px-5 pt-5">
         <Logo />
       </header>
