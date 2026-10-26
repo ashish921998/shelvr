@@ -130,6 +130,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `photoUsage`, `getImportOperation`, and `listCities` / `listCityItems` (the cities Home
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
   is the shared helper).
+  Home searches the caller's saved titles, cities and place names through `searchItems`,
+  using the existing account-filtered full-text index (at most 50 matches). After
+  deploying the city/place search change, run from `apps/native`:
+  `pnpm exec convex run --prod items:backfillPlaceSearch '{"cursor":null}'`.
+  This internal, paginated repair updates only search text for live owners, schedules
+  its remaining pages, and is safe to restart. Deploy and finish it before releasing
+  the search UI so older saves match cities and places too.
   `listCities.count` retains the legacy save count for installed apps; optional
   `placeCount` is the distinct mapped-place count for that city.
   City reads filter pins by their resolved city; legacy unlabelled pins are shown only for single-city saves. New clients hide an absent or

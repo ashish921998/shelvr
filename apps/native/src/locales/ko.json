@@ -490,6 +490,7 @@
   "map.emptyBody": "저장한 사진은 촬영 장소를 유지해요.\n위치 정보가 있는 새 항목이 여기에 표시돼요.",
   "navigation.searchHeader": "검색",
   "search.placeholder": "저장한 항목 검색",
+  "search.clear": "검색 지우기",
   "search.emptyTitle": "무엇이든 찾아보세요",
   "search.emptyBody": "메모 내용과 Shelvr가 작성한 제목,\n태그, 설명을 검색해요.",
   "search.noResultsTitle": "아직 없어요",

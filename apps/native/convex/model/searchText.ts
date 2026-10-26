@@ -9,9 +9,13 @@ export function buildSearchText(parts: {
   siteName?: string;
   note?: string;
   content?: string;
+  cities?: string[];
+  places?: string[];
 }): string {
   return [
     parts.title,
+    ...(parts.cities ?? []),
+    ...(parts.places ?? []),
     parts.description,
     ...parts.tags,
     parts.siteName,

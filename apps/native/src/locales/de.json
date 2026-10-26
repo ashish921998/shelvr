@@ -497,6 +497,7 @@
   "map.emptyBody": "Gespeicherte Fotos behalten ihren Aufnahmeort.\nNeue Inhalte mit Standortdaten erscheinen hier.",
   "navigation.searchHeader": "suche",
   "search.placeholder": "Deine Inhalte durchsuchen",
+  "search.clear": "Suche löschen",
   "search.emptyTitle": "Alles wiederfinden",
   "search.emptyBody": "Die Suche durchsucht deine Notizen sowie Titel,\nSchlagwörter und Beschreibungen von Shelvr.",
   "search.noResultsTitle": "Noch nichts",

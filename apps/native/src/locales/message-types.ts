@@ -471,6 +471,7 @@ export type MessageParams = {
   "map.emptyBody": undefined;
   "navigation.searchHeader": undefined;
   "search.placeholder": undefined;
+  "search.clear": undefined;
   "search.emptyTitle": undefined;
   "search.emptyBody": undefined;
   "search.noResultsTitle": undefined;

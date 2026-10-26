@@ -506,6 +506,7 @@
   "map.emptyBody": "Las fotos guardadas conservan el lugar donde se tomaron.\nLos nuevos contenidos con ubicación aparecerán aquí.",
   "navigation.searchHeader": "buscar",
   "search.placeholder": "Busca en tus contenidos",
+  "search.clear": "Borrar búsqueda",
   "search.emptyTitle": "Encuentra cualquier cosa",
   "search.emptyBody": "La búsqueda recorre tus notas y los títulos,\netiquetas y descripciones que creó Shelvr.",
   "search.noResultsTitle": "Aún no hay nada",

@@ -587,10 +587,41 @@ export const searchItems = authedQuery({
     const items = await ctx.db
       .query("items")
       .withSearchIndex("search_text", (q) =>
-        q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
+        q
+          .search(
+            "searchText",
+            trimmed.toLowerCase().split(/\s+/).slice(0, 16).join(" "),
+          )
+          .eq("userId", userId),
       )
       .take(50);
     return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+  },
+});
+
+/** Run once after deploying city/place search; safe to restart from a null cursor. */
+export const backfillPlaceSearch = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("items").paginate({
+      cursor,
+      numItems: 25,
+      maximumBytesRead: 2 * 1024 * 1024,
+    });
+    for (const item of batch.page) {
+      if (!(await liveOwner(ctx, item.userId))) continue;
+      const searchText = buildSearchText(item);
+      if (searchText !== item.searchText) {
+        await ctx.db.patch(item._id, { searchText });
+      }
+    }
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
   },
 });
 
@@ -1668,6 +1699,8 @@ export const updateNoteItem = authedMutation({
       titleSource: typedTitle !== "" ? "user" : undefined,
       searchText: buildSearchText({
         title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
         tags: item.tags,
         note: text,
@@ -2214,6 +2247,8 @@ export const setEmbeddingsInternal = internalMutation({
 
       const nextSearchText = buildSearchText({
         title: item.title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
         tags: item.tags,
         siteName: item.siteName,
