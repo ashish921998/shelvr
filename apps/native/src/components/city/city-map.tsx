@@ -6,6 +6,7 @@ import {
   framedPins,
   type CityPin,
 } from "@/lib/city-pins";
+import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -84,17 +85,19 @@ export function CityMap({
     [standard, width, height],
   );
 
+  // A recomputed camera with the same values is not a move.
+  const [steady, setSteady] = useState(camera);
+  if (!sameCamera(steady, camera)) setSteady(camera);
   // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
-  const [firstCamera, setFirstCamera] = useState(camera);
-  if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
+  const [firstCamera, setFirstCamera] = useState(steady);
+  if (firstCamera === undefined && steady !== undefined) setFirstCamera(steady);
   useEffect(() => {
-    if (!camera || camera === firstCamera) return;
-    ref.current
-      ?.setCameraPosition(camera)
-      .catch((error: unknown) =>
-        analytics.captureError("city_map_camera_failed", error),
-      );
-  }, [camera, firstCamera]);
+    if (!steady || steady === firstCamera) return;
+    return moveCamera(
+      () => ref.current?.setCameraPosition(steady),
+      (error) => analytics.captureError("city_map_camera_failed", error),
+    );
+  }, [steady, firstCamera]);
 
   const annotations = pins.map((pin) => {
     const id = cityPinId(pin);
@@ -134,7 +137,7 @@ export function CityMap({
   return (
     <GoogleMaps.View
       style={styles.map}
-      cameraPosition={camera}
+      cameraPosition={steady}
       markers={annotations.map((pin) => ({
         id: pin.id,
         coordinates: pin.coordinates,
