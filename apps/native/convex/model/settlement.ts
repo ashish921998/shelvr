@@ -10,6 +10,7 @@ import {
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  normalizePlaces,
   postMediaValidator,
   recipeValidator,
   type Recipe,
@@ -97,7 +98,10 @@ function classifiedWords(
     tags: classification.tags,
     intents: classification.intents,
     cities: classification.cities,
-    places: classification.places,
+    places:
+      classification.places === undefined
+        ? undefined
+        : normalizePlaces(classification.places, classification.cities),
     placesHeard: classification.placesHeard,
     recipe: reading.recipe ?? classification.recipe,
   };

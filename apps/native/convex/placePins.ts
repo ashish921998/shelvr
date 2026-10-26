@@ -16,13 +16,20 @@ import {
 } from "./model/appleMaps";
 import {
   MAX_ITEM_PLACES,
-  normalizeCities,
+  normalizePlaceName,
+  normalizePlaces,
   placePinsValidator,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
-import { dropStrays, keepNearby, middleOf, type LatLng } from "./model/trip";
+import {
+  cityKey,
+  dropStrays,
+  keepNearby,
+  middleOf,
+  type LatLng,
+} from "./model/trip";
 
 const MAX_PINS = MAX_ITEM_PLACES;
 const BACKFILL_PAGE = 100;
@@ -30,15 +37,29 @@ const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number; city?: string };
 
-/** In a save that names exactly one city, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
-function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
-  if (
-    cities.length !== 1 ||
-    new Set(pins.flatMap((pin) => (pin.city ? [pin.city.toLowerCase()] : [])))
-      .size > 1
-  )
-    return pins;
+/** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
+function lookupCity(cities: string[]): string | undefined {
+  return cities.length === 1 ? cities[0] : undefined;
+}
+
+/** In a single-city save, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
+function nearEachOther(pins: Pin[], city: string | undefined): Pin[] {
+  if (city === undefined) return pins;
   return dropStrays(pins).filter((pin) => pin !== null);
+}
+
+/** Keep the source's city scope: a suburb cannot create a new city or disable later outlier checks. */
+function inSourceCity(pin: Pin, cities: string[]): Pin {
+  const city =
+    cities.length === 1
+      ? cities[0]
+      : cities.find((source) => cityKey(source) === cityKey(pin.city ?? ""));
+  return {
+    name: normalizePlaceName(pin.name, cities),
+    lat: pin.lat,
+    lng: pin.lng,
+    ...(city ? { city } : {}),
+  };
 }
 
 function lookupCentre(points: LatLng[]): LatLng | null {
@@ -71,7 +92,8 @@ async function wantedPlaces(
       .flatMap((join) => mapsNames(join.intents)),
   ];
   const wanted = new Map<string, string>();
-  for (const name of names) {
+  for (const raw of names) {
+    const name = normalizePlaceName(raw, item.cities);
     const key = placeKey(name);
     if (key !== "" && !wanted.has(key)) wanted.set(key, name);
   }
@@ -82,8 +104,9 @@ async function wantedPlaces(
 function lookupQuery(name: string, city: string | undefined): string {
   if (
     city &&
-    !name.includes(",") &&
-    !name.toLowerCase().includes(city.trim().toLowerCase())
+    !name
+      .split(",")
+      .some((part) => part.trim().toLowerCase() === city.trim().toLowerCase())
   ) {
     return `${name}, ${city.trim()}`;
   }
@@ -105,7 +128,11 @@ export const toLocate = internalQuery({
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.status !== "ready") return null;
     if (!(await aiAllowed(ctx, item.userId))) return null;
-    const pinned = new Set((item.placePins ?? []).map((p) => placeKey(p.name)));
+    const pinned = new Set(
+      (item.placePins ?? []).map((p) =>
+        placeKey(normalizePlaceName(p.name, item.cities)),
+      ),
+    );
     const wanted = [...(await wantedPlaces(ctx, item))];
     const kept = wanted.filter(([key]) => pinned.has(key)).length;
     const names = wanted
@@ -113,24 +140,12 @@ export const toLocate = internalQuery({
       .map(([, name]) => name)
       // Look past the free slots: a stray match storePins drops must not keep the next place from a pin.
       .slice(0, !args.refresh && kept >= MAX_PINS ? 0 : MAX_PINS);
-    const singleCity =
-      item.cities?.length === 1 &&
-      wanted.every(
-        ([, name]) =>
-          !name.includes(",") ||
-          name
-            .split(",")
-            .slice(1)
-            .some(
-              (part) =>
-                part.trim().toLowerCase() ===
-                item.cities?.[0].trim().toLowerCase(),
-            ),
-      );
-    const pins = nearEachOther(item.placePins ?? [], item.cities ?? []);
+    const city = lookupCity(item.cities ?? []);
+    const singleCity = city !== undefined;
+    const pins = nearEachOther(item.placePins ?? [], city);
     return {
       names,
-      city: singleCity ? item.cities?.[0] : undefined,
+      city,
       singleCity,
       centre: singleCity ? lookupCentre(pins) : null,
     };
@@ -149,13 +164,11 @@ export const storePins = internalMutation({
     const wanted = await wantedPlaces(ctx, item);
     const next = new Map<string, Pin>();
     for (const pin of [...(item.placePins ?? []), ...args.found]) {
-      const key = placeKey(pin.name);
-      if (wanted.has(key)) next.set(key, pin);
+      const key = placeKey(normalizePlaceName(pin.name, item.cities));
+      if (wanted.has(key)) next.set(key, inSourceCity(pin, item.cities ?? []));
     }
-    const pins = nearEachOther([...next.values()], item.cities ?? []).slice(
-      0,
-      MAX_PINS,
-    );
+    const city = lookupCity(item.cities ?? []);
+    const pins = nearEachOther([...next.values()], city).slice(0, MAX_PINS);
     const before = item.placePins ?? [];
     const same =
       pins.length === before.length &&
@@ -166,13 +179,16 @@ export const storePins = internalMutation({
           pin.lng === before[i].lng &&
           pin.city === before[i].city,
       );
-    const cities = normalizeCities([
-      ...(item.cities ?? []),
-      ...pins.flatMap((pin) => (pin.city ? [pin.city] : [])),
-    ]);
-    if (!same || JSON.stringify(cities) !== JSON.stringify(item.cities ?? [])) {
-      await ctx.db.patch(item._id, { placePins: pins, cities });
-    }
+    const places =
+      item.places === undefined
+        ? undefined
+        : normalizePlaces(item.places, item.cities);
+    const samePlaces = JSON.stringify(places) === JSON.stringify(item.places);
+    if (!same || !samePlaces)
+      await ctx.db.patch(item._id, {
+        placePins: pins,
+        ...(places === undefined ? {} : { places }),
+      });
     return null;
   },
 });
@@ -234,7 +250,7 @@ async function lookUp(
             name,
             lat: at.lat,
             lng: at.lng,
-            ...(at.city ? { city: at.city } : city ? { city } : {}),
+            ...(city ? { city } : at.city ? { city: at.city } : {}),
           },
         ],
   );

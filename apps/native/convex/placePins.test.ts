@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { deleteMembership } from "./model/memberships";
 import {
@@ -83,6 +83,39 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {
+    const { t, itemId, pins } = await setup(["Guest House, Austin"], {
+      read: ["Guest House, Austin", "Guest House", "Eberly, Austin"],
+    });
+    const existing = [
+      {
+        name: "Guest House, Austin",
+        lat: 30.265,
+        lng: -97.749,
+        city: "Austin",
+      },
+      { name: "Guest House", lat: 30.265, lng: -97.749, city: "Austin" },
+      { name: "Eberly, Austin", lat: 30.258, lng: -97.759, city: "Austin" },
+    ];
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { cities: ["Austin"], placePins: existing }),
+    );
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.places).toEqual([
+      "Guest House",
+      "Eberly",
+    ]);
+    expect(await pins()).toEqual([
+      { ...existing[0], name: "Guest House" },
+      { ...existing[2], name: "Eberly" },
+    ]);
+    expect(
+      await t.query(internal.placePins.toLocate, { itemId }),
+    ).toMatchObject({ names: [] });
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect(await pins()).toHaveLength(2);
+  });
+
   it("does not use distant pins as a synthetic search centre", async () => {
     const { t, itemId } = await setup(["Paris", "Michigan", "Next"]);
     await t.run(async (ctx) =>
@@ -109,10 +142,12 @@ describe("placePins", () => {
     expect(todo?.centre).toBeNull();
     expect(todo?.names).toHaveLength(3);
   });
-  it("resolves places independently, stores their cities, and discovers another city", async () => {
+  it("resolves places independently into their source-declared cities", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup(["Cafe, Lisbon", "Tower, Porto"]);
-    // Classification missed Porto; explicit place qualifiers must still win.
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, { cities: ["Lisbon", "Porto"] }),
+    );
     const queries: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -136,12 +171,125 @@ describe("placePins", () => {
     await t.action(internal.placePins.locateItem, { itemId });
     expect(queries).toEqual(["Cafe, Lisbon", "Tower, Porto"]);
     expect((await pins())?.map((pin) => pin.city)).toEqual(["Lisbon", "Porto"]);
-    // A resolved place can add a city that classification missed.
-    await t.run(async (ctx) => ctx.db.patch(itemId, { cities: ["Lisbon"] }));
-    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+  });
+
+  it("keeps a suburb on its source city's page and rejects a later distant namesake", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Pier"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, { cities: ["Los Angeles"] }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const q = url.searchParams.get("q") ?? "";
+        const pier = q.startsWith("Pier");
+        const wrong = q.startsWith("Wrong");
+        return Response.json({
+          results: [
+            {
+              structuredAddress: {
+                locality: wrong
+                  ? "Michigan"
+                  : pier
+                    ? "Santa Monica"
+                    : "Los Angeles",
+                thoroughfare: "Street",
+              },
+              coordinate: {
+                latitude: wrong ? 43.7858 : pier ? 34.01 : 34.05,
+                longitude: wrong ? -85.5028 : pier ? -118.49 : -118.25,
+              },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    const item = await t.run(async (ctx) => ctx.db.get(itemId));
+    expect(item?.cities).toEqual(["Los Angeles"]);
+    expect((await pins())?.[0].city).toBe("Los Angeles");
+    const owner = t.withIdentity({ subject: `${item?.userId}|session-1` });
+    expect(
+      (await owner.query(api.items.listCities, {})).map((city) => city.city),
+    ).toEqual(["Los Angeles"]);
+    expect(
+      (await owner.query(api.items.listCityItems, { city: "Los Angeles" }))[0]
+        .placePins,
+    ).toHaveLength(1);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        intents: ["Pier", "Cafe", "Bakery", "Wrong"].map(maps),
+      }),
+    );
+    expect(
+      (await t.query(internal.placePins.toLocate, { itemId }))?.singleCity,
+    ).toBe(true);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.map((pin) => pin.name)).toEqual([
+      "Pier",
+      "Cafe",
+      "Bakery",
+    ]);
+    expect((await t.run(async (ctx) => ctx.db.get(itemId)))?.cities).toEqual([
+      "Los Angeles",
+    ]);
+  });
+
+  it("uses only source-declared cities for multi-city pins", async () => {
+    const { t, itemId, pins } = await setup(["Cafe", "Tower", "Other"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, { cities: ["Lisbon", "Porto"] }),
+    );
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [
+        { name: "Cafe", city: " lisbon ", lat: 38.72, lng: -9.1 },
+        { name: "Tower", city: "PORTO", lat: 41.15, lng: -8.6 },
+        { name: "Other", city: "Santa Monica", lat: 34.01, lng: -118.49 },
+      ],
+    });
+    expect((await pins())?.map((pin) => pin.city)).toEqual([
+      "Lisbon",
+      "Porto",
+      undefined,
+    ]);
     expect((await t.run(async (ctx) => ctx.db.get(itemId)))?.cities).toEqual([
       "Lisbon",
       "Porto",
+    ]);
+  });
+
+  it("keeps city context when a comma belongs to the venue name", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId } = await setup(["Cafe, Downtown"]);
+    const todo = await t.query(internal.placePins.toLocate, { itemId });
+    expect(todo?.city).toBe("Lisbon");
+    expect(todo?.singleCity).toBe(true);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries()).toEqual(["Cafe, Downtown, Lisbon"]);
+  });
+
+  it("keeps retained and new single-city pins assigned to their source city", async () => {
+    const { t, itemId, pins } = await setup(["Cafe", "Tower"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [{ name: "Cafe", lat: 38.72, lng: -9.1 }],
+      }),
+    );
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [{ name: "Tower", city: "Porto", lat: 41.15, lng: -8.6 }],
+    });
+    expect((await pins())?.map((pin) => [pin.name, pin.city])).toEqual([
+      ["Cafe", "Lisbon"],
+      ["Tower", "Lisbon"],
+    ]);
+    expect((await t.run(async (ctx) => ctx.db.get(itemId)))?.cities).toEqual([
+      "Lisbon",
     ]);
   });
 
@@ -283,7 +431,57 @@ describe("placePins", () => {
         { name: "Pink Street", lat: 2, lng: 2 },
       ],
     });
-    expect(await pins()).toEqual([{ name: "Pink Street", lat: 2, lng: 2 }]);
+    expect(await pins()).toEqual([
+      { name: "Pink Street", lat: 2, lng: 2, city: "Lisbon" },
+    ]);
+  });
+
+  it("rejects a distant namesake during incremental lookup before creating another city", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([
+      "PNY",
+      "Blend",
+      "Bomaye",
+      "Micho",
+    ]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Paris"],
+        placePins: [{ name: "PNY", lat: 48.8638, lng: 2.3627, city: "Paris" }],
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const wrong = (url.searchParams.get("q") ?? "").startsWith("Micho");
+        return Response.json({
+          results: [
+            {
+              structuredAddress: {
+                locality: wrong ? "Michigan" : "Paris",
+                thoroughfare: "Street",
+              },
+              coordinate: {
+                latitude: wrong ? 43.7858 : 48.8685,
+                longitude: wrong ? -85.5028 : 2.3256,
+              },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.map((pin) => pin.name)).toEqual([
+      "PNY",
+      "Blend",
+      "Bomaye",
+    ]);
+    expect((await t.run(async (ctx) => ctx.db.get(itemId)))?.cities).toEqual([
+      "Paris",
+    ]);
   });
 
   it("drops a pin far from the save's other places, a same-named place elsewhere", async () => {
@@ -292,10 +490,10 @@ describe("placePins", () => {
     await t.mutation(internal.placePins.storePins, {
       itemId,
       found: [
-        { name: "PNY", lat: 48.8638, lng: 2.3627 },
-        { name: "Blend", lat: 48.8685, lng: 2.3256 },
-        { name: "Bomaye", lat: 48.8748, lng: 2.3539 },
-        { name: "Micho", lat: 43.7858, lng: -85.5028 },
+        { city: "Paris", name: "PNY", lat: 48.8638, lng: 2.3627 },
+        { city: "Paris", name: "Blend", lat: 48.8685, lng: 2.3256 },
+        { city: "Paris", name: "Bomaye", lat: 48.8748, lng: 2.3539 },
+        { city: "Michigan", name: "Micho", lat: 43.7858, lng: -85.5028 },
       ],
     });
     expect((await pins())?.map((p) => p.name)).toEqual([
@@ -308,21 +506,23 @@ describe("placePins", () => {
   it("keeps far-apart pins on a save that names several cities", async () => {
     const { t, itemId, pins } = await setup([
       "Time Out",
+      "Local Cafe",
+      "Local Bakery",
       "Majestic",
-      "Faro Marina",
     ]);
     await t.run(async (ctx) => {
-      await ctx.db.patch(itemId, { cities: ["Lisbon", "Porto", "Faro"] });
+      await ctx.db.patch(itemId, { cities: ["Lisbon", "Porto"] });
     });
     await t.mutation(internal.placePins.storePins, {
       itemId,
       found: [
         { name: "Time Out", lat: 38.707, lng: -9.1457 },
         { name: "Majestic", lat: 41.1468, lng: -8.6066 },
-        { name: "Faro Marina", lat: 37.0144, lng: -7.9351 },
+        { name: "Local Cafe", city: "Lisbon", lat: 38.71, lng: -9.14 },
+        { name: "Local Bakery", city: "Lisbon", lat: 38.72, lng: -9.14 },
       ],
     });
-    expect(await pins()).toHaveLength(3);
+    expect(await pins()).toHaveLength(4);
   });
 
   it("keeps every pin when no majority agrees where the save is", async () => {

@@ -85,6 +85,27 @@ beforeEach(() => {
 });
 
 describe("useReplayOnboarding and the account", () => {
+  it("keeps the sample reel queued until the signed-in account has Pro", async () => {
+    const sample = ahaSample("trip", null);
+    entitlement.entitled = false;
+    queueDemoUrl(sample.firstSaveUrl);
+    createLinkItem.mockResolvedValue("item");
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(createLinkItem).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBe(sample.firstSaveUrl);
+    entitlement.entitled = true;
+    hook.rerender();
+    await settle();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: sample.firstSaveUrl,
+        saveSource: "onboarding_demo",
+      }),
+    );
+    expect(createLinkItem).toHaveBeenCalledOnce();
+  });
+
   it.each(["date", "trip", "weekend"] as const)(
     "saves the fallback %s reel after the account becomes available, once",
     async (kind) => {

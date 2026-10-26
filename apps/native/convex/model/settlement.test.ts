@@ -77,6 +77,41 @@ describe("a run without the model", () => {
   });
 });
 
+it("stores single-city classification places without city suffixes", () => {
+  const patch = completionPatch(
+    savedItem(),
+    {
+      reading: {},
+      classification: {
+        description: "Austin restaurants",
+        tags: [],
+        cities: ["Austin"],
+        places: ["Guest House, Austin", "Guest House", "Eberly, Austin"],
+      },
+    },
+    true,
+  );
+  expect(patch.places).toEqual(["Guest House", "Eberly"]);
+});
+
+it("preserves multi-city classification qualifiers", () => {
+  const places = ["Cafe, Austin", "Cafe, Dallas"];
+  const patch = completionPatch(
+    savedItem(),
+    {
+      reading: {},
+      classification: {
+        description: "Two cities",
+        tags: [],
+        cities: ["Austin", "Dallas"],
+        places,
+      },
+    },
+    true,
+  );
+  expect(patch.places).toEqual(places);
+});
+
 describe("a decline that lands at commit", () => {
   const item = savedItem({
     title: "Saved title",

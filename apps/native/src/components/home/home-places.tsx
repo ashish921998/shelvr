@@ -87,6 +87,7 @@ function UnplacedSection({
         <Pressable
           key={save._id}
           accessibilityRole="button"
+          accessibilityLabel={`${save.title ?? save.url ?? ""}, ${title}`}
           onPress={() =>
             router.push({
               pathname: "/item/[id]",
