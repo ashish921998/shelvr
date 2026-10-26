@@ -31,16 +31,14 @@
   font-size: clamp(54px, 7vw, 104px);
   line-height: 0.94;
   letter-spacing: -0.025em;
-  opacity: 0;
-  transform: translateY(12px);
-  transition:
-    opacity 700ms var(--ease),
-    transform 700ms var(--ease);
+  animation: rise 700ms var(--ease) both;
 }
 
-.loaded .title {
-  opacity: 1;
-  transform: none;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 .title span {
@@ -125,16 +123,15 @@
 }
 
 .hero .reel {
-  opacity: 0;
-  transform: translateY(16px) rotate(var(--r));
-  transition:
-    opacity 700ms var(--ease),
-    transform 700ms var(--ease);
+  transform: rotate(var(--r));
+  animation: reel-in 700ms var(--ease) both;
 }
 
-.loaded .hero .reel {
-  opacity: 1;
-  transform: rotate(var(--r));
+@keyframes reel-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) rotate(var(--r));
+  }
 }
 
 /* story: saved reels become pins */
@@ -358,9 +355,35 @@
 
 @media (prefers-reduced-motion: reduce) {
   .title,
-  .hero .reel,
-  .beat,
+  .hero .reel {
+    animation: none;
+  }
+
   .appMap {
+    transition: none;
+  }
+
+  /* No scroll story: all three beats stacked beside the finished map. */
+  .story {
+    height: auto;
+  }
+
+  .storyPin {
+    position: static;
+    height: auto;
+    padding: 96px 0;
+  }
+
+  .beats {
+    display: grid;
+    gap: 32px;
+    min-height: 0;
+  }
+
+  .beat {
+    position: static;
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 }

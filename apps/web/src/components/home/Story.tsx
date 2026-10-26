@@ -94,12 +94,7 @@ export default function Story() {
       <div className={`${styles.wrap} ${styles.storyPin}`}>
         <div className={styles.beats}>
           {beats.map((b, i) => (
-            <div
-              key={b.title}
-              className={styles.beat}
-              data-on={i === beat}
-              aria-hidden={i !== beat}
-            >
+            <div key={b.title} className={styles.beat} data-on={i === beat}>
               <h2 className={styles.heading}>{b.title}</h2>
               <p className={styles.text}>{b.body}</p>
             </div>

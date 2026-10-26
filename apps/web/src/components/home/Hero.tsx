@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 import AppStoreButton from "@/components/AppStoreButton";
 import styles from "./Landing.module.css";
 
@@ -33,14 +33,12 @@ const reels = [
 ];
 
 export default function Hero() {
-  const [loaded, setLoaded] = useState(false);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setLoaded(true));
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
-    if (reduce || !fine) return () => cancelAnimationFrame(frame);
+    if (reduce || !fine) return;
 
     // Gentle pointer parallax, eased towards the pointer each frame.
     let tx = 0;
@@ -48,9 +46,14 @@ export default function Hero() {
     let x = 0;
     let y = 0;
     let tick = 0;
+    let running = false;
     const onMove = (e: PointerEvent) => {
       tx = e.clientX / innerWidth - 0.5;
       ty = e.clientY / innerHeight - 0.5;
+      if (!running) {
+        running = true;
+        tick = requestAnimationFrame(step);
+      }
     };
     const step = () => {
       x += (tx - x) * 0.08;
@@ -59,19 +62,19 @@ export default function Hero() {
         if (card)
           card.style.translate = `${-x * reels[i].depth}px ${-y * reels[i].depth}px`;
       });
-      tick = requestAnimationFrame(step);
+      // Stop once the cards have caught up; the next move restarts it.
+      running = Math.abs(tx - x) + Math.abs(ty - y) > 0.001;
+      if (running) tick = requestAnimationFrame(step);
     };
     addEventListener("pointermove", onMove);
-    tick = requestAnimationFrame(step);
     return () => {
-      cancelAnimationFrame(frame);
       cancelAnimationFrame(tick);
       removeEventListener("pointermove", onMove);
     };
   }, []);
 
   return (
-    <div className={`${styles.wrap} ${loaded ? styles.loaded : ""}`}>
+    <div className={styles.wrap}>
       <section id="top" className={styles.hero}>
         <div>
           <h1 className={styles.title}>
@@ -101,7 +104,7 @@ export default function Hero() {
               className={styles.reel}
               style={{
                 ...(reel.style as CSSProperties),
-                transitionDelay: `${200 + i * 90}ms`,
+                animationDelay: `${200 + i * 90}ms`,
               }}
             >
               <Image

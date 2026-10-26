@@ -22,7 +22,11 @@ export default function StoreButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={onClick}
-      aria-label="Download Shelvr on the App Store"
+      aria-label={
+        source === "header"
+          ? "Get the app on the App Store"
+          : "Download Shelvr on the App Store"
+      }
       className={`inline-flex shrink-0 items-center rounded-[11px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-deep ${VARIANTS[source]}`}
     >
       <svg
