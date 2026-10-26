@@ -385,21 +385,12 @@
     "other": "%{formattedCount} stops"
   },
   "trip.emptyDay": "Nothing saved fits this day yet. Save a few more places and plan again.",
-  "trip.slotMorning": "Morning",
-  "trip.slotLunch": "Lunch",
-  "trip.slotAfternoon": "Afternoon",
-  "trip.slotDinner": "Dinner",
-  "trip.slotEvening": "Evening",
-  "trip.gapLunch": "No saved lunch spot for this day",
-  "trip.gapLunchNear": "No saved lunch spot near %{area}",
-  "trip.gapDinner": "No saved dinner spot for this day",
-  "trip.gapDinnerNear": "No saved dinner spot near %{area}",
   "trip.wishlistCount": {
     "one": "%{formattedCount} more saved place didn't fit",
     "other": "%{formattedCount} more saved places didn't fit"
   },
   "trip.change": "Change trip",
-  "trip.stopEyebrow": "Stop %{number} · %{slot}",
+  "trip.stopEyebrow": "Stop %{number}",
   "trip.yourSave": "Your save",
   "trip.yourSaveBy": "Your save · %{creator}",
   "trip.openSave": "Open the save",
@@ -586,7 +577,6 @@
   "pro.notFoundBody": "No active Shelvr Pro purchase was found for this %{store} account.",
   "pro.restoreFailedBody": "Check your connection and try again. You can also manage your plan in %{store}.",
   "profile.appearanceLabel": "Appearance: %{appearance}",
-  "profile.photoUsage": "%{count} of %{limit} photos saved",
   "share.progress": "Saved %{saved} of %{total}…",
   "share.failureCount": {
     "one": "%{formattedCount} item could not be saved",
@@ -628,7 +618,6 @@
   "errors.saveFallback": "Save failed. Please try again.",
   "widget.title": "Recent Saves",
   "widget.description": "Your latest saves, at a glance.",
-  "permissions.cameraUsage": "Shelvr uses your camera so you can capture things you want to save for later.",
   "permissions.photosUsage": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
   "permissions.calendarUsage": "Shelvr adds events to your calendar from things you've saved.",
   "permissions.locationUsage": "Shelvr shows where you are on the map so you can find the places you saved nearby.",
@@ -748,6 +737,7 @@
     "one": "%{formattedCount} place from your saves",
     "other": "%{formattedCount} places from your saves"
   },
+  "cityMap.placesList": "Places list",
   "cityMap.placeDetails": "Place details for %{name}",
   "opener.tagline": "Save the spots. We'll plan the date or the trip.",
   "onboardingQ.skip": "Skip",

@@ -393,22 +393,13 @@
     "other": "%{formattedCount} paradas"
   },
   "trip.emptyDay": "Todavía no hay nada guardado para este día. Guarda algunos lugares más y vuelve a planear.",
-  "trip.slotMorning": "Mañana",
-  "trip.slotLunch": "Comida",
-  "trip.slotAfternoon": "Tarde",
-  "trip.slotDinner": "Cena",
-  "trip.slotEvening": "Noche",
-  "trip.gapLunch": "Ningún sitio guardado para comer este día",
-  "trip.gapLunchNear": "Ningún sitio guardado para comer cerca de %{area}",
-  "trip.gapDinner": "Ningún sitio guardado para cenar este día",
-  "trip.gapDinnerNear": "Ningún sitio guardado para cenar cerca de %{area}",
   "trip.wishlistCount": {
     "one": "%{formattedCount} lugar guardado más no cupo",
     "many": "%{formattedCount} lugares guardados más no cupieron",
     "other": "%{formattedCount} lugares guardados más no cupieron"
   },
   "trip.change": "Cambiar viaje",
-  "trip.stopEyebrow": "Parada %{number} · %{slot}",
+  "trip.stopEyebrow": "Parada %{number}",
   "trip.yourSave": "Tu guardado",
   "trip.yourSaveBy": "Tu guardado · %{creator}",
   "trip.openSave": "Abrir el guardado",
@@ -596,7 +587,6 @@
   "pro.notFoundBody": "No se ha encontrado ninguna compra activa de Shelvr Pro para esta cuenta de %{store}.",
   "pro.restoreFailedBody": "Revisa tu conexión y vuelve a intentarlo. También puedes administrar tu plan en %{store}.",
   "profile.appearanceLabel": "Apariencia: %{appearance}",
-  "profile.photoUsage": "%{count} de %{limit} fotos guardadas",
   "share.progress": "Guardados %{saved} de %{total}…",
   "share.failureCount": {
     "one": "No se pudo guardar %{formattedCount} elemento",
@@ -645,7 +635,6 @@
   "errors.saveFallback": "No se ha podido guardar. Vuelve a intentarlo.",
   "widget.title": "Guardados recientes",
   "widget.description": "Tus últimos contenidos de un vistazo.",
-  "permissions.cameraUsage": "Shelvr usa tu cámara para que captures cosas que quieras guardar para más tarde.",
   "permissions.photosUsage": "Shelvr permite guardar fotos y capturas de tu fototeca en tu biblioteca y ordenar tus fotos.",
   "permissions.calendarUsage": "Shelvr agrega eventos a tu calendario a partir de contenidos que has guardado.",
   "permissions.locationUsage": "Shelvr muestra dónde estás en el mapa para que encuentres los lugares guardados cerca de ti.",
@@ -769,6 +758,7 @@
     "many": "%{formattedCount} lugares de tus guardados",
     "other": "%{formattedCount} lugares de tus guardados"
   },
+  "cityMap.placesList": "Lista de lugares",
   "cityMap.placeDetails": "Detalles de %{name}",
   "opener.tagline": "Guarda los lugares. Nosotros planeamos la cita o el viaje.",
   "onboardingQ.skip": "Omitir",

@@ -393,22 +393,13 @@
     "other": "%{formattedCount} étapes"
   },
   "trip.emptyDay": "Rien d’enregistré ne convient encore à ce jour. Enregistrez quelques lieux de plus et replanifiez.",
-  "trip.slotMorning": "Matin",
-  "trip.slotLunch": "Déjeuner",
-  "trip.slotAfternoon": "Après-midi",
-  "trip.slotDinner": "Dîner",
-  "trip.slotEvening": "Soirée",
-  "trip.gapLunch": "Aucune adresse enregistrée pour déjeuner ce jour-là",
-  "trip.gapLunchNear": "Aucune adresse enregistrée pour déjeuner près de %{area}",
-  "trip.gapDinner": "Aucune adresse enregistrée pour dîner ce jour-là",
-  "trip.gapDinnerNear": "Aucune adresse enregistrée pour dîner près de %{area}",
   "trip.wishlistCount": {
     "one": "%{formattedCount} autre lieu enregistré n’a pas trouvé de place",
     "many": "%{formattedCount} autres lieux enregistrés n’ont pas trouvé de place",
     "other": "%{formattedCount} autres lieux enregistrés n’ont pas trouvé de place"
   },
   "trip.change": "Modifier le voyage",
-  "trip.stopEyebrow": "Étape %{number} · %{slot}",
+  "trip.stopEyebrow": "Étape %{number}",
   "trip.yourSave": "Votre enregistrement",
   "trip.yourSaveBy": "Votre enregistrement · %{creator}",
   "trip.openSave": "Ouvrir l’enregistrement",
@@ -596,7 +587,6 @@
   "pro.notFoundBody": "Aucun achat Shelvr Pro actif n'a été trouvé pour ce compte %{store}.",
   "pro.restoreFailedBody": "Vérifiez votre connexion et réessayez. Vous pouvez aussi gérer votre abonnement dans %{store}.",
   "profile.appearanceLabel": "Apparence : %{appearance}",
-  "profile.photoUsage": "Photos enregistrées : %{count} sur %{limit}",
   "share.progress": "%{saved} sur %{total} enregistrés…",
   "share.failureCount": {
     "one": "%{formattedCount} élément n’a pas pu être enregistré",
@@ -645,7 +635,6 @@
   "errors.saveFallback": "L'enregistrement a échoué. Réessayez.",
   "widget.title": "Enregistrements récents",
   "widget.description": "Vos derniers contenus, en un coup d'œil.",
-  "permissions.cameraUsage": "Shelvr utilise votre appareil photo pour capturer ce que vous souhaitez garder pour plus tard.",
   "permissions.photosUsage": "Shelvr permet d'enregistrer des photos et captures d'écran de votre photothèque dans votre bibliothèque, et de trier vos photos.",
   "permissions.calendarUsage": "Shelvr ajoute des événements à votre calendrier à partir de vos contenus enregistrés.",
   "permissions.locationUsage": "Shelvr affiche ta position sur la carte pour que tu trouves les lieux enregistrés près de toi.",
@@ -769,6 +758,7 @@
     "many": "%{formattedCount} lieux de vos enregistrements",
     "other": "%{formattedCount} lieux de vos enregistrements"
   },
+  "cityMap.placesList": "Liste des lieux",
   "cityMap.placeDetails": "Détails du lieu : %{name}",
   "opener.tagline": "Enregistrez les adresses. On planifie le rendez-vous ou le voyage.",
   "onboardingQ.skip": "Passer",

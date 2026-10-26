@@ -1,5 +1,10 @@
 import { EmptyState } from "@/components/empty-state";
 import { TripBuilding } from "@/components/trip/trip-building";
+import {
+  mapBehind,
+  TripCityMap,
+  useTripCityPins,
+} from "@/components/trip/trip-city-map";
 import { TripDayPanel } from "@/components/trip/trip-day-panel";
 import { TripMap, type StopRef } from "@/components/trip/trip-map";
 import { TripPlanForm } from "@/components/trip/trip-plan-form";
@@ -19,6 +24,7 @@ import {
   TRIP_PANEL_SHARE,
   useBuildTrip,
   type StopPick,
+  useCityPlaceCount,
   type TripRequest,
 } from "@/lib/trip";
 import { api } from "@convex/_generated/api";
@@ -62,6 +68,8 @@ const PANEL_RESIZE = LinearTransition.duration(motion.duration.enter).easing(
 );
 const MAP_IN = FadeIn.duration(300).easing(motion.easing.out);
 const CONTENT_OUT = FadeOut.duration(140).easing(motion.easing.out);
+// The most of the screen a sheet over a map may take.
+const PANEL_OVER_MAP_SHARE = 0.56;
 
 function isNothingToSwap(error: unknown): boolean {
   return (
@@ -88,6 +96,8 @@ export default function TripScreen() {
   const { data: cities } = useQuery(
     convexQuery(api.tripData.tripCities, { spaceId }),
   );
+  const placeCount = useCityPlaceCount(tappedCity);
+  const cityPins = useTripCityPins(tappedCity);
   const { state, build, reset } = useBuildTrip(spaceId, locale);
   const swapTripStop = useMutation(api.tripData.swapTripStop);
   const { isVisited, toggle: toggleVisited } = usePlaceVisits();
@@ -230,6 +240,8 @@ export default function TripScreen() {
           <TripPlanForm
             saveCount={savedCount}
             cities={cities}
+            fixedCity={tappedCity}
+            placeCount={placeCount}
             initial={
               lastRequest ??
               (trip
@@ -306,10 +318,21 @@ export default function TripScreen() {
       </View>
     ) : null;
 
-  const overMap = hasMap && trip !== null && !reveal.hidesMap;
+  const overTripMap = hasMap && trip !== null && !reveal.hidesMap;
+  const behind = mapBehind({
+    mode,
+    tripMap: overTripMap,
+    revealing: reveal.revealing,
+    pins: cityPins,
+  });
   return (
     <View style={styles.screen}>
-      {overMap ? (
+      <TripCityMap
+        shown={behind === "city"}
+        pins={cityPins}
+        coveredShare={PANEL_OVER_MAP_SHARE}
+      />
+      {overTripMap ? (
         <Animated.View entering={MAP_IN} style={styles.fill}>
           <TripMap
             trip={trip}
@@ -331,7 +354,7 @@ export default function TripScreen() {
         />
       ) : (
         <TripSheet
-          overMap={overMap}
+          overMap={behind !== null}
           fixed={mode === "days"}
           contentKey={mode}
           footer={footer}
@@ -410,7 +433,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     boxShadow: "0 -8px 30px rgba(0,0,0,0.18)",
   },
   panelOverMap: {
-    maxHeight: rt.screen.height * 0.56,
+    maxHeight: rt.screen.height * PANEL_OVER_MAP_SHARE,
   },
   panelFull: {
     maxHeight: rt.screen.height - rt.insets.top - theme.gap(7),

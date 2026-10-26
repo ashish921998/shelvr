@@ -3,17 +3,15 @@ import { formattingLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { MAX_PLAN_ITEMS } from "@convex/model/plan";
-import {
-  STOPS_PER_DAY,
-  type TripPace,
-  type TripSlot,
-} from "@convex/model/trip";
+import { cityKey, STOPS_PER_DAY, type TripPace } from "@convex/model/trip";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { FunctionReturnType } from "convex/server";
 import { useAction } from "convex/react";
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
-export type { TripPace, TripSlot };
+export type { TripPace };
 export { MAX_TRIP_DAYS, MIN_TRIP_DAYS } from "@convex/model/trip";
 
 export type Trip = NonNullable<
@@ -31,10 +29,30 @@ export function tripSaveCount(
   let count = saveCount;
   if (city !== undefined) {
     const named = cities.reduce((sum, c) => sum + c.count, 0);
-    const own = cities.find((c) => c.city === city)?.count ?? 0;
+    const own =
+      cities.find((c) => cityKey(c.city) === cityKey(city))?.count ?? 0;
     count = Math.min(saveCount, own + Math.max(0, saveCount - named));
   }
   return Math.min(count, MAX_PLAN_ITEMS);
+}
+
+/** The places the city page shows for `city`, read from the list Home already holds. */
+export function useCityPlaceCount(
+  city: string | undefined,
+): number | undefined {
+  const { data } = useQuery(convexQuery(api.items.listCities, {}));
+  if (city === undefined) return undefined;
+  return data?.find((c) => cityKey(c.city) === cityKey(city))?.placeCount;
+}
+
+/** How many places a trip can fill: the city page's place count when known, since one save can name many places. */
+export function tripPlaceEstimate(
+  saveCount: number,
+  cities: { city: string; count: number }[],
+  city: string | undefined,
+  placeCount: number | undefined,
+): number {
+  return Math.max(placeCount ?? 0, tripSaveCount(saveCount, cities, city));
 }
 
 export function daysSavesFill(saveCount: number, pace: TripPace): number {

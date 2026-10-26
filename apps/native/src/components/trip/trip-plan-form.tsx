@@ -12,7 +12,7 @@ import {
   formatTripDay,
   toDateKey,
   tripDayDate,
-  tripSaveCount,
+  tripPlaceEstimate,
   type TripPace,
   type TripRequest,
 } from "@/lib/trip";
@@ -54,6 +54,10 @@ function paceLabel(pace: TripPace): string {
 type Props = {
   saveCount: number;
   cities: { city: string; count: number }[];
+  /** The city page this trip was opened from: the trip is for it, so no city is asked. */
+  fixedCity?: string;
+  /** Distinct mapped places the city page shows for `fixedCity`. */
+  placeCount?: number;
   initial?: Partial<TripRequest>;
   onBuild: (request: TripRequest) => void;
   onCancel?: () => void;
@@ -250,6 +254,8 @@ function StartDate({
 export function TripPlanForm({
   saveCount,
   cities,
+  fixedCity,
+  placeCount,
   initial,
   onBuild,
   onCancel,
@@ -268,8 +274,15 @@ export function TripPlanForm({
     0,
     cities.findIndex((c) => c.city.toLowerCase() === picked?.toLowerCase()),
   );
-  const city = cities[cityIndex]?.city;
-  const askCity = cities.length >= 2;
+  const askCity = fixedCity === undefined && cities.length >= 2;
+  const city = fixedCity ?? cities[cityIndex]?.city;
+  const sendCity = fixedCity !== undefined || askCity;
+  const fillCount = tripPlaceEstimate(
+    saveCount,
+    cities,
+    sendCity ? city : undefined,
+    placeCount,
+  );
 
   return (
     <Animated.View layout={RESIZE} style={styles.form}>
@@ -284,7 +297,9 @@ export function TripPlanForm({
 
       {askCity ? (
         <View style={styles.cityBlock}>
-          <ThemedText variant="bodyLabel">{t("trip.whichCity")}</ThemedText>
+          <ThemedText variant="bodyLabel" style={styles.cityLabel}>
+            {t("trip.whichCity")}
+          </ThemedText>
           <TripSegments
             scroll
             labels={cities.map((c) => c.city)}
@@ -300,10 +315,7 @@ export function TripPlanForm({
         <Days
           days={days}
           onChange={setDays}
-          fill={daysSavesFill(
-            tripSaveCount(saveCount, cities, askCity ? city : undefined),
-            pace,
-          )}
+          fill={daysSavesFill(fillCount, pace)}
         />
         <Segmented
           label={t("trip.pace")}
@@ -324,7 +336,7 @@ export function TripPlanForm({
             days,
             pace,
             ...(start ? { startDate: toDateKey(start) } : {}),
-            ...(askCity && city ? { city } : {}),
+            ...(sendCity && city ? { city } : {}),
           })
         }
       />
@@ -357,6 +369,10 @@ const styles = StyleSheet.create((theme) => ({
   cityBlock: {
     gap: theme.gap(1),
     marginHorizontal: -theme.gap(2),
+  },
+  // The block bleeds to the sheet edge so the pills can scroll; the label keeps the sheet's inset.
+  cityLabel: {
+    paddingHorizontal: theme.gap(2),
   },
   rows: {
     gap: theme.gap(2),
