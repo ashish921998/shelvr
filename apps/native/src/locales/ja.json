@@ -717,6 +717,7 @@
   "cityMap.placesFromSaves": {
     "other": "保存からの%{formattedCount}か所"
   },
+  "cityMap.placesList": "場所のリスト",
   "cityMap.placeDetails": "%{name}の詳細",
   "opener.tagline": "スポットを保存しよう。デートも旅行もプランはおまかせ。",
   "onboardingQ.skip": "スキップ",

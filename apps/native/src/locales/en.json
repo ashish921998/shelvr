@@ -738,6 +738,7 @@
     "one": "%{formattedCount} place from your saves",
     "other": "%{formattedCount} places from your saves"
   },
+  "cityMap.placesList": "Places list",
   "cityMap.placeDetails": "Place details for %{name}",
   "opener.tagline": "Save the spots. We'll plan the date or the trip.",
   "onboardingQ.skip": "Skip",

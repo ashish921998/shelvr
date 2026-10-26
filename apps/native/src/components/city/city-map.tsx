@@ -17,10 +17,18 @@ type Props = {
   pins: CityPin[];
   selected: string | null;
   height: number;
+  /** How much of the map's bottom the places sheet covers when the page opens. */
+  coveredBottom: number;
   onSelect: (id: string) => void;
 };
 
-export function CityMap({ pins, selected, height, onSelect }: Props) {
+export function CityMap({
+  pins,
+  selected,
+  height,
+  coveredBottom,
+  onSelect,
+}: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const { width } = rt.screen;
@@ -36,23 +44,29 @@ export function CityMap({ pins, selected, height, onSelect }: Props) {
           width,
           height,
           top: rt.insets.top + theme.gap(6),
-          // The sheet below overlaps the map's bottom edge.
-          bottom: theme.gap(6),
+          bottom: coveredBottom + theme.gap(3),
           worldWidth: 256,
           centerY: height / 2,
         },
       ),
-    [pins, width, height, rt.insets.top, theme],
+    [pins, width, height, coveredBottom, rt.insets.top, theme],
   );
   const focus = useMemo(() => {
     const pin = pins.find((place) => cityPinId(place) === selected);
-    return pin
-      ? {
-          coordinates: { latitude: pin.lat, longitude: pin.lng },
-          zoom: SELECTED_ZOOM,
-        }
-      : undefined;
-  }, [pins, selected]);
+    if (!pin) return undefined;
+    // Centre the pin in the map the sheet leaves showing, not behind the sheet.
+    const top = rt.insets.top + theme.gap(6);
+    const shownMiddle = (top + height - coveredBottom) / 2;
+    const cos = Math.cos((pin.lat * Math.PI) / 180);
+    const latPerPoint = (360 * cos) / (256 * 2 ** SELECTED_ZOOM);
+    return {
+      coordinates: {
+        latitude: pin.lat - (height / 2 - shownMiddle) * latPerPoint,
+        longitude: pin.lng,
+      },
+      zoom: SELECTED_ZOOM,
+    };
+  }, [pins, selected, height, coveredBottom, rt.insets.top, theme]);
   const standard = focus ?? fit;
   const camera = useMemo(
     () =>

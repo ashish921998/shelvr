@@ -759,6 +759,7 @@
     "many": "%{formattedCount} lieux de vos enregistrements",
     "other": "%{formattedCount} lieux de vos enregistrements"
   },
+  "cityMap.placesList": "Liste des lieux",
   "cityMap.placeDetails": "Détails du lieu : %{name}",
   "opener.tagline": "Enregistrez les adresses. On planifie le rendez-vous ou le voyage.",
   "onboardingQ.skip": "Passer",
