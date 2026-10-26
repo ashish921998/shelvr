@@ -236,7 +236,7 @@ const itemAnalysisSchema = z.object({
   cities: z
     .array(z.string())
     .describe(
-      "The cities of the specific places this item names or shows (restaurants, bars, cafés, shops, hotels, sights), at most 30, city name only in English, e.g. 'Mumbai' or 'New York'. Empty if it names no place or the city is not stated or clearly shown; never guess.",
+      "The cities of the specific places this item names or shows (restaurants, bars, cafés, shops, hotels, sights), at most 30, city name only in English, e.g. 'Mumbai' or 'New York'. For a suburb or neighbourhood of a big city, name the big city instead, e.g. 'Chicago' for Oak Park or Evanston, 'New York' for Brooklyn. Empty if it names no place or the city is not stated or clearly shown; never guess.",
     ),
   places: z
     .array(z.string())
