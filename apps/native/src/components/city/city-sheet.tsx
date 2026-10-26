@@ -59,9 +59,13 @@ export function CitySheet({ snaps, top, header, list, onHeaderHeight }: Props) {
   });
 
   const { headerDrag, listDrag } = useMemo(() => {
-    const clamp = (value: number) =>
-      Math.min(snaps.collapsed, Math.max(snaps.expanded, value));
+    // Both run inside the gesture callbacks on the UI thread.
+    const clamp = (value: number) => {
+      "worklet";
+      return Math.min(snaps.collapsed, Math.max(snaps.expanded, value));
+    };
     const settle = (velocityY: number) => {
+      "worklet";
       top.set(
         withSpring(settleSheet(top.get(), velocityY, snaps), {
           ...motion.spring.snap,
