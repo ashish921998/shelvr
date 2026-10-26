@@ -669,7 +669,7 @@
   "home.nextUpOpen": "나중에 보려고 저장함",
   "splash.tagline": "나중을 위해 저장하세요",
   "refundConsent.title": "업데이트된 약관",
-  "refundConsent.disclosure": "Apple 환불 심사에 관한 약관이 업데이트되었습니다. 아래에서 동의하면 업데이트된 약관을 수락하고, 환불 요청 시 Shelvr가 RevenueCat을 통해 구매 및 제공 정보를 Apple과 공유하도록 허용합니다. 최종 결정은 Apple이 내립니다. 저장한 링크, 메모, 사진은 여기에 포함되지 않습니다.",
+  "refundConsent.disclosure": "Apple 환불 심사에 관한 약관이 업데이트되었습니다. 아래에서 동의하면 업데이트된 약관을 수락하고, 환불 요청 시 Shelvr가 RevenueCat을 통해 구매 및 제공 정보를 Apple과 공유하도록 허용합니다. 최종 결정은 Apple이 내립니다. 저장한 항목과 그 안의 장소는 여기에 포함되지 않습니다.",
   "refundConsent.optional": "공유는 선택 사항입니다. 공유에 동의하지 않아도 Shelvr를 계속 사용하고 환불을 요청할 수 있습니다. 프로필에서 선택을 변경할 수 있습니다.",
   "refundConsent.accept": "동의하고 공유 허용",
   "refundConsent.later": "나중에",
