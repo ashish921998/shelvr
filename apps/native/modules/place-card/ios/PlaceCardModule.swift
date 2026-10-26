@@ -12,6 +12,7 @@ public class PlaceCardModule: Module {
     View(PlaceCardView.self) {
       Events("onStatus", "onHeight")
       Prop("placeName") { (view: PlaceCardView, name: String) in view.placeName = name }
+      Prop("city") { (view: PlaceCardView, city: String) in view.city = city }
       Prop("latitude") { (view: PlaceCardView, value: Double) in view.latitude = value }
       Prop("longitude") { (view: PlaceCardView, value: Double) in view.longitude = value }
       OnViewDidUpdateProps { (view: PlaceCardView) in view.loadPlace() }

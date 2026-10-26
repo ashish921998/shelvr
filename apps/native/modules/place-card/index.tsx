@@ -7,7 +7,12 @@ import {
 } from "react-native";
 import { analytics } from "@/lib/analytics";
 
-type Props = { placeName: string; latitude: number; longitude: number };
+type Props = {
+  placeName: string;
+  city?: string;
+  latitude: number;
+  longitude: number;
+};
 type NativeProps = Props &
   ViewProps & {
     onStatus: (

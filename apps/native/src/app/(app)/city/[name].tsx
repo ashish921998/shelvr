@@ -178,6 +178,7 @@ export default function CityScreen() {
                   <GooglePlaceCard
                     key={row.id}
                     placeName={pin.name}
+                    city={city}
                     latitude={pin.lat}
                     longitude={pin.lng}
                   />

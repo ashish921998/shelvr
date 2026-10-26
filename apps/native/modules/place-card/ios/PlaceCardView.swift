@@ -36,6 +36,7 @@ private struct GoogleCard: View {
 
 class PlaceCardView: ExpoView {
   var placeName = ""
+  var city = ""
   var latitude = Double.nan
   var longitude = Double.nan
   let onStatus = EventDispatcher()
@@ -64,7 +65,7 @@ class PlaceCardView: ExpoView {
 
   func loadPlace() {
     guard window != nil, !placeName.isEmpty, latitude.isFinite, longitude.isFinite else { return }
-    let next = "\(placeName):\(latitude):\(longitude)"
+    let next = "\(placeName):\(city):\(latitude):\(longitude)"
     guard next != signature else { return }
     signature = next
     task?.cancel()
@@ -77,6 +78,7 @@ class PlaceCardView: ExpoView {
     guard Self.configured else { onStatus(["status": "unavailable"]); return }
 
     let name = placeName
+    let sourceCity = city
     let lat = latitude
     let lng = longitude
     task = Task { @MainActor [weak self] in
@@ -89,11 +91,10 @@ class PlaceCardView: ExpoView {
       )
       let response = await PlacesClient.shared.responseForSearchByText(with: request)
       guard !Task.isCancelled, let self, self.signature == next else { return }
-      guard case .success(let result) = response,
-        let place = result.places?.first(where: {
-          PlaceCardMatch.accepts(expected: name, actual: $0.displayName ?? "", lat: lat, lng: lng,
-                                 foundLat: $0.location.latitude, foundLng: $0.location.longitude)
-        }), let id = place.placeID else {
+      guard case .success(let result) = response, let places = result.places,
+        let index = PlaceCardMatch.uniqueIndex(expected: name, city: sourceCity, lat: lat, lng: lng,
+          candidates: places.map { PlaceCardMatch.Candidate(name: $0.displayName ?? "", lat: $0.location.latitude, lng: $0.location.longitude) }),
+        let id = places[index].placeID else {
         self.onStatus(["status": "unavailable"])
         return
       }
