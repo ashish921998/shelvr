@@ -229,7 +229,7 @@ export default function OnboardingScreen() {
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
-    // The reel they shared in the demo becomes the account’s free demo save after sign-in.
+    // The reel they shared in the demo becomes their first real save once they have Pro.
     queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();

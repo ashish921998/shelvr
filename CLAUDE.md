@@ -307,11 +307,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
-  and `storePins` writes at most 30 with their Apple Maps locality, dropping any place no longer named.
+  and `storePins` writes at most 30, dropping any place no longer named.
+  Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,
+  Apple locality is used only when it matches a source-declared city; unmatched pins remain unassigned.
   Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
   Only source cities can disable single-city outlier rejection; returned localities cannot.
-  Retained legacy single-city pins are labelled before adding a discovered city.
-  Resolved cities join `items.cities`, so Home creates an entry for each (up to 30). Scheduled from
+  Pin lookup never expands `items.cities`; Home creates entries for the cities extracted from the source (up to 30). Scheduled from
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
   membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older unlabelled pins, run by hand after deployment:
   `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped

@@ -14,15 +14,17 @@ import {
   appleMapsConfig,
   appleMapsLookup,
 } from "./model/appleMaps";
-import {
-  MAX_ITEM_PLACES,
-  normalizeCities,
-  placePinsValidator,
-} from "./model/itemFields";
+import { MAX_ITEM_PLACES, placePinsValidator } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
-import { dropStrays, keepNearby, middleOf, type LatLng } from "./model/trip";
+import {
+  cityKey,
+  dropStrays,
+  keepNearby,
+  middleOf,
+  type LatLng,
+} from "./model/trip";
 
 const MAX_PINS = MAX_ITEM_PLACES;
 const BACKFILL_PAGE = 100;
@@ -39,6 +41,20 @@ function lookupCity(cities: string[]): string | undefined {
 function nearEachOther(pins: Pin[], city: string | undefined): Pin[] {
   if (city === undefined) return pins;
   return dropStrays(pins).filter((pin) => pin !== null);
+}
+
+/** Keep the source's city scope: a suburb cannot create a new city or disable later outlier checks. */
+function inSourceCity(pin: Pin, cities: string[]): Pin {
+  const city =
+    cities.length === 1
+      ? cities[0]
+      : cities.find((source) => cityKey(source) === cityKey(pin.city ?? ""));
+  return {
+    name: pin.name,
+    lat: pin.lat,
+    lng: pin.lng,
+    ...(city ? { city } : {}),
+  };
 }
 
 function lookupCentre(points: LatLng[]): LatLng | null {
@@ -137,14 +153,9 @@ export const storePins = internalMutation({
     if (item === null || !(await aiAllowed(ctx, item.userId))) return null;
     const wanted = await wantedPlaces(ctx, item);
     const next = new Map<string, Pin>();
-    // Legacy single-city pins already belong to this city. Preserve that association before expanding cities.
-    const legacyCity = lookupCity(item.cities ?? []);
-    const retained = (item.placePins ?? []).map((pin) =>
-      pin.city || legacyCity === undefined ? pin : { ...pin, city: legacyCity },
-    );
-    for (const pin of [...retained, ...args.found]) {
+    for (const pin of [...(item.placePins ?? []), ...args.found]) {
       const key = placeKey(pin.name);
-      if (wanted.has(key)) next.set(key, pin);
+      if (wanted.has(key)) next.set(key, inSourceCity(pin, item.cities ?? []));
     }
     const city = lookupCity(item.cities ?? []);
     const pins = nearEachOther([...next.values()], city).slice(0, MAX_PINS);
@@ -158,13 +169,7 @@ export const storePins = internalMutation({
           pin.lng === before[i].lng &&
           pin.city === before[i].city,
       );
-    const cities = normalizeCities([
-      ...(item.cities ?? []),
-      ...pins.flatMap((pin) => (pin.city ? [pin.city] : [])),
-    ]);
-    if (!same || JSON.stringify(cities) !== JSON.stringify(item.cities ?? [])) {
-      await ctx.db.patch(item._id, { placePins: pins, cities });
-    }
+    if (!same) await ctx.db.patch(item._id, { placePins: pins });
     return null;
   },
 });
@@ -226,7 +231,7 @@ async function lookUp(
             name,
             lat: at.lat,
             lng: at.lng,
-            ...(at.city ? { city: at.city } : city ? { city } : {}),
+            ...(city ? { city } : at.city ? { city: at.city } : {}),
           },
         ],
   );
