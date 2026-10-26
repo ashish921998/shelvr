@@ -8,17 +8,51 @@ const MAX_CITY_DISTANCE_KM = 80;
 
 export type LatLng = { lat: number; lng: number };
 
+// Two lookups of one venue can land a few doors apart.
+const SAME_PLACE_KM = 0.3;
+
 /** Count and draw the same mapped place once even when several saves mention it. */
-export function uniquePlacePins<T extends LatLng & { name: string }>(
-  pins: T[],
-): T[] {
-  const seen = new Set<string>();
-  return pins.filter((pin) => {
-    const key = `${placeKey(pin.name)}:${pin.lat.toFixed(4)}:${pin.lng.toFixed(4)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+export function uniquePlacePins<
+  T extends LatLng & { name: string; appleId?: string },
+>(pins: T[]): T[] {
+  const byApple = new Set<string>();
+  // Indexes into `kept` of each name's pins, to merge a nearby repeat into.
+  const byName = new Map<string, number[]>();
+  const kept: T[] = [];
+  for (const pin of pins) {
+    if (pin.appleId !== undefined && byApple.has(pin.appleId)) continue;
+    const key = placeKey(pin.name);
+    const named = byName.get(key) ?? [];
+    const same = named.find(
+      (index) =>
+        !otherVenue(kept[index], pin) &&
+        distanceKm(kept[index], pin) <= SAME_PLACE_KM,
+    );
+    if (same !== undefined) {
+      if (pin.appleId !== undefined) {
+        // A later pin under another name may carry this id for the same venue,
+        // and the kept pin needs it to open Apple's place card.
+        byApple.add(pin.appleId);
+        if (kept[same].appleId === undefined) {
+          kept[same] = { ...kept[same], appleId: pin.appleId };
+        }
+      }
+      continue;
+    }
+    if (pin.appleId !== undefined) byApple.add(pin.appleId);
+    byName.set(key, [...named, kept.length]);
+    kept.push(pin);
+  }
+  return kept;
+}
+
+/** Apple tells two nearby branches of one name apart; trust it over distance. */
+function otherVenue(a: { appleId?: string }, b: { appleId?: string }): boolean {
+  return (
+    a.appleId !== undefined &&
+    b.appleId !== undefined &&
+    a.appleId !== b.appleId
+  );
 }
 
 export function distanceKm(a: LatLng, b: LatLng): number {

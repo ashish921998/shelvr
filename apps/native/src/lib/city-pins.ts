@@ -1,5 +1,5 @@
 import { linkSource, type LinkSource } from "@convex/model/externalUrl";
-import { uniquePlacePins } from "@convex/model/trip";
+import { distanceKm, middleOf, uniquePlacePins } from "@convex/model/trip";
 
 export type CityPin = {
   itemId: string;
@@ -31,6 +31,27 @@ export function cityPins(
       (save.placePins ?? []).map((pin) => ({ itemId: save._id, ...pin })),
     ),
   ).map((pin, index) => ({ ...pin, number: index + 1 }));
+}
+
+const FRAME_SPREAD = 3;
+const FRAME_MIN_KM = 10;
+
+/**
+ * The pins the city map opens on: those near the middle of the rest, so one place far out of town
+ * does not zoom the map out to the whole region. A pin counts as far when it is over three times the
+ * typical distance from the middle, and never within 10 km. Far pins stay on the map.
+ */
+export function framedPins<T extends { lat: number; lng: number }>(
+  pins: T[],
+): T[] {
+  const middle = middleOf(pins);
+  if (middle === null || pins.length < 3) return pins;
+  const distances = pins.map((pin) => distanceKm(pin, middle));
+  const typical = [...distances].sort((a, b) => a - b)[
+    Math.floor(distances.length / 2)
+  ];
+  const reach = Math.max(FRAME_MIN_KM, typical * FRAME_SPREAD);
+  return pins.filter((_, i) => distances[i] <= reach);
 }
 
 /** One row per mapped place, plus every save not represented by a place row. */

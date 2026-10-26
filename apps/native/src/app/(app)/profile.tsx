@@ -16,9 +16,6 @@ import {
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useNotificationSession } from "@/lib/notifications";
-import { api } from "@convex/_generated/api";
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigation, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useState } from "react";
@@ -35,7 +32,6 @@ export default function ProfileScreen() {
   const navigation = useNavigation() as ClosingScreen;
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
-  const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
@@ -55,7 +51,6 @@ export default function ProfileScreen() {
               ? "…"
               : t("pro.viewPlans");
 
-  const hasSubscription = status !== "none" && !loading;
   const opensPaywall = status === "none" || status === "lapsed";
 
   const openSubscription = async () => {
@@ -127,14 +122,6 @@ export default function ProfileScreen() {
           />
           <View style={styles.proCopy}>
             <Text style={styles.proLabel}>{proLabel}</Text>
-            {photoUsage && hasSubscription && status !== "lapsed" ? (
-              <Text style={styles.preferenceDescription}>
-                {t("profile.photoUsage", {
-                  count: photoUsage.count,
-                  limit: photoUsage.limit,
-                })}
-              </Text>
-            ) : null}
           </View>
           <AppSymbolIcon
             name="chevron.right"
@@ -254,12 +241,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(1.5),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
-  },
-  preferenceDescription: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.muted,
   },
   proCopy: {
     flex: 1,

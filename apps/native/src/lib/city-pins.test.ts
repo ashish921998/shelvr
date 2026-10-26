@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { appleZoom, cityPins, cityRows, saveSource } from "./city-pins";
+import {
+  appleZoom,
+  cityPins,
+  cityRows,
+  framedPins,
+  saveSource,
+} from "./city-pins";
 
 describe("appleId", () => {
   it("flows from a stored pin to its city pin and row", () => {
@@ -82,6 +88,113 @@ describe("cityPins", () => {
       ]),
     ).toEqual([{ ...pin, itemId: "newer", number: 1 }]);
   });
+  it("shows a place once when two lookups land it a few doors apart", () => {
+    expect(
+      cityPins([
+        {
+          _id: "newer",
+          placePins: [{ name: "Chrissy's Pizza", lat: 40.7237, lng: -73.9502 }],
+        },
+        {
+          _id: "older",
+          placePins: [{ name: "Chrissy’s Pizza", lat: 40.7239, lng: -73.9507 }],
+        },
+      ]).map((pin) => pin.itemId),
+    ).toEqual(["newer"]);
+  });
+
+  it("shows a place once when Apple names the same venue two ways", () => {
+    expect(
+      cityPins([
+        {
+          _id: "a",
+          placePins: [
+            { name: "Cloud Gate", lat: 41.8827, lng: -87.6233, appleId: "I9" },
+          ],
+        },
+        {
+          _id: "b",
+          placePins: [
+            { name: "The Bean", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+          ],
+        },
+      ]).map((pin) => pin.name),
+    ).toEqual(["Cloud Gate"]);
+  });
+
+  it("remembers the Apple id of a pin merged by name", () => {
+    expect(
+      cityPins([
+        {
+          _id: "a",
+          placePins: [{ name: "Cloud Gate", lat: 41.8827, lng: -87.6233 }],
+        },
+        {
+          _id: "b",
+          placePins: [
+            { name: "Cloud Gate", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+          ],
+        },
+        {
+          _id: "c",
+          placePins: [
+            { name: "The Bean", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+          ],
+        },
+      ]).map((pin) => pin.itemId),
+    ).toEqual(["a"]);
+  });
+
+  it("gives the kept place the Apple id a merged repeat carried", () => {
+    const [pin] = cityPins([
+      {
+        _id: "older",
+        placePins: [{ name: "Cloud Gate", lat: 41.8827, lng: -87.6233 }],
+      },
+      {
+        _id: "newer",
+        placePins: [
+          { name: "Cloud Gate", lat: 41.8826, lng: -87.6234, appleId: "I9" },
+        ],
+      },
+    ]);
+    expect(pin).toMatchObject({ itemId: "older", appleId: "I9" });
+  });
+
+  it("keeps two nearby branches Apple names as separate places", () => {
+    expect(
+      cityPins([
+        {
+          _id: "a",
+          placePins: [
+            { name: "Starbucks", lat: 41.8827, lng: -87.6233, appleId: "S1" },
+          ],
+        },
+        {
+          _id: "b",
+          placePins: [
+            { name: "Starbucks", lat: 41.8845, lng: -87.6233, appleId: "S2" },
+            { name: "Starbucks", lat: 41.8845, lng: -87.6234, appleId: "S2" },
+          ],
+        },
+      ]).map((pin) => pin.appleId),
+    ).toEqual(["S1", "S2"]);
+  });
+
+  it("keeps two branches of one name in different parts of town", () => {
+    expect(
+      cityPins([
+        {
+          _id: "a",
+          placePins: [
+            { name: "Joe's Pizza", lat: 40.7306, lng: -74.0021 },
+            { name: "Joe's Pizza", lat: 40.7547, lng: -73.9873 },
+          ],
+        },
+      ]),
+    ).toHaveLength(2);
+  });
+
   it("tags each stored pin with its save and skips saves without pins", () => {
     const saves = [
       {
@@ -112,5 +225,36 @@ describe("appleZoom", () => {
     expect(appleZoom(12, 38.7, 400, 300)).toBeGreaterThan(
       appleZoom(12, 38.7, 400, 400),
     );
+  });
+});
+
+describe("framedPins", () => {
+  const downtown = [
+    { lat: 41.8826, lng: -87.6226 },
+    { lat: 41.8827, lng: -87.6233 },
+    { lat: 41.8837, lng: -87.6251 },
+    { lat: 41.8947, lng: -87.6244 },
+    { lat: 41.8917, lng: -87.6086 },
+  ];
+
+  it("opens on downtown when one place is far south of it", () => {
+    const far = { lat: 41.6, lng: -87.6 };
+    expect(framedPins([...downtown, far])).toEqual(downtown);
+  });
+
+  it("keeps a spread-out city's places in view", () => {
+    const la = [
+      { lat: 34.0522, lng: -118.2437 },
+      { lat: 34.0195, lng: -118.4912 },
+      { lat: 34.1016, lng: -118.3267 },
+      { lat: 33.985, lng: -118.4695 },
+      { lat: 34.0736, lng: -118.4004 },
+    ];
+    expect(framedPins(la)).toEqual(la);
+  });
+
+  it("frames every pin when there are too few to tell a stray", () => {
+    const two = [downtown[0], { lat: 41.6, lng: -87.6 }];
+    expect(framedPins(two)).toEqual(two);
   });
 });

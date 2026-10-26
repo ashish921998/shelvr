@@ -379,20 +379,11 @@
     "other": "장소 %{formattedCount}곳"
   },
   "trip.emptyDay": "이 날에 맞는 저장 항목이 아직 없어요. 장소를 몇 군데 더 저장하고 다시 계획해 보세요.",
-  "trip.slotMorning": "아침",
-  "trip.slotLunch": "점심",
-  "trip.slotAfternoon": "오후",
-  "trip.slotDinner": "저녁 식사",
-  "trip.slotEvening": "저녁",
-  "trip.gapLunch": "이 날 점심 먹을 곳을 저장하지 않았어요",
-  "trip.gapLunchNear": "%{area} 근처에 저장한 점심 먹을 곳이 없어요",
-  "trip.gapDinner": "이 날 저녁 먹을 곳을 저장하지 않았어요",
-  "trip.gapDinnerNear": "%{area} 근처에 저장한 저녁 먹을 곳이 없어요",
   "trip.wishlistCount": {
     "other": "저장한 장소 %{formattedCount}곳이 더 있지만 일정에 넣지 못했어요"
   },
   "trip.change": "여행 바꾸기",
-  "trip.stopEyebrow": "%{number}번째 장소 · %{slot}",
+  "trip.stopEyebrow": "%{number}번째 장소",
   "trip.yourSave": "내 저장 항목",
   "trip.yourSaveBy": "내 저장 항목 · %{creator}",
   "trip.openSave": "저장 항목 열기",
@@ -578,7 +569,6 @@
   "pro.notFoundBody": "이 %{store} 계정에서 유효한 Shelvr Pro 구매를 찾지 못했어요.",
   "pro.restoreFailedBody": "연결을 확인하고 다시 시도하세요. %{store}에서 요금제를 관리할 수도 있어요.",
   "profile.appearanceLabel": "화면 모드: %{appearance}",
-  "profile.photoUsage": "저장한 사진: %{limit}장 중 %{count}장",
   "share.progress": "%{total}개 중 %{saved}개 저장했어요…",
   "share.failureCount": {
     "other": "항목 %{formattedCount}개를 저장하지 못했어요"

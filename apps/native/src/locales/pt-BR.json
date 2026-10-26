@@ -393,22 +393,13 @@
     "other": "%{formattedCount} paradas"
   },
   "trip.emptyDay": "Nada salvo cabe neste dia ainda. Salve mais alguns lugares e planeje de novo.",
-  "trip.slotMorning": "Manhã",
-  "trip.slotLunch": "Almoço",
-  "trip.slotAfternoon": "Tarde",
-  "trip.slotDinner": "Jantar",
-  "trip.slotEvening": "Noite",
-  "trip.gapLunch": "Nenhum lugar salvo para almoçar neste dia",
-  "trip.gapLunchNear": "Nenhum lugar salvo para almoçar perto de %{area}",
-  "trip.gapDinner": "Nenhum lugar salvo para jantar neste dia",
-  "trip.gapDinnerNear": "Nenhum lugar salvo para jantar perto de %{area}",
   "trip.wishlistCount": {
     "one": "Mais %{formattedCount} lugar salvo não coube",
     "many": "Mais %{formattedCount} lugares salvos não couberam",
     "other": "Mais %{formattedCount} lugares salvos não couberam"
   },
   "trip.change": "Mudar viagem",
-  "trip.stopEyebrow": "Parada %{number} · %{slot}",
+  "trip.stopEyebrow": "Parada %{number}",
   "trip.yourSave": "Seu item salvo",
   "trip.yourSaveBy": "Seu item salvo · %{creator}",
   "trip.openSave": "Abrir o item salvo",
@@ -596,7 +587,6 @@
   "pro.notFoundBody": "Nenhuma compra ativa do Shelvr Pro foi encontrada para esta conta da %{store}.",
   "pro.restoreFailedBody": "Verifique sua conexão e tente novamente. Você também pode gerenciar seu plano na %{store}.",
   "profile.appearanceLabel": "Aparência: %{appearance}",
-  "profile.photoUsage": "%{count} de %{limit} fotos salvas",
   "share.progress": "Salvos %{saved} de %{total}…",
   "share.failureCount": {
     "one": "Não foi possível salvar %{formattedCount} item",

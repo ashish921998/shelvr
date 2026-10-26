@@ -362,18 +362,9 @@ export type MessageParams = {
   "trip.dayTitleTwo": { day: string; first: string; second: string };
   "trip.stopCount": { count: number };
   "trip.emptyDay": undefined;
-  "trip.slotMorning": undefined;
-  "trip.slotLunch": undefined;
-  "trip.slotAfternoon": undefined;
-  "trip.slotDinner": undefined;
-  "trip.slotEvening": undefined;
-  "trip.gapLunch": undefined;
-  "trip.gapLunchNear": { area: string };
-  "trip.gapDinner": undefined;
-  "trip.gapDinnerNear": { area: string };
   "trip.wishlistCount": { count: number };
   "trip.change": undefined;
-  "trip.stopEyebrow": { number: string; slot: string };
+  "trip.stopEyebrow": { number: string };
   "trip.yourSave": undefined;
   "trip.yourSaveBy": { creator: string };
   "trip.openSave": undefined;
@@ -557,7 +548,6 @@ export type MessageParams = {
   "pro.notFoundBody": { store: string };
   "pro.restoreFailedBody": { store: string };
   "profile.appearanceLabel": { appearance: string };
-  "profile.photoUsage": { count: number; limit: number };
   "share.progress": { saved: number; total: number };
   "share.failureCount": { count: number };
   "spaces.saveCount": { count: number };

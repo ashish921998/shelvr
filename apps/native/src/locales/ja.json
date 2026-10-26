@@ -379,20 +379,11 @@
     "other": "%{formattedCount}か所"
   },
   "trip.emptyDay": "この日に合う保存はまだありません。スポットをもう少し保存して、もう一度計画してください。",
-  "trip.slotMorning": "朝",
-  "trip.slotLunch": "ランチ",
-  "trip.slotAfternoon": "午後",
-  "trip.slotDinner": "ディナー",
-  "trip.slotEvening": "夜",
-  "trip.gapLunch": "この日のランチ候補は保存されていません",
-  "trip.gapLunchNear": "%{area}周辺のランチ候補は保存されていません",
-  "trip.gapDinner": "この日のディナー候補は保存されていません",
-  "trip.gapDinnerNear": "%{area}周辺のディナー候補は保存されていません",
   "trip.wishlistCount": {
     "other": "ほかに%{formattedCount}か所の保存スポットが入りきりませんでした"
   },
   "trip.change": "旅行を変更",
-  "trip.stopEyebrow": "スポット%{number} · %{slot}",
+  "trip.stopEyebrow": "スポット%{number}",
   "trip.yourSave": "あなたの保存",
   "trip.yourSaveBy": "あなたの保存 · %{creator}",
   "trip.openSave": "保存を開く",
@@ -578,7 +569,6 @@
   "pro.notFoundBody": "この%{store}アカウントで有効なShelvr Proの購入が見つかりません。",
   "pro.restoreFailedBody": "接続を確認して再試行してください。%{store}でプランを管理することもできます。",
   "profile.appearanceLabel": "外観：%{appearance}",
-  "profile.photoUsage": "保存した写真：%{limit}枚中%{count}枚",
   "share.progress": "%{total}件中%{saved}件を保存しました…",
   "share.failureCount": {
     "other": "%{formattedCount}件の項目を保存できませんでした"

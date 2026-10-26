@@ -1,6 +1,11 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
-import { appleZoom, cityPinId, type CityPin } from "@/lib/city-pins";
+import {
+  appleZoom,
+  cityPinId,
+  framedPins,
+  type CityPin,
+} from "@/lib/city-pins";
 import { fitCamera } from "@/lib/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,7 +28,10 @@ export function CityMap({ pins, selected, height, onSelect }: Props) {
   const fit = useMemo(
     () =>
       fitCamera(
-        pins.map((pin) => ({ latitude: pin.lat, longitude: pin.lng })),
+        framedPins(pins).map((pin) => ({
+          latitude: pin.lat,
+          longitude: pin.lng,
+        })),
         {
           width,
           height,
