@@ -74,18 +74,22 @@ function unplacedLabel(save: UnplacedSave): string {
   return t("homePlaces.noPlaceNone");
 }
 
-/** Saves no city card shows, so nothing shared disappears; each opens its save to retry or delete. */
-export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
-  useAppLocale();
+function UnplacedSection({
+  saves,
+  title,
+}: {
+  saves: UnplacedSave[];
+  title: string;
+}) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const all = unplacedSaves(saves);
+  const all = saves;
   const unplaced = expanded ? all : all.slice(0, MAX_UNPLACED_ROWS);
   const hidden = all.length - unplaced.length;
   if (all.length === 0) return null;
   return (
     <View style={styles.unplaced}>
-      <Text style={styles.sectionLabel}>{t("homePlaces.noPlaceTitle")}</Text>
+      <Text style={styles.sectionLabel}>{title}</Text>
       {unplaced.map((save) => (
         <Pressable
           key={save._id}
@@ -119,6 +123,28 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+/** Keep pending and failed reads separate from completed saves without a city. */
+export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
+  useAppLocale();
+  const all = unplacedSaves(saves);
+  return (
+    <>
+      <UnplacedSection
+        saves={all.filter((save) => save.status === "processing")}
+        title={t("homePlaces.noPlaceReading")}
+      />
+      <UnplacedSection
+        saves={all.filter((save) => save.status === "failed")}
+        title={t("homePlaces.noPlaceFailed")}
+      />
+      <UnplacedSection
+        saves={all.filter((save) => save.status === "ready")}
+        title={t("homePlaces.noPlaceTitle")}
+      />
+    </>
   );
 }
 

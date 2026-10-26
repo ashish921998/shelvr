@@ -742,7 +742,7 @@
   "homePlaces.yourCities": "Vos villes",
   "homePlaces.citiesHint": "Les lieux des reels et TikToks que tu as enregistrés",
   "homePlaces.noPlaceTitle": "Aucun lieu trouvé",
-  "homePlaces.noPlaceReading": "Lecture en cours…",
+  "homePlaces.noPlaceReading": "Recherche de lieux…",
   "homePlaces.noPlaceFailed": "Impossible de le lire",
   "homePlaces.noPlaceNone": "Aucun lieu dans celui-ci",
   "homePlaces.spotCount": {

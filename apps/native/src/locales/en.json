@@ -723,7 +723,7 @@
   "homePlaces.yourCities": "Your cities",
   "homePlaces.citiesHint": "Places from the reels and TikToks you saved",
   "homePlaces.noPlaceTitle": "No place found",
-  "homePlaces.noPlaceReading": "Still reading…",
+  "homePlaces.noPlaceReading": "Finding places…",
   "homePlaces.noPlaceFailed": "Couldn't read this one",
   "homePlaces.noPlaceNone": "No place in this one",
   "homePlaces.spotCount": {

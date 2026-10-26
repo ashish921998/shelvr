@@ -704,7 +704,7 @@
   "homePlaces.yourCities": "あなたの都市",
   "homePlaces.citiesHint": "保存したリールやTikTokに出てくる場所",
   "homePlaces.noPlaceTitle": "場所が見つからない保存",
-  "homePlaces.noPlaceReading": "読み込み中…",
+  "homePlaces.noPlaceReading": "場所を検索中…",
   "homePlaces.noPlaceFailed": "読み込めませんでした",
   "homePlaces.noPlaceNone": "場所の記載がありません",
   "homePlaces.spotCount": {
