@@ -1,5 +1,4 @@
 // @vitest-environment edge-runtime
-/// <reference types="vite/client" />
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
