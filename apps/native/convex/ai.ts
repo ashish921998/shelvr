@@ -209,7 +209,7 @@ const intentSchema = z.object({
     ),
 });
 
-const PLACES_DESCRIPTION = `Every specific place this item names (restaurants, cafés, bars, bakeries, food stalls, markets, shops, hotels, museums, parks, sights), at most ${MAX_ITEM_PLACES}, each its name as written, e.g. 'Café de Flore', without address or description. When more than one city is mentioned, append each place's explicitly stated city (e.g. 'Café de Flore, Paris'); never assign every place to the first city. Include a place named only by its @handle when the handle clearly is the place. Empty if it names none; never add a place it does not name.`;
+const PLACES_DESCRIPTION = `Every specific place this item names (restaurants, cafés, bars, bakeries, food stalls, markets, shops, hotels, museums, parks, sights), at most ${MAX_ITEM_PLACES}, each its name as written, e.g. 'Café de Flore', without address or description. For a single-city item, leave the city out of every place name. When more than one city is mentioned, append each place's explicitly stated city (e.g. 'Café de Flore, Paris'); never assign every place to the first city. Include a place named only by its @handle when the handle clearly is the place. Empty if it names none; never add a place it does not name.`;
 
 const itemAnalysisSchema = z.object({
   title: z

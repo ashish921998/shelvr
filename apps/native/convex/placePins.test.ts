@@ -83,6 +83,39 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {
+    const { t, itemId, pins } = await setup(["Guest House, Austin"], {
+      read: ["Guest House, Austin", "Guest House", "Eberly, Austin"],
+    });
+    const existing = [
+      {
+        name: "Guest House, Austin",
+        lat: 30.265,
+        lng: -97.749,
+        city: "Austin",
+      },
+      { name: "Guest House", lat: 30.265, lng: -97.749, city: "Austin" },
+      { name: "Eberly, Austin", lat: 30.258, lng: -97.759, city: "Austin" },
+    ];
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { cities: ["Austin"], placePins: existing }),
+    );
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.places).toEqual([
+      "Guest House",
+      "Eberly",
+    ]);
+    expect(await pins()).toEqual([
+      { ...existing[0], name: "Guest House" },
+      { ...existing[2], name: "Eberly" },
+    ]);
+    expect(
+      await t.query(internal.placePins.toLocate, { itemId }),
+    ).toMatchObject({ names: [] });
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect(await pins()).toHaveLength(2);
+  });
+
   it("does not use distant pins as a synthetic search centre", async () => {
     const { t, itemId } = await setup(["Paris", "Michigan", "Next"]);
     await t.run(async (ctx) =>

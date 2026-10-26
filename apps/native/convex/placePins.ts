@@ -14,7 +14,12 @@ import {
   appleMapsConfig,
   appleMapsLookup,
 } from "./model/appleMaps";
-import { MAX_ITEM_PLACES, placePinsValidator } from "./model/itemFields";
+import {
+  MAX_ITEM_PLACES,
+  normalizePlaceName,
+  normalizePlaces,
+  placePinsValidator,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
@@ -50,7 +55,7 @@ function inSourceCity(pin: Pin, cities: string[]): Pin {
       ? cities[0]
       : cities.find((source) => cityKey(source) === cityKey(pin.city ?? ""));
   return {
-    name: pin.name,
+    name: normalizePlaceName(pin.name, cities),
     lat: pin.lat,
     lng: pin.lng,
     ...(city ? { city } : {}),
@@ -87,7 +92,8 @@ async function wantedPlaces(
       .flatMap((join) => mapsNames(join.intents)),
   ];
   const wanted = new Map<string, string>();
-  for (const name of names) {
+  for (const raw of names) {
+    const name = normalizePlaceName(raw, item.cities);
     const key = placeKey(name);
     if (key !== "" && !wanted.has(key)) wanted.set(key, name);
   }
@@ -122,7 +128,11 @@ export const toLocate = internalQuery({
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.status !== "ready") return null;
     if (!(await aiAllowed(ctx, item.userId))) return null;
-    const pinned = new Set((item.placePins ?? []).map((p) => placeKey(p.name)));
+    const pinned = new Set(
+      (item.placePins ?? []).map((p) =>
+        placeKey(normalizePlaceName(p.name, item.cities)),
+      ),
+    );
     const wanted = [...(await wantedPlaces(ctx, item))];
     const kept = wanted.filter(([key]) => pinned.has(key)).length;
     const names = wanted
@@ -154,7 +164,7 @@ export const storePins = internalMutation({
     const wanted = await wantedPlaces(ctx, item);
     const next = new Map<string, Pin>();
     for (const pin of [...(item.placePins ?? []), ...args.found]) {
-      const key = placeKey(pin.name);
+      const key = placeKey(normalizePlaceName(pin.name, item.cities));
       if (wanted.has(key)) next.set(key, inSourceCity(pin, item.cities ?? []));
     }
     const city = lookupCity(item.cities ?? []);
@@ -169,7 +179,16 @@ export const storePins = internalMutation({
           pin.lng === before[i].lng &&
           pin.city === before[i].city,
       );
-    if (!same) await ctx.db.patch(item._id, { placePins: pins });
+    const places =
+      item.places === undefined
+        ? undefined
+        : normalizePlaces(item.places, item.cities);
+    const samePlaces = JSON.stringify(places) === JSON.stringify(item.places);
+    if (!same || !samePlaces)
+      await ctx.db.patch(item._id, {
+        placePins: pins,
+        ...(places === undefined ? {} : { places }),
+      });
     return null;
   },
 });

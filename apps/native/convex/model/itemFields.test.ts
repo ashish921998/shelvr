@@ -45,6 +45,27 @@ describe("normalizeCities", () => {
 });
 
 describe("normalizePlaces", () => {
+  it("removes only the sole source city's trailing qualifier before deduplication", () => {
+    expect(
+      normalizePlaces(
+        [
+          " Guest House, AUSTIN. ",
+          "Guest House",
+          "Cafe, Downtown, Austin",
+          "Austin Java",
+          "Cafe, Dallas",
+        ],
+        [" Austin ", "austin"],
+      ),
+    ).toEqual(["Guest House", "Cafe, Downtown", "Austin Java", "Cafe, Dallas"]);
+  });
+
+  it("keeps city qualifiers when the source has multiple cities or no city", () => {
+    const places = ["Cafe, Austin", "Cafe, Dallas"];
+    expect(normalizePlaces(places, ["Austin", "Dallas"])).toEqual(places);
+    expect(normalizePlaces(places)).toEqual(places);
+  });
+
   it("keeps each place once, ignoring case, tidied, in first-seen order", () => {
     expect(
       normalizePlaces([" Café  de Flore. ", "Santelmo", "café de flore", ""]),
