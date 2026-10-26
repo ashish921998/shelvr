@@ -116,7 +116,9 @@ private final class PlaceCardCoordinator: NSObject, MKMapItemDetailViewControlle
   }
 
   func close() {
-    guard let card, card.presentingViewController != nil, !card.isBeingDismissed else { return }
+    // UIKit can take the card down with its presenter and tell no delegate, so answer here or JS waits forever.
+    guard let card, card.presentingViewController != nil else { return finish("cancelled") }
+    guard !card.isBeingDismissed else { return }
     card.dismiss(animated: true) { [self] in finish("cancelled") }
   }
 
