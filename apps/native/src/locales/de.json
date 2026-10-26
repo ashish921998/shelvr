@@ -498,6 +498,7 @@
   "navigation.searchHeader": "suche",
   "search.placeholder": "Deine Inhalte durchsuchen",
   "search.clear": "Suche löschen",
+  "search.resultLimit": "Es werden bis zu 50 Ergebnisse angezeigt. Suche nach einem Ortsnamen, um die Suche einzugrenzen.",
   "search.emptyTitle": "Alles wiederfinden",
   "search.emptyBody": "Die Suche durchsucht deine Notizen sowie Titel,\nSchlagwörter und Beschreibungen von Shelvr.",
   "search.noResultsTitle": "Noch nichts",

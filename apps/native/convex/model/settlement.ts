@@ -199,6 +199,7 @@ export function completionPatch(
       title,
       cities: words.cities ?? item.cities,
       places: words.places ?? item.places,
+      placePins: item.placePins,
       description: words.description,
       tags: words.tags,
       siteName: reading.siteName,

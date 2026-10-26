@@ -194,3 +194,22 @@ it("prefers resolved pin names over extracted names", () => {
   expect(screen.getByText("Belém Tower")).toBeTruthy();
   expect(screen.queryByText("Extracted name")).toBeNull();
 });
+
+it.each([49, 50])(
+  "shows the result cap notice only when the cap is reached (%s matches)",
+  (count) => {
+    mocks.result.data = Array.from({ length: count }, (_, i) => ({
+      _id: `save-${i}`,
+      title: `Lisbon save ${i}`,
+      cities: ["Lisbon"],
+    }));
+    home();
+    type("Lisbon");
+    settle();
+    expect(
+      screen.queryByText(
+        "Showing up to 50 results. Search a place name to narrow it down.",
+      ) !== null,
+    ).toBe(count === 50);
+  },
+);

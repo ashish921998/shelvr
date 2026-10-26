@@ -491,6 +491,7 @@
   "navigation.searchHeader": "검색",
   "search.placeholder": "저장한 항목 검색",
   "search.clear": "검색 지우기",
+  "search.resultLimit": "검색 결과는 최대 50개까지 표시됩니다. 장소 이름으로 검색하여 결과를 좁혀 보세요.",
   "search.emptyTitle": "무엇이든 찾아보세요",
   "search.emptyBody": "메모 내용과 Shelvr가 작성한 제목,\n태그, 설명을 검색해요.",
   "search.noResultsTitle": "아직 없어요",

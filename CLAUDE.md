@@ -131,7 +131,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
   is the shared helper).
   Home searches the caller's saved titles, cities and place names through `searchItems`,
-  using the existing account-filtered full-text index (at most 50 matches).
+  using the existing account-filtered full-text index (at most 50 matches, with an
+  inline notice asking for a narrower search when that limit is reached). Mapped
+  pin names are indexed too, including pins sourced from Maps intents; storing
+  pins refreshes search text in the same transaction.
   Its response includes optional `places` so unpinned matches can show their place
   names; older clients can ignore the field. Query terms are split on punctuation
   as well as whitespace and capped at 16 before searching. After
@@ -254,8 +257,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
   matches become `suggested` memberships (`saved` in a space set to auto-file). The model
-  also lists every place a save names into `items.places` (server-only: `enrichItem` strips
-  it; plans and trips read it through `toPlanSource`). A short video's speech is read once
+  also lists every place a save names into `items.places`. `enrichItem` strips it
+  from general item reads; `searchItems` explicitly returns it as an optional field
+  so unpinned matches can show their names. Plans and trips read it through
+  `toPlanSource`. A short video's speech is read once
   through Treg (`model/videoTranscript.ts`) when the model flags it as a cooking video whose
   caption and linked page gave no recipe, or as a video that recommends or visits places;
   a second call then lifts the recipe, the spoken places, or both. The file also holds

@@ -115,6 +115,11 @@ function SearchResults({
   }
   return (
     <View style={styles.results}>
+      {result.data.length >= 50 ? (
+        <Text accessibilityLiveRegion="polite" style={styles.subtitle}>
+          {t("search.resultLimit")}
+        </Text>
+      ) : null}
       {result.data.map((save) => (
         <Pressable
           key={save._id}

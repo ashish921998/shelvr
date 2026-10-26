@@ -22,6 +22,7 @@ import {
   withoutCitySuffix,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
+import { buildSearchText } from "./model/searchText";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
 import {
@@ -186,9 +187,15 @@ export const storePins = internalMutation({
         ? undefined
         : normalizePlaces(item.places, item.cities);
     const samePlaces = JSON.stringify(places) === JSON.stringify(item.places);
-    if (!same || !samePlaces)
+    const searchText = buildSearchText({ ...item, places, placePins: pins });
+    if (
+      !same ||
+      !samePlaces ||
+      (pins.length > 0 && searchText !== item.searchText)
+    )
       await ctx.db.patch(item._id, {
         placePins: pins,
+        searchText,
         ...(places === undefined ? {} : { places }),
       });
     return null;

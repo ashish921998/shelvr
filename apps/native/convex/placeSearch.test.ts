@@ -69,9 +69,87 @@ it("bounds punctuation-separated and URL-like queries to 16 Unicode terms", () =
     );
   }
   expect(searchQueryText("BELÉM—東京,서울/123")).toBe("belém 東京 서울 123");
-  expect(searchQueryText("Bele\u0301m")).toBe("belém");
+  // Match the index tokenizer: it does not compose decomposed accents.
+  expect(searchQueryText("Bele\u0301m")).toBe("bele m");
+  for (const name of ["मुंबई", "हिंदी", "กรุงเทพ"]) {
+    expect(searchQueryText(name)).toBe(name);
+  }
   expect(searchQueryText("!!!")).toBe("");
 });
+
+it("indexes intent-sourced map pins during backfill and keeps pin updates searchable", async () => {
+  const backend = newConvexTest();
+  const { t, userId } = await signedInUser(backend);
+  const pin = { name: "Torre de Belém", lat: 38.6916, lng: -9.216 };
+  const itemId = await t.run((ctx) =>
+    ctx.db.insert("items", {
+      userId,
+      type: "link",
+      status: "ready",
+      title: "Lisbon eats",
+      cities: ["Lisbon"],
+      tags: [],
+      searchText: "lisbon eats lisbon",
+      placePins: [{ ...pin, city: "Lisbon" }],
+      intents: [{ kind: "open_maps", label: "Map", value: pin.name }],
+    }),
+  );
+  const found = async () =>
+    (await t.query(api.items.searchItems, { query: "Torre" })).map(
+      (item) => item._id,
+    );
+  expect(await found()).toEqual([]);
+  await backend.mutation(internal.items.backfillPlaceSearch, { cursor: null });
+  expect(await found()).toEqual([itemId]);
+  expect(
+    (await backend.run((ctx) => ctx.db.get(itemId)))?.places,
+  ).toBeUndefined();
+  await backend.run((ctx) =>
+    ctx.db.patch(itemId, { searchText: "stale", placePins: [] }),
+  );
+  await backend.mutation(internal.placePins.storePins, {
+    itemId,
+    found: [pin],
+  });
+  expect(await found()).toEqual([itemId]);
+  await backend.run((ctx) => ctx.db.patch(itemId, { searchText: "stale" }));
+  await backend.mutation(internal.placePins.storePins, {
+    itemId,
+    found: [pin],
+  });
+  expect(await found()).toEqual([itemId]);
+  await backend.run((ctx) => ctx.db.patch(itemId, { intents: [] }));
+  await backend.mutation(internal.placePins.storePins, { itemId, found: [] });
+  expect(await found()).toEqual([]);
+});
+
+it.each(["मुंबई", "กรุงเทพ"])(
+  "finds an exact saved city name containing alphabetic marks: %s",
+  async (city) => {
+    const backend = newConvexTest();
+    const { t, userId } = await signedInUser(backend);
+    const id = await backend.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Weekend",
+        cities: [city],
+        tags: [],
+        searchText: buildSearchText({
+          title: "Weekend",
+          cities: [city],
+          tags: [],
+        }),
+      }),
+    );
+    expect(
+      (await t.query(api.items.searchItems, { query: city })).map(
+        (item) => item._id,
+      ),
+    ).toEqual([id]);
+  },
+);
 
 it("does not reindex a deleting or missing owner", async () => {
   const backend = newConvexTest();
