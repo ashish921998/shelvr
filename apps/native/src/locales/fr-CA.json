@@ -857,5 +857,7 @@
   "map.kindActivities": "À faire",
   "map.kindShopping": "Magasinage",
   "map.kindStay": "Hébergements",
-  "map.filters": "Filtrer les lieux"
+  "map.filters": "Filtrer les lieux",
+  "map.searchPlaceholder": "Rechercher dans vos lieux",
+  "map.searchNoResults": "Aucun lieu ne correspond à « %{query} »."
 }

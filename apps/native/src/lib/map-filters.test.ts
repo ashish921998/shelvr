@@ -4,6 +4,8 @@ import {
   filterPlaces,
   hasPlaceNear,
   mapFilters,
+  searchPlaces,
+  topSearchResults,
 } from "./map-filters";
 
 const place = (kinds: string[], city?: string) => ({ kinds, city });
@@ -73,5 +75,38 @@ describe("hasPlaceNear", () => {
   it("says no when every place is in another city or the location is unknown", () => {
     expect(hasPlaceNear(austin, chicago)).toBe(false);
     expect(hasPlaceNear(undefined, chicago)).toBe(false);
+  });
+});
+
+describe("searchPlaces", () => {
+  const places = [
+    { name: "Ramen Tatsu-Ya", city: "Austin" },
+    { name: "Café Rue", city: "Paris" },
+    { name: "Best Ramen", city: "Chicago" },
+    { name: "Le Bar", city: "Paris" },
+  ];
+
+  it("matches names and cities, ignoring case and accents, names starting with the query first", () => {
+    expect(searchPlaces(places, "ramen").map((p) => p.name)).toEqual([
+      "Ramen Tatsu-Ya",
+      "Best Ramen",
+    ]);
+    expect(searchPlaces(places, "cafe").map((p) => p.name)).toEqual([
+      "Café Rue",
+    ]);
+    expect(searchPlaces(places, "paris bar").map((p) => p.name)).toEqual([
+      "Le Bar",
+    ]);
+  });
+
+  it("finds nothing for a blank or unmatched query", () => {
+    expect(searchPlaces(places, "  ")).toEqual([]);
+    expect(searchPlaces(places, "sushi")).toEqual([]);
+  });
+
+  it("lists at most eight results", () => {
+    expect(
+      topSearchResults(Array.from({ length: 12 }, (_, i) => i)),
+    ).toHaveLength(8);
   });
 });

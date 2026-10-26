@@ -815,5 +815,7 @@
   "map.kindActivities": "遊び",
   "map.kindShopping": "ショッピング",
   "map.kindStay": "宿泊",
-  "map.filters": "場所を絞り込む"
+  "map.filters": "場所を絞り込む",
+  "map.searchPlaceholder": "保存した場所を検索",
+  "map.searchNoResults": "「%{query}」に一致する場所はありません。"
 }

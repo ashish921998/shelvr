@@ -775,6 +775,8 @@ export type MessageParams = {
   "map.kindShopping": undefined;
   "map.kindStay": undefined;
   "map.filters": undefined;
+  "map.searchPlaceholder": undefined;
+  "map.searchNoResults": { query: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

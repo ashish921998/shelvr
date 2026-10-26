@@ -21,6 +21,12 @@ export type MapPin = {
   lng: number;
 };
 
+/** A place the camera flies to; a new key moves it again even to the same spot. */
+export type MapFocus = LatLng & { key: number };
+
+/** How close the camera comes to a place picked from search. */
+const FOCUS_ZOOM = 15;
+
 type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
@@ -29,6 +35,7 @@ type Props = {
   showsUser: boolean;
   /** Clears the floating filter row above the map. */
   topInset: number;
+  focus?: MapFocus;
   onSelect: (id: string) => void;
 };
 
@@ -37,6 +44,7 @@ export function PlacesMap({
   framed,
   showsUser,
   topInset,
+  focus,
   onSelect,
 }: Props) {
   const { theme, rt } = useUnistyles();
@@ -118,6 +126,19 @@ export function PlacesMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per grant; a new filter must not move the camera again
   }, [showsUser]);
   useEffect(() => () => clearTimeout(settle.current), []);
+  useEffect(() => {
+    if (!focus) return;
+    // A place the person picked wins over the opening check.
+    checkNearby.current = undefined;
+    return moveCamera(
+      () =>
+        ref.current?.setCameraPosition({
+          coordinates: { latitude: focus.lat, longitude: focus.lng },
+          zoom: FOCUS_ZOOM,
+        }),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [focus]);
 
   const select = (id: string | undefined) => {
     if (id) onSelect(id);

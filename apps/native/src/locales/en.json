@@ -836,5 +836,7 @@
   "map.kindActivities": "Things to do",
   "map.kindShopping": "Shopping",
   "map.kindStay": "Stays",
-  "map.filters": "Filter places"
+  "map.filters": "Filter places",
+  "map.searchPlaceholder": "Search your places",
+  "map.searchNoResults": "No places match “%{query}”."
 }

@@ -815,5 +815,7 @@
   "map.kindActivities": "놀거리",
   "map.kindShopping": "쇼핑",
   "map.kindStay": "숙소",
-  "map.filters": "장소 필터"
+  "map.filters": "장소 필터",
+  "map.searchPlaceholder": "저장한 장소 검색",
+  "map.searchNoResults": "“%{query}”에 맞는 장소가 없어요."
 }

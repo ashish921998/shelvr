@@ -836,5 +836,7 @@
   "map.kindActivities": "Unternehmungen",
   "map.kindShopping": "Shopping",
   "map.kindStay": "Unterkünfte",
-  "map.filters": "Orte filtern"
+  "map.filters": "Orte filtern",
+  "map.searchPlaceholder": "Deine Orte durchsuchen",
+  "map.searchNoResults": "Keine Orte passen zu „%{query}“."
 }

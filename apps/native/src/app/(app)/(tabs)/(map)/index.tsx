@@ -1,6 +1,11 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
-import { type MapPin, PlacesMap } from "@/components/map/places-map";
+import { MapSearch } from "@/components/map/map-search";
+import {
+  type MapFocus,
+  type MapPin,
+  PlacesMap,
+} from "@/components/map/places-map";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { withAlpha } from "@/lib/color";
@@ -11,7 +16,13 @@ import {
 } from "@/lib/apple-place-card";
 import { framedPins } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
-import { busiestCityPlaces, filterPlaces, mapFilters } from "@/lib/map-filters";
+import {
+  busiestCityPlaces,
+  filterPlaces,
+  mapFilters,
+  searchPlaces,
+  topSearchResults,
+} from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
@@ -19,7 +30,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** Room left at the right of the filter row for MapKit's my-location button. */
@@ -54,15 +65,23 @@ export default function MapScreen() {
   const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
   const location = useMapLocation(opened);
   const [kind, setKind] = useState<PlaceKind | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
 
   const all = places.data;
   const filters = useMemo(() => mapFilters(all ?? []), [all]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
   const shown = useMemo(() => filterPlaces(all ?? [], active), [all, active]);
+  const searching = searchText.trim() !== "";
+  // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
+  const matches = useMemo(
+    () => (searching ? searchPlaces(shown, searchText) : shown),
+    [searching, shown, searchText],
+  );
   const pins: MapPin[] = useMemo(
-    () => shown.map((place) => ({ ...place, id: placeId(place) })),
-    [shown],
+    () => matches.map((place) => ({ ...place, id: placeId(place) })),
+    [matches],
   );
   const framed = useMemo(
     () =>
@@ -102,8 +121,12 @@ export default function MapScreen() {
     );
   }
 
-  const chipsTop = rt.insets.top + theme.gap(1);
+  const top = rt.insets.top + theme.gap(1);
   const located = location === "granted";
+  // The search field, then the chips under it.
+  const overlayHeight =
+    theme.control.minHeight +
+    (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
   const select = (id: string) => {
     const place = shown.find((candidate) => placeId(candidate) === id);
     if (!place || !focused.current) return;
@@ -119,6 +142,18 @@ export default function MapScreen() {
       openSave();
     }
   };
+  const pickResult = (id: string) => {
+    const place = matches.find((candidate) => placeId(candidate) === id);
+    if (!place) return;
+    Keyboard.dismiss();
+    analytics.capture("map_search_result_opened", {});
+    setFocus((previous) => ({
+      lat: place.lat,
+      lng: place.lng,
+      key: (previous?.key ?? 0) + 1,
+    }));
+    select(id);
+  };
   const choose = (next: PlaceKind | null) => {
     setKind(next);
     if (next !== null) analytics.capture("map_filter_selected", { kind: next });
@@ -130,7 +165,8 @@ export default function MapScreen() {
         pins={pins}
         framed={framed}
         showsUser={located}
-        topInset={chipsTop + theme.control.minHeight}
+        topInset={top + overlayHeight}
+        focus={focus}
         onSelect={select}
       />
       <View
@@ -140,26 +176,40 @@ export default function MapScreen() {
           top: 0,
           left: 0,
           right: 0,
-          height: chipsTop + theme.control.minHeight + theme.gap(2),
+          height: top + overlayHeight + theme.gap(2),
           // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
           experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
         }}
       />
-      {filters.length > 0 ? (
-        <View
-          style={[
-            styles.chips,
-            // The row would cover the top half of MapKit's my-location button in the top right corner.
-            { top: chipsTop, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
-          ]}
-        >
+      <View
+        style={[
+          styles.overlay,
+          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
+          { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
+        ]}
+      >
+        <MapSearch
+          text={searchText}
+          onChangeText={setSearchText}
+          results={
+            searching
+              ? topSearchResults(matches).map((place) => ({
+                  id: placeId(place),
+                  name: place.name,
+                  city: place.city,
+                }))
+              : undefined
+          }
+          onSelect={pickResult}
+        />
+        {filters.length > 0 && !searching ? (
           <MapFilterChips
             kinds={filters.map((filter) => filter.kind)}
             selected={active}
             onSelect={choose}
           />
-        </View>
-      ) : null}
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -167,5 +217,5 @@ export default function MapScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   empty: { flex: 1, backgroundColor: theme.colors.background },
-  chips: { position: "absolute", left: 0, right: 0 },
+  overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
 }));

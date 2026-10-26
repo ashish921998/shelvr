@@ -857,5 +857,7 @@
   "map.kindActivities": "O que fazer",
   "map.kindShopping": "Compras",
   "map.kindStay": "Hospedagem",
-  "map.filters": "Filtrar lugares"
+  "map.filters": "Filtrar lugares",
+  "map.searchPlaceholder": "Busque seus lugares",
+  "map.searchNoResults": "Nenhum lugar corresponde a «%{query}»."
 }

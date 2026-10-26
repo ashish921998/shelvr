@@ -63,3 +63,33 @@ export function hasPlaceNear(
     places.some((place) => distanceKm(centre, place) <= NEARBY_KM)
   );
 }
+
+const MAX_SEARCH_RESULTS = 8;
+
+function folded(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** Places whose name or city holds every word of the query, names that start with it first. */
+export function searchPlaces<T extends { name: string; city?: string }>(
+  places: readonly T[],
+  query: string,
+): T[] {
+  const words = folded(query).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const first = words.join(" ");
+  const matches = places.filter((place) => {
+    const text = folded(`${place.name} ${place.city ?? ""}`);
+    return words.every((word) => text.includes(word));
+  });
+  const leading = (place: T) => (folded(place.name).startsWith(first) ? 0 : 1);
+  return matches
+    .map((place, index) => ({ place, index }))
+    .sort((a, b) => leading(a.place) - leading(b.place) || a.index - b.index)
+    .map(({ place }) => place);
+}
+
+/** The few matches listed under the search field; every match stays on the map. */
+export function topSearchResults<T>(matches: readonly T[]): T[] {
+  return matches.slice(0, MAX_SEARCH_RESULTS);
+}
