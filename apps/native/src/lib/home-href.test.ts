@@ -26,6 +26,16 @@ describe("resolveRootHref", () => {
     }
     expect(resolveRootHref("/spaceship")).toBe("/spaceship");
   });
+
+  it("opens the Map tab for its links, keeping the query", () => {
+    for (const path of ["/map", "/map/", "/(map)", "/(app)/(tabs)/(map)"]) {
+      expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(map)");
+    }
+    expect(resolveRootHref("/map?from=push")).toBe(
+      "/(app)/(tabs)/(map)?from=push",
+    );
+    expect(resolveRootHref("/maple")).toBe("/maple");
+  });
 });
 
 describe("appSchemeRoute", () => {

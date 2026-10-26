@@ -100,7 +100,30 @@ describe("listMapPlaces", () => {
     await save(userId, [pin], { tags: ["coffee"] });
     const newer = await save(userId, [pin], { tags: ["dessert"] });
     expect(await t.query(api.mapPlaces.listMapPlaces, {})).toEqual([
-      { ...pin, itemId: newer, kinds: ["dessert", "coffee"] },
+      { ...pin, itemId: newer, kinds: ["coffee", "dessert"] },
     ]);
+  });
+
+  it("merges one venue saved under two names, and keeps two branches of one name apart", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, [
+      { name: "Cloud Gate", lat: 41.8827, lng: -87.6233, appleId: "BEAN" },
+      { name: "Joe's", lat: 41.89, lng: -87.63, appleId: "JOE1" },
+    ]);
+    const newer = await save(
+      userId,
+      [
+        { name: "The Bean", lat: 41.8829, lng: -87.6235, appleId: "BEAN" },
+        { name: "Joe's", lat: 41.8902, lng: -87.6302, appleId: "JOE2" },
+      ],
+      { tags: ["date night"] },
+    );
+    const places = await t.query(api.mapPlaces.listMapPlaces, {});
+    expect(places.map((place) => [place.name, place.itemId])).toEqual([
+      ["The Bean", newer],
+      ["Joe's", newer],
+      ["Joe's", expect.any(String)],
+    ]);
+    expect(places[0].kinds).toEqual(["dateNight"]);
   });
 });

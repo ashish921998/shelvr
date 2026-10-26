@@ -22,6 +22,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+/** Room left at the right of the filter row for MapKit's my-location button. */
+const LOCATE_BUTTON_CLEARANCE = 64;
+
 function placeId(place: {
   itemId: string;
   name: string;
@@ -100,6 +103,7 @@ export default function MapScreen() {
   }
 
   const chipsTop = rt.insets.top + theme.gap(1);
+  const located = location === "granted";
   const select = (id: string) => {
     const place = shown.find((candidate) => placeId(candidate) === id);
     if (!place || !focused.current) return;
@@ -125,7 +129,7 @@ export default function MapScreen() {
       <PlacesMap
         pins={pins}
         framed={framed}
-        showsUser={location === "granted"}
+        showsUser={located}
         topInset={chipsTop + theme.control.minHeight}
         onSelect={select}
       />
@@ -142,7 +146,13 @@ export default function MapScreen() {
         }}
       />
       {filters.length > 0 ? (
-        <View style={[styles.chips, { top: chipsTop }]}>
+        <View
+          style={[
+            styles.chips,
+            // The row would cover the top half of MapKit's my-location button in the top right corner.
+            { top: chipsTop, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
+          ]}
+        >
           <MapFilterChips
             kinds={filters.map((filter) => filter.kind)}
             selected={active}

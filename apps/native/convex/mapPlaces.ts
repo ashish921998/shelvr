@@ -2,8 +2,8 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { readySavesNewestFirst } from "./items";
 import { authedQuery } from "./model/auth";
-import { placeKinds } from "./model/placeKinds";
-import { placeKey } from "./model/plan";
+import { PLACE_KINDS, placeKinds } from "./model/placeKinds";
+import { uniquePlacePins } from "./model/trip";
 
 /** Arrays a function returns hold at most 8192 values; a pin is 30 per save at most. */
 const MAX_MAP_PLACES = 3000;
@@ -34,29 +34,25 @@ export const listMapPlaces = authedQuery({
   args: {},
   returns: v.array(mapPlaceValidator),
   handler: async (ctx) => {
-    const places = new Map<string, MapPlace>();
-    for (const item of await readySavesNewestFirst(ctx, ctx.userId)) {
-      for (const pin of item.placePins ?? []) {
-        const key = `${placeKey(pin.name)}:${pin.lat.toFixed(4)}:${pin.lng.toFixed(4)}`;
-        const kinds = placeKinds(pin.category, item.tags);
-        const seen = places.get(key);
-        if (seen) {
-          // The same spot saved twice keeps the newest save and every kind either save gave it.
-          seen.kinds = [...new Set([...seen.kinds, ...kinds])];
-          continue;
-        }
-        if (places.size >= MAX_MAP_PLACES) continue;
-        places.set(key, {
+    const pins: MapPlace[] = [];
+    for (const item of await readySavesNewestFirst(ctx, ctx.userId))
+      for (const pin of item.placePins ?? [])
+        pins.push({
           itemId: item._id,
           name: pin.name,
           lat: pin.lat,
           lng: pin.lng,
           ...(pin.city ? { city: pin.city } : {}),
           ...(pin.appleId ? { appleId: pin.appleId } : {}),
-          kinds,
+          kinds: placeKinds(pin.category, item.tags),
         });
-      }
-    }
-    return [...places.values()];
+    // One venue across saves, by the city page's identity rules: it keeps the newest save and every
+    // kind any of its saves gave it.
+    return uniquePlacePins(pins, (kept, repeat) => ({
+      ...kept,
+      kinds: PLACE_KINDS.filter(
+        (kind) => kept.kinds.includes(kind) || repeat.kinds.includes(kind),
+      ),
+    })).slice(0, MAX_MAP_PLACES);
   },
 });
