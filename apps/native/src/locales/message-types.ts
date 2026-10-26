@@ -568,7 +568,6 @@ export type MessageParams = {
   "errors.saveFallback": undefined;
   "widget.title": undefined;
   "widget.description": undefined;
-  "permissions.cameraUsage": undefined;
   "permissions.photosUsage": undefined;
   "permissions.calendarUsage": undefined;
   "permissions.locationUsage": undefined;

@@ -635,7 +635,6 @@
   "errors.saveFallback": "L'enregistrement a échoué. Réessayez.",
   "widget.title": "Enregistrements récents",
   "widget.description": "Vos derniers contenus, en un coup d'œil.",
-  "permissions.cameraUsage": "Shelvr utilise votre appareil photo pour capturer ce que vous souhaitez garder pour plus tard.",
   "permissions.photosUsage": "Shelvr permet d'enregistrer des photos et captures d'écran de votre photothèque dans votre bibliothèque, et de trier vos photos.",
   "permissions.calendarUsage": "Shelvr ajoute des événements à votre calendrier à partir de vos contenus enregistrés.",
   "permissions.locationUsage": "Shelvr utilise votre position pour afficher les lieux enregistrés sur la carte.",
