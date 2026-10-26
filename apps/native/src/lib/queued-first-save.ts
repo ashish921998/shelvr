@@ -1,6 +1,5 @@
 import { api } from "@convex/_generated/api";
 import { isRateLimitedError } from "@convex/model/demoErrors";
-import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import { useCurrentUser } from "@/lib/current-user";
@@ -36,15 +35,10 @@ function readQueued(): QueuedSave | null {
 }
 
 // SecureStore's delete is async-only, so clearing writes "".
-function clearQueued() {
+export function clearQueued() {
   bestEffort("clear_queued_first_save_failed", () =>
     SecureStore.setItem(KEY, ""),
   );
-}
-
-export function queueFirstSave(save: PendingDemo) {
-  const queued: QueuedSave = { ...save, owner: null };
-  SecureStore.setItem(KEY, JSON.stringify(queued));
 }
 
 function claimQueued(save: QueuedSave, owner: string): boolean {
@@ -65,20 +59,13 @@ export function getQueuedFirstSaveUrl(): string | null {
 export function useQueuedFirstSave() {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
-  const { savesBlocked } = useAiConsent();
   const { data: user } = useCurrentUser();
   const userId = user?._id ?? null;
   const createDemoItem = useMutation(api.demo.createDemoItem);
   const ranRef = useRef(false);
 
   useEffect(() => {
-    if (
-      !isAuthenticated ||
-      userId === null ||
-      !onboarded ||
-      savesBlocked ||
-      ranRef.current
-    ) {
+    if (!isAuthenticated || userId === null || !onboarded || ranRef.current) {
       return;
     }
     const queued = readQueued();
@@ -115,5 +102,5 @@ export function useQueuedFirstSave() {
         }
       },
     );
-  }, [isAuthenticated, userId, onboarded, savesBlocked, createDemoItem]);
+  }, [isAuthenticated, userId, onboarded, createDemoItem]);
 }

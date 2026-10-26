@@ -3,6 +3,7 @@ import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { env, httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
+import { isDevDeployment } from "./model/deployment";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
@@ -150,6 +151,13 @@ http.route({
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
       return new Response("Bad payload", { status: 400 });
+    }
+    // Test Store purchases cost nothing, so only the dev deployment may grant Pro for one.
+    if (event.testStore && !isDevDeployment()) {
+      logEvent("warn", "revenuecat_test_store_ignored", {
+        event_type: event.type ?? "unknown",
+      });
+      return new Response(null, { status: 200 });
     }
 
     if (event.type === "TRANSFER") {

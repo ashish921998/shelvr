@@ -83,9 +83,23 @@ describe("item analytics", () => {
     );
   });
 
+  it("links a deletion to its save", () => {
+    analytics.itemDeleted(item, "feed");
+    expect(mock.capture).toHaveBeenCalledWith("item_deleted", {
+      item_id: "item-1",
+      item_type: "note",
+      saved_at: 1000,
+      item_age_ms: expect.any(Number),
+      surface: "feed",
+      environment: "development",
+      analytics_version: 1,
+    });
+  });
+
   it("excludes development fixtures", () => {
     analytics.itemOpened({ ...item, fixtureKey: "qa" }, "direct");
     analytics.itemAction({ ...item, fixtureKey: "qa" }, "copy");
+    analytics.itemDeleted({ ...item, fixtureKey: "qa" }, "item_detail");
     expect(mock.capture).not.toHaveBeenCalled();
   });
 
@@ -163,6 +177,23 @@ describe("captureError", () => {
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
       "private",
     );
+  });
+
+  it("names an Expo module rejection by its error code, not its message", () => {
+    const error = Object.assign(
+      new Error("Unable to find the 'AppleMapsViewWrapper' view with tag '12'"),
+      { code: "ERR_SWIFT_U_I_VIEW_NOT_FOUND" },
+    );
+    analytics.captureError("sample_map_camera_failed", error);
+    const reported = mock.captureException.mock.calls[0][0] as Error;
+    expect(reported.message).toBe("ERR_SWIFT_U_I_VIEW_NOT_FOUND");
+    expect(reported.name).toBe("Error");
+  });
+
+  it("keeps a message that is already a bare code", () => {
+    const error = new Error("AI_CONSENT_REQUIRED");
+    analytics.captureError("plan_failed", error);
+    expect(mock.captureException.mock.calls[0][0]).toBe(error);
   });
 
   it("reduces non-Error throws to their type", () => {

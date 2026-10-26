@@ -30,7 +30,7 @@ const BLOCKS = [
 const DOTS = [0.1, 6];
 const WATER = { light: "#cfdcd7", dark: "#2f4147" };
 
-export function usePinColors() {
+function usePinColors() {
   const { theme } = useUnistyles();
   return (day: number) =>
     day === 0
@@ -58,12 +58,15 @@ function routePath(trip: SampleTrip, day: number): string {
     .join(" ");
 }
 
+/** `visible` shows only the first that many pins, so they can drop in one by one. */
 export function SampleTripMap({
   trip,
   crop,
+  visible = Infinity,
 }: {
   trip: SampleTrip;
   crop: SampleCrop;
+  visible?: number;
 }) {
   useAppLocale();
   const { theme, rt } = useUnistyles();
@@ -126,7 +129,7 @@ export function SampleTripMap({
               ))}
             </Group>
           </Canvas>
-          {stops.map(({ stop, day, number }) => (
+          {stops.slice(0, visible).map(({ stop, day, number }) => (
             <View
               key={number}
               pointerEvents="none"

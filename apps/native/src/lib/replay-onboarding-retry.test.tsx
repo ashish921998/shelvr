@@ -13,6 +13,7 @@ import {
   notePurchaseBeforeSignIn,
 } from "./purchase-before-sign-in";
 import { useReplayOnboarding } from "./replay-onboarding";
+import { ahaSample } from "./aha-sample";
 
 const storage = vi.hoisted(() => new Map<string, string>());
 const createSpace = vi.hoisted(() => vi.fn());
@@ -45,7 +46,10 @@ vi.mock("expo-router", () => ({ useRouter: () => stableRouter }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: account.user }),
 }));
-vi.mock("@/lib/analytics", () => ({ analytics: { sessionId: () => "s" } }));
+const captureError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({
+  analytics: { sessionId: () => "s", captureError },
+}));
 vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ onboarded: true }),
 }));
@@ -74,12 +78,63 @@ beforeEach(() => {
   storage.clear();
   createSpace.mockReset();
   createLinkItem.mockReset();
+  captureError.mockReset();
   openPaywall.mockReset().mockResolvedValue(false);
   entitlement.entitled = true;
   account.user = { _id: "user_1" };
 });
 
 describe("useReplayOnboarding and the account", () => {
+  it("keeps the sample reel queued until the signed-in account has Pro", async () => {
+    const sample = ahaSample("trip", null);
+    entitlement.entitled = false;
+    queueDemoUrl(sample.firstSaveUrl);
+    createLinkItem.mockResolvedValue("item");
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(createLinkItem).not.toHaveBeenCalled();
+    expect(getPendingDemoUrl()).toBe(sample.firstSaveUrl);
+    entitlement.entitled = true;
+    hook.rerender();
+    await settle();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: sample.firstSaveUrl,
+        saveSource: "onboarding_demo",
+      }),
+    );
+    expect(createLinkItem).toHaveBeenCalledOnce();
+  });
+
+  it.each(["date", "trip", "weekend"] as const)(
+    "saves the fallback %s reel after the account becomes available, once",
+    async (kind) => {
+      const sample = ahaSample(kind, null);
+      queueDemoUrl(sample.firstSaveUrl);
+      createLinkItem.mockResolvedValue("item");
+      account.user = undefined;
+      const { rerender } = renderHook(() => useReplayOnboarding());
+      await settle();
+      expect(createLinkItem).not.toHaveBeenCalled();
+      expect(getPendingDemoUrl()).toBe(sample.firstSaveUrl);
+
+      account.user = { _id: "user_1" };
+      rerender();
+      await settle();
+      expect(createLinkItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: sample.firstSaveUrl,
+          operationId: expect.any(String),
+          saveSource: "onboarding_demo",
+        }),
+      );
+      expect(hasPending()).toBe(false);
+      rerender();
+      await settle();
+      expect(createLinkItem).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("never saves a link handed over for another account", async () => {
     createSpace.mockResolvedValue("space");
     createLinkItem.mockResolvedValue("item");
@@ -103,9 +158,28 @@ describe("useReplayOnboarding and the account", () => {
     await settle();
 
     expect(createLinkItem).toHaveBeenCalledWith(
-      expect.objectContaining({ url: "https://example.com/recipe" }),
+      expect.objectContaining({
+        url: "https://example.com/recipe",
+        saveSource: "onboarding_demo",
+      }),
     );
     expect(hasPending()).toBe(false);
+  });
+
+  it("reports a handed-over link that fails to save and keeps it queued", async () => {
+    createSpace.mockResolvedValue("space");
+    createLinkItem.mockRejectedValue(new Error("server error"));
+    queueDemoUrl("https://example.com/recipe", null, "user_1");
+    setPendingSpaces([]);
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(captureError).toHaveBeenCalledWith(
+      "onboarding_demo_save_failed",
+      expect.any(Error),
+    );
+    expect(hasPending()).toBe(true);
   });
 
   it("stops a run when another account signs in while it waits on the server", async () => {

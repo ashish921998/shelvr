@@ -3,12 +3,10 @@ import { internal } from "./_generated/api";
 import {
   internalMutation,
   internalQuery,
-  mutation,
-  query,
   type QueryCtx,
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_SWEEP_PAGE,
@@ -21,7 +19,7 @@ async function consentRow(ctx: QueryCtx, userId: string) {
     .unique();
 }
 
-/** Only an explicit decline blocks; unset stays allowed so builds without the consent card keep working. */
+/** AI is available by default for live owners; explicit legacy opt-outs remain authoritative. */
 export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
@@ -85,7 +83,7 @@ export const revalidateEmbeddingBatch = internalQuery({
   },
 });
 
-export const getStatus = query({
+export const getStatus = authedQuery({
   args: {},
   returns: v.object({
     status: v.union(
@@ -96,7 +94,7 @@ export const getStatus = query({
     version: v.number(),
   }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await consentRow(ctx, userId);
     return {
       status:
@@ -108,11 +106,11 @@ export const getStatus = query({
   },
 });
 
-export const setConsent = mutation({
+export const setConsent = authedMutation({
   args: { granted: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await consentRow(ctx, userId);
     const values = {
       status: args.granted ? ("granted" as const) : ("declined" as const),
@@ -124,7 +122,9 @@ export const setConsent = mutation({
     } else {
       await ctx.db.patch(row._id, values);
     }
-    if ((row?.status === "declined") !== !args.granted) {
+    // A first answer always syncs: an account with no row may hold vectors from
+    // before unanswered counted as declined, and needs them cleared or refreshed.
+    if (row === null || (row.status === "granted") !== args.granted) {
       await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
         userId,
         cursor: null,
@@ -135,6 +135,47 @@ export const setConsent = mutation({
 });
 
 const SYNC_BATCH = 50;
+
+/** One-time repair after deploying automatic AI: convex run aiConsent:repairUnansweredEmbeddings '{"cursor":null}' */
+export const repairUnansweredEmbeddings = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.object({ repaired: v.number(), done: v.boolean() }),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("items")
+      .withIndex("by_status_and_embeddingVersion", (q) =>
+        q
+          .eq("status", "ready")
+          .eq("embeddingVersion", CURRENT_EMBEDDING_VERSION),
+      )
+      .paginate({
+        numItems: SYNC_BATCH,
+        cursor: args.cursor,
+        maximumBytesRead: 1_000_000,
+      });
+    let repaired = 0;
+    for (const item of page) {
+      if (item.embedding !== undefined) continue;
+      if ((await liveOwner(ctx, item.userId)) === null) continue;
+      if ((await consentRow(ctx, item.userId)) !== null) continue;
+      await ctx.db.patch(item._id, {
+        embeddingVersion: undefined,
+        embeddingAttempts: undefined,
+      });
+      repaired++;
+    }
+    if (!isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.aiConsent.repairUnansweredEmbeddings,
+        {
+          cursor: continueCursor,
+        },
+      );
+    }
+    return { repaired, done: isDone };
+  },
+});
 
 export const syncEmbeddings = internalMutation({
   args: { userId: v.string(), cursor: v.union(v.string(), v.null()) },

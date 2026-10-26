@@ -11,14 +11,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ENTITLEMENT_WAIT_MS = 5000;
 
-/** Signed out, closing the paywall re-arms `ask`; an unavailable paywall is not a decline. */
+/** Closing re-arms `ask` on the commitment screen, without completing onboarding. */
 export function useOnboardingPaywall({
   onPro,
-  onDecline,
   onUnavailable,
 }: {
   onPro: () => void;
-  onDecline: () => void;
   onUnavailable: () => void;
 }): { ask: () => void; asked: boolean } {
   const router = useRouter();
@@ -32,9 +30,9 @@ export function useOnboardingPaywall({
     return () => clearTimeout(id);
   }, [asked, loading]);
   const started = useRef(false);
-  const handlers = useRef({ onPro, onDecline, onUnavailable });
+  const handlers = useRef({ onPro, onUnavailable });
   useEffect(() => {
-    handlers.current = { onPro, onDecline, onUnavailable };
+    handlers.current = { onPro, onUnavailable };
   });
 
   useEffect(() => {
@@ -44,15 +42,11 @@ export function useOnboardingPaywall({
       handlers.current.onPro();
       return;
     }
-    const decline = () => {
-      noteDeclinedDuringOnboarding();
-      handlers.current.onDecline();
-    };
     openPaywallOutcome(router, "onboarding")
       .then((outcome) => {
         if (outcome === "unavailable") return handlers.current.onUnavailable();
         if (outcome === "cancelled") {
-          if (isAuthenticated) return decline();
+          if (isAuthenticated) noteDeclinedDuringOnboarding();
           started.current = false;
           setWaitedOut(false);
           setAsked(false);

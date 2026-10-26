@@ -1,49 +1,45 @@
 export const ONBOARDING_STEPS = [
   "opener",
-  "interests",
-  "setup",
-  "demo",
-  "notifications",
-  "share",
-  "promise",
-  "tripBuild",
-  "tripLocked",
-  "tripReveal",
+  "savedCount",
+  "goal",
+  "planner",
+  "chart",
+  "city",
+  "ahaShare",
+  "ahaSpots",
+  "commitment",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 12;
+export const ONBOARDING_FLOW_VERSION = 22;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
-  setup: "setup",
-  interests: "interests",
-  demo: "live_demo",
-  notifications: "notifications",
-  share: "share_practice",
-  promise: "promise",
-  tripBuild: "trip_build",
-  tripLocked: "trip_locked",
-  tripReveal: "trip_reveal",
+  savedCount: "saved_count",
+  goal: "goal",
+  planner: "planner",
+  chart: "progress_chart",
+  city: "city",
+  ahaShare: "aha_share",
+  ahaSpots: "aha_spots",
+  commitment: "commitment",
 };
 
-const PREVIOUS_STEP: Record<OnboardingStep, OnboardingStep | null> = {
-  opener: null,
-  interests: "opener",
-  setup: "interests",
-  demo: null,
-  notifications: "demo",
-  share: "notifications",
-  promise: null,
-  tripBuild: null,
-  tripLocked: null,
-  tripReveal: null,
-};
+/** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */
+export function onboardingProgress(step: OnboardingStep): number | null {
+  const index = ONBOARDING_STEPS.indexOf(step);
+  return index === 0 ? null : index / (ONBOARDING_STEPS.length - 1);
+}
 
+/** The step before `step`; none on the opener. */
 export function previousOnboardingStep(
   step: OnboardingStep,
 ): OnboardingStep | null {
-  return PREVIOUS_STEP[step];
+  return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) - 1] ?? null;
+}
+
+export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
+  return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) + 1] ?? step;
 }
 
 /** `step` must be an index written by this flow version; getOnboardingProgress drops older flows' records. */

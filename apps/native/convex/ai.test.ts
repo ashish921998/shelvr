@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { finalRecipe } from "./ai";
 import {
   extractBodyText,
   fetchInstagram,
@@ -31,7 +30,11 @@ import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
 import type { ArticleMedia, PostMedia } from "./model/itemFields";
-import { newConvexTest, signedInUser } from "./test.setup";
+import {
+  newConvexTest,
+  signedInUser,
+  insertConsentingUser,
+} from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const parseJson = vi.hoisted(() => vi.fn());
@@ -208,31 +211,6 @@ describe("firstLinkedUrl", () => {
     expect(firstLinkedUrl('(see https://example.com/a?b=1&c=2) "x"')).toBe(
       "https://example.com/a?b=1&c=2",
     );
-  });
-});
-
-describe("finalRecipe", () => {
-  const markup = { ingredients: ["1 cup rice"], steps: ["Cook it."] };
-  const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
-
-  it("prefers the page's structured recipe over the model's proposal", () => {
-    expect(finalRecipe({ recipe: markup }, { recipe: proposed })).toBe(markup);
-  });
-
-  it("falls back to the sanitized model proposal when the page has none", () => {
-    expect(finalRecipe({}, { recipe: proposed })).toStrictEqual({
-      ingredients: ["2 eggs"],
-      steps: ["Fry."],
-    });
-    expect(finalRecipe(undefined, { recipe: proposed })).toStrictEqual({
-      ingredients: ["2 eggs"],
-      steps: ["Fry."],
-    });
-  });
-
-  it("is absent when neither source produced one", () => {
-    expect(finalRecipe({}, { recipe: null })).toBeUndefined();
-    expect(finalRecipe(undefined, {})).toBeUndefined();
   });
 });
 
@@ -622,6 +600,7 @@ describe("processItem for X posts", () => {
           spaceNames: [],
           intents: [],
           cities: [],
+          places: [],
           recipe: {
             name: "Pancakes",
             servings: "4 servings",
@@ -1270,7 +1249,7 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
         userId,
@@ -1554,6 +1533,60 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     const item = await save(cutAt(microdataHtml(), "the salt."), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
+  });
+
+  function jsonLdHtml(where: "head" | "body"): string {
+    const script = `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Miso butter roast chicken",
+      recipeIngredient: INGREDIENTS,
+      recipeInstructions: STEPS,
+    })}</script>`;
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title>${where === "head" ? script : ""}</head><body>${where === "body" ? script : ""}<p>${"Comments. ".repeat(50)}`;
+  }
+
+  it("keeps a JSON-LD recipe from a whole head when the page was cut", async () => {
+    const item = await save(jsonLdHtml("head"), true);
+    expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    expect(item?.recipe?.steps).toEqual(STEPS);
+  });
+
+  it("refuses a JSON-LD recipe in the body of a cut page", async () => {
+    const item = await save(jsonLdHtml("body"), true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  describe("when the model proposes a recipe too", () => {
+    const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
+
+    beforeEach(() => {
+      generateObject.mockResolvedValue({
+        object: {
+          title: "Miso butter chicken",
+          description: "A whole roast chicken with miso butter.",
+          tags: ["recipes"],
+          spaceNames: [],
+          intents: [],
+          recipe: proposed,
+        },
+      });
+    });
+
+    it("keeps the page's structured recipe over the proposal", async () => {
+      const item = await save(microdataHtml());
+      expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    });
+
+    it("stores the proposal, trimmed, when the page has no recipe", async () => {
+      const item = await save(
+        "<!DOCTYPE html><html><head><title>Notes</title></head><body><p>No recipe markup here.</p></body></html>",
+      );
+      expect(item?.recipe).toStrictEqual({
+        ingredients: ["2 eggs"],
+        steps: ["Fry."],
+      });
+    });
   });
 });
 

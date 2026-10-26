@@ -1,18 +1,16 @@
 import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
+import { keepNearby, type LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
 const SEARCH_TIMEOUT_MS = 8_000;
-export const MAX_CITY_DISTANCE_KM = 80;
 
 export type AppleMapsConfig = {
   privateKey: string;
   keyId: string;
   teamId: string;
 };
-
-export type LatLng = { lat: number; lng: number };
 
 export function appleMapsConfig(env: {
   APPLE_MAPS_PRIVATE_KEY?: string;
@@ -62,20 +60,49 @@ const replySchema = z.object({
   results: z.array(z.unknown()),
 });
 const placeSchema = z.object({
+  name: z.string().optional(),
+  structuredAddress: z
+    .object({
+      locality: z.string().optional(),
+      thoroughfare: z.string().optional(),
+    })
+    .optional(),
+  id: z.string().min(1).optional(),
   coordinate: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
 });
 
-export function firstPlace(body: unknown): LatLng | null {
+export function firstPlace(
+  body: unknown,
+  near?: LatLng,
+  skipCityOnly = false,
+  includeCity = false,
+): (LatLng & { city?: string; appleId?: string }) | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
+      const { name, structuredAddress: address } = place.data;
+      if (
+        skipCityOnly &&
+        address?.locality &&
+        !address.thoroughfare &&
+        name?.trim().toLowerCase() === address.locality.trim().toLowerCase()
+      )
+        continue;
       const { latitude, longitude } = place.data.coordinate;
-      return { lat: latitude, lng: longitude };
+      const point = { lat: latitude, lng: longitude };
+      if (near && keepNearby([point], near)[0] === null) continue;
+      return {
+        ...point,
+        ...(includeCity && address?.locality?.trim()
+          ? { city: address.locality.trim() }
+          : {}),
+        ...(place.data.id ? { appleId: place.data.id } : {}),
+      };
     }
   }
   return null;
@@ -87,29 +114,32 @@ export async function appleMapsLookup(
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
-): Promise<LatLng | null> {
+  includeCity = false,
+): Promise<(LatLng & { city?: string; appleId?: string }) | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
   try {
-    const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-    return firstPlace(await response.json().catch(() => null));
+    // Preserve exact street addresses. If Apple answers with only a city centre,
+    // retry as a point of interest instead of pretending that centre is the place.
+    for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
+      if (filter) params.set("resultTypeFilter", filter);
+      const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+      });
+      if (!response.ok) return null;
+      const found = firstPlace(
+        await response.json().catch(() => null),
+        near,
+        kind === "search",
+        includeCity,
+      );
+      if (found) return found;
+    }
+    return null;
   } catch {
     return null;
   }
-}
-
-export function distanceKm(a: LatLng, b: LatLng): number {
-  const rad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = rad(b.lat - a.lat);
-  const dLng = rad(b.lng - a.lng);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
 }

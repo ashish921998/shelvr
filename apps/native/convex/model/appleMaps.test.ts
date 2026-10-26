@@ -4,9 +4,9 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsLookup,
-  distanceKm,
   firstPlace,
 } from "./appleMaps";
+import { distanceKm } from "./trip";
 
 async function testKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey(
@@ -86,6 +86,15 @@ describe("appleMapsAccessToken", () => {
 });
 
 describe("firstPlace", () => {
+  it("skips a distant namesake and accepts the nearby result", () => {
+    const paris = { lat: 48.86, lng: 2.35 };
+    const results = [
+      { coordinate: { latitude: 43.7858, longitude: -85.5028 } },
+      { coordinate: { latitude: 48.866, longitude: 2.338 } },
+    ];
+    expect(firstPlace({ results }, paris)).toEqual({ lat: 48.866, lng: 2.338 });
+    expect(firstPlace({ results: results.slice(0, 1) }, paris)).toBeNull();
+  });
   it("reads the first result with a usable coordinate", () => {
     expect(
       firstPlace({
@@ -95,6 +104,19 @@ describe("firstPlace", () => {
         ],
       }),
     ).toEqual({ lat: 38.71, lng: -9.13 });
+  });
+
+  it("returns the result's Apple place id", () => {
+    expect(
+      firstPlace({
+        results: [
+          {
+            id: "I91A40F8387BB823E",
+            coordinate: { latitude: 1, longitude: 2 },
+          },
+        ],
+      }),
+    ).toEqual({ lat: 1, lng: 2, appleId: "I91A40F8387BB823E" });
   });
 
   it("is null for an empty or malformed reply", () => {
@@ -110,10 +132,78 @@ describe("firstPlace", () => {
 });
 
 describe("appleMapsLookup", () => {
+  it("preserves a street address instead of substituting a similarly named business", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "205 E Houston St",
+            structuredAddress: {
+              locality: "New York",
+              thoroughfare: "E Houston St",
+            },
+            coordinate: { latitude: 40.7221936, longitude: -73.9875081 },
+          },
+        ],
+      }),
+    );
+    expect(
+      await appleMapsLookup(
+        "tok",
+        "search",
+        "205 East Houston Street, New York, NY",
+        { lat: 40.72, lng: -73.98 },
+        fetchImpl as typeof fetch,
+      ),
+    ).toEqual({ lat: 40.7221936, lng: -73.9875081 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a city-centre address match as a place-name search", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          results: [
+            {
+              name: "Paris",
+              structuredAddress: { locality: "Paris" },
+              coordinate: { latitude: 48.8567879, longitude: 2.3510768 },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          results: [
+            {
+              name: "Micho",
+              structuredAddress: {
+                locality: "Paris",
+                thoroughfare: "Rue de Richelieu",
+              },
+              coordinate: { latitude: 48.8660723, longitude: 2.3371738 },
+            },
+          ],
+        }),
+      );
+    expect(
+      await appleMapsLookup(
+        "tok",
+        "search",
+        "Micho, Paris",
+        { lat: 48.86, lng: 2.35 },
+        fetchImpl,
+      ),
+    ).toEqual({ lat: 48.8660723, lng: 2.3371738 });
+    expect(
+      new URL(fetchImpl.mock.calls[1][0]).searchParams.get("resultTypeFilter"),
+    ).toBe("Poi");
+  });
   it("searches near a point with the access token", async () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({
-        results: [{ coordinate: { latitude: 1, longitude: 2 } }],
+        results: [{ coordinate: { latitude: 38.71, longitude: -9.13 } }],
       }),
     );
     const place = await appleMapsLookup(
@@ -123,13 +213,14 @@ describe("appleMapsLookup", () => {
       { lat: 38.7, lng: -9.1 },
       fetchImpl as unknown as typeof fetch,
     );
-    expect(place).toEqual({ lat: 1, lng: 2 });
+    expect(place).toEqual({ lat: 38.71, lng: -9.13 });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [
       string,
       { headers: Record<string, string> },
     ];
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/v1/search");
+    expect(parsed.searchParams.get("resultTypeFilter")).toBe("Poi,Address");
     expect(parsed.searchParams.get("q")).toBe("Pastéis de Belém, Lisbon");
     expect(parsed.searchParams.get("searchLocation")).toBe("38.7,-9.1");
     expect(init.headers.Authorization).toBe("Bearer tok");

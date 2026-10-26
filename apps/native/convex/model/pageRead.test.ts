@@ -608,6 +608,40 @@ describe("readPage for Instagram posts", () => {
       }
     },
   );
+  it("keeps the embed's caption when Instagram refuses the post page", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: { ok: false, code: "http_error", status: 429 },
+      [`${reelUrl}embed/captioned/`]: html(
+        reelUrl,
+        '<div class="Caption"><a class="CaptionUsername">cook</a>Garlic noodles\nBoil, toss, eat.<div class="CaptionComments"></div></div>',
+      ),
+    });
+    const read = await readPage(reelUrl);
+    expect(read).toMatchObject({
+      status: "ok",
+      page: {
+        title: "Garlic noodles",
+        author: "@cook",
+        caption: true,
+        incomplete: true,
+      },
+    });
+  });
+
+  it("still fails when Instagram refuses the post page and the embed has no post", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: { ok: false, code: "http_error", status: 429 },
+      [`${reelUrl}embed/captioned/`]: html(
+        reelUrl,
+        "<html><body></body></html>",
+      ),
+    });
+    const read = await readPage(reelUrl);
+    expect(read.status).not.toBe("ok");
+  });
+
   it("fails a deleted reel as gone instead of saving it blank", async () => {
     const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
     serve({
@@ -712,6 +746,131 @@ describe("readPage for Instagram posts", () => {
       askForRecipe: false,
       page: { caption: true },
     });
+  });
+  it("finds the recipe behind a later caption link when a sponsor's comes first", async () => {
+    const postUrl = "https://www.instagram.com/p/ABC124/";
+    const embedUrl = "https://www.instagram.com/p/ABC124/embed/captioned/";
+    const sponsorUrl = "https://shop.example.com/pans";
+    const recipeUrl = "https://example.com/lemon-pasta/";
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Lemon pasta",
+      recipeIngredient: ["200 g spaghetti", "1 lemon"],
+      recipeInstructions: ["Boil the pasta.", "Toss with lemon."],
+    };
+    serve({
+      [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+      [embedUrl]: html(
+        embedUrl,
+        `<div class="Caption"><a class="CaptionUsername">cook</a>Lemon pasta. My pan: ${sponsorUrl} Recipe: ${recipeUrl}<div class="CaptionComments"></div></div>`,
+      ),
+      [sponsorUrl]: html(
+        sponsorUrl,
+        "<html><head></head><body>Pans</body></html>",
+      ),
+      [recipeUrl]: html(
+        recipeUrl,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      ),
+    });
+    const read = await readPage(postUrl);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+  });
+
+  describe("with two caption links", () => {
+    const postUrl = "https://www.instagram.com/p/ABC125/";
+    const embedUrl = "https://www.instagram.com/p/ABC125/embed/captioned/";
+    const firstUrl = "https://example.com/lemon-pasta/";
+    const secondUrl = "https://example.org/garlic-bread/";
+
+    function recipePage(url: string, name: string) {
+      const recipe = {
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name,
+        recipeIngredient: [`1 ${name}`],
+        recipeInstructions: [`Make the ${name}.`],
+      };
+      return html(
+        url,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      );
+    }
+
+    function serveCaption(first: unknown, second: unknown) {
+      serve({
+        [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+        [embedUrl]: html(
+          embedUrl,
+          `<div class="Caption"><a class="CaptionUsername">cook</a>Pasta: ${firstUrl} Bread: ${secondUrl}<div class="CaptionComments"></div></div>`,
+        ),
+        [firstUrl]: first,
+        [secondUrl]: second,
+      });
+    }
+
+    it("returns the first link's recipe without waiting for a slower later link", async () => {
+      serveCaption(recipePage(firstUrl, "pasta"), new Promise(() => {}));
+      const read = await Promise.race([
+        readPage(postUrl),
+        new Promise((resolve) => setTimeout(resolve, 1000, "waited")),
+      ]);
+      expect(read).toMatchObject({
+        status: "ok",
+        page: { recipe: { ingredients: ["1 pasta"] } },
+      });
+    });
+
+    it("keeps the first link's recipe when a later link answers first", async () => {
+      serveCaption(
+        new Promise((resolve) =>
+          setTimeout(resolve, 50, recipePage(firstUrl, "pasta")),
+        ),
+        recipePage(secondUrl, "bread"),
+      );
+      const read = await readPage(postUrl);
+      expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual([
+        "1 pasta",
+      ]);
+    });
+  });
+});
+
+describe("readPage for TikTok videos", () => {
+  it("keeps an empty oEmbed response retryable", async () => {
+    const url = "https://www.tiktok.com/@cook/video/7350000000000000000";
+    const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+    serve({
+      [endpoint]: json(endpoint, { status_msg: "temporarily unavailable" }),
+    });
+    const read = await readPage(url);
+    expect(read.status).toBe("ok");
+    expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+      "partial",
+    );
+  });
+  it("titles the save with the caption's first line and keeps the rest as content", async () => {
+    const videoUrl = "https://www.tiktok.com/@cook/video/7350000000000000000";
+    const caption = `${"Crispy chilli oil noodles ".repeat(6)}\n\n#noodles #recipe`;
+    serve({
+      [`https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`]: {
+        ok: true,
+        finalUrl: videoUrl,
+        status: 200,
+        contentType: "application/json",
+        bytes: new TextEncoder().encode(
+          JSON.stringify({ title: caption, author_unique_id: "cook" }),
+        ),
+      },
+    });
+    const read = await readPage(videoUrl);
+    expect(read.status === "ok" && read.page.title).toBe(
+      "Crispy chilli oil noodles ".repeat(6).slice(0, 100),
+    );
+    expect(read.status === "ok" && read.page.content).toBe(caption);
   });
 });
 

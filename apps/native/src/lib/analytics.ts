@@ -1,12 +1,14 @@
 import {
-  SAFE_ERROR_MESSAGES,
   posthog,
   resetIfIdentified as resetClientIfIdentified,
+  safeExceptionValue,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
+import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
+import type { PlanKind } from "@/lib/sample-plans";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -38,7 +40,7 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
+export type OAuthSurface = "sign_in_view";
 export type AuthMethod = "native" | "web";
 
 export type TrialEligibility =
@@ -79,6 +81,13 @@ export type AnalyticsEventProperties = {
     duration_ms: number;
   };
   onboarding_opener_page_viewed: { page_index: number };
+  onboarding_commitment: {
+    action: "confirmed" | "skipped";
+    plan_kind: PlanKind;
+    sample_city: SampleCityId;
+    flow_version: number;
+  };
+  onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
     method: AuthMethod;
@@ -167,7 +176,7 @@ export type AnalyticsEventProperties = {
   };
   item_shared: { surface: "item_detail" | "feed"; share_ref?: string };
   item_link_copied: Record<string, never>;
-  item_deleted: { item_type: AnalyticsItem["type"] };
+  item_deleted: ItemProperties & { surface: "item_detail" | "feed" };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
   space_created: { dynamic: boolean; auto_file: boolean };
@@ -175,7 +184,7 @@ export type AnalyticsEventProperties = {
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
   plan_made: { considered: number; place_count: number };
-  plan_failed: { reason: "ai_consent" | "error" };
+  plan_failed: { reason: "error" };
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
@@ -188,20 +197,25 @@ export type AnalyticsEventProperties = {
     pace: "easy" | "balanced" | "packed";
     made: boolean;
   };
-  trip_failed: { reason: "ai_consent" | "error" };
+  trip_failed: { reason: "error" };
+  city_opened: { count: number };
+  city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };
   onboarding_completed: {
     save_pileup: string[];
-    save_types: string[];
     interests: string[];
     travel_vibes: string[];
     sample_city: SampleCityId | null;
+    goal: Goal | null;
+    goals: Goal[];
+    saved_count: SavedCount | null;
+    planner: Planner | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
-    $set: { save_pileup: string[]; save_types: string[] };
+    $set: { save_pileup: string[] };
   };
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
@@ -212,13 +226,6 @@ export type AnalyticsEventProperties = {
     delivery: "scheduled" | "unconfigured";
   };
   onboarding_demo_submitted: Record<string, never>;
-  onboarding_demo_skipped: Record<string, never>;
-  onboarding_demo_deferred: { sample: boolean };
-  onboarding_demo_picked: { sample: boolean; signed_in: boolean };
-  onboarding_signin_prompt: {
-    surface: "demo_sheet" | "sample_preview";
-    action: "shown" | "dismissed";
-  };
   onboarding_share_practice: {
     outcome:
       | "received"
@@ -227,14 +234,6 @@ export type AnalyticsEventProperties = {
       | "sheet_stuck"
       | "skipped"
       | "sheet_failed";
-  };
-  onboarding_reminder: {
-    action: "remind" | "skip";
-    slot: "tonight" | "tomorrow" | "weekend" | "nextWeek";
-    granted: boolean;
-  };
-  onboarding_demo_result: {
-    outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
   // Android replays a share on task restore; counts the replays the share screen skipped.
@@ -259,18 +258,13 @@ export type AnalyticsEventProperties = {
   trial_reminder_permission: { granted: boolean };
   trial_reminder_primer: { outcome: "accepted" | "declined" };
   welcome_save_shown: { trial: boolean };
-  welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
+  welcome_save_action: { action: "explore" | "dismiss"; trial: boolean };
   notification_permission_result: {
     outcome: "granted" | "provisional" | "denied";
   };
   notification_opened: { notification_kind: string; notification_id: string };
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
-  };
-  ai_consent_shown: Record<string, never>;
-  ai_consent_answered: {
-    granted: boolean;
-    surface: "card" | "settings" | "sign_in";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
@@ -325,10 +319,16 @@ function captureError(
 
   try {
     const original = error instanceof Error ? error : new Error(typeof error);
+    const message =
+      error instanceof Error
+        ? (safeExceptionValue(error.message) ??
+          safeExceptionValue((error as { code?: unknown }).code) ??
+          error.name)
+        : original.message;
     const reported =
-      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+      message === original.message
         ? original
-        : Object.assign(new Error(original.name), {
+        : Object.assign(new Error(message), {
             name: original.name,
             stack: original.stack,
           });
@@ -373,6 +373,14 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
     capture("item_action", { ...itemProperties(item), action });
 }
 
+function itemDeleted(
+  item: AnalyticsItem,
+  surface: "item_detail" | "feed",
+): void {
+  if (!item.fixtureKey)
+    capture("item_deleted", { ...itemProperties(item), surface });
+}
+
 function identify(userId: string): void {
   if (!posthog) return;
 
@@ -408,4 +416,5 @@ export const analytics = {
   screen,
   itemOpened,
   itemAction,
+  itemDeleted,
 };

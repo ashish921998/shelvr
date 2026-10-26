@@ -44,9 +44,6 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: mock.captureError },
 }));
 
-const disclosed = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/ai-consent", () => ({ markAiDisclosedAtSignIn: disclosed }));
-
 const redirect = new URL("https://auth.example/start");
 
 beforeEach(() => {
@@ -64,11 +61,8 @@ function endSession(result: object, ms = 5_000) {
   });
 }
 
-async function run(
-  provider: "apple" | "google" | "anonymous",
-  surface: "sign_in_view" | "demo_sheet" = "sign_in_view",
-) {
-  const hook = renderHook(() => useOAuthSignIn(surface));
+async function run(provider: "apple" | "google" | "anonymous") {
+  const hook = renderHook(() => useOAuthSignIn("sign_in_view"));
   let outcome: string | undefined;
   await act(async () => {
     outcome = await hook.result.current.signInWith(provider);
@@ -81,12 +75,6 @@ function captured(event: string) {
 }
 
 describe("useOAuthSignIn", () => {
-  it("notes that the sign-in started from a screen with the AI disclosure", async () => {
-    mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
-    await run("google");
-    expect(disclosed).toHaveBeenCalledTimes(1);
-  });
-
   it("keeps a cancel visible and times it", async () => {
     mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
     endSession({ type: "cancel" });
@@ -116,10 +104,10 @@ describe("useOAuthSignIn", () => {
         "(com.apple.AuthenticationServices.WebAuthenticationSession error 3.)",
     });
 
-    await run("google", "demo_sheet");
+    await run("google");
 
     expect(captured("auth_cancelled")).toMatchObject({
-      surface: "demo_sheet",
+      surface: "sign_in_view",
       result: "cancel",
       native_error_domain:
         "com.apple.AuthenticationServices.WebAuthenticationSession",

@@ -8,6 +8,7 @@ import {
 } from "@/lib/convexForward";
 import type { Metadata } from "next";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
+import ConfirmButton from "@/components/ConfirmButton";
 
 export const metadata: Metadata = {
   title: "Confirm your waitlist request",
@@ -91,12 +92,7 @@ export default async function ConfirmationPage({
         did not request it.
       </p>
       <form action={confirm}>
-        <button
-          type="submit"
-          className="mt-6 min-h-12 rounded-xl bg-ember px-6 font-semibold text-ink"
-        >
-          Confirm my request
-        </button>
+        <ConfirmButton />
       </form>
     </main>
   );

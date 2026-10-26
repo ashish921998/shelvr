@@ -15,7 +15,6 @@ import {
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
   STALE_IMPORT_CUTOFF_MS,
-  tagSearchWords,
 } from "./items";
 import {
   IMAGE_EMPTY_MESSAGE,
@@ -113,6 +112,31 @@ describe("listItems (installed builds)", () => {
     expect(results.map((item) => item._id)).toEqual([id]);
     expect(results[0].content).toContain("Article body 0");
     expect(results[0]).toHaveProperty("imageUrl");
+  });
+
+  it("finds a note by its own text while it processes and after its run fails", async () => {
+    const { t } = await as();
+    const itemId = await t.mutation(api.items.createNoteItem, {
+      text: "Zucchini lasagna for Sunday",
+      operationId: "note:search-failed-1",
+    });
+    const ids = async () =>
+      (await t.query(api.items.searchItems, { query: "zucchini" })).map(
+        (item) => item._id,
+      );
+
+    expect(await ids()).toEqual([itemId]);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))?.processingRunId;
+    expect(runId).toBeDefined();
+    expect(
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "error",
+        runId,
+      }),
+    ).toBe("applied");
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.status).toBe("failed");
+    expect(await ids()).toEqual([itemId]);
   });
 });
 
@@ -725,13 +749,6 @@ describe("similarItems", () => {
 
     const similar = await t.query(api.items.similarItems, { id: fresh });
     expect(similar.map((item) => item._id)).toEqual([old]);
-  });
-
-  it("keeps short tag words but drops filler from multi-word tags", () => {
-    expect(tagSearchWords("art")).toEqual(["art"]);
-    expect(tagSearchWords("ux")).toEqual(["ux"]);
-    expect(tagSearchWords("how to")).toEqual([]);
-    expect(tagSearchWords("to do lists")).toEqual(["do", "lists"]);
   });
 
   it("searches for older saves with non-Latin tags and titles", async () => {
@@ -2336,11 +2353,12 @@ describe("poster storage compensation", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "TikTok",
-      description: "A saved video",
-      tags: [],
-      storageId: replacement,
-      status: "ready",
+      reading: { storageId: replacement },
+      classification: {
+        title: "TikTok",
+        description: "A saved video",
+        tags: [],
+      },
     });
 
     await t.run(async (ctx) => {
@@ -2375,11 +2393,12 @@ describe("poster storage compensation", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "TikTok",
-      description: "A saved video",
-      tags: [],
-      storageId: replacement,
-      status: "ready",
+      reading: { storageId: replacement },
+      classification: {
+        title: "TikTok",
+        description: "A saved video",
+        tags: [],
+      },
     });
 
     await t.run(async (ctx) => {
@@ -2388,10 +2407,10 @@ describe("poster storage compensation", () => {
   });
 
   it("stores the cities a run read and keeps them when a later run has none", async () => {
-    const t = newConvexTest();
+    const { t, userId } = await as();
     const itemId = await t.run(async (ctx) => {
       return await ctx.db.insert("items", {
-        userId: "city-owner",
+        userId,
         type: "link",
         status: "processing",
         tags: [],
@@ -2401,11 +2420,13 @@ describe("poster storage compensation", () => {
     const finalize = async (cities?: string[]) =>
       await t.mutation(internal.items.finalizeItem, {
         itemId,
-        title: "Date spots",
-        description: "Bars in Bandra",
-        tags: [],
-        ...(cities !== undefined ? { cities } : {}),
-        status: "ready",
+        reading: {},
+        classification: {
+          title: "Date spots",
+          description: "Bars in Bandra",
+          tags: [],
+          ...(cities !== undefined ? { cities } : {}),
+        },
       });
 
     await finalize(["Mumbai"]);
@@ -3081,17 +3102,19 @@ describe("stale processing runs", () => {
   });
 
   it("finalizeItem and failItem are no-ops for a superseded run", async () => {
-    const t = newConvexTest();
-    const itemId = await processingLink(t, "fence", FRESH_AGE);
+    const { t, userId } = await as();
+    const itemId = await processingLink(t, userId, FRESH_AGE);
     const current = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
 
     const stale = await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId: "run-superseded",
-      title: "Old result",
-      description: "From the run the user retried past",
-      tags: ["stale"],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Old result",
+        description: "From the run the user retried past",
+        tags: ["stale"],
+      },
     });
     expect(stale).toBe("stale_run");
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
@@ -3113,10 +3136,12 @@ describe("stale processing runs", () => {
     const applied = await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId: current,
-      title: "Current result",
-      description: "From the run that owns the item",
-      tags: ["current"],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Current result",
+        description: "From the run that owns the item",
+        tags: ["current"],
+      },
     });
     expect(applied).toBe("applied");
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
@@ -3133,11 +3158,8 @@ describe("stale processing runs", () => {
     await t.mutation(internal.items.finalizeItem, {
       itemId: readyId,
       runId: readyRun,
-      title: "Ready",
-      description: "Usable",
-      tags: [],
-      status: "ready",
-      enrichment: "partial",
+      reading: { enrichment: "partial" },
+      classification: { title: "Ready", description: "Usable", tags: [] },
     });
 
     const failedId = await processingLink(t, "processed", FRESH_AGE);
@@ -3193,10 +3215,12 @@ describe("stale processing runs", () => {
       itemId,
       runId: "refresh-run",
       keepTitle: true,
-      title: "Updated note",
-      description: "The refreshed note",
-      tags: ["note"],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Updated note",
+        description: "The refreshed note",
+        tags: ["note"],
+      },
     });
 
     const jobs = await t.run((ctx) =>
@@ -3214,17 +3238,15 @@ describe("stale processing runs", () => {
     await expect(
       t.mutation(internal.items.finalizeItem, {
         itemId,
-        title: "x",
-        description: "y",
-        tags: [],
-        status: "ready",
+        reading: {},
+        classification: { title: "x", description: "y", tags: [] },
       }),
     ).resolves.toBe("missing");
   });
 
   it("finalizeItem persists a recipe extracted from a recipe page", async () => {
-    const t = newConvexTest();
-    const itemId = await processingLink(t, "recipe-persist", FRESH_AGE);
+    const { t, userId } = await as();
+    const itemId = await processingLink(t, userId, FRESH_AGE);
     const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
     const recipe = {
       name: "Pancakes",
@@ -3235,11 +3257,12 @@ describe("stale processing runs", () => {
     await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId,
-      title: "Pancakes",
-      description: "Fluffy breakfast pancakes",
-      tags: ["breakfast"],
-      status: "ready",
-      recipe,
+      reading: { recipe },
+      classification: {
+        title: "Pancakes",
+        description: "Fluffy breakfast pancakes",
+        tags: ["breakfast"],
+      },
     });
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ recipe });
   });
@@ -3251,15 +3274,18 @@ describe("stale processing runs", () => {
     await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId,
-      title: "Pancakes",
-      description: "Fluffy breakfast pancakes",
-      tags: ["breakfast"],
-      status: "ready",
-      recipe: {
-        name: "Pancakes",
-        servings: "4 servings",
-        ingredients: ["2 cups flour", "2 eggs"],
-        steps: ["Whisk.", "Fry."],
+      reading: {
+        recipe: {
+          name: "Pancakes",
+          servings: "4 servings",
+          ingredients: ["2 cups flour", "2 eggs"],
+          steps: ["Whisk.", "Fry."],
+        },
+      },
+      classification: {
+        title: "Pancakes",
+        description: "Fluffy breakfast pancakes",
+        tags: ["breakfast"],
       },
     });
 

@@ -6,7 +6,7 @@ import {
   geoOrthographic,
   geoPath,
 } from "d3-geo";
-import type { Feature, FeatureCollection } from "geojson";
+import type { Feature, FeatureCollection, Position } from "geojson";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import countriesData from "../../assets/world/countries-50m.json";
@@ -38,6 +38,7 @@ export type GlobePaths = {
 
 const RADIUS = 230;
 const LANDED_RADIUS = 2600;
+const SPIN_LAND_STEP_DEGREES = 1.5;
 const DETAIL_RADIUS = 700;
 const NEARBY = 25;
 const DEGREES = 180 / Math.PI;
@@ -58,7 +59,40 @@ const easeOut = (k: number) => 1 - Math.pow(1 - k, 4);
 const nearestTurn = (from: number, to: number) =>
   from + ((((to - from) % 360) + 540) % 360) - 180;
 
-let world: { land: Feature; countries: Feature[]; bounds: number[][][] };
+function thinRing(ring: Position[], step: number): Position[] {
+  const kept = [ring[0]];
+  for (let i = 1; i < ring.length - 1; i += 1) {
+    const last = kept[kept.length - 1];
+    const point = ring[i];
+    if (Math.abs(point[0] - last[0]) + Math.abs(point[1] - last[1]) >= step) {
+      kept.push(point);
+    }
+  }
+  kept.push(ring[ring.length - 1]);
+  return kept.length >= Math.min(8, ring.length) ? kept : ring;
+}
+
+export function thinLand(land: FeatureCollection, step: number): Feature {
+  const coordinates = land.features
+    .flatMap(({ geometry }) => {
+      if (geometry.type === "Polygon") return [geometry.coordinates];
+      if (geometry.type === "MultiPolygon") return geometry.coordinates;
+      return [];
+    })
+    .map((polygon) => polygon.map((ring) => thinRing(ring, step)));
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: { type: "MultiPolygon", coordinates },
+  };
+}
+
+let world: {
+  land: FeatureCollection;
+  spinLand: Feature;
+  countries: Feature[];
+  bounds: number[][][];
+};
 function loadWorld() {
   if (!world) {
     const land = landData as unknown as Topology<{ land: GeometryCollection }>;
@@ -66,8 +100,10 @@ function loadWorld() {
       countries: GeometryCollection;
     }>;
     const features = feature(countries, countries.objects.countries).features;
+    const outline = feature(land, land.objects.land);
     world = {
-      land: feature(land, land.objects.land) as unknown as Feature,
+      land: outline,
+      spinLand: thinLand(outline, SPIN_LAND_STEP_DEGREES),
       countries: features,
       bounds: features.map((country) => geoBounds(country)),
     };
@@ -240,10 +276,16 @@ export function globePaths(
     .precision(camera.scale > DETAIL_RADIUS ? 0.5 : 1);
   const path = geoPath(projection);
   const close = region !== null && closeUp(camera, screen, region);
+  const atlas = loadWorld();
+  const land = close
+    ? region.nearby
+    : camera.dive === 0
+      ? atlas.spinLand
+      : atlas.land;
   return {
     sphere: path({ type: "Sphere" }) ?? "",
     graticule: path(GRATICULE) ?? "",
-    land: path(close ? region.nearby : loadWorld().land) ?? "",
+    land: path(land) ?? "",
     country:
       region?.country && countryLight(camera.dive) > 0
         ? (path(region.country) ?? "")

@@ -15,7 +15,11 @@ import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_SWEEP_PAGE,
 } from "./model/embedding";
-import { newConvexTest } from "./test.setup";
+import {
+  newConvexTest,
+  insertConsentingUser,
+  setTestConsent,
+} from "./test.setup";
 import { aiAllowed } from "./aiConsent";
 
 const generateObject = vi.hoisted(() => vi.fn());
@@ -139,8 +143,8 @@ function queryBarrier(
 
 async function fixture(type: "note" | "link" | "image" = "note") {
   const t = newConvexTest();
-  const userId = await t.run((ctx) => ctx.db.insert("users", {}));
-  const foreignId = await t.run((ctx) => ctx.db.insert("users", {}));
+  const userId = await t.run((ctx) => insertConsentingUser(ctx));
+  const foreignId = await t.run((ctx) => insertConsentingUser(ctx));
   const itemId = await t.run(async (ctx) =>
     ctx.db.insert("items", {
       userId,
@@ -184,13 +188,7 @@ async function invalidate(f: Fixture, kind: Invalidation) {
     else if (kind === "deleted item") await ctx.db.delete(f.itemId);
     else if (kind === "foreign item")
       await ctx.db.patch(f.itemId, { userId: f.foreignId });
-    else
-      await ctx.db.insert("aiConsents", {
-        userId: f.userId,
-        status: "declined",
-        version: 1,
-        updatedAt: 0,
-      });
+    else await setTestConsent(ctx, f.userId, "declined");
   });
 }
 
@@ -216,12 +214,7 @@ describe("AI dispatch uses fresh live ownership", () => {
   it("revalidates a mixed sweep in one query and maps distinct vectors around empty and gone slots", async () => {
     const f = await fixture();
     const [declinedId, goneId, secondId] = await f.t.run(async (ctx) => {
-      await ctx.db.insert("aiConsents", {
-        userId: f.foreignId,
-        status: "declined",
-        version: 1,
-        updatedAt: 0,
-      });
+      await setTestConsent(ctx, f.foreignId, "declined");
       const insert = (userId: string, title: string) =>
         ctx.db.insert("items", {
           userId,
@@ -358,14 +351,7 @@ describe("AI dispatch uses fresh live ownership", () => {
 
   it("excludes declined sweep text after consent removal following fresh denial", async () => {
     const f = await fixture();
-    const consentId = await f.t.run((ctx) =>
-      ctx.db.insert("aiConsents", {
-        userId: f.userId,
-        status: "declined",
-        version: 1,
-        updatedAt: 0,
-      }),
-    );
+    await f.t.run((ctx) => setTestConsent(ctx, f.userId, "declined"));
     await f.t.run((ctx) =>
       ctx.db.insert("items", {
         userId: f.foreignId,
@@ -399,7 +385,13 @@ describe("AI dispatch uses fresh live ownership", () => {
             itemId: f.itemId,
           }),
         ).toBe(false);
-        await f.t.run((ctx) => ctx.db.delete(consentId));
+        await f.t.run(async (ctx) => {
+          const row = await ctx.db
+            .query("aiConsents")
+            .withIndex("by_user", (q) => q.eq("userId", f.userId))
+            .unique();
+          if (row !== null) await ctx.db.delete(row._id);
+        });
         expect(
           await f.t.run(
             async (ctx) => (await ctx.db.get(f.userId))?.deleting !== true,
@@ -424,7 +416,7 @@ describe("AI dispatch uses fresh live ownership", () => {
     },
   );
   it.each(["deleted item", "foreign item"] as const)(
-    "rejects %s for a live unset-consent owner",
+    "rejects %s for a live owner who chose Allow",
     async (kind) => {
       const f = await fixture();
       await invalidate(f, kind);
@@ -436,23 +428,20 @@ describe("AI dispatch uses fresh live ownership", () => {
       ).toBe(false);
     },
   );
-  it("allows live unset and granted consent", async () => {
+  it("allows an account by default but honors an explicit opt-out", async () => {
     const f = await fixture();
+    await f.t.run(async (ctx) => {
+      const rows = await ctx.db.query("aiConsents").collect();
+      for (const row of rows) await ctx.db.delete(row._id);
+    });
     expect(
       await f.t.query(internal.aiConsent.isAllowed, {
         userId: f.userId,
         itemId: f.itemId,
       }),
     ).toBe(true);
-    await f.t.run((ctx) =>
-      ctx.db.insert("aiConsents", {
-        userId: f.userId,
-        status: "granted",
-        version: 1,
-        updatedAt: 0,
-      }),
-    );
-    expect(await f.t.run((ctx) => aiAllowed(ctx, f.userId))).toBe(true);
+    await f.t.run((ctx) => setTestConsent(ctx, f.userId, "declined"));
+    expect(await f.t.run((ctx) => aiAllowed(ctx, f.userId))).toBe(false);
   });
 
   it.each([

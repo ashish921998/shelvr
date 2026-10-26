@@ -2,7 +2,6 @@ import { analytics } from "@/lib/analytics";
 import { formattingLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { isAiConsentRequired } from "@convex/model/aiConsent";
 import { MAX_PLAN_ITEMS } from "@convex/model/plan";
 import {
   STOPS_PER_DAY,
@@ -196,7 +195,6 @@ type BuildState =
   | { status: "building" }
   | { status: "arriving"; previous: Id<"trips"> | null }
   | { status: "empty"; considered: number }
-  | { status: "ai_off" }
   | { status: "error" };
 
 /** `arriving` lasts until the subscription shows a trip other than `previous`; an empty result keeps the old trip. */
@@ -225,12 +223,9 @@ export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
         setState({ status: "arriving", previous });
         return true;
       } catch (error) {
-        const aiOff = isAiConsentRequired(error);
-        analytics.capture("trip_failed", {
-          reason: aiOff ? "ai_consent" : "error",
-        });
-        if (!aiOff) analytics.captureError("make_trip_failed", error);
-        setState({ status: aiOff ? "ai_off" : "error" });
+        analytics.capture("trip_failed", { reason: "error" });
+        analytics.captureError("make_trip_failed", error);
+        setState({ status: "error" });
         return false;
       }
     },

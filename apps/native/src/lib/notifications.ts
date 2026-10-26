@@ -23,6 +23,7 @@ import {
 } from "react";
 import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
+import { applyQueuedWeeklyShelf } from "./pending-weekly-shelf";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
 import { deferLink } from "@/lib/deferred-sheet-link";
@@ -86,12 +87,13 @@ export function NotificationSessionProvider({
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
-        saveToken: (token, locale) =>
+        getTimezone: getNotificationTimezone,
+        saveToken: (token, locale, timezone) =>
           registerDevice({
             token,
             locale,
             platform: Platform.OS === "ios" ? "ios" : "android",
-            timezone: getNotificationTimezone(),
+            timezone,
           }),
         revokeToken: (token) => unregisterDevice({ token }),
         setWeeklyShelf: (enabled) =>
@@ -144,6 +146,10 @@ export function NotificationSessionProvider({
       return;
     }
     session.start();
+    applyQueuedWeeklyShelf((enabled) => session.setWeeklyShelf(enabled)).catch(
+      (error: unknown) =>
+        analytics.captureError("weekly_shelf_preference_failed", error),
+    );
 
     const register = async (
       devicePushToken?: Notifications.DevicePushToken,

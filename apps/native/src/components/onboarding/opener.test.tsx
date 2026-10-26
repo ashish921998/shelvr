@@ -26,7 +26,12 @@ const mock = vi.hoisted(() => {
   return {
     capture: vi.fn(),
     largeText: false,
+    reducedMotion: false,
+    reduceMotionAtMount: false,
     pager: null as null | ((event: ScrollEvent) => void),
+    beginDrag: null as null | (() => void),
+    pageDrag: null as null | (() => void),
+    reduceMotionChanged: null as null | ((enabled: boolean) => void),
     view: ({
       children,
       testID,
@@ -63,18 +68,33 @@ const mock = vi.hoisted(() => {
 });
 
 vi.mock("react-native", async () => {
-  const { useEffect, useRef } = await import("react");
+  const { useEffect, useImperativeHandle, useRef } = await import("react");
   const ScrollView = ({
+    ref,
     children,
     horizontal,
     onLayout,
     onScroll,
+    onScrollBeginDrag,
   }: Children & {
+    ref?: React.Ref<{ scrollTo: (to: { x: number }) => void }>;
     horizontal?: boolean;
     onLayout?: (event: unknown) => void;
     onScroll?: (event: ScrollEvent) => void;
+    onScrollBeginDrag?: () => void;
   }) => {
     if (horizontal && onScroll) mock.pager = onScroll;
+    if (horizontal && onScrollBeginDrag) mock.beginDrag = onScrollBeginDrag;
+    if (!horizontal && onScrollBeginDrag) mock.pageDrag = onScrollBeginDrag;
+    useImperativeHandle(ref, () => ({
+      scrollTo: ({ x }: { x: number }) =>
+        onScroll?.({
+          nativeEvent: {
+            contentOffset: { x },
+            layoutMeasurement: { width: PAGE_WIDTH },
+          },
+        }),
+    }));
     const laidOut = useRef(false);
     useEffect(() => {
       if (!horizontal || laidOut.current) return;
@@ -92,6 +112,13 @@ vi.mock("react-native", async () => {
     Text: mock.text,
     Pressable: mock.pressable,
     ScrollView,
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(mock.reduceMotionAtMount),
+      addEventListener: (_event: string, listener: (on: boolean) => void) => {
+        mock.reduceMotionChanged = listener;
+        return { remove: () => (mock.reduceMotionChanged = null) };
+      },
+    },
   };
 });
 vi.mock("react-native-unistyles", () => ({
@@ -102,6 +129,7 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native-reanimated", () => ({
   default: { View: mock.view },
+  useReducedMotion: () => mock.reducedMotion,
 }));
 vi.mock("@/lib/motion", () => ({
   fadeIn: {},
@@ -154,8 +182,24 @@ const pageViews = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   mock.largeText = false;
+  mock.reducedMotion = false;
+  mock.reduceMotionAtMount = false;
   mock.pager = null;
+  mock.beginDrag = null;
+  mock.pageDrag = null;
+  mock.reduceMotionChanged = null;
+  vi.useRealTimers();
 });
+
+const renderOpener = () =>
+  render(
+    <OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} viewedPages={new Set()} />,
+  );
+
+const wait = (ms: number) =>
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
 
 describe("OpenerStep", () => {
   it("shows the three pages, each with its headline and body", () => {
@@ -209,15 +253,15 @@ describe("OpenerStep", () => {
         viewedPages={new Set()}
       />,
     );
-    fireEvent.click(screen.getByText("onboarding.startYours"));
+    fireEvent.click(screen.getByText("opener.getStarted"));
     swipeTo(1);
-    fireEvent.click(screen.getByText("onboarding.startYours"));
+    fireEvent.click(screen.getByText("opener.getStarted"));
     swipeTo(2);
-    fireEvent.click(screen.getByText("onboarding.startYours"));
+    fireEvent.click(screen.getByText("opener.getStarted"));
     expect(onStart).toHaveBeenCalledTimes(3);
   });
 
-  it("offers sign-in on the first page only", () => {
+  it("offers sign-in on every page", () => {
     const onSignIn = vi.fn();
     render(
       <OpenerStep
@@ -226,14 +270,12 @@ describe("OpenerStep", () => {
         viewedPages={new Set()}
       />,
     );
-    expect(screen.getByText("onboarding.haveAccount")).toBeTruthy();
-    swipeTo(1);
-    expect(screen.queryByText("onboarding.haveAccount")).toBeNull();
-    swipeTo(2);
-    expect(screen.queryByText("onboarding.haveAccount")).toBeNull();
-    swipeTo(0);
     fireEvent.click(screen.getByText("onboarding.signIn"));
-    expect(onSignIn).toHaveBeenCalledTimes(1);
+    swipeTo(1);
+    fireEvent.click(screen.getByText("onboarding.signIn"));
+    swipeTo(2);
+    fireEvent.click(screen.getByText("onboarding.signIn"));
+    expect(onSignIn).toHaveBeenCalledTimes(3);
   });
 
   it("plays a page's entrance once the page is reached, and keeps it", () => {
@@ -295,7 +337,7 @@ describe("OpenerStep", () => {
     expect(pageViews()).toEqual([0, 1, 2]);
   });
 
-  it("keeps sign-in with the first page's copy at the large text sizes", () => {
+  it("keeps sign-in with each page's copy at the large text sizes", () => {
     mock.largeText = true;
     render(
       <OpenerStep
@@ -304,9 +346,81 @@ describe("OpenerStep", () => {
         viewedPages={new Set()}
       />,
     );
-    expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(1);
-    swipeTo(2);
-    expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(1);
-    expect(screen.getByText("onboarding.startYours")).toBeTruthy();
+    expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(3);
+    expect(screen.getByText("opener.getStarted")).toBeTruthy();
+  });
+
+  it("advances a page every four seconds and stops on the last", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    wait(3999);
+    expect(dot(0)).toContain("dotOn");
+    wait(1);
+    expect(dot(1)).toContain("dotOn");
+    wait(4000);
+    expect(dot(2)).toContain("dotOn");
+    wait(20000);
+    expect(dot(2)).toContain("dotOn");
+  });
+
+  it("stops advancing for good once the person swipes", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    act(() => mock.beginDrag?.());
+    swipeTo(1);
+    swipeTo(0);
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
+  });
+
+  it("never advances with Reduce Motion on", () => {
+    vi.useFakeTimers();
+    mock.reducedMotion = true;
+    renderOpener();
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
+  });
+
+  it("stops advancing when Reduce Motion is turned on mid-way", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    wait(4000);
+    expect(dot(1)).toContain("dotOn");
+    act(() => mock.reduceMotionChanged?.(true));
+    wait(20000);
+    expect(dot(1)).toContain("dotOn");
+  });
+
+  it("never advances when Reduce Motion was turned on after the app started", async () => {
+    vi.useFakeTimers();
+    mock.reduceMotionAtMount = true;
+    renderOpener();
+    await act(async () => {});
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
+  });
+
+  it("keeps a Reduce Motion change that lands before the mount query answers", async () => {
+    vi.useFakeTimers();
+    let answer: (enabled: boolean) => void = () => {};
+    const query = new Promise<boolean>((resolve) => (answer = resolve));
+    const { AccessibilityInfo } = await import("react-native");
+    const spy = vi
+      .spyOn(AccessibilityInfo, "isReduceMotionEnabled")
+      .mockReturnValue(query);
+    renderOpener();
+    act(() => mock.reduceMotionChanged?.(true));
+    await act(async () => answer(false));
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
+    spy.mockRestore();
+  });
+
+  it("stops advancing once the person scrolls a page's copy", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    act(() => mock.pageDrag?.());
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
   });
 });

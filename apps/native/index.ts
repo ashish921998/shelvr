@@ -10,4 +10,7 @@ import "./src/boot/notifications";
 // An e2e run keeps the development error banner off the screen
 // (src/lib/e2e-log-box.ts).
 import "./src/boot/e2e-log-box";
+// An e2e run can start as a fresh install, before anything reads the
+// session or onboarding state (src/lib/e2e-fresh-install.ts).
+import "./src/boot/e2e-fresh-install";
 import "expo-router/entry";

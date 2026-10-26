@@ -96,6 +96,11 @@ function cubicAt(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
   ];
 }
 
+/** The thread's sideways tremble at sample `i`, so a drawn path looks hand-sewn. */
+export function threadJitter(i: number): number {
+  return 0.9 * Math.sin(i * 0.61 + 1) + 0.5 * Math.sin(i * 1.73);
+}
+
 function sampleThread(
   p0: Point,
   p1: Point,
@@ -106,10 +111,7 @@ function sampleThread(
   const points: Point[] = [];
   for (let i = 0; i <= steps; i++) {
     const [x, y] = cubicAt(p0, p1, p2, p3, i / steps);
-    points.push([
-      x + 0.9 * Math.sin(i * 0.61 + 1) + 0.5 * Math.sin(i * 1.73),
-      y,
-    ]);
+    points.push([x + threadJitter(i), y]);
   }
   return points;
 }

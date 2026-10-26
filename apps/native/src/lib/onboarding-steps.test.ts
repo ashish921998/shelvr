@@ -2,65 +2,56 @@ import { describe, expect, it } from "vitest";
 import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
+  nextOnboardingStep,
+  onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
+  type OnboardingStep,
 } from "./onboarding-steps";
 
 describe("restoreOnboardingStep", () => {
-  it.each([
-    [0, "opener"],
-    [1, "interests"],
-    [2, "setup"],
-    [3, "demo"],
-    [4, "notifications"],
-    [5, "share"],
-    [6, "promise"],
-    [7, "tripBuild"],
-    [8, "tripLocked"],
-    [9, "tripReveal"],
-  ] as const)("restores step %i to %s", (stored, expected) => {
-    expect(restoreOnboardingStep(stored)).toBe(expected);
-  });
+  it.each(ONBOARDING_STEPS.map((step, index) => [index, step] as const))(
+    "restores step %i to %s",
+    (stored, expected) => {
+      expect(restoreOnboardingStep(stored)).toBe(expected);
+    },
+  );
 
-  it.each([null, -1, 10, 11, 1.5])(
+  it.each([null, -1, ONBOARDING_STEPS.length, 11, 1.5])(
     "restarts a missing or out-of-range index (%s) at the opener",
     (stored) => {
       expect(restoreOnboardingStep(stored)).toBe("opener");
     },
   );
-
-  it("keeps every index a v9 record could hold on the same step", () => {
-    expect(ONBOARDING_STEPS.slice(0, 7)).toEqual([
-      "opener",
-      "interests",
-      "setup",
-      "demo",
-      "notifications",
-      "share",
-      "promise",
-    ]);
-  });
 });
 
 describe("previousOnboardingStep", () => {
   it.each([
-    ["interests", "opener"],
-    ["setup", "interests"],
-    ["notifications", "demo"],
-    ["share", "notifications"],
+    ["savedCount", "opener"],
+    ["goal", "savedCount"],
+    ["planner", "goal"],
+    ["chart", "planner"],
+    ["city", "chart"],
+    ["ahaShare", "city"],
+    ["ahaSpots", "ahaShare"],
+    ["commitment", "ahaSpots"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
 
-  it.each([
-    "opener",
-    "demo",
-    "promise",
-    "tripBuild",
-    "tripLocked",
-    "tripReveal",
-  ] as const)("leaves %s without a fixed step to go back to", (step) => {
-    expect(previousOnboardingStep(step)).toBeNull();
+  it("leaves the opener without a step to go back to", () => {
+    expect(previousOnboardingStep("opener")).toBeNull();
+  });
+});
+
+describe("nextOnboardingStep", () => {
+  it("walks the questions, city, sample and commitment, and stays on the commitment", () => {
+    const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
+    while (walked.length < ONBOARDING_STEPS.length)
+      walked.push(nextOnboardingStep(walked[walked.length - 1]));
+    expect(walked).toEqual([...ONBOARDING_STEPS]);
+    expect(nextOnboardingStep("ahaSpots")).toBe("commitment");
+    expect(nextOnboardingStep("commitment")).toBe("commitment");
   });
 });
 
@@ -69,10 +60,15 @@ describe("ONBOARDING_STEP_IDS", () => {
     const ids = ONBOARDING_STEPS.map((step) => ONBOARDING_STEP_IDS[step]);
     expect(new Set(ids).size).toBe(ONBOARDING_STEPS.length);
   });
+});
 
-  it("gives the sample trip steps their own ids", () => {
-    expect(ONBOARDING_STEP_IDS.tripBuild).toBe("trip_build");
-    expect(ONBOARDING_STEP_IDS.tripLocked).toBe("trip_locked");
-    expect(ONBOARDING_STEP_IDS.tripReveal).toBe("trip_reveal");
+describe("onboardingProgress", () => {
+  it("has no bar on the opener and fills evenly to the commitment", () => {
+    expect(onboardingProgress("opener")).toBeNull();
+    const bars = ONBOARDING_STEPS.slice(1).map(onboardingProgress);
+    expect(bars.at(-1)).toBe(1);
+    bars.forEach((bar, index) => {
+      if (index > 0) expect(bar).toBeGreaterThan(bars[index - 1] ?? 0);
+    });
   });
 });

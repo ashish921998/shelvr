@@ -29,21 +29,23 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   that belongs to one feature is exported from that feature's module
   (`useTrialReminder` in `trial-reminder.ts`, `useHomeFeed` in `home-feed.tsx`),
   so search for the hook name, not the filename. Subfolders exist only for
-  `src/lib/share`, `src/lib/splash` and `src/lib/tidy`.
+  `src/lib/share` and `src/lib/splash`.
 - **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
-  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
-  `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.
+  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
   `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
-  `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
+  `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
-- **Home feed:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`);
-  cards in `src/components/item-card.tsx` and `src/components/home`.
+- **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
+  cities list and processing, failed-read and "No place found" sections are in `src/components/home`
+  (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`, with its
+  map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
+  Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`.
+  the Add sheet (`src/app/(app)/add.tsx`) takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.
@@ -67,10 +69,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   decides what a processing run writes to a save; `finalizeItem` in
   `convex/items.ts` is its adapter. `convex/finalizeItem.grid.test.ts` pins the
   rules with the recorded rows in `convex/testdata/settlement/rows.json`.
+  `failurePatch` in the same module is the rule for a failed run;
+  `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
-- **Large files:** `convex/items.ts` (about 3,250 lines), `convex/ai.ts` (about 1,400)
-  and `convex/model/pageReadCore.ts` (about 550). Embedding and recommendation actions
+- **Large files:** `convex/items.ts` (about 2,500 lines), `convex/ai.ts` (about 1,400)
+  and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
@@ -89,6 +93,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/accountDeletion.test.ts` and says how to read a failure. Use it before
   changing the deletion drain in `convex/users.ts`, a table with a user key, an
   owner check, or a function that writes rows for a user.
+- **Proving photo saves keep their image:** `.agents/skills/image-import-storage`
+  model-checks the image import and upload receiver in TLA+
+  (`tools/formal/image-import`). Use it before changing those functions, the
+  storage cleanup crons, or any code that deletes a `_storage` blob.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 - **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
   every reviewer (CI Claude, Codex, any agent) works from.
@@ -192,13 +200,13 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
-- OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change,
-  or `version` in `app.json`) makes new updates invisible to binaries built
-  from the old fingerprint: cut a fresh store build before resuming OTA
-  publishes. The version is the easy one to miss: a bump must land on
-  `main` before any OTA aimed at the build carrying it. The build number is
-  not an input.
+- OTA updates reach installs by EAS fingerprint. A change to a native module, a
+  config plugin, `app.json` or `app.config.js` may move the fingerprint, and a
+  moved fingerprint makes new updates invisible to binaries built from the old
+  one: cut a fresh store build before resuming OTA publishes. Do not predict a
+  move; run `pnpm run verify:fingerprint origin/main HEAD`. What the
+  fingerprint hashes, and what it cannot see, is in
+  `docs/architecture/push-notifications.md#what-the-fingerprint-hashes`.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed
@@ -234,6 +242,7 @@ cannot happen.
 | No `console.*` in app code outside the loggers                                     | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
 | `check:code` is the one gate                                                       | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
 | The pre-push hook gates a push of branch commits, not deletes or tags              | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
+| Convex modules the app imports pull in no server-only package (zod, ai, linkedom)  | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
 | `_generated/api.d.ts` lists every Convex module                                    | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
 | Copy lives in `en.json`; generated catalogs untouched                              | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |
 | `CLAUDE.md` names every table, module and route                                    | `tools/verify-agent-docs.mjs`                                                                                    | `check:code`                         |
@@ -246,8 +255,14 @@ cannot happen.
 | OTA reaches only builds with the same native fingerprint                           | `tools/verify-ota-compatibility.mjs` blocks the publish; `tools/verify-native-fingerprint.mjs` only warns on PRs | OTA `before_update`; CI warns        |
 | A PR shows how it was verified; UI shows a screenshot                              | `tools/verify-pr-evidence.mjs`                                                                                   | CI `PR evidence`                     |
 | No high or critical advisories                                                     | `pnpm run audit`                                                                                                 | `check`, CI on dependency PRs, daily |
-| `requireUserId`, no client `userId`, `liveOwner`                                   | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| Public queries and mutations use the auth builders or are in `PUBLIC_ON_PURPOSE`   | `convex/model/publicFunctions.test.ts`; public actions stay review-only                                          | `check:code`                         |
+| A built function refuses a signed-out and a deleting caller before its handler     | The same test calls each one with a ctx stub                                                                     | `check:code`                         |
+| A `PUBLIC_ON_PURPOSE` reason matches its handler                                   | Review against `REVIEW.md`; CODEOWNERS only labels the file                                                      | nowhere                              |
+| No client `userId`; `liveOwner` before acting for an account                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | `requireProEntitlement`; `aiAllowed` before content leaves                         | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | AI passes touch only `suggested` memberships                                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| Indexes over `.filter()`; `logEvent` scalars; `safeFetch`                          | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| `newConvexTest()`; `captureError`; no test in `src/app`                            | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| No database `.filter((q) => ...)` in `convex/` outside tests                       | ESLint `no-restricted-syntax` (name an index instead)                                                            | `lint`                               |
+| `logEvent` scalars; `safeFetch`                                                    | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| Convex test harnesses come from `newConvexTest()`                                  | ESLint `no-restricted-imports` on `convexTest` outside `convex/test.setup.ts`                                    | `lint`                               |
+| No test file under `src/app`                                                       | ESLint `no-restricted-syntax` on `src/app/**/*.{test,spec}.*`                                                    | `lint`                               |
+| `captureError`                                                                     | Review against `REVIEW.md`                                                                                       | nowhere                              |

@@ -3,13 +3,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "@convex/_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 
 const generateObject = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (original) => ({
   ...(await original<typeof import("ai")>()),
   generateObject,
 }));
+
+const captureBreaks = vi.hoisted(() => ({ on: false }));
+vi.mock("./model/posthogCapture", async (original) => {
+  const actual = await original<typeof import("./model/posthogCapture")>();
+  return {
+    ...actual,
+    deliverPostHogEvent: (
+      ...args: Parameters<typeof actual.deliverPostHogEvent>
+    ) =>
+      captureBreaks.on
+        ? Promise.reject(new Error("capture broke"))
+        : actual.deliverPostHogEvent(...args),
+  };
+});
 
 const CLASSIFICATION = {
   title: "Grocery List",
@@ -32,6 +46,7 @@ beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
   generateObject.mockReset();
   generateObject.mockResolvedValue({ object: CLASSIFICATION });
+  captureBreaks.on = false;
 });
 
 afterEach(() => {
@@ -45,7 +60,7 @@ async function note(
   t: ReturnType<typeof newConvexTest>,
   runId: string,
 ): Promise<Id<"items">> {
-  const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+  const userId = await t.run((ctx) => insertConsentingUser(ctx));
   return t.run((ctx) =>
     ctx.db.insert("items", {
       userId,
@@ -195,6 +210,26 @@ describe("run fencing in processItem", () => {
       processingRunId: "run-new",
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps a save ready when a step after settling throws", async () => {
+    captureBreaks.on = true;
+    const t = newConvexTest();
+    const itemId = await note(t, "run-1");
+
+    await expect(
+      t.action(internal.ai.processItem, { itemId, runId: "run-1" }),
+    ).rejects.toThrow("ai_categorization_failed");
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({ status: "ready", title: "Grocery List" });
+    expect(item?.failureReason).toBeUndefined();
+    const processed = await t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect()).filter(
+        (job) => job.name === "analytics:captureItemProcessed",
+      ),
+    );
+    expect(processed.map((job) => job.args[0].outcome)).toEqual(["ready"]);
   });
 
   it("finalizes normally when the run still owns the item", async () => {

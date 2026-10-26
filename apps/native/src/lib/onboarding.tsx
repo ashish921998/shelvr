@@ -7,6 +7,11 @@ export function readOnboardedFlag(): boolean {
   return SecureStore.getItem(ONBOARDING_KEY) === "true";
 }
 
+// SecureStore's delete is async-only, so clearing writes "".
+export function forgetOnboarded(): void {
+  SecureStore.setItem(ONBOARDING_KEY, "");
+}
+
 type OnboardingContextValue = {
   onboarded: boolean;
   completeOnboarding: () => void;

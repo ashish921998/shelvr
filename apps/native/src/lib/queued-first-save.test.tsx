@@ -8,7 +8,6 @@ const mock = vi.hoisted(() => ({
   keychainFailing: false,
   authenticated: true,
   onboarded: true,
-  savesBlocked: false,
   user: { _id: "user-1" } as { _id: string } | null,
   createDemoItem: vi.fn(),
   queueDemoUrl: vi.fn(),
@@ -30,9 +29,6 @@ vi.mock("@convex/_generated/api", () => ({
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
   useMutation: () => mock.createDemoItem,
-}));
-vi.mock("@/lib/ai-consent", () => ({
-  useAiConsent: () => ({ savesBlocked: mock.savesBlocked }),
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: mock.user }),
@@ -60,8 +56,20 @@ vi.mock("@/lib/analytics", () => ({
   },
 }));
 
-const { getQueuedFirstSaveUrl, queueFirstSave, useQueuedFirstSave } =
+const { getQueuedFirstSaveUrl, useQueuedFirstSave } =
   await import("./queued-first-save");
+
+/** Only an older build's onboarding queues a first save, so seed the keychain the way it left it. */
+function queueFirstSave(save: {
+  url: string;
+  destination: string | null;
+  source: "direct" | "share";
+}) {
+  mock.store.set(
+    "shelvr.onboarding.queuedSave",
+    JSON.stringify({ ...save, owner: null }),
+  );
+}
 
 const SAMPLE = "https://sample.test/ready-made";
 const result = (overrides: object = {}) => ({
@@ -87,7 +95,6 @@ beforeEach(() => {
   mock.keychainFailing = false;
   mock.authenticated = true;
   mock.onboarded = true;
-  mock.savesBlocked = false;
   mock.user = { _id: "user-1" };
   mock.createDemoItem.mockReset().mockResolvedValue(result());
   mock.queueDemoUrl.mockReset();
@@ -111,19 +118,15 @@ describe("a first save queued before sign-in", () => {
     expect(mock.capture).toHaveBeenCalledWith("onboarding_demo_submitted");
   });
 
-  it("waits for sign-in, the end of onboarding and the AI answer", async () => {
+  it("waits for sign-in and onboarding, without waiting for an AI answer", async () => {
     queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
     mock.authenticated = false;
     const hook = await mount();
     mock.authenticated = true;
     mock.onboarded = false;
     hook.rerender();
-    mock.onboarded = true;
-    mock.savesBlocked = true;
-    hook.rerender();
     expect(mock.createDemoItem).not.toHaveBeenCalled();
-
-    mock.savesBlocked = false;
+    mock.onboarded = true;
     hook.rerender();
     await act(async () => {});
     expect(mock.createDemoItem).toHaveBeenCalledOnce();

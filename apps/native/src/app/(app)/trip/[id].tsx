@@ -78,7 +78,11 @@ function isNothingToSwap(error: unknown): boolean {
 
 export default function TripScreen() {
   const locale = useAppLocale();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `city` is set when the City screen opened this trip, so the form starts on it.
+  const { id, city: tappedCity } = useLocalSearchParams<{
+    id: string;
+    city?: string;
+  }>();
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
   const { data: space } = useQuery(
@@ -203,29 +207,18 @@ export default function TripScreen() {
               title={
                 state.status === "empty"
                   ? t("trip.emptyTitle")
-                  : state.status === "ai_off"
-                    ? t("trip.make")
-                    : t("trip.failedTitle")
+                  : t("trip.failedTitle")
               }
               message={
                 state.status === "empty"
                   ? t("trip.emptyBody")
-                  : state.status === "ai_off"
-                    ? t("trip.aiOff")
-                    : t("errors.retrySoon")
+                  : t("errors.retrySoon")
               }
             />
-            {state.status === "ai_off" ? (
-              <Button
-                title={t("profile.settings")}
-                onPress={() => router.push("/settings")}
-              />
-            ) : (
-              <Button
-                title={t("common.tryAgain")}
-                onPress={() => (lastRequest ? onBuild(lastRequest) : reset())}
-              />
-            )}
+            <Button
+              title={t("common.tryAgain")}
+              onPress={() => (lastRequest ? onBuild(lastRequest) : reset())}
+            />
             <Pressable
               accessibilityRole="button"
               onPress={reset}
@@ -250,9 +243,11 @@ export default function TripScreen() {
                     days: trip.days.length,
                     pace: trip.pace,
                     startDate: trip.startDate,
-                    city: trip.city,
+                    city: tappedCity ?? trip.city,
                   }
-                : undefined)
+                : tappedCity
+                  ? { city: tappedCity }
+                  : undefined)
             }
             onBuild={onBuild}
             onCancel={trip ? () => setEditing(false) : undefined}

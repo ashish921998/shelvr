@@ -140,14 +140,13 @@ describe("shipped localization resources", () => {
     const navigation = [
       "navigation.home",
       "navigation.spaces",
-      "navigation.tidy",
       "navigation.map",
       "navigation.search",
     ].map((key) => messages[key]);
     expect(
       new Set(navigation).size,
       `${locale}: distinct navigation labels`,
-    ).toBe(5);
+    ).toBe(4);
     for (const [key, source] of Object.entries(en)) {
       const translated = messages[key];
       expect(typeof translated).toBe(typeof source);

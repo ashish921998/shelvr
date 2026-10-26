@@ -137,6 +137,11 @@ function instagramPostUrl(post: InstagramPost): string {
   return `https://www.instagram.com/${post.kind}/${post.shortcode}/`;
 }
 
+function hasPost(embedHtml: string): boolean {
+  const embedded = parseInstagramEmbed(embedHtml);
+  return embedded.caption !== undefined || embedded.posterUrl !== undefined;
+}
+
 async function fetchInstagramPost(url: string) {
   const linked = instagramMedia(url);
   const direct = isInstagramPost(linked) ? linked : undefined;
@@ -149,6 +154,20 @@ async function fetchInstagramPost(url: string) {
     direct ? embedFor(direct) : Promise.resolve(undefined),
   ]);
   if (!page.ok) {
+    // Instagram often refuses the post page to servers while its embed still answers.
+    if (directEmbed?.status === "ok" && hasPost(directEmbed.html)) {
+      logEvent("warn", "instagram_page_fetch_failed", {
+        error_category: page.code,
+      });
+      return {
+        pageTruncated: false,
+        incomplete: true,
+        html: "",
+        kind: direct?.kind,
+        embed: directEmbed,
+        postUrl: direct && instagramPostUrl(direct),
+      };
+    }
     throw new PageFetchError(page.code, page.status);
   }
   const html = decodeWithContentType(page.bytes, page.contentType);
@@ -164,7 +183,8 @@ async function fetchInstagramPost(url: string) {
     });
   }
   return {
-    page,
+    pageTruncated: page.truncated === true,
+    incomplete: embed.status === "transient",
     html,
     kind: (post ?? linked)?.kind,
     embed,
@@ -173,12 +193,12 @@ async function fetchInstagramPost(url: string) {
 }
 
 export async function fetchInstagram(url: string): Promise<PageData> {
-  const { page, html, kind, embed, postUrl } = await fetchInstagramPost(url);
+  const { pageTruncated, incomplete, html, kind, embed, postUrl } =
+    await fetchInstagramPost(url);
   const embedded: InstagramEmbedFields =
     embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
   const card = instagramCard(html);
-  const truncated =
-    page.truncated === true || (embed.status === "ok" && embed.truncated);
+  const truncated = pageTruncated || (embed.status === "ok" && embed.truncated);
   // Instagram answers 200 for a deleted post; "gone" is no post data plus the embed's broken-media box.
   const readNothing =
     card === undefined &&
@@ -210,7 +230,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     content: caption,
     video: card?.video,
     ...(truncated ? { truncated: true as const } : {}),
-    ...(embed.status === "transient" || (readNothing && truncated)
+    ...(incomplete || (readNothing && truncated)
       ? { incomplete: true as const }
       : {}),
   };

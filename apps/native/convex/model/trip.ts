@@ -1,6 +1,35 @@
 import { type Infer, v } from "convex/values";
-import { distanceKm, MAX_CITY_DISTANCE_KM, type LatLng } from "./appleMaps";
-import type { PlanPlace } from "./plan";
+import type { Id } from "../_generated/dataModel";
+import { placeKey, type PlanPlace } from "./plan";
+
+// Geometry lives here, not beside the Apple Maps client, because the app
+// imports this module: anything it imports ships in the app bundle.
+const MAX_CITY_DISTANCE_KM = 80;
+
+export type LatLng = { lat: number; lng: number };
+
+/** Count and draw the same mapped place once even when several saves mention it. */
+export function uniquePlacePins<T extends LatLng & { name: string }>(
+  pins: T[],
+): T[] {
+  const seen = new Set<string>();
+  return pins.filter((pin) => {
+    const key = `${placeKey(pin.name)}:${pin.lat.toFixed(4)}:${pin.lng.toFixed(4)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function distanceKm(a: LatLng, b: LatLng): number {
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 export const MIN_TRIP_DAYS = 1;
 export const MAX_TRIP_DAYS = 15;
@@ -28,6 +57,47 @@ export function tidyCity(city: string): string {
 
 export function cityKey(city: string): string {
   return tidyCity(city).toLowerCase();
+}
+
+/** A pin belongs to its resolved city; legacy unlabelled pins are safe only for single-city saves. */
+export function pinsForCity<T extends LatLng & { name: string; city?: string }>(
+  item: { cities?: string[]; placePins?: T[] },
+  city: string,
+): T[] {
+  const cities = new Set((item.cities ?? []).map(cityKey));
+  return (item.placePins ?? []).filter((pin) =>
+    pin.city
+      ? cityKey(pin.city) === cityKey(city)
+      : cities.size === 1 && cities.has(cityKey(city)),
+  );
+}
+
+export function countCities(
+  items: { cities?: string[] }[],
+): { city: string; count: number }[] {
+  const counts = new Map<
+    string,
+    { count: number; spellings: Map<string, number> }
+  >();
+  for (const item of items) {
+    const seen = new Set<string>();
+    for (const city of item.cities ?? []) {
+      const key = cityKey(city);
+      if (key === "" || seen.has(key)) continue;
+      seen.add(key);
+      const entry = counts.get(key) ?? { count: 0, spellings: new Map() };
+      const spelling = tidyCity(city);
+      entry.count++;
+      entry.spellings.set(spelling, (entry.spellings.get(spelling) ?? 0) + 1);
+      counts.set(key, entry);
+    }
+  }
+  return [...counts.values()]
+    .map(({ count, spellings }) => ({
+      city: [...spellings].sort((a, b) => b[1] - a[1])[0][0],
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export const TRIP_SLOTS = [
@@ -258,23 +328,56 @@ export function buildTrip(
   };
 }
 
-export function keepNearby(
-  found: (LatLng | null)[],
-  centre: LatLng | null,
-): (LatLng | null)[] {
-  const points = found.filter((p): p is LatLng => p !== null);
-  if (points.length === 0) return found;
+/** The median point: one stray place cannot drag it away from the rest. */
+export function middleOf(points: LatLng[]): LatLng | null {
+  if (points.length === 0) return null;
   const median = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
     return sorted[Math.floor(sorted.length / 2)];
   };
-  const anchor = centre ?? {
+  return {
     lat: median(points.map((p) => p.lat)),
     lng: median(points.map((p) => p.lng)),
   };
+}
+
+export function keepNearby(
+  found: (LatLng | null)[],
+  centre: LatLng | null,
+): (LatLng | null)[] {
+  const anchor =
+    centre ?? middleOf(found.filter((p): p is LatLng => p !== null));
+  if (anchor === null) return found;
   return found.map((p) =>
     p !== null && distanceKm(p, anchor) <= MAX_CITY_DISTANCE_KM ? p : null,
   );
+}
+
+/** Drops points far from the rest, but only when three or more agree on where "the rest" is. */
+export function dropStrays<T extends LatLng>(
+  points: (T | null)[],
+): (T | null)[] {
+  const before = points.filter((p) => p !== null).length;
+  if (before < 3) return points;
+  const kept = keepNearby(points, null);
+  const after = kept.filter((p) => p !== null).length;
+  return after * 2 > before
+    ? points.map((p, i) => (kept[i] ? p : null))
+    : points;
+}
+
+export type SavedPin = { itemId: Id<"items">; name: string } & LatLng;
+
+/** The map pin the save already has for this place, so a trip never looks it up again. */
+export function savedPinFor(
+  candidate: TripCandidate,
+  pins: SavedPin[],
+): LatLng | null {
+  const key = placeKey(candidate.name);
+  const pin = pins.find(
+    (p) => p.itemId === candidate.itemId && placeKey(p.name) === key,
+  );
+  return pin ? { lat: pin.lat, lng: pin.lng } : null;
 }
 
 export function swapStop(

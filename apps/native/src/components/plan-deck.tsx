@@ -73,6 +73,9 @@ export function PlanDeck({
     );
   }, [flipped, reducedMotion, turn]);
 
+  // One place: the next card is this card and `front` never changes, so the
+  // centring effect above never runs after a swipe.
+  const single = places.length === 1;
   const swipe = useMemo(() => {
     const away = width * 1.2;
     return Gesture.Pan()
@@ -93,11 +96,13 @@ export function PlanDeck({
         const direction = x + event.velocityX * 0.1 < 0 ? -1 : 1;
         panX.set(
           withTiming(direction * away, { duration: 220 }, (done) => {
-            if (done) scheduleOnRN(onNext);
+            if (!done) return;
+            scheduleOnRN(onNext);
+            if (single) panX.set(withSpring(0, motion.spring.drag));
           }),
         );
       });
-  }, [width, cardWidth, panX, onNext]);
+  }, [width, cardWidth, panX, onNext, single]);
 
   const topStyle = useAnimatedStyle(() => ({
     transform: [

@@ -40,6 +40,8 @@ export function classifyPayload(payload: ResolvedPayload): {
   kind: ShareEntryKind;
   url?: string;
   reason?: string;
+  /** The payload itself is unusable, so a retry would fail the same way. */
+  final?: true;
 } {
   if (payload.contentType === "image") {
     if (!payload.contentUri) {
@@ -50,7 +52,11 @@ export function classifyPayload(payload: ResolvedPayload): {
   if (payload.contentType === "website") {
     const url = payload.value.trim();
     if (!url || !isProbablyUrl(url)) {
-      return { kind: "link", reason: "Shared link was not a valid URL" };
+      return {
+        kind: "link",
+        reason: "Shared link was not a valid URL",
+        final: true,
+      };
     }
     return { kind: "link" };
   }
@@ -65,7 +71,7 @@ export function classifyPayload(payload: ResolvedPayload): {
   }
   const value = payload.value.trim();
   if (!value) {
-    return { kind: "note", reason: "Shared text was empty" };
+    return { kind: "note", reason: "Shared text was empty", final: true };
   }
   const url = isProbablyUrl(value) ? value : extractFirstUrl(value);
   if (url) {
@@ -162,6 +168,14 @@ export function resolvedFromRawPayloads(
   });
 }
 
+// "unsupported" is settled: Retry skips it, as it would fail the same way again.
+function unsettledStatus(
+  kind: ShareEntryKind,
+  final: true | undefined,
+): ShareEntry["status"] {
+  return kind === "unsupported" || final ? "unsupported" : "failed";
+}
+
 export function classifyEntries(
   session: ShareSession,
   resolved: ResolvedPayload[],
@@ -175,10 +189,9 @@ export function classifyEntries(
         message: "No resolved payload for this entry",
       };
     }
-    const { kind, reason } = classifyInShare(resolved, entry.index);
+    const { kind, reason, final } = classifyInShare(resolved, entry.index);
     if (reason !== undefined) {
-      const status: ShareEntry["status"] =
-        kind === "unsupported" ? "unsupported" : "failed";
+      const status = unsettledStatus(kind, final);
       return { ...entry, kind, status, message: reason };
     }
     return { ...entry, kind };
@@ -255,10 +268,9 @@ async function processOne(
       message: "No resolved payload for this entry",
     };
   }
-  const { kind, reason, url } = classifyInShare(resolved, entry.index);
+  const { kind, reason, url, final } = classifyInShare(resolved, entry.index);
   if (reason !== undefined) {
-    const status: ShareEntry["status"] =
-      kind === "unsupported" ? "unsupported" : "failed";
+    const status = unsettledStatus(kind, final);
     return { kind, status, message: reason };
   }
 

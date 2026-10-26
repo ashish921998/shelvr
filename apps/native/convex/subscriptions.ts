@@ -1,10 +1,5 @@
 import { v } from "convex/values";
-import {
-  action,
-  query,
-  internalMutation,
-  internalQuery,
-} from "./_generated/server";
+import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -12,6 +7,7 @@ import {
   isDevelopmentAnonymousUser,
   liveOwner,
   requireUserId,
+  authedQuery,
 } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
 import { rateLimiter } from "./model/rateLimiter";
@@ -26,14 +22,14 @@ const subscriptionStatusValidator = v.union(
 );
 
 /** Returns the raw `expiresAt`: Convex queries do not rerun as time advances, so the client checks it against its own clock. */
-export const getEntitlement = query({
+export const getEntitlement = authedQuery({
   args: {},
   returns: v.object({
     status: v.union(subscriptionStatusValidator, v.literal("none")),
     expiresAt: v.optional(v.number()),
   }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     if (await isDevelopmentAnonymousUser(ctx, userId)) {
       return { status: "lifetime" as const };
     }

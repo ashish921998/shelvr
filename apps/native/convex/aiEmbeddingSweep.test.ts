@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 import { internal } from "./_generated/api";
 import {
   CURRENT_EMBEDDING_VERSION,
@@ -37,7 +37,7 @@ afterEach(() => {
 async function seedReady(count: number) {
   const t = newConvexTest();
   await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", {});
+    const userId = await insertConsentingUser(ctx);
     for (let i = 0; i < count; i++) {
       await ctx.db.insert("items", {
         userId,
@@ -68,7 +68,7 @@ describe("sweepItemEmbeddings", () => {
     await t.run(async (ctx) => {
       const owner = (await ctx.db.query("users").collect())[0];
       await ctx.db.patch(owner._id, { deleting: true });
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("items", {
         userId,
         type: "note",
@@ -97,7 +97,7 @@ describe("sweepItemEmbeddings", () => {
     await t.run(async (ctx) => {
       const owner = (await ctx.db.query("users").collect())[0];
       await ctx.db.delete(owner._id);
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("items", {
         userId,
         type: "note",
@@ -240,7 +240,7 @@ describe("sweepItemEmbeddings", () => {
   it("finishes items with no embeddable text without calling the provider", async () => {
     const t = newConvexTest();
     await t.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("items", {
         userId,
         type: "image" as const,

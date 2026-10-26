@@ -50,8 +50,10 @@ xcrun simctl openurl <udid> 'exp+shelvr://expo-development-client/?url=http%3A%2
 ## Building the dev client
 
 The runtime version uses the fingerprint policy (`app.json`), so a dev client
-only loads bundles whose native fingerprint matches. Rebuild with
-`npx expo run:ios` after a native dependency or config plugin changes.
+only loads bundles whose native fingerprint matches (see
+[What the fingerprint hashes](push-notifications.md#what-the-fingerprint-hashes)).
+Rebuild with `npx expo run:ios` after a native dependency or config plugin
+changes.
 
 - **Set a UTF-8 locale.** In a shell without one, `pod install` dies with
   `Unicode Normalization not appropriate for ASCII-8BIT`. Prefix the command
@@ -82,10 +84,12 @@ only loads bundles whose native fingerprint matches. Rebuild with
   the V1 paywall, so QA against it gives misleading results. Test-store prices
   stay separate from Apple's.
 
-- **First-run onboarding.** Terminate the app, then
-  `xcrun simctl keychain <udid> reset`. This clears the auth token, the
-  onboarded flag and pending onboarding progress together, so the next launch
-  is a new anonymous user with an unused demo save. No reinstall needed.
+- **First-run onboarding.** On a build with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`
+  set to `true`, relaunch the development build with the
+  `-E2EFreshInstall YES` argument (`src/lib/e2e-fresh-install.ts`). It clears
+  the auth token, the onboarded flag and pending onboarding progress, so the
+  launch is signed out at "Get started" and the next dev sign-in is a new
+  anonymous user. No reinstall needed.
 - **The paywall.** A development anonymous user never sees it:
   `getEntitlement` in `convex/subscriptions.ts` returns `lifetime` for them. To
   see the real sheet, either sign in with a real account, or launch the
