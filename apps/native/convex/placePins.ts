@@ -30,14 +30,14 @@ const BACKFILL_STAGGER_MS = 250;
 
 type Pin = { name: string; lat: number; lng: number; city?: string };
 
-/** In a save that names exactly one city, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
-function nearEachOther(pins: Pin[], cities: string[]): Pin[] {
-  if (
-    cities.length !== 1 ||
-    new Set(pins.flatMap((pin) => (pin.city ? [pin.city.toLowerCase()] : [])))
-      .size > 1
-  )
-    return pins;
+/** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
+function lookupCity(cities: string[]): string | undefined {
+  return cities.length === 1 ? cities[0] : undefined;
+}
+
+/** In a single-city save, a pin far from most of the others is a wrong match for a same-named place elsewhere. */
+function nearEachOther(pins: Pin[], city: string | undefined): Pin[] {
+  if (city === undefined) return pins;
   return dropStrays(pins).filter((pin) => pin !== null);
 }
 
@@ -82,8 +82,9 @@ async function wantedPlaces(
 function lookupQuery(name: string, city: string | undefined): string {
   if (
     city &&
-    !name.includes(",") &&
-    !name.toLowerCase().includes(city.trim().toLowerCase())
+    !name
+      .split(",")
+      .some((part) => part.trim().toLowerCase() === city.trim().toLowerCase())
   ) {
     return `${name}, ${city.trim()}`;
   }
@@ -113,24 +114,12 @@ export const toLocate = internalQuery({
       .map(([, name]) => name)
       // Look past the free slots: a stray match storePins drops must not keep the next place from a pin.
       .slice(0, !args.refresh && kept >= MAX_PINS ? 0 : MAX_PINS);
-    const singleCity =
-      item.cities?.length === 1 &&
-      wanted.every(
-        ([, name]) =>
-          !name.includes(",") ||
-          name
-            .split(",")
-            .slice(1)
-            .some(
-              (part) =>
-                part.trim().toLowerCase() ===
-                item.cities?.[0].trim().toLowerCase(),
-            ),
-      );
-    const pins = nearEachOther(item.placePins ?? [], item.cities ?? []);
+    const city = lookupCity(item.cities ?? []);
+    const singleCity = city !== undefined;
+    const pins = nearEachOther(item.placePins ?? [], city);
     return {
       names,
-      city: singleCity ? item.cities?.[0] : undefined,
+      city,
       singleCity,
       centre: singleCity ? lookupCentre(pins) : null,
     };
@@ -148,14 +137,17 @@ export const storePins = internalMutation({
     if (item === null || !(await aiAllowed(ctx, item.userId))) return null;
     const wanted = await wantedPlaces(ctx, item);
     const next = new Map<string, Pin>();
-    for (const pin of [...(item.placePins ?? []), ...args.found]) {
+    // Legacy single-city pins already belong to this city. Preserve that association before expanding cities.
+    const legacyCity = lookupCity(item.cities ?? []);
+    const retained = (item.placePins ?? []).map((pin) =>
+      pin.city || legacyCity === undefined ? pin : { ...pin, city: legacyCity },
+    );
+    for (const pin of [...retained, ...args.found]) {
       const key = placeKey(pin.name);
       if (wanted.has(key)) next.set(key, pin);
     }
-    const pins = nearEachOther([...next.values()], item.cities ?? []).slice(
-      0,
-      MAX_PINS,
-    );
+    const city = lookupCity(item.cities ?? []);
+    const pins = nearEachOther([...next.values()], city).slice(0, MAX_PINS);
     const before = item.placePins ?? [];
     const same =
       pins.length === before.length &&

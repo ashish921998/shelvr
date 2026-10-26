@@ -309,6 +309,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
   and `storePins` writes at most 30 with their Apple Maps locality, dropping any place no longer named.
   Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
+  Only source cities can disable single-city outlier rejection; returned localities cannot.
+  Retained legacy single-city pins are labelled before adding a discovered city.
   Resolved cities join `items.cities`, so Home creates an entry for each (up to 30). Scheduled from
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
   membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older unlabelled pins, run by hand after deployment:

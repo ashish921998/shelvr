@@ -24,8 +24,18 @@ vi.mock("react-native", () => ({
     <span>{children}</span>
   )),
   Pressable: vi.fn(
-    ({ children, onPress }: { children: ReactNode; onPress: () => void }) => (
-      <button onClick={onPress}>{children}</button>
+    ({
+      children,
+      onPress,
+      accessibilityLabel,
+    }: {
+      children: ReactNode;
+      onPress: () => void;
+      accessibilityLabel?: string;
+    }) => (
+      <button onClick={onPress} aria-label={accessibilityLabel}>
+        {children}
+      </button>
     ),
   ),
 }));
@@ -80,8 +90,33 @@ describe("unplaced save states", () => {
     expect(within(emptySection).queryByText("Failed reel")).toBeNull();
     expect(screen.getAllByText("Finding places…")).toHaveLength(1);
     expect(screen.getAllByText("Couldn't read these saves")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Pending reel" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Failed reel" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Pending reel, Finding places…" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Failed reel, Couldn't read these saves",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("distinguishes equal save titles by their status when navigating buttons", () => {
+    render(
+      <UnplacedSaves
+        saves={[
+          { _id: "pending", status: "processing", title: "Same reel" },
+          { _id: "failed", status: "failed", title: "Same reel" },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Same reel, Finding places…" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Same reel, Couldn't read these saves",
+      }),
+    ).toBeTruthy();
   });
 
   it("expands processing saves without labeling them as missing places", () => {
