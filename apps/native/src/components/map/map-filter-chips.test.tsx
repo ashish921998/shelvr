@@ -5,10 +5,6 @@ import { expect, it, vi } from "vitest";
 import { MapFilterChips } from "./map-filter-chips";
 
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-vi.mock("@/components/glass", () => ({
-  hasLiquidGlass: false,
-  GlassView: vi.fn(),
-}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), hairlineWidth: 1 },
 }));

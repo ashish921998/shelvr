@@ -1,10 +1,15 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import { hasPlaceNear } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
+import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+/** How long the camera must rest after moving to the person before the map checks what is near. */
+const SETTLE_MS = 600;
 
 export type MapPin = {
   id: string;
@@ -63,16 +68,36 @@ export function PlacesMap({
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
   const centredOnUser = useRef(false);
+  const centre = useRef<LatLng | undefined>(undefined);
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Set while the camera travels to the person; once it rests, a map with none of their places in
+  // reach moves on to the city they saved the most in.
+  const checkNearby = useRef<(() => void) | undefined>(undefined);
+  const waitForRest = () => {
+    clearTimeout(settle.current);
+    settle.current = setTimeout(() => checkNearby.current?.(), SETTLE_MS);
+  };
   useEffect(() => {
     if (!showsUser || centredOnUser.current) return;
     centredOnUser.current = true;
+    checkNearby.current = () => {
+      checkNearby.current = undefined;
+      if (fit && !hasPlaceNear(centre.current, pins))
+        ref.current
+          ?.setCameraPosition(fit)
+          .catch((error: unknown) =>
+            analytics.captureError("places_map_camera_failed", error),
+          );
+    };
     // No position means the person's own location.
     ref.current
       ?.setCameraPosition()
+      .then(waitForRest)
       .catch((error: unknown) =>
         analytics.captureError("places_map_camera_failed", error),
       );
-  }, [showsUser]);
+  });
+  useEffect(() => () => clearTimeout(settle.current), []);
 
   const select = (id: string | undefined) => {
     if (id) onSelect(id);
@@ -101,6 +126,14 @@ export function PlacesMap({
           tintColor: theme.colors.primary,
         }))}
         onMarkerClick={(marker) => select(marker.id)}
+        onCameraMove={(event) => {
+          const { latitude, longitude } = event.coordinates;
+          centre.current =
+            latitude !== undefined && longitude !== undefined
+              ? { lat: latitude, lng: longitude }
+              : undefined;
+          if (checkNearby.current) waitForRest();
+        }}
       />
     );
   }

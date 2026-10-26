@@ -3,6 +3,7 @@ import { MapFilterChips } from "@/components/map/map-filter-chips";
 import { type MapPin, PlacesMap } from "@/components/map/places-map";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
+import { withAlpha } from "@/lib/color";
 import {
   canOpenPlaceCard,
   cancelPlaceDetails,
@@ -35,9 +36,11 @@ export default function MapScreen() {
   const { theme, rt } = useUnistyles();
   // A place card's Apple lookup can finish after the user has left; it must not present or navigate then.
   const focused = useRef(false);
+  const [opened, setOpened] = useState(false);
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
+      setOpened(true);
       return () => {
         focused.current = false;
         cancelPlaceDetails();
@@ -45,7 +48,7 @@ export default function MapScreen() {
     }, []),
   );
   const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
-  const location = useMapLocation();
+  const location = useMapLocation(opened);
   const [kind, setKind] = useState<PlaceKind | null>(null);
 
   const all = places.data;
@@ -66,15 +69,16 @@ export default function MapScreen() {
     [all],
   );
 
-  const opened = useRef(false);
+  const reported = useRef(false);
   useEffect(() => {
-    if (all === undefined || location === "asking" || opened.current) return;
-    opened.current = true;
+    if (!opened || all === undefined || location === "asking") return;
+    if (reported.current) return;
+    reported.current = true;
     analytics.capture("map_opened", {
       count: all.length,
       located: location === "granted",
     });
-  }, [all, location]);
+  }, [opened, all, location]);
 
   if (places.isError) {
     return (
@@ -122,6 +126,18 @@ export default function MapScreen() {
         showsUser={location === "granted"}
         topInset={chipsTop + theme.control.minHeight}
         onSelect={select}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: chipsTop + theme.control.minHeight + theme.gap(2),
+          // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
+          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
+        }}
       />
       {filters.length > 0 ? (
         <View style={[styles.chips, { top: chipsTop }]}>

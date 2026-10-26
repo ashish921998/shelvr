@@ -428,8 +428,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
 - `(app)/(tabs)` holds two native tabs, `(home)` and `(map)`. `(map)` is every mapped place on
-  one full-screen map, opening on the person's location (iOS asks once; otherwise the city with
-  the most places), with filter chips for the kinds that have three or more places
+  one full-screen map, opening on the person's location (iOS asks once, when the tab first opens)
+  unless none of their places is within 50 km; otherwise on the city with the most places, with filter chips for the kinds that have three or more places
   (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
   `(home)` is Home. It lists "Your cities",
   "Finding places…" for processing saves, "Couldn't read these saves" for failed reads,

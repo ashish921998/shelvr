@@ -1,4 +1,3 @@
-import { GlassView, hasLiquidGlass } from "@/components/glass";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { t } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
@@ -38,15 +37,10 @@ function Chip({
       onPress={onPress}
       style={({ pressed }) => pressed && styles.pressed}
     >
-      {selected ? (
-        <View style={[styles.chip, styles.selected]}>{text}</View>
-      ) : hasLiquidGlass ? (
-        <GlassView isInteractive style={styles.chip}>
-          {text}
-        </GlassView>
-      ) : (
-        <View style={[styles.chip, styles.plain]}>{text}</View>
-      )}
+      {/* Solid, not glass: a see-through chip is unreadable over busy map labels. */}
+      <View style={[styles.chip, selected ? styles.selected : styles.plain]}>
+        {text}
+      </View>
     </Pressable>
   );
 }
@@ -87,7 +81,7 @@ export function MapFilterChips({
 const styles = StyleSheet.create((theme) => ({
   row: { gap: theme.gap(1), paddingHorizontal: theme.gap(2) },
   chip: {
-    overflow: "hidden",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.16)",
     paddingVertical: theme.gap(1),
     paddingHorizontal: theme.gap(2),
     borderRadius: 999,
