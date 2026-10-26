@@ -1,17 +1,9 @@
 const MAX_IMAGE_MIB = 14;
-// Base64 expands this to ~19.6 MB, leaving room for prompts below Gemini's
-// 20 MB inline request limit. Cap space candidates by JSON-escaped
-// UTF-8 bytes as part of the same budget. Check size before allocating bytes.
 export const MAX_STORED_IMAGE_BYTES = MAX_IMAGE_MIB * 1024 * 1024;
 export const MAX_SPACE_PROMPT_BYTES = 64 * 1024;
 export const IMAGE_TOO_LARGE_MESSAGE = `This photo is too large to read. Save a smaller copy (under ${MAX_IMAGE_MIB} MB).`;
 export const IMAGE_EMPTY_MESSAGE = "This photo is empty. Please save it again.";
 
-/** The save-error code for a rejected upload size, or undefined when the size
- * is fine. The literals are a subset of `SaveErrorCode`, spelled out here
- * rather than imported: `model/saveErrors.ts` imports this module for its
- * message table, so depending on it back would be a cycle. Call sites hand the
- * result straight to `saveError`, which typechecks the overlap. */
 export function imageSizeErrorCode(
   size: number,
 ): "image_empty" | "image_too_large" | undefined {
@@ -25,12 +17,9 @@ export function imageSizeError(size: number): string | undefined {
   if (code === "image_too_large") return IMAGE_TOO_LARGE_MESSAGE;
 }
 
-/** Photos an account may hold at once; same for every Pro plan. Keeps a
- * yearly seat from becoming a photo backup. Deleting a photo frees its slot. */
 export const MAX_PHOTOS_PER_ACCOUNT = 1000;
 export const PHOTO_LIMIT_MESSAGE = `Photo limit reached (${MAX_PHOTOS_PER_ACCOUNT.toLocaleString("en-US")}). Delete some photos to save more.`;
 
-/** Recognize HEIF containers independently of the SDK's narrow ftyp prefix. */
 export function heifMediaType(bytes: Uint8Array): string | undefined {
   if (
     bytes.length < 16 ||

@@ -25,7 +25,6 @@ const source = readJson("src/locales/en.json");
 const placeholders = (value) =>
   (value.match(/%\{[^}]+\}/g) ?? []).sort().join("|");
 
-/** Keys pushed to a device, and the exact placeholder set each one must carry. */
 const notificationPlaceholders = {
   "digest.waitingCount": "%{formattedCount}",
   "digest.namedCount": "%{formattedCount}|%{title}",
@@ -36,7 +35,6 @@ const notificationPlaceholders = {
   "reminder.cookBody": "%{title}",
 };
 
-// Validate the whole input before writing any native resources.
 const catalogs = locales.map((locale) => {
   const messages = readJson(`src/locales/${locale}.json`);
   if (
@@ -62,10 +60,6 @@ const catalogs = locales.map((locale) => {
     const variants = isPlural ? Object.values(value) : [value];
     const reference = isPlural ? original.other : original;
     for (const variant of variants) {
-      // Notification bodies are built by convex/model/notificationFields.ts,
-      // which substitutes a fixed placeholder set per key. A catalog that
-      // drops or adds one would render a literal `%{...}` on a lock screen,
-      // so the exact set is pinned here rather than only compared to English.
       const required = notificationPlaceholders[key];
       if (
         required !== undefined &&
@@ -178,8 +172,6 @@ await writeGenerated(
   ) + "\n",
 );
 
-// The Android widget picker reads its label and description from string
-// resources in the widget module, one values folder per locale.
 const androidQualifier = (locale) => {
   const [language, region] = locale.split("-");
   return region ? `${language}-r${region}` : language;

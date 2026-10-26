@@ -31,8 +31,8 @@ For any change a person can see, screenshots or a recording go here, naming the 
 commit they were taken at. Drag images into this box.
 CI requires one when the pull request touches UI files (screens, styles, motion, copy, assets,
 native view modules, app intents, app config, push copy, apps/web UI). If those files changed but
-nothing on screen did, say why here; only the owner waives the screenshot, with the "no-ui-change"
-label (a rule, not a check: CI cannot tell who added the label, so agents never add it).
+nothing on screen did, say why here and add the "no-ui-change" label when you open the pull
+request (`gh pr create --label no-ui-change`). Any visible change still needs a screenshot.
 Paywall changes live in RevenueCat, so CI cannot see them: they still need screenshots.
 -->
 
@@ -45,5 +45,5 @@ Paywall changes live in RevenueCat, so CI cannot see them: they still need scree
 <!-- Keep the lines that apply and delete the rest. Each trailer goes on a commit in this PR. -->
 
 - Public Convex function `args` or `returns` changed: add the `Convex-Api: changed` trailer and say how installed apps survive it.
-- Native fingerprint moved (native module, config plugin, `app.json`, `app.config.js`): add the `Native-Fingerprint: changed` trailer. OTAs wait for a store build.
+- Native fingerprint may have moved (native module, config plugin, `app.json`, `app.config.js`): CI's `native fingerprint` job reports it, for the production variant only and without blocking. If it reports CHANGED, add the `Native-Fingerprint: changed` trailer. OTAs wait for a store build. The job cannot see `eas.json` build fields, `.easignore` edits or pnpm patches; if you changed one, decide by hand ([what the fingerprint hashes](https://github.com/ashish921998/shelvr/blob/main/docs/architecture/push-notifications.md#what-the-fingerprint-hashes)).
 - Backend must deploy before the client: say so.

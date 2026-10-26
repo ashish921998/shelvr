@@ -24,9 +24,6 @@ vi.mock("@convex-dev/auth/react", () => ({
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => mock.currentUser,
 }));
-vi.mock("@/lib/exit-offer-reminder", () => ({
-  clearExitOfferReminder: vi.fn(async () => mock.cleared.push("exit-offer")),
-}));
 vi.mock("@/lib/first-save-reminder", () => ({
   clearFirstSaveReminder: vi.fn(async () => mock.cleared.push("first-save")),
 }));
@@ -64,12 +61,7 @@ describe("useSignOutWhenAccountGone", () => {
     state(null);
     renderHook(() => useSignOutWhenAccountGone());
     await vi.waitFor(() =>
-      expect(mock.cleared).toEqual([
-        "signed-out",
-        "exit-offer",
-        "first-save",
-        "trial",
-      ]),
+      expect(mock.cleared).toEqual(["signed-out", "first-save", "trial"]),
     );
   });
 

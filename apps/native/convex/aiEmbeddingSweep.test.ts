@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 import { internal } from "./_generated/api";
 import {
   CURRENT_EMBEDDING_VERSION,
@@ -13,9 +13,6 @@ import {
 
 const embedMany = vi.hoisted(() => vi.fn());
 
-// The sweep action runs the real pipeline code end to end; only the provider
-// call is replaced. `ai.ts` builds its language model at import, so
-// wrapLanguageModel has to be stubbed too.
 vi.mock("ai", () => ({
   embedMany,
   generateObject: vi.fn(),
@@ -28,8 +25,6 @@ function unitVector(): number[] {
   return v;
 }
 
-// convex-test runs `runAfter(0, ...)` through a real setTimeout, which would
-// fire during teardown. Fake timers keep the rows assertable without executing.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   embedMany.mockReset();
@@ -42,7 +37,7 @@ afterEach(() => {
 async function seedReady(count: number) {
   const t = newConvexTest();
   await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", {});
+    const userId = await insertConsentingUser(ctx);
     for (let i = 0; i < count; i++) {
       await ctx.db.insert("items", {
         userId,
@@ -73,7 +68,7 @@ describe("sweepItemEmbeddings", () => {
     await t.run(async (ctx) => {
       const owner = (await ctx.db.query("users").collect())[0];
       await ctx.db.patch(owner._id, { deleting: true });
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("items", {
         userId,
         type: "note",
@@ -102,7 +97,7 @@ describe("sweepItemEmbeddings", () => {
     await t.run(async (ctx) => {
       const owner = (await ctx.db.query("users").collect())[0];
       await ctx.db.delete(owner._id);
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("items", {
         userId,
         type: "note",
@@ -157,9 +152,6 @@ describe("sweepItemEmbeddings", () => {
   });
 
   it("strands nothing and does not accelerate when the provider is down", async () => {
-    // The failure this guards: stamping on a provider error would march the
-    // whole table, marking every item as embedded with no vector, and chaining
-    // at full speed while doing it. Nothing would ever revisit those rows.
     const t = await seedReady(EMBEDDING_SWEEP_PAGE + 1);
     embedMany.mockRejectedValue(new Error("provider down"));
 
@@ -171,20 +163,13 @@ describe("sweepItemEmbeddings", () => {
     const rows = await t.run((ctx) => ctx.db.query("items").collect());
     for (const row of rows) {
       expect(row.embeddingVersion).toBeUndefined();
-      // An outage is not the item's fault, so it costs no attempt either.
       expect(row.embeddingAttempts).toBeUndefined();
     }
   });
 
   it("spends an attempt when the provider answers with nothing usable", async () => {
-    // A completed call whose vectors are all malformed is not an outage. Read
-    // as one, every row would defer, and because the same rows lead the sweep
-    // range every run the page would be re-read forever, wedging the sweep
-    // behind items it can never embed, with every later ready item stuck
-    // behind them. These spend an attempt instead, and the cap clears them.
     const t = await seedReady(3);
     embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
-      // Right count, wrong width: the provider answered, the answer is unusable.
       embeddings: values.map(() => [1, 2, 3]),
     }));
 
@@ -194,14 +179,11 @@ describe("sweepItemEmbeddings", () => {
     const rows = await t.run((ctx) => ctx.db.query("items").collect());
     for (const row of rows) {
       expect(row.embeddingAttempts).toBe(1);
-      // Still unstamped, so the sweep will retry (up to the cap).
       expect(row.embeddingVersion).toBeUndefined();
     }
   });
 
   it("stamps a permanently unembeddable item once it hits the cap", async () => {
-    // What the attempt budget buys: without it, one row the provider can never
-    // embed leads the range forever and nothing behind it is ever reached.
     const t = await seedReady(1);
     embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
       embeddings: values.map(() => [1, 2, 3]),
@@ -215,7 +197,6 @@ describe("sweepItemEmbeddings", () => {
     expect(row.embeddingAttempts).toBe(MAX_EMBEDDING_ATTEMPTS);
     expect(row.embeddingVersion).toBe(CURRENT_EMBEDDING_VERSION);
     expect(row.embedding).toBeUndefined();
-    // Out of the range, so the rows behind it are reachable again.
     expect(
       await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
         limit: EMBEDDING_SWEEP_PAGE,
@@ -259,7 +240,7 @@ describe("sweepItemEmbeddings", () => {
   it("finishes items with no embeddable text without calling the provider", async () => {
     const t = newConvexTest();
     await t.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {});
+      const userId = await insertConsentingUser(ctx);
       await ctx.db.insert("items", {
         userId,
         type: "image" as const,
@@ -273,7 +254,6 @@ describe("sweepItemEmbeddings", () => {
 
     expect(result).toEqual({ scanned: 1, written: 0 });
     expect(embedMany).not.toHaveBeenCalled();
-    // Stamped anyway, so the sweep drains rather than spinning on it.
     expect(
       await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
         limit: EMBEDDING_SWEEP_PAGE,

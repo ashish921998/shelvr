@@ -1,8 +1,10 @@
 # Shelvr
 
-Shelvr is a save-for-later hub. Capture links, images, and notes; Convex + an LLM
-classify each item (title, description, tags, spaces). Everything lands in a
-searchable feed, organized into themed **spaces**.
+Shelvr is a save-for-later hub. Save a reel, TikTok or link; Convex + an LLM
+classify it (title, description, tags, cities, places). Its places land under
+their city on Home, and each city page has a map of them with Plan a date and
+Plan a trip. Themed **spaces** stay in the backend for old builds and behind
+each city's plans; the app no longer shows them.
 
 The product is **mobile-first**: the native app is the full experience. The web
 site is marketing only.
@@ -164,7 +166,7 @@ pnpm --filter native-app exec convex dev
 pnpm --filter native-app test    # vitest run
 pnpm --filter web-app test       # vitest run
 pnpm run coverage                 # native and web Vitest coverage gates
-pnpm --filter native-app check   # lint, then typecheck, then test
+pnpm run check                    # the whole gate: what CI runs, plus the dependency audit
 ```
 
 Tests are `*.test.ts` files next to the code under `apps/native/convex/`,
@@ -175,30 +177,41 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 
 #### End-to-end flows on the iOS simulator (pilot)
 
-`tools/e2e` drives the development build through seven flows with the
-[e2e](https://github.com/tester-army/e2e) framework: save a link, save a note,
-save a photo, create a space, search, a search with no match, and the paywall,
-plus a smoke test (`tests/smoke.e2e.ts`) that only opens the seeded Home.
-Search, save-a-note, create-a-space and the paywall use plain locators and make
-no model call from the test; save-a-note still needs the backend's model, which
-makes the note searchable. The paywall flow relaunches the app with `-E2EHidePro YES`, which makes
-a development build show its always-Pro dev user as not Pro. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo taps the system photo picker by position, because the picker is not in the accessibility tree, and uses the model only to see that the picker has opened and to read the result. It is not part of `pnpm run check`. The `e2e ios` workflow runs search, search-no-results, create-space, the paywall, save-a-note and save-link-fixture on pull requests that touch the app, against a local Convex backend and with no real model, as a check that is not required yet. That backend classifies the note, and serves and classifies a fixture page for save-link-fixture, with the deterministic fake in `apps/native/convex/model/fakeAi.ts`, which only a local backend with the e2e switch, dev sign-in and the placeholder key turns on. Every flow launches with `-E2EHideLogBox YES`, which keeps the
+`tools/e2e` drives the development build through the app's one flow with the
+[e2e](https://github.com/tester-army/e2e) framework: Home lists the seeded
+"Your cities" (`tests/home-cities.e2e.ts`), onboarding, the paywall, and saving
+a pasted link, which lands under "No place found" when it names no place, and
+planning a date from a city (`tests/plan-city-date.e2e.ts`): it saves a Lisbon
+fixture page, opens Lisbon from Home and checks Plan a date returns a shortlist.
+Home-cities, onboarding and the paywall use plain locators and make no model
+call from the test. The paywall flow relaunches the app with `-E2EHidePro YES`,
+which makes a development build show its always-Pro dev user as not Pro.
+`save-link` reads a real page and uses one model call to read the result. It
+is not part of `pnpm run check`. The `e2e ios` workflow runs two shards on main
+and on pull requests that touch the app and carry the `run-e2e` label: a
+(home-cities, onboarding) and b (paywall, plan-city-date, save-link-fixture), against a local
+Convex backend and with no real model, as a check that is not required yet.
+save-link-fixture and plan-city-date save fixture pages that the deterministic
+fake in `apps/native/convex/model/fakeAi.ts` serves and classifies (with a city
+and places for the Lisbon page), and the fake also answers the plan call;
+plan-city-date skips itself without that fake. Only a local
+backend with the e2e switch, dev sign-in and the placeholder key turns that
+fake on. Every flow launches with `-E2EHideLogBox YES`, which keeps the
 development error banner from covering the controls the flows tap.
 
 It needs a booted iOS simulator with the development build
 (`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
 Convex deployment, and `AUTH_ENABLE_ANONYMOUS=true` on that deployment. The
-app runs in English whatever the simulator's language, and the save-a-photo
-flow adds its own photo (`tools/e2e/fixtures/photo.png`) to the simulator's
-library. Each
+app runs in English whatever the simulator's language. Each
 test signs in as the anonymous dev user and resets its data through Settings >
-"Reset flow fixtures", so run it only against a throwaway dev user.
+"Reset flow fixtures" (in CI, `E2E_FIXTURE_RESET=backend` resets it from the
+Convex CLI instead), so run it only against a throwaway dev user.
 
 ```sh
 cd tools/e2e
 export GOOGLE_GENERATIVE_AI_API_KEY=...   # an AI Studio key; never commit it
-pnpm exec e2e run                         # all seven flows and the smoke test
-pnpm exec e2e run tests/search.e2e.ts     # one flow
+pnpm exec e2e run                         # all flows
+pnpm exec e2e run tests/home-cities.e2e.ts  # one flow
 pnpm exec e2e run --video on              # record an MP4 per test under .e2e/
 ```
 
@@ -213,8 +226,8 @@ recordings are gitignored for now, so each machine makes its own.
 `pnpm exec e2e run --no-cache` forces every step back through the model.
 
 Checks use plain locators wherever the label is known in advance; seeded
-saves carry `fixture-item-*` test IDs. Only the count of saves after a new link
-or photo, whose title the model writes, is judged from a screenshot
+saves carry `fixture-item-*` test IDs. Only the save a real link makes, whose
+title the model writes, is judged from a screenshot
 (`agent.waitFor` with `vision`), at one model call per run.
 
 ## Domain model (Convex)
@@ -292,18 +305,13 @@ with plaintext or sensitive visibility in EAS production so builds and
 updates use the same config inputs. Both environment validation and OTA
 publication pin `APP_VARIANT=production`.
 
-**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
-change that alters it makes new updates invisible to binaries built from the
-old fingerprint. That includes a native dependency added or removed, a native
-config change, or the `version` in `app.json`. Cut a fresh store build before
-resuming OTA publishes.
-
-The app version is the surprising input. Bumping 1.0.3 to 1.0.4 moved the
-iOS fingerprint from `d2537f3a` to `890e5366`, measured across two local
-production builds of the same commit differing only in that field. So a
-version bump has to land on `main` before any OTA aimed at the build that
-carries it, or every publish is invisible to the app it was meant for. The
-build number is not an input.
+**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. A change to
+a native module, a config plugin, `app.json` or `app.config.js` may move it, and
+a moved fingerprint makes new updates invisible to binaries built from the old
+one. Cut a fresh store build before resuming OTA publishes. Do not predict a
+move; run `pnpm run verify:fingerprint origin/main HEAD`. What the fingerprint
+hashes, and what it cannot see, is in
+[What the fingerprint hashes](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 
 **Building outside the workflow.** `eas build --local` runs on your own
 machine when EAS cloud minutes run out, but it is not guaranteed to produce

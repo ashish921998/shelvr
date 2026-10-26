@@ -6,7 +6,7 @@ The app records behavior; this dashboard is for the product team. It does not ad
 
 ## Metric contract
 
-- A save is an item successfully created in Convex, timed by `_creationTime`, not a photo's original `capturedAt`. Link, note, share-sheet, onboarding, camera, and Tidy imports all converge on the instrumented creation paths.
+- A save is an item successfully created in Convex, timed by `_creationTime`, not a photo's original `capturedAt`. Link, note, share-sheet, onboarding, and camera imports all converge on the instrumented creation paths.
 - A reopen is a focused, foreground item view in a nonempty PostHog session different from the original save session, within seven days of creation. Preloaded adjacent pages do not generate opens. Repeated opens count once per item in the report.
 - A useful return is a reopen followed by `copy` or a platform-confirmed `share` of the same item in that return session, also within seven days of creation. This is an observable action signal, not proof that someone read an article or cooked a recipe.
 - Session matching is intentionally strict: if PostHog rotates the session ID between the open and the action, that action does not qualify unless another open is recorded in the new session. This can undercount long or interrupted engagements. A rotated session can also qualify as a reopen; sessions are an operational proxy for a return, not proof of a separate visit. Do not compare this metric directly with a day-based return rate.
@@ -18,15 +18,15 @@ The app records behavior; this dashboard is for the product team. It does not ad
 
 ## Events
 
-| Event                           | Origin                                                                                                  | Important fields                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `item_saved`                    | Convex, once per creation transaction                                                                   | `item_id`, `item_type`, `saved_at`, `save_session_id`, `save_source`, optional `operation_id` |
-| `item_processed`                | Convex, once per applied processing outcome                                                             | `item_id`, `item_type`, `outcome`, optional `failure_reason`/`enrichment`, `processing_ms`    |
-| `save_attempt_started`          | Native client, once per submitted save operation                                                        | `save_source`, `save_kind`, optional `operation_id`                                           |
-| `save_failed`                   | Native client, once per failed save operation                                                           | `save_source`, `save_kind`, `stage`, optional `operation_id`                                  |
-| `item_opened`                   | Focused item pager / foreground return                                                                  | `item_id`, `item_type`, `saved_at`, `item_age_ms`, `source`, SDK `$session_id`                |
-| `item_action`                   | Item detail actions, feed sharing, and the first saved edit per note page visit (`action: note_edited`) | Same item fields, `action`, SDK `$session_id`                                                 |
-| `item_space_membership_changed` | Space corrections and Undo                                                                              | `item_id`, `space_id`, `membership_added`, `undone`                                           |
+| Event                           | Origin                                                                                                                                                                                         | Important fields                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `item_saved`                    | Convex, once per creation transaction                                                                                                                                                          | `item_id`, `item_type`, `saved_at`, `save_session_id`, `save_source`, optional `operation_id` |
+| `item_processed`                | Convex, once per applied processing outcome                                                                                                                                                    | `item_id`, `item_type`, `outcome`, optional `failure_reason`/`enrichment`, `processing_ms`    |
+| `save_attempt_started`          | Native client, once per submitted save operation                                                                                                                                               | `save_source`, `save_kind`, optional `operation_id`                                           |
+| `save_failed`                   | Native client, once per failed save operation                                                                                                                                                  | `save_source`, `save_kind`, `stage`, optional `operation_id`                                  |
+| `item_opened`                   | Focused item pager / foreground return                                                                                                                                                         | `item_id`, `item_type`, `saved_at`, `item_age_ms`, `source`, SDK `$session_id`                |
+| `item_action`                   | Item detail actions, feed sharing, Open in Maps from a Home card (`action: open_maps`, which the detail page also sends), and the first saved edit per note page visit (`action: note_edited`) | Same item fields, `action`, SDK `$session_id`                                                 |
+| `item_space_membership_changed` | Space corrections and Undo                                                                                                                                                                     | `item_id`, `space_id`, `membership_added`, `undone`                                           |
 
 All events include `environment` and `analytics_version`. `item_saved` and
 `item_processed` join on `item_id`; `operation_id` additionally joins a client
@@ -53,7 +53,7 @@ Removing a saved membership now retains a `dismissed` record. Both AI classifica
 
 ## Verification
 
-Run `pnpm --filter native-app check` for lint, TypeScript, and unit/backend tests. Regression tests cover persistent removal, explicit restoration, authorization, canonical save timestamps, idempotent retries, telemetry UUID reuse, unavailable analytics, and content-free item event properties.
+Run `pnpm run check` for lint, TypeScript, and unit/backend tests. Regression tests cover persistent removal, explicit restoration, authorization, canonical save timestamps, idempotent retries, telemetry UUID reuse, unavailable analytics, and content-free item event properties.
 
 `validate-useful-returns.sql` runs synthetic rows directly through PostHog's SQL engine without inserting events. Expected: `valid` reopens and acts; `same_session` and `too_late` do neither; `unknown_session` is unmeasurable; `immature` is absent; `action_before_open` and `different_session` reopen but do not count as useful returns.
 

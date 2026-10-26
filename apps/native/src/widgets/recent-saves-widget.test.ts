@@ -1,12 +1,5 @@
-// The widget extension's JS runtime renders through @expo/ui's SwiftUI
-// intrinsics, which need a native host. The component is invoked directly
-// here (no rendering): each intrinsic is an identity registered in
-// `fsx.views`, and every modifier becomes a tagged descriptor, so the tests
-// assert on the element tree the widget would hand the runtime.
 import { describe, expect, it, vi } from "vitest";
 
-// Importing the module runs createWidget, which registers the component in
-// the expo-widgets mock below (vi.mock factories hoist above imports).
 import "@/widgets/recent-saves-widget";
 
 type WidgetSaveItem = {
@@ -32,7 +25,6 @@ type WidgetEnvironment = {
   date?: Date;
 };
 
-/** One element of the tree the component returns. */
 type WidgetElement = {
   type: unknown;
   props: {
@@ -107,7 +99,6 @@ function widget(): WidgetComponent {
   return fsx.component;
 }
 
-/** The `index`th child of an element's children, failing loudly if absent. */
 function childView(tree: WidgetElement, index: number): WidgetElement {
   const child = (tree.props.children ?? [])[index];
   if (child === undefined) {
@@ -116,15 +107,11 @@ function childView(tree: WidgetElement, index: number): WidgetElement {
   return child;
 }
 
-/** The first text child of the `index`th child view. JSX hands a single
- * child over as the raw value and multiple children as an array, so
- * normalize before comparing. */
 function textOf(tree: WidgetElement, index: number): unknown {
   const children = childView(tree, index).props.children;
   return Array.isArray(children) ? children[0] : children;
 }
 
-/** The URL the whole widget taps through to, or undefined if none is set. */
 function widgetUrl(tree: WidgetElement): unknown {
   return (
     (tree.props.modifiers ?? []).find((m) => m.mod === "widgetURL")?.args[0] ??
@@ -144,20 +131,18 @@ describe("RecentSavesWidget", () => {
       smallLight,
     );
 
-    // Lock icon instead of the tray, with the localized Pro copy under it.
     expect(childView(tree, 0).type).toBe(fsx.views.Image);
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
     expect(textOf(tree, 1)).toBe("Shelvr Pro");
     expect(textOf(tree, 2)).toBe("Unlock your latest saves");
-    // Tapping a locked widget goes to the paywall.
-    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(widgetUrl(tree)).toBe("shelvr:///");
   });
 
   it("fails closed to the Pro state before the app writes a snapshot", () => {
     const tree = widget()({}, smallLight);
 
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
-    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(widgetUrl(tree)).toBe("shelvr:///");
   });
 
   it("renders the normal empty state for an entitled user", () => {
@@ -226,9 +211,8 @@ describe("RecentSavesWidget", () => {
       { ...smallLight, date: new Date(2_000) },
     );
 
-    // The lapsed entitlement collapses to the Pro upsell: no saved content.
     expect(childView(tree, 0).props.systemName).toBe("lock.fill");
-    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(widgetUrl(tree)).toBe("shelvr:///");
     expect(JSON.stringify(tree)).not.toContain("Chair");
   });
 });
@@ -240,6 +224,6 @@ it.each(["shelvr-dev", "shelvr-preview"])(
       { items: [], locked: true, scheme },
       { colorScheme: "light", widgetFamily: "systemSmall", date: new Date() },
     );
-    expect(widgetUrl(tree)).toBe(`${scheme}:///paywall`);
+    expect(widgetUrl(tree)).toBe(`${scheme}:///`);
   },
 );

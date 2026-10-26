@@ -1,30 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { after, test } from "node:test";
 
 import { trailerValues } from "./git-trailer.mjs";
+import { createRepo } from "./temp-repo.mjs";
 
-// Reading a trailer is git's job, so the test gives git real commits rather
-// than a string that only looks like one.
-const repo = realpathSync(mkdtempSync(join(tmpdir(), "git-trailer-")));
-const git = (...args) =>
-  execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" });
-
-git("init", "--quiet");
-git("config", "user.email", "test@example.com");
-git("config", "user.name", "Test");
-git("config", "commit.gpgsign", "false");
-
-const commit = (message) =>
-  git("commit", "--quiet", "--allow-empty", "-m", message);
+const { dir: repo, git, commit, remove } = createRepo("git-trailer-");
+after(() => remove());
 
 commit("root");
 const root = git("rev-parse", "HEAD").trim();
-
-after(() => rmSync(repo, { recursive: true, force: true }));
 
 test("a value containing a comma stays one value", () => {
   commit(

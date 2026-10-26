@@ -2,17 +2,12 @@
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
-import { env, internalAction, type ActionCtx } from "./_generated/server";
+import { env, internalAction } from "./_generated/server";
 import { revokeRefreshToken } from "./model/appleClient";
 import { errorName, logEvent } from "./model/log";
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5 * 60_000;
-
-async function forget(ctx: ActionCtx, tokenId: Id<"appleTokens">) {
-  await ctx.runMutation(internal.users.forgetAppleToken, { tokenId });
-}
 
 type RevokeResult =
   | { kind: "unconfigured" }
@@ -20,12 +15,6 @@ type RevokeResult =
   | { kind: "status"; status: number }
   | { kind: "unreachable" };
 
-/**
- * One revocation attempt against Apple. Apple revokes a token only for the
- * client it was issued to: the app's bundle id for the native sheet, the
- * Service ID for the web flow. The Service ID is Convex Auth's own variable,
- * so it is not declared in convex.config.ts.
- */
 async function revokeOnce(
   refreshToken: string,
   clientId: string | undefined,
@@ -53,13 +42,6 @@ async function revokeOnce(
   }
 }
 
-/**
- * Logs one attempt's outcome and applies the shared policy: a refusal (an
- * already revoked token, a bad key) would be refused again, so it settles;
- * only "Apple could not be reached" is retried, a bounded number of times.
- * 429 is Apple asking us to slow down, not a refusal, so it takes the retry
- * path too.
- */
 function classify(result: RevokeResult, attempt: number): "settled" | "retry" {
   if (result.kind === "unconfigured") {
     logEvent("info", "apple_revoke_skipped", { code: "unconfigured" });
@@ -95,12 +77,6 @@ function classify(result: RevokeResult, attempt: number): "settled" | "retry" {
   return willRetry ? "retry" : "settled";
 }
 
-/**
- * Revokes a Sign in with Apple refresh token after its account was deleted.
- * Best effort by design: nothing about the deletion
- * depends on Apple answering. Only "Apple could not be reached" is retried;
- * a refusal (an already revoked token, a bad key) would be refused again.
- */
 export const revoke = internalAction({
   args: { tokenId: v.id("appleTokens"), attempt: v.optional(v.number()) },
   returns: v.null(),
@@ -121,19 +97,14 @@ export const revoke = internalAction({
         },
       );
     } else {
-      await forget(ctx, args.tokenId);
+      await ctx.runMutation(internal.users.forgetAppleToken, {
+        tokenId: args.tokenId,
+      });
     }
     return null;
   },
 });
 
-/**
- * Revokes a web-flow refresh token that was never kept: the sign-in landed
- * while the owner row was already `deleting`, so `storeAppleToken` refused it
- * and `keepAppleRefreshToken` parked it in `detachedAppleTokens`. Same
- * best-effort policy as `revoke`; the parked row goes once Apple has answered
- * or the attempts run out.
- */
 export const revokeDetachedToken = internalAction({
   args: {
     tokenId: v.id("detachedAppleTokens"),

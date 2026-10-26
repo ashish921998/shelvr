@@ -18,23 +18,21 @@ import Animated, {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { scheduleOnRN } from "react-native-worklets";
 
+type Tally = { picks: number; passes: number };
+
 type Props = {
   places: PlanPlace[];
-  /** The card on top. */
   front: number;
-  /** The top card shows its back: why it was picked and where from. */
   flipped: boolean;
   imageFor: (place: PlanPlace) => string | undefined;
   titleFor: (place: PlanPlace) => string | undefined;
   isVisited: (place: PlanPlace) => boolean;
+  tallyFor: (place: PlanPlace) => Tally | null;
   onFlip: () => void;
-  /** The top card was swiped away; it goes to the back of the deck. */
   onNext: () => void;
   onOpenMaps: (place: PlanPlace, rank: number) => void;
 };
 
-// Each card under the top one sits a little turned, so the deck reads as a
-// hand of photos rather than a list. Index 0 is the top card.
 const FAN = [
   { rotate: -1, x: 0, y: 0 },
   { rotate: 5, x: 14, y: 8 },
@@ -43,7 +41,6 @@ const FAN = [
 ];
 const FLIP_MS = 360;
 
-/** A plan as a deck of photo cards: swipe for the next, tap to flip. */
 export function PlanDeck({
   places,
   front,
@@ -51,6 +48,7 @@ export function PlanDeck({
   imageFor,
   titleFor,
   isVisited,
+  tallyFor,
   onFlip,
   onNext,
   onOpenMaps,
@@ -65,7 +63,6 @@ export function PlanDeck({
   const panX = useSharedValue(0);
   const turn = useSharedValue(flipped ? 1 : 0);
 
-  // A new top card arrives centered, face up.
   useLayoutEffect(() => {
     panX.set(0);
   }, [front, panX]);
@@ -76,6 +73,9 @@ export function PlanDeck({
     );
   }, [flipped, reducedMotion, turn]);
 
+  // One place: the next card is this card and `front` never changes, so the
+  // centring effect above never runs after a swipe.
+  const single = places.length === 1;
   const swipe = useMemo(() => {
     const away = width * 1.2;
     return Gesture.Pan()
@@ -96,11 +96,13 @@ export function PlanDeck({
         const direction = x + event.velocityX * 0.1 < 0 ? -1 : 1;
         panX.set(
           withTiming(direction * away, { duration: 220 }, (done) => {
-            if (done) scheduleOnRN(onNext);
+            if (!done) return;
+            scheduleOnRN(onNext);
+            if (single) panX.set(withSpring(0, motion.spring.drag));
           }),
         );
       });
-  }, [width, cardWidth, panX, onNext]);
+  }, [width, cardWidth, panX, onNext, single]);
 
   const topStyle = useAnimatedStyle(() => ({
     transform: [
@@ -155,6 +157,7 @@ export function PlanDeck({
                 place={place}
                 imageUrl={imageFor(place)}
                 visited={isVisited(place)}
+                tally={tallyFor(place)}
               />
             </View>
           );
@@ -166,7 +169,9 @@ export function PlanDeck({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={
-                  flipped ? backLabel(place, titleFor(place)) : cardLabel(place)
+                  flipped
+                    ? backLabel(place, titleFor(place))
+                    : cardLabel(place, tallyFor(place))
                 }
                 accessibilityHint={t("plan.flipHint")}
                 accessibilityActions={[
@@ -194,6 +199,7 @@ export function PlanDeck({
                     place={place}
                     imageUrl={imageFor(place)}
                     visited={isVisited(place)}
+                    tally={tallyFor(place)}
                   />
                 </Animated.View>
                 <Animated.View
@@ -216,30 +222,33 @@ export function PlanDeck({
   );
 }
 
-/** The back read aloud: the place, why, and the save it came from. */
 function backLabel(place: PlanPlace, sourceTitle?: string): string {
   const from = sourceTitle ? t("plan.from", { title: sourceTitle }) : null;
   return [place.name, place.why, from].filter(Boolean).join(". ");
 }
 
-function cardLabel(place: PlanPlace): string {
-  return place.area ? `${place.name}, ${place.area}` : place.name;
+function cardLabel(place: PlanPlace, tally: Tally | null): string {
+  const name = place.area ? `${place.name}, ${place.area}` : place.name;
+  if (!tally) return name;
+  return `${name}. ${t("plan.tally", {
+    picks: String(tally.picks),
+    passes: String(tally.passes),
+  })}`;
 }
 
-/** The photo side: the save's image, the place's name, and a stamp once been. */
 function CardFace({
   place,
   imageUrl,
   visited,
+  tally,
 }: {
   place: PlanPlace;
   imageUrl?: string;
   visited: boolean;
+  tally: Tally | null;
 }) {
   return (
     <>
-      {/* Under the photo, so a save with no image, or one that fails to
-          load, still shows a card rather than a blank block. */}
       <View style={[styles.fill, styles.noImage]}>
         <ThemedText variant="hero" style={styles.initial}>
           {place.name.trim().charAt(0).toUpperCase()}
@@ -272,11 +281,17 @@ function CardFace({
         ) : null}
       </View>
       {visited ? <Stamp /> : null}
+      {tally ? (
+        <View style={styles.tally} accessible={false}>
+          <ThemedText variant="labelStrong" style={styles.tallyText}>
+            {`✓ ${tally.picks}  ·  ✕ ${tally.passes}`}
+          </ThemedText>
+        </View>
+      ) : null}
     </>
   );
 }
 
-/** "We went", inked on the photo. */
 function Stamp() {
   return (
     <View style={styles.stamp}>
@@ -288,7 +303,6 @@ function Stamp() {
   );
 }
 
-/** The back: why this place, the save it came from, and Maps. */
 function CardBack({
   place,
   imageUrl,
@@ -444,6 +458,20 @@ const styles = StyleSheet.create((theme) => ({
   stampText: {
     color: theme.colors.danger,
     textAlign: "center",
+  },
+  tally: {
+    position: "absolute",
+    top: theme.gap(1.5),
+    left: theme.gap(1.5),
+    paddingVertical: theme.gap(0.5),
+    paddingHorizontal: theme.gap(1.25),
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255, 255, 255, 0.35)",
+    backgroundColor: theme.colors.overlay,
+  },
+  tallyText: {
+    color: theme.colors.onOverlay,
   },
   backBody: {
     flex: 1,

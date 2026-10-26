@@ -21,52 +21,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10.33.0
 
-      # CI runs the exact minimum Node version the root package.json `engines`
-      # field supports, so a newer local runtime cannot mask a regression there.
+      # Keep CI on the supported Node 22 line used by the release workflow.
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20.20.0
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm run lint
+      # The command .husky/pre-push runs, so a check added to it reaches CI.
+      - name: Gate
+        run: pnpm run check:code
 
-      - name: Typecheck
-        run: pnpm turbo run typecheck
-
-      - name: Convex codegen drift
-        run: pnpm run verify:codegen
-
-      - name: Agent docs drift
-        run: pnpm run verify:agent-docs
-
-      - name: Tooling tests
-        run: pnpm run test:tools
-
-      - name: Dead code
-        run: pnpm run knip
+      # A new advisory appears in the registry, not in anyone's diff, so a
+      # required audit turns every open pull request red for a cause none of
+      # them contains. A pull request is audited only when it changes
+      # dependencies; audit.yml covers the rest on a schedule. Not on push to
+      # main either: Deploy waits for this workflow to pass.
+      - name: Dependency files changed
+        id: deps
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          # Captured before matching: a pipe into grep -q can fail git diff
+          # with SIGPIPE under pipefail, and a failed diff must fail the step
+          # rather than skip the audit.
+          changed_files=$(git diff --name-only "$BASE_SHA" HEAD)
+          if grep -qE '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$' <<< "$changed_files"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Security audit
+        if: github.event_name == 'workflow_dispatch' || steps.deps.outputs.changed == 'true'
         run: pnpm run audit
-
-      - name: Version drift
-        run: pnpm run syncpack:lint
-
-      - name: Test coverage
-        run: pnpm run coverage
 
   # A Convex deploy reaches every installed build at once, so a public
   # function's args and returns are a contract with apps already in the wild.
@@ -79,20 +79,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10.33.0
 
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20.20.0
+          node-version: 22
           cache: pnpm
 
       # Reads both refs out of git rather than checking them out, but it parses
@@ -100,14 +100,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The base commit this pull request was opened against, not the branch
-      # tip. Main can move while a run waits, and comparing against a newer tip
-      # reports its functions as removed by this pull request, failing a
-      # blocking check over a change it does not contain.
+      # The base branch, not the pull request's base.sha: the checked-out merge
+      # commit already carries whatever main gained since that sha, and the
+      # script compares from the point the head left the base, so only this
+      # pull request's own changes are measured.
       - name: Public Convex contract
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node tools/verify-convex-api.mjs "$BASE_SHA" HEAD
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/verify-convex-api.mjs "origin/$BASE_REF" HEAD
 
   # An OTA update only reaches installs whose store build shares the native
   # fingerprint. This job reports a pull request that moves it and never fails,
@@ -120,20 +120,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10.33.0
 
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20.20.0
+          node-version: 22
           cache: pnpm
 
       # The guard exports and installs both refs itself, so the checkout

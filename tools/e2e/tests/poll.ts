@@ -1,19 +1,8 @@
 import { expect } from "e2e";
 
-/**
- * Test-tool failures in a row that a poll sits through before it stops. One
- * snapshot can time out and the next succeed, but once the tool's daemon has
- * stopped answering, every later read fails the same way (seen on CI: a poll
- * read "Daemon request timed out" for its whole three minutes).
- */
-const TOOL_FAILURE_STREAK = 2;
+const TOOL_FAILURE_GRACE_MS = 15_000;
 
-/**
- * True when the test tool failed rather than the app: the runner gives an
- * engine failure such as a timed-out daemon request the `infrastructure`
- * category, and a missing or wrong control the `test` category. It may sit
- * under a wrapping error, so the cause chain is searched.
- */
+// The runner gives engine failures the "infrastructure" category, possibly on a wrapped cause.
 function isToolFailure(error: unknown): boolean {
   let current = error;
   for (let depth = 0; depth < 10; depth += 1) {
@@ -25,33 +14,27 @@ function isToolFailure(error: unknown): boolean {
   return false;
 }
 
-/**
- * Calls `check` until it returns true, like `expect.poll(check).toBe(true)`.
- * `expect.poll` treats every thrown read as "not yet", so a test tool that
- * stopped answering used to keep a poll going until its timeout and then
- * fail as an assertion. Here the tool's own failure ends the poll at once,
- * after TOOL_FAILURE_STREAK of them in a row, and the error names it.
- *
- * It is thrown as a plain error, which the runner counts as a test failure:
- * on CI it retries a test only for those, and a retry starts from a fresh
- * launch that often gets past a stalled tool.
- */
+/** Replaces `expect.poll(check).toBe(true)`, which counts every thrown read as "not yet". */
 export async function pollUntil(
   check: () => Promise<boolean>,
   { timeout }: { timeout: number },
 ): Promise<void> {
   let toolFailure: unknown;
-  let streak = 0;
+  let failingSince: number | undefined;
   await expect
     .poll(
       async () => {
         try {
           const done = await check();
-          streak = 0;
+          failingSince = undefined;
           return done;
         } catch (error) {
-          streak = isToolFailure(error) ? streak + 1 : 0;
-          if (streak < TOOL_FAILURE_STREAK) throw error;
+          if (!isToolFailure(error)) {
+            failingSince = undefined;
+            throw error;
+          }
+          failingSince ??= Date.now();
+          if (Date.now() - failingSince < TOOL_FAILURE_GRACE_MS) throw error;
           toolFailure = error;
           return true;
         }
@@ -62,6 +45,7 @@ export async function pollUntil(
   if (toolFailure !== undefined) {
     const reason =
       toolFailure instanceof Error ? toolFailure.message : String(toolFailure);
+    // The runner retries a plain Error (a test failure) but not an infrastructure failure.
     throw new Error(`The test tool stopped answering: ${reason}`);
   }
 }

@@ -1,10 +1,6 @@
 // @vitest-environment jsdom
-// Tests for the one shared home-feed subscription. convex/react is stubbed, so
-// the pagination states are simulated directly and the provider's contract is
-// what's under test: undefined items until the first page, exact load-more
-// gating, and one context instance shared by every consumer.
 import { render, screen } from "@testing-library/react";
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { HomeFeedProvider, useHomeFeed } from "./home-feed";
@@ -26,14 +22,12 @@ vi.mock("@convex/_generated/api", () => ({
   },
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-// The real account-gone boundary wraps the provider; its loader is native UI.
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <div>loader</div>),
 }));
 
 type HomeFeed = ReturnType<typeof useHomeFeed>;
 
-// Renders nothing; hands the context value it sees to the test.
 function Probe({ sink }: { sink: HomeFeed[] }) {
   sink.push(useHomeFeed());
   return null;
@@ -137,7 +131,6 @@ describe("HomeFeedProvider", () => {
     const { rerender } = render(tree());
     expect(screen.getByText("loader")).toBeTruthy();
 
-    // Signed out but not onboarded: the tree stays mounted.
     mocks.useConvexAuth.mockReturnValue({ isAuthenticated: false });
     mocks.usePaginatedQuery.mockReturnValue({
       results: [],
@@ -171,10 +164,58 @@ describe("HomeFeedProvider", () => {
     );
     const { rerender } = render(tree());
 
-    // Onboarding's sign-in step lands; its local state must survive.
     stubFeed("LoadingFirstPage");
     rerender(tree());
     expect(screen.getByText("onboarding")).toBeTruthy();
     expect(mounts).toBe(1);
+  });
+  it("re-renders only the card whose save changed when Convex re-sends a page", () => {
+    type Row = { _id: string; title: string; tags: string[] };
+    const page = (changed?: number): Row[] =>
+      Array.from({ length: 40 }, (_, i) => ({
+        _id: `items:${i}`,
+        title: i === changed ? `Save ${i} (ready)` : `Save ${i}`,
+        tags: ["travel"],
+      }));
+    const renders = new Map<string, number>();
+    const Card = memo(function Card({ item }: { item: Row }) {
+      renders.set(item._id, (renders.get(item._id) ?? 0) + 1);
+      return null;
+    });
+    function Feed() {
+      const { items } = useHomeFeed();
+      return (
+        <>
+          {(items as Row[] | undefined)?.map((item) => (
+            <Card key={item._id} item={item} />
+          ))}
+        </>
+      );
+    }
+    const tree = () => (
+      <HomeFeedProvider>
+        <Feed />
+      </HomeFeedProvider>
+    );
+    const serve = (results: Row[]) =>
+      mocks.usePaginatedQuery.mockReturnValue({
+        results,
+        status: "CanLoadMore",
+        loadMore: vi.fn(),
+      });
+    mocks.useConvexAuth.mockReturnValue({ isAuthenticated: true });
+
+    serve(page());
+    const { rerender } = render(tree());
+    renders.clear();
+
+    // A fresh decode of the same page: every row is a new, equal object.
+    serve(page());
+    rerender(tree());
+    expect(renders.size).toBe(0);
+
+    serve(page(7));
+    rerender(tree());
+    expect([...renders.keys()]).toEqual(["items:7"]);
   });
 });

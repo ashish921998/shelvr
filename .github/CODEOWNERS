@@ -1,0 +1,3 @@
+# The lists of public Convex functions that skip the auth builders need the owner's eye.
+/apps/native/convex/model/publicFunctions.ts @ashish921998
+/.github/CODEOWNERS @ashish921998

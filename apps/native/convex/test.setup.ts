@@ -1,6 +1,8 @@
 import { convexTest } from "convex-test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import schema from "./schema";
 import { vi } from "vitest";
 
@@ -10,12 +12,14 @@ export function revenuecatSnapshot({
   expiresAt = Date.now() + 60_000,
   graceUntil,
   periodType = "normal",
+  store,
 }: {
   entitlement?: string;
   productId?: string;
   expiresAt?: number;
   graceUntil?: number;
   periodType?: string;
+  store?: string;
 } = {}) {
   return {
     request_date_ms: Date.now(),
@@ -36,7 +40,7 @@ export function revenuecatSnapshot({
           }
         : {},
       subscriptions: productId
-        ? { [productId]: { period_type: periodType } }
+        ? { [productId]: { period_type: periodType, store } }
         : {},
     },
   };
@@ -48,14 +52,8 @@ export function stubRevenueCatFetch(body: unknown) {
   return fetchMock;
 }
 
-// The module map lets convex-test discover and load function files.
 const modules = import.meta.glob("./**/*.ts");
 
-/**
- * Build a convex-test instance with the rate-limiter component registered.
- * Every test must go through this: mutations that call `rateLimiter.limit`
- * fail with "Component not registered" against a bare `convexTest(schema, ...)`.
- */
 export function newConvexTest() {
   const t = convexTest(schema, modules);
   registerRateLimiter(t);
@@ -64,27 +62,56 @@ export function newConvexTest() {
 
 export type TestBackend = ReturnType<typeof newConvexTest>;
 
-/**
- * A signed-in identity backed by a real users row. `requireUserId` rejects an
- * identity whose owner row is missing or mid-deletion, so a made-up subject
- * cannot authorize anything; tests take the row's id from here and use it for
- * the data they seed. `pro` adds an active subscription, which every save and
- * Pro feature is gated on. `session` adds a real `authSessions` row and makes
- * it the subject's session suffix, for tests that assert auth-table cleanup.
- */
+/** A users row that has chosen Allow on the Gemini ask, as every account must before AI runs. */
+export async function insertConsentingUser(
+  ctx: MutationCtx,
+  fields: { email?: string } = {},
+): Promise<Id<"users">> {
+  const userId = await ctx.db.insert("users", fields);
+  await ctx.db.insert("aiConsents", {
+    userId,
+    status: "granted",
+    version: AI_CONSENT_VERSION,
+    updatedAt: Date.now(),
+  });
+  return userId;
+}
+
+/** Replaces the account's Gemini answer, as setConsent would. */
+export async function setTestConsent(
+  ctx: MutationCtx,
+  userId: string,
+  status: "granted" | "declined",
+  version: number = AI_CONSENT_VERSION,
+): Promise<void> {
+  const row = await ctx.db
+    .query("aiConsents")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  const values = { status, version, updatedAt: Date.now() };
+  if (row === null) await ctx.db.insert("aiConsents", { userId, ...values });
+  else await ctx.db.patch(row._id, values);
+}
+
 export async function signedInUser(
   backend: TestBackend,
-  options: { email?: string; pro?: boolean; session?: boolean } = {},
+  options: {
+    email?: string;
+    pro?: boolean;
+    session?: boolean;
+    aiConsent?: "granted" | "unset";
+  } = {},
 ): Promise<{
   userId: Id<"users">;
   sessionId: Id<"authSessions"> | undefined;
   t: ReturnType<TestBackend["withIdentity"]>;
 }> {
   const { userId, sessionId } = await backend.run(async (ctx) => {
-    const userId = await ctx.db.insert(
-      "users",
-      options.email === undefined ? {} : { email: options.email },
-    );
+    const fields = options.email === undefined ? {} : { email: options.email };
+    const userId =
+      options.aiConsent === "unset"
+        ? await ctx.db.insert("users", fields)
+        : await insertConsentingUser(ctx, fields);
     const sessionId =
       options.session === true
         ? await ctx.db.insert("authSessions", {
@@ -111,8 +138,6 @@ export async function signedInUser(
   };
 }
 
-/** `count` ready note items for `userId`, the payload deletion tests use to
- * keep an account mid-deletion past the first batch. */
 export async function seedNotes(
   backend: Pick<TestBackend, "run">,
   userId: Id<"users">,
@@ -132,13 +157,6 @@ export async function seedNotes(
   });
 }
 
-/**
- * A one-shot barrier for race tests. Hand `hold` to the seam under test (a
- * stubbed fetch, an exchange): when the code reaches it, `reached` resolves
- * and the seam waits; the test then arranges the racing state and calls
- * `open()`, and `hold` resolves with its value. Single use: arm a fresh gate
- * per held call.
- */
 export function gate(): {
   reached: Promise<void>;
   open(): void;

@@ -4,6 +4,7 @@ export type RevenueCatEvent = {
   expiresAt?: number;
   productId?: string;
   periodType?: string;
+  testStore?: boolean;
   cancelReason?: string;
   expirationReason?: string;
   eventTimestampMs?: number;
@@ -11,26 +12,21 @@ export type RevenueCatEvent = {
   transferredTo?: string[];
 };
 
-/** Parse the subset of a RevenueCat webhook used by the entitlement sync.
- * Returns `undefined` only when the body is not a readable object: the caller
- * then returns HTTP 400. A readable event missing `type` or `app_user_id`
- * returns a partial object with those fields as `undefined` so the caller can
- * respond HTTP 200 (acknowledging the event so RevenueCat stops retrying)
- * without acting on it. `expiresAt` is optional for all event types; the
- * handler decides what to do when it's missing.
- */
 export function parseRevenueCatEvent(
   body: unknown,
 ): RevenueCatEvent | undefined {
   const event = readRecord(readRecord(body)?.event);
   if (event === undefined) return undefined;
 
-  const type = readString(event?.type);
-  const userId = readString(event?.app_user_id);
-  const expiresAt = readNumber(event?.expiration_at_ms);
-  const productId = readString(event?.product_id);
-  const periodType = readString(event?.period_type);
-  const eventTimestampMs = readNumber(event?.event_timestamp_ms);
+  const type = readString(event.type);
+  const userId = eventOwner(
+    readString(event.app_user_id),
+    readStringArray(event.aliases),
+  );
+  const expiresAt = readNumber(event.expiration_at_ms);
+  const productId = readString(event.product_id);
+  const periodType = readString(event.period_type);
+  const eventTimestampMs = readNumber(event.event_timestamp_ms);
 
   return {
     type,
@@ -38,6 +34,10 @@ export function parseRevenueCatEvent(
     expiresAt,
     productId,
     periodType,
+    testStore: isTestStoreEvent(
+      readString(event.store),
+      readString(event.app_id),
+    ),
     cancelReason: readString(event.cancel_reason),
     expirationReason: readString(event.expiration_reason),
     eventTimestampMs,
@@ -50,12 +50,35 @@ export function parseRevenueCatEvent(
   };
 }
 
-/** Map RevenueCat lifecycle events to Shelvr's server-side entitlement state.
- * Dashboard-granted entitlements arrive as NON_RENEWING_PURCHASE events with
- * a PROMOTIONAL period. Treat only that combination as Pro; ordinary
- * non-renewing purchases remain advisory so a consumable can never unlock the
- * subscription gate.
- */
+const PRODUCTION_TEST_STORE_APP_ID = "app20ea108057";
+
+/** RevenueCat may leave `store` out of an event, but not `app_id`. A named store wins, since a promotional grant can carry the id of any app the customer used. */
+function isTestStoreEvent(
+  store: string | undefined,
+  appId: string | undefined,
+): boolean {
+  return store === undefined
+    ? appId === PRODUCTION_TEST_STORE_APP_ID
+    : isTestStore(store);
+}
+
+/** Webhook events spell it TEST_STORE, the REST API test_store. */
+function isTestStore(store: unknown): boolean {
+  return readString(store)?.toLowerCase() === "test_store";
+}
+
+const ANONYMOUS_PREFIX = "$RCAnonymousID:";
+
+/** RevenueCat's `logIn` makes the anonymous id of a pre-sign-in purchase an alias of the account's own. */
+function eventOwner(
+  appUserId: string | undefined,
+  aliases: string[] | undefined,
+): string | undefined {
+  if (!appUserId?.startsWith(ANONYMOUS_PREFIX)) return appUserId;
+  return aliases?.find((id) => !id.startsWith(ANONYMOUS_PREFIX)) ?? appUserId;
+}
+
+/** Dashboard-granted entitlements arrive as NON_RENEWING_PURCHASE events with a PROMOTIONAL period. */
 export function mapRevenueCatStatus(
   type: string,
   periodType?: string,
@@ -74,7 +97,10 @@ export function mapRevenueCatStatus(
   }
 }
 
-/** Events whose current access must come from RevenueCat, not the webhook body. */
+function isDashboardGrant(event: RevenueCatEvent): boolean {
+  return event.periodType === "PROMOTIONAL";
+}
+
 export function requiresAuthoritativeReconciliation(
   event: RevenueCatEvent,
 ): boolean {
@@ -83,25 +109,18 @@ export function requiresAuthoritativeReconciliation(
     case "REFUND_REVERSED":
       return true;
     case "NON_RENEWING_PURCHASE":
-      // A dashboard grant. A lifetime one carries no expiry, which the
-      // webhook path would read as "nothing to record"; the snapshot reports
-      // its real end, or none for lifetime.
-      return event.periodType === "PROMOTIONAL";
+      // A lifetime dashboard grant carries no expiry.
+      return isDashboardGrant(event);
     case "CANCELLATION":
-      // A failed charge sends BILLING_ERROR with the already-past expiry; only
-      // the snapshot knows the billing grace window. A cancelled dashboard
-      // grant may be a sticky lifetime row, as under EXPIRATION.
+      // A failed charge sends BILLING_ERROR with the already-past expiry; only the snapshot knows the billing grace window.
       return (
         event.cancelReason === "CUSTOMER_SUPPORT" ||
         event.cancelReason === "BILLING_ERROR" ||
-        event.periodType === "PROMOTIONAL"
+        isDashboardGrant(event)
       );
     case "EXPIRATION":
-      // A revoked dashboard grant may have been stored as a sticky lifetime
-      // row, which only an authoritative snapshot can lapse.
       return (
-        event.expirationReason === "CUSTOMER_SUPPORT" ||
-        event.periodType === "PROMOTIONAL"
+        event.expirationReason === "CUSTOMER_SUPPORT" || isDashboardGrant(event)
       );
     default:
       return false;
@@ -125,9 +144,6 @@ type RevenueCatSnapshot = {
   productId?: string;
 };
 
-/** Read only the project's Pro entitlement; malformed responses must not revoke access.
- * Billing grace is honoured only from this authoritative snapshot, never the webhook body.
- */
 export function parseRevenueCatSnapshot(
   body: unknown,
   entitlementIdentifier = "Shelvr Pro",
@@ -165,14 +181,35 @@ export function parseRevenueCatSnapshot(
   };
 }
 
+/** One real purchase of a one-time product means it was paid for, so every purchase must come from the Test Store. */
+export function grantedByTestStore(
+  body: unknown,
+  entitlementIdentifier: string,
+): boolean {
+  const subscriber = readRecord(readRecord(body)?.subscriber);
+  const entitlement = readRecord(
+    readRecord(subscriber?.entitlements)?.[entitlementIdentifier],
+  );
+  const productId = readString(entitlement?.product_identifier);
+  if (productId === undefined) return false;
+  const subscription = readRecord(
+    readRecord(subscriber?.subscriptions)?.[productId],
+  );
+  if (subscription) return isTestStore(subscription.store);
+  const purchases = readRecord(subscriber?.non_subscriptions)?.[productId];
+  return (
+    Array.isArray(purchases) &&
+    purchases.length > 0 &&
+    purchases.every((purchase) => isTestStore(readRecord(purchase)?.store))
+  );
+}
+
 function parseDate(value: unknown): number {
   const date = typeof value === "string" ? Date.parse(value) : NaN;
   if (!Number.isFinite(date)) throw new Error("Invalid RevenueCat expiry");
   return date;
 }
 
-// Shared guards for untyped RevenueCat webhook payloads; paymentTelemetry.ts
-// reuses them so the two parsers cannot drift apart.
 export function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
@@ -185,7 +222,6 @@ export function readRecord(
     : undefined;
 }
 
-/** A finite number strictly greater than zero (prices, millisecond stamps). */
 export function readPositiveNumber(value: unknown): number | undefined {
   const number = readNumber(value);
   return number !== undefined && number > 0 ? number : undefined;

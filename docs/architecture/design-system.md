@@ -9,14 +9,14 @@ touch a file for other reasons, not in bulk.
 
 ## Type
 
-The type ramp is `theme.type`: 23 named steps from `hero` (48) down to `badge`
+The type ramp is `theme.type`: 24 named steps from `hero` (48) down to `badge`
 (10), each pairing a font family with a size. The steps were not invented.
 Each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
 from those literals later. The display face (`CrimsonProRoman-Regular`) carries titles
-(`hero`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
+(`hero`, `displayTitle`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
 Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.
@@ -46,12 +46,17 @@ stays consistent.
 Components never hardcode hex values; they read `theme.colors.*` roles. Roles
 are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `foreground`, `muted`, `faint`, `primary`, `primaryForeground`, `primarySoft`,
-`primaryText`, `border`, `imageBorder`, `danger`, `overlay`, `onOverlay`,
-`onTint`, `keep`, `onKeep`, and `tabTint`. Content drawn on a filled tint
+`primaryText`, `border`, `imageBorder`, `frame`, `danger`, `overlay`,
+`onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, and the Trip Reveal
+globe's `globeOcean`, `globeLand` and `globeLandEdge`. `frame` is the mat
+around a saved picture (the save page's hero and the onboarding collage): paper
+white in the light theme and the card surface in the dark ones, so a photo
+never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` is the tab bar tint. iOS `NativeTabs` paints the selected tab's icon
-and its label with it, so it carries normal-size text: the light theme darkens
+`tabTint` was the tab bar tint. The app has no tab bar now, so nothing reads it.
+iOS `NativeTabs` painted the selected tab's icon and its label with it, so it
+carried normal-size text: the light theme darkens
 it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
 4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the
@@ -124,15 +129,14 @@ leaves its nominal rate exits INCONCLUSIVE rather than being timed by index.
 Reduce Motion is `System` by default on the timing objects except the `fade`
 token and the fade builders, which use `Never`. Screens add explicit branches
 where spatial motion would carry meaning: navigation stacks
-fade instead of sliding, zoom transitions are suppressed, the tidy card
-container drops its transforms, and the text morph falls back to native text
+fade instead of sliding, zoom transitions are suppressed, and the text morph falls back to native text
 (alongside Dynamic Type above 1x and complex scripts, which native text
 shapes correctly and per-glyph Skia cannot). Pure opacity changes may opt
 into `ReduceMotion.Never` to keep state changes legible.
 
 ## Primitives
 
-`Button` is the capsule action for a screen's main step (Tidy's Continue).
+`Button` is the capsule action for a screen's main step.
 Where iOS supports Liquid Glass (`hasLiquidGlass` in
 `src/components/glass.tsx`) it is interactive glass and the system owns the
 press response; elsewhere it is a solid capsule that opacity-shifts and scales

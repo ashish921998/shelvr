@@ -17,7 +17,6 @@ describe("rubberBand", () => {
     const far = rubberBand(80, RUBBER_BAND_LIMIT);
     expect(near).toBeGreaterThan(0);
     expect(rubberBand(-8, RUBBER_BAND_LIMIT)).toBeCloseTo(-near);
-    // The first pixels track the finger closely; later ones barely register.
     expect(near / 8).toBeGreaterThan(far / 80);
   });
 
@@ -37,7 +36,6 @@ describe("overflowPast", () => {
 });
 
 describe("tabIndexAt", () => {
-  // A 216pt pill with 8pt padding leaves four 50pt slots.
   const hit = (x: number) => tabIndexAt(x, 216, 4, 8);
 
   it("maps each slot to its tab", () => {
@@ -63,7 +61,6 @@ describe("tabSlotX", () => {
   it("places whole and in-between indices along the pill", () => {
     expect(tabSlotX(0, 216, 4, 8)).toBe(8);
     expect(tabSlotX(3, 216, 4, 8)).toBe(158);
-    // Halfway through a spring from tab 1 to tab 2.
     expect(tabSlotX(1.5, 216, 4, 8)).toBe(83);
   });
 });

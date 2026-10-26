@@ -3,12 +3,10 @@ import { internal } from "./_generated/api";
 import {
   internalMutation,
   internalQuery,
-  mutation,
-  query,
   type QueryCtx,
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
-import { liveOwner, requireUserId } from "./model/auth";
+import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_SWEEP_PAGE,
@@ -21,15 +19,7 @@ async function consentRow(ctx: QueryCtx, userId: string) {
     .unique();
 }
 
-/**
- * Whether this user's content may be sent to third-party AI (Gemini, SerpAPI).
- * Every path that sends it asks here first.
- *
- * Only an explicit decline blocks. A user who has not answered stays allowed,
- * because installed builds (1.0.8) cannot show the consent card and must keep
- * working. A decline holds across disclosure versions until the user answers
- * again, even though `getStatus` reports it as `unset` to re-ask.
- */
+/** AI is available by default for live owners; explicit legacy opt-outs remain authoritative. */
 export async function aiAllowed(
   ctx: QueryCtx,
   userId: string,
@@ -38,10 +28,6 @@ export async function aiAllowed(
   return (await consentRow(ctx, userId))?.status !== "declined";
 }
 
-/** The action-side check answers no once that save is
- * gone: a deleted save, or a deleted account, whose content a run still
- * holds in memory, must not be sent after the fact. Deleting the account
- * removes the consent row too, which on its own would read as "not asked". */
 export const isAllowed = internalQuery({
   args: { userId: v.string(), itemId: v.id("items") },
   returns: v.boolean(),
@@ -52,10 +38,6 @@ export const isAllowed = internalQuery({
   },
 });
 
-/** One snapshot for the whole page, immediately before provider inputs are built.
- * Deleting or missing owners read as declined: their rows are stamped without
- * sending any text, so they cannot wedge the sweep. Only a save that is itself
- * gone is skipped, and it has already left the range. */
 export const revalidateEmbeddingBatch = internalQuery({
   args: {
     entries: v.array(v.object({ itemId: v.id("items"), userId: v.string() })),
@@ -101,7 +83,7 @@ export const revalidateEmbeddingBatch = internalQuery({
   },
 });
 
-export const getStatus = query({
+export const getStatus = authedQuery({
   args: {},
   returns: v.object({
     status: v.union(
@@ -112,7 +94,7 @@ export const getStatus = query({
     version: v.number(),
   }),
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await consentRow(ctx, userId);
     return {
       status:
@@ -124,11 +106,11 @@ export const getStatus = query({
   },
 });
 
-export const setConsent = mutation({
+export const setConsent = authedMutation({
   args: { granted: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const row = await consentRow(ctx, userId);
     const values = {
       status: args.granted ? ("granted" as const) : ("declined" as const),
@@ -140,9 +122,9 @@ export const setConsent = mutation({
     } else {
       await ctx.db.patch(row._id, values);
     }
-    // Stored vectors follow the answer: a decline drops them, and a grant
-    // after a decline hands the items back to the embedding sweep.
-    if ((row?.status === "declined") !== !args.granted) {
+    // A first answer always syncs: an account with no row may hold vectors from
+    // before unanswered counted as declined, and needs them cleared or refreshed.
+    if (row === null || (row.status === "granted") !== args.granted) {
       await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
         userId,
         cursor: null,
@@ -154,15 +136,47 @@ export const setConsent = mutation({
 
 const SYNC_BATCH = 50;
 
-/**
- * Brings one page of a user's stored vectors in line with their consent, then
- * continues. It reads the answer again on every page, so two runs started by
- * a quick change of mind both converge on the latest one.
- *
- * Declined: the vector is removed and the row is stamped as current, which
- * keeps it out of the embedding sweep. Allowed: a row without a vector loses
- * its stamp, so the sweep embeds it.
- */
+/** One-time repair after deploying automatic AI: convex run aiConsent:repairUnansweredEmbeddings '{"cursor":null}' */
+export const repairUnansweredEmbeddings = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.object({ repaired: v.number(), done: v.boolean() }),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("items")
+      .withIndex("by_status_and_embeddingVersion", (q) =>
+        q
+          .eq("status", "ready")
+          .eq("embeddingVersion", CURRENT_EMBEDDING_VERSION),
+      )
+      .paginate({
+        numItems: SYNC_BATCH,
+        cursor: args.cursor,
+        maximumBytesRead: 1_000_000,
+      });
+    let repaired = 0;
+    for (const item of page) {
+      if (item.embedding !== undefined) continue;
+      if ((await liveOwner(ctx, item.userId)) === null) continue;
+      if ((await consentRow(ctx, item.userId)) !== null) continue;
+      await ctx.db.patch(item._id, {
+        embeddingVersion: undefined,
+        embeddingAttempts: undefined,
+      });
+      repaired++;
+    }
+    if (!isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.aiConsent.repairUnansweredEmbeddings,
+        {
+          cursor: continueCursor,
+        },
+      );
+    }
+    return { repaired, done: isDone };
+  },
+});
+
 export const syncEmbeddings = internalMutation({
   args: { userId: v.string(), cursor: v.union(v.string(), v.null()) },
   returns: v.null(),

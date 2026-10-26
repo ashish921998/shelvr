@@ -1,7 +1,5 @@
 import type { LibraryRow, LibraryStats } from "@/lib/oracleLibrary";
 
-// Mirrors OracleInput and OracleVerdict in apps/native/convex/model/oracle.ts,
-// which validates every request; this side only builds them.
 export type OracleInput =
   | { kind: "links"; urls: string[] }
   | {
@@ -20,7 +18,6 @@ export type OracleVerdict = {
   tagline: string;
   spaces: { name: string; reason: string }[];
   guesses: { label: string; why: string }[];
-  // Optional while an older backend may still answer without them.
   score?: number;
   moreSpaces?: string[];
 };

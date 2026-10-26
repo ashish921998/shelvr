@@ -1,17 +1,17 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import type { OracleInputProps } from "@/lib/oracle";
 
 import { FieldHint, SubmitButton } from "./OracleFields";
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
+// The picked file is shrunk to a JPEG before it is sent, so this only keeps decoding bounded.
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_EDGE_PX = 2000;
+// Matches ORACLE_MAX_IMAGE_BASE64_CHARS in apps/native/convex/model/oracle.ts.
+const MAX_IMAGE_BASE64_CHARS = 4 * 1024 * 1024;
 
-/** Re-encodes the image as a JPEG no longer than 2000 px on a side. That keeps
- * a 4 MB camera-roll PNG well under the server's 3 MB cap and the hosting
- * platform's request limit, and still leaves a phone screenshot legible. */
 async function encodeImage(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(
@@ -35,7 +35,7 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
   const [file, setFile] = useState<File>();
   const [error, setError] = useState<string>();
   const [preparing, setPreparing] = useState(false);
-  const preview = useMemo(() => file && URL.createObjectURL(file), [file]);
+  const [preview, setPreview] = useState<string>();
 
   useEffect(() => {
     return () => {
@@ -49,10 +49,12 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     if (!picked) return;
     if (picked.size > MAX_FILE_BYTES) {
       setFile(undefined);
-      setError("That one is over 4 MB. Try a smaller screenshot.");
+      setPreview(undefined);
+      setError("That one is over 20 MB. Try a smaller screenshot.");
       return;
     }
     setFile(picked);
+    setPreview(URL.createObjectURL(picked));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -61,6 +63,12 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     setPreparing(true);
     try {
       const imageBase64 = await encodeImage(file);
+      if (imageBase64.length > MAX_IMAGE_BASE64_CHARS) {
+        setError(
+          "That one is too big for the oracle. Try a smaller screenshot.",
+        );
+        return;
+      }
       onSubmit({ kind: "screenshot", imageBase64, mediaType: "image/jpeg" });
     } catch {
       setError("Couldn’t read that image. Try a JPEG or PNG.");
@@ -73,7 +81,6 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
     <form onSubmit={submit}>
       <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-line-strong bg-white p-4 text-center transition hover:border-ember-deep focus-within:border-ember-deep">
         {preview ? (
-          // A local object URL; next/image has nothing to optimise here.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={preview}
@@ -86,7 +93,7 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
           </span>
         )}
         <span className="text-sm text-muted">
-          {preview ? "Tap to pick another" : "JPEG, PNG, or WebP, up to 4 MB"}
+          {preview ? "Tap to pick another" : "JPEG, PNG, or WebP, up to 20 MB"}
         </span>
         <input
           type="file"

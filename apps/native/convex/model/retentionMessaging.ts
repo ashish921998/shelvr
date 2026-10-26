@@ -1,16 +1,9 @@
-/**
- * Apple's Retention Messaging API: the App Store posts here while a subscriber
- * looks at the page where they can cancel, and the reply names which
- * pre-uploaded, Apple-approved message to show them.
- *
- * https://developer.apple.com/documentation/retentionmessaging
- */
 import { verifyAppleJws } from "./appleJws";
+import { signEs256Jwt } from "./appleSigning";
 
-/** Shelvr's App Store id, `ascAppId` in eas.json. */
 const SHELVR_APP_APPLE_ID = 6798143550;
+const SHELVR_BUNDLE_ID = "app.shelvr.save";
 
-// Apple's body is three certificates and a short payload, about 5 KB.
 export const RETENTION_MAX_BODY_BYTES = 32 * 1024;
 
 export type RetentionReply = {
@@ -19,17 +12,70 @@ export type RetentionReply = {
   reason?: string;
 };
 
-/**
- * Answers one Get Retention Message request. A reply with no `message` leaves
- * Apple on the default message configured for the product and locale, so an
- * unset `messageId` is a working state, not an error.
- *
- * ponytail: one message for every subscriber. Choosing by save count needs
- * message ids, which exist only once Apple grants access and approves uploads.
- */
+type RetentionOffer = { offerIdentifier: string; messageIdentifier: string };
+
+export type OfferSigningKey = {
+  keyId: string;
+  issuerId: string;
+  privateKey: string;
+};
+
+export function parseRetentionOffers(
+  raw: string | undefined,
+): Record<string, RetentionOffer> {
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  const offers: Record<string, RetentionOffer> = {};
+  for (const [productId, value] of Object.entries(parsed)) {
+    const { offerIdentifier, messageIdentifier } = (value ?? {}) as Record<
+      string,
+      unknown
+    >;
+    if (
+      typeof offerIdentifier === "string" &&
+      offerIdentifier &&
+      typeof messageIdentifier === "string" &&
+      messageIdentifier
+    )
+      offers[productId] = { offerIdentifier, messageIdentifier };
+  }
+  return offers;
+}
+
+export async function signPromotionalOffer(
+  key: OfferSigningKey,
+  offer: { productId: string; offerIdentifier: string; transactionId: string },
+  now: number,
+): Promise<string> {
+  return await signEs256Jwt(
+    key.privateKey,
+    { kid: key.keyId, typ: "JWT" },
+    {
+      iss: key.issuerId,
+      iat: Math.floor(now / 1000),
+      aud: "promotional-offer",
+      bid: SHELVR_BUNDLE_ID,
+      nonce: crypto.randomUUID(),
+      ...offer,
+    },
+  );
+}
+
 export async function answerRetentionRequest(
   body: string,
-  options: { root: string; now: number; messageId?: string },
+  options: {
+    root: string;
+    now: number;
+    messageId?: string;
+    offers?: Record<string, RetentionOffer>;
+    signingKey?: OfferSigningKey;
+  },
 ): Promise<RetentionReply> {
   const reject = (reason: string): RetentionReply => ({
     status: 400,
@@ -43,7 +89,11 @@ export async function answerRetentionRequest(
     return reject("body_json");
   }
   if (typeof signedPayload !== "string") return reject("body_shape");
-  let payload: { appAppleId?: unknown };
+  let payload: {
+    appAppleId?: unknown;
+    productId?: unknown;
+    originalTransactionId?: unknown;
+  };
   try {
     payload = (await verifyAppleJws(
       signedPayload,
@@ -51,8 +101,6 @@ export async function answerRetentionRequest(
       options.now,
     )) as typeof payload;
   } catch (error) {
-    // AppleJwsError messages are fixed codes. Anything else is the runtime
-    // refusing a crypto call, which must not hide behind a parsing code.
     return reject(
       error instanceof Error && error.name === "AppleJwsError"
         ? error.message
@@ -60,10 +108,44 @@ export async function answerRetentionRequest(
     );
   }
   if (payload?.appAppleId !== SHELVR_APP_APPLE_ID) return reject("wrong_app");
-  return {
+  const plain: RetentionReply = {
     status: 200,
     body: options.messageId
       ? { message: { messageIdentifier: options.messageId } }
       : {},
+  };
+  const { productId, originalTransactionId } = payload;
+  const offer =
+    typeof productId === "string" &&
+    options.offers &&
+    Object.hasOwn(options.offers, productId)
+      ? options.offers[productId]
+      : undefined;
+  if (!offer) return plain;
+  if (!options.signingKey) return { ...plain, reason: "offer_key_unset" };
+  if (typeof originalTransactionId !== "string" || !originalTransactionId)
+    return { ...plain, reason: "offer_no_transaction" };
+  let signature: string;
+  try {
+    signature = await signPromotionalOffer(
+      options.signingKey,
+      {
+        productId: productId as string,
+        offerIdentifier: offer.offerIdentifier,
+        transactionId: originalTransactionId,
+      },
+      options.now,
+    );
+  } catch {
+    return { ...plain, reason: "offer_sign_failed" };
+  }
+  return {
+    status: 200,
+    body: {
+      promotionalOffer: {
+        messageIdentifier: offer.messageIdentifier,
+        promotionalOfferSignatureV2: signature,
+      },
+    },
   };
 }

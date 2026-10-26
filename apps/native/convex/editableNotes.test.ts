@@ -13,8 +13,6 @@ import { MAX_ITEM_TITLE_CHARS, MAX_NOTE_TEXT_CHARS } from "./model/itemFields";
 type TestCtx = TestConvexForDataModel<DataModel>;
 type ItemFields = Partial<Omit<Doc<"items">, "_id" | "_creationTime">>;
 
-// Scheduled refreshes stay queued rather than calling the model during
-// teardown; their `_scheduled_functions` rows are still assertable.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
@@ -23,7 +21,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** A real user on `base` with an active Pro subscription. */
 async function proUser(
   base: ReturnType<typeof newConvexTest>,
 ): Promise<{ t: TestCtx; userId: string }> {
@@ -249,8 +246,8 @@ describe("updateNoteItem", () => {
 
 describe("classification after an edit", () => {
   it("keeps a typed title and indexes the note's own words", async () => {
-    const t = newConvexTest();
-    const id = await readyNote(t, "keeper", {
+    const { t, userId } = await signedInUser(newConvexTest());
+    const id = await readyNote(t, userId, {
       title: "Milk run",
       titleSource: "user",
       processingRunId: "run-refresh",
@@ -259,10 +256,12 @@ describe("classification after an edit", () => {
     const outcome = await t.mutation(internal.items.finalizeItem, {
       itemId: id,
       runId: "run-refresh",
-      title: "Classifier title",
-      description: "Shopping list",
-      tags: ["errands"],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Classifier title",
+        description: "Shopping list",
+        tags: ["errands"],
+      },
     });
 
     expect(outcome).toBe("applied");
@@ -277,17 +276,19 @@ describe("classification after an edit", () => {
   });
 
   it("keeps the classifier title a note already has on a refresh", async () => {
-    const t = newConvexTest();
-    const id = await readyNote(t, "steady", { processingRunId: "run-refresh" });
+    const { t, userId } = await signedInUser(newConvexTest());
+    const id = await readyNote(t, userId, { processingRunId: "run-refresh" });
 
     const outcome = await t.mutation(internal.items.finalizeItem, {
       itemId: id,
       runId: "run-refresh",
-      title: "Dairy restock plan",
       keepTitle: true,
-      description: "A longer shopping note",
-      tags: ["errands"],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Dairy restock plan",
+        description: "A longer shopping note",
+        tags: ["errands"],
+      },
     });
 
     expect(outcome).toBe("applied");
@@ -299,8 +300,8 @@ describe("classification after an edit", () => {
   });
 
   it("names an untitled note on a refresh", async () => {
-    const t = newConvexTest();
-    const id = await readyNote(t, "cleared", {
+    const { t, userId } = await signedInUser(newConvexTest());
+    const id = await readyNote(t, userId, {
       title: undefined,
       processingRunId: "run-refresh",
     });
@@ -308,11 +309,13 @@ describe("classification after an edit", () => {
     await t.mutation(internal.items.finalizeItem, {
       itemId: id,
       runId: "run-refresh",
-      title: "Dairy restock plan",
       keepTitle: true,
-      description: "A shopping note",
-      tags: ["groceries"],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Dairy restock plan",
+        description: "A shopping note",
+        tags: ["groceries"],
+      },
     });
 
     const note = await t.run((ctx) => ctx.db.get(id));

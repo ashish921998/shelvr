@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_ITEM_CITIES, normalizeCities } from "./itemFields";
+import {
+  MAX_ITEM_CITIES,
+  MAX_ITEM_PLACES,
+  normalizeCities,
+  normalizePlaces,
+} from "./itemFields";
 
 describe("normalizeCities", () => {
   it("trims, single-spaces and drops trailing punctuation", () => {
@@ -7,6 +12,10 @@ describe("normalizeCities", () => {
       "New York",
       "Goa",
     ]);
+  });
+
+  it("trims the space left behind by trailing punctuation", () => {
+    expect(normalizeCities(["Goa .", "Paris !"])).toEqual(["Goa", "Paris"]);
   });
 
   it("keeps one entry per city, ignoring case, in first-seen order", () => {
@@ -23,12 +32,68 @@ describe("normalizeCities", () => {
   });
 
   it("caps the list", () => {
-    expect(normalizeCities(["A", "B", "C", "D", "E"])).toHaveLength(
-      MAX_ITEM_CITIES,
-    );
+    expect(
+      normalizeCities(
+        Array.from({ length: MAX_ITEM_CITIES + 2 }, (_, i) => `City ${i}`),
+      ),
+    ).toHaveLength(MAX_ITEM_CITIES);
   });
 
   it("treats a missing answer as no cities", () => {
     expect(normalizeCities(undefined)).toEqual([]);
+  });
+});
+
+describe("normalizePlaces", () => {
+  it("removes only the sole source city's trailing qualifier before deduplication", () => {
+    expect(
+      normalizePlaces(
+        [
+          " Guest House, AUSTIN. ",
+          "Guest House",
+          "Cafe, Downtown, Austin",
+          "Austin Java",
+          "Cafe, Dallas",
+        ],
+        [" Austin ", "austin"],
+      ),
+    ).toEqual(["Guest House", "Cafe, Downtown", "Austin Java", "Cafe, Dallas"]);
+  });
+
+  it("removes a sole source city that itself contains a comma", () => {
+    expect(
+      normalizePlaces(
+        ["Founding Farmers, Washington, D.C.", "Founding Farmers", "D.C"],
+        ["Washington, D.C."],
+      ),
+    ).toEqual(["Founding Farmers", "D.C"]);
+  });
+
+  it("keeps city qualifiers when the source has multiple cities or no city", () => {
+    const places = ["Cafe, Austin", "Cafe, Dallas"];
+    expect(normalizePlaces(places, ["Austin", "Dallas"])).toEqual(places);
+    expect(normalizePlaces(places)).toEqual(places);
+  });
+
+  it("keeps each place once, ignoring case, tidied, in first-seen order", () => {
+    expect(
+      normalizePlaces([" Café  de Flore. ", "Santelmo", "café de flore", ""]),
+    ).toEqual(["Café de Flore", "Santelmo"]);
+  });
+
+  it("drops runaway text and caps the list", () => {
+    expect(normalizePlaces(["x".repeat(81), "Intenso"])).toEqual(["Intenso"]);
+    const many = Array.from({ length: 40 }, (_, i) => `Place ${i}`);
+    expect(normalizePlaces(many)).toHaveLength(MAX_ITEM_PLACES);
+  });
+
+  it("trims the space left behind by trailing punctuation", () => {
+    expect(normalizePlaces(["Café de Flore .", "café de flore"])).toEqual([
+      "Café de Flore",
+    ]);
+  });
+
+  it("reads a missing list as none", () => {
+    expect(normalizePlaces(undefined)).toEqual([]);
   });
 });

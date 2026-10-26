@@ -38,6 +38,8 @@ export default {
   ],
   workers: 1,
   timeout: 300_000,
+  actionTimeout: 90_000,
+  cleanupTimeout: 90_000,
   agents: {
     default: {
       model: google(process.env.E2E_MODEL ?? "gemini-3.8-flash"),

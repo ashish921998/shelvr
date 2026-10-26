@@ -19,21 +19,9 @@ import {
 } from "./model/appleTokens";
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
+import { deletePlanSharesForUser } from "./planShares";
 
-/**
- * Returns the currently signed-in user's id and email, or `null` when
- * unauthenticated or when the account is being deleted. The client uses this
- * for:
- *  - the profile screen (email display)
- *  - RevenueCat identity sync (`_id` is passed to `Purchases.logIn` so the
- *    webhook's `app_user_id` matches the `userId` every table keys on)
- *
- * `_id` is the same value `requireUserId` returns server-side, so passing it to
- * RevenueCat keeps the webhook mapping consistent. Only the two fields the
- * client needs are projected out, not the full auth document, so the contract
- * doesn't drift with Convex Auth's `users` schema (phone, verification state,
- * …).
- */
+/** Null when unauthenticated or the account is being deleted. */
 export const getCurrentUser = query({
   args: {},
   returns: v.union(
@@ -52,42 +40,6 @@ export const getCurrentUser = query({
   },
 });
 
-/**
- * Deletes the currently authenticated user's Shelvr account and all owned data.
- *
- * Identity is always derived from Convex Auth, never from a client-supplied
- * user id. Cleanup covers:
- *  - items (and their image storage blobs)
- *  - space memberships
- *  - spaces
- *  - itemOperations (including pending upload storage)
- *  - onboardingDemos (the demo allowance row and its item reference)
- *  - subscriptions
- *  - cancelSurveys (the one-time cancel-survey ask row)
- *  - aiConsents (the AI processing answer)
- *  - appleTokens (the Sign in with Apple refresh token, revoked with Apple)
- *  - feedbackSubmissions (in-app feedback rows and their messages)
- *  - Convex Auth sessions, refresh tokens, accounts, and the users row
- *
- * Apple/Google subscriptions are NOT cancelled here; the client must warn the
- * user that subscription management remains an App Store action.
- *
- * Deletion is batched: each transaction removes at most `DELETE_BATCH` rows
- * per table and schedules a continuation for the rest, so a heavy account
- * cannot blow Convex's per-transaction limits and become undeletable. Small
- * accounts finish synchronously in this first call; large ones complete in
- * the background moments later. The auth identity is only removed by the
- * final batch, after all domain data is confirmed gone.
- *
- * The first transaction also marks the users row `deleting`. From then on
- * `requireUserId` and every other owner check treat the account as gone, so
- * a JWT retained on another device, an in-flight capture-token mint, a
- * billing webhook or a late Apple token exchange cannot write data back into
- * an account that is draining. The marker is why this mutation reads the
- * identity directly instead of through `requireUserId`: a retry has to get
- * past the fence it set, so it can resume the drain (or do nothing once the
- * row is gone) instead of failing.
- */
 export const deleteCurrentUserAccount = mutation({
   args: {},
   returns: v.null(),
@@ -95,8 +47,6 @@ export const deleteCurrentUserAccount = mutation({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    // Already removed: the identity is a leftover token. Nothing to resume,
-    // nothing to report.
     if (user === null) return null;
     if (user.deleting !== true) {
       await ctx.db.patch(user._id, { deleting: true });
@@ -108,11 +58,6 @@ export const deleteCurrentUserAccount = mutation({
   },
 });
 
-/** Apple requires an app that offers Sign in with Apple to revoke the user's
- * token when the account is deleted. The job gets the token row's id, not the
- * token: job arguments stay readable in the dashboard long after they run.
- * The row is the one thing this deletion leaves behind, and the job removes
- * it once Apple has answered or the attempts run out. */
 async function scheduleAppleRevoke(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -120,9 +65,6 @@ async function scheduleAppleRevoke(
   const tokenId = await appleTokenId(ctx, userId);
   if (tokenId !== null) {
     await ctx.scheduler.runAfter(0, internal.appleRevoke.revoke, { tokenId });
-    // The action normally removes the row itself. A scheduled mutation is
-    // the guarantee: it runs even if the action died before cleaning up, and
-    // it is set past the action's last retry.
     await ctx.scheduler.runAfter(
       APPLE_TOKEN_MAX_LIFE_MS,
       internal.users.forgetAppleToken,
@@ -141,7 +83,6 @@ async function scheduleAppleRevoke(
   }
 }
 
-/** The refresh token the revoke job was pointed at, or null once it is gone. */
 export const appleTokenForRevoke = internalQuery({
   args: { tokenId: v.id("appleTokens") },
   returns: v.union(
@@ -155,7 +96,6 @@ export const appleTokenForRevoke = internalQuery({
   },
 });
 
-/** The parked token a detached revoke job was pointed at, or null once gone. */
 export const detachedAppleTokenForRevoke = internalQuery({
   args: { tokenId: v.id("detachedAppleTokens") },
   returns: v.union(v.string(), v.null()),
@@ -175,11 +115,6 @@ export const forgetDetachedAppleToken = internalMutation({
   },
 });
 
-/** Stores the refresh token the native Apple sheet's code was traded for.
- * Internal-only: the sign-in that calls it has just verified the user.
- * Deletion can start while Apple is still answering; `storeAppleToken` then
- * keeps whatever token the revoke job was already pointed at and returns false
- * so the action can revoke the freshly exchanged token without storing it. */
 export const keepNativeAppleToken = internalMutation({
   args: {
     userId: v.id("users"),
@@ -195,7 +130,6 @@ export const keepNativeAppleToken = internalMutation({
   },
 });
 
-/** Drops the token row once the revoke job has no further use for it. */
 export const forgetAppleToken = internalMutation({
   args: { tokenId: v.id("appleTokens") },
   returns: v.null(),
@@ -207,8 +141,6 @@ export const forgetAppleToken = internalMutation({
   },
 });
 
-/** Continuation worker for batched account deletion. Internal-only: userId is
- * trusted here because the public mutation derived it from auth. */
 export const processAccountDeletion = internalMutation({
   args: { userId: v.id("users") },
   returns: v.null(),
@@ -218,14 +150,8 @@ export const processAccountDeletion = internalMutation({
   },
 });
 
-/** Max rows deleted from any one table per transaction. Small enough that a
- * pass (rows + their storage blobs) stays far under Convex transaction limits;
- * large enough that typical accounts finish in the first, synchronous pass. */
 export const DELETE_BATCH = 100;
 
-/** Bytes of items one pass reads before it hands the rest to the
- * continuation. Well under the 16 MiB read limit, leaving room for the other
- * tables the same pass reads. */
 const DELETE_ITEM_READ_BYTES = 4 * 1024 * 1024;
 
 async function deleteAccountBatch(
@@ -242,28 +168,15 @@ async function deleteAccountBatch(
   await deleteAuthIdentity(ctx, userId);
 }
 
-/** Deletes up to one batch of domain data keyed by the Convex Auth user id.
- * Returns true when everything is gone. Tables drain strictly in order:
- * memberships fully first so join rows never dangle mid-deletion, and a full
- * batch from any table ends the pass so the continuation resumes there.
- * Storage is deleted with the rows that reference it. */
 async function deleteUserOwnedDataBatch(
   ctx: MutationCtx,
-  userId: Id<"users"> | string,
+  userId: Id<"users">,
 ): Promise<boolean> {
-  const userKey = userId as string;
+  if (!(await deleteCaptureTokensBatch(ctx, userId))) return false;
 
-  // Capture tokens first, so Siri stops saving into the account the moment
-  // deletion starts rather than after its saves have drained.
-  if (!(await deleteCaptureTokensBatch(ctx, userId as Id<"users">)))
-    return false;
-
-  // Raw deletes on purpose: every spaceItems write normally goes through
-  // model/memberships.ts to keep the space summary exact, but these spaces
-  // are deleted in the same pass, so patching their counters would be waste.
   const memberships = await ctx.db
     .query("spaceItems")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const row of memberships) {
     await ctx.db.delete(row._id);
@@ -272,18 +185,16 @@ async function deleteUserOwnedDataBatch(
 
   const spaces = await ctx.db
     .query("spaces")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const space of spaces) {
     await ctx.db.delete(space._id);
   }
   if (spaces.length === DELETE_BATCH) return false;
 
-  // Items alone also stop on bytes: a link save keeps up to 100k characters
-  // of article plus its search copy, so a full batch of them can read past
-  // Convex's 16 MiB transaction limit and fail every retry.
+  // Link saves can be ~100k chars each; stop on bytes to stay under Convex's 16 MiB transaction limit.
   const { rows: items, bytes: itemBytes } = await takeWithinBytes(
-    ctx.db.query("items").withIndex("by_user", (q) => q.eq("userId", userKey)),
+    ctx.db.query("items").withIndex("by_user", (q) => q.eq("userId", userId)),
     { maxRows: DELETE_BATCH, maxBytes: DELETE_ITEM_READ_BYTES },
   );
   for (const item of items) {
@@ -295,10 +206,9 @@ async function deleteUserOwnedDataBatch(
   if (items.length === DELETE_BATCH || itemBytes >= DELETE_ITEM_READ_BYTES)
     return false;
 
-  // Pending rows may still hold an unfinalized upload: delete that storage.
   const operations = await ctx.db
     .query("itemOperations")
-    .withIndex("by_user_operation", (q) => q.eq("userId", userKey))
+    .withIndex("by_user_operation", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const op of operations) {
     if (op.storageId !== undefined) {
@@ -310,7 +220,7 @@ async function deleteUserOwnedDataBatch(
 
   const demos = await ctx.db
     .query("onboardingDemos")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const demo of demos) {
     await ctx.db.delete(demo._id);
@@ -319,19 +229,18 @@ async function deleteUserOwnedDataBatch(
 
   const reads = await ctx.db
     .query("itemReads")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const read of reads) {
     await ctx.db.delete(read._id);
   }
   if (reads.length === DELETE_BATCH) return false;
 
-  if (!(await deleteShareLinksBatch(ctx, userKey))) return false;
-  if (!(await deletePlaceVisitsBatch(ctx, userKey))) return false;
+  if (!(await deleteSharingAndPlansBatch(ctx, userId))) return false;
 
   const devices = await ctx.db
     .query("notificationDevices")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const device of devices) {
     await ctx.db.delete(device._id);
@@ -340,35 +249,30 @@ async function deleteUserOwnedDataBatch(
 
   const preferences = await ctx.db
     .query("notificationPreferences")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const preference of preferences) {
     await ctx.db.delete(preference._id);
   }
   if (preferences.length === DELETE_BATCH) return false;
 
-  if (!(await deleteSentNotificationsBatch(ctx, userKey))) return false;
+  if (!(await deleteSentNotificationsBatch(ctx, userId))) return false;
 
-  // Feedback rows hold the user's authored messages, so they drain with the
-  // account. Deleting a row cannot retract an already-delivered inbox email
-  // (see docs/architecture/feedback.md); it only removes the Convex copy.
-  if (!(await deleteFeedbackBatch(ctx, userKey))) return false;
+  if (!(await deleteFeedbackBatch(ctx, userId))) return false;
 
-  // Does not cancel the App Store subscription: only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (sub !== null) {
     await ctx.db.delete(sub._id);
   }
 
-  await deleteAiConsent(ctx, userKey);
+  await deleteAiConsent(ctx, userId);
 
-  // The cancel-survey ask row is user-owned state; drain it with the rest.
   const survey = await ctx.db
     .query("cancelSurveys")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (survey !== null) {
     await ctx.db.delete(survey._id);
@@ -378,26 +282,24 @@ async function deleteUserOwnedDataBatch(
 
 async function deleteAiConsent(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<void> {
   const row = await ctx.db
     .query("aiConsents")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (row !== null) {
     await ctx.db.delete(row._id);
   }
 }
 
-/** Deletes up to one batch each of the user's weekly digests and save
- * reminders. Returns true when both tables are drained for this user. */
 async function deleteSentNotificationsBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const digests = await ctx.db
     .query("weeklyDigests")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const digest of digests) {
     await ctx.db.delete(digest._id);
@@ -405,7 +307,7 @@ async function deleteSentNotificationsBatch(
   if (digests.length === DELETE_BATCH) return false;
   const reminders = await ctx.db
     .query("saveReminders")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const reminder of reminders) {
     await ctx.db.delete(reminder._id);
@@ -413,18 +315,13 @@ async function deleteSentNotificationsBatch(
   return reminders.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch of the user's feedback submissions. Returns true
- * when the table is fully drained for this user. Feedback rows hold the
- * user's authored messages, so they drain with the account; deleting a row
- * cannot retract an already-delivered inbox email
- * (see docs/architecture/feedback.md). It only removes the Convex copy. */
 async function deleteFeedbackBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const feedback = await ctx.db
     .query("feedbackSubmissions")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const submission of feedback) {
     await ctx.db.delete(submission._id);
@@ -432,8 +329,6 @@ async function deleteFeedbackBatch(
   return feedback.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch of the user's Siri capture tokens. Returns true
- * when the table is fully drained for this user. */
 async function deleteCaptureTokensBatch(
   ctx: MutationCtx,
   userId: Id<"users">,
@@ -448,15 +343,25 @@ async function deleteCaptureTokensBatch(
   return tokens.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch of the user's branded share links. Returns true
- * when the table is fully drained for this user. */
+async function deleteSharingAndPlansBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  return (
+    (await deleteShareLinksBatch(ctx, userId)) &&
+    (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deleteTripsBatch(ctx, userId)) &&
+    (await deletePlanSharesForUser(ctx, userId))
+  );
+}
+
 async function deleteShareLinksBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const links = await ctx.db
     .query("shareLinks")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const link of links) {
     await ctx.db.delete(link._id);
@@ -464,15 +369,13 @@ async function deleteShareLinksBatch(
   return links.length !== DELETE_BATCH;
 }
 
-/** Deletes up to one batch of the user's "We went" places. Returns true
- * when the table is fully drained for this user. */
 async function deletePlaceVisitsBatch(
   ctx: MutationCtx,
-  userKey: string,
+  userId: string,
 ): Promise<boolean> {
   const visits = await ctx.db
     .query("placeVisits")
-    .withIndex("by_user_and_visited", (q) => q.eq("userId", userKey))
+    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const visit of visits) {
     await ctx.db.delete(visit._id);
@@ -480,7 +383,20 @@ async function deletePlaceVisitsBatch(
   return visits.length !== DELETE_BATCH;
 }
 
-/** Sessions (+ refresh tokens), accounts (+ verification codes), then users. */
+async function deleteTripsBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  const trips = await ctx.db
+    .query("trips")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const trip of trips) {
+    await ctx.db.delete(trip._id);
+  }
+  return trips.length !== DELETE_BATCH;
+}
+
 async function deleteAuthIdentity(
   ctx: MutationCtx,
   userId: Id<"users">,

@@ -88,7 +88,6 @@ describe("REVENUECAT_API_KEY", () => {
     expect(preview.REVENUECAT_API_KEY).toBeUndefined();
     expect(preview.REVENUECAT_DISABLED_BY_BUILD).toBe(true);
 
-    // A production build with no key is a misconfiguration, not a choice.
     setVariant("production");
     const production = await loadModule("ios");
     expect(production.REVENUECAT_API_KEY).toBeUndefined();
@@ -109,4 +108,22 @@ describe("REVENUECAT_API_KEY", () => {
     vi.stubEnv("EXPO_PUBLIC_REVENUECAT_ANDROID_KEY", "goog_prod");
     await expect(loadKey("web")).resolves.toBeUndefined();
   });
+});
+
+describe("REVENUECAT_PRO_ENTITLEMENT", () => {
+  it("names the production project's entitlement on production builds", async () => {
+    setVariant("production");
+    const prod = await loadModule("ios");
+    expect(prod.REVENUECAT_PRO_ENTITLEMENT).toBe("Shelvr Pro");
+  });
+
+  it.each(["development", "preview", undefined])(
+    "names the Development project's entitlement on a %s build",
+    async (variant) => {
+      setVariant(variant);
+      vi.stubGlobal("__DEV__", true);
+      const other = await loadModule("ios");
+      expect(other.REVENUECAT_PRO_ENTITLEMENT).toBe("shelvr_pro");
+    },
+  );
 });

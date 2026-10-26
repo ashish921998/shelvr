@@ -1,40 +1,51 @@
 # Paywall
 
-Someone without Pro who tries a Pro action gets the RevenueCat paywall
-instead.
+No entry without a plan. A signed-in account past onboarding without Pro
+lands on the plan gate ("Pick a plan to open Shelvr") instead of Home, and
+its See plans opens the RevenueCat paywall.
 
 ## Sub-features
 
-- Home's `Add` opens the paywall, not the Add sheet.
-- Home's "View Pro plans" prompt opens the same paywall.
-- The paywall lists Monthly and Annual, Continue, and Restore Purchases;
-  closing it returns to Home unchanged.
+- The plan gate shows See plans, Restore Purchases, Sign out, Settings, Terms
+  and Privacy; Home, its saves and `Add` are not reachable.
+- See plans opens the paywall (v3, trial timeline): "How free trial works",
+  the 7-day trial plan card, "View all plans", "Start 7-day free trial" and
+  "Restore purchases"; closing it returns to the plan gate.
+- Settings opens over the gate, with restore and account deletion.
 
 ## How to get to it (user POV)
 
-Without Pro, Home > `Add` or "View Pro plans". The dev user is always Pro on
-the server, so the test relaunches with `-E2EHidePro YES`, which makes a
-development build show them as not Pro and skips the exit offer
+Without Pro, launch the app and tap See plans on the plan gate. The dev user
+is always Pro on the server, so the test relaunches with `-E2EHidePro YES`,
+which makes a development build show them as not Pro
 (`src/lib/e2e-hide-pro.ts`).
 
 ## Driving it with e2e
 
 `tests/paywall.e2e.ts`, no model: `device.openApp` with the extra launch
-argument, `screen.getByRole("button", "View Pro plans")`,
-`screen.getByText("Shelvr Pro")`, `screen.getByRole("button", /^Monthly, /)`,
-`/^Annual, /`, `Continue`, `Restore Purchases`; the close control is the first
-unlabelled button.
+argument, waits for the plan gate, taps `screen.getByRole("button", "See plans")`,
+then `expectPaywall` (`tests/paywall-sheet.ts`): `getByText("How free trial
+works")`, `/Shelvr Pro/`, the `/^7-day trial, /` plan button, `View all plans`,
+`Start 7-day free trial` and `/^Restore purchases$/i`; the close control is the
+button named `Close` (provided by the upgraded native SDK). No assertion matches a price.
+
+Plan switching has its own test: it opens "View all plans", selects Monthly,
+checks the billed-today disclosure, then selects Annual and checks the trial
+CTA. `expectPaywall` only observes the initial paywall, so the entry and
+dismissal tests never need to switch plans. The paywall at the end of
+onboarding has its own feature file, [onboarding](onboarding.md).
 
 ## Proof
 
-Both entry points show the paywall with both plans; after each close Home
-shows the four seeded saves, no Add sheet, and nothing processing. No
+The gate shows instead of Home; See plans shows the paywall with its trial
+plan and the way to all plans; after each close the gate is back and `Add`
+and the seeded saves stay hidden; Settings opens with Delete account. No
 purchase is made; the server entitlement is untouched.
 
 ## Charters
 
 ```
-paywall-flow|ios|skeptic|Launched with -E2EHidePro YES, reach the paywall from every Pro entry point on Home and close it each time; check Home is unchanged and no save was started
+paywall-flow|ios|skeptic|Launched with -E2EHidePro YES, check the plan gate shows instead of Home, open the paywall from See plans and close it; check the gate is back, Home and Add stay unreachable, and Settings opens
 ```
 
 ## Gotchas

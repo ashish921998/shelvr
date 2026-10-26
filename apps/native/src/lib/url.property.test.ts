@@ -3,13 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import { extractFirstUrl, isProbablyUrl } from "./url";
 
-/** A link that ends in a character no sentence borrows, so the whole of it
- * is the link. */
 const link = fc
   .webUrl({ withQueryParameters: true, withFragments: true })
   .filter((url) => /[A-Za-z0-9/]$/.test(url));
 
-/** What a share sheet puts before the link: any text with no link of its own. */
 const caption = fc.string().filter((text) => !/https?:\/\//i.test(text));
 
 describe("extractFirstUrl", () => {
@@ -29,8 +26,6 @@ describe("extractFirstUrl", () => {
           expect(
             extractFirstUrl(`${before}\n${url}${punctuation} ${after}`),
           ).toBe(url);
-          // A caption that wraps the link in brackets keeps its own bracket.
-          // A link with brackets of its own is a guess either way.
           if (!/[()]/.test(url)) {
             expect(extractFirstUrl(`${before} (${url})${punctuation}`)).toBe(
               url,
@@ -57,7 +52,6 @@ describe("extractFirstUrl", () => {
           expect(text).toContain(url);
           expect(url).toMatch(/^https?:\/\//i);
           expect(url).not.toMatch(/[\s<>"]/);
-          // Trimming is finished: extracting from the result changes nothing.
           expect(extractFirstUrl(url)).toBe(url);
         },
       ),

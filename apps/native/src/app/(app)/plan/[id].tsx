@@ -8,12 +8,16 @@ import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { runIntent } from "@/lib/intents";
 import {
+  daysLeft,
+  linkForPlan,
   placeLabel,
   planShareText,
   useMakePlan,
   usePlaceVisits,
+  usePlanAsk,
   usePlanDeck,
   usePlanPicker,
+  votesFor,
   type PlanPlace,
 } from "@/lib/make-plan";
 import { api } from "@convex/_generated/api";
@@ -22,8 +26,8 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { Stack, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, Share, View } from "react-native";
 import Animated, {
   FadeIn,
@@ -47,7 +51,6 @@ function haptic(kind: "tick" | "done") {
   }
 }
 
-/** The space's saves fanned out and shuffling while the model reads them. */
 function PlanLoading({ images }: { images: string[] }) {
   useAppLocale();
   const reducedMotion = useReducedMotion();
@@ -92,7 +95,6 @@ function PlanLoading({ images }: { images: string[] }) {
   );
 }
 
-/** Maps and "We went" for the card on top, once the deck has dealt one. */
 function TonightActions({
   place,
   visited,
@@ -146,18 +148,147 @@ function TonightActions({
   );
 }
 
+function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ busy }}
+      disabled={busy}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.action,
+        styles.actionOpen,
+        busy && styles.actionBusy,
+        pressed && styles.pressed,
+      ]}
+    >
+      <AppSymbolIcon
+        name="square.and.arrow.up"
+        size={15}
+        tintColor={theme.colors.foreground}
+      />
+      <ThemedText variant="button" style={styles.actionLabel}>
+        {t("plan.ask")}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+function deckHint(
+  been: PlanPlace | null,
+  votes: { voters: number; expiresAt: number } | null | undefined,
+): string {
+  if (been) return t("plan.beenHint", { name: been.name });
+  if (votes && votes.voters > 0) {
+    const voters = t("plan.voterCount", { count: votes.voters });
+    const days = t("plan.daysLeft", { count: daysLeft(votes.expiresAt) });
+    return `${voters} ${days}`;
+  }
+  return t("plan.deckHint");
+}
+
+function PlanFooter({
+  dealt,
+  place,
+  visited,
+  spinning,
+  askButton,
+  onOpenMaps,
+  onToggleVisited,
+  onDeal,
+}: {
+  dealt: boolean;
+  place: PlanPlace | null;
+  visited: boolean;
+  spinning: boolean;
+  askButton: ReactNode;
+  onOpenMaps: () => void;
+  onToggleVisited: () => void;
+  onDeal: () => void;
+}) {
+  return (
+    <View style={styles.footer}>
+      {place ? (
+        <TonightActions
+          place={place}
+          visited={visited}
+          onOpenMaps={onOpenMaps}
+          onToggleVisited={onToggleVisited}
+        />
+      ) : null}
+      {dealt ? (
+        <>
+          {askButton}
+          <Pressable
+            accessibilityRole="button"
+            onPress={onDeal}
+            hitSlop={8}
+            style={({ pressed }) => [styles.again, pressed && styles.pressed]}
+          >
+            <ThemedText variant="secondaryLabel" style={styles.muted}>
+              {t("plan.dealAgain")}
+            </ThemedText>
+          </Pressable>
+        </>
+      ) : (
+        <View style={styles.actions}>
+          <View style={styles.actionSlot}>
+            <Button
+              title={t("plan.pick")}
+              onPress={onDeal}
+              loading={spinning}
+              style={styles.pick}
+            />
+          </View>
+          <View style={styles.actionSlot}>{askButton}</View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** A shared shortlist reopens from a city only when every place on it is one of that city's saves. */
+function sharedForCity<T extends { places: { itemId: string }[] }>(
+  shared: T | null | undefined,
+  city: string | undefined,
+  citySaves: { _id: string }[] | undefined,
+): T | null | undefined {
+  if (!city || !shared) return shared;
+  if (citySaves === undefined) return undefined;
+  const ids = new Set(citySaves.map((save) => save._id));
+  return shared.places.every((place) => ids.has(place.itemId)) ? shared : null;
+}
+
 export default function PlanScreen() {
   const locale = useAppLocale();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `city` is set when a city page opened this plan, so it plans that city's saves.
+  const { id, city } = useLocalSearchParams<{ id: string; city?: string }>();
   const spaceId = id as Id<"spaces">;
-  const router = useRouter();
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: spaceId }),
   );
-  const { state, retry } = useMakePlan(spaceId, locale);
+  const { data: latestLink, isError: linkFailed } = useQuery(
+    convexQuery(api.planShares.latestPlanShare, { spaceId }),
+  );
+  const { data: citySaves } = useQuery(
+    convexQuery(api.items.listCityItems, city ? { city } : "skip"),
+  );
+  const { state, retry } = useMakePlan(
+    spaceId,
+    locale,
+    sharedForCity<NonNullable<typeof latestLink>>(
+      linkFailed ? null : latestLink,
+      city,
+      citySaves,
+    ),
+    city,
+  );
   const reducedMotion = useReducedMotion();
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
+  const votes = linkForPlan(latestLink, places);
+  const { ask, asking } = usePlanAsk(spaceId, places, votes);
   const planId = state.status === "ready" ? state.planId : null;
   const deck = usePlanDeck(planId, places.length);
   const { show } = deck;
@@ -179,8 +310,6 @@ export default function PlanScreen() {
     },
   );
   const { isVisited, toggle: toggleVisited } = usePlaceVisits();
-  // While dealing, the deck shuffles through its cards; then the card on top
-  // is the one the actions below act on.
   const front = isSpinning && highlight !== null ? highlight : deck.front;
   const frontPlace = places[front] ?? null;
   const hasPlaces = state.status === "ready" && places.length > 0;
@@ -198,7 +327,6 @@ export default function PlanScreen() {
     return { imageById: images, titleById: titles };
   }, [space]);
 
-  // A new plan replaces the old one, its pick and any spin still running.
   const again = () => void retry();
 
   const share = async () => {
@@ -304,6 +432,7 @@ export default function PlanScreen() {
               imageFor={(place) => imageById.get(place.itemId)}
               titleFor={(place) => titleById.get(place.itemId)}
               isVisited={isVisited}
+              tallyFor={(place) => votesFor(votes, place)}
               onFlip={deck.flip}
               onNext={deck.next}
               onOpenMaps={openMaps}
@@ -313,9 +442,7 @@ export default function PlanScreen() {
               style={[styles.muted, styles.hint]}
               accessibilityLiveRegion="polite"
             >
-              {frontBeen && frontPlace
-                ? t("plan.beenHint", { name: frontPlace.name })
-                : t("plan.deckHint")}
+              {deckHint(frontBeen ? frontPlace : null, votes)}
             </ThemedText>
           </>
         ) : null}
@@ -333,27 +460,6 @@ export default function PlanScreen() {
           </View>
         ) : null}
 
-        {state.status === "ai_off" ? (
-          <View style={styles.message}>
-            <EmptyState title={t("plan.make")} message={t("plan.aiOff")} />
-            <Button
-              title={t("profile.settings")}
-              onPress={() => router.push("/settings")}
-            />
-            {/* Back from Settings with AI on, the screen is still mounted. */}
-            <Pressable
-              accessibilityRole="button"
-              onPress={again}
-              hitSlop={8}
-              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
-            >
-              <ThemedText variant="secondaryLabel" style={styles.muted}>
-                {t("common.tryAgain")}
-              </ThemedText>
-            </Pressable>
-          </View>
-        ) : null}
-
         {state.status === "error" ? (
           <View style={styles.message}>
             <EmptyState
@@ -365,36 +471,16 @@ export default function PlanScreen() {
         ) : null}
       </ScrollView>
       {hasPlaces ? (
-        // Pinned under the list so the pick and its result stay on screen
-        // however long the shortlist is.
-        <View style={styles.footer}>
-          {dealt && frontPlace ? (
-            <TonightActions
-              place={frontPlace}
-              visited={isVisited(frontPlace)}
-              onOpenMaps={() => openMaps(frontPlace, front + 1)}
-              onToggleVisited={() => toggleVisited(frontPlace)}
-            />
-          ) : null}
-          {dealt ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={pickForMe}
-              hitSlop={8}
-              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
-            >
-              <ThemedText variant="secondaryLabel" style={styles.muted}>
-                {t("plan.dealAgain")}
-              </ThemedText>
-            </Pressable>
-          ) : (
-            <Button
-              title={t("plan.pick")}
-              onPress={pickForMe}
-              disabled={isSpinning}
-            />
-          )}
-        </View>
+        <PlanFooter
+          dealt={dealt}
+          place={dealt ? frontPlace : null}
+          visited={frontBeen}
+          spinning={isSpinning}
+          askButton={<AskButton busy={asking} onPress={() => void ask()} />}
+          onOpenMaps={() => frontPlace && openMaps(frontPlace, front + 1)}
+          onToggleVisited={() => frontPlace && toggleVisited(frontPlace)}
+          onDeal={pickForMe}
+        />
       ) : null}
     </>
   );
@@ -425,7 +511,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: "space-between",
     gap: theme.gap(1),
   },
-  // Sits on the title's last line, not centred against the whole heading.
   shuffle: {
     paddingBottom: theme.gap(0.75),
   },
@@ -476,11 +561,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.gap(1),
-    minHeight: theme.control.minHeight + theme.gap(0.5),
+    minHeight: theme.control.minHeight,
+    paddingHorizontal: theme.gap(1.5),
+    paddingVertical: theme.gap(1),
     borderRadius: 999,
     borderWidth: 2,
     borderColor: "transparent",
   },
+  actionSlot: { flex: 1 },
+  pick: { minHeight: theme.control.minHeight },
   actionFilled: {
     backgroundColor: theme.colors.primary,
   },
@@ -490,6 +579,13 @@ const styles = StyleSheet.create((theme, rt) => ({
   actionWent: {
     borderColor: theme.colors.danger,
   },
+  actionBusy: {
+    opacity: theme.opacity.disabled,
+  },
+  actionLabel: {
+    flexShrink: 1,
+    textAlign: "center",
+  },
   onTint: {
     color: theme.colors.onTint,
   },
@@ -498,7 +594,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   hint: {
     textAlign: "center",
-    // Two lines held, so the We went hint replacing it moves nothing.
     minHeight: 36,
     paddingHorizontal: theme.gap(2),
   },

@@ -69,7 +69,6 @@ function renderShare({
 beforeEach(() => {
   mock.payloads = [];
   mock.getSharedPayloads.mockReset().mockImplementation(() => mock.payloads);
-  // An empty read forgets the link the hook last handed over.
   renderShare().unmount();
   mock.getSharedPayloads.mockClear();
   mock.clearSharedPayloads.mockReset();
@@ -128,7 +127,6 @@ describe("useIncomingShareUrl", () => {
     mock.payloads = [link("https://a.test/x")];
     const { onSharedUrl } = renderShare();
     expect(onSharedUrl).toHaveBeenCalledWith("https://a.test/x");
-    // Nothing is cleared until the server says this link was saved.
     expect(mock.clearSharedPayloads).not.toHaveBeenCalled();
     expect(mock.markPendingShareOnDevice).not.toHaveBeenCalled();
   });
@@ -143,7 +141,6 @@ describe("useIncomingShareUrl", () => {
     const second = renderShare();
     expect(second.onSharedUrl).not.toHaveBeenCalled();
 
-    // A different link shared afterwards is a new share.
     mock.payloads = [link("https://b.test/y")];
     act(() => mock.appStateListener?.("active"));
     expect(second.onSharedUrl).toHaveBeenCalledWith("https://b.test/y");

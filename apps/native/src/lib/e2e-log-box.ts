@@ -2,7 +2,6 @@ import { LogBox, Platform, Settings } from "react-native";
 
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 
-/** Launch argument every e2e flow passes: `-E2EHideLogBox YES`. */
 const LAUNCH_ARGUMENT = "E2EHideLogBox";
 
 /**

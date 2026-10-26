@@ -1,10 +1,7 @@
-import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { after, test } from "node:test";
 
+import { createRepo } from "./temp-repo.mjs";
 import {
   acknowledgementValues,
   diffSources,
@@ -139,7 +136,6 @@ test("the early warning names the release gate as what enforces compatibility", 
   const report = drifted(true);
   assert.match(report, /early warning and does not fail the check/);
   assert.match(report, /verify-ota-compatibility\.mjs/);
-  // Same comparison either way: the flag changes the verdict, not the finding.
   assert.match(report, /ios {6}1111111 -> 2222222 {2}CHANGED/);
   assert.match(report, /posthog-react-native/);
   assert.match(report, /Native-Fingerprint: changed/);
@@ -152,14 +148,9 @@ test("without the flag the report claims no other gate", () => {
   assert.match(report, /ios {6}1111111 -> 2222222 {2}CHANGED/);
 });
 
-const repo = mkdtempSync(join(tmpdir(), "fingerprint-trailer-"));
-const git = (...args) =>
-  execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" });
-const commit = (message) => git("commit", "-q", "--allow-empty", "-m", message);
+const { dir: repo, commit, remove } = createRepo("fingerprint-trailer-");
+after(() => remove());
 
-git("init", "-q", "-b", "main");
-git("config", "user.email", "test@example.com");
-git("config", "user.name", "Test");
 commit("base");
 commit(
   [
@@ -184,8 +175,6 @@ commit(
     "Co-Authored-By: Someone <someone@example.com>",
   ].join("\n"),
 );
-
-after(() => rmSync(repo, { recursive: true, force: true }));
 
 test("prose and subjects that repeat the line do not acknowledge", () => {
   assert.deepEqual(acknowledgementValues(repo, "HEAD~3..HEAD~1"), []);

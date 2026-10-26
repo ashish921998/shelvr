@@ -7,15 +7,18 @@ name: e2e ios
 #
 # No secrets: the backend is a throwaway local deployment (CONVEX_AGENT_MODE
 # anonymous), so a fork's pull request runs it the same way. The backend's
-# model is the deterministic fake in convex/model/fakeAi.ts, which classifies
-# a note from its own words, so save-note runs here, and serves the fixture
-# pages in the same file, so save-link-fixture saves a link with no network
-# read. It also suggests the saves that share a word with a new space's name,
-# so space-suggestions sees a seeded save suggested. Two flows are left out because the fake cannot stand in for them:
-# save-link and save-image judge the screen with a real model.
+# model is the deterministic fake in convex/model/fakeAi.ts, which serves the
+# fixture pages in the same file, so save-link-fixture saves a link with no
+# network read. save-link is left out because it judges the screen with a
+# real model.
 
+# On a pull request it runs only once the PR carries the `run-e2e` label:
+# adding the label starts a run, and while it stays on, every push re-runs
+# it. Each run takes about 25 minutes of two macOS runners, and running it on
+# every push of every PR left five queued against each other (2026-10-21).
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - "apps/native/**"
       - "tools/e2e/**"
@@ -44,8 +47,10 @@ permissions:
 # every commit keeps its own run, in a group of its own: merges landing close
 # together used to cancel each other (four on 2026-10-15), so main never built
 # the record of clean runs this check needs before it can be required.
+# Adding any other label also starts this workflow (its jobs then skip); that
+# run takes a group of its own, so it never cancels a real run.
 concurrency:
-  group: e2e-ios-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: e2e-ios-${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'run-e2e') && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -55,23 +60,47 @@ env:
 
 jobs:
   ios:
-    name: e2e ios
+    name: e2e ios (${{ matrix.shard.name }})
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'run-e2e') ||
+      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-e2e'))
     runs-on: macos-26
     timeout-minutes: 90
+    # The flows split over two runners, each with its own simulator and
+    # backend, balanced on the 2026-10-21 timings: 7 to 10 minutes of flows
+    # each once setup is done. One shard failing does not stop the other.
+    # A shard runs its files in name order. Onboarding stays behind
+    # home-cities: as the first flow on a fresh simulator it lost the driver
+    # twice ("Daemon request timed out").
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: a
+            tests: >-
+              tests/home-cities.e2e.ts
+              tests/onboarding.e2e.ts
+              tests/settings-no-ai-permission.e2e.ts
+          - name: b
+            tests: >-
+              tests/paywall.e2e.ts
+              tests/plan-city-date.e2e.ts
+              tests/save-link-fixture.e2e.ts
     steps:
       - name: Check out the repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10.33.0
 
       # e2e needs Node 22.12 or later, above the root package's minimum.
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: pnpm
@@ -139,8 +168,7 @@ jobs:
           path: ~/.agent-device
           key: ${{ steps.fingerprint.outputs.runner-key }}
 
-      # The picker taps in save-image are measured on an iPhone 17, and the
-      # other flows run on any iPhone; the runtime is the newest the image has.
+      # The flows run on any iPhone; the runtime is the newest the image has.
       - name: Boot a simulator and install the build
         run: |
           runtime=$(xcrun simctl list runtimes available -j | node -p '
@@ -155,13 +183,15 @@ jobs:
       # A cold runner build can outlast the budget e2e gives the engine to
       # start (seen: "boot failed: Daemon request timed out"), so it is built
       # here with a budget of its own. The daemon is stopped afterwards so it
-      # does not hold the runner the run's own daemon needs.
+      # does not hold the runner the run's own daemon needs. --json prints
+      # where the time went (timing.additiveParts: build vs connect): this
+      # step takes 1 to 5 minutes even when its cache hits.
       - name: Prepare the XCTest runner
         id: prepare-runner
         run: |
           node node_modules/agent-device/bin/agent-device.mjs prepare ios-runner \
-            --platform ios --udid "$E2E_DEVICE" --timeout 900000
-          node node_modules/agent-device/bin/agent-device.mjs daemon stop
+            --platform ios --udid "$E2E_DEVICE" --timeout 900000 --json
+          tools/e2e/stop-agent-device.sh
 
       - name: Save the agent-device runner
         if: ${{ !cancelled() && steps.prepare-runner.outcome == 'success' && steps.runner-cache.outputs.cache-hit != 'true' }}
@@ -249,23 +279,63 @@ jobs:
           echo "::error::Metro on 8091 did not stop; the run could not start its own"
           exit 1
 
+      # A failure here is decided by the next step, which can rerun the flows.
       - name: Run the flows
+        id: flows
+        continue-on-error: true
         working-directory: tools/e2e
-        # Tells the flows that need the fake (save-link-fixture,
-        # space-suggestions) that the backend runs it.
+        # Tells the flows that need the fake (plan-city-date,
+        # save-link-fixture) that the backend runs it. E2E_FIXTURE_RESET has
+        # the seeded flows reset their data with `convex run` against this
+        # local backend instead of through Settings (startOnSeededHome), which
+        # cost each flow about 50 seconds of taps and a relaunch.
         env:
           E2E_FAKE_AI: local-v1
-        run: >-
-          pnpm exec e2e run
-          tests/search.e2e.ts
-          tests/search-no-results.e2e.ts
-          tests/create-space.e2e.ts
-          tests/paywall.e2e.ts
-          tests/save-note.e2e.ts
-          tests/save-link-fixture.e2e.ts
-          tests/space-suggestions.e2e.ts
-          tests/onboarding.e2e.ts
-          --reporter list,junit
+          E2E_FIXTURE_RESET: backend
+          CONVEX_AGENT_MODE: anonymous
+        run: pnpm exec e2e run ${{ matrix.shard.tests }} --reporter list,junit
+
+      # The test tool's daemon can wedge for good: every read then answers
+      # "Daemon request timed out" until the test gives up (main after #431,
+      # #446's first run), and a test retry meets the same daemon. When a
+      # failure reads like that, stop the daemon, reboot the simulator, which
+      # ends its XCTest runner, and run the tests that did not pass once more.
+      # A real failure should fail again; one the tool caused gets a fresh daemon.
+      - name: Rerun flows the test tool dropped
+        id: rerun
+        if: ${{ steps.flows.outcome == 'failure' }}
+        working-directory: tools/e2e
+        env:
+          E2E_FAKE_AI: local-v1
+          E2E_FIXTURE_RESET: backend
+          CONVEX_AGENT_MODE: anonymous
+        run: |
+          test -f .e2e/report.json || exit 1
+          # Only a failure --last-failed reruns counts: a test's final
+          # attempt, or a beforeAll/afterAll hook, not a flaky test's
+          # earlier attempt.
+          node -e '
+            const run = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8")).run;
+            const wedged = /Daemon request timed out|test tool stopped answering|overran its watchdog|runner is wedged|LAUNCH_TIMEOUT|xcrun timed out|Runner did not accept connection/;
+            const failed = run.results
+              .filter((r) => ["failed", "timed-out", "interrupted"].includes(r.status))
+              .map((r) => r.attempts?.at(-1)?.error ?? r.error);
+            const hooks = run.errors.filter((e) => e.phase === "beforeAll" || e.phase === "afterAll");
+            process.exit([...failed, ...hooks].some((e) => wedged.test(JSON.stringify(e ?? ""))) ? 0 : 1);
+          ' || exit 1
+          echo "::warning title=Test tool wedged::restarting the daemon and simulator, then rerunning the tests that did not pass"
+          # The rerun writes its own report; keep the first run's for the artifact.
+          first="$RUNNER_TEMP/first-run"
+          mkdir -p "$first"
+          cp .e2e/report.json "$first/"
+          cp ~/.agent-device/daemon.log "$first/" 2>/dev/null || true
+          ./stop-agent-device.sh
+          xcrun simctl shutdown "$E2E_DEVICE" || true
+          xcrun simctl bootstatus "$E2E_DEVICE" -b
+          status=0
+          pnpm exec e2e run ${{ matrix.shard.tests }} --last-failed --reporter list,junit || status=$?
+          mkdir -p .e2e/first-run && cp "$first"/* .e2e/first-run/
+          exit $status
 
       # tapUntilVisible taps again when a tap was lost. The run still passes
       # then, so a recovered tap is surfaced here as a warning on the pull
@@ -277,7 +347,7 @@ jobs:
           node -e '
             if (!require("fs").existsSync(".e2e/report.json")) process.exit(0);
             const report = JSON.parse(require("fs").readFileSync(".e2e/report.json", "utf8"));
-            const watched = /name: "(Profile|Add|New space)"/;
+            const watched = /name: "(Profile|Add)"/;
             const walk = (node) => {
               if (Array.isArray(node)) return node.forEach(walk);
               if (!node || typeof node !== "object") return;
@@ -310,16 +380,39 @@ jobs:
             | grep -iE "devlauncher|manifest|NSURLError|bundle|error" | tail -150 || true
           echo "::endgroup::"
 
-      - name: Copy the backend log
+      # The backend's log, and the test tool's: its daemon's lifecycle log and
+      # the XCTest runner's, which say why a read timed out.
+      - name: Copy the backend and test tool logs
         if: ${{ !cancelled() }}
-        run: cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
+        run: |
+          cp "$RUNNER_TEMP/convex.log" tools/e2e/.e2e/ 2>/dev/null || true
+          cp ~/.agent-device/daemon.log tools/e2e/.e2e/ 2>/dev/null || true
+          # Each session keeps its runner's log under the daemon's state; the
+          # path, flattened, keeps sessions apart.
+          mkdir -p tools/e2e/.e2e/runner-logs
+          find "$HOME/.agent-device" "${TMPDIR:-/tmp}/agent-device" -name '*.xcresult' -prune -o -name '*.log' ! -name daemon.log -print 2>/dev/null |
+            while read -r log; do cp "$log" "tools/e2e/.e2e/runner-logs/$(echo "${log#"$HOME"/}" | tr '/' '_')"; done || true
 
       - name: Upload the run
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-ios
+          name: e2e-ios-${{ matrix.shard.name }}
           path: tools/e2e/.e2e
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
+
+  # One stable check named `e2e ios` over both shards, for when the check
+  # becomes required. It skips with them on a pull request without the label.
+  # A run that another label started reports under a name of its own, so its
+  # skip never stands in for this commit's real result.
+  result:
+    name: ${{ github.event.action == 'labeled' && github.event.label.name != 'run-e2e' && 'e2e ios (label)' || 'e2e ios' }}
+    needs: ios
+    if: ${{ !cancelled() && needs.ios.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Both shards passed
+        run: test "${{ needs.ios.result }}" = success

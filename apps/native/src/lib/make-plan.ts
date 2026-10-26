@@ -2,10 +2,10 @@ import { t } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { isAiConsentRequired } from "@convex/model/aiConsent";
 import { placeKey, type PlanPlace } from "@convex/model/plan";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Share } from "react-native";
 
 export type { PlanPlace };
 
@@ -15,86 +15,104 @@ type PlanState =
       status: "ready";
       places: PlanPlace[];
       considered: number;
-      /** Unique per answer, so anything tied to one plan can key on it. */
       planId: number;
     }
-  | { status: "ai_off" }
   | { status: "error" };
 
-/** Where a shared plan sends people who don't have Shelvr yet. */
 export const PLAN_SHARE_URL = "https://shelvr-web.vercel.app/?ct=plan-share";
 
 const LOADING: PlanState = { status: "loading" };
 
-/**
- * Runs `plans.makePlan` for a space once per space and locale, and again on
- * `retry`. A late answer from an earlier run never overwrites a newer one, and
- * an answer for another space or locale reads as loading, never as ready.
- */
-export function useMakePlan(spaceId: Id<"spaces">, locale: string) {
+type SharedShortlist = {
+  expiresAt: number;
+  places: PlanPlace[];
+};
+
+export function useMakePlan(
+  spaceId: Id<"spaces">,
+  locale: string,
+  shared: SharedShortlist | null | undefined,
+  city?: string,
+) {
   const makePlan = useAction(api.plans.makePlan);
-  const key = `${spaceId}:${locale}`;
+  const key = `${spaceId}:${locale}:${city ?? ""}`;
+  const sharedRef = useRef(shared);
+  useEffect(() => {
+    sharedRef.current = shared;
+  });
+  const linkLoaded = shared !== undefined;
   const [result, setResult] = useState<{
     key: string;
     state: PlanState;
   } | null>(null);
   const run = useRef(0);
 
-  // Resolves to the next state and never throws; callers apply it only if
-  // no newer run has started.
   const load = useCallback(
     async (planId: number): Promise<PlanState> => {
       try {
-        const plan = await makePlan({ spaceId, locale });
+        const plan = await makePlan({ spaceId, locale, city });
         analytics.capture("plan_made", {
           considered: plan.considered,
           place_count: plan.places.length,
         });
         return { status: "ready", ...plan, planId };
       } catch (error) {
-        const aiOff = isAiConsentRequired(error);
-        analytics.capture("plan_failed", {
-          reason: aiOff ? "ai_consent" : "error",
-        });
-        if (!aiOff) analytics.captureError("make_plan_failed", error);
-        return { status: aiOff ? "ai_off" : "error" };
+        analytics.capture("plan_failed", { reason: "error" });
+        analytics.captureError("make_plan_failed", error);
+        return { status: "error" };
       }
     },
-    [makePlan, spaceId, locale],
+    [makePlan, spaceId, locale, city],
   );
 
   useEffect(() => {
+    if (!linkLoaded) return;
     const current = ++run.current;
-    void load(current).then((next) => {
-      if (current === run.current) setResult({ key, state: next });
+    const link = sharedRef.current;
+    const next: Promise<PlanState> =
+      link && link.expiresAt > Date.now() && link.places.length > 0
+        ? Promise.resolve({
+            status: "ready",
+            places: link.places,
+            considered: link.places.length,
+            planId: current,
+          })
+        : load(current);
+    void next.then((state) => {
+      if (current === run.current) setResult({ key, state });
     });
     return () => {
-      // Unmounted or regenerating: drop whatever the in-flight run returns.
       run.current += 1;
     };
-  }, [load, key]);
+  }, [load, key, linkLoaded]);
+
+  const resultRef = useRef(result);
+  useEffect(() => {
+    resultRef.current = result;
+  });
 
   const retry = useCallback(async () => {
     const current = ++run.current;
+    const shown =
+      resultRef.current?.key === key ? resultRef.current.state : null;
     setResult(null);
     const next = await load(current);
-    if (current === run.current) setResult({ key, state: next });
+    if (current !== run.current) return;
+    if (next.status === "error" && shown?.status === "ready") {
+      setResult({ key, state: shown });
+      Alert.alert(t("plan.failedTitle"), t("errors.retrySoon"));
+      return;
+    }
+    setResult({ key, state: next });
   }, [load, key]);
 
   const state = result?.key === key ? result.state : LOADING;
   return { state, retry };
 }
 
-/**
- * "We went" for the places on a plan. A tap shows at once and is saved in the
- * background; if the save fails the place goes back to how it was. A place
- * the server already tagged `been` reads as visited until the user takes the
- * mark back.
- */
 export function usePlaceVisits() {
   const setVisited = useMutation(api.placeVisits.setVisited);
   const [marks, setMarks] = useState<ReadonlyMap<string, boolean>>(new Map());
-  // The latest tap per place: an older save failing must not undo a newer tap.
   const latest = useRef(new Map<string, number>());
 
   const isVisited = useCallback(
@@ -130,11 +148,6 @@ export function usePlaceVisits() {
 
 type Deck = { planId: number | null; front: number; flipped: boolean };
 
-/**
- * The plan as a deck of cards: which card is on top and whether it is turned
- * over to show why it was picked. A new plan starts on its first card, face
- * up. `next` sends the top card to the back; `show` brings a card to the top.
- */
 export function usePlanDeck(planId: number | null, count: number) {
   const [deck, setDeck] = useState<Deck>({
     planId,
@@ -161,10 +174,6 @@ export function usePlanDeck(planId: number | null, count: number) {
   return { front, flipped: current.flipped, next, show, flip };
 }
 
-/**
- * Indexes of the cards to draw, back to front: up to `depth` cards, ending
- * with `front`, so the top card renders last.
- */
 export function deckOrder(count: number, front: number, depth = 4): number[] {
   const shown = Math.min(count, depth);
   return Array.from(
@@ -180,11 +189,6 @@ type Pick = {
   spinning: boolean;
 };
 
-/**
- * "Pick for me" for one plan: the spin, its timers and the result all belong
- * to `planId`. A new plan (or none, while one loads) discards the last pick
- * and stops a spin still running; so does unmounting.
- */
 export function usePlanPicker(
   places: PlanPlace[],
   planId: number | null,
@@ -203,6 +207,8 @@ export function usePlanPicker(
       timers.current.forEach(clearTimeout);
       timers.current = [];
       spinningPlan.current = null;
+      // A failed shuffle brings the same plan back; a spin cut short must not come back with it.
+      setPick((shown) => (shown?.spinning ? null : shown));
     },
     [planId],
   );
@@ -217,7 +223,6 @@ export function usePlanPicker(
     timers.current = [];
     setPick({ planId, highlight: null, picked: null, spinning: true });
     const winner = Math.floor(Math.random() * places.length);
-    // Reduce Motion lands straight on the pick instead of cycling cards.
     const steps = reducedMotion ? [] : spinSteps(places.length, winner);
     let at = 0;
     for (const step of steps) {
@@ -253,7 +258,6 @@ export function usePlanPicker(
   };
 }
 
-/** Ready saves a space needs before it offers a plan. */
 const PLAN_MIN_SAVES = 3;
 
 type PlanCandidate = {
@@ -262,11 +266,6 @@ type PlanCandidate = {
   spaceIntents?: { kind: string }[];
 };
 
-/**
- * Whether a space offers "Make a plan". The planner reads ready saves only,
- * and at least one must already carry a place (an "Open in Maps" action, on
- * the save or steered for this space), so a reading list never offers one.
- */
 export function canMakePlan(items: PlanCandidate[]): boolean {
   const ready = items.filter((item) => item.status === "ready");
   return (
@@ -279,12 +278,10 @@ export function canMakePlan(items: PlanCandidate[]): boolean {
   );
 }
 
-/** `name` plus its area, for display and for the Maps query. */
 export function placeLabel(place: PlanPlace): string {
   return place.area ? `${place.name}, ${place.area}` : place.name;
 }
 
-/** The plain-text plan the share sheet sends. */
 export function planShareText(
   spaceName: string,
   places: PlanPlace[],
@@ -302,10 +299,6 @@ export function planShareText(
   return lines.join("\n");
 }
 
-/**
- * The highlight path for "Pick for me": a few laps through the list that slow
- * down and stop on `winner`. Returns each step's index and how long it holds.
- */
 export function spinSteps(
   count: number,
   winner: number,
@@ -315,7 +308,99 @@ export function spinSteps(
   const total = count * laps + winner + 1;
   return Array.from({ length: total }, (_, step) => ({
     index: step % count,
-    // Ease out: 60 ms per step at the start, about 300 ms at the end.
     holdMs: Math.round(60 + 240 * (step / Math.max(total - 1, 1)) ** 2),
   }));
+}
+
+export function planVoteUrl(token: string): string {
+  const origin =
+    process.env.EXPO_PUBLIC_WEB_URL || "https://shelvr-web.vercel.app";
+  return new URL(`/p/${encodeURIComponent(token)}`, origin).href;
+}
+
+export function usePlanAsk(
+  spaceId: Id<"spaces">,
+  places: PlanPlace[],
+  current: { token: string; expiresAt: number } | null,
+) {
+  const createPlanShare = useMutation(api.planShares.createPlanShare);
+  const [asking, setAsking] = useState(false);
+  const busy = useRef(false);
+
+  const ask = useCallback(async () => {
+    if (places.length === 0 || busy.current) return;
+    busy.current = true;
+    setAsking(true);
+    try {
+      const token =
+        (current && current.expiresAt > Date.now() ? current.token : null) ??
+        (await createPlanShare({
+          spaceId,
+          places: places.map((place) => ({
+            name: place.name,
+            area: place.area,
+            why: place.why,
+            itemId: place.itemId,
+          })),
+        }));
+      await sharePlanLink(token, places.length);
+    } catch (error) {
+      analytics.capture("plan_ask_failed", { reason: "link" });
+      analytics.captureError("plan_ask_failed", error);
+      Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
+    } finally {
+      busy.current = false;
+      setAsking(false);
+    }
+  }, [createPlanShare, current, places, spaceId]);
+
+  return { ask, asking };
+}
+
+async function sharePlanLink(token: string, placeCount: number) {
+  try {
+    const result = await Share.share({
+      message: t("plan.askText", { url: planVoteUrl(token) }),
+    });
+    if (result.action === Share.sharedAction) {
+      analytics.capture("plan_asked", { place_count: placeCount });
+    }
+  } catch (error) {
+    analytics.capture("plan_ask_failed", { reason: "share" });
+    analytics.captureError("plan_ask_failed", error);
+    Alert.alert(t("plan.askFailedTitle"), t("errors.retrySoon"));
+  }
+}
+
+export function linkForPlan<
+  T extends { expiresAt: number; places: { name: string }[] },
+>(link: T | null | undefined, places: PlanPlace[], now = Date.now()): T | null {
+  if (!link || places.length === 0 || link.expiresAt <= now) return null;
+  const keys = (names: { name: string }[]) =>
+    names
+      .map((entry) => placeKey(entry.name))
+      .sort()
+      .join("\n");
+  return keys(link.places) === keys(places) ? link : null;
+}
+
+type PlanVotes = {
+  voters: number;
+  expiresAt: number;
+  places: { name: string; picks: number; passes: number }[];
+};
+
+export function votesFor(
+  votes: PlanVotes | null | undefined,
+  place: PlanPlace,
+): { picks: number; passes: number } | null {
+  if (!votes) return null;
+  const key = placeKey(place.name);
+  const tally = votes.places.find((entry) => placeKey(entry.name) === key);
+  if (!tally || tally.picks + tally.passes === 0) return null;
+  return { picks: tally.picks, passes: tally.passes };
+}
+
+export function daysLeft(expiresAt: number, now = Date.now()): number {
+  return Math.max(1, Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000)));
 }

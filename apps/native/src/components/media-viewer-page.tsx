@@ -27,6 +27,7 @@ import {
   type NativeSyntheticEvent,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   Text,
   useWindowDimensions,
   View,
@@ -39,8 +40,6 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Reads as a caption over any photo: clear across the picture's middle, dark
-// enough under the text for white type, eased so the fade has no edge.
 const CAPTION_SCRIM = `linear-gradient(180deg, ${[
   "rgba(0, 0, 0, 0) 0%",
   "rgba(0, 0, 0, 0.4) 25%",
@@ -48,8 +47,6 @@ const CAPTION_SCRIM = `linear-gradient(180deg, ${[
   "rgba(0, 0, 0, 0.85) 100%",
 ].join(", ")})`;
 
-// Clearance for the Add / Dismiss bar and the "added to" notice the pager
-// pins over the bottom of the page.
 const FOOTER_CLEARANCE = 72;
 
 const EXPANDED_LINES = 10;
@@ -59,35 +56,17 @@ type Props = {
   social: SocialPost | undefined;
   heroUri: string;
   isZoomTarget: boolean;
-  // The page's own height (the pager's), so the stage fills it exactly.
   pageHeight: number;
-  // How far the transparent iOS header reaches into the page; 0 on Android.
   headerInset: number;
-  // Leave room for the pager's bottom bar on this page.
   reserveFooter: boolean;
-  scrollRef: RefObject<ScrollView | null>;
-  // Told when the details sheet reaches (true) or leaves (false) the header,
-  // so the pager can hand the header back its light-page colors.
+  scrollRef: RefObject<ScrollViewInstance | null>;
   onSheetUnderHeader?: (itemId: string, under: boolean) => void;
-  // Told when the in-app browser opens (true) and closes (false) over this
-  // page, so the pager can lift its light status bar while it is up.
-  onSourceBrowser?: (open: boolean) => void;
   testID?: string;
-  // Save status (processing, failed, retry) shown in the caption.
   notice: ReactNode;
-  // The item's action chips.
   actions: ReactNode;
-  // Everything else about the save, in the sheet below the stage.
   details: ReactNode;
 };
 
-/**
- * A photo or social post shown the way a camera roll or reel shows it: the
- * picture fills a black stage the height of the page, with its caption over a
- * scrim at the bottom. Tapping the picture hides the caption; tapping a video
- * poster opens the post on its site. Scrolling up brings the rest of the save
- * (spaces, tags, caption, products, similar) in on a sheet.
- */
 export function MediaViewerPage({
   item,
   social,
@@ -98,7 +77,6 @@ export function MediaViewerPage({
   reserveFooter,
   scrollRef,
   onSheetUnderHeader,
-  onSourceBrowser,
   testID,
   notice,
   actions,
@@ -110,26 +88,14 @@ export function MediaViewerPage({
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  // FlashList recycles this page for other saves, which must open with their
-  // caption showing and collapsed. Moving to another save starts it afresh
-  // (during render, so the old save's state never paints on the new one).
   const [stored, setCaption] = useState(() => captionFor(null, item._id));
   const caption = captionFor(stored, item._id);
   if (caption !== stored) setCaption(caption);
   const expanded = caption.expanded;
 
-  // Reports only when the sheet crosses the header, with some slack, so a
-  // scroll doesn't push header options every frame. A recycled page starts
-  // at the top, so it reports its new item as clear of the header.
   const stillTap = useStillTap();
 
-  // The pager's light status bar would sit white-on-white over the in-app
-  // browser. The pager owns the bar, so it decides what comes back when the
-  // browser closes (the sheet may be up, or the screen gone).
-  const openSource = () => {
-    onSourceBrowser?.(true);
-    openItemSource(item, () => onSourceBrowser?.(false));
-  };
+  const openSource = () => openItemSource(item);
 
   const captionHidden = caption.hidden;
 
@@ -164,13 +130,9 @@ export function MediaViewerPage({
       source={{ uri: heroUri }}
       recyclingKey={item._id}
       contentFit="contain"
-      // The frame stays visible when the picture fails to load, so the
-      // stage never reads as empty.
       style={[mediaSize, styles.media]}
     />
   );
-  // What sits under the caption: the page's foot, plus the pager's Add /
-  // Dismiss bar when it covers this page.
   const footInset = insets.bottom + (reserveFooter ? FOOTER_CLEARANCE : 0);
   const video = playableVideo(social, item.url);
   const hero = video ? (
@@ -205,9 +167,6 @@ export function MediaViewerPage({
       contentInsetAdjustmentBehavior="never"
       showsVerticalScrollIndicator={false}
       directionalLockEnabled
-      // The page rests either on the photo or with the sheet fully up, never
-      // with the caption half under the header; past the sheet's top it
-      // scrolls freely.
       snapToOffsets={[0, pageHeight]}
       snapToEnd={false}
       decelerationRate="fast"
@@ -216,9 +175,6 @@ export function MediaViewerPage({
     >
       <View style={{ height: pageHeight }}>
         {video ? (
-          // A video poster is itself the button that opens the post, so the
-          // stage around it stays plain: wrapping it in the caption toggle
-          // would hide that button from VoiceOver.
           <View style={styles.stage}>{stageMedia}</View>
         ) : (
           <Pressable
@@ -241,7 +197,6 @@ export function MediaViewerPage({
 
         <Animated.View
           pointerEvents={captionHidden ? "none" : "box-none"}
-          // A hidden caption leaves the accessibility tree too.
           accessibilityElementsHidden={captionHidden}
           importantForAccessibility={
             captionHidden ? "no-hide-descendants" : "auto"
@@ -298,8 +253,6 @@ export function MediaViewerPage({
             >
               <Text
                 style={styles.description}
-                // Capped so a long caption can't push the title off the top of
-                // the stage; the sheet below carries the full text.
                 numberOfLines={expanded ? EXPANDED_LINES : 2}
               >
                 {item.description}
@@ -350,9 +303,6 @@ export function MediaViewerPage({
         style={[
           styles.sheet,
           {
-            // Fully up, the sheet fills the page and runs under the header,
-            // so the header sits on the sheet's own color (no black stage
-            // or corner wedges behind it) and the content starts below it.
             minHeight: pageHeight,
             paddingTop: headerInset + theme.gap(1.5),
             paddingBottom: insets.bottom + theme.gap(4),
@@ -366,7 +316,6 @@ export function MediaViewerPage({
   );
 }
 
-/** The post when it is a video with a link to open. */
 function playableVideo(
   social: SocialPost | undefined,
   url: string | undefined,
@@ -374,15 +323,12 @@ function playableVideo(
   return social?.playable && url ? social : undefined;
 }
 
-// Keeps white caption type readable where a light photo shows through the
-// top of the scrim.
 const CAPTION_SHADOW = {
   textShadowColor: "rgba(0, 0, 0, 0.45)",
   textShadowOffset: { width: 0, height: 1 },
   textShadowRadius: 6,
 };
 
-/** Tells a tap from a swipe back that began on the picture (see isStillTap). */
 function useStillTap() {
   const start = useRef<{ x: number; y: number } | null>(null);
   return {

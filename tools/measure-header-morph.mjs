@@ -1,29 +1,5 @@
 #!/usr/bin/env node
-// Measures how the item-detail header title paints, from a screen recording of
-// one navigation, and judges it against the morph's contract.
-//
-//   node tools/measure-header-morph.mjs <recording.mp4> --from <frame> [--window 120] [--mode stagger|swap]
-//
-// The title band is cropped, converted to grayscale, and split into vertical
-// columns. Ink is measured against the page itself: the blank band that opens
-// the window sets the baseline, and ink is each pixel's contrast past a gate
-// from that level in either direction, so a dark page needs no special case.
-// Stagger mode anchors on the blank band frame, then judges the entrance on
-// saturation order, ramp length, monotonicity, and whether the baseline holds
-// once settled. Swap mode starts on a screen whose title already painted and
-// reports the largest single-frame column step, which is the native-to-canvas
-// shift P1 exists to catch. The window must not contain the push transition,
-// whose overlapping screens defeat ink-based anchoring.
-//
-// The blank band is not the font-resolve latency, and no number off this
-// harness should be reported as one: the count starts only once the incoming
-// header covers the band, and the entrance's own delay sits between the font
-// arriving and the first ink. Time the font inside the app instead.
-//
-// Timing reads the frames' presentation timestamps; a recording whose frame
-// spacing leaves the nominal rate exits INCONCLUSIVE instead of being timed
-// by its index.
-//
+// Usage: node tools/measure-header-morph.mjs <recording.mp4> --from <frame> [--window 120] [--mode stagger|swap]
 // Exits 0 when every predicate passes, 1 on a FAIL, 2 on INCONCLUSIVE.
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -35,9 +11,6 @@ if (!video) {
   console.error(usage);
   process.exit(2);
 }
-// --from anchors the window past the push transition. Defaulting it to frame 0
-// analyzed that transition instead, whose overlapping screens defeat ink-based
-// anchoring and yield a confident but meaningless verdict, so it is required.
 const integerArg = (name, { fallback, min }) => {
   const at = rest.indexOf(`--${name}`);
   if (at === -1) {
@@ -62,19 +35,10 @@ if (mode !== "stagger" && mode !== "swap") {
   console.error(usage);
   process.exit(2);
 }
-// --dump prints every row in the window and exits, to locate the frame where
-// the push transition ends before anchoring an analysis window.
 const dump = rest.includes("--dump");
 const COLUMNS = 6;
-// Fractions of the screen holding the native header title, measured from the
-// accessibility frame of the title node on the item-detail screen. Fits the
-// device it was measured on; re-derive it from `describe` for another screen
-// size before trusting a number off this harness.
 const BAND = { x: 0.227, y: 0.062, width: 0.545, height: 0.035 };
 
-// Budgets the blank band is judged against, read from the motion tokens so the
-// gate follows them instead of drifting. Each lookup is scoped to its own
-// object: `enter` names both a duration and a spring.
 const motionSource = await readFile(
   new URL("../apps/native/src/lib/motion.ts", import.meta.url),
   "utf8",
@@ -123,11 +87,6 @@ const probe = await run("ffprobe", [
 const [width, height, rate] = probe.trim().split("\n");
 const [num, den] = rate.split("/").map(Number);
 const fps = num / (den || 1);
-// Timing reads each frame's own presentation timestamp, never its index: the
-// nominal rate is a promise the recorder can break, and a recording that
-// drops frames or varies its rate still indexes uniformly, so frames counted
-// against it would hand stagger and hold verdicts to timings the pixels never
-// showed. ffprobe decodes the file once more to list them, buffering nothing.
 const timestamps = (await run("ffprobe", [
   "-v", "error",
   "-select_streams", "v:0",
@@ -138,12 +97,6 @@ const timestamps = (await run("ffprobe", [
   .trim()
   .split("\n")
   .map((line) => (line.trim() === "" ? NaN : Number(line)));
-// The blank band may not outlast the hold budget plus the entrance's own delay:
-// the count starts once the incoming header covers the band, and the first ink
-// trails the resolved font by textMorph.enterDelay, so a limit without it fails
-// a recording whose font arrived on time. Two frames of sampling slack, taken
-// from this recording's rate so the allowance means the same at 30fps as at 60
-// rather than the four frames a fixed 67ms bought at one of them.
 const HOLD_LIMIT_MS = Math.round(enterMs + enterDelayMs + 2000 / fps);
 const even = (n) => Math.max(2, Math.round(n / 2) * 2);
 const cw = even(Number(width) * BAND.width);
@@ -151,12 +104,6 @@ const ch = even(Number(height) * BAND.height);
 const cx = even(Number(width) * BAND.x);
 const cy = even(Number(height) * BAND.y);
 
-// Only the judged window leaves ffmpeg: the trim sits after the crop, so the
-// rest of the recording is decoded but never buffered, and a long recording
-// costs the window's bytes instead of the whole file's. Passthrough keeps the
-// decode honest on top of it: ffmpeg's default mode duplicates frames to fill
-// the nominal rate, which would pad a variable-rate recording with copies the
-// timestamps below never saw.
 const raw = await run(
   "ffmpeg",
   ["-v", "error", "-i", video, "-vf",
@@ -168,8 +115,6 @@ const raw = await run(
 
 const FRAME = cw * ch;
 const total = Math.floor(raw.length / FRAME);
-// The window's frames sit at the same positions in ffmpeg's decode as in
-// ffprobe's list, so the slice aligns with what the pixels above decoded.
 const framePts = timestamps.slice(from, from + total);
 const period = 1 / fps;
 if (framePts.length < total || framePts.some((t) => !Number.isFinite(t))) {
@@ -184,12 +129,6 @@ if (
     "frame spacing leaves the nominal rate; the recording drops frames or varies its rate, so index-based timing would be false",
   );
 }
-// The window opens on a blank band by contract, so the first frame's modal
-// bucket is the page itself; its mean is the ink baseline. Ink is each
-// pixel's distance past a small gate from that level. Fixed cutoffs cannot
-// know where the page sits: the shipped dark surfaces measure grayscale
-// 22-41, so a near-black cutoff counted a blank dark header as ink and
-// left stagger mode without its hold frame.
 const histogram = new Array(16).fill(0);
 for (let i = 0; i < FRAME; i++) histogram[raw[i] >> 4]++;
 const bucket = histogram.indexOf(Math.max(...histogram));
@@ -276,27 +215,18 @@ if (mode === "stagger") {
   const settled = frames[settleAt];
   for (const r of frames.slice(Math.max(0, anchor - 1), settleAt + 4)) row(r);
 
-  // Column saturation order. A stagger reaches each column's own 90% left to right.
   const saturation = settled.columns.map((finalInk, index) => {
     if (finalInk < peak * 0.05) return null;
     const hit = frames.find((r, i) => i >= appear && r.columns[index] >= finalInk * 0.9);
     return hit ? hit.ms : null;
   });
   const lit = saturation.filter((ms) => ms !== null);
-  // Adjacent columns legitimately tie: the per-glyph stagger is shorter than a
-  // frame, so two columns can saturate in the same one. What separates a
-  // stagger from a uniform cross-fade is that the whole run spreads over
-  // several frames, so order alone is not enough to pass.
   const ordered = lit.every((ms, i) => i === 0 || ms >= lit[i - 1]);
   const spread = lit.length > 1 ? lit[lit.length - 1] - lit[0] : 0;
-  // Four frames of this recording, not a fixed 67ms that means four frames at
-  // 60fps and two at 30.
   const spreadMinMs = Math.round(4000 / fps);
   const staggered = ordered && lit.length > 1 && spread >= spreadMinMs;
   const ramp = settled.ms - frames[appear].ms;
 
-  // Post-settle layout drift. A native-to-canvas swap moves glyphs after the
-  // title already read as complete, which is the artifact that must not happen.
   let drift = 0;
   for (const r of frames.slice(settleAt + 1)) {
     for (let i = 0; i < COLUMNS; i++) {
@@ -304,11 +234,6 @@ if (mode === "stagger") {
       if (delta > drift) drift = delta;
     }
   }
-  // Column ink barely moves when the swap is a pure vertical translation, so
-  // the baseline is judged on its own. This catches the swap on any title,
-  // where a per-column ink threshold depends on which letters the title has.
-  // The limit clears the ~1.6px of anti-aliasing wobble a settled title shows
-  // and still catches the measured 5.5px native-to-canvas step.
   let baselineShift = 0;
   for (const r of frames.slice(settleAt + 1)) {
     if (r.cy === null) continue;
@@ -319,8 +244,6 @@ if (mode === "stagger") {
   for (let i = appear + 1; i <= settleAt; i++) {
     if (frames[i].ink < frames[i - 1].ink * 0.98) dips++;
   }
-  // Blank from the first held frame through the anchor: the distance between
-  // their timestamps, not hold periods counted at the nominal rate.
   const holdMs = frames[anchor].ms - frames[anchor - hold + 1].ms;
 
   console.log("");

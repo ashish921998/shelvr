@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { appStoreUrl, arrivalCampaign } from "@/lib/appStore";
+import { bioAppStoreUrl } from "@/lib/bioLink";
+import { useBrowserValue } from "@/lib/browserValue";
 import { sharePageUrl, shareRef } from "@/lib/shareRef";
 
 type AppStoreLinkSource =
@@ -12,32 +12,30 @@ type AppStoreLinkSource =
   | "footer"
   | "share"
   | "oracle"
+  | "plan"
+  | "bio"
   | "ig_tool";
 
-/**
- * The App Store link for one button, tagged with the campaign the visitor
- * arrived with (a creator's `?ct=`), or else with where the button sits, and
- * the matching `app_store_clicked` event.
- */
+export function useArrivalCampaign(fallback: string) {
+  return useBrowserValue(
+    () => arrivalCampaign(window.location.search) ?? fallback,
+    fallback,
+  );
+}
+
 export function useAppStoreLink(
   source: AppStoreLinkSource,
   shareToken?: string,
 ) {
-  const fallback = source === "share" ? "share" : `web_${source}`;
-  const [campaign, setCampaign] = useState(fallback);
-  useEffect(() => {
-    // The search string only exists in the browser, after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCampaign(arrivalCampaign(window.location.search) ?? fallback);
-  }, [fallback]);
+  const campaign = useArrivalCampaign(
+    source === "share" ? "share" : `web_${source}`,
+  );
 
   const onClick = () => {
     if (!shareToken) {
       captureWebAnalyticsEvent("app_store_clicked", {
         source,
         campaign,
-        // A shared oracle verdict rides in `?c=`, so oracle pages keep the
-        // path only.
         ...(source === "oracle"
           ? {
               $current_url: `${window.location.origin}${window.location.pathname}`,
@@ -56,5 +54,8 @@ export function useAppStoreLink(
     );
   };
 
-  return { href: appStoreUrl(campaign), onClick };
+  return {
+    href: source === "bio" ? bioAppStoreUrl(campaign) : appStoreUrl(campaign),
+    onClick,
+  };
 }

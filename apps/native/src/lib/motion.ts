@@ -2,33 +2,42 @@ import {
   cubicBezier,
   Easing,
   FadeIn,
+  FadeInDown,
   FadeOut,
   ReduceMotion,
+  SlideInDown,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutDown,
+  SlideOutLeft,
+  SlideOutRight,
 } from "react-native-reanimated";
 
-// Shared motion vocabulary. Durations form a budget: feedback (press/hover
-// swaps), state (in-place content changes), enter/exit (layout animations).
-// Curves match Expo's easing exactly. `out` is also published in CSS form
-// below, so layout animations and Reanimated CSS transitions feel identical.
 const curves = {
   out: [0.23, 1, 0.32, 1],
   inOut: [0.77, 0, 0.175, 1],
 } as const;
 
-const duration = { feedback: 120, state: 180, enter: 250, exit: 200 } as const;
+const duration = {
+  feedback: 120,
+  state: 180,
+  enter: 250,
+  exit: 200,
+  // A critically damped spring settles in this long (Apple's fluid-interface default).
+  spring: 350,
+  // The gap between items that arrive one after another, like pins dropping.
+  stagger: 300,
+} as const;
 const easing = {
   out: Easing.bezier(...curves.out),
   inOut: Easing.bezier(...curves.inOut),
 };
 
-// CSS easing objects are class instances. Keep them outside `motion` so a
-// gesture capturing motion.spring never tries to serialize them to the UI runtime.
+// cubicBezier() objects are class instances Reanimated cannot serialize to the UI runtime, so they stay out of `motion`.
 export const motionCSS = {
   out: cubicBezier(...curves.out),
 };
 
-// Pure fades/color changes remain gentle with Reduce Motion enabled. Spatial
-// motion uses System or an explicit reduced-motion branch at the call site.
 export const motion = {
   duration,
   easing,
@@ -49,8 +58,6 @@ export const motion = {
       reduceMotion: ReduceMotion.Never,
     },
   },
-  // The header text morph is a deliberate, staggered signature effect. Keep
-  // its choreography separate from the short press/feedback budget.
   textMorph: {
     stagger: 25,
     enterDelay: 120,
@@ -82,6 +89,11 @@ export const motion = {
     },
   },
   spring: {
+    snap: {
+      duration: duration.spring,
+      dampingRatio: 1,
+      reduceMotion: ReduceMotion.System,
+    },
     settle: {
       duration: 400,
       dampingRatio: 1,
@@ -96,8 +108,6 @@ export const motion = {
   scale: { pressed: 0.97 },
 } as const;
 
-// Builders stay outside render; these only animate opacity, including under
-// Reduce Motion. Don't attach entrances to recycled list rows.
 export const fadeIn = FadeIn.duration(duration.enter)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
@@ -105,18 +115,50 @@ export const fadeOut = FadeOut.duration(duration.exit)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
 
-/** A staged entrance: a slow, plain fade, one beat after another. It moves
- * nothing, so it stays on with Reduce Motion. */
 export const settleIn = (delay: number) =>
   FadeIn.delay(delay)
     .duration(520)
     .easing(easing.out)
     .reduceMotion(ReduceMotion.Never);
 
-// Reduced motion keeps the state change legible without translation or scale.
+export const riseIn = FadeInDown.duration(duration.enter)
+  .easing(easing.out)
+  .reduceMotion(ReduceMotion.System);
+
 export const REDUCED_FADE_IN = FadeIn.duration(duration.feedback)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
 export const REDUCED_FADE_OUT = FadeOut.duration(duration.feedback)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
+
+/** A critically damped spring entrance: no overshoot, interruptible, and a short cross-fade under Reduce Motion. */
+export const springIn = (reduced: boolean, delay = 0) =>
+  reduced
+    ? FadeIn.delay(delay).duration(duration.feedback).easing(easing.out)
+    : FadeInDown.delay(delay)
+        .springify(duration.spring)
+        .dampingRatio(1)
+        .reduceMotion(ReduceMotion.Never);
+
+/** A screen of a step-by-step flow: forward arrives from the right, Back leaves to the right. */
+export function stepTransition(reduced: boolean, backward: boolean) {
+  if (reduced) return { entering: REDUCED_FADE_IN, exiting: REDUCED_FADE_OUT };
+  const [entering, exiting] = backward
+    ? [SlideInLeft, SlideOutRight]
+    : [SlideInRight, SlideOutLeft];
+  return {
+    entering: entering.springify(duration.spring).dampingRatio(1),
+    exiting: exiting.springify(duration.spring).dampingRatio(1),
+  };
+}
+
+/** A sheet that comes up from the bottom and leaves downward. */
+export const sheetIn = (reduced: boolean, delay = 0) =>
+  reduced
+    ? FadeIn.delay(delay).duration(duration.feedback)
+    : SlideInDown.delay(delay).springify(duration.spring).dampingRatio(1);
+export const sheetOut = (reduced: boolean) =>
+  reduced
+    ? FadeOut.duration(duration.feedback)
+    : SlideOutDown.springify(duration.spring).dampingRatio(1);

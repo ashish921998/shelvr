@@ -1,18 +1,3 @@
-/**
- * Syntactic URL normalization and policy for user-supplied link URLs.
- *
- * This module is runtime-agnostic: it has no Node-only imports, so it can be
- * used from Convex mutations (default V8 runtime) and from Node actions alike.
- * It validates only the *form* of a URL: scheme, host, port, credentials,
- * length. It does NOT resolve DNS or inspect the destination address; that is
- * the job of `safeFetch.ts` at request time, bound to the actual connection.
- *
- * Network destination safety (private/reserved IP ranges, DNS answers) lives in
- * `safeFetch.ts` because it requires Node-only libraries.
- */
-
-/** Policy error categories. Stable codes used by callers and logs; never the
- * internal parser text or the offending URL. */
 export type UrlPolicyError =
   | "empty"
   | "invalid_url"
@@ -24,8 +9,6 @@ export type UrlPolicyError =
 
 const ALLOWED_SCHEMES = new Set(["http:", "https:"]);
 
-/** Hard cap on normalized URL length in UTF-16 code units (string `.length`).
- * Generous for real links, bounded to deny pathological input. */
 export const MAX_URL_LENGTH = 2048;
 
 class UrlPolicyErrorClass extends Error {
@@ -42,28 +25,6 @@ export function isUrlPolicyError(e: unknown): e is UrlPolicyErrorClass {
   return e instanceof UrlPolicyErrorClass;
 }
 
-/**
- * Normalize and policy-check a user-supplied link string.
- *
- * - trims input and prepends `https://` only when no scheme is present;
- * - parses with `new URL`;
- * - accepts only `http:` and `https:`;
- * - rejects username/password, empty hostname, invalid ports, and any explicit
- *   non-default port (e.g. `:8080`); explicit default ports (`http://…:80`,
- *   `https://…:443`) are dropped by the URL serializer's canonical form and are
- *   accepted;
- * - rejects URLs longer than {@link MAX_URL_LENGTH} UTF-16 code units after
- *   normalization;
- * - normalizes to the URL serializer's canonical string.
- *
- * Scheme detection is scheme-aware, not a `://` substring test: the input is
- * parsed as-is first, so single-colon schemes (`javascript:`, `data:`,
- * `localhost:3000`) are recognized as having a scheme and rejected as
- * unsupported rather than mis-prefixed.
- *
- * @returns the canonical URL string on success.
- * @throws {UrlPolicyErrorClass} with a stable code on any policy violation.
- */
 export function normalizeExternalUrl(raw: string): string {
   if (typeof raw !== "string") {
     throw new UrlPolicyErrorClass("invalid_url", "URL must be a string");
@@ -73,26 +34,16 @@ export function normalizeExternalUrl(raw: string): string {
     throw new UrlPolicyErrorClass("empty", "URL is empty");
   }
 
-  // Decide whether the input already carries a scheme. A scheme is the leading
-  // "<name>:" token; we detect it explicitly so that schemeless input (e.g.
-  // "example.com") gets https:// prepended, while an explicit scheme is honored
-  // and rejected as unsupported if it isn't http(s). Detecting the scheme up
-  // front (rather than blindly retrying with an https:// prefix after a parse
-  // failure) prevents "https://" alone from being rescued into a bogus host.
   const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed);
 
   let parsed: URL;
   if (hasScheme) {
-    // Input has a scheme: parse as-is so we can report its real scheme.
     try {
       parsed = new URL(trimmed);
     } catch {
-      // Parsed-here-but-bad (e.g. "https://" with no host): the input declared
-      // an http(s)-style scheme but is not a complete URL.
       throw new UrlPolicyErrorClass("invalid_host", "URL has no host");
     }
   } else {
-    // Schemeless: prepend https:// and parse the canonical form.
     try {
       parsed = new URL(`https://${trimmed}`);
     } catch {
@@ -106,8 +57,6 @@ export function normalizeExternalUrl(raw: string): string {
       "Only http(s) URLs are allowed",
     );
   }
-  // The URL serializer exposes username/password via these getters even when
-  // absent from the original string for some hosts; check the raw userInfo part.
   if (parsed.username !== "" || parsed.password !== "") {
     throw new UrlPolicyErrorClass(
       "credentials_not_allowed",
@@ -117,9 +66,6 @@ export function normalizeExternalUrl(raw: string): string {
   if (parsed.hostname === "") {
     throw new UrlPolicyErrorClass("invalid_host", "URL has no host");
   }
-  // An explicit non-default port survives in parsed.port (the URL serializer
-  // strips only the *default* port for the scheme). Any remaining port is
-  // non-default and is rejected: we only ever fetch standard web endpoints.
   if (parsed.port !== "") {
     throw new UrlPolicyErrorClass(
       "invalid_port",
@@ -134,9 +80,6 @@ export function normalizeExternalUrl(raw: string): string {
   return canonical;
 }
 
-/** True for a TikTok video link (any subdomain, including the `vm`/`vt` short
- * hosts). Shared by the pipeline (oEmbed instead of a page fetch: TikTok
- * refuses bot page loads) and the client (video card/detail treatment). */
 export function isTikTokUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {
@@ -147,14 +90,6 @@ export function isTikTokUrl(url: string | undefined): boolean {
   }
 }
 
-/** An Instagram post, reel, or IGTV link reduced to its media kind and
- * shortcode. Accepts instagram.com with or without the www/m subdomain, the
- * instagr.am short host, the `/reels/` alias, and the `/{user}/reel/{id}`
- * shape Instagram serves after a share. A `/share/{kind}/{token}` link names
- * the kind but carries a redirect token, not a shortcode, so its shortcode is
- * left for the caller to resolve from the redirect. Profiles, stories, and
- * look-alike hosts are not media links. A relative `url` resolves against
- * `base`. */
 export function instagramMedia(
   url: string | undefined,
   base?: string,
@@ -175,7 +110,6 @@ export function instagramMedia(
     const match = parsed.pathname.match(
       /^\/(?:[A-Za-z0-9._]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)(?:\/.*)?$/,
     );
-    // `/reels/audio/{id}` is a sound page, not a reel.
     if (!match || match[2] === "audio") return undefined;
     const kind =
       match[1] === "reels" ? "reel" : (match[1] as "reel" | "p" | "tv");
@@ -187,15 +121,10 @@ export function instagramMedia(
   }
 }
 
-/** True for an Instagram post, reel, or IGTV link. */
 export function isInstagramUrl(url: string | undefined): boolean {
   return instagramMedia(url) !== undefined;
 }
 
-/** Short-form social links whose saved content is a caption, not an article:
- * TikTok videos and Instagram media. `video` is true for TikTok and for
- * Instagram reels and IGTV; an Instagram `/p/` link may be a photo. The
- * pipeline and the client share this so both treat these links the same way. */
 export function shortFormSource(
   url: string | undefined,
 ): { site: "TikTok" | "Instagram"; video: boolean } | undefined {
@@ -219,10 +148,6 @@ export function isXHost(hostname: string): boolean {
   );
 }
 
-/** The numeric id of an X / Twitter post URL: `x.com/{user}/status/{id}` and
- * the `x.com/i/web/status/{id}` path the import screen builds from archive
- * bookmark ids. Profiles, lists, and `t.co` short links are not posts and
- * return undefined, so they go through the normal page reader. */
 export function xStatusId(url: string | undefined): string | undefined {
   if (!url) return undefined;
   try {
@@ -230,8 +155,6 @@ export function xStatusId(url: string | undefined): string | undefined {
     if (!isXHost(parsed.hostname)) {
       return undefined;
     }
-    // The id must be a whole path segment, optionally followed by more
-    // segments such as /photo/1, so /status/123abc is rejected.
     return parsed.pathname.match(
       /^\/(?:[^/]+|i\/web)\/status\/(\d+)(?:\/.*)?$/,
     )?.[1];
@@ -240,8 +163,6 @@ export function xStatusId(url: string | undefined): string | undefined {
   }
 }
 
-/** Pinterest's own domains, as they follow `pinterest.`: .com and the country
- * domains it serves pins on. Any other two-letter TLD is someone else's. */
 const PINTEREST_DOMAIN_SUFFIXES = new Set([
   "com",
   "at",
@@ -266,8 +187,6 @@ const PINTEREST_DOMAIN_SUFFIXES = new Set([
   "se",
 ]);
 
-/** True for any Pinterest-owned host: pinterest.com, its country domains
- * (pinterest.co.uk, in.pinterest.com), and the `pin.it` short host. */
 export function isPinterestHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
   if (host === "pin.it") {
@@ -277,10 +196,6 @@ export function isPinterestHost(hostname: string): boolean {
   return suffix !== undefined && PINTEREST_DOMAIN_SUFFIXES.has(suffix);
 }
 
-/** The numeric id of a Pinterest pin URL: `/pin/{id}/` and the slugged
- * `/pin/{slug}--{id}/` shape Pinterest serves, with any trailing segment such
- * as `/sent/` after a share. Boards, profiles, and look-alike hosts are not
- * pins and return undefined. */
 export function pinterestPinId(url: string | undefined): string | undefined {
   if (!url) return undefined;
   try {
@@ -294,8 +209,6 @@ export function pinterestPinId(url: string | undefined): string | undefined {
   }
 }
 
-/** True for a `pin.it` short link, what the Pinterest app shares. It redirects
- * to the pin, so its id is only known after the redirect. */
 export function isPinterestShortUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {
@@ -305,12 +218,8 @@ export function isPinterestShortUrl(url: string | undefined): boolean {
   }
 }
 
-/** The platforms whose links have their own reader instead of a plain page
- * fetch. */
 export type LinkSource = "tiktok" | "x" | "instagram" | "pinterest" | "youtube";
 
-/** Which platform reader a saved link goes to, or undefined for a plain web
- * page. The one place that answers "which platform is this URL". */
 export function linkSource(url: string | undefined): LinkSource | undefined {
   if (isTikTokUrl(url)) return "tiktok";
   if (xStatusId(url) !== undefined) return "x";
@@ -329,10 +238,31 @@ const YOUTUBE_HOSTS = new Set([
   "m.youtube.com",
   "music.youtube.com",
 ]);
+const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 
-/** True for a YouTube video link: youtube.com (www, m, music) and the youtu.be
- * short host. YouTube often answers a server's page load with a consent or
- * bot-check page that has no video metadata, so these go to its oEmbed. */
+export function youtubeVideoId(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(normalizeExternalUrl(new URL(raw).href));
+    if (!YOUTUBE_HOSTS.has(url.hostname)) return undefined;
+
+    let candidate: string | null | undefined;
+    if (url.hostname === "youtu.be") {
+      candidate = url.pathname.slice(1);
+    } else if (url.pathname === "/watch") {
+      if (url.searchParams.getAll("v").length !== 1) return undefined;
+      candidate = url.searchParams.get("v");
+    } else {
+      candidate = url.pathname.match(/^\/(?:shorts|embed)\/([^/]+)$/)?.[1];
+    }
+    return candidate && YOUTUBE_VIDEO_ID.test(candidate)
+      ? candidate
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function isYouTubeUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {

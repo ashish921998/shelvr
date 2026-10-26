@@ -1,70 +1,68 @@
-import type { Id } from "@convex/_generated/dataModel";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
-
-// Persisted store for onboarding state that must survive leaving the screen
-// (the demo step's inline OAuth) or an app kill: the picked library
-// categories, the picked save kinds, current step, and an in-flight demo save. The
-// same record later drives the post-sign-in replay in lib/replay-onboarding
-// .ts. Backed by SecureStore so the data survives an app kill (iOS can and
-// does kill backgrounded apps). Clears use setItem('') because SecureStore's
-// delete is async-only; getters treat empty as "not set".
+import {
+  isPlanner,
+  isSavedCount,
+  readGoals,
+  type Goal,
+  type Planner,
+  type SavedCount,
+} from "@/lib/onboarding-goals";
+import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-// Older flows stored `step` as an index into a different step list, under the
-// same key. Their step and answers are ignored so progress restarts at the
-// opener; the replay fields (operationId, spaces, demoUrl) still apply.
-// Version 3 inserted the acquisition source step after the opener, 4 the
-// notifications step before the reveal. 5 removed the source step, inserted
-// the interests step after the opener and added the share step. 6 removed
-// the reveal step.
-const PROGRESS_VERSION = 6;
+const PROGRESS_VERSION = 11;
 
-/** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
- * while the save is still processing) resumes the exact save the user asked
- * for. It is kept after the demo step advances so the share practice can
- * avoid offering the same link again. Cancelling the demo's sign-in clears
- * it, and `setPendingSpaces` (the finish path) drops it, so a completed save
- * is never replayed or left behind in SecureStore. */
 export type PendingDemo = {
   url: string;
-  /** The demo's explicit single destination ("just my shelf" when null). */
   destination: string | null;
-  /** Only a URL received through Shelvr's share extension counts as a share. */
   source: "direct" | "share";
-};
-
-/** The demo's finished save, so a relaunch on the reminder step still has
- * the save to remind about. Dropped with the demo when onboarding finishes. */
-type PendingSaved = {
-  itemId: Id<"items">;
-  savedSpaceNames: string[];
 };
 
 type PendingRecord = {
   operationId: string;
   spaces: string[];
   demoUrl: string | null;
-  /** Absent on records written by an older flow. */
+  demoSpace: string | null;
+  demoOwner: string | null;
   progressVersion: number | null;
-  saveKinds: string[];
   step: number | null;
-  demo: PendingDemo | null;
-  /** Absent on records written before the save was kept. */
-  saved: PendingSaved | null;
   spaceNames: Record<string, string>;
+  travelCity?: SampleCityId | null;
+  goals?: Goal[];
+  savedCount?: SavedCount | null;
+  planner?: Planner | null;
 };
 
-/** What onboarding.tsx restores on mount. */
-type OnboardingProgress = {
-  saveKinds: string[];
+type OnboardingAnswers = {
+  travelCity: SampleCityId | null;
+  goals: Goal[];
+  savedCount: SavedCount | null;
+  planner: Planner | null;
+};
+
+type OnboardingProgress = OnboardingAnswers & {
   spaces: string[];
   step: number | null;
-  demo: PendingDemo | null;
-  saved: PendingSaved | null;
 };
+
+const NO_ANSWERS: OnboardingAnswers = {
+  travelCity: null,
+  goals: [],
+  savedCount: null,
+  planner: null,
+};
+
+function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
+  return {
+    travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
+    goals: readGoals(record.goals),
+    savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
+    planner: isPlanner(record.planner) ? record.planner : null,
+  };
+}
 
 let revision = 0;
 const listeners = new Set<() => void>();
@@ -100,26 +98,7 @@ function readPendingRecord(): PendingRecord | null {
         ? value
         : null;
     const spaces = stringArray(record.spaces);
-    const saveKinds = stringArray(record.saveKinds) ?? [];
     const step = typeof record.step === "number" ? record.step : null;
-    const storedDemo =
-      record.demo !== null &&
-      typeof record.demo === "object" &&
-      typeof record.demo.url === "string" &&
-      (record.demo.destination === null ||
-        typeof record.demo.destination === "string")
-        ? record.demo
-        : null;
-    // Builds before the first-share fix did not persist origin. Treat those
-    // records as direct saves rather than hiding guidance on an assumption.
-    const demo: PendingDemo | null =
-      storedDemo === null
-        ? null
-        : {
-            url: storedDemo.url,
-            destination: storedDemo.destination,
-            source: storedDemo.source === "share" ? "share" : "direct",
-          };
     if (
       typeof record.operationId !== "string" ||
       record.operationId === "" ||
@@ -132,31 +111,25 @@ function readPendingRecord(): PendingRecord | null {
       operationId: record.operationId,
       spaces,
       demoUrl: record.demoUrl === "" ? null : record.demoUrl,
+      demoSpace:
+        typeof record.demoSpace === "string" && record.demoSpace !== ""
+          ? record.demoSpace
+          : null,
+      demoOwner:
+        typeof record.demoOwner === "string" && record.demoOwner !== ""
+          ? record.demoOwner
+          : null,
       progressVersion:
         typeof record.progressVersion === "number"
           ? record.progressVersion
           : null,
-      saveKinds,
       step,
-      demo,
-      saved: readSaved(record.saved),
       spaceNames: readSpaceNames(record.spaceNames),
+      ...answersOf(record),
     };
   } catch {
     return null;
   }
-}
-
-function readSaved(value: unknown): PendingSaved | null {
-  if (typeof value !== "object" || value === null) return null;
-  const { itemId, savedSpaceNames } = value as Partial<PendingSaved>;
-  if (typeof itemId !== "string" || itemId === "") return null;
-  if (
-    !Array.isArray(savedSpaceNames) ||
-    !savedSpaceNames.every((name) => typeof name === "string")
-  )
-    return null;
-  return { itemId, savedSpaceNames };
 }
 
 function readSpaceNames(value: unknown): Record<string, string> {
@@ -169,6 +142,7 @@ function readSpaceNames(value: unknown): Record<string, string> {
   );
 }
 
+// SecureStore's delete is async-only, so clearing writes ""; readers treat "" as unset.
 function writePendingRecord(record: PendingRecord | null) {
   SecureStore.setItem(
     PENDING_KEY,
@@ -176,7 +150,7 @@ function writePendingRecord(record: PendingRecord | null) {
   );
 }
 
-function ensureOperationId(): string {
+export function getOrCreatePendingOperationId(): string {
   const existing = readPendingRecord();
   if (existing !== null) return existing.operationId;
   const operationId = createOperationId();
@@ -184,25 +158,16 @@ function ensureOperationId(): string {
     operationId,
     spaces: [],
     demoUrl: null,
+    demoSpace: null,
+    demoOwner: null,
     progressVersion: null,
-    saveKinds: [],
     step: null,
-    demo: null,
-    saved: null,
     spaceNames: {},
   });
   return operationId;
 }
 
-// Replay retries (refreshOperationId=false) update the existing operation
-// rather than starting a new one; otherwise a successfully-created demo link
-// could be duplicated after a partial space-creation failure.
-function writePendingSpaces(
-  spaces: string[],
-  refreshOperationId: boolean,
-  demo: PendingDemo | null,
-  saved: PendingSaved | null,
-) {
+function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
   const existing = readPendingRecord();
   const operationId =
     spaces.length > 0 && refreshOperationId && !existing?.demoUrl
@@ -212,67 +177,73 @@ function writePendingSpaces(
     operationId,
     spaces,
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
+    demoOwner: existing?.demoOwner ?? null,
     progressVersion: existing?.progressVersion ?? null,
-    saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
-    demo,
-    saved,
     spaceNames: existing?.spaceNames ?? {},
+    ...answersOf(existing ?? {}),
   });
   notifyChanged();
 }
 
-/** Onboarding finished: hand the picked spaces to the replay hook. The demo
- * step is over, so its in-flight record is dropped here as well — otherwise a
- * completed save would outlive onboarding in SecureStore (`hasPending` ignores
- * it, so nothing downstream would ever clear it). */
+/** Onboarding finished: hands the spaces to the replay hook. */
 export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true, null, null);
+  writePendingSpaces(spaces, true);
 }
 
 export function updatePendingSpaces(spaces: string[]) {
-  const existing = readPendingRecord();
-  writePendingSpaces(
-    spaces,
-    false,
-    existing?.demo ?? null,
-    existing?.saved ?? null,
-  );
+  writePendingSpaces(spaces, false);
 }
 
 export function getPendingSpaces(): string[] {
   return readPendingRecord()?.spaces ?? [];
 }
 
-/** Read-only: unlike getOrCreatePendingOperationId, never writes a record. */
 export function getPendingOperationId(): string | null {
   return readPendingRecord()?.operationId ?? null;
 }
 
-export function getOrCreatePendingOperationId(): string {
-  return ensureOperationId();
-}
-
-/** Older builds queued this save until purchase. Preserve that intent. */
 export function getPendingDemoUrl(): string | null {
   return readPendingRecord()?.demoUrl ?? null;
+}
+
+export function getPendingDemoSpace(): string | null {
+  return readPendingRecord()?.demoSpace ?? null;
+}
+
+export function getPendingDemoOwner(): string | null {
+  return readPendingRecord()?.demoOwner ?? null;
+}
+
+/** Queues a first save for the replay once the account is Pro; `owner` keeps it out of a later account. */
+export function queueDemoUrl(
+  url: string,
+  space: string | null = null,
+  owner: string | null = null,
+) {
+  getOrCreatePendingOperationId();
+  const existing = readPendingRecord();
+  if (existing === null) return;
+  writePendingRecord({
+    ...existing,
+    demoUrl: url,
+    demoSpace: space,
+    demoOwner: owner,
+  });
+  notifyChanged();
 }
 
 export function clearLegacyDemoUrl() {
   const existing = readPendingRecord();
   if (existing === null || existing.demoUrl === null) return;
-  writePendingRecord({ ...existing, demoUrl: null });
+  writePendingRecord({
+    ...existing,
+    demoUrl: null,
+    demoSpace: null,
+    demoOwner: null,
+  });
   notifyChanged();
-}
-
-export function clearLegacyDemoUrlIfSaved(savedUrl: string) {
-  const queued = getPendingDemoUrl();
-  if (!queued) return;
-  try {
-    if (new URL(queued).href === new URL(savedUrl).href) clearLegacyDemoUrl();
-  } catch {
-    // An invalid old URL remains recoverable instead of being silently lost.
-  }
 }
 
 function isCurrentProgress(record: PendingRecord | null): boolean {
@@ -282,54 +253,26 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { saveKinds: [], spaces: [], step: null, demo: null, saved: null };
+    return { ...NO_ANSWERS, spaces: [], step: null };
   }
-  return {
-    saveKinds: record.saveKinds,
-    spaces: record.spaces,
-    step: record.step,
-    demo: record.demo,
-    saved: record.saved,
-  };
+  return { ...answersOf(record), spaces: record.spaces, step: record.step };
 }
 
-export function setOnboardingProgress(progress: {
-  saveKinds: string[];
-  spaces: string[];
-  step: number;
-  saved?: PendingSaved | null;
-}) {
+export function setOnboardingProgress(
+  progress: Partial<OnboardingAnswers> & { spaces: string[]; step: number },
+) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
   writePendingRecord({
     operationId,
     spaces: progress.spaces,
     demoUrl: existing?.demoUrl ?? null,
+    demoSpace: existing?.demoSpace ?? null,
+    demoOwner: existing?.demoOwner ?? null,
     progressVersion: PROGRESS_VERSION,
-    saveKinds: progress.saveKinds,
     step: progress.step,
-    // An older flow's in-flight demo belongs to a step this flow restarted.
-    demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
-    saved: progress.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
-  });
-  notifyChanged();
-}
-
-export function setPendingDemo(demo: PendingDemo | null) {
-  const existing = readPendingRecord();
-  if (existing === null && demo === null) return;
-  const operationId = existing?.operationId ?? createOperationId();
-  writePendingRecord({
-    operationId,
-    spaces: existing?.spaces ?? [],
-    demoUrl: existing?.demoUrl ?? null,
-    progressVersion: existing?.progressVersion ?? null,
-    saveKinds: existing?.saveKinds ?? [],
-    step: existing?.step ?? null,
-    demo,
-    saved: existing?.saved ?? null,
-    spaceNames: existing?.spaceNames ?? {},
+    ...answersOf(progress),
   });
   notifyChanged();
 }
@@ -341,10 +284,9 @@ export function hasPending(): boolean {
   );
 }
 
-/** Freeze a preset's persisted name before its first creation. Display labels
- * may change language, but demo and completion must use the same identity. */
+/** Freezes a preset's name on first use, so a language change cannot give demo and completion two names. */
 export function resolveOnboardingSpaceName(id: string): string {
-  ensureOperationId();
+  getOrCreatePendingOperationId();
   const record = readPendingRecord();
   if (record === null) throw new Error("Onboarding state unavailable");
   if (Object.hasOwn(record.spaceNames, id)) return record.spaceNames[id];

@@ -3,16 +3,10 @@ import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** A bordered card that stacks settings rows with hairline dividers. */
 export function SettingsGroup({ children }: { children: ReactNode }) {
   return <View style={styles.group}>{children}</View>;
 }
 
-/**
- * One tappable row in a SettingsGroup: a label, an optional current value,
- * and a trailing symbol. Without `onPress` it renders as plain content, which
- * lets a native menu wrap it and own the tap.
- */
 export function SettingsRow({
   label,
   value,
@@ -28,7 +22,6 @@ export function SettingsRow({
   icon?: AppSymbolName;
   onPress?: () => void;
   disabled?: boolean;
-  /** Draws the hairline above this row; the first row in a group omits it. */
   divider?: boolean;
   accessibilityLabel?: string;
   testID?: string;

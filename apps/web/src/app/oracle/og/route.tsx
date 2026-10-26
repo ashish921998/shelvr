@@ -4,8 +4,6 @@ import { verifiedVerdict } from "@/lib/oracleProof";
 import { authorizeRequestBody } from "@/lib/requestBody";
 import { type SharedVerdict } from "@/lib/oracleShare";
 
-// The link preview is 1200×630. The story cut is 9:16, for saving to the
-// camera roll and posting to Stories.
 const SIZES = {
   link: { width: 1200, height: 630 },
   story: { width: 1080, height: 1920 },
@@ -45,8 +43,6 @@ function Bar({ score, height }: { score: number; height: number }) {
 
 function Score({ score, story }: { score: number; story: boolean }) {
   if (!story) {
-    // One row, so the 630px link card still fits a two-line persona, a long
-    // tagline and three spaces.
     return (
       <div
         style={{

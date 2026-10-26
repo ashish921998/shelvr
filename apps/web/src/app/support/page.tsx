@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/home/Footer";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { pageMetadata } from "@/lib/siteMetadata";
 
-export const metadata: Metadata = {
-  title: "Support — Shelvr",
-  description: "Get help with Shelvr, subscriptions, privacy, or your account.",
-};
+export const metadata: Metadata = pageMetadata(
+  "/support",
+  "Support — Shelvr",
+  "Get help with Shelvr, subscriptions, privacy, or your account.",
+);
 
 export default function SupportPage() {
   return (

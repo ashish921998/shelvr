@@ -6,19 +6,20 @@ import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
 import { useAppearanceMode } from "@/lib/appearance-runtime";
-import {
-  openPaywall,
-  useEntitlement,
-  waitForSheetTransition,
-} from "@/lib/entitlement";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { manageSubscription } from "@/lib/manage-subscription";
+import {
+  backOrHome,
+  closeScreen,
+  type ClosingScreen,
+} from "@/lib/screen-dismiss";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
+  const navigation = useNavigation() as ClosingScreen;
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
@@ -38,15 +40,7 @@ export default function ProfileScreen() {
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
 
-  const closeProfile = () => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    // A development reload or direct link can restore Profile as the root
-    // route. In that state there is no history entry for Android Back to pop.
-    router.replace("/");
-  };
+  const closeProfile = () => backOrHome(router);
 
   const proLabel =
     status === "trialing"
@@ -61,25 +55,17 @@ export default function ProfileScreen() {
               ? "…"
               : t("pro.viewPlans");
 
-  // Customer Center is only relevant to users who have (or had) a subscription:
-  // any non-`none` status. A `none` user has nothing to manage and should see
-  // the "View Pro plans" paywall row instead.
   const hasSubscription = status !== "none" && !loading;
-  // A lapsed trial or subscription has nothing left to manage: the way back is
-  // a new purchase, so that row opens the paywall rather than Customer Center.
   const opensPaywall = status === "none" || status === "lapsed";
 
-  // An active subscriber goes to Customer Center, which can only present
-  // once this profile sheet is gone; a `none` or lapsed user to the paywall,
-  // after the same dismissal.
   const openSubscription = async () => {
     if (loading) return;
+    const dismissProfile = () => closeScreen(navigation, closeProfile);
     if (!opensPaywall) {
-      await manageSubscription(() => router.back());
+      await manageSubscription(dismissProfile);
       return;
     }
-    router.back();
-    await waitForSheetTransition();
+    await dismissProfile();
     void openPaywall(
       router,
       status === "lapsed" ? "profile_lapsed" : "profile",
@@ -101,18 +87,14 @@ export default function ProfileScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
-      {process.env.EXPO_OS === "android" ? (
-        <View style={styles.sheetHeader}>
-          <Wordmark size={30} />
-          <HeaderIconButton
-            icon="xmark"
-            label={t("profile.close")}
-            onPress={closeProfile}
-          />
-        </View>
-      ) : (
+      <View style={styles.sheetHeader}>
         <Wordmark size={30} />
-      )}
+        <HeaderIconButton
+          icon="xmark"
+          label={t("profile.close")}
+          onPress={closeProfile}
+        />
+      </View>
       <Text style={styles.slogan}>{t("brand.tagline")}</Text>
 
       <View style={styles.card}>

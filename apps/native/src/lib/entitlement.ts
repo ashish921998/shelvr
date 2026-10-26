@@ -2,16 +2,19 @@ import { revenueCatLocale, syncRevenueCatUILocale } from "./revenuecat-locale";
 import { api } from "@convex/_generated/api";
 import { isEntitled } from "@convex/model/entitlement";
 import { convexQuery } from "@convex-dev/react-query";
-import { useConvexAuth } from "convex/react";
+import { useAction, useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
+import { getOnboardingProgress } from "@/lib/pending-onboarding";
 import {
   activeProductId,
   forgetPaywallFunnel,
   hasActiveEntitlement,
+  paywallVariables,
   readPaywallContext,
   readPaywallOffering,
+  refreshCustomerInfo,
   recordAccess,
   recordBlockedAction,
   restoreCameBackEmpty,
@@ -20,19 +23,6 @@ import {
 } from "@/lib/paywall-funnel";
 import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
-import {
-  EXIT_OFFERING_ID,
-  EXIT_OFFER_WINDOW_MS,
-  exitOfferDue,
-  exitOfferEndsAt,
-  exitOfferShownKey,
-  findExitOffering,
-  parseShownAt,
-  timeLeft,
-} from "@/lib/exit-offer";
-import { t } from "@/lib/i18n";
-import { trialTimelineVariables } from "@/lib/date";
-import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
@@ -46,36 +36,21 @@ import {
 import {
   REVENUECAT_API_KEY,
   REVENUECAT_DISABLED_BY_BUILD,
+  REVENUECAT_PRO_ENTITLEMENT,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
-import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { isExitOfferForcedForE2E, isProHiddenForE2E } from "@/lib/e2e-hide-pro";
-
-/**
- * Shelvr Pro entitlement.
- *
- * The source of truth for "is this user entitled" is the Convex
- * `subscriptions` row, written by the RevenueCat webhook. The RevenueCat SDK is
- * used only to present offerings and drive purchases, never to gate features
- * directly, so a spoofed client can't unlock Pro without a real subscription.
- *
- * Model: the yearly plan carries a 7-day free trial (payment method upfront,
- * auto-charges at day 7 unless cancelled); the monthly plan has no trial and
- * charges immediately. No free tier. A lapsed user
- * (trial or subscription ended) is read-only: they can view and search existing
- * saves and spaces, but every save and Pro feature routes to the paywall.
- *
- * The paywall UI itself is rendered natively by RevenueCat's SDK (designed in
- * the RevenueCat dashboard Paywall Editor). We call `presentPaywall()` which
- * presents a native sheet: no custom paywall view code needed.
- */
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
+import {
+  claimPurchaseBeforeSignIn,
+  clearPurchaseBeforeSignIn,
+} from "@/lib/purchase-before-sign-in";
+import {
+  notePurchaseLanding,
+  reservePurchaseLanding,
+} from "@/lib/purchase-landing";
 
 export type EntitlementStatus =
   | "trialing"
@@ -92,31 +67,26 @@ export type Entitlement = {
   expiresAt?: number;
 };
 
-// ---------------------------------------------------------------------------
-// RevenueCat identity sync readiness
-// ---------------------------------------------------------------------------
-
-/**
- * Tracks which Convex user RevenueCat is targeting and which user has actually
- * been synced. The paywall is ready only when both ids match. Otherwise a
- * purchase could be attributed to an anonymous RevenueCat user instead of the
- * Convex user id the webhook keys on. This is a module-level state so any caller
- * of `presentPaywall` can observe it without a direct hook dependency.
- */
 let _rcTargetUserId: string | null = null;
 let _rcSyncedUserId: string | null = null;
 let _rcIdentitySync = Promise.resolve();
+let _rcAnonymousReady = false;
+let _rcSignedOut = false;
+const ANONYMOUS_PLACEMENT = "onboarding";
 
-// Maximum time presentPaywall waits for RC identity sync before giving up and
-// letting the caller fall back to the paywall route. Long enough to cover a
-// normal logIn round-trip, short enough that a missing/unconfigured RC SDK
-// (Expo Go, unset key, outage) doesn't freeze the UI.
 const SYNC_READY_TIMEOUT_MS = 5000;
 
 function setRcTargetUserId(userId: string | null) {
   if (_rcTargetUserId === userId) return;
   _rcTargetUserId = userId;
   _rcSyncedUserId = null;
+  _rcAnonymousReady = false;
+}
+
+function setRcSignedOut(signedOut: boolean) {
+  if (_rcSignedOut === signedOut) return;
+  _rcSignedOut = signedOut;
+  _rcAnonymousReady = false;
 }
 
 function markRcUserSynced(userId: string) {
@@ -128,48 +98,36 @@ function isRcSyncReady() {
   return _rcTargetUserId !== null && _rcSyncedUserId === _rcTargetUserId;
 }
 
-/**
- * Block until RevenueCat identity sync completes, or give up after
- * `SYNC_READY_TIMEOUT_MS`. A purchase/management action before login would be
- * attributed to an anonymous RC user, breaking the webhook's userId mapping.
- * The timeout caps the wait so a missing/unconfigured RC SDK (Expo Go, unset
- * key, logIn failure, RC outage) cannot wedge the UI forever: callers fall
- * back to a safe route. Shared by `presentPaywall` and `presentCustomerCenter`.
- */
-async function awaitRcSyncReady(): Promise<boolean> {
-  if (isRcSyncReady()) return true;
+function rcReadyFor(anonymous: boolean) {
+  return anonymous
+    ? _rcTargetUserId === null && _rcAnonymousReady
+    : isRcSyncReady();
+}
+
+// Before logIn, RevenueCat attributes purchases to an anonymous user the webhook cannot map.
+async function awaitRcSyncReady(anonymous = false): Promise<boolean> {
+  const ready = () => rcReadyFor(anonymous);
+  if (ready()) return true;
   return Promise.race([
-    _rcIdentitySync.then(() => isRcSyncReady()),
+    _rcIdentitySync.then(ready),
     new Promise<boolean>((r) =>
       setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS),
     ),
   ]);
 }
 
-/**
- * Delay before presenting RevenueCat UI after a sheet/stack transition. UIKit
- * refuses to present while a dismiss is mid-flight ("already presenting
- * RNSScreen"), so callers `router.back()` / complete a transition first, then
- * await this. One home for the magic number so it can't drift between screens.
- */
+// UIKit refuses to present while a dismiss is mid-flight ("already presenting RNSScreen").
 const SHEET_SETTLE_MS = 600;
 
 export function waitForSheetTransition(): Promise<void> {
   return new Promise((r) => setTimeout(r, SHEET_SETTLE_MS));
 }
 
-// ---------------------------------------------------------------------------
-// RevenueCat configuration
-// ---------------------------------------------------------------------------
-
 let configured = false;
 
-/**
- * Configure the RevenueCat SDK with the platform-specific public key. Safe to
- * call repeatedly; only configures once. Missing configuration is reported
- * by the identity sync observer and never marks the paywall ready.
- */
-async function configureRevenueCat(appUserID: string): Promise<void> {
+async function configureRevenueCat(
+  appUserID: string | undefined,
+): Promise<void> {
   if (configured) return;
   const rc = getPurchases();
   if (!rc) throw new Error("revenuecat_module_unavailable");
@@ -182,23 +140,18 @@ async function configureRevenueCat(appUserID: string): Promise<void> {
   configured = true;
 }
 
-/**
- * Keep RevenueCat's app user id in sync with the Convex Auth user id.
- * RevenueCat's `original_app_user_id` becomes the `userId` the webhook writes,
- * so it must match the `users` document id every other table keys on. Call once
- * after sign-in.
- *
- * Identity changes are serialized, and readiness is recorded for the current
- * user id only after `rc.logIn` succeeds. Sign-out or a user change clears it
- * immediately so `presentPaywall` cannot use a previous account's session.
- */
+/** Mount once at the app root: logs RevenueCat in as the Convex user id, which the webhook keys on. */
 export function useEntitlementSync(): void {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const sub = isAuthenticated ? (user?._id ?? null) : null;
+  const signedOut = !isAuthenticated && !isLoading;
+  const syncPurchase = useAction(api.subscriptions.syncPurchase);
+  const syncPurchaseRef = useRef(syncPurchase);
+  useEffect(() => {
+    syncPurchaseRef.current = syncPurchase;
+  });
   const entitlement = useEntitlement();
-  // The status an `entitlement_activated` event may report: narrowed from
-  // `useEntitlement`'s wider union to the entitled statuses.
   const activeStatus =
     entitlement.entitled &&
     (entitlement.status === "trialing" ||
@@ -209,21 +162,24 @@ export function useEntitlementSync(): void {
 
   useEffect(() => {
     setRcTargetUserId(sub);
+    setRcSignedOut(signedOut);
     if (sub === null) {
-      // The funnel memory belongs to the account that earned it, so a
-      // sign-out or account change drops it (see `forgetPaywallFunnel`).
       forgetPaywallFunnel();
       return;
     }
-    // A build that deliberately has no key would only burn the retry budget
-    // and report the absence as a sync failure on every foreground. Readiness
-    // stays false, so purchase entry points still degrade to unavailable.
     if (REVENUECAT_DISABLED_BY_BUILD) return;
 
     let cancelled = false;
+    const claimed = claimPurchaseBeforeSignIn(sub, () =>
+      analytics.captureError(
+        "purchase_attach_expired",
+        new Error("purchase_attach_expired"),
+      ),
+    );
+    if (claimed) notePurchaseLanding();
+    let attach: ReturnType<typeof startRevenueCatIdentitySync> | null = null;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
-        // Keep retries and account changes on the same serial queue.
         const attempt = _rcIdentitySync.then(async () => {
           if (cancelled || _rcTargetUserId !== sub) return;
           await configureRevenueCat(sub);
@@ -235,24 +191,69 @@ export function useEntitlementSync(): void {
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
       },
-      onReady: () => markRcUserSynced(sub),
+      onReady: () => {
+        markRcUserSynced(sub);
+        if (cancelled || !claimed) return;
+        attach = startRevenueCatIdentitySync({
+          sync: () =>
+            attachPurchaseBeforeSignIn(sub, () => syncPurchaseRef.current({})),
+          onReady: clearPurchaseBeforeSignIn,
+          onError: (error) =>
+            analytics.captureError("purchase_sync_failed", error),
+        });
+      },
       onError: reportRevenueCatIdentityError,
     });
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") observer.retry();
+      if (state !== "active") return;
+      observer.retry();
+      attach?.retry();
     });
 
     return () => {
       cancelled = true;
       observer.dispose();
+      attach?.dispose();
       subscription.remove();
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
-  }, [sub]);
+  }, [sub, signedOut]);
 
-  // Purchase/restore -> backend entitlement available: the RevenueCat webhook
-  // has written the row and the client's query now shows it.
   useEntitlementActivation(activeStatus);
+}
+
+// logIn merges an anonymous purchase only into an account with no anonymous history, so sync the receipt either way.
+async function attachPurchaseBeforeSignIn(
+  sub: string,
+  syncPurchase: () => Promise<boolean>,
+): Promise<void> {
+  const receipt = _rcIdentitySync.then(async () => {
+    if (_rcSyncedUserId !== sub) throw new Error("purchase_attach_superseded");
+    try {
+      await getPurchases()?.syncPurchasesForResult();
+    } catch (error) {
+      analytics.captureError("revenuecat_purchase_attach_failed", error);
+    }
+  });
+  _rcIdentitySync = receipt.catch(() => {});
+  await receipt;
+  if (!(await syncPurchase())) throw new Error("purchase_not_attached");
+}
+
+// Not on every signed-out screen: an anonymous customer posting a renewal would take the subscription off its account.
+function prepareAnonymousRevenueCat(): void {
+  if (_rcAnonymousReady) return;
+  const attempt = _rcIdentitySync.then(async () => {
+    if (!_rcSignedOut || _rcTargetUserId !== null) return;
+    await configureRevenueCat(undefined);
+    const rc = getPurchases();
+    if (!rc) throw new Error("revenuecat_module_unavailable");
+    if (!(await rc.isAnonymous())) await rc.logOut();
+    if (_rcSignedOut && _rcTargetUserId === null) _rcAnonymousReady = true;
+  });
+  _rcIdentitySync = attempt.catch((error: unknown) =>
+    analytics.captureError("revenuecat_anonymous_sync_failed", error),
+  );
 }
 
 function reportRevenueCatIdentityError(error: unknown) {
@@ -268,25 +269,10 @@ function reportRevenueCatIdentityError(error: unknown) {
     const code = String(error.code);
     if (/^\d{1,3}$/.test(code)) reason = `revenuecat_error_${code}`;
   }
-  // The bounded reason travels as a property, not an error message:
-  // `captureError` redacts any message outside its fixed allowlist (free-form
-  // text can carry user content), so a reason wrapped in an Error never
-  // reaches PostHog. The original error keeps its class and stack, which name
-  // the real failure site better than a synthetic error would.
   analytics.captureError("purchase_identity_sync_failed", error, { reason });
 }
 
-// ---------------------------------------------------------------------------
-// Entitlement query
-// ---------------------------------------------------------------------------
-
-/**
- * The current user's entitlement, derived from the Convex `subscriptions` row.
- * `entitled` is computed against the client's own clock so the query never
- * reads the wall clock (queries aren't rerun as time advances); the server
- * re-checks expiry inside gated mutations, so a stale client view can never
- * grant access the server denies.
- */
+/** Advisory view: expiry uses the client clock since Convex queries do not rerun as time passes; gated mutations re-check it. */
 export function useEntitlement(): Entitlement {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { data } = useQuery(
@@ -295,12 +281,7 @@ export function useEntitlement(): Entitlement {
       isAuthenticated ? {} : "skip",
     ),
   );
-  // The clock is seeded once and refreshed on an interval so a trial expiring
-  // between Convex updates flips `entitled` without a server push. Seeding via
-  // a useState initializer (and updating inside the effect) keeps Date.now
-  // out of the render body: the React compiler flags impure calls there.
-  // The interval only runs while there's an expiry to count down: a user with
-  // no subscription never ticks, avoiding a per-screen 60s rerender.
+  // The useState initializer keeps Date.now out of render, which the React compiler flags.
   const [now, setNow] = useState(() => Date.now());
   const hasExpiry = data?.expiresAt !== undefined;
   useEffect(() => {
@@ -309,15 +290,9 @@ export function useEntitlement(): Entitlement {
     return () => clearInterval(id);
   }, [hasExpiry]);
 
-  // An e2e run of the paywall flow: the dev user is always Pro, so the flow
-  // asks the client to show them as not Pro. After the hooks, so their order
-  // never changes.
   if (isAuthenticated && isProHiddenForE2E()) {
     return { status: "none", entitled: false, loading: false, now };
   }
-  // Onboarding is intentionally visible before sign-in. Do not invoke the
-  // authenticated Convex query in that state, and never render persisted data
-  // from a previous account as this user's entitlement.
   if (!isAuthenticated) {
     return { status: "none", entitled: false, loading: authLoading, now };
   }
@@ -330,8 +305,6 @@ export function useEntitlement(): Entitlement {
     };
   }
   const expiresAt = data.expiresAt;
-  // The shared gate: same logic the server uses in requireProEntitlement, so
-  // the client's advisory view can never grant access the server denies.
   const active = isEntitled(data.status, expiresAt, now);
   return {
     status: active ? data.status : "lapsed",
@@ -342,27 +315,13 @@ export function useEntitlement(): Entitlement {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Paywall presentation
-// ---------------------------------------------------------------------------
-
-/**
- * Present the RevenueCat paywall natively (sheet on iOS). Returns a three-way
- * outcome so callers can distinguish purchase/restore, user cancellation, and
- * real unavailability (SDK missing, identity sync timeout, ERROR).
- *
- * The paywall is NOT presented until RevenueCat identity sync is ready (the
- * Convex user id has been logged in to RC), so a purchase is always attributed
- * to the correct user.
- */
 async function presentPaywallImpl(
   placement = "pro_gate",
 ): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
+  const owner = openSheet;
   analytics.capture("paywall_requested", properties);
-  // Started before the identity gate and awaited after it, so the cached
-  // RevenueCat reads never add their own wait in front of the sheet.
   const context = readPaywallContext();
   const failed = (reason: string) =>
     analytics.capture("paywall_failed", {
@@ -370,9 +329,12 @@ async function presentPaywallImpl(
       reason,
       duration_ms: Math.max(0, Date.now() - requestedAt),
     });
-  // A purchase before RC identity sync would be attributed to an anonymous RC
-  // user, breaking the webhook's userId mapping, so block until it completes.
-  if (!(await awaitRcSyncReady())) {
+  const anonymous =
+    placement === ANONYMOUS_PLACEMENT &&
+    _rcTargetUserId === null &&
+    _rcSignedOut;
+  if (anonymous && !REVENUECAT_DISABLED_BY_BUILD) prepareAnonymousRevenueCat();
+  if (!(await awaitRcSyncReady(anonymous))) {
     failed("identity_not_ready");
     return "unavailable";
   }
@@ -387,299 +349,100 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const enriched = { ...properties, ...(await context) };
-    // Read after identity sync, so the dates come from this account's
-    // offering, and presented from the same snapshot. An unknown trial length
-    // dates nothing: the paywall falls back to its undated labels instead of
-    // claiming a length the offer may not have.
-    const { offering, trial } = await readPaywallOffering();
-    const customVariables = trial && trialTimelineVariables(Date.now(), trial);
+    const [{ offering, trial, eligibility }, customerRead] = await Promise.all([
+      readPaywallOffering(),
+      refreshCustomerInfo(),
+    ]);
+    if (!customerRead) {
+      failed("customer_info_unavailable");
+      return "unavailable";
+    }
+    const enriched = {
+      ...properties,
+      ...(await context),
+      ...(offering && { offering_id: offering.identifier }),
+      ...(eligibility && { trial_eligible: eligibility }),
+    };
+    const customVariables = paywallVariables(
+      Date.now(),
+      trial,
+      offering?.availablePackages.map((pkg) => pkg.product) ?? [],
+      enriched.trial_eligible,
+      getOnboardingProgress(),
+    );
+    // A sign-out during those reads must not open a paywall that cannot close.
+    if (!rcReadyFor(anonymous)) {
+      failed("identity_not_ready");
+      return "unavailable";
+    }
+    // Keep IfNeeded so a restore that finds Pro dismisses the paywall too.
+    const present = () =>
+      rcui.presentPaywallIfNeeded({
+        requiredEntitlementIdentifier: REVENUECAT_PRO_ENTITLEMENT,
+        offering,
+        customVariables,
+      });
     const result = await observePaywallPresentation(
       enriched,
-      () =>
-        rcui.presentPaywall({ offering, customVariables }).then(confirmRestore),
+      () => nativePresentation(owner, present).then(confirmRestore),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
       recordAccess(result === "RESTORED" ? "restore" : "purchase");
     }
-    // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
-    const outcome = mapPaywallResult(result);
-    if (outcome !== "cancelled") return outcome;
-    return (await presentExitOffer(rcui, placement)) ?? outcome;
+    return mapPaywallResult(result);
   } catch {
     return "unavailable";
   }
 }
 
-/** An empty restore is a close, so the caller is not told the user subscribed
- * and the exit offer still follows. */
 async function confirmRestore(result: string): Promise<string> {
   if (result !== "RESTORED") return result;
   return (await restoreCameBackEmpty()) ? "CANCELLED" : result;
 }
 
-// Home re-reads the open offer whenever it is claimed or released.
-const exitOfferListeners = new Set<() => void>();
-const notifyExitOffer = () => exitOfferListeners.forEach((read) => read());
-
-function readShownAt(userId: string): number | null {
-  try {
-    return parseShownAt(SecureStore.getItem(exitOfferShownKey(userId)));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The exit offering for an e2e run that asked for the offer, taken as it is.
- * With RevenueCat's Test Store the offering loads but the intro price checks
- * in `findExitOffering` have not passed on CI, and what the run checks is
- * the sheet, not who qualifies for it.
- */
-async function findForcedExitOffering(
-  rc: NonNullable<ReturnType<typeof getPurchases>>,
-) {
-  try {
-    return (await rc.getOfferings()).all[EXIT_OFFERING_ID] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
-  return {
-    getOfferings: () => rc.getOfferings(),
-    checkEligibility: (ids: string[]) =>
-      rc.checkTrialOrIntroductoryPriceEligibility(ids),
-  };
-}
-
-/**
- * After a paywall close, present the discounted exit offering once (see
- * `exit-offer.ts`). Showing it opens the offer's 24-hour window. Runs inside
- * the same sheet latch as the paywall it follows. Returns null when nothing
- * was shown; a failure after the user already closed the paywall stays a
- * cancel, never the fallback screen.
- */
-async function presentExitOffer(
-  rcui: NonNullable<ReturnType<typeof getRCUI>>,
-  sourcePlacement: string,
-): Promise<PaywallOutcome | null> {
-  const userId = _rcSyncedUserId;
-  const rc = getPurchases();
-  if (!userId || !rc) return null;
-  // The paywall e2e flows close the paywall and expect Home, on a simulator
-  // whose offer may or may not be due, unless the run asked for the offer.
-  const forced = isExitOfferForcedForE2E();
-  if (isProHiddenForE2E() && !forced) return null;
-  const key = exitOfferShownKey(userId);
-  const now = Date.now();
-  let lastShownAt: number | null;
-  try {
-    lastShownAt = parseShownAt(SecureStore.getItem(key));
-  } catch {
-    return null;
-  }
-  if (!exitOfferDue(sourcePlacement, forced ? null : lastShownAt, now))
-    return null;
-  const offering = forced
-    ? await findForcedExitOffering(rc)
-    : await findExitOffering(exitOfferDeps(rc));
-  if (!offering) return null;
-  try {
-    // Claim before presenting, so a crash mid-sheet can't repeat it.
-    SecureStore.setItem(key, String(now));
-  } catch {
-    return null;
-  }
-  notifyExitOffer();
-  // UIKit refuses to present while the first paywall is still dismissing.
-  await waitForSheetTransition();
-  // A sheet that never appeared must not open the window.
-  // Awaited before the sheet latch clears, so a later claim can't race it.
-  const release = async () => {
-    try {
-      if (lastShownAt === null) await SecureStore.deleteItemAsync(key);
-      else SecureStore.setItem(key, String(lastShownAt));
-    } catch {
-      // Best-effort; the worst case is one skipped offer.
-    }
-    notifyExitOffer();
-  };
-  const outcome = await showExitOffering(
-    rcui,
-    offering,
-    sourcePlacement,
-    now + EXIT_OFFER_WINDOW_MS,
-    release,
-  );
-  // The user already closed the paywall, so a failed offer stays a cancel.
-  return outcome === "success" ? outcome : "cancelled";
-}
-
-async function showExitOffering(
-  rcui: NonNullable<ReturnType<typeof getRCUI>>,
-  offering: import("react-native-purchases").PurchasesOffering,
-  sourcePlacement: string,
-  endsAt: number,
-  onNotPresented: () => void | Promise<void> = () => {},
-  onDeclined?: () => void,
-): Promise<PaywallOutcome> {
-  const properties = {
-    placement: "exit_offer",
-    source_placement: sourcePlacement,
-    paywall_attempt_id: randomUUID(),
-    // The exit sheet renders a known offering, so its id needs no SDK read.
-    offering_id: offering.identifier,
-  };
-  analytics.capture("paywall_requested", properties);
-  try {
-    const result = await observePaywallPresentation(
-      properties,
-      () =>
-        // Our own sheet, so the offer can close at its deadline.
-        presentExitSheet({
-          Paywall: rcui.Paywall,
-          offering,
-          customVariables: exitOfferVariables(endsAt),
-          endsAt,
-          onDeclined,
-          // The one paywall mounted as a component, so the one place the
-          // purchase tap itself is observable.
-          onPurchaseStarted: (packageId) =>
-            analytics.capture("paywall_purchase_started", {
-              placement: "exit_offer",
-              paywall_attempt_id: properties.paywall_attempt_id,
-              package_id: packageId,
-            }),
-        }),
-      activeProductId,
-    );
-    if (result === "PURCHASED" || result === "RESTORED") {
-      recordAccess(result === "RESTORED" ? "restore" : "purchase");
-    }
-    if (result === "NOT_PRESENTED" || result === "ERROR")
-      await onNotPresented();
-    // Held until the sheet has slid away, so the latch is not released while
-    // UIKit would still refuse the next paywall.
-    else await whenExitSheetDismissed();
-    return mapPaywallResult(result);
-  } catch {
-    await onNotPresented();
-    return "unavailable";
-  }
-}
-
-/**
- * The time left, filled into the paywall's `{{ custom.offer_ends }}` line when
- * the sheet opens. The dashboard default ("Available for a limited time.")
- * covers older builds that pass nothing.
- */
-function exitOfferVariables(endsAt: number) {
-  const { hours, minutes } = timeLeft(endsAt - Date.now());
-  const value = t("exitOffer.sheetEndsIn", {
-    hours: String(hours),
-    minutes: String(minutes),
-  });
-  return { offer_ends: { type: "string", value } as const };
-}
-
-/**
- * Reopen the exit offer while its window is open. If the window closed or the
- * offering vanished, the regular paywall opens at `fallbackPlacement`
- * instead, so the tap never dead-ends.
- */
-async function presentOpenExitOfferImpl(
-  sourcePlacement: string,
-  fallbackPlacement: string,
-  paywallOnDecline = false,
-): Promise<PaywallOutcome> {
-  if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
-  const userId = _rcSyncedUserId;
-  const rc = getPurchases();
-  const rcui = getRCUI();
-  const endsAt = userId
-    ? exitOfferEndsAt(readShownAt(userId), Date.now())
-    : null;
-  if (!rc || !rcui || endsAt === null)
-    return presentPaywallImpl(fallbackPlacement);
-  if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
-  const offering = await findExitOffering(exitOfferDeps(rc));
-  // The lookup can outlast the window; never sell the offer after it closes.
-  if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
-    return presentPaywallImpl(fallbackPlacement);
-  // Only the person's own close counts. A sheet closed by its deadline or by
-  // a torn-down host must not put another paywall in front of them.
-  let declined = false;
-  const outcome = await showExitOffering(
-    rcui,
-    offering,
-    sourcePlacement,
-    endsAt,
-    undefined,
-    paywallOnDecline ? () => void (declined = true) : undefined,
-  );
-  if (!declined || outcome !== "cancelled") return outcome;
-  // The offer carries one plan, so declining it must still leave the trial
-  // and the other plans one step away. Closing that paywall is inside the
-  // cooldown and does not open the offer again.
-  return presentPaywallImpl(fallbackPlacement);
-}
-
-function subscribeExitOffer(onChange: () => void): () => void {
-  exitOfferListeners.add(onChange);
-  const sub = AppState.addEventListener("change", (state) => {
-    if (state === "active") onChange();
-  });
-  return () => {
-    exitOfferListeners.delete(onChange);
-    sub.remove();
-  };
-}
-
-/**
- * The open exit offer's closing time for this account, or null. Updates when
- * the offer is claimed, released, or expires, and on return to the app.
- */
-export function useExitOfferEndsAt(userId: string | undefined): number | null {
-  const shownAt = useSyncExternalStore(subscribeExitOffer, () =>
-    userId ? readShownAt(userId) : null,
-  );
-  // Re-render at the deadline so the card disappears on time.
-  const [now, setNow] = useState(Date.now);
-  const endsAt = exitOfferEndsAt(shownAt, now);
-  useEffect(() => {
-    if (endsAt === null) return;
-    const timer = setTimeout(
-      () => setNow(Date.now()),
-      Math.max(0, endsAt - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [endsAt]);
-  return endsAt;
-}
-
-// A RevenueCat promise that never settles must not hold the latch for the
-// life of the process; past this age the sheet is presumed gone.
 const SHEET_STALE_MS = 5 * 60_000;
+
+const NATIVE_SHOW_MS = 2000;
 
 type OpenSheet = {
   startedAt: number;
-  // null while the Customer Center holds the latch.
   paywall: Promise<PaywallOutcome> | null;
+  nativeSince?: number;
+  abandon?: () => void;
 };
 let openSheet: OpenSheet | null = null;
+let lastAppTouchAt = 0;
+
+/** Called by the app root on every touch; one after the native paywall should cover the app shows UIKit refused it. */
+export function noteAppTouch(): void {
+  lastAppTouchAt = Date.now();
+}
+
+function nativePresentation<T>(
+  sheet: OpenSheet | null,
+  present: () => Promise<T>,
+): Promise<T> {
+  if (sheet) sheet.nativeSince = Date.now();
+  return present().finally(() => {
+    if (sheet) sheet.nativeSince = undefined;
+  });
+}
 
 function liveSheet(): OpenSheet | null {
   if (openSheet && Date.now() - openSheet.startedAt < SHEET_STALE_MS) {
-    return openSheet;
+    const since = openSheet.nativeSince;
+    if (since === undefined || lastAppTouchAt < since + NATIVE_SHOW_MS) {
+      return openSheet;
+    }
+    openSheet.abandon?.();
+    releaseSheet(openSheet);
+    return null;
   }
   openSheet = null;
   return null;
 }
 
-// Callers waiting for the live sheet to close (see `whenSheetSettled`).
 const sheetWaiters = new Set<() => void>();
 
 function releaseSheet(sheet: OpenSheet): void {
@@ -690,11 +453,7 @@ function releaseSheet(sheet: OpenSheet): void {
   for (const waiter of waiters) waiter();
 }
 
-/**
- * Resolves once no RevenueCat sheet is up and the last one has finished
- * sliding away, so a React Native modal can present. A sheet whose promise
- * never settles is presumed gone at the same age `liveSheet` drops it.
- */
+/** Resolves once no RevenueCat sheet is up and the last has slid away, so a React Native modal can present. */
 export function whenSheetSettled(): Promise<void> {
   return new Promise((resolve) => {
     const live = liveSheet();
@@ -722,89 +481,51 @@ export function isPaywallPending(): boolean {
   return liveSheet() !== null;
 }
 
-/** `owned` is false when this call joined a presentation someone else opened. */
 type Presentation = { outcome: PaywallOutcome; owned: boolean };
 
-async function presentPaywall(
-  placement = "pro_gate",
-  present: () => Promise<PaywallOutcome> = () => presentPaywallImpl(placement),
-): Promise<Presentation> {
-  // iOS presents one sheet at a time. A second presentation raced against a
-  // live one leaves both RevenueCat promises unsettled, so neither reports an
-  // outcome and the user sees at most one paywall. The `share` placement
-  // shipped 6 presentations and 2 outcomes this way. A duplicate caller joins
-  // the live presentation and receives its real outcome. Behind a Customer
-  // Center sheet it reports `cancelled` rather than `unavailable`, because
-  // the fallback route would stack a second screen behind the sheet.
+async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
+  // iOS presents one sheet at a time; a concurrent second presentation leaves both RevenueCat promises unsettled.
   const live = liveSheet();
   if (live) {
     const outcome = live.paywall ? await live.paywall : "cancelled";
     return { outcome, owned: false };
   }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
-  sheet.paywall = present().finally(() => {
-    // A stale sheet may already have been replaced; only release our own.
-    releaseSheet(sheet);
+  const abandoned = new Promise<PaywallOutcome>((resolve) => {
+    sheet.abandon = () => resolve("cancelled");
   });
   openSheet = sheet;
+  const landing = reservePurchaseLanding();
+  sheet.paywall = Promise.race([presentPaywallImpl(placement), abandoned])
+    .then((outcome) => {
+      if (outcome === "success") landing();
+      return outcome;
+    })
+    .finally(() => {
+      releaseSheet(sheet);
+    });
   return { outcome: await sheet.paywall, owned: true };
 }
 
-/**
- * Present the RevenueCat paywall. On real unavailability (SDK not linked, sync
- * timed out, ERROR), fall back to the paywall route. On cancellation, return
- * to the caller without routing: cancel must not look like an outage. Returns
- * `true` only on purchase/restore. Shared by every Pro-gated affordance.
- */
+/** Resolves true only on purchase/restore; routes to the paywall screen when unavailable, never on cancel. */
 export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
   const { outcome, owned } = await presentPaywall(placement);
-  // Only the caller that opened the sheet may route. Joined callers share the
-  // same `unavailable`, and a second push stacks a second paywall screen.
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
-  // The gated action did not run. Whatever the sheet resolved to, the caller
-  // re-taps. Remember the block so the guard that later lets the action
-  // through can report the resume, and whether a purchase sits between.
   recordBlockedAction(placement, outcome === "success");
   return outcome === "success";
 }
 
-/** `openPaywall` for the Home countdown: reopens the open exit offer. */
-export async function openExitOffer(
-  router: ReturnType<typeof useRouter>,
-): Promise<boolean> {
-  const { outcome, owned } = await presentPaywall("home_countdown", () =>
-    presentOpenExitOfferImpl("home_countdown", "home_card"),
-  );
-  if (owned && shouldOpenPaywallFallback(outcome)) {
-    router.push("/(app)/paywall");
-  }
-  return outcome === "success";
-}
-
-/**
- * `openPaywall` that keeps an open exit offer: while its window is open the
- * discounted sheet opens instead of full price, so someone who just closed
- * the offer is not shown the higher price on their next tap. With
- * `paywallOnDecline`, declining it there opens the regular paywall: right for
- * a tap, too much for a sheet nobody asked for. Otherwise it is `openPaywall`,
- * exit offer on close included. Returns the outcome itself, so onboarding can
- * tell a paywall that never showed from one that was closed.
- */
-export async function openPaywallKeepingExitOffer(
+/** `openPaywall` returning the outcome; the onboarding placement never gets the fallback screen. */
+export async function openPaywallOutcome(
   router: ReturnType<typeof useRouter>,
   placement: string,
-  paywallOnDecline: boolean,
 ): Promise<PaywallOutcome> {
-  const { outcome, owned } = await presentPaywall(placement, () =>
-    presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
-  );
-  // Onboarding finishes whatever the outcome, which swaps the screens under
-  // a pushed fallback. The app's own Pro gates offer the paywall again.
+  const { outcome, owned } = await presentPaywall(placement);
   if (
     owned &&
     shouldOpenPaywallFallback(outcome) &&
@@ -816,34 +537,12 @@ export async function openPaywallKeepingExitOffer(
   return outcome;
 }
 
-// ---------------------------------------------------------------------------
-// Customer Center
-// ---------------------------------------------------------------------------
-
-/**
- * Present the RevenueCat Customer Center natively (sheet on iOS), where the
- * user can manage their subscription: change plan, request a refund (iOS),
- * restore purchases, cancel, or open a configured deeplink/URL. Like the
- * paywall, this is NOT presented until RC identity sync is ready: management
- * actions (restore, refund, plan change) must be attributed to the signed-in
- * Convex user so the webhook's `app_user_id` matches.
- *
- * Returns `true` if the Customer Center sheet was presented at all (regardless
- * of what the user did inside it); `false` if the RC UI SDK isn't linked or
- * identity sync didn't complete in time. Callers should hide the "manage"
- * affordance or fall back to a help link when this returns `false`.
- *
- * Requires `react-native-purchases-ui` >= 8.7.0 and Customer Center to be
- * configured in the RevenueCat dashboard (Project Settings → Customer Center).
- */
+/** True if the Customer Center (set up in the RevenueCat dashboard) was presented; false if the SDK lacks it or sync timed out. */
 export async function presentCustomerCenter(): Promise<boolean> {
   if (liveSheet()) return false;
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
   openSheet = sheet;
   try {
-    // Same identity-sync gate as presentPaywall: a restore or refund before
-    // login would be attributed to an anonymous RC user and not reflected in
-    // the subscriptions row keyed on the Convex user id.
     if (!(await awaitRcSyncReady())) return false;
 
     const rcui = getRCUI();
@@ -862,12 +561,8 @@ export async function presentCustomerCenter(): Promise<boolean> {
 
 type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
 
-/**
- * Restore App Store purchases for the signed-in RevenueCat identity. This is a
- * first-class Profile action so a returning subscriber does not have to infer
- * that Restore is hidden inside the paywall or Customer Center.
- */
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return "unavailable";
 
   const rc = getPurchases();
@@ -876,26 +571,14 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
     const customerInfo = await rc.restorePurchases();
     if (Object.keys(customerInfo.entitlements.active).length === 0)
       return "none";
-    // A Profile restore arms the same activation measurement a sheet restore
-    // does, but only while nothing is entitled: restoring an already-visible
-    // entitlement made nothing new visible, so it reports nothing.
     if (!hasActiveEntitlement()) recordAccess("restore");
+    landing();
     return "restored";
   } catch {
     return "unavailable";
   }
 }
 
-// ---------------------------------------------------------------------------
-// Trial cancellation detection (next-visit cancel survey)
-// ---------------------------------------------------------------------------
-
-/**
- * Read the signed-in user's trial-cancellation state from RevenueCat. Same
- * identity-sync gate as the other RC reads, so the answer is always for the
- * logged-in Convex user (a stale anonymous CustomerInfo can never trigger
- * the survey). Classification lives in `trial-cancellation.ts`.
- */
 export async function readRcTrialCancellation(): Promise<TrialCancellationState> {
   if (!(await awaitRcSyncReady())) return "unknown";
   const rc = getPurchases();
@@ -903,12 +586,7 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
   return await readFreshTrialCancellation(rc);
 }
 
-/**
- * Whether the signed-in account can still start the free trial on the current
- * offering, for copy that promises one. True only on RevenueCat's "eligible":
- * a pending identity sync, a failed read or an unknown answer all read as no,
- * so nobody who already used the trial is told they will get it.
- */
+/** True only when RevenueCat says "eligible"; a pending sync, failed read or unknown answer reads as false. */
 export async function readTrialEligible(): Promise<boolean> {
   if (!(await awaitRcSyncReady())) return false;
   try {
@@ -918,24 +596,7 @@ export async function readTrialEligible(): Promise<boolean> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Paywall guard
-// ---------------------------------------------------------------------------
-
-/**
- * Returns a guard that runs `action` only when the user is entitled, otherwise
- * presents the RevenueCat paywall (native sheet). If the RC UI SDK isn't linked
- * or the paywall is unavailable, falls back to routing to the paywall route.
- * A user cancellation returns to the current screen. Use this at every
- * Pro-gated affordance (Save, dynamic spaces,
- * Find links, Tidy, Map) so the paywall appears at a moment of felt need rather
- * than blocking the whole app. The server re-checks entitlement on every gated
- * mutation, so this client guard is advisory only.
- *
- * While entitlement is loading, the guard returns `false` without acting.
- * Callers should disable the affordance or show a loading state. The hook also
- * returns `loading` so callers can read it without a second `useEntitlement`.
- */
+/** Runs `action` only when entitled, else opens the paywall; resolves false whenever the action did not run. */
 export function usePaywallGuard(placement = "pro_gate"): {
   guard: (action?: () => void) => Promise<boolean>;
   loading: boolean;
@@ -946,14 +607,10 @@ export function usePaywallGuard(placement = "pro_gate"): {
     async (action?: () => void) => {
       if (loading) return false;
       if (entitled) {
-        // A pass at the same placement that a paywall recently blocked reports
-        // the resume: the funnel's last leg after purchase/restore.
         resumeBlockedAction(placement);
         action?.();
         return true;
       }
-      // Fallback to the paywall screen is handled by openPaywall (reached when
-      // the native SDK isn't linked, identity sync times out, or RC returns an error).
       await openPaywall(router, placement);
       return false;
     },

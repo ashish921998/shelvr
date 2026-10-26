@@ -1,15 +1,19 @@
-import { AiConsentCard } from "@/components/ai-consent";
-import { useAiConsent } from "@/lib/ai-consent";
 import { AppIntentsBridge } from "@/lib/app-intents";
-import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
-import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
+import { releaseSheetLink } from "@/lib/deferred-sheet-link";
+import { useForgetExitOffer } from "@/lib/forget-exit-offer";
+import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
-import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { useReplayOnboarding } from "@/lib/replay-onboarding";
+import {
+  useAwaitingOnboardingPurchase,
+  useReplayOnboarding,
+} from "@/lib/replay-onboarding";
+import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
@@ -17,75 +21,50 @@ import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
-import { Platform, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useEffect } from "react";
+import { Platform } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 
-/**
- * The AI consent gate. Every save path, and every hook that saves on its own
- * (onboarding replay, a resumed share, queued Siri captures), lives in
- * AppStack below, so holding AppStack back is what guarantees nothing is
- * saved before the answer.
- *
- * Past onboarding, AppStack is not mounted at all until the answer is known.
- * During onboarding it has to stay mounted, since unmounting would lose the
- * flow's place: the card covers it instead, and the one save that can run
- * there (`useDemoSave`) waits on the same answer.
- */
 export default function AppLayout() {
-  useAppLocale();
-  const { onboarded } = useOnboarding();
-  const consent = useAiConsent();
-  const { asking } = consent;
-
-  if (onboarded && consent.savesBlocked) {
-    return asking ? (
-      <AiConsentCard />
-    ) : (
-      <ScreenLoader label={t("loading.app")} />
-    );
-  }
-
-  return (
-    <>
-      <AppStack />
-      {asking ? (
-        <View style={styles.cover}>
-          <AiConsentCard />
-        </View>
-      ) : null}
-    </>
-  );
-}
-
-const styles = StyleSheet.create({
-  cover: { ...StyleSheet.absoluteFillObject },
-});
-
-function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
-  // Spatial slide transitions are the first thing to cut under Reduce Motion.
   const reducedMotion = useReducedMotion();
 
-  // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
+  const entitlement = useEntitlement();
+  const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
+  }, [isAuthenticated, isLoading]);
+  const planUnknown =
+    isAuthenticated && entitlement.loading && !awaitingPurchase;
+  const gated =
+    isAuthenticated &&
+    !entitlement.loading &&
+    !entitlement.entitled &&
+    !awaitingPurchase;
+
+  const planLoading = entitlement.loading;
+  const entitled = entitlement.entitled;
+  useEffect(() => {
+    const link = releaseSheetLink(planLoading);
+    if (!link || (link.sheet && !(onboarded && entitled))) return;
+    router.push(link.route as never);
+  }, [planLoading, entitled, onboarded, router]);
+
   useReplayOnboarding();
-  // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
-  useResumePendingShare();
-  // Remind trialers two days before the yearly plan starts charging.
+  useQueuedFirstSave();
+  useResumePendingShare(gated || planUnknown);
   useTrialReminder();
-  // Right after Pro starts, Home hands off to one real save.
   useWelcomeSaveTracker();
-  useExitOfferReminder();
+  useForgetExitOffer();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
   }
 
-  // Onboarding runs BEFORE sign-in. Only kick users to the sign-in screen
-  // once they've finished onboarding but haven't authenticated yet.
   if (!isAuthenticated && onboarded) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -94,7 +73,6 @@ function AppStack() {
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
       <AppIntentsBridge />
-      <ExitOfferSheetHost />
       <TrialReminderPrimerSheet />
       <Stack
         screenOptions={{
@@ -104,39 +82,15 @@ function AppStack() {
           headerTintColor: theme.colors.primary,
         }}
       >
-        <Stack.Protected guard={onboarded}>
+        <Stack.Protected
+          guard={onboarded && !gated}
+          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="share" options={{ headerShown: false }} />
           <Stack.Screen
             name="item/[id]"
             options={{
-              // Transparent native header over the full-bleed hero; the screen
-              // fills in the toolbar buttons (share/delete) once the item loads.
-              title: "",
-              headerBackButtonDisplayMode: "minimal",
-            }}
-          />
-          <Stack.Screen
-            name="digest/[id]"
-            options={{
-              title: t("notifications.weeklyShelf"),
-              headerBackButtonDisplayMode: "minimal",
-              headerBackVisible: true,
-              headerLeft: ({ canGoBack }) =>
-                canGoBack ? null : (
-                  <HeaderIconButton
-                    icon="house.fill"
-                    label={t("digest.backHome")}
-                    onPress={() => router.replace("/")}
-                  />
-                ),
-            }}
-          />
-          <Stack.Screen
-            name="space/[id]"
-            options={{
-              // iOS 26 native soft scroll edge: the feed fades out under the header.
-              scrollEdgeEffects: { top: "soft" },
               title: "",
               headerBackButtonDisplayMode: "minimal",
             }}
@@ -146,13 +100,30 @@ function AppStack() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
+            name="trip/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
+            name="city/[name]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+        </Stack.Protected>
+        {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
+        <Stack.Protected
+          guard={onboarded && !gated && !planUnknown}
+          redirectTo={
+            !onboarded
+              ? "/onboarding"
+              : gated
+                ? "/plan-gate"
+                : "/(app)/(tabs)/(home)"
+          }
+        >
+          <Stack.Screen
             name="add"
             options={
               Platform.OS === "android"
                 ? {
-                    // Android owns presentation inside add.tsx with Expo UI's native
-                    // Material 3 BottomSheet. Keep this route visually transparent so
-                    // the current tab remains behind the sheet and its scrim.
                     presentation: "transparentModal",
                     animation: "none",
                     headerShown: false,
@@ -165,34 +136,13 @@ function AppStack() {
                     headerTransparent: false,
                     headerStyle: { backgroundColor: theme.colors.background },
                     sheetGrabberVisible: true,
-                    // Sized to its content so the compact action menu and the
-                    // taller note/article composer both fit without a fixed
-                    // detent leaving the editor unreachable.
                     sheetAllowedDetents: "fitToContents",
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
             }
           />
-          <Stack.Screen
-            name="new-space"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-          <Stack.Screen
-            name="manage-spaces"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
+        </Stack.Protected>
+        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
           <Stack.Screen
             name="profile"
             options={{
@@ -207,29 +157,23 @@ function AppStack() {
             name="settings"
             options={{
               presentation: "formSheet",
-              // Android form sheets have no native header, so the screen
-              // draws its own title and close button, as Profile does.
               headerShown: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
-          <Stack.Screen
-            name="camera"
-            options={{
-              presentation: "fullScreenModal",
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
         </Stack.Protected>
-        <Stack.Protected guard={!onboarded}>
+        <Stack.Protected
+          guard={onboarded && gated}
+          redirectTo="/(app)/(tabs)/(home)"
+        >
+          <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
-        {/* Onboarding opens the paywall fallback before onboarding
-            completes. Keep it last: the first available screen is the initial
-            route, so it must be (tabs) or onboarding. */}
+        {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}
         <Stack.Screen
           name="paywall"
           options={{
@@ -241,6 +185,7 @@ function AppStack() {
           }}
         />
       </Stack>
+      {onboarded && planUnknown ? <PlanLoadingCover /> : null}
     </HomeFeedProvider>
   );
 }

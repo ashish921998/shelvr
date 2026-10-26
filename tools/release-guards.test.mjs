@@ -227,10 +227,6 @@ test("rejects missing, failed, pending, wrong-commit and fork CI", async () => {
 });
 
 test("does not deploy a commit main has already moved past", async () => {
-  // Re-running an old commit's CI succeeds whenever it succeeded the first
-  // time, so without this the rerun deploys that older tree over production.
-  // It is superseded rather than broken, so it must not fail the run either:
-  // a failure here would report a broken deploy when only the newer tip matters.
   const result = await checkCi([passingRun], {}, "newer-sha");
   assert.equal(result.deployable, "false");
   assert.deepEqual(result.failures, []);
@@ -260,8 +256,6 @@ async function checkTip(mainHead) {
 }
 
 test("refuses a deploy when main advances while it is queued", async () => {
-  // main can advance while this run waits in the deploy concurrency queue.
-  // Checking once, up front, is not enough.
   assert.deepEqual(await checkTip("selected-sha"), []);
   const failures = await checkTip("newer-sha");
   assert.equal(failures.length, 1);

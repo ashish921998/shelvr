@@ -27,7 +27,6 @@ vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice,
 }));
 
-// What the native module returns for a production install.
 vi.mock("expo-linking", () => ({
   createURL: () => "shelvr:///",
 }));

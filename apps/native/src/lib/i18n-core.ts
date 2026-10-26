@@ -1,4 +1,3 @@
-import { I18n } from "i18n-js";
 import type { MessageKey } from "@/locales/message-types";
 import { pluralRules } from "@convex/model/localization";
 import {
@@ -7,40 +6,65 @@ import {
   type SupportedLocale,
 } from "@/locales/catalogs";
 
-// Catalog files use stable namespace.message identifiers. Expand them into
-// i18n-js's normal namespace tree; English punctuation is only ever a value.
-const translations = Object.fromEntries(
-  Object.entries(catalogs).map(([locale, messages]) => {
-    const namespaces: Record<
-      string,
-      Record<string, string | Record<string, string>>
-    > = {};
-    for (const [key, message] of Object.entries(messages)) {
-      const [namespace, name] = key.split(".");
-      (namespaces[namespace] ??= {})[name] = message;
+type Message = string | Record<string, string>;
+
+// The locales a lookup tries in order: the exact one, its language, then
+// English (the same chain i18n-js used with enableFallback).
+function fallbackChain(locale: string): string[] {
+  const chain: string[] = [];
+  for (const entry of [locale, "en"]) {
+    const codes = entry.split("-");
+    for (const candidate of [
+      entry,
+      ...(codes.length === 3 ? [`${codes[0]}-${codes[1]}`] : []),
+      codes[0],
+    ]) {
+      if (!chain.includes(candidate)) chain.push(candidate);
     }
-    return [locale, namespaces];
-  }),
-);
-const i18n = new I18n(translations, {
-  defaultLocale: "en",
-  enableFallback: true,
-});
-for (const [locale, rule] of Object.entries(pluralRules)) {
-  i18n.pluralization.register(locale, (_i18n, count) => [rule(Number(count))]);
+  }
+  return chain;
+}
+
+function lookup(
+  locale: string,
+  key: MessageKey,
+): { message: Message; catalog: string } | undefined {
+  for (const catalog of fallbackChain(locale)) {
+    const message = isSupportedLocale(catalog)
+      ? (catalogs[catalog][key] as Message | undefined)
+      : undefined;
+    if (message !== undefined && message !== null) return { message, catalog };
+  }
+  return undefined;
+}
+
+const PLACEHOLDER = /(?:\{\{|%\{)(.*?)(?:\}\}?)/g;
+
+function interpolate(
+  message: string,
+  values: Record<string, string | number>,
+): string {
+  return message.replace(PLACEHOLDER, (placeholder, name: string) => {
+    const value = values[name] as string | number | undefined | null;
+    return value === undefined || value === null
+      ? `[missing "${placeholder}" value]`
+      : value.toString();
+  });
+}
+
+function missing(locale: string, scope: string): string {
+  return `[missing "${locale}.${scope}" translation]`;
 }
 
 export function canonicalizeTag(tag: string) {
   try {
     const canonical = Intl.getCanonicalLocales(tag.replaceAll("_", "-"))[0];
-    // Hermes supports canonicalization but does not guarantee Intl.Locale.
     return { canonical, baseName: canonical.split(/-[ux]-/i)[0] };
   } catch {
     return undefined;
   }
 }
 
-/** Follow ordered preferences, resolving only to catalogs included in this build. */
 export function resolveLocale(
   languageTags: readonly string[],
 ): SupportedLocale {
@@ -64,7 +88,6 @@ function formatNumber(locale: string, value: number): string {
   let formatter = numberFormatters.get(locale);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale);
-    // Device tags may include arbitrary region/numbering extensions.
     if (numberFormatters.size >= 32) numberFormatters.clear();
     numberFormatters.set(locale, formatter);
   }
@@ -88,10 +111,21 @@ export function translate(
     if (typeof values.count !== "number" || !Number.isFinite(values.count)) {
       throw new Error("Plural messages require a finite numeric count");
     }
-    // Selection must receive a number, even when interpolation uses regional
-    // grouping such as 1.234 or 12,34,567.
     formatted.formattedCount = formatNumber(numberLocale, values.count);
-    return i18n.t(key, { ...formatted, count: values.count, locale });
   }
-  return i18n.t(key, { ...formatted, locale });
+  const found = lookup(locale, key);
+  if (typeof found?.message === "string") {
+    return interpolate(found.message, { ...formatted, locale });
+  }
+  if (found === undefined || typeof values.count !== "number") {
+    return missing(locale, key);
+  }
+  // The rule of the catalog the message came from, so a regional fallback
+  // (fr-BE reading fr) picks French plural forms.
+  const rule = pluralRules[found.catalog] ?? pluralRules.en;
+  const variant = found.message[rule(values.count)] as string | undefined;
+  if (variant === undefined) {
+    return missing(locale, `${key}.${rule(values.count)}`);
+  }
+  return interpolate(variant, { ...formatted, count: values.count, locale });
 }

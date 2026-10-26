@@ -1,44 +1,18 @@
+import { signEs256Jwt } from "./appleSigning";
+
 const TOKEN_URL = "https://appleid.apple.com/auth/token";
 const REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 
-function base64Url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-function encodeJson(value: unknown): string {
-  return base64Url(new TextEncoder().encode(JSON.stringify(value)));
-}
-
-/** Apple's client secret: a short-lived ES256 JWT signed with the team's .p8
- * key. WebCrypto's ECDSA signature is already the raw r||s form a JWT wants. */
 export async function clientSecret(config: {
   clientId: string;
   privateKey: string;
   keyId: string;
   teamId: string;
 }): Promise<string> {
-  const der = Uint8Array.from(
-    atob(
-      config.privateKey
-        // An env var pasted on one line carries its newlines as "\n".
-        .replace(/\\n/g, "")
-        .replace(/-----[A-Z ]+-----/g, "")
-        .replace(/\s+/g, ""),
-    ),
-    (c) => c.charCodeAt(0),
-  );
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    der,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"],
-  );
   const issuedAt = Math.floor(Date.now() / 1000);
-  const signed = `${encodeJson({ alg: "ES256", kid: config.keyId })}.${encodeJson(
+  return await signEs256Jwt(
+    config.privateKey,
+    { kid: config.keyId },
     {
       iss: config.teamId,
       iat: issuedAt,
@@ -46,21 +20,9 @@ export async function clientSecret(config: {
       aud: "https://appleid.apple.com",
       sub: config.clientId,
     },
-  )}`;
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    key,
-    new TextEncoder().encode(signed),
   );
-  return `${signed}.${base64Url(new Uint8Array(signature))}`;
 }
 
-/**
- * Trades the native sheet's one-time authorization code for a refresh token,
- * the only thing Apple accepts when an account is deleted and its sign-in has
- * to be revoked. Returns null when Apple refuses or cannot be reached; the
- * caller treats that as "nothing to revoke later", never as a failed sign-in.
- */
 export async function exchangeAuthorizationCode(config: {
   code: string;
   clientId: string;
@@ -69,7 +31,6 @@ export async function exchangeAuthorizationCode(config: {
   teamId: string;
 }): Promise<{
   refreshToken: string | null;
-  /** Names the Apple account the code, and so the refresh token, belongs to. */
   identityToken: string | null;
   status?: number;
 }> {
@@ -99,13 +60,6 @@ export async function exchangeAuthorizationCode(config: {
   };
 }
 
-/**
- * Asks Apple to revoke a refresh token, signing the client secret with the
- * team key itself, like `exchangeAuthorizationCode`. A thrown error is a
- * signing failure (a malformed key); undefined means Apple could not be
- * reached. Runtime-neutral and bounded; callers decide whether a retained
- * row permits a scheduled retry.
- */
 export async function revokeRefreshToken(config: {
   refreshToken: string;
   clientId: string;

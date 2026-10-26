@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "@convex/_generated/api";
-import { finalRecipe } from "./ai";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   extractBodyText,
   fetchInstagram,
@@ -14,6 +14,7 @@ import {
   readPage,
   storePoster,
 } from "./model/pageRead";
+import { fetchImageAspectRatio } from "./model/pageReadCore";
 import { sanitizeRecipe } from "./model/recipeMarkup";
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
@@ -29,7 +30,11 @@ import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
 import type { ArticleMedia, PostMedia } from "./model/itemFields";
-import { newConvexTest, signedInUser } from "./test.setup";
+import {
+  newConvexTest,
+  signedInUser,
+  insertConsentingUser,
+} from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const parseJson = vi.hoisted(() => vi.fn());
@@ -74,6 +79,59 @@ describe("storePoster", () => {
     );
 
     expect(stored).toBeUndefined();
+  });
+
+  it("keeps a full-size PNG hero of a few megabytes as the cover", async () => {
+    const heroBytes = 3_787_207;
+    safeFetch.mockResolvedValue({
+      ok: true,
+      finalUrl: "https://media.example.com/images/1/image.jpg",
+      status: 200,
+      contentType: "image/png",
+      bytes: new Uint8Array([1, 2, 3]),
+    });
+    const store = vi.fn(async () => "kg2storedposter" as Id<"_storage">);
+
+    const stored = await storePoster(
+      { storage: { store } },
+      "https://media.example.com/images/1/image.jpg",
+    );
+
+    expect(stored).toBe("kg2storedposter");
+    expect(store).toHaveBeenCalledOnce();
+    expect(safeFetch.mock.calls[0][1].maxBytes).toBeGreaterThanOrEqual(
+      heroBytes,
+    );
+  });
+});
+
+describe("fetchImageAspectRatio", () => {
+  beforeEach(() => {
+    safeFetch.mockReset();
+  });
+
+  it("reads the size from the front of a picture sent whole", async () => {
+    const header = new Uint8Array(24);
+    header.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    header.set([0x49, 0x48, 0x44, 0x52], 12);
+    const view = new DataView(header.buffer);
+    view.setUint32(16, 1971);
+    view.setUint32(20, 1314);
+    safeFetch.mockResolvedValue({
+      ok: true,
+      finalUrl: "https://media.example.com/images/1/image.jpg",
+      status: 200,
+      contentType: "image/png",
+      bytes: header,
+      truncated: true,
+    });
+
+    const ratio = await fetchImageAspectRatio(
+      "https://media.example.com/images/1/image.jpg",
+    );
+
+    expect(ratio).toBeCloseTo(1971 / 1314);
+    expect(safeFetch.mock.calls[0][1].onOverflow).toBe("truncate");
   });
 });
 
@@ -139,6 +197,12 @@ describe("firstLinkedUrl", () => {
         "saved from https://in.pinterest.com/pin/1/ and https://pin.it/abc",
       ),
     ).toBe(undefined);
+    expect(
+      firstLinkedUrl(
+        "https://m.youtube.com/watch?v=1 https://vm.tiktok.com/a https://l.instagram.com/?u=x https://cook.example/dal",
+      ),
+    ).toBe("https://cook.example/dal");
+    expect(firstLinkedUrl("https://box.com/dal")).toBe("https://box.com/dal");
     expect(firstLinkedUrl("no links here")).toBeUndefined();
     expect(firstLinkedUrl(undefined)).toBeUndefined();
   });
@@ -147,31 +211,6 @@ describe("firstLinkedUrl", () => {
     expect(firstLinkedUrl('(see https://example.com/a?b=1&c=2) "x"')).toBe(
       "https://example.com/a?b=1&c=2",
     );
-  });
-});
-
-describe("finalRecipe", () => {
-  const markup = { ingredients: ["1 cup rice"], steps: ["Cook it."] };
-  const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
-
-  it("prefers the page's structured recipe over the model's proposal", () => {
-    expect(finalRecipe({ recipe: markup }, { recipe: proposed })).toBe(markup);
-  });
-
-  it("falls back to the sanitized model proposal when the page has none", () => {
-    expect(finalRecipe({}, { recipe: proposed })).toStrictEqual({
-      ingredients: ["2 eggs"],
-      steps: ["Fry."],
-    });
-    expect(finalRecipe(undefined, { recipe: proposed })).toStrictEqual({
-      ingredients: ["2 eggs"],
-      steps: ["Fry."],
-    });
-  });
-
-  it("is absent when neither source produced one", () => {
-    expect(finalRecipe({}, { recipe: null })).toBeUndefined();
-    expect(finalRecipe(undefined, {})).toBeUndefined();
   });
 });
 
@@ -244,8 +283,6 @@ describe("fetchXPost", () => {
       heroImageUrl:
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
-      // X cut the preview itself, so no length check can tell it from a
-      // complete short post.
       truncated: true,
     });
   });
@@ -553,8 +590,6 @@ describe("processItem for X posts", () => {
     );
   });
 
-  /** Answer as the provider does: the model can only fill fields the chosen
-   * schema declares, and zod strips the rest. */
   function offerRecipe() {
     generateObject.mockImplementation(
       async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
@@ -565,6 +600,7 @@ describe("processItem for X posts", () => {
           spaceNames: [],
           intents: [],
           cities: [],
+          places: [],
           recipe: {
             name: "Pancakes",
             servings: "4 servings",
@@ -577,8 +613,6 @@ describe("processItem for X posts", () => {
   }
 
   it("does not lift a recipe out of a long post X served cut short", async () => {
-    // `note_tweet` means the 280 characters on hand are a cut copy of the post,
-    // which no length check can tell from a post that is simply short.
     offerRecipe();
     serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
 
@@ -723,9 +757,6 @@ describe("linkEnrichment", () => {
     },
   );
   it("does not turn a skip link into the article body", () => {
-    // The symptom this guards: a bot-hostile page yields only its skip link,
-    // the classifier describes that, and the reader shows "Skip to main
-    // content" as both the description and the whole body.
     const content = extractBodyText(
       '<html><head><title>Ultimate chocolate cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><a href="#content">Skip to content</a><div id="main"></div></body></html>',
       "https://example.com/recipes/cake",
@@ -802,10 +833,6 @@ describe("linkEnrichment", () => {
     expect(content).not.toContain("Copyright");
     expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
   });
-  // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
-  // failed (retryable, classified from the URL alone), the page read but had
-  // no article body (terminal, e.g. an oEmbed-only TikTok read), a fully
-  // read article, and no page at all (images/notes never fetch).
   it("flags an unreadable page as partial so the client offers a retry", () => {
     expect(linkEnrichment({ status: "unreadable" })).toBe("partial");
   });
@@ -882,8 +909,6 @@ function html(body: string) {
 
 type EmbedFailure = { ok: false; code: string; status?: number };
 
-/** Route mocked fetches the way Instagram answers a link preview: the post page,
- * its captioned embed (or how its fetch failed), and the poster image. */
 function instagramAnswers(
   page: string,
   embed: string | EmbedFailure | "throws",
@@ -921,6 +946,14 @@ describe("parseInstagramEmbed", () => {
       brokenMedia: true,
     });
     expect(parseInstagramEmbed(REEL_EMBED).brokenMedia).toBeUndefined();
+  });
+
+  it("keeps escaped markup as text and leaves no tag behind", () => {
+    const embed =
+      '<div class="Caption">Salt &amp;lt;3 and <b>pepper</b> <script<div class="CaptionComments">';
+    expect(parseInstagramEmbed(embed).caption).toBe(
+      "Salt &lt;3 and pepper script",
+    );
   });
 
   it("returns nothing from a page without an embed", () => {
@@ -1007,7 +1040,6 @@ describe("fetchInstagram", () => {
       heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
       heroAspectRatio: 1,
       content: undefined,
-      // The card calls this /p/ link a reel.
       video: true,
     });
   });
@@ -1217,7 +1249,7 @@ describe("processItem for Instagram links", () => {
   });
 
   async function reel(t: ReturnType<typeof newConvexTest>) {
-    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const userId = await t.run((ctx) => insertConsentingUser(ctx));
     return await t.run((ctx) =>
       ctx.db.insert("items", {
         userId,
@@ -1343,8 +1375,6 @@ describe("sanitizeRecipe", () => {
   });
 
   it("keeps a long instruction whole rather than cutting it short", () => {
-    // The card replaces the article body, so a step cut mid-sentence loses its
-    // temperature or its timing with nothing left on screen to recover it.
     const step = `Braise until fork-tender, ${"about three hours, ".repeat(30)}then glaze.`;
     const recipe = sanitizeRecipe({
       ingredients: ["3 lb short ribs"],
@@ -1354,8 +1384,6 @@ describe("sanitizeRecipe", () => {
   });
 
   it("keeps a quantity that two components both call for", () => {
-    // `recipeIngredient` is one flat list, so a cake and its frosting each
-    // wanting a cup of sugar reads as a repeat. Dropping it changes the recipe.
     expect(
       sanitizeRecipe({
         ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
@@ -1368,8 +1396,6 @@ describe("sanitizeRecipe", () => {
   });
 
   it("refuses a recipe too long to store instead of trimming it", () => {
-    // Refusing leaves the article body in place, which is readable; a recipe
-    // missing its last ten steps is not, and looks complete.
     const steps = Array.from({ length: 40 }, () => "x".repeat(600));
     expect(sanitizeRecipe({ ingredients: ["Salt"], steps })).toBeUndefined();
     expect(
@@ -1387,7 +1413,6 @@ describe("sanitizeRecipe", () => {
       ingredients: ["Salt"],
       steps: ["Add salt."],
     });
-    // Strict: the keys must be absent, not present with an undefined value.
     expect(recipe).toStrictEqual({
       ingredients: ["Salt"],
       steps: ["Add salt."],
@@ -1428,9 +1453,6 @@ describe("processItem for a recipe page the fetch cap cut short", () => {
     "Carve and serve with the pan juices spooned over.",
   ];
 
-  /** Microdata rather than JSON-LD on purpose: a cut JSON-LD block is rejected
-   * by `JSON.parse`, so microdata is the shape that survives a cut and needs
-   * the guard. */
   function microdataHtml(): string {
     return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title></head><body>
 <div itemscope itemtype="https://schema.org/Recipe">
@@ -1491,9 +1513,6 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     return await t.run((ctx) => ctx.db.get(itemId));
   }
 
-  /** The document as the fetch cap would hand it over: everything before
-   * `marker`. What makes the read truncated is the flag `save` sets, so the cut
-   * only has to land at a known point in the markup. */
   function cutAt(html: string, marker: string): string {
     return html.slice(0, html.indexOf(marker));
   }
@@ -1505,12 +1524,8 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
   });
 
   it("refuses a recipe whose method the cap cut off after one step", async () => {
-    // The worst shape, because nothing about it looks wrong: a complete
-    // ingredient list and a method that simply stops. A reader would believe
-    // heating the oven is the whole recipe.
     const item = await save(cutAt(microdataHtml(), STEPS[1]), true);
     expect(item?.recipe).toBeUndefined();
-    // The article body still stands in for it, so the save is not wasted.
     expect(item?.status).toBe("ready");
   });
 
@@ -1518,6 +1533,60 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     const item = await save(cutAt(microdataHtml(), "the salt."), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
+  });
+
+  function jsonLdHtml(where: "head" | "body"): string {
+    const script = `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Miso butter roast chicken",
+      recipeIngredient: INGREDIENTS,
+      recipeInstructions: STEPS,
+    })}</script>`;
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title>${where === "head" ? script : ""}</head><body>${where === "body" ? script : ""}<p>${"Comments. ".repeat(50)}`;
+  }
+
+  it("keeps a JSON-LD recipe from a whole head when the page was cut", async () => {
+    const item = await save(jsonLdHtml("head"), true);
+    expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    expect(item?.recipe?.steps).toEqual(STEPS);
+  });
+
+  it("refuses a JSON-LD recipe in the body of a cut page", async () => {
+    const item = await save(jsonLdHtml("body"), true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  describe("when the model proposes a recipe too", () => {
+    const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
+
+    beforeEach(() => {
+      generateObject.mockResolvedValue({
+        object: {
+          title: "Miso butter chicken",
+          description: "A whole roast chicken with miso butter.",
+          tags: ["recipes"],
+          spaceNames: [],
+          intents: [],
+          recipe: proposed,
+        },
+      });
+    });
+
+    it("keeps the page's structured recipe over the proposal", async () => {
+      const item = await save(microdataHtml());
+      expect(item?.recipe?.ingredients).toEqual(INGREDIENTS);
+    });
+
+    it("stores the proposal, trimmed, when the page has no recipe", async () => {
+      const item = await save(
+        "<!DOCTYPE html><html><head><title>Notes</title></head><body><p>No recipe markup here.</p></body></html>",
+      );
+      expect(item?.recipe).toStrictEqual({
+        ingredients: ["2 eggs"],
+        steps: ["Fry."],
+      });
+    });
   });
 });
 
@@ -1537,8 +1606,6 @@ describe("readPage recipe eligibility", () => {
     decodeWithContentType.mockImplementation(actual.decodeWithContentType);
   });
 
-  /** A TikTok whose oEmbed caption is `caption`; `recipeHtml`, when given, is
-   * the page the caption links to. Every other fetch fails. */
   function serveTikTok(caption: string, recipeHtml?: string) {
     safeFetch.mockImplementation(async (url: string) => {
       if (url.startsWith("https://www.tiktok.com/oembed?")) {
@@ -1604,12 +1671,13 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
-  it("marks an Instagram reel short-form and asks for a recipe from its caption", async () => {
+  it("marks an Instagram reel short-form and allows its full caption recipe path", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({
       status: "ok",
       askForRecipe: true,
+      page: { caption: true },
       shortForm: { site: "Instagram", video: true },
     });
     expect(read.status === "ok" && read.page.content).toContain(
@@ -1618,7 +1686,6 @@ describe("readPage recipe eligibility", () => {
   });
 
   it("does not ask for a recipe when only the Instagram card was read", async () => {
-    // The card's og:description is a cut summary, not the caption.
     instagramAnswers(REEL_PAGE_WITH_DESCRIPTION, SHELL_PAGE);
     const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
     expect(read).toMatchObject({ status: "ok", askForRecipe: false });

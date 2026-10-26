@@ -1,14 +1,48 @@
 // @vitest-environment edge-runtime
-import { describe, expect, it } from "vitest";
-import { newConvexTest, signedInUser } from "./test.setup";
+import type { FunctionReference } from "convex/server";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
 import { api } from "./_generated/api";
 
-// Server-enforced "ask once per account": the row is the authority across
-// devices and reinstalls, so these tests drive the mutation/query contract
-// the client hook relies on: idempotent markShown, first-response-wins
-// respond, and strict per-user isolation. Fresh backend per test (the
-// repo convention) so rows never leak between cases.
+type Caller = Pick<TestBackend, "query" | "mutation">;
+
+const calls = {
+  getStatus: (t: Caller) => t.query(api.cancelSurvey.getStatus, {}),
+  markShown: (t: Caller) => t.mutation(api.cancelSurvey.markShown, {}),
+  respond: (t: Caller) =>
+    t.mutation(api.cancelSurvey.respond, { outcome: "dismissed" }),
+};
+
 describe("cancelSurvey", () => {
+  it("keeps the api reference installed apps compiled against", () => {
+    expectTypeOf(api.cancelSurvey.getStatus).toEqualTypeOf<
+      FunctionReference<
+        "query",
+        "public",
+        Record<never, never>,
+        { asked: boolean }
+      >
+    >();
+  });
+
+  it.each(Object.entries(calls))(
+    "%s refuses a signed-out caller",
+    async (_name, call) => {
+      const t = newConvexTest();
+      await expect(call(t)).rejects.toThrow("Not authenticated");
+    },
+  );
+
+  it.each(Object.entries(calls))(
+    "%s refuses an account marked deleting",
+    async (_name, call) => {
+      const t = newConvexTest();
+      const { t: user, userId } = await signedInUser(t);
+      await t.run(async (ctx) => ctx.db.patch(userId, { deleting: true }));
+      await expect(call(user)).rejects.toThrow("Not authenticated");
+    },
+  );
+
   it("reports unasked, then asked, after markShown", async () => {
     const t = newConvexTest();
     const { t: user } = await signedInUser(t);
@@ -48,7 +82,6 @@ describe("cancelSurvey", () => {
       outcome: "submitted",
       reason: "too_expensive",
     });
-    // A stale device (or reinstall) tries to answer again.
     await user.mutation(api.cancelSurvey.respond, { outcome: "dismissed" });
 
     const rows = await t.run(
@@ -90,7 +123,6 @@ describe("cancelSurvey", () => {
     expect(await stranger.query(api.cancelSurvey.getStatus, {})).toEqual({
       asked: false,
     });
-    // The stranger's response creates its own row, not a patch on the first.
     await stranger.mutation(api.cancelSurvey.respond, {
       outcome: "submitted",
       reason: "other",
@@ -102,8 +134,6 @@ describe("cancelSurvey", () => {
     expect(rows.length).toBe(2);
     const userRow = rows.find((row) => row.userId === userId);
     const strangerRow = rows.find((row) => row.userId === strangerId);
-    // The stranger's response created its own row; the first user's ask is
-    // untouched (no outcome yet).
     expect(userRow).toBeDefined();
     expect(userRow?.outcome).toBeUndefined();
     expect(strangerRow).toMatchObject({
@@ -120,8 +150,7 @@ describe("cancelSurvey", () => {
     await expect(
       user.mutation(api.cancelSurvey.respond, {
         outcome: "submitted",
-        // Deliberately invalid: the validator must reject it at runtime.
-        // @ts-expect-error: the point of the test is the runtime rejection
+        // @ts-expect-error
         reason: "because the app crashed when I opened it",
       }),
     ).rejects.toThrow();

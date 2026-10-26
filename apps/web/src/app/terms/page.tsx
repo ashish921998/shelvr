@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { pageMetadata } from "@/lib/siteMetadata";
 
-export const metadata: Metadata = {
-  title: "Terms of Service — Shelvr",
-  description: "The terms that govern your use of Shelvr.",
-};
+export const metadata: Metadata = pageMetadata(
+  "/terms",
+  "Terms of Service — Shelvr",
+  "The terms that govern your use of Shelvr.",
+);
 
 export default function TermsPage() {
   return (

@@ -1,7 +1,3 @@
-// Tests for the pure share processor. No React/Convex/storage imports are
-// exercised: save operations and persistence are fakes. Runs in the Node
-// default env. The orchestration correctness (per-entry isolation, retry-only-
-// failed, idempotent re-process) lives here.
 import { describe, expect, it, vi } from "vitest";
 
 import type { Id } from "@convex/_generated/dataModel";
@@ -15,7 +11,11 @@ import {
   type ResolvedPayload,
   type ShareSaveDeps,
 } from "./process-share";
-import { countPartial, countProgress } from "./session-view";
+import {
+  countPartial,
+  countProgress,
+  hasRetryableEntries,
+} from "./session-view";
 import {
   operationIdFor,
   type RawSharePayload,
@@ -23,12 +23,6 @@ import {
   type ShareSession,
 } from "./storage";
 
-// Stub the modules the processor imports via the `@/` alias so it loads under
-// Node without the Metro path map. The processor consumes `isProbablyUrl` at
-// runtime (classify) and the dataModel/use-save-image types at compile time
-// only. Mirrors how use-save-image.test.ts mocks its alias modules. isProbablyUrl
-// is re-exported from its real relative source so classification behavior is
-// exercised against the actual helper, not a hand-rolled stub.
 vi.mock("@/lib/url", async () => {
   const actual = await vi.importActual<{
     isProbablyUrl: (t: string) => boolean;
@@ -41,17 +35,13 @@ vi.mock("@/lib/url", async () => {
 });
 vi.mock("@convex/_generated/dataModel", () => ({}));
 
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
-
 function makeSession(entryCount: number, sessionId = "sess-1"): ShareSession {
   const entries: ShareEntry[] = Array.from(
     { length: entryCount },
     (_, index) => ({
       index,
       operationId: operationIdFor(sessionId, index),
-      kind: "link", // placeholder; classifyEntries overrides it
+      kind: "link",
       status: "pending" as const,
     }),
   );
@@ -102,10 +92,6 @@ const imagePayload = (uri: string | null): ResolvedPayload => ({
   contentUri: uri,
   contentMimeType: "image/jpeg",
 });
-
-// ---------------------------------------------------------------------------
-// classifyPayload
-// ---------------------------------------------------------------------------
 
 describe("classifyPayload", () => {
   it("classifies a valid website as a link", () => {
@@ -166,12 +152,14 @@ describe("classifyPayload", () => {
     expect(classifyPayload(urlPayload("   "))).toEqual({
       kind: "link",
       reason: "Shared link was not a valid URL",
+      final: true,
     });
   });
   it("fails a website value that is not a URL", () => {
     expect(classifyPayload(urlPayload("not a url"))).toEqual({
       kind: "link",
       reason: "Shared link was not a valid URL",
+      final: true,
     });
   });
   it("marks unsupported content types as unsupported, never a note", () => {
@@ -211,21 +199,18 @@ describe("classifyPayload", () => {
     expect(classifyPayload(textPayload("   "))).toEqual({
       kind: "note",
       reason: "Shared text was empty",
+      final: true,
     });
   });
 });
-
-// ---------------------------------------------------------------------------
-// classifyEntries
-// ---------------------------------------------------------------------------
 
 describe("classifyEntries", () => {
   it("stamps kinds and terminal statuses without side effects", () => {
     const session = makeSession(3);
     const resolved = [
-      textPayload("note"), // note
-      imagePayload("file://img.jpg"), // image
-      imagePayload(null), // failed image
+      textPayload("note"),
+      imagePayload("file://img.jpg"),
+      imagePayload(null),
     ];
     const entries = classifyEntries(session, resolved);
     expect(entries.map((e) => e.kind)).toEqual(["note", "image", "image"]);
@@ -253,10 +238,6 @@ describe("classifyEntries", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// processSession
-// ---------------------------------------------------------------------------
-
 describe("processSession", () => {
   it("saves all entries on full success and reports progress in order", () => {
     const session = makeSession(3);
@@ -280,7 +261,6 @@ describe("processSession", () => {
         "saved",
         "saved",
       ]);
-      // Progress fired once per entry.
       expect(settled).toHaveLength(3);
       expect(settled.map((e) => e.index)).toEqual([0, 1, 2]);
     });
@@ -314,7 +294,6 @@ describe("processSession", () => {
     const failed = result.entries[1];
     expect(failed.kind).toBe("link");
     expect(failed.message).toBe("link b down");
-    // The successful entries carry their item ids.
     expect(result.entries[0].itemId).toBeDefined();
     expect(result.entries[2].itemId).toBeDefined();
   });
@@ -345,8 +324,6 @@ describe("processSession", () => {
     ]);
     expect(saveLink).toHaveBeenCalledTimes(3);
 
-    // Second pass reuses the SAME session (same operation ids). The caller
-    // would persist first.entries before this; here we pass them straight back.
     saveLink.mockClear();
     const second = await processSession(first, resolved, deps);
     expect(second.entries.map((e) => e.status)).toEqual([
@@ -354,7 +331,6 @@ describe("processSession", () => {
       "failed",
       "saved",
     ]);
-    // Only the still-failed entry (index 1) was re-invoked.
     expect(saveLink).toHaveBeenCalledTimes(1);
     expect(saveLink.mock.calls[0][0].operationId).toBe(
       operationIdFor("sess-1", 1),
@@ -389,9 +365,6 @@ describe("processSession", () => {
   });
 
   it("saves the extracted URL (not the caption text) for caption-wrapped shares", async () => {
-    // TikTok-style shares arrive as text/plain with template text around the
-    // URL. The save must be a LINK keyed to the embedded URL, never a note
-    // holding the raw caption.
     const session = makeSession(1);
     const resolved = [
       textPayload(
@@ -416,8 +389,6 @@ describe("processSession", () => {
   });
 
   it("saves one item when a share carries the same URL as a link and as caption text", async () => {
-    // Instagram's share sheet attaches the reel URL twice: a URL attachment and
-    // a text attachment holding the same URL. Each becomes its own entry.
     const reel = "https://www.instagram.com/reel/DHVrPLrIyQ_/?igsh=abc123";
     const session = makeSession(2);
     const resolved = [urlPayload(reel), textPayload(reel)];
@@ -450,8 +421,6 @@ describe("processSession", () => {
   });
 
   it("saves one link item when a share pairs the link with caption text that has no URL", async () => {
-    // Instagram's web share sends the caption and the reel URL as separate
-    // attachments; the caption alone is not a note the user meant to save.
     const reel =
       "https://www.instagram.com/reel/DHVrPLrIyQ_/?utm_source=ig_web_button_native_share";
     const session = makeSession(2);
@@ -514,8 +483,6 @@ describe("processSession", () => {
   });
 
   it("never reuses a note an older build saved from a link's caption", async () => {
-    // A session persisted before the caption rule shipped: its URL-less text
-    // entry was saved as a note, and the link entry failed.
     const reel = "https://www.instagram.com/reel/DHVrPLrIyQ_/";
     const resolved = [textPayload("See this post"), urlPayload(reel)];
     const session = makeSession(2);
@@ -586,8 +553,6 @@ describe("processSession", () => {
   });
 
   it("deduplicates an idempotent re-process: a saved entry's operation is not re-invoked", async () => {
-    // The backend idempotency is the real guard, but the processor must ALSO not
-    // re-invoke save for already-saved entries (avoids needless network).
     const session = makeSession(2);
     const resolved = [
       urlPayload("https://a.example"),
@@ -599,7 +564,6 @@ describe("processSession", () => {
     );
     const deps = makeDeps({ saveLink });
 
-    // Pre-mark entry 0 as saved (e.g. a prior session processed it).
     const pre = {
       ...session,
       entries: classified.map((e) =>
@@ -610,14 +574,11 @@ describe("processSession", () => {
     };
     const result = await processSession(pre, resolved, deps);
     expect(result.entries[0].status).toBe("saved");
-    expect(result.entries[0].itemId).toBe("items:prior"); // unchanged
-    expect(saveLink).toHaveBeenCalledTimes(1); // only entry 1
+    expect(result.entries[0].itemId).toBe("items:prior");
+    expect(saveLink).toHaveBeenCalledTimes(1);
   });
 
   it("retries a failed entry and reports saved when the backend now returns the existing item", async () => {
-    // Models the "ambiguous response then idempotent retry": the first attempt
-    // failed at the network, the retry hits the completed operation and returns
-    // the same item id the original would have.
     let attempts = 0;
     const saveLink = vi.fn(async ({ operationId }) => {
       attempts += 1;
@@ -639,23 +600,23 @@ describe("processSession", () => {
     const second = await processSession(first, resolved, deps);
     expect(second.entries[0].status).toBe("saved");
     expect(second.entries[0].itemId).toBe("items:survived");
-    // Same operation id across both passes (stable retry key).
     expect(saveLink.mock.calls[0][0].operationId).toBe(
       saveLink.mock.calls[1][0].operationId,
     );
   });
 
   it("does not re-attempt a malformed link/note and never calls the backend", async () => {
-    // processOne must re-validate the payload and fail fast WITHOUT a save call,
-    // rather than sending an empty url/text to the backend (pointless round-trip
-    // that also overwrites the classifier's friendly message).
     const session = makeSession(2);
-    const resolved = [
-      urlPayload("   "), // blank website
-      textPayload("   "), // blank text
-    ];
+    const resolved = [urlPayload("   "), textPayload("   ")];
     const classified = classifyEntries(session, resolved);
-    expect(classified.map((e) => e.status)).toEqual(["failed", "failed"]);
+    // Settled, so the share screen offers no Retry that could only fail again.
+    expect(classified.map((e) => e.status)).toEqual([
+      "unsupported",
+      "unsupported",
+    ]);
+    expect(hasRetryableEntries({ ...session, entries: classified })).toBe(
+      false,
+    );
     const saveLink = vi.fn(async () => "should-not-be-called" as Id<"items">);
     const saveNote = vi.fn(async () => "should-not-be-called" as Id<"items">);
     const deps = makeDeps({ saveLink, saveNote });
@@ -665,24 +626,19 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    expect(result.entries.map((e) => e.status)).toEqual(["failed", "failed"]);
-    // No backend call was made for either malformed entry.
+    expect(result.entries.map((e) => e.status)).toEqual([
+      "unsupported",
+      "unsupported",
+    ]);
     expect(saveLink).not.toHaveBeenCalled();
     expect(saveNote).not.toHaveBeenCalled();
-    // The classifier's friendly messages are preserved, not overwritten by a
-    // backend "Invalid URL" / "Note text is empty" error.
     expect(result.entries[0].message).toBe("Shared link was not a valid URL");
     expect(result.entries[1].message).toBe("Shared text was empty");
   });
 
   it("saves an image correctly on resume even if its persisted kind placeholder is link", async () => {
-    // Regression for the crash window: an entry classified image in-memory but
-    // whose placeholder kind:'link' was persisted (the entry never settled
-    // before the crash). On resume, processOne must re-derive 'image' from the
-    // resolved payload and call saveImage, NOT saveLink.
     const session = makeSession(1);
     const resolved = [imagePayload("file://img.jpg")];
-    // Simulate the persisted state: kind='link' placeholder, status='pending'.
     const persistedPending: ShareEntry[] = [
       { ...session.entries[0], kind: "link", status: "pending" },
     ];
@@ -702,20 +658,13 @@ describe("processSession", () => {
     );
     expect(result.entries[0].status).toBe("saved");
     expect(result.entries[0].itemId).toBe("items:image-resume");
-    // Re-derived kind was image, so saveImage ran and saveLink did NOT.
     expect(saveImage).toHaveBeenCalledTimes(1);
     expect(saveLink).not.toHaveBeenCalled();
   });
 
   it("corrects a stale placeholder kind to the re-derived kind on resume", async () => {
-    // Regression: on a resume where classifyEntries does not run (a sibling was
-    // already settled so fresh=false), a pending entry may still carry its
-    // placeholder kind:'link'. processOne re-derives the real kind; processSession
-    // must merge that kind into the settled entry so the persisted record is
-    // corrected; otherwise a crash here would leave a permanently wrong kind.
     const session = makeSession(1);
     const resolved = [imagePayload("file://img.jpg")];
-    // Persisted state: placeholder kind:'link', still pending.
     const persistedPending: ShareEntry[] = [
       { ...session.entries[0], kind: "link", status: "pending" },
     ];
@@ -733,7 +682,6 @@ describe("processSession", () => {
       resolved,
       deps,
     );
-    // The settled kind is corrected to 'image', not left as the 'link' placeholder.
     expect(result.entries[0].kind).toBe("image");
     expect(result.entries[0].status).toBe("saved");
   });
@@ -784,10 +732,6 @@ describe("processSession", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// resolvedFromRawPayloads (native-resolution fallback)
-// ---------------------------------------------------------------------------
-
 describe("resolvedFromRawPayloads", () => {
   const raw = (
     value: string,
@@ -824,8 +768,6 @@ describe("resolvedFromRawPayloads", () => {
     expect(resolved[0].contentType).toBe("image");
     expect(resolved[0].contentUri).toBeNull();
 
-    // Round-trip through the processor: an unresolvable image is a terminal
-    // failed entry, never a backend call with a missing uri.
     const session = makeSession(1);
     const classified = classifyEntries(session, resolved);
     expect(classified[0].kind).toBe("image");

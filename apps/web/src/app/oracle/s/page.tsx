@@ -29,11 +29,12 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: "/oracle" },
-    // A shared verdict is for the people it was sent to, not for search.
     robots: { index: false, follow: false },
     openGraph: {
       title,
       description,
+      // The verdict's own address, so a preview that follows og:url keeps this verdict, not the generic /oracle card.
+      url: verdict ? `/oracle/s?c=${encodeURIComponent(code)}` : "/oracle",
       siteName: "Shelvr",
       type: "website",
       images: image ? [{ url: image, width: 1200, height: 630 }] : undefined,

@@ -3,16 +3,12 @@ import {
   notificationLocale,
 } from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
-import {
-  internalMutation,
-  mutation,
-  query,
-  type QueryCtx,
-} from "./_generated/server";
+import { internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
-import { requireUserId } from "./model/auth";
+import { tripStopItemIds } from "./tripData";
+import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   localHour,
   nextLocalHourAt,
@@ -24,6 +20,7 @@ import {
 import { takeWithinBytes } from "./model/readBudget";
 import {
   SHELF_HISTORY,
+  SHELF_SCAN_BYTES,
   SHELF_SCAN_ITEMS,
   SHELF_SIZE,
   archiveCheckOrder,
@@ -64,36 +61,18 @@ const preferencesValidator = v.object({
   remindersEnabled: v.boolean(),
 });
 
-/** Due users scheduled per transaction. A full page chains a follow-up run so a
- * backlog drains at scheduler speed instead of one page per hourly tick. */
 export const DUE_DIGEST_BATCH_SIZE = 50;
 const DUE_REMINDER_BATCH_SIZE = 50;
-/** The newest ready saves a reminder pass reads, bounded by count and bytes:
- * article bodies make item rows large, and the pass runs daily per user. */
 const REMINDER_SCAN_ROWS = 500;
 const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
-/**
- * Candidates of each kind checked against reminder history and read state per
- * pass. Every opened or already-reminded save spends one check, so the bound
- * is the number of such saves a reader can have inside the reminder window
- * before the unread ones behind them stop being reached.
- *
- * The worst case is one pass that finds nothing to send: two kinds, this many
- * checks each, two index point reads per check, so 400 serialized reads on
- * top of the item scan (up to `REMINDER_SCAN_ROWS` rows or
- * `REMINDER_SCAN_BYTES`). Each read returns at most one or two small rows, so
- * the pass stays well inside a Convex transaction's 16,384-document and 8 MiB
- * read limits, and a daily per-user pass at this size is still cheap.
- */
 const REMINDER_CHECKS_PER_KIND = 100;
-/** Failed attempts at one save before it is given up on. */
 const MAX_FAILED_REMINDERS = 2;
 
-export const getPreferences = query({
+export const getPreferences = authedQuery({
   args: {},
   returns: preferencesValidator,
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -104,13 +83,12 @@ export const getPreferences = query({
         ? (preferences.nextDigestAt ?? null)
         : null,
       timezone: preferences?.timezone ?? null,
-      // No row means no device was ever registered, so nothing can arrive.
       remindersEnabled: preferences !== null && remindersOn(preferences),
     };
   },
 });
 
-export const setPreferences = mutation({
+export const setPreferences = authedMutation({
   args: {
     weeklyShelfEnabled: v.boolean(),
     nextDigestAt: v.optional(v.number()),
@@ -118,7 +96,7 @@ export const setPreferences = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const existing = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -134,8 +112,6 @@ export const setPreferences = mutation({
         "nextDigestAt must be a valid timestamp within one week of now",
       );
     }
-    // A supplied zone is rejected if Intl does not know it; a stored zone that
-    // predates validation is repaired to UTC here instead of being written back.
     const timezone =
       parseTimezoneInput(args.timezone) ?? resolveTimezone(existing?.timezone);
     const previous = existing?.nextDigestAt;
@@ -145,8 +121,6 @@ export const setPreferences = mutation({
       previous <= now + DIGEST_WINDOW_MS
         ? previous
         : nextWeeklyDigestAt(now, timezone);
-    // A zone change rebooks the shelf and the reminder slot, as registerDevice
-    // and setSaveReminders do, so a traveller's reminders follow the shelf.
     const rebooked =
       existing === null
         ? undefined
@@ -156,8 +130,6 @@ export const setPreferences = mutation({
             now,
             remindersOn(existing) ? DEFAULT_REMINDER_HOUR : null,
           );
-    // The shelf slot is rebooked whether or not the shelf is on, so turning it
-    // on later lands in the right zone; a supplied slot still wins.
     const nextDigestAt = rebooked?.nextDigestAt ?? kept;
     const fields = {
       weeklyShelfEnabled: args.weeklyShelfEnabled,
@@ -179,23 +151,21 @@ export const setPreferences = mutation({
   },
 });
 
-export const registerDevice = mutation({
+export const registerDevice = authedMutation({
   args: {
     locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
-    // Accepted for compatibility with installed clients; scheduling belongs to setPreferences.
     nextDigestAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const token = args.token.trim();
     if (token.length === 0 || token.length > 4096) {
       throw new Error("Invalid notification token");
     }
-    // Validate before any write so a bad zone cannot leave a half-registered device.
     const timezone = parseTimezoneInput(args.timezone);
     const locale = notificationLocale(args.locale);
     const languageFields = locale === undefined ? {} : { locale };
@@ -215,9 +185,6 @@ export const registerDevice = mutation({
         lastSeenAt: now,
       });
     } else if (existingToken.userId === userId || !existingToken.enabled) {
-      // Re-bind is allowed only for the owner or for a released token. The
-      // client revokes every stored token before sign-out, so the account-switch
-      // flow on one device always arrives here with a disabled row.
       await ctx.db.patch(existingToken._id, {
         userId,
         platform: args.platform,
@@ -226,9 +193,6 @@ export const registerDevice = mutation({
         lastSeenAt: now,
       });
     } else {
-      // The server cannot prove a token belongs to the caller's device, so an
-      // enabled row owned by another account is never moved: that would let
-      // anyone who learns a token redirect and silence its owner's digests.
       throw new ConvexError({
         code: "notification_token_owned_by_another_account",
         message:
@@ -250,8 +214,6 @@ export const registerDevice = mutation({
         updatedAt: now,
       });
     } else {
-      // Every launch registers with the device's current zone, and a zone
-      // change rebooks the shelf and the reminder slot.
       const rebooked =
         timezone === undefined
           ? undefined
@@ -261,8 +223,6 @@ export const registerDevice = mutation({
               now,
               remindersOn(existingPreferences) ? DEFAULT_REMINDER_HOUR : null,
             );
-      // Also arms reminders for a user who had none scheduled: one whose row
-      // predates reminders, or whose last pass found no device to send to.
       const arm =
         rebooked === undefined &&
         remindersOn(existingPreferences) &&
@@ -287,11 +247,11 @@ export const registerDevice = mutation({
   },
 });
 
-export const setSaveReminders = mutation({
+export const setSaveReminders = authedMutation({
   args: { enabled: v.boolean(), timezone: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const existing = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -299,8 +259,6 @@ export const setSaveReminders = mutation({
     const now = Date.now();
     const timezone =
       parseTimezoneInput(args.timezone) ?? resolveTimezone(existing?.timezone);
-    // A zone change rebooks the weekly shelf and drops the booked reminder
-    // slot; the switch books its own fresh one below, so no hour is passed.
     const rebooked =
       existing === null
         ? undefined
@@ -335,11 +293,11 @@ export const setSaveReminders = mutation({
   },
 });
 
-export const unregisterDevice = mutation({
+export const unregisterDevice = authedMutation({
   args: { token: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const device = await ctx.db
       .query("notificationDevices")
       .withIndex("by_token", (q) => q.eq("token", args.token))
@@ -350,11 +308,11 @@ export const unregisterDevice = mutation({
   },
 });
 
-export const markItemOpened = mutation({
+export const markItemOpened = authedMutation({
   args: { itemId: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== userId) {
       return null;
@@ -380,11 +338,11 @@ export const markItemOpened = mutation({
   },
 });
 
-export const getDigest = query({
+export const getDigest = authedQuery({
   args: { id: v.optional(v.id("weeklyDigests")) },
   returns: v.union(digestResponseValidator, v.null()),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const digest =
       args.id !== undefined
         ? await ctx.db.get(args.id)
@@ -417,11 +375,11 @@ export const getDigest = query({
   },
 });
 
-export const markDigestOpened = mutation({
+export const markDigestOpened = authedMutation({
   args: { id: v.id("weeklyDigests") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx);
+    const { userId } = ctx;
     const digest = await ctx.db.get(args.id);
     if (
       digest !== null &&
@@ -436,20 +394,12 @@ export const markDigestOpened = mutation({
 
 export const prepareDueWeeklyDigests = internalMutation({
   args: {
-    // Set only by a chained run. The cron always starts a fresh sweep.
     now: v.optional(v.number()),
     cursor: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // `now` is fixed for the whole sweep so the due set is a snapshot: users who
-    // become due while the chain runs wait for the next tick, and the chain
-    // cannot loop over an ever-growing range.
     const now = args.now ?? Date.now();
-    // A pagination cursor, not a re-query, is what guarantees progress. Each
-    // due user is moved forward by a separate `prepareWeeklyDigest` transaction
-    // that may not have run yet, so re-reading `nextDigestAt <= now` from the
-    // start could return the same page and schedule duplicate digests.
     const due = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_enabled_and_next_digest_at", (q) =>
@@ -480,7 +430,6 @@ export const prepareDueWeeklyDigests = internalMutation({
   },
 });
 
-/** Whether `userId` has ever opened `itemId`. */
 async function wasOpened(
   ctx: QueryCtx,
   userId: string,
@@ -499,6 +448,7 @@ export const prepareWeeklyDigest = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    if ((await liveOwner(ctx, args.userId)) === null) return null;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -511,20 +461,36 @@ export const prepareWeeklyDigest = internalMutation({
       return null;
     }
 
-    const items = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .order("desc")
-      .take(SHELF_SCAN_ITEMS);
+    const { rows: items } = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user_and_status", (q) =>
+          q.eq("userId", args.userId).eq("status", "ready"),
+        )
+        .order("desc"),
+      { maxRows: SHELF_SCAN_ITEMS, maxBytes: SHELF_SCAN_BYTES },
+    );
     const recentDigests = await ctx.db
       .query("weeklyDigests")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(SHELF_HISTORY);
+    // A shelf that never reached a device has not shown its saves to anyone.
     const previouslyIncluded = new Set<string>(
-      recentDigests.flatMap((digest) => digest.itemIds),
+      recentDigests
+        .filter(
+          (digest) =>
+            digest.deliveryStatus !== "failed" ||
+            digest.deliverySentAt !== undefined,
+        )
+        .flatMap((digest) => digest.itemIds),
     );
-    const candidates = shelfCandidates(items, previouslyIncluded, args.now);
+    const planned = await tripStopItemIds(ctx, args.userId);
+    const candidates = shelfCandidates(
+      items,
+      new Set([...previouslyIncluded, ...planned]),
+      args.now,
+    );
 
     const recentOpened = await Promise.all(
       candidates.recent.map((item) => wasOpened(ctx, args.userId, item._id)),
@@ -533,7 +499,6 @@ export const prepareWeeklyDigest = internalMutation({
       candidates.recent.filter((_, index) => !recentOpened[index]),
     );
 
-    // Older saves are checked one at a time, and only until enough are found.
     const archive: Doc<"items">[] = [];
     const wanted = archiveLimit(recent.length);
     for (const item of archiveCheckOrder(
@@ -583,19 +548,15 @@ export const prepareWeeklyDigest = internalMutation({
 
 export const prepareDueSaveReminders = internalMutation({
   args: {
-    // Set only by a chained run. The cron always starts a fresh sweep.
     now: v.optional(v.number()),
     cursor: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     if (!saveRemindersLive()) return null;
-    // A fixed `now` and a cursor, for the same reasons as the digest sweep.
     const now = args.now ?? Date.now();
     const due = await ctx.db
       .query("notificationPreferences")
-      // `gte(0)` skips rows with no reminder scheduled: `undefined` sorts
-      // before every number.
       .withIndex("by_next_reminder_at", (q) =>
         q.gte("nextReminderAt", 0).lte("nextReminderAt", now),
       )
@@ -621,15 +582,7 @@ export const prepareDueSaveReminders = internalMutation({
   },
 });
 
-/**
- * One-off, after the deploy that adds save reminders: schedules a first
- * reminder pass for every user with a preferences row and none scheduled.
- * Without it a user is only armed by their next `registerDevice`, which
- * leaves out exactly the people who stopped opening the app. Anyone with no
- * device is parked again by their first pass, so running it twice is
- * harmless. Pages itself:
- * `npx convex run notifications:armSaveReminders`.
- */
+// One-off backfill: npx convex run notifications:armSaveReminders
 export const armSaveReminders = internalMutation({
   args: { cursor: v.optional(v.string()) },
   returns: v.null(),
@@ -661,16 +614,11 @@ export const armSaveReminders = internalMutation({
   },
 });
 
-/**
- * The daily reminder pass for one user. It always moves the next pass to
- * tomorrow at the hour this user tends to save things, then sends at most one
- * reminder if the budget allows and a save qualifies. See
- * `model/saveReminders.ts` for the rules.
- */
 export const prepareSaveReminder = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
   handler: async (ctx, { userId, now }) => {
+    if ((await liveOwner(ctx, userId)) === null) return null;
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -691,8 +639,6 @@ export const prepareSaveReminder = internalMutation({
       )
       .first();
     if (!remindersOn(preferences) || device === null) {
-      // Parked rather than advanced, so a user nobody can reach costs nothing
-      // each day. `setSaveReminders` or the next `registerDevice` re-arms it.
       await ctx.db.patch(preferences._id, {
         nextReminderAt: undefined,
         updatedAt: now,
@@ -720,7 +666,6 @@ export const prepareSaveReminder = internalMutation({
     });
     if (late) return null;
 
-    // The budget counts what reached, or is still trying to reach, a device.
     const reminders = (
       await ctx.db
         .query("saveReminders")
@@ -767,11 +712,9 @@ export const prepareSaveReminder = internalMutation({
       items,
       now,
       reminders[0]?.kind,
+      await tripStopItemIds(ctx, userId),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
-      // A failed reminder never reached the user (paused, expired, no
-      // device), so it does not use up the save. Two failures do, so one
-      // save that cannot be delivered never blocks every save behind it.
       const earlier = await ctx.db
         .query("saveReminders")
         .withIndex("by_user_and_item", (q) =>

@@ -11,7 +11,6 @@ import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-/** Ids of the accounts the current test signed in; set by `signInA` / `signInB`. */
 let userA = "";
 let userB = "";
 
@@ -154,7 +153,6 @@ describe("weekly shelf notifications", () => {
     expect(
       await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
     ).toEqual(before);
-    // The rejected caller gets no preference row either: nothing was written.
     expect(
       await t.run((ctx) => ctx.db.query("notificationPreferences").collect()),
     ).toHaveLength(1);
@@ -189,7 +187,6 @@ describe("weekly shelf notifications", () => {
       token: "token-a",
       platform: "ios",
     });
-    // The client revokes every stored token before it ends the auth session.
     await first.mutation(api.notifications.unregisterDevice, {
       token: "token-a",
     });
@@ -202,7 +199,6 @@ describe("weekly shelf notifications", () => {
     );
     expect(devices).toHaveLength(1);
     expect(devices[0]).toMatchObject({ userId: userB, enabled: true });
-    // Switching back works the same way.
     await second.mutation(api.notifications.unregisterDevice, {
       token: "token-a",
     });
@@ -273,7 +269,6 @@ describe("weekly shelf notifications", () => {
     );
     expect(rescheduled?.nextDigestAt).toBeGreaterThan(now);
     expect(rescheduled?.nextDigestAt).toBe(nextWeeklyDigestAt(now, "UTC"));
-    // The next preference save replaces the bad zone rather than writing it back.
     await t.mutation(api.notifications.setPreferences, {
       weeklyShelfEnabled: true,
     });
@@ -291,7 +286,7 @@ describe("weekly shelf notifications", () => {
       await t.run(async (ctx) => {
         for (let i = 0; i < total; i++) {
           await ctx.db.insert("notificationPreferences", {
-            userId: `due-${i}`,
+            userId: await ctx.db.insert("users", {}),
             weeklyShelfEnabled: true,
             nextDigestAt: now - 1000,
             updatedAt: now,
@@ -307,7 +302,6 @@ describe("weekly shelf notifications", () => {
       expect(
         names.filter((name) => name.endsWith("prepareWeeklyDigest")),
       ).toHaveLength(DUE_DIGEST_BATCH_SIZE);
-      // The first batch was full, so the mutation re-scheduled itself with a cursor.
       const chained = scheduled.filter((job) =>
         job.name.endsWith("prepareDueWeeklyDigests"),
       );
@@ -458,58 +452,6 @@ describe("weekly shelf notifications", () => {
     }
   });
 
-  it("excludes opened candidates even after more than 1000 historical reads", async () => {
-    const t = await signInA();
-    const now = Date.now();
-    await t.run(async (ctx) => {
-      for (let i = 0; i < 1003; i++) {
-        const itemId = await ctx.db.insert("items", {
-          userId: userA,
-          type: "note",
-          status: "ready",
-          title: `Opened save ${i}`,
-          tags: [],
-          searchText: "opened save",
-        });
-        await ctx.db.insert("itemReads", {
-          userId: userA,
-          itemId,
-          firstOpenedAt: now,
-          lastOpenedAt: now,
-        });
-      }
-    });
-    await t.mutation(api.notifications.setPreferences, {
-      weeklyShelfEnabled: true,
-      nextDigestAt: now - 1,
-    });
-    await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: userA,
-      now,
-    });
-    expect(await t.query(api.notifications.getDigest, {})).toBeNull();
-
-    const unopenedIds = await Promise.all([
-      seedItem(t, userA, "note"),
-      seedItem(t, userA, "note"),
-      seedItem(t, userA, "note"),
-    ]);
-    await t.mutation(api.notifications.setPreferences, {
-      weeklyShelfEnabled: true,
-      nextDigestAt: now - 1,
-    });
-
-    await t.mutation(internal.notifications.prepareWeeklyDigest, {
-      userId: userA,
-      now,
-    });
-
-    const digest = await t.query(api.notifications.getDigest, {});
-    expect(digest?.items.map((item) => item._id).sort()).toEqual(
-      unopenedIds.sort(),
-    );
-  }, 20_000); // seeding 1003 reads can exceed the 5s default under coverage
-
   it("starts disabled until the user opts in", async () => {
     const t = await signInA();
 
@@ -576,7 +518,6 @@ describe("weekly shelf archive saves", () => {
   const DAY = 24 * 60 * 60 * 1000;
   const START = Date.UTC(2026, 0, 4, 12);
 
-  /** The account predates every back-dated save: creation times never run backwards. */
   async function user() {
     vi.setSystemTime(START - DAY);
     return await signInA();
@@ -643,7 +584,6 @@ describe("weekly shelf archive saves", () => {
 
       expect(ids).toHaveLength(3);
       expect(ids).toContain(old);
-      // This week's saves lead, so the push names one of them.
       expect(ids[2]).toBe(old);
       expect(recent).toEqual(expect.arrayContaining(ids.slice(0, 2)));
     } finally {
@@ -663,8 +603,60 @@ describe("weekly shelf archive saves", () => {
       const second = await prepare(t, START + 67 * DAY);
 
       expect(first?.items).toHaveLength(3);
-      // Only one unseen save is left, which is not enough for a shelf.
       expect(second?._id).toBe(first?._id);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers the saves of a shelf that never reached a device again", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      for (let i = 0; i < 3; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+
+      const first = await prepare(t, START + 60 * DAY);
+      const firstId = first?._id;
+      if (firstId === undefined) throw new Error("expected a first shelf");
+      await t.run((ctx) =>
+        ctx.db.patch(firstId, {
+          deliveryStatus: "failed",
+          deliveryError: "no_devices",
+        }),
+      );
+      const second = await prepare(t, START + 67 * DAY);
+
+      expect(second?._id).not.toBe(firstId);
+      expect(second?.items.map((item) => item._id).sort()).toEqual(
+        first?.items.map((item) => item._id).sort(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a failed shelf's saves off later shelves once it reached a device", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = await user();
+      for (let i = 0; i < 4; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+
+      const first = await prepare(t, START + 60 * DAY);
+      const firstId = first?._id;
+      if (firstId === undefined) throw new Error("expected a first shelf");
+      await t.run((ctx) =>
+        ctx.db.patch(firstId, {
+          deliveryStatus: "failed",
+          deliverySentAt: START + 60 * DAY,
+        }),
+      );
+      const second = await prepare(t, START + 67 * DAY);
+
+      expect(second?._id).toBe(firstId);
     } finally {
       vi.useRealTimers();
     }
@@ -731,10 +723,9 @@ describe("weekly shelf selection", () => {
       vi.setSystemTime(NOW - (count - i) * 60_000);
       ids.push(await seedItem(t, userA, types[i % types.length]));
     }
-    return ids.reverse(); // newest first, as the shelf orders them
+    return ids.reverse();
   }
 
-  /** The older saves in the order this week's preparation checks them. */
   async function checkOrder(t: TestCtx) {
     const items = await t.run((ctx) =>
       ctx.db
@@ -760,10 +751,6 @@ describe("weekly shelf selection", () => {
     });
   }
 
-  /**
-   * Two read rows for one save make its read check throw (`.unique()`), so a
-   * preparation that succeeds proves the save was never checked.
-   */
   async function poison(t: TestCtx, itemIds: Id<"items">[]) {
     await markOpened(t, itemIds);
     await markOpened(t, itemIds);
@@ -795,6 +782,50 @@ describe("weekly shelf selection", () => {
       recent[0],
       recent[1],
       order[0],
+    ]);
+  });
+
+  it("leaves a save planned on a trip day off the shelf, but not one that didn't fit or left the space", async () => {
+    const t = await user();
+    const recent = await seedRecent(t, 4);
+    await t.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", {
+        userId: userA,
+        name: "Lisbon",
+      });
+      for (const [itemId, status] of [
+        [recent[0], "saved"],
+        [recent[1], "dismissed"],
+      ] as const)
+        await ctx.db.insert("spaceItems", {
+          userId: userA,
+          spaceId,
+          itemId,
+          status,
+        });
+      const stop = { name: "Café", why: "saved", slot: "morning" as const };
+      await ctx.db.insert("trips", {
+        userId: userA,
+        spaceId,
+        pace: "easy",
+        days: [
+          {
+            areas: [],
+            stops: [
+              { ...stop, itemId: recent[0] },
+              { ...stop, itemId: recent[1] },
+            ],
+            gaps: [],
+          },
+        ],
+        wishlist: [{ ...stop, itemId: recent[3] }],
+      });
+    });
+
+    expect(shelfIds(await prepare(t))).toEqual([
+      recent[1],
+      recent[2],
+      recent[3],
     ]);
   });
 
@@ -902,7 +933,6 @@ describe("weekly shelf selection", () => {
     expect(unchecked).toHaveLength(3);
     await poison(t, unchecked);
 
-    // The three unopened saves sit past the fiftieth check, so none is found.
     expect(await prepare(t)).toBeNull();
   }, 20_000);
 

@@ -5,21 +5,11 @@ import {
 import { t } from "@/lib/i18n";
 import { Alert, Linking, Platform } from "react-native";
 
-/**
- * Opens subscription management for a current subscriber: RevenueCat's
- * Customer Center (cancel, refund, change plan, restore).
- *
- * RevenueCat UI presents from the root view controller, and UIKit refuses to
- * present while a form sheet is up ("already presenting RNSScreen"). So the
- * caller's `dismissSheets` closes every sheet first and this waits for them to
- * settle. When Customer Center is not linked or configured, or identity sync
- * timed out, it falls back to the platform's own subscription page rather
- * than leaving the tap with no visible effect.
- */
+// UIKit refuses to present while a form sheet is up ("already presenting RNSScreen").
 export async function manageSubscription(
-  dismissSheets: () => void,
+  dismissSheets: () => void | Promise<void>,
 ): Promise<void> {
-  dismissSheets();
+  await dismissSheets();
   await waitForSheetTransition();
   if (await presentCustomerCenter()) return;
   Alert.alert(t("pro.manage"), t("pro.manageHelp"), [

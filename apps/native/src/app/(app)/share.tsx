@@ -37,6 +37,7 @@ import {
 } from "@/lib/share/pending-share-store";
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
+import { bestEffort } from "@/lib/best-effort";
 import { saveFailureStage } from "@convex/model/saveErrors";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
@@ -66,15 +67,6 @@ import {
 } from "@/lib/motion";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
-/**
- * Landing screen for content shared into Shelvr from another app (Safari, Photos,
- * etc.). Resolves the incoming payload and saves each piece through the same
- * idempotent operation ledger the in-app flows use. Every decision (phases,
- * session guards, completion ordering, the tombstone, the ghost-replay skip,
- * the Pro gate) belongs to the owner in lib/share/incoming-share.ts; this screen
- * feeds it events, renders the phase it returns, and runs its effects.
- */
-
 const PHASE_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ translateY: 6 }] },
   100: {
@@ -93,11 +85,6 @@ const PHASE_EXIT = new Keyframe({
   },
 }).duration(motion.duration.exit);
 
-/** Wraps one share save entry with the first-save funnel's client legs: the
- * attempt event fires when the entry is submitted, and a rejection fires its
- * bounded `save_failed` stage before the error re-reaches the session state
- * machine unchanged. A share entry otherwise has no batch reporter the
- * in-app paths use. */
 function withSaveTelemetry<T>(
   saveKind: "link" | "note",
   operationId: string,
@@ -126,8 +113,6 @@ export default function ShareScreen() {
   const { data: user } = useCurrentUser();
   const entitlement = useEntitlement();
   const { entitled } = entitlement;
-  // A purchase made in onboarding reaches Convex by webhook a moment later.
-  // Until it does, a held share waits instead of asking for Pro again.
   const awaitingPurchase = useAwaitingOnboardingPurchase(entitled);
   const entitlementLoading = entitlement.loading || awaitingPurchase;
   const {
@@ -141,16 +126,10 @@ export default function ShareScreen() {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
 
-  // The owner's state. Read and written synchronously on every dispatch, so
-  // two presses landing before a re-render both see the first one's guards.
   const owner = useRef(initialIncomingShare(Platform.OS === "android"));
   const [phase, setPhase] = useState<SharePhase>(owner.current.phase);
   const [resolutionStarted, setResolutionStarted] = useState(false);
 
-  /** The injected save operations, built once. Both the initial run and a
-   * "Retry failed" press share this so the deps object is never rebuilt. Each
-   * link and note entry carries its own save-funnel telemetry (see
-   * `withSaveTelemetry`); image entries get theirs from `useSaveImages`. */
   const saveDeps = useMemo<ShareSaveDeps>(
     () => ({
       saveLink: ({ url, operationId }) =>
@@ -179,9 +158,6 @@ export default function ShareScreen() {
     [createLinkItem, createNoteItem, saveImages],
   );
 
-  /** The raw payload batch, narrowed to the identity-bearing fields the session
-   * store and the processor's fallback read. Memoized because both the
-   * processor payloads and the reconcile effect run against the same list. */
   const rawPayloads = useMemo<RawSharePayload[]>(
     () =>
       (shareBatchAllowed(sharedPayloads) ? sharedPayloads : []).map((p) => ({
@@ -192,8 +168,6 @@ export default function ShareScreen() {
     [sharedPayloads],
   );
 
-  /** The payload list the processor runs against (see selectProcessorPayloads
-   * for the resolution-failure fallback). */
   const processorPayloads = useMemo<ResolvedPayload[]>(
     () =>
       selectProcessorPayloads({
@@ -204,9 +178,6 @@ export default function ShareScreen() {
     [error, rawPayloads, resolvedSharedPayloads],
   );
 
-  /** Steps the owner and runs the effects it returns, in order. A save that
-   * settles later reports through the dispatch it started with, so the owner
-   * sees the world as it was when it asked for the save. */
   const dispatch = useCallback(
     function dispatch(event: ShareEvent): void {
       const next = stepIncomingShare(owner.current, event, {
@@ -235,30 +206,16 @@ export default function ShareScreen() {
     ],
   );
 
-  // Reconcile + drive the save. The resolution-driven phases (resolving /
-  // empty) are derived in render below; this effect only runs once resolution
-  // has settled AND there are payloads to save. A resolution failure does not
-  // block the save: processorPayloads falls back to the raw payloads. The
-  // deferred-share flag is cleared on completion or discard, NOT here, so a
-  // process death mid-share still resumes on next launch.
   useEffect(() => {
-    // useIncomingShare hands over the raw batch on the first render and only
-    // starts resolving it in its own mount effect, so on this first pass
-    // isResolving is still false and nothing is resolved yet. A save started
-    // now marks a shared image failed for want of its resolved URI. Skip the
-    // pass: the re-render this causes carries the hook's isResolving.
     if (!resolutionStarted) {
       setResolutionStarted(true);
       return;
     }
-    // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
     if (isResolving || sharedPayloads.length === 0) return;
     const result = reconcileSession(shareStore, user._id, rawPayloads, () =>
       Crypto.randomUUID(),
     );
-    // Deferred out of the synchronous effect body so the phase the owner
-    // returns is not set during the effect (a cascading render).
     void Promise.resolve().then(() => dispatch({ type: "reconciled", result }));
   }, [
     resolutionStarted,
@@ -269,19 +226,9 @@ export default function ShareScreen() {
     dispatch,
   ]);
 
-  // --- Derived resolution state (pure functions of hook props) --------------
-
-  // Resolution failures no longer kill the share: the processor falls back to
-  // the raw payloads (see processorPayloads) and entries the fallback cannot
-  // resolve surface as failed entries on the partial screen.
   const nothingResolved =
     !isResolving && rawPayloads.length === 0 && phase.kind === "idle";
 
-  // --- Phase render ---------------------------------------------------------
-
-  // Entitlement is still loading: don't fall through to the idle/complete
-  // render. The effect also blocks on entitlementLoading, so no save starts
-  // until it resolves.
   if (entitlementLoading && phase.kind === "idle") {
     return (
       <Centered
@@ -293,9 +240,6 @@ export default function ShareScreen() {
     );
   }
 
-  // Pro gate: an unentitled user sharing into Shelvr reached the paywall and
-  // (on cancel) landed here. Do NOT fall through to the terminal "Saved to
-  // Shelvr" spinner: the save never happened. Offer Unlock Pro or Cancel.
   if (phase.kind === "locked") {
     return (
       <PhaseSurface key="locked" phaseKey="locked">
@@ -318,9 +262,6 @@ export default function ShareScreen() {
     );
   }
 
-  // Derived resolution states take precedence over the session-driven phases
-  // stored in `phase`: they are pure functions of the hook props and avoid the
-  // synchronous-in-effect setState that storing them would require.
   if (isResolving && phase.kind === "idle") {
     return (
       <Centered
@@ -359,12 +300,7 @@ export default function ShareScreen() {
       phase.session,
       processorPayloads,
     );
-    // Show Retry only when there is at least one failed/pending entry left to
-    // attempt. Unsupported entries have nothing to retry.
     const hasRetryable = hasRetryableEntries(phase.session);
-    // failed counts only failed/unsupported terminal entries; the orchestration-
-    // error catch path can land here with still-pending entries (failed===0), so
-    // word the subtitle from the count rather than assuming at least one failed.
     const failedWording =
       failed === 0
         ? t("share.pending")
@@ -417,9 +353,6 @@ export default function ShareScreen() {
     );
   }
   if (phase.kind === "clearFailed") {
-    // Native clear threw: the completed session is retained so a remount (or the
-    // Try again press) re-attempts it. This is the escape hatch so a persistently
-    // throwing clear never traps the user on an eternal "Saving…" spinner.
     return (
       <ErrorActions
         phaseKey="clear-failed"
@@ -432,7 +365,6 @@ export default function ShareScreen() {
       />
     );
   }
-  // complete: brief spinner before navigation lands.
   return (
     <Centered
       phaseKey="complete"
@@ -443,19 +375,12 @@ export default function ShareScreen() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 type EffectDeps = {
   clearSharedPayloads: () => void;
   router: ReturnType<typeof useRouter>;
   saveDeps: ShareSaveDeps;
 };
 
-/** Runs one owner effect. Best-effort effects report and carry on: the share
- * is already durable, or the screen is leaving, so a SecureStore failure must
- * not trap the user here. */
 function runEffect(
   effect: ShareEffect,
   dispatch: (event: ShareEvent) => void,
@@ -529,13 +454,11 @@ function runEffect(
       void openPaywall(deps.router, "share");
       return;
     case "navigateHome":
-      deps.router.replace("/");
+      deps.router.replace("/(app)/(tabs)/(home)");
       return;
   }
 }
 
-/** Persists the classified entries, runs the processor, and reports each
- * settled entry and the outcome back to the owner. */
 async function save(
   effect: Extract<ShareEffect, { type: "save" }>,
   dispatch: (event: ShareEvent) => void,
@@ -561,9 +484,6 @@ async function save(
   }
 }
 
-/** Writes a single settled entry to the store, scoped to `sessionId`. The scope
- * makes the persist a no-op if a newer share has replaced this session's record
- * mid-flight, preventing cross-session corruption. Safe to call for any status. */
 function persistEntry(entry: ShareEntry, sessionId: string): void {
   const patch: Partial<ShareEntry> = {
     status: entry.status,
@@ -573,18 +493,6 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
   if (entry.message !== undefined) patch.message = entry.message;
   updateEntry(shareStore, entry.index, patch, sessionId);
 }
-
-function bestEffort(code: string, run: () => void): void {
-  try {
-    run();
-  } catch (err) {
-    analytics.captureError(code, err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Presentational pieces (existing theme typography/buttons, no design system)
-// ---------------------------------------------------------------------------
 
 type Theme = ReturnType<typeof useUnistyles>["theme"];
 

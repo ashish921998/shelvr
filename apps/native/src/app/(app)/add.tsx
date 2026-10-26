@@ -5,84 +5,38 @@ import {
   BottomSheetView,
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
-import { pickAndSaveImages } from "@/lib/pick-and-save-images";
-import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
-import { useSaveImageBatch } from "@/lib/use-save-image-batch";
+import { openPaywall } from "@/lib/entitlement";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { Stack, useRouter } from "expo-router";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
-  Pressable,
   Text,
   TextInput,
   View,
   type LayoutChangeEvent,
+  type TextInputInstance,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { typedLink } from "@/lib/url";
 
-type Mode = "menu" | "note" | "article";
-type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
-
-/** Shared by the up-front guard and by the server's `pro_required` refusal, so
- * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
 
-function ActionButton({
-  icon,
-  label,
-  onPress,
-  disabled,
-  testID,
-}: {
-  icon: AppSymbolName;
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  testID?: string;
-}) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      onPress={onPress}
-      disabled={disabled}
-      style={[styles.action, disabled && { opacity: 0.4 }]}
-    >
-      <View style={styles.actionIcon}>
-        <AppSymbolIcon
-          name={icon}
-          size={40}
-          tintColor={theme.colors.foreground}
-        />
-      </View>
-      <Text style={styles.actionLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function AndroidAddHeader({
-  title,
-  isComposer,
   canSave,
-  back,
+  close,
   save,
 }: {
-  title: string;
-  isComposer: boolean;
   canSave: boolean;
-  back: () => void;
+  close: () => void;
   save: () => void;
 }) {
   useAppLocale();
@@ -93,19 +47,15 @@ function AndroidAddHeader({
 
   return (
     <View style={styles.androidHeader}>
-      {isComposer ? (
-        <HeaderIconButton
-          icon="chevron.left"
-          label={t("capture.backToOptions")}
-          onPress={back}
-        />
-      ) : (
-        <View style={styles.androidHeaderSpacer} />
-      )}
+      <HeaderIconButton
+        icon="xmark"
+        label={t("common.close")}
+        onPress={close}
+      />
       <View style={styles.androidHeaderTitleContainer} onLayout={measureTitle}>
         {titleWidth > 0 ? (
           <AnimatedText
-            text={title}
+            text={t("capture.articleTitle")}
             width={titleWidth}
             truncate
             height={44}
@@ -113,145 +63,78 @@ function AndroidAddHeader({
           />
         ) : null}
       </View>
-      {isComposer ? (
-        <HeaderIconButton
-          icon="checkmark"
-          label={t("common.save")}
-          disabled={!canSave}
-          onPress={save}
-        />
-      ) : (
-        <View style={styles.androidHeaderSpacer} />
-      )}
+      <HeaderIconButton
+        icon="checkmark"
+        label={t("common.save")}
+        disabled={!canSave}
+        onPress={save}
+      />
     </View>
   );
 }
 
-type AddContentProps = {
-  close: () => void;
-  openCamera: (spaceId?: Id<"spaces">) => void;
-};
-
-function AddContent({ close, openCamera }: AddContentProps) {
+/** The + sheet takes one thing: a link to a reel, TikTok or page that names places. */
+function AddContent({ close }: { close: () => void }) {
   useAppLocale();
   const { theme } = useUnistyles();
   const router = useRouter();
-  // Opened from inside a space: everything saved here is pre-pinned to it.
-  // `mode=note` opens straight into the note composer (Home's save card).
-  const { spaceId, mode: startMode } = useLocalSearchParams<{
-    spaceId?: string;
-    mode?: string;
-  }>();
-  const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
-  const [mode, setMode] = useState<Mode>("menu");
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createLinkItem = useMutation(api.items.createLinkItem);
-  const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro: route to the paywall before composing if not entitled.
-  const { guard, loading: entitlementLoading } =
-    usePaywallGuard(PAYWALL_PLACEMENT);
-
-  // A composer opened straight from a link opens only once the Pro guard
-  // passes, so nothing is typed into a composer the paywall then closes.
-  const startChecked = useRef(false);
-  useEffect(() => {
-    if (startMode !== "note" || entitlementLoading || startChecked.current) {
-      return;
-    }
-    startChecked.current = true;
-    void guard().then((entitled) => {
-      if (entitled) setMode("note");
-    });
-  }, [startMode, entitlementLoading, guard]);
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
 
-  // Android's Material sheet resizes to the composer over ~300ms, and a
-  // keyboard opened mid-resize can land behind it, so focus once it settles.
   useEffect(() => {
-    if (Platform.OS !== "android" || mode === "menu") return;
+    if (Platform.OS !== "android") return;
     focusTimer.current = setTimeout(() => inputRef.current?.focus(), 350);
     return () => {
       if (focusTimer.current) clearTimeout(focusTimer.current);
     };
-  }, [mode]);
+  }, []);
 
-  // The sheet keeps this content mounted through its hide animation, so a
-  // pending focus must be dropped when dismissal starts, or the keyboard
-  // would come back up mid-close.
   const dismiss = () => {
     if (focusTimer.current) clearTimeout(focusTimer.current);
     close();
   };
 
-  const success = () => {
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    dismiss();
-  };
-
-  const openComposer = (next: Mode) => {
-    setValue("");
-    setMode(next);
-  };
-
   const save = async () => {
     if (!canSave) return;
-    // Checked here so typed text that is not a link never reaches the server,
-    // whose refusal would only surface as the generic failure alert.
-    const link = mode === "article" ? typedLink(trimmed) : null;
-    if (mode === "article" && link === null) {
+    const link = typedLink(trimmed);
+    if (link === null) {
       Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
       return;
     }
     setSaving(true);
-    // The first-save funnel: the submission's attempt event, with the entry
-    // source the server's `item_saved` will carry too.
-    const saveSource = mode === "article" ? "manual_link" : "note";
-    const saveKind = mode === "article" ? "link" : "note";
-    const operationId = `${saveKind}:${Crypto.randomUUID()}`;
+    const operationId = `link:${Crypto.randomUUID()}`;
     analytics.capture("save_attempt_started", {
-      save_source: saveSource,
-      save_kind: saveKind,
+      save_source: "manual_link",
+      save_kind: "link",
       operation_id: operationId,
     });
     try {
-      if (mode === "article") {
-        await createLinkItem({
-          url: link ?? trimmed,
-          spaceId: pinnedSpaceId,
-          operationId,
-          analyticsSessionId: analytics.sessionId(),
-          saveSource: "manual_link",
-        });
-      } else {
-        await createNoteItem({
-          text: trimmed,
-          spaceId: pinnedSpaceId,
-          operationId,
-          analyticsSessionId: analytics.sessionId(),
-        });
+      await createLinkItem({
+        url: link,
+        operationId,
+        analyticsSessionId: analytics.sessionId(),
+        saveSource: "manual_link",
+      });
+      analytics.capture("article_saved");
+      if (process.env.EXPO_OS === "ios") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      analytics.capture(mode === "article" ? "article_saved" : "note_saved");
-      success();
+      dismiss();
     } catch (error) {
-      // The bounded stage: the server's structured refusal code when it sent
-      // one, `other` for a network failure or a redacted error.
       analytics.capture("save_failed", {
-        save_source: saveSource,
-        save_kind: saveKind,
+        save_source: "manual_link",
+        save_kind: "link",
         stage: saveFailureStage(error),
         operation_id: operationId,
       });
       setSaving(false);
-      // Pro can lapse while the composer is open. The paywall is the only
-      // useful next step, so show it instead of a generic failure alert.
       if (saveErrorCode(error) === "pro_required") {
         await openPaywall(router, PAYWALL_PLACEMENT);
         return;
@@ -259,39 +142,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
       Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
     }
   };
-
-  // Runs a batch of image requests, closing on success or reporting a partial
-  // outcome. The hook owns the retry (which replays each failed request's
-  // operation id rather than minting a new one), the `pro_required` paywall
-  // route, and the partial-failure alert.
-  const runImageRequests = useSaveImageBatch({
-    spaceId: pinnedSpaceId,
-    saveSource: "photo_import",
-    paywallPlacement: PAYWALL_PLACEMENT,
-    setBusy: setSaving,
-    onAllSaved: (results) => {
-      // Empty when there was nothing to save, which is not a save event.
-      if (results.length > 0) {
-        analytics.capture("images_saved", { image_count: results.length });
-      }
-      success();
-    },
-    onDismiss: dismiss,
-    onUnexpectedError: (error) => {
-      analytics.captureError("image_upload_failed", error);
-      Alert.alert(t("errors.saveTitle"), t("errors.batchUpload"));
-    },
-  });
-
-  const pickImages = () => pickAndSaveImages(runImageRequests);
-
-  const isComposer = mode === "note" || mode === "article";
-  const isArticle = mode === "article";
-  const title = isArticle
-    ? t("capture.articleTitle")
-    : mode === "note"
-      ? t("capture.noteTitle")
-      : t("capture.title");
 
   return (
     <View style={styles.content}>
@@ -302,31 +152,22 @@ function AddContent({ close, openCamera }: AddContentProps) {
           headerStyle: { backgroundColor: theme.colors.background },
         }}
       />
-      {/* Each platform mounts exactly one persistent title so changes cascade
-          between "Save something" / "New note" / "Save a link". */}
       {Platform.OS === "ios" ? (
-        <Stack.Title asChild>
-          <AnimatedText text={title} style={styles.heading} truncate />
-        </Stack.Title>
-      ) : null}
-      {Platform.OS === "android" ? (
-        <AndroidAddHeader
-          title={title}
-          isComposer={isComposer}
-          canSave={canSave}
-          back={() => setMode("menu")}
-          save={save}
-        />
-      ) : null}
-      {isComposer && Platform.OS === "ios" ? (
         <>
+          <Stack.Title asChild>
+            <AnimatedText
+              text={t("capture.articleTitle")}
+              style={styles.heading}
+              truncate
+            />
+          </Stack.Title>
           <Stack.Toolbar placement="left">
             <Stack.Toolbar.Button
-              icon="chevron.left"
-              tintColor={theme.colors.primary}
-              onPress={() => setMode("menu")}
+              icon="xmark"
+              tintColor={theme.colors.foreground}
+              onPress={dismiss}
             >
-              {t("common.back")}
+              {t("common.close")}
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
           <Stack.Toolbar placement="right">
@@ -339,65 +180,26 @@ function AddContent({ close, openCamera }: AddContentProps) {
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         </>
-      ) : null}
-
-      {isComposer ? (
-        <TextInput
-          ref={inputRef}
-          testID={isArticle ? "add-article-input" : "add-note-input"}
-          style={isArticle ? styles.articleInput : styles.noteInput}
-          value={value}
-          onChangeText={setValue}
-          placeholder={
-            isArticle
-              ? t("capture.linkPlaceholder")
-              : t("capture.notePlaceholder")
-          }
-          placeholderTextColor={theme.colors.muted}
-          autoFocus={Platform.OS !== "android"}
-          multiline={!isArticle}
-          autoCapitalize={isArticle ? "none" : "sentences"}
-          autoCorrect={!isArticle}
-          keyboardType={isArticle ? "url" : "default"}
-          returnKeyType={isArticle ? "done" : "default"}
-          onSubmitEditing={isArticle ? save : undefined}
-          editable={!saving}
-        />
-      ) : null}
-      {isComposer ? null : (
-        <View style={styles.actions}>
-          <ActionButton
-            testID="add-option-note"
-            icon="square.and.pencil"
-            label={t("item.note")}
-            onPress={() => guard(() => openComposer("note"))}
-            disabled={saving || entitlementLoading}
-          />
-          <ActionButton
-            testID="add-option-article"
-            icon="link"
-            label={t("item.article")}
-            onPress={() => guard(() => openComposer("article"))}
-            disabled={saving || entitlementLoading}
-          />
-          <ActionButton
-            icon="photo.on.rectangle"
-            label={t("capture.photos")}
-            onPress={() => guard(pickImages)}
-            disabled={saving || entitlementLoading}
-          />
-          <ActionButton
-            icon="camera"
-            label={t("capture.camera")}
-            onPress={() =>
-              guard(() => {
-                openCamera(pinnedSpaceId);
-              })
-            }
-            disabled={saving || entitlementLoading}
-          />
-        </View>
+      ) : (
+        <AndroidAddHeader canSave={canSave} close={dismiss} save={save} />
       )}
+      <TextInput
+        ref={inputRef}
+        testID="add-article-input"
+        style={styles.articleInput}
+        value={value}
+        onChangeText={setValue}
+        placeholder={t("capture.linkPlaceholder")}
+        placeholderTextColor={theme.colors.muted}
+        autoFocus={Platform.OS !== "android"}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+        returnKeyType="done"
+        onSubmitEditing={save}
+        editable={!saving}
+      />
+      <Text style={styles.hint}>{t("capture.linkHint")}</Text>
     </View>
   );
 }
@@ -406,28 +208,7 @@ function AndroidAddSheet() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const sheetRef = useRef<BottomSheetMethods>(null);
-  const dismissActionRef = useRef<AndroidDismissAction>(null);
-
-  const close = useCallback(() => {
-    sheetRef.current?.close();
-  }, []);
-
-  const openCamera = useCallback((spaceId?: Id<"spaces">) => {
-    dismissActionRef.current = { type: "camera", spaceId };
-    sheetRef.current?.close();
-  }, []);
-
-  const finishDismiss = useCallback(() => {
-    const action = dismissActionRef.current;
-    if (action?.type === "camera") {
-      router.replace({
-        pathname: "/camera",
-        params: action.spaceId ? { spaceId: action.spaceId } : {},
-      });
-      return;
-    }
-    router.back();
-  }, [router]);
+  const close = useCallback(() => sheetRef.current?.close(), []);
 
   return (
     <BottomSheet
@@ -435,11 +216,11 @@ function AndroidAddSheet() {
       index={0}
       enableDynamicSizing
       enablePanDownToClose
-      onClose={finishDismiss}
+      onClose={() => backOrHome(router)}
       backgroundStyle={{ backgroundColor: theme.colors.background }}
     >
       <BottomSheetView>
-        <AddContent close={close} openCamera={openCamera} />
+        <AddContent close={close} />
       </BottomSheetView>
     </BottomSheet>
   );
@@ -447,23 +228,8 @@ function AndroidAddSheet() {
 
 export default function AddScreen() {
   const router = useRouter();
-
-  if (Platform.OS === "android") {
-    return <AndroidAddSheet />;
-  }
-
-  return (
-    <AddContent
-      close={() => router.back()}
-      openCamera={(spaceId) => {
-        router.back();
-        router.push({
-          pathname: "/camera",
-          params: spaceId ? { spaceId } : {},
-        });
-      }}
-    />
-  );
+  if (Platform.OS === "android") return <AndroidAddSheet />;
+  return <AddContent close={() => backOrHome(router)} />;
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -491,47 +257,12 @@ const styles = StyleSheet.create((theme) => ({
   androidHeaderTitleContainer: {
     flex: 1,
   },
-  androidHeaderSpacer: {
-    width: 40,
-    height: 40,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: theme.gap(2),
-  },
-  action: {
-    alignItems: "center",
-    gap: theme.gap(0.75),
-    minWidth: 64,
-  },
-  actionIcon: {
-    padding: theme.gap(1),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 12,
-    color: theme.colors.foreground,
-    textAlign: "center",
-  },
-  noteInput: {
+
+  hint: {
     fontFamily: theme.fonts.regular,
-    fontSize: 18,
-    color: theme.colors.foreground,
-    minHeight: 120,
-    // The Android sheet sizes to its content above the keyboard. An uncapped
-    // note would grow the sheet until the header and its Save button leave
-    // the screen, so long notes scroll inside the field instead.
-    maxHeight: Platform.OS === "android" ? 240 : undefined,
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    textAlignVertical: "top",
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
   },
   articleInput: {
     fontFamily: theme.fonts.regular,

@@ -1,15 +1,3 @@
-// The one owner of the incoming-share flow. The share screen feeds it events
-// (a reconcile result, a settled save, a native clear outcome, a button
-// press) and gets back the next state, including the phase it renders, and
-// an ordered list of effects to run. Every rule the flow depends on lives
-// here: effect ordering, which session is current, the per-session guards,
-// the Android-only tombstone, the ghost-replay skip, and the Pro gate.
-//
-// No React, Convex, storage, or native imports: the screen runs each effect
-// against MMKV, SecureStore, expo-sharing, the router, and analytics, and
-// reports the outcomes that decide what happens next (a native clear
-// succeeding or throwing, a save settling) back as events.
-
 import { classifyEntries, type ResolvedPayload } from "./process-share";
 import { withEntry } from "./session-view";
 import {
@@ -22,16 +10,6 @@ import {
   type ShareSession,
 } from "./storage";
 
-/** What the screen renders. The resolution-driven states (resolving, empty)
- * are derived in render from the share hook, never stored here.
- *
- * A terminal outcome with any failed/unsupported entry is `partial`, so the
- * user gets retry/continue/cancel; only an all-saved batch completes.
- * `clearFailed` is the escape hatch when the native clear throws: the
- * completed session is kept so a remount retries the clear, and the user gets
- * Try again / Cancel instead of an eternal spinner. `locked` is the Pro gate:
- * an unentitled user reaches the paywall, and a cancel lands on an explicit
- * Unlock Pro / Cancel screen rather than the "Saved to Shelvr" spinner. */
 export type SharePhase =
   | { kind: "idle" }
   | { kind: "locked" }
@@ -43,38 +21,20 @@ export type SharePhase =
 export type IncomingShareState = {
   phase: SharePhase;
   android: boolean;
-  /** The session id of the persisted record as this owner last wrote or
-   * reconciled it. A newer share replaces the record; a run for the older
-   * session is then stale and must not tombstone over the newer batch. */
   recordId: string | null;
-  /** The session a save run is in flight for. A second run for the same
-   * session never starts; a run for a newer session may. */
   running: string | null;
-  /** Guards completion so it runs once per session, keyed so a later session
-   * can still complete after an earlier one. */
   completing: string | null;
-  /** The session settled on the partial screen. It must not auto-restart on
-   * every reconcile; only Retry re-runs it. */
   partial: string | null;
-  /** The session already routed to the paywall, so a reconcile re-run for it
-   * does not present a second one. Cleared when a run starts, so a later
-   * lapse gates the session again. */
   locked: string | null;
-  /** A ghost replay is skipped once per mount, however often reconcile
-   * re-runs before the native clear lands. */
   ghostSkipped: boolean;
 };
 
-/** The world as the screen sees it when it dispatches. */
 export type ShareContext = {
   userId: string | null;
   entitled: boolean;
   entitlementLoading: boolean;
   rawPayloads: RawSharePayload[];
   resolved: ResolvedPayload[];
-  /** The session id the store holds right now. The owner's `recordId` only
-   * catches up when a reconcile result is dispatched, a microtask after the
-   * record is written, and another mount may have written it. */
   storedSessionId: string | null;
 };
 
@@ -93,10 +53,6 @@ export type ShareEvent =
   | { type: "cancel" }
   | { type: "unlock" };
 
-/** Effects run in order. `nativeClear` is always last in its list: its
- * outcome comes back as a `nativeClearSettled` event, which decides the rest.
- * `save` runs classified persists then the processor, reporting each settled
- * entry, the result, or a crash back as events. */
 export type ShareEffect =
   | { type: "markComplete"; sessionId: string }
   | {
@@ -151,8 +107,6 @@ export function stepIncomingShare(
     case "reconciled":
       return reconciled(state, event.result, ctx);
     case "entrySettled": {
-      // Progress for a session no longer on screen is persisted (scoped to
-      // its own record) but never drawn over the current phase.
       const { phase } = state;
       const next =
         phase.kind === "saving" && phase.session.sessionId === event.sessionId
@@ -178,11 +132,6 @@ export function stepIncomingShare(
     case "saveSettled": {
       const sid = event.session.sessionId;
       const settled = releaseRun(state, sid);
-      // A newer share replaced this session's record while it saved. Its
-      // result must not clear the newer batch's native payloads, leave the
-      // screen, or draw over the newer run; that session's own completion
-      // does all of it. A missing record is not a replacement: a record lost
-      // mid-save still completes, or the screen would spin forever.
       const superseded =
         (state.recordId !== null && state.recordId !== sid) ||
         (ctx.storedSessionId !== null && ctx.storedSessionId !== sid);
@@ -202,9 +151,6 @@ export function stepIncomingShare(
       });
     }
     case "saveCrashed": {
-      // The processor records per-entry save failures as data, so a crash is
-      // persistence or classification. Show whatever survived in the store
-      // on the partial screen: retry/continue/cancel, never a spinner.
       const sid = event.session.sessionId;
       return none({
         ...releaseRun(state, sid),
@@ -236,13 +182,6 @@ function reconciled(
     case "empty":
       return none(state);
     case "ghost": {
-      // No session record, but this exact batch was the user's last completed
-      // share and every entry settled: Android restored the task after a
-      // process death and replayed the old share intent. It is already in
-      // Shelvr, so consume it quietly
-      // and go Home. Saving would mint an operationId the backend ledger
-      // cannot dedupe (a duplicate), and asking made every cold start after
-      // a share look like a new one.
       if (state.ghostSkipped) return none(state);
       const dropped = abandon(state, ctx);
       return {
@@ -258,7 +197,6 @@ function reconciled(
       };
     }
     case "clear":
-      // A completed session matches: clear native payloads and leave.
       return complete(
         { ...state, recordId: result.session.sessionId },
         result.session,
@@ -268,8 +206,6 @@ function reconciled(
     case "resume": {
       const session = result.session;
       const next = { ...state, recordId: session.sessionId };
-      // Already running, or settled on the partial screen (only Retry re-runs
-      // it). A different, newer session is unaffected by either guard.
       if (
         state.running === session.sessionId ||
         state.partial === session.sessionId
@@ -281,7 +217,6 @@ function reconciled(
   }
 }
 
-/** The entitlement gate, then a save run for `session`. */
 function requestSave(
   state: IncomingShareState,
   session: ShareSession,
@@ -290,8 +225,6 @@ function requestSave(
   const sid = session.sessionId;
   if (state.running === sid) return none(state);
   if (ctx.entitlementLoading) return none(state);
-  // Saving is Pro. Set the locked phase before presenting, so a cancel lands
-  // on the explicit Pro gate, and present once per session.
   if (!ctx.entitled) {
     if (state.locked === sid) return none(state);
     return {
@@ -299,17 +232,12 @@ function requestSave(
       effects: [{ type: "openPaywall" }],
     };
   }
-  // Classify a fresh session (no side effects), persisting terminal statuses
-  // so a crash before any save still records failed/unsupported entries.
   const fresh = session.entries.every((e) => e.status === "pending");
   let working = session;
   if (fresh) {
     try {
       working = { ...session, entries: classifyEntries(session, ctx.resolved) };
     } catch (error) {
-      // A malformed payload: settle on the partial screen as a crashed run
-      // does (the screen reports it and reloads what survived), never idle
-      // behind the "Saved to Shelvr" spinner.
       return {
         state: {
           ...state,
@@ -343,22 +271,10 @@ function requestSave(
   };
 }
 
-/** Drops the run guard only if this run still holds it; a newer session may
- * have started since. */
 function releaseRun(state: IncomingShareState, sid: string) {
   return state.running === sid ? { ...state, running: null } : state;
 }
 
-/** The one completion path for all-saved, Continue, Cancel on the partial
- * screen, and a reconciled completed session. Ordering is what the
- * crash-window reconciliation depends on:
- *   1. persist `phase: complete` (a crash after this reconciles as a clear)
- *   2. tombstone the batch, Android only, and only while this session still
- *      owns the record, so a stale run cannot overwrite a newer tombstone.
- *      Every later exit can delete the session, and without the tombstone
- *      the next task-restore replay would save the batch again. iOS never
- *      replays a share.
- *   3. native clear; the rest waits for its outcome (see clearSettled). */
 function complete(
   state: IncomingShareState,
   session: ShareSession,
@@ -379,9 +295,6 @@ function complete(
   return { state: { ...state, completing: sid }, effects };
 }
 
-/** Explicit discard: drop the session and the pending flag, clear native
- * payloads, go Home. Deleting the session matters: leaving it would let a
- * later identical share resume the cancelled work. */
 function abandon(state: IncomingShareState, ctx: ShareContext): Step {
   return {
     state: { ...state, recordId: null },
@@ -406,10 +319,6 @@ function clearSettled(
   ctx: ShareContext,
 ): Step {
   if (cleared.kind === "abandon") {
-    // A throwing clear leaves the discarded batch in the native store, and
-    // the resume path treats an unread batch as owed. Record it as discarded
-    // so it is not routed back and re-saved under new operation ids. A clean
-    // clear makes any discard record moot.
     return {
       state,
       effects: [
@@ -423,17 +332,12 @@ function clearSettled(
   const { session } = cleared;
   const sid = session.sessionId;
   if (!ok) {
-    // Keep the completed session so a remount (or Try again) retries.
     return none({
       ...state,
       completing: null,
       phase: { kind: "clearFailed", session },
     });
   }
-  // The native store is empty: a discard record no longer describes
-  // anything. Delete the session only now, or a later identical re-share
-  // would match a stale completed record and be dropped. The pending flag
-  // goes last so a process death mid-share still resumes next launch.
   const effects: ShareEffect[] = [
     { type: "clearDiscardRecord" },
     { type: "deleteSession", sessionId: sid },

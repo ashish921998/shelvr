@@ -6,15 +6,6 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/**
- * Shown on Home in place of the save how-to while the user has no Pro. Saving
- * is Pro-only, so teaching someone who closed the paywall to share into
- * Shelvr only leads back to the paywall; this card says so up front and
- * reopens it. The trial note is shown only once the store confirms this
- * account can still start the trial: a lapsed account has used it, and so may
- * one that subscribed under the same Apple ID before. Until the answer is in,
- * or when it cannot be read, the card promises nothing.
- */
 export function ProCard({ lapsed }: { lapsed: boolean }) {
   useAppLocale();
   const router = useRouter();

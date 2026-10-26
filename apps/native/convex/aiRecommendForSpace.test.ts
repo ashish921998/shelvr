@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, insertConsentingUser } from "./test.setup";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -14,16 +14,12 @@ import {
 const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
 
-// The action runs end to end; only the two provider calls are replaced.
-// `ai.ts` builds its language model at import, so wrapLanguageModel is stubbed
-// as well.
 vi.mock("ai", () => ({
   embedMany,
   generateObject,
   wrapLanguageModel: vi.fn(() => ({})),
 }));
 
-/** A vector with the given components set and the rest zero. */
 function vec(components: Record<number, number>): number[] {
   const v = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0);
   for (const [index, value] of Object.entries(components)) {
@@ -32,9 +28,6 @@ function vec(components: Record<number, number>): number[] {
   return v;
 }
 
-// Cosine against vec({0: 1}): 1.0, 0.8, 0.0. Insertion order below is the
-// reverse of that, so any assertion on relevance order also proves the read is
-// no longer by recency.
 const ON_TOPIC = vec({ 0: 1 });
 const NEARBY = vec({ 0: 0.8, 1: 0.6 });
 const OFF_TOPIC = vec({ 1: 1 });
@@ -45,20 +38,14 @@ type SeedItem = {
   title: string;
   embedding?: number[];
   status?: "ready" | "failed" | "processing";
-  /** Only set where a test is about the hydration byte budget. */
   content?: string;
 };
 
-/**
- * Every seeded item carries an embedding unless a test is explicitly about the
- * no-vector path. convex-test's `vectorSearch` scores every row matching the
- * filter, including rows with no vector field, and throws on them. Real
- * Convex simply leaves unembedded documents out of the index.
- */
+// convex-test vectorSearch throws on rows with no vector field; real Convex skips them.
 async function seed(items: SeedItem[]) {
   const t = newConvexTest();
   const ids = await t.run(async (ctx) => {
-    USER = await ctx.db.insert("users", {});
+    USER = await insertConsentingUser(ctx);
     const spaceId = await ctx.db.insert("spaces", {
       userId: USER,
       name: "Pasta",
@@ -88,7 +75,6 @@ async function seed(items: SeedItem[]) {
   return { t, ...ids };
 }
 
-/** The numbered candidate list the prompt was built from, in prompt order. */
 function promptedTitles(): string[] {
   const { prompt } = generateObject.mock.calls[0][0] as { prompt: string };
   return [...prompt.matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1]);
@@ -112,7 +98,6 @@ async function suggestedTitles(t: Awaited<ReturnType<typeof seed>>["t"]) {
 beforeEach(() => {
   embedMany.mockReset();
   generateObject.mockReset();
-  // The action's only embed call is the space query.
   embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
     embeddings: values.map(() => ON_TOPIC),
   }));
@@ -129,8 +114,6 @@ describe("recommendForSpace candidate selection", () => {
 
     expect(embedMany).toHaveBeenCalledTimes(1);
     const call = embedMany.mock.calls[0][0];
-    // Asymmetric retrieval: stored item vectors are RETRIEVAL_DOCUMENT, so a
-    // query embedded as a document would silently rank worse rather than fail.
     expect(call.providerOptions.google.taskType).toBe("RETRIEVAL_QUERY");
     expect(call.providerOptions.google.outputDimensionality).toBe(
       EMBEDDING_DIMENSIONS,
@@ -147,7 +130,6 @@ describe("recommendForSpace candidate selection", () => {
 
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
-    // Newest-first would have been the exact reverse.
     expect(promptedTitles()).toEqual(["Carbonara", "Pesto", "Kubernetes"]);
   });
 
@@ -185,8 +167,6 @@ describe("recommendForSpace candidate selection", () => {
 
   it("drops a hit whose vector outlived its ready status", async () => {
     const { t, spaceId } = await seed([
-      // Strongest match, but no longer a ready save. The vector index has no
-      // status filter field, so only the hydrating query can catch this.
       { title: "Carbonara", embedding: ON_TOPIC, status: "failed" },
       { title: "Pesto", embedding: NEARBY },
     ]);
@@ -221,8 +201,6 @@ describe("recommendForSpace candidate selection", () => {
       { title: "Pesto", embedding: NEARBY },
       { title: "Kubernetes", embedding: OFF_TOPIC },
     ]);
-    // A user mid-backfill reaches the same branch by way of an empty index;
-    // here the provider is simply down, which is the reachable trigger.
     embedMany.mockRejectedValue(new Error("provider down"));
     generateObject.mockResolvedValue({ object: { itemNumbers: [1] } });
 
@@ -238,12 +216,6 @@ describe("recommendForSpace candidate selection", () => {
       { title: "Pesto", embedding: NEARBY },
     ]);
     await t.run(async (ctx) => {
-      // The trigger is a harness artifact: convex-test scores every row
-      // matching the filter, so a row with no vector makes its cosine throw.
-      // Real Convex leaves unembedded documents out of the index entirely.
-      // What the test is actually for is the catch: the outer action only
-      // logs and returns, so an error escaping the search would turn a
-      // transient hiccup into no recommendations at all.
       await ctx.db.insert("items", {
         userId: USER,
         type: "link" as const,
@@ -266,10 +238,6 @@ describe("recommendForSpace candidate selection", () => {
   });
 
   it("fills the whole candidate budget from the ranking alone", async () => {
-    // The headline path, and the only one the small fixtures above never
-    // reach: enough embedded items that the ranking fills the budget by
-    // itself and the recency half is never consulted. Cosine against
-    // vec({0: 1}) falls monotonically with the index.
     const shelf = Array.from({ length: 101 }, (_, index) => ({
       title: `Save ${index}`,
       embedding: vec({ 0: 1 - index * 0.001, 1: index * 0.001 }),
@@ -279,9 +247,6 @@ describe("recommendForSpace candidate selection", () => {
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
     const prompted = promptedTitles();
-    // Exactly the cap, in relevance order, and the 101st (the weakest match)
-    // is the one left out. A recency top-up would have put it back, and a
-    // truncated search window would have cost one of the strong ones.
     expect(prompted).toHaveLength(100);
     expect(prompted[0]).toBe("Save 0");
     expect(prompted[99]).toBe("Save 99");
@@ -289,11 +254,6 @@ describe("recommendForSpace candidate selection", () => {
   });
 
   it("fills a short ranked list out with recent items", async () => {
-    // Hydration's byte budget is the reachable stand-in for a half-drained
-    // sweep: either way the index hands back fewer candidates than the shelf
-    // holds, and the prompt must not shrink to match. Two bodies of just over
-    // half the budget cross it, so the third hit never survives hydration,
-    // sized from the constant so retuning it moves this fixture too.
     const half = "x".repeat(Math.ceil(MAX_HYDRATE_READ_BYTES / 2) + 1);
     const { t, spaceId } = await seed([
       { title: "Carbonara", embedding: ON_TOPIC, content: half },
@@ -303,8 +263,6 @@ describe("recommendForSpace candidate selection", () => {
 
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
-    // Ranked hits lead; recency supplies what the ranking could not reach.
-    // Without the top-up the prompt would have been the first two alone.
     expect(promptedTitles()).toEqual(["Carbonara", "Pesto", "Kubernetes"]);
   });
 
@@ -316,7 +274,6 @@ describe("recommendForSpace candidate selection", () => {
 
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
-    // Both reads see both items; the prompt must still number them once.
     expect(promptedTitles()).toEqual(["Carbonara", "Pesto"]);
   });
 

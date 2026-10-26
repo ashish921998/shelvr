@@ -6,8 +6,6 @@ import type { OracleInputProps } from "@/lib/oracle";
 
 import { FieldHint, SubmitButton, fieldClass } from "./OracleFields";
 
-/** The oracle reads https pages only, so a bare domain or an http link is
- * upgraded rather than refused. */
 function toHttps(value: string): string | undefined {
   const text = value.trim();
   if (!text) return undefined;

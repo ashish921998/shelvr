@@ -1,7 +1,3 @@
-// Tests for the pure saveImageOperations orchestration. The React/Convex
-// adapter (useSaveImages) and the expo modules it imports are not exercised
-// here: only the dependency-injected orchestration, which is where the
-// per-image settled-result contract lives. Runs in the Node default env.
 import {
   MAX_CONCURRENT_SAVES,
   reportSaveFailures,
@@ -12,11 +8,6 @@ import {
 } from "./use-save-image";
 import { describe, expect, it, vi } from "vitest";
 
-// Stub the expo modules the module under test imports at the top level, so it
-// loads under Node without a React Native runtime. Vitest hoists these mocks
-// above the imports above, so the module under test sees the stubs at load
-// time. Only the orchestration (which receives its deps as arguments) is
-// exercised.
 vi.mock("expo-file-system", () => ({ File: class {} }));
 vi.mock("@/lib/normalize-image", () => ({ normalizeImage: vi.fn() }));
 const captured: unknown[] = [];
@@ -28,9 +19,6 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
 vi.mock("expo-crypto", () => {
-  // A counter (not a constant) so tests can assert each image in a batch mints
-  // a DISTINCT operation id: a constant stub would hide an id-reuse bug that
-  // collapses a whole batch into one backend operation.
   let n = 0;
   return { randomUUID: () => `stub-uuid-${++n}` };
 });
@@ -38,8 +26,6 @@ vi.mock("@convex/_generated/api", () => ({ api: {} }));
 vi.mock("@convex/_generated/dataModel", () => ({}));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 
-// Build a deps object from per-stage behaviors. Each stage is an async fn so a
-// test can make a specific stage throw to assert the reported failure stage.
 function makeDeps(overrides: Partial<SaveImageDeps> = {}): SaveImageDeps {
   return {
     begin:
@@ -66,15 +52,12 @@ describe("saveImageOperations", () => {
 
     expect(results).toHaveLength(3);
     expect(results.map((r) => r.status)).toEqual(["saved", "saved", "saved"]);
-    // Results follow input order even though tasks run concurrently.
     expect(
       (results[0] as Extract<ImageSaveResult, { status: "saved" }>).image.uri,
     ).toBe("a");
     expect(
       (results[2] as Extract<ImageSaveResult, { status: "saved" }>).image.uri,
     ).toBe("c");
-    // Each result carries the operation id it minted, and every image in the
-    // batch gets its own distinct id.
     for (const r of results) {
       expect(r.operationId).toMatch(/^image:stub-uuid-\d+$/);
     }
@@ -96,7 +79,6 @@ describe("saveImageOperations", () => {
     expect(results.map((r) => r.status)).toEqual(["saved", "failed", "saved"]);
     const failed = results[1] as Extract<ImageSaveResult, { status: "failed" }>;
     expect(failed.stage).toBe("upload");
-    // A sanitized message, not a stack trace.
     expect(failed.message).toBe("boom");
   });
 
@@ -133,7 +115,6 @@ describe("saveImageOperations", () => {
   });
 
   it("lets a retry submit only the failed operation id, reusing it verbatim", async () => {
-    // First pass: finalize is down, so every request fails at that stage.
     const finalized = new Set<string>();
     const deps = makeDeps({
       finalize: async () => {
@@ -150,8 +131,6 @@ describe("saveImageOperations", () => {
     const failed = firstResults.filter((r) => r.status === "failed");
     expect(failed).toHaveLength(2);
 
-    // The caller retries ONLY the failed results, passing their existing op ids.
-    // No new id is minted for a retry.
     const retryRequests = failed.map((r) => ({
       image: r.image,
       operationId: r.operationId,
@@ -161,7 +140,6 @@ describe("saveImageOperations", () => {
       "image:op-b",
     ]);
 
-    // Second pass with a working finalize: the same op ids come back saved.
     const retryDeps = makeDeps({
       finalize: async (input) => {
         finalized.add(input.operationId);
@@ -244,8 +222,6 @@ describe("saveImageOperations", () => {
   });
 
   it("sanitizes URLs and ids out of the failure message", async () => {
-    // Realistic Convex ids: long unbroken lowercase-alphanumeric tokens, no
-    // underscore prefix (the earlier ks_/kg_ fixtures matched nothing real).
     const storageId = "kg2e5gqf40sy8kdqxcm3vp7hn96wtxyz";
     const itemId = "jd7bw2mkq4vc9ntxhe6grf8ysm5apqrs";
     const deps = makeDeps({
@@ -266,8 +242,6 @@ describe("saveImageOperations", () => {
   });
 
   it("passes image metadata and spaceId through to finalize", async () => {
-    // A regression that drops spaceId (image filed to the wrong space) or
-    // aspectRatio/isSticker/capturedAt/location must not pass silently.
     const finalizeInputs: unknown[] = [];
     const deps = makeDeps({
       finalize: async (input) => {
@@ -334,7 +308,6 @@ describe("saveImageOperations", () => {
     expect(finalizeInputs).toEqual([
       expect.objectContaining({ aspectRatio: 2 }),
     ]);
-    // The result still carries the original so a retry re-normalizes from it.
     expect(results[0]).toMatchObject({ status: "saved", image: { uri: "a" } });
     expect(results[1]).toMatchObject({
       status: "failed",
@@ -385,7 +358,6 @@ describe("saveImageOperations", () => {
     const { ConvexError } = await import("convex/values");
     const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } =
       await import("@convex/model/imagePolicy");
-    // Server refusals arrive as ConvexError; client-side failures as plain Error.
     const failWith = async (error: unknown) => {
       const deps = makeDeps({
         upload: async () => {
@@ -419,7 +391,6 @@ describe("saveImageOperations", () => {
     const [result] = await saveImageOperations([{ image: img("a") }], deps);
     const failed = result as Extract<ImageSaveResult, { status: "failed" }>;
     expect(failed.code).toBe("photo_limit");
-    // A server-side copy edit must not move the bucket.
     expect(saveFailureReason("some reworded sentence", failed.code)).toBe(
       "photo_limit",
     );
@@ -435,7 +406,6 @@ describe("saveImageOperations", () => {
     const [result] = await saveImageOperations([{ image: img("a") }], deps);
     const failed = result as Extract<ImageSaveResult, { status: "failed" }>;
     expect(failed.code).toBe("pro_required");
-    // No bucket of its own: the paywall funnel is what measures this.
     expect(saveFailureReason(failed.message, failed.code)).toBe("other");
   });
 

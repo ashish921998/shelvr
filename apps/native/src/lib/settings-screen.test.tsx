@@ -22,7 +22,10 @@ const mocks = vi.hoisted(() => ({
   setSaveReminders: vi.fn(),
   manageSubscription: vi.fn(),
   dismissAll: vi.fn(),
+  replace: vi.fn(),
+  stackRoot: "(tabs)",
   status: "none",
+  permission: "granted" as "granted" | "ask" | "blocked" | undefined,
   preferences: { weeklyShelfEnabled: true, remindersEnabled: true } as
     | { weeklyShelfEnabled: boolean; remindersEnabled: boolean }
     | undefined,
@@ -58,6 +61,9 @@ vi.mock("@/lib/notifications", () => ({
     },
   }),
 }));
+vi.mock("@/lib/use-notification-permission", () => ({
+  useNotificationPermission: () => mocks.permission,
+}));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.preferences }),
 }));
@@ -67,13 +73,13 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({
     back: vi.fn(),
     canGoBack: () => true,
-    replace: vi.fn(),
+    replace: mocks.replace,
     dismissAll: mocks.dismissAll,
   }),
-}));
-// The screen's own flows are under test; its child settings have their own.
-vi.mock("@/components/ai-consent", () => ({
-  AiConsentSetting: vi.fn(() => null),
+  useNavigation: () => ({
+    addListener: () => () => {},
+    getState: () => ({ routes: [{ name: mocks.stackRoot }] }),
+  }),
 }));
 vi.mock("@/components/legal-consent", () => ({
   LegalConsentPreference: vi.fn(() => null),
@@ -154,6 +160,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.preferences = { weeklyShelfEnabled: true, remindersEnabled: true };
   mocks.status = "none";
+  mocks.permission = "granted";
+  mocks.stackRoot = "(tabs)";
 });
 afterEach(cleanup);
 
@@ -204,12 +212,38 @@ it.each(["trialing", "pro"])(
 
     buttons[1].onPress?.();
     expect(mocks.deleteAccount).not.toHaveBeenCalled();
-    // Both sheets go before Customer Center can present.
     const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
     dismiss();
     expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).not.toHaveBeenCalled();
   },
 );
+
+it("replaces a root Profile with Home before Customer Center", () => {
+  mocks.status = "pro";
+  mocks.stackRoot = "profile";
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("account.delete"));
+  lastAlert().buttons[1].onPress?.();
+
+  const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+  dismiss();
+  expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+});
+
+it("keeps another root, such as a linked plan, under Customer Center", () => {
+  mocks.status = "pro";
+  mocks.stackRoot = "plan/[id]";
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("account.delete"));
+  lastAlert().buttons[1].onPress?.();
+
+  const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+  dismiss();
+  expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+  expect(mocks.replace).not.toHaveBeenCalled();
+});
 
 it("reports a failed deletion and points to support", async () => {
   mocks.deleteAccount.mockRejectedValue(new Error("server"));
@@ -272,4 +306,43 @@ it("leaves a toggle unrecorded when another operation held the queue", async () 
   );
   expect(mocks.capture).not.toHaveBeenCalled();
   expect(mocks.alert).not.toHaveBeenCalled();
+});
+
+it.each(["blocked", "ask"] as const)(
+  "shows notifications off when the device permission is %s, though the preferences are on",
+  (permission) => {
+    mocks.permission = permission;
+    render(<SettingsScreen />);
+    expect(
+      (screen.getByLabelText("notifications.toggleLabel") as HTMLInputElement)
+        .checked,
+    ).toBe(false);
+    expect(
+      (
+        screen.getByLabelText(
+          "notifications.remindersToggle",
+        ) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
+  },
+);
+
+it("keeps the saved preference on screen until the permission has been read", () => {
+  mocks.permission = undefined;
+  render(<SettingsScreen />);
+  expect(
+    (screen.getByLabelText("notifications.toggleLabel") as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+});
+
+it("turns a toggle shown off for a blocked device on, which leads to system settings", async () => {
+  mocks.permission = "blocked";
+  mocks.setWeeklyShelf.mockResolvedValue(false);
+  render(<SettingsScreen />);
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("notifications.toggleLabel")),
+  );
+  expect(mocks.setWeeklyShelf).toHaveBeenCalledWith(true);
+  expect(lastAlert().title).toBe("notifications.disabledTitle");
 });

@@ -54,18 +54,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { analytics } from "@/lib/analytics";
-import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
 import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
 
-// Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
-// React Query still subscribes through the Convex adapter, and an invalid
-// arg (e.g. an empty-string id) throws ArgumentValidationError on every
-// socket reconnect, which the server answers by closing the WebSocket.
 function spaceQueryArg(
   from?: string,
   spaceId?: string,
@@ -77,8 +73,6 @@ function searchQueryArg(from?: string, q?: string): "skip" | { query: string } {
   return from === "search" && q ? { query: q } : "skip";
 }
 
-// The undo notice shows only while the accepted item is really a member of
-// this space: the accept may have raced a swipe away or an unmount.
 function acceptedNoticeVisible(
   accepted: { itemId: Id<"items">; spaceId: Id<"spaces"> } | null,
   activeItem: DetailItem | undefined,
@@ -92,9 +86,6 @@ function acceptedNoticeVisible(
   );
 }
 
-// The pager shows the feed's loaded pages, so swiping toward their end must
-// fetch the next one just as scrolling the feed does; otherwise a swipe that
-// started on page one stops at its last item.
 function pagerEndReached(
   items: DetailItem[] | undefined,
   homeFeed: ReturnType<typeof useHomeFeed>,
@@ -104,9 +95,6 @@ function pagerEndReached(
     : undefined;
 }
 
-// The pager header's colors for the page in view: white over a media save's
-// black stage, the app's own otherwise, including once that save's light
-// details sheet has scrolled up under the header.
 function pagerHeaderColors(
   activeItem: DetailItem | undefined,
   sheetsUnder: ReadonlySet<string>,
@@ -123,27 +111,8 @@ function pagerHeaderColors(
       };
 }
 
-/**
- * What sits behind the transparent iOS header, plus the status bar style.
- *
- * Over a media save's black stage the blur band would read as a grey bar; a
- * black fade keeps the white header legible over bright photos and over the
- * details sheet as it scrolls up beneath. The light status bar holds only
- * while this screen is focused: on blur or unmount expo-status-bar falls back
- * to the root layout's theme-driven bar.
- */
-function PagerHeaderBackdrop({
-  onMedia,
-  browserOpen,
-}: {
-  onMedia: boolean;
-  // The in-app browser is up over a media save: its page is light, so the
-  // bar falls back to the root layout's until it closes.
-  browserOpen: boolean;
-}) {
+function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   const { theme } = useUnistyles();
-  // Typed to the events used here: the native stack's transitionStart and
-  // gestureCancel aren't in expo-router's generic navigation type.
   const navigation = useNavigation() as {
     addListener: (
       type: "beforeRemove" | "transitionStart" | "gestureCancel",
@@ -158,16 +127,8 @@ function PagerHeaderBackdrop({
       return () => setFocused(false);
     }, []),
   );
-  // Blur only lands once the pop animation ends, leaving a white clock over
-  // the feed while it plays; drop the light bar as the pop starts instead.
-  // A native back (button or swipe) skips beforeRemove, so the closing
-  // transition's start is what catches it. A swipe back the user lets go of
-  // keeps the screen focused, so no focus event brings the light bar back;
-  // gestureCancel does.
   useEffect(() => {
     const drop = () => setFocused(false);
-    // A back tap landing mid-swipe cancels the gesture as the pop starts;
-    // the screen is no longer focused then, and the bar stays dropped.
     const offCancel = navigation.addListener("gestureCancel", () =>
       setFocused(navigation.isFocused()),
     );
@@ -190,7 +151,7 @@ function PagerHeaderBackdrop({
   return (
     <>
       <HeaderScrim color={MEDIA_CANVAS} />
-      {focused && !browserOpen ? <StatusBar style="light" /> : null}
+      {focused ? <StatusBar style="light" /> : null}
     </>
   );
 }
@@ -200,11 +161,6 @@ export default function ItemScreen() {
   return <ItemScreenContent />;
 }
 
-// Owns the item pager's route-param sync: deduped writes through the owning
-// screen's navigation, a blur-cancelled pending write, and a refocus resync.
-// expo-router's generated param types don't cover imperative setParams, and
-// @react-navigation/native isn't a direct dependency: owning writes only
-// need these two members.
 function usePagerParamSync(initialId: string) {
   const navigation = useNavigation() as {
     setParams: (params: { id?: string }) => void;
@@ -218,18 +174,11 @@ function usePagerParamSync(initialId: string) {
     (nextId: string) => {
       if (lastWrittenId.current === nextId) return;
       lastWrittenId.current = nextId;
-      // Write through this screen's navigation: the owning route takes the
-      // update even while a pushed screen holds focus, where router.setParams
-      // would retarget the modal.
       navigation.setParams({ id: nextId });
     },
     [navigation],
   );
 
-  // A pending write is stale the moment the screen loses focus; on the way
-  // back, resync the URL to the page the user is actually on. The first
-  // focus is a no-op: writeParams dedupes against the pushed id. The
-  // cleanup runs on blur and unmount alike, so it owns the pending timer.
   useFocusEffect(
     useCallback(() => {
       writeParams(activeIdRef.current);
@@ -258,18 +207,6 @@ function usePagerParamSync(initialId: string) {
   };
 }
 
-/**
- * Each page is bounded to the list so the inner vertical ScrollView has a
- * fixed height to scroll within (rather than growing to fit). The height is
- * the list's own, not the window's: on Android the opaque toolbar sits above
- * the list, so a window-tall page would push its last header-height of
- * content below the screen where no scroll reaches it. iOS keeps a
- * transparent header and the list fills the window, so the two agree there.
- * The window height only covers the first frame, before layout reports.
- *
- * Stable so an ItemScreen re-render (setActiveId on every swipe) doesn't hand
- * FlashList a fresh renderItem/style and force every mounted page to re-render.
- */
 function usePageStyle(width: number, windowHeight: number) {
   const [listHeight, setListHeight] = useState<number | null>(null);
   const onListLayout = useCallback(
@@ -282,12 +219,8 @@ function usePageStyle(width: number, windowHeight: number) {
 }
 
 const pagerKey = (item: DetailItem) => item._id;
-// Module-level so the pager sees one stable object across renders.
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
 
-// The list can reorder under the pager (an accepted suggestion moves behind
-// the remaining ones). The pager keeps its offset, so without this it shows
-// a neighbour while the header and the action menu still target this save.
 function usePagerFollowsActive(
   listRef: RefObject<FlashListRef<DetailItem> | null>,
   items: DetailItem[] | undefined,
@@ -307,11 +240,6 @@ function usePagerFollowsActive(
   }, [listRef, items, activeIdRef]);
 }
 
-/**
- * The pager's page renderer. Stable across swipes for the same reason as
- * usePageStyle. A page whose bottom the pager covers with the suggestion bar
- * or its undo notice is told so, so a media caption can sit above it.
- */
 function usePagerPages({
   width,
   windowHeight,
@@ -327,9 +255,6 @@ function usePagerPages({
 }) {
   const acceptedId = accepted?.itemId;
   const { pageStyle, onListLayout } = usePageStyle(width, windowHeight);
-  // The media saves whose details sheet is up under the header: the header
-  // goes back to the light page's colors over them. Tracked per save, since
-  // a swipe leaves each page's sheet where it was.
   const [sheetsUnder, setSheetsUnder] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -344,10 +269,8 @@ function usePagerPages({
       }),
     [],
   );
-  const [browserOpen, setBrowserOpen] = useState(false);
   const renderItem = useCallback(
     ({ item }: { item: DetailItem }) => (
-      // AppEntityView tells Siri which save is on screen ("send this to Sam").
       <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
         <ItemDetail
           item={item}
@@ -355,20 +278,14 @@ function usePagerPages({
           pageHeight={pageStyle.height}
           reserveFooter={suggestedIds.has(item._id) || item._id === acceptedId}
           onSheetUnderHeader={onSheetUnderHeader}
-          onSourceBrowser={setBrowserOpen}
         />
       </AppEntityView>
     ),
     [pageStyle, pushedId, suggestedIds, acceptedId, onSheetUnderHeader],
   );
-  return { renderItem, onListLayout, sheetsUnder, browserOpen };
+  return { renderItem, onListLayout, sheetsUnder };
 }
 
-// Takes the save in view out of the space it was opened from, and only that
-// space: Home and its other spaces keep it. The page leaves the space's list,
-// so slide to a neighbour first, the way dismiss and delete do. A suggested
-// page has its own Dismiss, so only a saved one offers this, and Delete then
-// has to say it reaches every space.
 function useRemoveFromSpace({
   from,
   spaceId,
@@ -392,13 +309,10 @@ function useRemoveFromSpace({
 }) {
   const router = useRouter();
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
-  // Read live from the space's saved list, not the route: the save may have
-  // left the space in Change spaces while this screen stayed open.
   const available =
     from === "space" &&
     !!spaceId &&
     !!space?.items.some((item) => item._id === activeId);
-  // A second tap while the first is in flight would navigate twice.
   const pending = useRef(false);
   const remove = useCallback(async () => {
     if (!spaceId || !activeId || !items || pending.current) return;
@@ -426,7 +340,7 @@ function useRemoveFromSpace({
         goTo(neighbor._id);
         writeParams(neighbor._id);
       } else if (router.canGoBack()) router.back();
-      else router.replace("/");
+      else router.replace("/(app)/(tabs)/(home)");
     } catch {
       Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
     } finally {
@@ -447,14 +361,12 @@ function useRemoveFromSpace({
     available,
     remove,
     deleteLabel: available ? t("item.deleteEverywhere") : t("common.delete"),
-    // Spread straight into the Android header menu.
     menuActions: available
       ? [{ label: t("spaces.removeFromSpace"), onPress: remove }]
       : [],
   };
 }
 
-// The pager's list ref and whether its programmatic scrolls should animate.
 function usePagerScroll() {
   const listRef = useRef<FlashListRef<DetailItem>>(null);
   const reducedMotion = useReducedMotion();
@@ -485,11 +397,6 @@ function ItemScreenContent() {
   const [decisionBusy, setDecisionBusy] = useState(false);
   const { listRef, reducedMotion } = usePagerScroll();
 
-  // Rebuild the ordered sibling list from whichever list the user opened from.
-  // The home feed is paginated and shared through HomeFeedProvider, so every
-  // page the user scrolled to is already here; the other two queries are warm
-  // in the cache from the source screen. Either way this is a cache read, not
-  // a network round-trip. The conditional args use the 'skip' sentinel above.
   const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
     convexQuery(api.spaces.getSpace, spaceQueryArg(from, spaceId)),
@@ -498,14 +405,10 @@ function ItemScreenContent() {
     convexQuery(api.items.searchItems, searchQueryArg(from, q)),
   );
 
-  // A single-item fallback for deep links (no source) or a stale list that no
-  // longer contains this id.
   const { data: single } = useQuery(
     convexQuery(api.items.getItem, { id: id as Id<"items"> }),
   );
 
-  // Mirror the space screen's feed order exactly (suggestions first, then
-  // saved) so swiping pages through what the user saw in the grid.
   const list = useMemo<DetailItem[] | undefined>(() => {
     if (from === "space") {
       return spaceQ.data
@@ -513,6 +416,8 @@ function ItemScreenContent() {
         : undefined;
     }
     if (from === "search") return searchQ.data;
+    // On Android a deep start index in the home pager drew an empty page.
+    if (from === "next-up") return undefined;
     return homeFeed.items;
   }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
@@ -523,8 +428,6 @@ function ItemScreenContent() {
 
   const startIndex = list ? list.findIndex((i) => i._id === id) : -1;
 
-  // Prefer the sibling list when it contains this item; otherwise page over the
-  // single item alone. `undefined` means we're still loading.
   const items = useMemo<DetailItem[] | undefined>(
     () =>
       startIndex >= 0
@@ -539,8 +442,6 @@ function ItemScreenContent() {
 
   const onEndReached = pagerEndReached(items, homeFeed);
 
-  // The id the screen was pushed with owns the Apple-zoom target; captured once
-  // so swiping (which rewrites the `id` param) never re-pairs the transition.
   const [pushedId] = useState(id);
   const [activeId, setActiveId] = useState(id);
   const {
@@ -558,18 +459,10 @@ function ItemScreenContent() {
     [activeIdRef],
   );
 
-  // Keeping the route `id` param in sync writes navigation state, which
-  // re-renders the entire native-stack tree, a ~16ms cascade profiled as the
-  // single most expensive JS event per swipe. `activeId` (local state) already
-  // drives the header/toolbar/actions, so only the deep-link/restore URL needs
-  // the param (debounced so a run of swipes writes once, after it settles).
   const onViewable = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken<DetailItem>[] }) => {
-      const first = viewableItems[0]?.item as DetailItem | undefined;
+      const first = viewableItems[0]?.item;
       if (!first) return;
-      // Offscreen layout passes and scroll corrections re-emit viewability
-      // for the page already shown, and while a pushed screen or a dismiss
-      // animation holds focus, position changes aren't the user's intent.
       if (first._id === activeIdRef.current) return;
       if (!navigation.isFocused()) return;
       goTo(first._id);
@@ -578,7 +471,7 @@ function ItemScreenContent() {
     [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
 
-  const { renderItem, onListLayout, sheetsUnder, browserOpen } = usePagerPages({
+  const { renderItem, onListLayout, sheetsUnder } = usePagerPages({
     width,
     windowHeight: height,
     pushedId,
@@ -590,13 +483,8 @@ function ItemScreenContent() {
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
-  // A photo or social post opens in the black media viewer, so the chrome
-  // over it (header, status bar) turns light while it is the page in view.
   const media = pagerHeaderColors(activeItem, sheetsUnder, theme);
 
-  // List rows are card-shaped (no article body, no shopping status), so the
-  // toolbar reads those from getItem. `single` follows the debounced `id`
-  // param and can lag a swipe, hence the identity check.
   const activeFull =
     single && single._id === activeItem?._id ? single : undefined;
 
@@ -607,9 +495,6 @@ function ItemScreenContent() {
   );
   useItemOpen(activeItem, from ?? "direct", markOpened);
 
-  // A link shares its URL; a saved image/sticker shares the picture itself.
-  // Prefers the full getItem row when it has caught up, so link saves can use
-  // the extracted article content a card row does not carry.
   const shareActive = useItemShare(activeFull ?? activeItem);
 
   const copyLink = useCallback(async () => {
@@ -622,23 +507,6 @@ function ItemScreenContent() {
     }
   }, [activeItem]);
 
-  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(
-    activeFull ?? activeItem,
-  );
-
-  // Same picker the inline control opens, so membership behavior (and the
-  // formSheet presentation) is identical whichever entry point is used.
-  const openSpaces = useCallback(() => {
-    if (!activeItem) return;
-    router.push({
-      pathname: "/manage-spaces",
-      params: { itemId: activeItem._id },
-    });
-  }, [activeItem, router]);
-
-  // Suggested items (opened from a space) trade the normal footer for an
-  // Add / Dismiss decision bar. Accepting keeps the page open: the bar just
-  // drops away as the suggestion becomes a real membership.
   const activeIsSuggested =
     from === "space" &&
     !!spaceId &&
@@ -695,11 +563,7 @@ function ItemScreenContent() {
 
   const onDismiss = useCallback(async () => {
     if (!spaceId || !activeId || !items) return;
-    // Cancel any pending debounced setParams so it doesn't revert the
-    // immediate param write below to the just-dismissed item.
     cancelParamWrite();
-    // The dismissed item leaves the space's list; slide to a neighbour first,
-    // mirroring delete, so the pager never lands on a vanished page.
     const idx = items.findIndex((i) => i._id === activeId);
     const neighbor = items[idx + 1] ?? items[idx - 1];
     const dismissedId = activeId as Id<"items">;
@@ -713,11 +577,16 @@ function ItemScreenContent() {
     } else {
       router.back();
     }
-    const changed = await dismissSuggestion({
-      itemId: dismissedId,
-      spaceId: spaceId as Id<"spaces">,
-    });
-    if (changed) analytics.capture("suggestion_dismissed");
+    try {
+      const changed = await dismissSuggestion({
+        itemId: dismissedId,
+        spaceId: spaceId as Id<"spaces">,
+      });
+      if (changed) analytics.capture("suggestion_dismissed");
+    } catch (error) {
+      analytics.captureError("suggestion_dismiss_failed", error);
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
+    }
   }, [
     spaceId,
     activeId,
@@ -731,27 +600,29 @@ function ItemScreenContent() {
     reducedMotion,
   ]);
 
-  const onDelete = useCallback(async () => {
+  const onDelete = useCallback(() => {
     if (!activeItem || !items) return;
-    cancelParamWrite();
-    const idx = items.findIndex((item) => item._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    try {
-      await deleteItem({ id: activeItem._id });
-      forgetDeletedSharedItem(activeItem._id);
-      analytics.capture("item_deleted", { item_type: activeItem.type });
-      if (neighbor) {
-        goTo(neighbor._id);
-        writeParams(neighbor._id);
-        listRef.current?.scrollToIndex({
-          index: Math.min(idx, items.length - 2),
-          animated: !reducedMotion,
-        });
-      } else if (router.canGoBack()) router.back();
-      else router.replace("/");
-    } catch {
-      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-    }
+    confirmItemDelete(async () => {
+      cancelParamWrite();
+      const idx = items.findIndex((item) => item._id === activeItem._id);
+      const neighbor = items[idx + 1] ?? items[idx - 1];
+      try {
+        await deleteItem({ id: activeItem._id });
+        forgetDeletedSharedItem(activeItem._id);
+        analytics.itemDeleted(activeItem, "item_detail");
+        if (neighbor) {
+          goTo(neighbor._id);
+          writeParams(neighbor._id);
+          listRef.current?.scrollToIndex({
+            index: Math.min(idx, items.length - 2),
+            animated: !reducedMotion,
+          });
+        } else if (router.canGoBack()) router.back();
+        else router.replace("/(app)/(tabs)/(home)");
+      } catch {
+        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
+      }
+    });
   }, [
     activeItem,
     items,
@@ -794,15 +665,9 @@ function ItemScreenContent() {
         options={{
           headerShown: true,
           headerBackButtonDisplayMode: "minimal",
-          // Always set: Stack.Screen merges options, so leaving the key out
-          // would keep a media page's white tint on the next article.
           headerTintColor: media.tint,
           ...(Platform.OS === "android"
             ? {
-                // Android has no progressive-blur band, so a transparent
-                // header leaves scrolled content running through the title
-                // text. Give the toolbar the opaque treatment the space
-                // screen uses; content then starts below it natively.
                 headerTransparent: false,
                 headerStyle: { backgroundColor: media.background },
                 headerTitleAlign: "center",
@@ -814,22 +679,9 @@ function ItemScreenContent() {
                       activeItem?.title ?? activeItem?.note ?? t("item.actions")
                     }
                     actions={[
-                      ...(activeItem?.status === "ready"
-                        ? [{ label: t("spaces.addItem"), onPress: openSpaces }]
-                        : []),
                       { label: t("common.share"), onPress: shareActive },
                       ...(activeItem?.url
                         ? [{ label: t("item.copyLink"), onPress: copyLink }]
-                        : []),
-                      ...(activeItem?.status === "ready" &&
-                      activeItem.type !== "note"
-                        ? [
-                            {
-                              label: t("products.findLinks"),
-                              onPress: onFindLinks,
-                              disabled: searchDisabled,
-                            },
-                          ]
                         : []),
                       ...removeFromSpace.menuActions,
                       {
@@ -850,14 +702,6 @@ function ItemScreenContent() {
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Menu icon="ellipsis">
-            {activeItem?.status === "ready" ? (
-              <Stack.Toolbar.MenuAction
-                icon="rectangle.stack"
-                onPress={openSpaces}
-              >
-                {t("spaces.addItem")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.up"
               onPress={shareActive}
@@ -867,15 +711,6 @@ function ItemScreenContent() {
             {activeItem?.url ? (
               <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
                 {t("item.copyLink")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-            {activeItem?.status === "ready" && activeItem.type !== "note" ? (
-              <Stack.Toolbar.MenuAction
-                icon="bag"
-                onPress={onFindLinks}
-                disabled={searchDisabled}
-              >
-                {t("products.findLinks")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
@@ -913,23 +748,9 @@ function ItemScreenContent() {
         onEndReachedThreshold={2}
       />
 
-      {/* A pinned blur band behind the transparent iOS header: without it,
-          scrolled article text and photos pass right through the header's
-          title and date. Android has no blur band, so it gets the opaque
-          toolbar below instead.
-
-          This header stacks a title over a date, filling the band down to its
-          bottom edge, so the default fade (which dissolves inside the band)
-          would leave that text in front of barely-blurred content. Carry the
-          blur across the whole band and land the fade where the reader
-          layout's content begins — the same gap(1.5) — so nothing at rest is
-          hazed. */}
-      <PagerHeaderBackdrop onMedia={media.onMedia} browserOpen={browserOpen} />
+      <PagerHeaderBackdrop onMedia={media.onMedia} />
 
       {activeIsSuggested ? (
-        // SlideInDown (not a fade) so the bar never mounts at opacity 0: a
-        // GlassView whose parent starts fully transparent silently fails to
-        // render the liquid glass (expo/expo#41024).
         <Animated.View
           entering={SlideInDown.duration(250)}
           exiting={FadeOutDown.duration(200)}
@@ -1059,8 +880,6 @@ const styles = StyleSheet.create((theme) => ({
   acceptWrap: {
     flex: 2,
   },
-  // Shared glass surface for both decision buttons. No backgroundColor/border.
-  // The liquid glass provides the material; the CTA sets it via tintColor.
   decisionButton: {
     flexDirection: "row",
     alignItems: "center",

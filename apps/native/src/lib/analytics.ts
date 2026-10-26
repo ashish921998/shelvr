@@ -1,11 +1,14 @@
 import {
-  SAFE_ERROR_MESSAGES,
   posthog,
   resetIfIdentified as resetClientIfIdentified,
+  safeExceptionValue,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
+import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
+import type { SampleCityId } from "@/lib/sample-cities";
+import type { PlanKind } from "@/lib/sample-plans";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -37,29 +40,15 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-/**
- * Which sign-in UI started an OAuth attempt. `$screen_name` cannot tell these
- * apart, because the onboarding route renders both the full-page view and the
- * demo sheet, and only the sheet runs the flow from inside a native modal.
- */
-export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
-/** How a sign-in ran: the system's Sign in with Apple sheet on iOS, or a web
- * session, which is every other provider and Apple where the sheet is missing. */
+export type OAuthSurface = "sign_in_view";
 export type AuthMethod = "native" | "web";
 
-/** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
- * products on the presented offering, folded to one bounded word: the trial is
- * available, it is not, the products carry no intro offer at all, or the SDK
- * could not tell. */
 export type TrialEligibility =
   | "eligible"
   | "ineligible"
   | "no_intro"
   | "unknown";
 
-/** The paywall context read from RevenueCat while the sheet opens. Optional
- * on every event that carries it: an SDK without cached offerings, or a read
- * that raced its deadline, reports nothing rather than a guess. */
 export type PaywallContext = {
   offering_id?: string;
   trial_eligible?: TrialEligibility;
@@ -71,18 +60,15 @@ export type PaywallAttemptProperties = {
   source_placement?: string;
 } & PaywallContext;
 
-/** A paywall attempt's outcome events: the attempt's identity, the context
- * read while the sheet opened, and how long the sheet was up. */
 type PaywallOutcomeProperties = PaywallAttemptProperties & {
   duration_ms: number;
 };
 
-/** The funnel stage vocabulary for `save_kind`. */
 type SaveKind = "link" | "note" | "image";
 
 type NextUpKind = "read" | "cook" | "watch" | "open";
 
-type AnalyticsEventProperties = {
+export type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
     step_index: number;
@@ -94,9 +80,14 @@ type AnalyticsEventProperties = {
     flow_version: number;
     duration_ms: number;
   };
-  // The four OAuth flow events share one `auth_attempt_id` per
-  // `signInWith` call, so a funnel can pair each start with the outcome that
-  // ended it and count repeat starts by one person without guessing on time.
+  onboarding_opener_page_viewed: { page_index: number };
+  onboarding_commitment: {
+    action: "confirmed" | "skipped";
+    plan_kind: PlanKind;
+    sample_city: SampleCityId;
+    flow_version: number;
+  };
+  onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
     method: AuthMethod;
@@ -106,18 +97,12 @@ type AnalyticsEventProperties = {
   auth_cancelled: {
     provider: string;
     method: AuthMethod;
-    // Set when a web session ended before its sheet could have shown and was
-    // reopened once. The outcome is the second session's.
     auto_retry?: true;
     elapsed_ms: number;
     browser_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
-    // iOS reports a person backing out and a session that never presented as
-    // the same `cancel`, so the fields below carry what the OS said. The
-    // NSError domain and code are bounded and carry no user content; the
-    // description they come from is not sent, because free-form error text is
-    // redacted out of this project's telemetry on purpose.
+    // iOS reports a person backing out and a session that never presented as the same cancel.
     result: "cancel" | "dismiss";
     native_error_domain?: string;
     native_error_code?: number;
@@ -127,15 +112,11 @@ type AnalyticsEventProperties = {
     method: AuthMethod;
     auto_retry?: true;
     stage: "request" | "browser" | "exchange";
-    // The native module's own code (ERR_REQUEST_FAILED and the like), when the
-    // failure came from one. A fixed vocabulary, never a message.
     error_code?: string;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
   };
-  // A sign-in that finished in this session. `auth_completed` below is the
-  // identify-time signal and also fires on every signed-in cold start.
   auth_succeeded: {
     provider: string;
     method: AuthMethod;
@@ -145,25 +126,12 @@ type AnalyticsEventProperties = {
     auth_attempt_id: string;
   };
   auth_completed: Record<string, never>;
-  // Widget snapshot and file cleanup completed, including signed-out startup
-  // and foreground recovery. This counts cleanup operations, not sign-outs or
-  // confirmed WidgetKit redraws.
   widget_cleared: Record<string, never>;
-  // A widget thumbnail could not be built, so the item degraded to its text
-  // tile. `reason` separates a bounded timeout (a stalled download or wedged
-  // decode) from any other download or decode error. It never carries the
-  // image URL or any saved content.
   widget_sync_failed: { reason: "timeout" | "error" };
   paywall_requested: PaywallAttemptProperties;
-  // Every event after the request carries the context fields (`offering_id`,
-  // `trial_eligible`) read from RevenueCat while the sheet opens, joining
-  // back to the request through the shared attempt id. `paywall_requested`
-  // stays lean on purpose: it fires before any SDK read.
   paywall_presentation_started: PaywallAttemptProperties;
   paywall_shown: PaywallOutcomeProperties;
   paywall_cancelled: PaywallOutcomeProperties;
-  // `product_id` is the store product behind the now-active entitlement, read
-  // from RevenueCat's customer info right after the sheet resolved.
   paywall_purchase_completed: PaywallOutcomeProperties & {
     product_id?: string;
   };
@@ -172,26 +140,11 @@ type AnalyticsEventProperties = {
     reason: string;
     duration_ms: number;
   };
-  // The user tapped purchase inside the exit-offer sheet. The imperative
-  // `presentPaywall` API reports no purchase-start callback, so for the main
-  // paywall this signal does not exist; the tap-to-checkout gap is only
-  // measurable where the paywall is a mounted component.
-  paywall_purchase_started: {
-    placement: string;
-    paywall_attempt_id: string;
-    package_id: string;
-  };
-  // A purchase or restore made the Convex `subscriptions` row visible to the
-  // client: the webhook delivered, the query updated. `delay_ms` measures
-  // the purchase-to-entitlement path, not the whole funnel.
   entitlement_activated: {
     status: "trialing" | "pro" | "lifetime";
     source: "purchase" | "restore";
     delay_ms: number;
   };
-  // A gated action at `placement` that was blocked by the paywall later ran.
-  // `purchased_since_block` says whether the same session's sheet resolved in
-  // a purchase or restore between the block and the retry.
   paywall_blocked_action_resumed: {
     placement: string;
     delay_ms: number;
@@ -199,13 +152,6 @@ type AnalyticsEventProperties = {
   };
   item_opened: ItemProperties & { source: string };
   item_action: ItemProperties & { action: ItemAction };
-  // The first-save funnel's client legs. `save_attempt_started` fires when a
-  // submission actually begins (a composer save tap, a share entry, or an
-  // image operation), after the auth and Pro gates, which the paywall and
-  // auth events already cover. `save_source` matches the server's
-  // `item_saved`, and idempotent operations join on `operation_id`.
-  // `save_failed` carries the bounded stage; content, URLs, and error text
-  // never appear.
   save_attempt_started: {
     save_source: SaveSource;
     save_kind: SaveKind;
@@ -220,8 +166,6 @@ type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
-  // Photo saves fail as data, never as thrown errors, so error tracking never
-  // sees them. `reason` is one of three fixed words, never the message text.
   images_save_failed: { reason: ImageSaveFailureReason; image_count: number };
   photo_captured: { capture_mode: "photo" | "sticker" };
   item_space_membership_changed: {
@@ -230,44 +174,49 @@ type AnalyticsEventProperties = {
     space_id: string;
     undone: boolean;
   };
-  // `share_ref` is set when a branded link went out: a hash of its token that
-  // matches the web share page's `share_page_viewed` and `app_store_clicked`.
   item_shared: { surface: "item_detail" | "feed"; share_ref?: string };
   item_link_copied: Record<string, never>;
-  item_deleted: { item_type: AnalyticsItem["type"] };
+  item_deleted: ItemProperties & { surface: "item_detail" | "feed" };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
   space_created: { dynamic: boolean; auto_file: boolean };
   space_updated: { dynamic: boolean; auto_file: boolean };
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
-  // "Make a plan" on a space. `considered` is the saves read, `place_count`
-  // the shortlist size (0 = nothing named a place).
   plan_made: { considered: number; place_count: number };
-  plan_failed: { reason: "ai_consent" | "error" };
+  plan_failed: { reason: "error" };
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
   plan_shared: { place_count: number; picked: boolean };
+  plan_asked: { place_count: number };
+  plan_ask_failed: { reason: "link" | "share" };
+  trip_made: {
+    considered: number;
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    made: boolean;
+  };
+  trip_failed: { reason: "error" };
+  city_opened: { count: number };
+  city_plan_started: { kind: "date" | "trip" };
+  trip_stop_opened: { day: number; stop: number };
+  trip_directions_opened: { located: boolean };
+  trip_stop_swapped: { day: number };
   onboarding_completed: {
-    // Always empty since the pileup question was removed. Kept so existing
-    // PostHog insights keep a stable property shape.
     save_pileup: string[];
-    // The setup step's "What do you save?" kinds, which seed the space presets.
-    save_types: string[];
-    // The interests step's picked topics. Each is also one of the spaces.
     interests: string[];
+    travel_vibes: string[];
+    sample_city: SampleCityId | null;
+    goal: Goal | null;
+    goals: Goal[];
+    saved_count: SavedCount | null;
+    planner: Planner | null;
     space_count: number;
-    // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
     custom_space_count: number;
-    // Mirror the setup answers onto the person so they're durable for
-    // segmentation after the (later) sign-in identify merges the anon person.
-    $set: { save_pileup: string[]; save_types: string[] };
+    $set: { save_pileup: string[] };
   };
-  // Feedback events never carry message text; see lib/feedback.ts. The
-  // submission event fires only after Convex acknowledges persistence. The
-  // message itself lives in Convex and the support inbox, never in PostHog.
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
   feedback_opened: { surface: string };
@@ -276,60 +225,30 @@ type AnalyticsEventProperties = {
     char_count: number;
     delivery: "scheduled" | "unconfigured";
   };
-  // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
-  // space names. Only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
-  onboarding_demo_skipped: Record<string, never>;
-  // A first-save pick, before any sign-in. `sample` is a ready-made link
-  // (previewed when signed out); otherwise a pasted, typed or shared one.
-  onboarding_demo_picked: { sample: boolean; signed_in: boolean };
-  // The onboarding sign-in ask: the demo's sheet (a pasted or typed link) or
-  // the screen after a previewed sample. "dismissed" is the sheet's scrim or
-  // back, or that screen's back button; a sign-in itself shows as auth_started.
-  onboarding_signin_prompt: {
-    surface: "demo_sheet" | "sample_preview";
-    action: "shown" | "dismissed";
-  };
-  // The share-sheet practice before the paywall (onboarding/share-practice.tsx).
-  // "received" is a share that reached Shelvr, saved later by the share
-  // screen. "other_app" can repeat; the other outcomes fire once per mount.
   onboarding_share_practice: {
-    outcome: "received" | "other_app" | "skipped" | "sheet_failed";
-  };
-  // The onboarding notifications step's answer. `granted` is what the OS
-  // reported after the tap; a skipped step (nothing to ask) sends nothing.
-  onboarding_reminder: {
-    action: "remind" | "skip";
-    slot: "tonight" | "tomorrow" | "weekend" | "nextWeek";
-    granted: boolean;
-  };
-  onboarding_demo_result: {
-    outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
+    outcome:
+      | "received"
+      | "other_app"
+      | "dismissed"
+      | "sheet_stuck"
+      | "skipped"
+      | "sheet_failed";
   };
   shared_content_saved: { item_count: number };
-  // Android task-restore ghost: the share screen skipped a replayed batch
-  // that was already handled (recordCompletedShare tombstone matched).
+  // Android replays a share on task restore; counts the replays the share screen skipped.
   share_ghost_skipped: Record<string, never>;
-  // Save recall card on Home (lib/use-save-recall.ts). Counts only: never the
-  // saved item's title, tags, or URL.
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
-  // "Open this next" card on Home (lib/next-up.ts). The kind only: never the
-  // save's title or URL.
   next_up_shown: { kind: NextUpKind };
   next_up_opened: { kind: NextUpKind };
   next_up_dismissed: { kind: NextUpKind };
-  // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
-  // per account per launch. `saved` is the real-save count, demo excluded.
   save_progress_card_shown: { saved: number };
   save_progress_card_action: {
     action: "photos" | "note" | "dismiss";
     saved: number;
   };
-  // Once per account, when a shelf this device watched below the goal
-  // reaches it (lib/save-goal.ts). `hours_since_start` counts from that
-  // first sighting, so "3+ saves in 48h" is `hours_since_start <= 48`.
   save_goal_reached: {
     goal: number;
     hours_since_start: number;
@@ -338,31 +257,14 @@ type AnalyticsEventProperties = {
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
   trial_reminder_primer: { outcome: "accepted" | "declined" };
-  // Post-purchase save handoff on Home (lib/welcome-save.ts).
   welcome_save_shown: { trial: boolean };
-  welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
-  exit_offer_reminder_opt_in: { granted: boolean };
-  exit_offer_reminder_opt_out: Record<string, never>;
-  exit_offer_expired_open: Record<string, never>;
-  // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
-  // never free text. A response is stated intent, NOT proof of cancellation.
-  // Only the server-side webhook events (trial_cancelled, …) count as
-  // cancellations; funnels must never divide by survey responses.
-  // Only the prompted outcome: a cold start that finds an existing grant is
-  // not a decision the user just made.
+  welcome_save_action: { action: "explore" | "dismiss"; trial: boolean };
   notification_permission_result: {
     outcome: "granted" | "provisional" | "denied";
   };
   notification_opened: { notification_kind: string; notification_id: string };
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
-  };
-  // Third-party AI consent (lib/ai-consent.ts). `shown` is the card;
-  // `answered` also covers the Settings switch.
-  ai_consent_shown: Record<string, never>;
-  ai_consent_answered: {
-    granted: boolean;
-    surface: "card" | "settings" | "sign_in";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
@@ -386,9 +288,7 @@ function capture<Event extends AnalyticsEvent>(
       environment: Constants.expoConfig?.extra?.variant ?? "development",
       analytics_version: 1,
     });
-  } catch {
-    // Analytics must never change the outcome of a product action.
-  }
+  } catch {}
 }
 
 const SAFE_ERROR_NAMES = new Set([
@@ -408,8 +308,6 @@ function captureError(
   error: unknown,
   properties: Record<string, string | number | boolean> = {},
 ): void {
-  // Custom names, messages, and stacks can contain user content. Only a
-  // known error type is safe for console diagnostics without PostHog.
   const errorType =
     error instanceof Error
       ? SAFE_ERROR_NAMES.has(error.name)
@@ -421,10 +319,16 @@ function captureError(
 
   try {
     const original = error instanceof Error ? error : new Error(typeof error);
+    const message =
+      error instanceof Error
+        ? (safeExceptionValue(error.message) ??
+          safeExceptionValue((error as { code?: unknown }).code) ??
+          error.name)
+        : original.message;
     const reported =
-      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+      message === original.message
         ? original
-        : Object.assign(new Error(original.name), {
+        : Object.assign(new Error(message), {
             name: original.name,
             stack: original.stack,
           });
@@ -434,9 +338,7 @@ function captureError(
       environment: Constants.expoConfig?.extra?.variant ?? "development",
       analytics_version: 1,
     });
-  } catch {
-    // Error reporting must never mask or replace the original failure.
-  }
+  } catch {}
 }
 
 function sessionId(): string | undefined {
@@ -456,8 +358,6 @@ function itemProperties(item: AnalyticsItem): ItemProperties {
   };
 }
 
-/** The feeds an open is attributed to. Anything else (a deep link, a share
- * preview) is `direct`. */
 const OPENED_SOURCES = new Set(["home", "space", "search", "digest", "map"]);
 
 function itemOpened(item: AnalyticsItem, source: string): void {
@@ -473,35 +373,29 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
     capture("item_action", { ...itemProperties(item), action });
 }
 
-// The Convex user id is the whole identity PostHog needs. The email stays in
-// Convex: sending it as a person property would copy PII into a third party
-// (and into replay-linked person profiles) for no analytics gain.
+function itemDeleted(
+  item: AnalyticsItem,
+  surface: "item_detail" | "feed",
+): void {
+  if (!item.fixtureKey)
+    capture("item_deleted", { ...itemProperties(item), surface });
+}
+
 function identify(userId: string): void {
   if (!posthog) return;
 
   try {
     posthog.identify(userId);
-  } catch {
-    // Analytics must never block authentication or app rendering.
-  }
+  } catch {}
 }
 
-/** The only reset. Resets only when PostHog still holds an identified user:
- * a signed-out launch keeps its anonymous id, while an explicit sign-out, an
- * account deletion, or an expired session stops attributing events to the
- * previous account once Convex reports it. A device that was never
- * identified has no link to break, so rotating its anonymous id would only
- * split one person's onboarding across two profiles. Invoked solely from
- * `useAnalyticsIdentity` on the auth edge; sign-out flows must not reset
- * analytics themselves. */
+/** Resets only an identified PostHog user, since a reset rotates the anonymous id; call only from `useAnalyticsIdentity`. */
 async function resetIfIdentified(): Promise<void> {
   if (!posthog) return;
 
   try {
     await resetClientIfIdentified(posthog);
-  } catch {
-    // Analytics must never block sign-out.
-  }
+  } catch {}
 }
 
 function screen(route: string): void {
@@ -510,9 +404,7 @@ function screen(route: string): void {
       environment: Constants.expoConfig?.extra?.variant ?? "development",
       analytics_version: 1,
     });
-  } catch {
-    // Screen tracking must never interrupt navigation.
-  }
+  } catch {}
 }
 
 export const analytics = {
@@ -524,4 +416,5 @@ export const analytics = {
   screen,
   itemOpened,
   itemAction,
+  itemDeleted,
 };

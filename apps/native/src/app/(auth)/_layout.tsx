@@ -6,7 +6,6 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 
 export default function AuthRoutesLayout() {
   useAppLocale();
-  // Fade instead of slide under Reduce Motion.
   const reducedMotion = useReducedMotion();
   const { isLoading, isAuthenticated } = useConvexAuth();
 
@@ -15,7 +14,7 @@ export default function AuthRoutesLayout() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href={"/"} />;
+    return <Redirect href="/(app)/(tabs)/(home)" />;
   }
 
   return (

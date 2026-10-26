@@ -36,8 +36,11 @@ export default function GlobalError({
             Something went wrong
           </h1>
           <p style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
-            The page hit an unexpected error. You can try again, or email
-            {SUPPORT_EMAIL} if it keeps happening.
+            The page hit an unexpected error. You can try again, or email{" "}
+            <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: "inherit" }}>
+              {SUPPORT_EMAIL}
+            </a>{" "}
+            if it keeps happening.
           </p>
           <button
             onClick={reset}

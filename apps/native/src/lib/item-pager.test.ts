@@ -5,8 +5,6 @@ const list = (...ids: string[]) => ids.map((_id) => ({ _id }));
 
 describe("pagerResyncIndex", () => {
   it("follows an accepted suggestion to its place among the saved items", () => {
-    // Space feed order is suggestions first, then saved. Accepting "a" moves
-    // it behind the remaining suggestion "b".
     expect(pagerResyncIndex(list("a", "b"), list("b", "a"), "a")).toBe(1);
   });
 

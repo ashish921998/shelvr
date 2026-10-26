@@ -2,25 +2,25 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { Image } from "expo-image";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { withAlpha } from "@/lib/color";
 
 const APP_ICON = require("../../assets/icon.png");
 
-/**
- * A lock-screen style mock of a Shelvr notification. Defaults to the Sunday
- * weekly shelf.
- */
+/** `frosted` sits it over a photo on a near-opaque surface, as iOS draws a banner over content. */
 export function NotificationPreview({
   body,
   title,
   when,
+  frosted = false,
 }: {
   body: string;
   title?: string;
   when?: string;
+  frosted?: boolean;
 }) {
   useAppLocale();
   return (
-    <View style={styles.push} accessible>
+    <View style={[styles.push, frosted && styles.frosted]} accessible>
       <Image source={APP_ICON} style={styles.icon} />
       <View style={styles.text}>
         <View style={styles.top}>
@@ -44,6 +44,9 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
+  },
+  frosted: {
+    backgroundColor: withAlpha(theme.colors.surface, 0.94),
   },
   icon: {
     width: 32,

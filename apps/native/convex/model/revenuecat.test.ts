@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  grantedByTestStore,
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   parseRevenueCatSnapshot,
@@ -23,15 +24,12 @@ describe("parseRevenueCatEvent", () => {
       expiresAt: undefined,
       productId: "monthly",
       periodType: undefined,
+      testStore: false,
       eventTimestampMs: undefined,
     });
   });
 
   it("returns other event types without an expiration timestamp (handler decides)", () => {
-    // The parser returns any readable event; the HTTP handler decides whether
-    // to act on it or acknowledge it. A RENEWAL with null expiration is still
-    // parsed: the handler will pass expiresAt: 0 to upsert, which preserves
-    // the existing row's expiry.
     expect(
       parseRevenueCatEvent({
         event: {
@@ -46,6 +44,7 @@ describe("parseRevenueCatEvent", () => {
       expiresAt: undefined,
       productId: undefined,
       periodType: undefined,
+      testStore: false,
       eventTimestampMs: undefined,
     });
   });
@@ -216,8 +215,6 @@ describe("RevenueCat project entitlement isolation", () => {
   });
 });
 
-// A mutation-testing pass (Stryker) showed these rules could be
-// removed without any test failing.
 describe("RevenueCat parsing edge cases", () => {
   const now = Date.parse("2026-09-08T12:00:00Z");
   function customer(entitlement: unknown, extra: Record<string, unknown> = {}) {
@@ -342,8 +339,36 @@ describe("RevenueCat parsing edge cases", () => {
       expiresAt: undefined,
       productId: undefined,
       periodType: undefined,
+      testStore: false,
       eventTimestampMs: undefined,
     });
+  });
+
+  it.each([
+    [
+      "the account an anonymous purchase was aliased to",
+      "$RCAnonymousID:abc",
+      ["$RCAnonymousID:abc", "user-1"],
+      "user-1",
+    ],
+    [
+      "an anonymous id with no account yet",
+      "$RCAnonymousID:abc",
+      ["$RCAnonymousID:abc"],
+      "$RCAnonymousID:abc",
+    ],
+    [
+      "an account's own id over its aliases",
+      "user-1",
+      ["$RCAnonymousID:abc", "user-2"],
+      "user-1",
+    ],
+  ])("names %s as the owner", (_case, appUserId, aliases, owner) => {
+    expect(
+      parseRevenueCatEvent({
+        event: { type: "RENEWAL", app_user_id: appUserId, aliases },
+      })?.userId,
+    ).toBe(owner);
   });
 
   it("only reads transfer participants on TRANSFER events", () => {
@@ -382,5 +407,54 @@ describe("RevenueCat parsing edge cases", () => {
         event: { type: "TRANSFER", transferred_from: ids },
       })?.transferredFrom,
     ).toEqual(ids);
+  });
+});
+
+describe("Test Store purchases", () => {
+  const event = (fields: Record<string, string>) =>
+    parseRevenueCatEvent({ event: { type: "INITIAL_PURCHASE", ...fields } });
+  const yearly = (store: string) => ({
+    subscriber: {
+      entitlements: { "Shelvr Pro": { product_identifier: "yearly" } },
+      subscriptions: { yearly: { store } },
+    },
+  });
+  const lifetime = (...stores: string[]) => ({
+    subscriber: {
+      entitlements: { "Shelvr Pro": { product_identifier: "lifetime" } },
+      subscriptions: {},
+      non_subscriptions: {
+        lifetime: stores.map((store, index) => ({ id: String(index), store })),
+      },
+    },
+  });
+
+  it("knows a Test Store event by its store, or by its app when it leaves the store out", () => {
+    expect(event({ store: "TEST_STORE" })?.testStore).toBe(true);
+    expect(event({ app_id: "app20ea108057" })?.testStore).toBe(true);
+    expect(
+      event({ store: "APP_STORE", app_id: "app8c34b380e7" })?.testStore,
+    ).toBe(false);
+    expect(event({})?.testStore).toBe(false);
+  });
+
+  it("trusts a named store over the app a promotional grant is filed under", () => {
+    expect(
+      event({ store: "PROMOTIONAL", app_id: "app20ea108057" })?.testStore,
+    ).toBe(false);
+  });
+
+  it("knows an entitlement granted by a Test Store subscription", () => {
+    expect(grantedByTestStore(yearly("test_store"), "Shelvr Pro")).toBe(true);
+    expect(grantedByTestStore(yearly("app_store"), "Shelvr Pro")).toBe(false);
+    expect(grantedByTestStore(yearly("test_store"), "shelvr_pro")).toBe(false);
+  });
+
+  it("counts a one-time product as Test Store only when every purchase came from it", () => {
+    expect(grantedByTestStore(lifetime("test_store"), "Shelvr Pro")).toBe(true);
+    expect(
+      grantedByTestStore(lifetime("test_store", "app_store"), "Shelvr Pro"),
+    ).toBe(false);
+    expect(grantedByTestStore(lifetime(), "Shelvr Pro")).toBe(false);
   });
 });

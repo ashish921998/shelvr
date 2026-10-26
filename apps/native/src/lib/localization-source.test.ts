@@ -60,8 +60,6 @@ function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
       checkKey(node.whenTrue);
       checkKey(node.whenFalse);
     }
-    // Non-literal keys are constrained by t()'s generated MessageKey type.
-    // This also checks arrays/maps and required interpolation parameters in tsc.
   };
   const checkAlertButtons = (node: ts.Node) => {
     if (
@@ -121,7 +119,7 @@ function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
 it.each([
   '<Failure retryLabel="Try again" cancelLabel="Cancel" />',
   '<Stack.Screen options={{ title: "spaces" }} />',
-  '<Text>{count === 1 ? "1 deleted" : t("tidy.deletedCount", { count })}</Text>',
+  '<Text>{count === 1 ? "1 deleted" : t("item.deletedCount", { count })}</Text>',
   '<Failure retryLabel={failed ? "Retry" : "Done"} />',
   'import { Alert } from "react-native"; Alert.alert("Could not save", "Try again.")',
   'import { Alert } from "react-native"; Alert.alert(t("common.save"), undefined, [{ text: "Retry" }])',

@@ -1,10 +1,6 @@
-// Tests for the SDK boundary the app configures: the `before_send` hook must
-// apply the same message allowlist to autocaptured `$exception` events that
-// analytics.captureError applies to handled errors. The SDK itself is stubbed,
-// so the real PostHog client never loads. Runs in the Node default env.
 import { describe, expect, it, vi } from "vitest";
 
-import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
+import { safeExceptionValue, superProperties } from "./posthog";
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
@@ -20,9 +16,6 @@ type EventLike = {
 };
 
 const posthogCtor = vi.hoisted(() => {
-  // The module news up the client and registers environment properties on it
-  // at import time, so the stub must be a constructible class exposing the
-  // constructor options (where the send hook lives) and the touched surface.
   class PostHogStub {
     static options: unknown;
     register: unknown;
@@ -53,7 +46,6 @@ vi.mock("expo-constants", () => ({
   },
 }));
 
-// The hook's key is the SDK's fixed snake_case option name.
 function sentBeforeSend(): BeforeSend {
   const options = posthogCtor.options as Record<string, BeforeSend>;
   expect(options, "PostHog was constructed with options").toBeTruthy();
@@ -112,6 +104,99 @@ describe("posthog before_send", () => {
     expect(list[0].value).toBe("ERR_UNAVAILABLE");
   });
 
+  it.each([
+    ["an empty frame list", { type: "raw", frames: [] }],
+    ["no stack trace", undefined],
+  ])(
+    "groups and names a handled error with %s by its failure code",
+    (_shape, stacktrace) => {
+      const sent = sentBeforeSend()({
+        event: "$exception",
+        properties: {
+          error_event: "sample_map_camera_failed",
+          $exception_list: [{ type: "Error", value: "Error", stacktrace }],
+        },
+      });
+      expect(sent.properties).toMatchObject({
+        $exception_fingerprint: "sample_map_camera_failed:Error",
+        $issue_name: "sample_map_camera_failed",
+      });
+    },
+  );
+
+  it("keeps two causes of one stackless failure in separate issues", () => {
+    const send = (value: string) =>
+      sentBeforeSend()({
+        event: "$exception",
+        properties: {
+          error_event: "auth_failed",
+          $exception_list: [{ type: "Error", value }],
+        },
+      }).properties?.$exception_fingerprint;
+    expect(send("ERR_CANCELED")).toBe("auth_failed:ERR_CANCELED");
+    expect(send("Network request failed")).toBe(
+      "auth_failed:Network request failed",
+    );
+  });
+
+  it("never puts a raw message into a stackless fingerprint", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "auth_failed",
+        $exception_list: [
+          { type: "Error", value: "Failed for https://private.example/note" },
+        ],
+      },
+    });
+    expect(sent.properties?.$exception_fingerprint).toBe("auth_failed:Error");
+  });
+
+  it("never puts a type that is not a class name into a stackless fingerprint", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "auth_failed",
+        $exception_list: [{ type: "Bearer private-token", value: "x y" }],
+      },
+    });
+    expect(sent.properties?.$exception_fingerprint).toBe("auth_failed");
+  });
+
+  it("leaves a handled error that has stack frames to PostHog's grouping", () => {
+    const sent = sentBeforeSend()({
+      event: "$exception",
+      properties: {
+        error_event: "render_error",
+        $exception_list: [
+          {
+            type: "TypeError",
+            value: "TypeError",
+            stacktrace: { type: "raw", frames: [{ filename: "app.js" }] },
+          },
+        ],
+      },
+    });
+    expect(sent.properties).not.toHaveProperty("$exception_fingerprint");
+    expect(sent.properties).not.toHaveProperty("$issue_name");
+  });
+
+  it("leaves an autocaptured exception with no failure code to PostHog", () => {
+    const sent = sentBeforeSend()(
+      exceptionEvent({
+        list: [
+          {
+            type: "Error",
+            value: "Error",
+            stacktrace: { type: "raw", frames: [] },
+          },
+        ],
+      }),
+    );
+    expect(sent.properties).not.toHaveProperty("$exception_fingerprint");
+    expect(sent.properties).not.toHaveProperty("$issue_name");
+  });
+
   it("redacts an all-caps message that is not a bare code token", () => {
     const beforeSend = sentBeforeSend();
     const sent = beforeSend(
@@ -151,8 +236,6 @@ describe("posthog before_send", () => {
     expect(serialized).not.toContain(noteUrl);
     expect(sent.properties?.$exception_message).toBe("TypeError");
     const list = sent.properties?.$exception_list as ExceptionListEntry[];
-    // The class identifies the exception for grouping; the stack still ships
-    // for symbolication.
     expect(list[0].value).toBe("TypeError");
     expect(list[0].stacktrace).toBe("frame at app.js:1");
   });
@@ -176,8 +259,6 @@ describe("posthog before_send", () => {
       properties: { item_id: "items:1", message: "anything at all" },
     };
     expect(beforeSend(event)).toBe(event);
-    // Value equality, not just identity: the hook must not stamp exception
-    // keys (not even undefined ones) onto ordinary events.
     expect(event.properties).toEqual({
       item_id: "items:1",
       message: "anything at all",
@@ -199,15 +280,17 @@ describe("posthog before_send", () => {
     expect(sent.properties?.$exception_list).toBe("not-a-list");
   });
 
-  it("exports the shared allowlist used by analytics.captureError", () => {
-    expect(SAFE_ERROR_MESSAGES.has("Network request failed")).toBe(true);
+  it("shares one safe-value rule with analytics.captureError", () => {
+    expect(safeExceptionValue("Network request failed")).toBe(
+      "Network request failed",
+    );
+    expect(safeExceptionValue("ERR_CANCELED")).toBe("ERR_CANCELED");
+    expect(safeExceptionValue("Failed for https://x.test")).toBeUndefined();
   });
 });
 
 describe("posthog exception autocapture gate", () => {
   it("stays off on a development build", () => {
-    // The module is mocked with variant "development", so a local dev crash
-    // never opens an error issue next to production traffic.
     const options = posthogCtor.options as {
       errorTracking: { autocapture: Record<string, unknown> };
     };
@@ -216,8 +299,6 @@ describe("posthog exception autocapture gate", () => {
   });
 
   it("turns on for a production build", async () => {
-    // Re-import the module against a production config so the gate is read
-    // fresh; the PostHog stub records the new constructor options.
     vi.resetModules();
     vi.doMock("expo-constants", () => ({
       default: {
@@ -313,10 +394,6 @@ describe("superProperties", () => {
 });
 
 describe("push notification capture", () => {
-  // Both options default to true in the SDK, and the native side sends
-  // `$push_notification_opened` without consulting `before_send`, so the
-  // redaction above cannot reach it. Pinned off explicitly: an SDK bump must
-  // not widen what leaves the device.
   it("stays off so no push data bypasses the redaction hook", () => {
     const options = posthogCtor.options as Record<string, unknown>;
     expect(options.capturePushNotificationSubscriptions).toBe(false);

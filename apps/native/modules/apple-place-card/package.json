@@ -1,0 +1,7 @@
+{
+  "name": "apple-place-card",
+  "version": "1.0.0",
+  "description": "Apple's own place card (MapKit, iOS 18+) in a sheet with a Shelvr strip.",
+  "main": "index.ts",
+  "private": true
+}

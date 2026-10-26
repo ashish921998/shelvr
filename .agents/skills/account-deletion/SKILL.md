@@ -1,0 +1,81 @@
+---
+name: account-deletion
+description: Check that deleting a Shelvr account leaves nothing of the person in the Convex backend, leaves other accounts alone, and that no function writes rows or hands a notification to delivery for an account that is deleting or gone. Use before changing, or claiming a change is safe in, the deletion drain (users.ts), schema.ts tables, any function that inserts rows keyed by a user, the owner checks in model/auth.ts, the Apple token and refund-consent retention, or the notification writers, delivery claims and plan-vote writer.
+---
+
+# Account deletion
+
+**The promise.** When someone deletes their account, the backend removes everything it stores about them. Two rows are kept on purpose (`appleTokens`, `legalConsents`), each with a job that removes it. Other accounts are untouched. Once an account has started deleting, no function adds rows for it and no notification is handed to delivery for it.
+
+**The harm if it breaks.** A person told their account is gone still has saves, photos, push tokens or feedback in the database, gets a push naming one of their saves, or the deletion removed someone else's data.
+
+**How it is checked.** Not a proof and not a hand-written model. The check runs the real Convex functions (vitest and convex-test, versions in `apps/native/package.json`) against every table in `schema.ts`, every function that inserts into a user-owned table (found by reading `convex/**/*.ts` with the TypeScript compiler), and every point between two passes of the batched deletion. Convex runs each mutation as one serializable transaction, so "the writer ran between drain pass k and pass k+1" is every ordering that exists for one writer. A TLA+ model of that would have to be kept in step with the code by hand, and this runs the code itself with nothing to install.
+
+## Run it
+
+```bash
+cd apps/native && pnpm exec vitest run convex/accountDeletion.test.ts convex/notificationDelivery.test.ts convex/notifications.test.ts convex/saveReminders.test.ts
+```
+
+`notificationDelivery.test.ts` and `saveReminders.test.ts` hold the unit tests the claim checks below name; `notifications.test.ts` exercises `prepareWeeklyDigest` with a live owner. `accountDeletion.test.ts` runs in the Node environment, not `edge-runtime` like most Convex tests, because it reads source files. It never needs a simulator, a deployment or a secret.
+
+Run it after any change under `apps/native/convex/`. CI runs it too, but CI cannot tell whether the reasons recorded in the policy tables still describe the code: `UNOWNED_TABLES`, `RETAINED_ROWS` and `ONE_ROW_PER_ACCOUNT` at the top of the test file, `RECIPES` further down. When a change touches the deletion drain (`users.ts`, `planShares.ts`), `schema.ts`, `model/auth.ts`, the notification writers and claims, or the Apple token and refund-consent retention, reread them.
+
+## Reading a failure
+
+A failure is a finding about the code until you can show the test's model is wrong. Do not edit the policy tables to make a red test green without telling the user. One cause usually fails several tests that share it: read the first message, not the count.
+
+- **`the tables › accounts for every table`**: a table has no user key and no entry in `UNOWNED_TABLES`. If it holds anything about a person, give it a `userId` and a drain step in `deleteUserOwnedDataBatch` (users.ts). If it holds nothing personal, add it to `UNOWNED_TABLES` with the reason. The "names a table that is gone / not owned" messages mean an entry is stale: delete it.
+- **`leaves nothing of the account…` or `drains <table> across batches`, "a row survived"**: the drain never deletes that table, or stops early. `drains <table>` seeds `DELETE_BATCH + 1` rows, so a step that forgets to return `false` on a full batch leaves one row. Real: add or fix the step, keeping `.take(DELETE_BATCH)` and `return false` when the batch is full. If the table is meant to stay, it belongs in `RETAINED_ROWS` with the job that removes it.
+- **the same tests, "a blob … survived"**: a step deletes the row but not the stored file. Real: call `safeDeleteStorage` as the items and itemOperations steps do.
+- **`drains <table>` throws "unique() … more than one"**: the drain reads that table with `.unique()`, so it holds one row per account by design. Model: add the table to `ONE_ROW_PER_ACCOUNT`.
+- **`leaves another account exactly as it was`**: the drain read or deleted rows it does not own, usually a query missing its `by_user` index constraint. Real.
+- **`adds no row the fixture did not put there`**: deleting an account wrote a row (a log, a receipt). Decide whether it holds personal data. Real if it does.
+- **`schedules the job that removes each retained row`**: `appleTokens` or `legalConsents` no longer get their removal job, or one is no longer retained. Real if the job is missing (the row would never go). Model if the row is now deleted outright: drop the `RETAINED_ROWS` entry.
+- **`the writers › checks the owner before every insert…`**: names `file.ts#function`. It inserts into an owned table and neither it nor all its callers calls `liveOwner`, `requireUserId`, `aiAllowed` or a helper that does. Real: add `requireUserId(ctx)` (public) or `if ((await liveOwner(ctx, userId)) === null) return null` (internal). If a cron or scheduled job reaches the writer, also add a recipe (see "When a change is intended").
+- **`the writers › keeps a recipe only for a writer that still checks the owner`**: a `RECIPES` key names a function that is gone, no longer inserts into an owned table, or lost its owner check. Real if it lost the check. Model if the function was renamed or removed: update or delete the recipe.
+- **`<writer>, with an owner check › refuses a draining account at every drain pass`**: the writer wrote a row, threw, or left a row that outlived the account, at some point between two drain passes. The message lists each point ("after 1 more pass(es): wrote a row; 0 row(s) left…"). Real when it says "wrote a row": the owner check is missing, or it is called and its answer is ignored (the scan cannot see that, this test can). If many of these fail together, suspect `liveOwner` in `model/auth.ts`. A point that shows an error message ("Validator error…") means the recipe's `call` no longer matches the function: Model, fix the recipe. "the account finished deleting before there were two gaps to test" means the recipe's `padding` and `fillers` no longer keep the drain going across passes (the drain got faster, or `DELETE_BATCH` changed): Model, raise them.
+- **`<writer>, then its delivery claim › hands out nothing once the account began deleting`**: `claim` or `claimReminder` accepted a digest or reminder for an account that had begun deleting, so a push naming a save can follow a confirmed deletion. Real: restore the `liveOwner` guard before the preferences read; it patches the row with `OWNER_UNAVAILABLE` and returns null.
+- **`<writer>, then its delivery claim › closes what it refuses, so recovery does not queue it again`**: the claim refused the notification but left the row `pending`, so `recover` queues it again on every run, or the refusal scheduled a send or an analytics event. Real: the guard must `patch` the row with `OWNER_UNAVAILABLE` (`failed`, `owner_unavailable`, no next attempt) and return null. Do not close it with `closeBetweenAttempts`: that helper schedules a `notification_sent` event whenever the row has recipients, and marks a row `complete` once a device took the push. `notificationDelivery.test.ts` and `saveReminders.test.ts` hold the same check for an owner whose `users` row is missing, and again for a row already sent once, which is the case that has recipients.
+- **`… › writes for a live account in the sweep's setup (the recipe reaches the insert)` or `… hands out what it prepared for a live account (the recipe reaches the claim)`**: the recipe no longer gets a healthy account through the writer or the claim (it gained a precondition). The first of the two runs in the sweep's own padded setup, so a recipe that could never write cannot pass the sweep for the wrong reason. Model: fix the recipe in `RECIPES` until a live account writes and is handed the notification. Until then no boundary test below it means anything.
+
+## What a green run proves
+
+- **The tables** (`the tables › accounts for every table`, `seeds a row in every table the account owns`): every table in `schema.ts` is owned, a child of an owned table, or explained in `UNOWNED_TABLES`, and the fixture reaches every owned table and a stored blob, so the checks below cannot pass on an empty account.
+- **Deletion** (`leaves nothing of the account…`, `adds no row…`, `leaves another account…`, `drains <table> across batches`): after `deleteCurrentUserAccount` and the continuation passes, no row of any owned or child table, no blob and no `users` row remain except the retained rows, deletion wrote nothing extra, and a second seeded account is byte-identical. Each owned table (except the retained and one-row tables) also drains when it holds more than one batch of rows.
+- **Retained rows** (`schedules the job that removes each retained row`): `appleTokens` gets `appleRevoke:revoke` and `users:forgetAppleToken` (an hour later) and `legalConsents` gets `legalConsentSync:send`, each carrying the row id. The jobs are scheduled, not run.
+- **Writers** (`the writers`): every function in `convex/**` (tests and `_generated` excluded) that calls `db.insert` on an owned table calls an owner check, directly or in every caller, and every writer with a recipe still does. The recipes (`prepareWeeklyDigest`, `prepareSaveReminder`, `recordPlanVote`) go further: the account is padded so the drain takes several passes while the writer's own inputs still exist, and the writer runs after 0, 1, … passes until the account is gone. It writes nothing and throws nothing at any point, and no row of its table is left after the drain. The same recipe also runs once on a live account in that padded setup, so it cannot pass by never being able to write.
+- **Delivery claims** (`…then its delivery claim`): a digest or reminder prepared for a live account is handed out, and the same one, once the account has begun deleting, is not: the claim returns null, closes the row as `failed` (`owner_unavailable`), and no send or analytics event is scheduled, even after `recover` runs. Unit tests prove the same for an owner whose `users` row is missing: `closes a digest whose owner is gone…` and `closes a digest already sent once when its owner is gone…` in `notificationDelivery.test.ts`, and the two matching `closes a reminder…` tests in `saveReminders.test.ts`. The "already sent once" pair is the only place a refused row has recipients, which is when `closeBetweenAttempts` would mark it `complete` and schedule `notification_sent`; the deletion check's rows are never attempted.
+
+## Bounds and what this does not cover
+
+- One account under test and one bystander. Rows per table: one each, and `DELETE_BATCH + 1` in one table at a time. Writers are called once, at each boundary between drain passes, never two at once and never retried.
+- The writer scan reads function bodies by name. It counts an owner-check call anywhere in the function, whatever is done with the answer, and it does not follow `ctx.runMutation(internal.x.y)`: a registered Convex function must carry its own check. The recipes close that gap for the three writers they cover (see the break below). Other writers are trusted on the call alone. Only `db.insert` is scanned, not `patch` or `replace`.
+- Nothing checks that the reasons in the policy tables and the recipes' `fence` sentences are still true. The tests fail when behavior breaks, not when a reason goes stale. Reread them when you change the code they describe.
+- A notification already handed to the send action before the account began deleting can still reach Expo: the claim and the HTTP call cannot share a transaction. The tests cover what is claimed after deletion began, not what is in flight.
+- A refused claim closes its row only when a claim reaches it: a row the drain deletes first never needs it, and a row leased to an in-flight send is skipped until the lease ends (the due check runs before the owner check).
+- `finish` and `finishReminder` still schedule the PostHog `notification_sent` event when a delivery claimed before deletion began finishes while its row exists. It carries the user id (person profile off), the notification id, its kind and counts, no content.
+- The writer scan reads source with the `typescript` compiler API (a dependency of `apps/native`, also used by `tools/verify-convex-api.mjs`). `the writers › finds the writers (the scan is not empty)` fails if the scan finds too few writers (the threshold is in the test).
+- A table is "owned" if it has `userId` or an `id("users")` field. A table keyed another way (an email, an `ownerId` string) lands in the unexplained list on purpose.
+- The Convex Auth library tables `authVerifiers` and `authRateLimits` are listed as unowned and not audited.
+- Retained rows: only that their removal job is scheduled. Removal itself is covered by `appleRevoke.test.ts` ("keeps the retained token readable for the revoke job after the owner is gone, then forgets it") and `legalConsent.test.ts` ("revokes after account deletion and removes the consent record only after delivery").
+- Data outside Convex is out of scope: PostHog, RevenueCat customers (beyond the consent job), Resend and delivered emails, Expo, Apple.
+- The Settings > Delete account screen. The e2e suite (`tools/e2e`, see `.agents/skills/verify-shelvr`) reaches the button in `paywall.e2e.ts` but nothing taps it. Use that skill if a change touches the screen or its confirmation; this check begins at the mutation.
+- A test that seeds notification rows needs a real `users` row (`ctx.db.insert("users", {})`). The owner checks treat any other id as not live, so a made-up `"user-a"` makes the function return null without writing and the test sees nothing happen.
+
+## When a change is intended
+
+1. Make the code change. Run the check.
+2. New table with personal data: add its drain step to `deleteUserOwnedDataBatch`, and mention the table and its step in the `CLAUDE.md` schema list as `tools/verify-agent-docs.mjs` requires. If the step uses `.unique()`, add the table to `ONE_ROW_PER_ACCOUNT`. If it must outlive deletion, add it to `RETAINED_ROWS` with the job that removes it, and schedule that job in the deletion transaction.
+3. New table without personal data: `UNOWNED_TABLES`, with the reason.
+4. New function that inserts into an owned table: give it an owner check. If a cron, webhook or scheduled job reaches it with a raw `userId`, also add a recipe to `RECIPES`: a `fence` sentence saying what refuses a draining account, the `table` it writes, a `seed` that makes a live account write, a `call`, and the `padding` (saves) and `fillers` (rows per table) that keep the account draining across several passes while the writer's own inputs still exist. If it prepares something for delivery, add a `claim` that hands it out, and the claim tests pick it up.
+5. Re-run. Then prove the edited check can still fail (next section).
+6. If code under `apps/native/convex/` changed without anyone running this check, run it and reread the policy tables against that code: a green CI does not mean their reasons still hold.
+
+## Prove it can still fail
+
+A check that has never failed proves nothing. After editing the check, apply a scratch break to real code, run the command above, see the named test fail, then reverse the edit and confirm the run is back to green. If the file has uncommitted work, check `git diff <file>` first: `git checkout -- <file>` would discard that too.
+
+The break worth knowing: **replace the `prepareWeeklyDigest` guard with a bare `await liveOwner(ctx, args.userId);`** (answer ignored) in `convex/notifications.ts`. It fails `notifications.ts#prepareWeeklyDigest, with an owner check › refuses a draining account at every drain pass` only: the scan sees the call and passes, the sweep sees the write.
+
+For any other part of the check, break the code that its failure message above names (drop a drain step, remove an owner guard) and expect that message.

@@ -1,23 +1,5 @@
 import { formattingLocale } from "./i18n";
 
-/**
- * Reads the original capture time from an image picker asset's EXIF data.
- * EXIF `DateTimeOriginal` is formatted `"YYYY:MM:DD HH:MM:SS"` (colons in the
- * date portion), which `Date.parse` won't accept. Swap the first two colons
- * for dashes first. Returns epoch ms, or `undefined` if the tag is missing or
- * unparseable.
- */
-export function parseExifDate(
-  exif: Record<string, unknown> | null | undefined,
-): number | undefined {
-  const raw = exif?.DateTimeOriginal;
-  if (typeof raw !== "string") return undefined;
-  const iso = raw.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? undefined : ms;
-}
-
-/** Formats an epoch-ms timestamp as a short display date, e.g. "Jul 5, 2026". */
 export function formatShortDate(ms: number): string {
   return new Date(ms).toLocaleDateString(formattingLocale(), {
     month: "short",
@@ -26,8 +8,6 @@ export function formatShortDate(ms: number): string {
   });
 }
 
-/** A short date that names the year only when it is not this year's:
- * "Aug 14", but "Aug 14, 2025". */
 export function formatRecentDate(ms: number, now = Date.now()): string {
   const date = new Date(ms);
   const thisYear = date.getFullYear() === new Date(now).getFullYear();
@@ -38,24 +18,14 @@ export function formatRecentDate(ms: number, now = Date.now()): string {
   });
 }
 
-/** A free trial's length as the store reports it: `unit` is DAY, WEEK, MONTH
- * or YEAR. */
 export type TrialPeriod = { unit: string; count: number };
 
-/**
- * Dates and day numbers for the paywall's trial timeline, filled into its
- * `{{ custom.* }}` labels ("Day 5 · Oct 7"). `trial` is the offer's own
- * length, so both follow it; the reminder is two days before the end, as in
- * `trial-reminder.ts`. The dashboard defaults are empty dates and the day
- * numbers of a seven-day trial, so a build that passes nothing shows the bare
- * labels; the caller does the same when the offer's length is unknown.
- * `trial_day5` and `trial_day7` keep the names the dashboard already
- * references: they are the reminder and end dates.
- */
-export function trialTimelineVariables(now: number, trial: TrialPeriod) {
-  // Day and week trials run in elapsed time, as the store bills them and as
-  // the reminder is scheduled, so a daylight saving change inside the trial
-  // cannot move a date by a day.
+/** `remindAt` is when the trial reminder fires for a trial ending at `end`. */
+export function trialTimelineVariables(
+  now: number,
+  trial: TrialPeriod,
+  remindAt: (end: number) => number | null = (end) => end - 2 * 86_400_000,
+) {
   const dayMs = 86_400_000;
   const start = new Date(now);
   let end = new Date(now);
@@ -66,7 +36,6 @@ export function trialTimelineVariables(now: number, trial: TrialPeriod) {
         ? trial.count
         : 0;
   if (months > 0) {
-    // Jan 31 plus a month is the last day of February, not a date in March.
     end.setDate(1);
     end.setMonth(end.getMonth() + months);
     const lastDay = new Date(
@@ -78,7 +47,7 @@ export function trialTimelineVariables(now: number, trial: TrialPeriod) {
   } else {
     end = new Date(now + trial.count * (trial.unit === "WEEK" ? 7 : 1) * dayMs);
   }
-  const remind = new Date(end.getTime() - 2 * dayMs);
+  const remind = new Date(remindAt(end.getTime()) ?? end.getTime() - 2 * dayMs);
   const label = (date: Date) =>
     date.toLocaleDateString(formattingLocale(), {
       month: "short",

@@ -5,34 +5,25 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { Platform } from "react-native";
-import { openInAppBrowser } from "@/lib/in-app-browser";
+import { openLink } from "@/lib/open-link";
 import type { IntentKind } from "@convex/model/itemFields";
 
-// The closed set of action kinds the AI can attach to an item, derived from
-// the same INTENT_KINDS tuple the Convex validators use so the exhaustive
-// switch below fails to compile when the backend learns a new kind.
 export type { IntentKind };
 
-/**
- * Execute an intent. Each kind maps to a guaranteed-installed Expo primitive.
- * `open_url` uses Linking (not WebBrowser) so an https URL can hand off to the
- * matching native app via universal links, e.g. an x.com URL opens the X app
- * if installed, falling back to the in-app browser only if nothing handles it.
- */
 export async function runIntent(
   kind: IntentKind,
   value: string,
 ): Promise<void> {
   switch (kind) {
     case "open_url":
-      await Linking.openURL(value).catch(() => openInAppBrowser(value));
+      await openLink(value);
       break;
     case "copy":
       await Clipboard.setStringAsync(value);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       break;
     case "web_search":
-      await openInAppBrowser(
+      await openLink(
         `https://www.google.com/search?q=${encodeURIComponent(value)}`,
       );
       break;
@@ -53,8 +44,6 @@ export async function runIntent(
       await Linking.openURL(`mailto:${value}`);
       break;
     case "add_event":
-      // Presents the system "Add Event" sheet prefilled with the title; the
-      // user picks the date/time. Requires calendar permission.
       await createEventInCalendarAsync({ title: value });
       break;
   }

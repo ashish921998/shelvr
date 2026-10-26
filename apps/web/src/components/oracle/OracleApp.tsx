@@ -19,7 +19,6 @@ import StoreCta from "./StoreCta";
 import TabsInput from "./TabsInput";
 import VerdictCard from "./VerdictCard";
 
-// Screenshot is the default: one tap into the camera roll, nothing to find.
 const DEFAULT_MODE: OracleMode = "screenshot";
 
 const MODES: Record<
@@ -81,7 +80,6 @@ export default function OracleApp() {
   useEffect(() => {
     const mode = new URLSearchParams(window.location.search).get("mode");
     if (isOracleMode(mode)) {
-      // The query string only exists in the browser, after hydration.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ phase: "asking", mode });
       captureWebAnalyticsEvent("oracle_opened", { mode });
@@ -108,16 +106,12 @@ export default function OracleApp() {
       >;
       if (response.ok && body.persona) {
         const verdict = body as OracleVerdict;
-        // The persona is read from the visitor's saves, so it stays out of
-        // analytics.
         captureWebAnalyticsEvent("oracle_verdict", { mode });
         setState({ phase: "answered", mode, input, verdict, unlocked: false });
         return;
       }
       message = body.message;
-    } catch {
-      message = undefined;
-    }
+    } catch {}
     captureWebAnalyticsEvent("oracle_failed", { mode, status });
     setState({
       phase: "asking",
@@ -200,7 +194,6 @@ function ModePanel({
         <h2 className="text-2xl font-bold text-ink">{name}</h2>
         <p className="mt-1 text-base text-muted">{hook}</p>
         <div className="mt-5">
-          {/* Keyed so switching modes starts the new input empty. */}
           <Input key={state.mode} busy={busy} onSubmit={onSubmit} />
         </div>
         {state.phase === "asking" && state.error && (

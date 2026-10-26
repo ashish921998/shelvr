@@ -1,10 +1,5 @@
-/**
- * Bounds a cover's aspect ratio for layout. Falls back to `fallback` when the
- * ratio is missing or NaN, then clamps to `[min, max]`. Preserves the true
- * proportions so previews aren't cropped; only bounds pathological extremes so
- * one very tall or wide cover can't hijack its cell. Callers pass the bounds
- * their layout allows.
- */
+import { youTubeVideo } from "./url";
+
 export function clampRatio(
   ratio: number | undefined,
   fallback: number,
@@ -13,4 +8,19 @@ export function clampRatio(
 ): number {
   const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
   return Math.min(Math.max(value, min), max);
+}
+
+const STOCK_THUMBNAIL_RATIO = 4 / 3;
+
+export function letterboxedVideoRatio(
+  pageUrl: string | undefined,
+  aspectRatio: number | undefined,
+): number | undefined {
+  if (
+    aspectRatio === undefined ||
+    Math.abs(aspectRatio - STOCK_THUMBNAIL_RATIO) > 0.01
+  ) {
+    return undefined;
+  }
+  return youTubeVideo(pageUrl) === "video" ? 16 / 9 : undefined;
 }

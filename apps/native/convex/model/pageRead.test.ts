@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { linkEnrichment, pinterestPage, readPage } from "./pageRead";
 
 const safeFetch = vi.hoisted(() => vi.fn());
+const logEvent = vi.hoisted(() => vi.fn());
+
+vi.mock("./log", () => ({ logEvent }));
 
 vi.mock("./safeFetch", async (original) => ({
   ...(await original<typeof import("./safeFetch")>()),
@@ -15,9 +18,6 @@ const WIDGET_URL =
   "https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=643944446743403202";
 const SOURCE_URL = "https://neutraleating.com/chicken-recipes/";
 
-// The fields a probe of this pin's widget answer returned on 2026-09-28. It is
-// a video pin: the probe found a V_HLSV4 video (1000x1500) in its video list
-// while is_video read false, as it did on every video pin probed.
 const videoPin = {
   id: "643944446743403202",
   description:
@@ -53,6 +53,10 @@ function json(url: string, body: unknown) {
   };
 }
 
+function video(snippet: Record<string, unknown>, id = "Ab_cd-Ef123") {
+  return { items: [{ id, snippet }] };
+}
+
 function html(url: string, body: string) {
   return {
     ok: true,
@@ -66,11 +70,9 @@ function html(url: string, body: string) {
 const PIN_PAGE =
   '<html><head><meta property="og:title" content="Chicken | recipes"><meta property="og:image" content="https://i.pinimg.com/736x/7a/11/ce/x.jpg"><meta property="og:image:width" content="736"><meta property="og:image:height" content="1104"></head><body></body></html>';
 
-/** A pin page with no image or text. */
 const EMPTY_PIN_PAGE =
   '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>';
 
-/** Serves `routes` by exact URL; every other fetch fails. */
 function serve(routes: Record<string, unknown>) {
   safeFetch.mockImplementation(
     async (url: string) =>
@@ -80,6 +82,300 @@ function serve(routes: Record<string, unknown>) {
 
 beforeEach(() => {
   safeFetch.mockReset();
+  logEvent.mockReset();
+  vi.stubEnv("YOUTUBE_API_KEY", "");
+});
+
+afterEach(() => vi.unstubAllEnvs());
+
+describe("YouTube description reader", () => {
+  const url = "https://www.youtube.com/watch?v=Ab_cd-Ef123";
+  const oembed = {
+    title: "Fallback title",
+    author_name: "Fallback channel",
+    thumbnail_url: "https://i.ytimg.com/fallback.jpg",
+    thumbnail_width: 480,
+    thumbnail_height: 360,
+  };
+  function serveVideo(snippet: Record<string, unknown>) {
+    vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
+    safeFetch.mockImplementation(async (endpoint: string) =>
+      new URL(endpoint).hostname === "www.googleapis.com"
+        ? json(
+            endpoint,
+            video({
+              title: "Soup",
+              channelTitle: "Cook",
+              thumbnails: {
+                high: {
+                  url: "https://i.ytimg.com/soup.jpg",
+                  width: 1280,
+                  height: 720,
+                },
+              },
+              ...snippet,
+            }),
+          )
+        : json(endpoint, oembed),
+    );
+  }
+  it.each([
+    [1280, 720],
+    [720, 1280],
+  ])(
+    "maps verified snippet fields and dimensions %i x %i",
+    async (width, height) => {
+      serveVideo({
+        description: "Ingredients: beans. Simmer until tender.",
+        thumbnails: {
+          high: { url: "https://i.ytimg.com/soup.jpg", width, height },
+        },
+      });
+      const result = await readPage(url);
+      expect(result).toMatchObject({
+        status: "ok",
+        askForRecipe: true,
+        page: {
+          title: "Soup",
+          author: "Cook",
+          siteName: "YouTube",
+          caption: true,
+          content: "Ingredients: beans. Simmer until tender.",
+          heroImageUrl: "https://i.ytimg.com/soup.jpg",
+          heroAspectRatio: width / height,
+        },
+      });
+      const [endpoint, options] = safeFetch.mock.calls[0];
+      expect(new URL(endpoint).searchParams.get("part")).toBe("snippet");
+      expect(new URL(endpoint).searchParams.get("id")).toBe("Ab_cd-Ef123");
+      expect(options).toMatchObject({ timeoutMs: 15000, maxBytes: 64 * 1024 });
+      expect(options.allowContentType("application/json")).toBe(true);
+      expect(options.allowContentType("text/html")).toBe(false);
+    },
+  );
+  it.each([undefined, "", "x".repeat(6001)])(
+    "does not transcribe missing or over-limit descriptions",
+    async (description) => {
+      serveVideo({ description });
+      expect(await readPage(url)).toMatchObject({
+        status: "ok",
+        askForRecipe: false,
+      });
+    },
+  );
+  it.each([
+    {
+      thumbnails: {
+        high: { url: "https://i.ytimg.com/high.jpg", width: 480, height: 360 },
+        maxres: {
+          url: "https://i.ytimg.com/maxres.jpg",
+          width: 1280,
+          height: 720,
+        },
+        default: {
+          url: "https://i.ytimg.com/default.jpg",
+          width: 120,
+          height: 90,
+        },
+      },
+      selected: "https://i.ytimg.com/maxres.jpg",
+      ratio: 1280 / 720,
+    },
+    {
+      thumbnails: { high: { url: "https://i.ytimg.com/high.jpg" } },
+      selected: "https://i.ytimg.com/high.jpg",
+      ratio: undefined,
+    },
+  ])(
+    "selects the best thumbnail without inventing missing dimensions: %#",
+    async ({ thumbnails, selected, ratio }) => {
+      serveVideo({ description: "Beans. Simmer.", thumbnails });
+      const result = await readPage(url);
+      expect(result).toMatchObject({
+        status: "ok",
+        askForRecipe: true,
+        page: { heroImageUrl: selected },
+      });
+      expect(
+        result.status === "ok" ? result.page.heroAspectRatio : "failed",
+      ).toBe(ratio);
+      expect(safeFetch).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("follows description links and lets markup win", async () => {
+    serveVideo({ description: "Recipe: https://recipes.example/soup" });
+    const primary = safeFetch.getMockImplementation()!;
+    safeFetch.mockImplementation(async (endpoint: string) =>
+      endpoint === "https://recipes.example/soup"
+        ? html(
+            endpoint,
+            `<script type="application/ld+json">${JSON.stringify({
+              "@type": "Recipe",
+              name: "Soup",
+              recipeIngredient: ["1 cup beans"],
+              recipeInstructions: ["Simmer beans."],
+            })}</script>`,
+          )
+        : primary(endpoint),
+    );
+    expect(await readPage(url)).toMatchObject({
+      status: "ok",
+      askForRecipe: false,
+      page: { recipe: { ingredients: ["1 cup beans"] } },
+    });
+    const linkedOptions = safeFetch.mock.calls.find(
+      ([endpoint]) => endpoint === "https://recipes.example/soup",
+    )?.[1];
+    expect(linkedOptions).toMatchObject({
+      timeoutMs: 15000,
+      maxBytes: 1024 * 1024,
+    });
+    expect(linkedOptions.allowContentType("text/html")).toBe(true);
+    expect(linkedOptions.allowContentType("application/json")).toBe(false);
+  });
+  it.each(["https://linktr.ee/cook", "https://recipes.example/missing"])(
+    "keeps captions when a linked recipe is skipped or fails: %s",
+    async (link) => {
+      serveVideo({ description: `Beans, simmer. ${link}` });
+      const primary = safeFetch.getMockImplementation()!;
+      safeFetch.mockImplementation(async (endpoint: string) =>
+        endpoint === link
+          ? { ok: false, code: "blocked_host" }
+          : primary(endpoint),
+      );
+      expect(await readPage(url)).toMatchObject({
+        status: "ok",
+        askForRecipe: true,
+      });
+      expect(safeFetch).toHaveBeenCalledTimes(
+        link.includes("linktr.ee") ? 1 : 2,
+      );
+    },
+  );
+  it.each([
+    [
+      "markup-less HTML",
+      html(
+        "https://recipes.example/soup",
+        "<html><body>No structured recipe here.</body></html>",
+      ),
+    ],
+    ["transient timeout", { ok: false, code: "timeout" }],
+    ["transient network failure", { ok: false, code: "network_error" }],
+  ])(
+    "retains the exact caption result after linked %s",
+    async (_, linkedResponse) => {
+      const link = "https://recipes.example/soup";
+      serveVideo({ description: `Beans. Simmer. ${link}` });
+      const primary = safeFetch.getMockImplementation()!;
+      safeFetch.mockImplementation(async (endpoint: string) =>
+        endpoint === link ? linkedResponse : primary(endpoint),
+      );
+      expect(await readPage(url)).toEqual({
+        status: "ok",
+        askForRecipe: true,
+        page: {
+          title: "Soup",
+          author: "Cook",
+          siteName: "YouTube",
+          heroImageUrl: "https://i.ytimg.com/soup.jpg",
+          heroAspectRatio: 1280 / 720,
+          content: `Beans. Simmer. ${link}`,
+          caption: true,
+        },
+      });
+      expect(safeFetch).toHaveBeenCalledTimes(2);
+      expect(safeFetch.mock.calls[1][0]).toBe(link);
+    },
+  );
+  it.each([
+    "https://www.youtube.com/watch?v=Ab_cd-Ef123",
+    "https://www.instagram.com/p/ABC123/",
+  ])("skips social description links just like link hubs: %s", async (link) => {
+    serveVideo({ description: `Beans. Simmer. ${link}` });
+    expect(await readPage(url)).toMatchObject({
+      status: "ok",
+      askForRecipe: true,
+      page: { caption: true, content: `Beans. Simmer. ${link}` },
+    });
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    [
+      { ok: false, code: "http_error", status: 403 },
+      "page_fetch_error:http_error",
+    ],
+    [
+      { ok: false, code: "http_error", status: 401 },
+      "page_fetch_error:http_error",
+    ],
+    [
+      { ok: false, code: "http_error", status: 500 },
+      "page_fetch_error:http_error",
+    ],
+    [{ ok: false, code: "network_error" }, "page_fetch_error:network_error"],
+    [json(url, { items: [] }), "unreadable_video"],
+    [json(url, video({ title: 42 })), "unreadable_video"],
+    [json(url, null), "unreadable_video"],
+    [
+      json(url, video({ title: "Wrong video" }, "differentID")),
+      "unreadable_video",
+    ],
+    [json(url, video({ title: "Soup", description: 42 })), "unreadable_video"],
+    [
+      { ...json(url, {}), bytes: new TextEncoder().encode("{bad") },
+      "unexpected_error:SyntaxError",
+    ],
+    [new Error("fixture network rejection"), "unexpected_error:Error"],
+    [
+      {
+        ...json(url, video({ title: "Soup", description: "Cut ingredients" })),
+        truncated: true,
+      },
+      "unreadable_video",
+    ],
+  ])(
+    "preserves the exact no-key oEmbed result on optional API failure %#",
+    async (failure, category) => {
+      safeFetch.mockImplementation(async (endpoint: string) =>
+        json(endpoint, oembed),
+      );
+      const baseline = await readPage(url);
+      expect(safeFetch).toHaveBeenCalledTimes(1);
+      vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
+      safeFetch.mockImplementation(async (endpoint: string) => {
+        if (new URL(endpoint).hostname !== "www.googleapis.com")
+          return json(endpoint, oembed);
+        if (failure instanceof Error) throw failure;
+        return failure;
+      });
+      expect(await readPage(url)).toEqual(baseline);
+      expect(logEvent).toHaveBeenCalledExactlyOnceWith(
+        "warn",
+        "youtube_data_api_fallback",
+        { error_category: category },
+      );
+    },
+  );
+  it.each([
+    "https://youtube.com/shorts/Ab_cd-Ef123/extra",
+    "https://youtube.com/watch",
+    "https://youtube.com/watch?v=short",
+    "https://youtu.be/",
+    "https://youtube.com/embed/not-an-id",
+    "https://youtube.com/live/Ab_cd-Ef123",
+  ])(
+    "does not request the Data API for unsupported video URLs: %s",
+    async (unsupportedUrl) => {
+      vi.stubEnv("YOUTUBE_API_KEY", "fixture-key");
+      safeFetch.mockImplementation(async (endpoint: string) =>
+        json(endpoint, oembed),
+      );
+      await readPage(unsupportedUrl);
+      expect(safeFetch).toHaveBeenCalledTimes(1);
+      expect(safeFetch.mock.calls[0][0]).toContain("/oembed?");
+    },
+  );
 });
 
 describe("pinterestPage", () => {
@@ -176,8 +472,6 @@ describe("readPage for Pinterest pins", () => {
     });
     const read = await readPage(shortUrl);
     expect(read.status === "ok" && read.page.siteName).toBe("Pinterest");
-    // The page cap, not a smaller one: draining a pin page past a 64 KiB cap
-    // stalled to the deadline on live Pinterest.
     expect(safeFetch).toHaveBeenCalledWith(
       shortUrl,
       expect.objectContaining({ maxRedirects: 5, maxBytes: 1024 * 1024 }),
@@ -201,7 +495,6 @@ describe("readPage for Pinterest pins", () => {
   it("marks the page read incomplete when the widget fails transiently", async () => {
     serve({
       [WIDGET_URL]: { ok: false, code: "http_error", status: 503 },
-      // Even an empty page is kept: the widget may answer on a retry.
       [PIN_URL]: html(PIN_URL, EMPTY_PIN_PAGE),
     });
     const read = await readPage(PIN_URL);
@@ -278,16 +571,77 @@ describe("readPage for Pinterest pins", () => {
   });
 });
 
-/** Instagram's crawler login shell: no card for any post. */
 const INSTAGRAM_SHELL =
   '<html><head><title>Instagram</title><meta property="og:title" content="Instagram" /></head><body></body></html>';
 
-// Probed 2026-10-02: a removed or made-up post's captioned embed answers 200
-// with this box in place of the media and caption.
 const BROKEN_EMBED =
   '<div class="_aa4c"><div class="EmbedBrokenMedia"><p>This post may be broken, or the post may have been removed.</p></div></div>';
 
 describe("readPage for Instagram posts", () => {
+  it.each([
+    ["Beans. Simmer for 20 minutes.", false, true],
+    ["A lovely sunset today.", false, true],
+    ["Beans…", true, false],
+    ["x".repeat(6001), false, false],
+    ["Beans. Simmer.", true, false],
+    ["", false, false],
+  ])(
+    "uses only complete verified captions: %#",
+    async (caption, truncated, eligible) => {
+      const url = "https://www.instagram.com/p/ABC123/";
+      const embedUrl = `${url}embed/captioned/`;
+      serve({
+        [url]: html(url, INSTAGRAM_SHELL),
+        [embedUrl]: {
+          ...html(
+            embedUrl,
+            `<div class="Caption"><a class="CaptionUsername">cook</a>${caption}<div class="CaptionComments"></div></div>`,
+          ),
+          truncated,
+        },
+      });
+      const result = await readPage(url);
+      expect(result).toMatchObject({ status: "ok", askForRecipe: eligible });
+      if (result.status === "ok") {
+        expect(result.page.caption).toBe(caption === "" ? undefined : true);
+        expect(result.page.recipe).toBeUndefined();
+      }
+    },
+  );
+  it("keeps the embed's caption when Instagram refuses the post page", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: { ok: false, code: "http_error", status: 429 },
+      [`${reelUrl}embed/captioned/`]: html(
+        reelUrl,
+        '<div class="Caption"><a class="CaptionUsername">cook</a>Garlic noodles\nBoil, toss, eat.<div class="CaptionComments"></div></div>',
+      ),
+    });
+    const read = await readPage(reelUrl);
+    expect(read).toMatchObject({
+      status: "ok",
+      page: {
+        title: "Garlic noodles",
+        author: "@cook",
+        caption: true,
+        incomplete: true,
+      },
+    });
+  });
+
+  it("still fails when Instagram refuses the post page and the embed has no post", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: { ok: false, code: "http_error", status: 429 },
+      [`${reelUrl}embed/captioned/`]: html(
+        reelUrl,
+        "<html><body></body></html>",
+      ),
+    });
+    const read = await readPage(reelUrl);
+    expect(read.status).not.toBe("ok");
+  });
+
   it("fails a deleted reel as gone instead of saving it blank", async () => {
     const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
     serve({
@@ -312,7 +666,6 @@ describe("readPage for Instagram posts", () => {
   it.each([
     ["the page", true, false, BROKEN_EMBED],
     ["the embed", false, true, BROKEN_EMBED],
-    // A cut embed can end before its broken-media box ever arrives.
     ["the embed, before its broken-media box,", false, true, "<html><body>"],
   ])(
     "keeps a post retryable, not gone, when %s was cut short",
@@ -329,7 +682,6 @@ describe("readPage for Instagram posts", () => {
         status: "ok",
         page: { truncated: true, incomplete: true },
       });
-      // Incomplete, so the save offers a retry instead of a blank ready item.
       expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
         "partial",
       );
@@ -390,6 +742,135 @@ describe("readPage for Instagram posts", () => {
     expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
       recipe.recipeIngredient,
     );
+    expect(read).toMatchObject({
+      askForRecipe: false,
+      page: { caption: true },
+    });
+  });
+  it("finds the recipe behind a later caption link when a sponsor's comes first", async () => {
+    const postUrl = "https://www.instagram.com/p/ABC124/";
+    const embedUrl = "https://www.instagram.com/p/ABC124/embed/captioned/";
+    const sponsorUrl = "https://shop.example.com/pans";
+    const recipeUrl = "https://example.com/lemon-pasta/";
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Lemon pasta",
+      recipeIngredient: ["200 g spaghetti", "1 lemon"],
+      recipeInstructions: ["Boil the pasta.", "Toss with lemon."],
+    };
+    serve({
+      [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+      [embedUrl]: html(
+        embedUrl,
+        `<div class="Caption"><a class="CaptionUsername">cook</a>Lemon pasta. My pan: ${sponsorUrl} Recipe: ${recipeUrl}<div class="CaptionComments"></div></div>`,
+      ),
+      [sponsorUrl]: html(
+        sponsorUrl,
+        "<html><head></head><body>Pans</body></html>",
+      ),
+      [recipeUrl]: html(
+        recipeUrl,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      ),
+    });
+    const read = await readPage(postUrl);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+  });
+
+  describe("with two caption links", () => {
+    const postUrl = "https://www.instagram.com/p/ABC125/";
+    const embedUrl = "https://www.instagram.com/p/ABC125/embed/captioned/";
+    const firstUrl = "https://example.com/lemon-pasta/";
+    const secondUrl = "https://example.org/garlic-bread/";
+
+    function recipePage(url: string, name: string) {
+      const recipe = {
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        name,
+        recipeIngredient: [`1 ${name}`],
+        recipeInstructions: [`Make the ${name}.`],
+      };
+      return html(
+        url,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      );
+    }
+
+    function serveCaption(first: unknown, second: unknown) {
+      serve({
+        [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+        [embedUrl]: html(
+          embedUrl,
+          `<div class="Caption"><a class="CaptionUsername">cook</a>Pasta: ${firstUrl} Bread: ${secondUrl}<div class="CaptionComments"></div></div>`,
+        ),
+        [firstUrl]: first,
+        [secondUrl]: second,
+      });
+    }
+
+    it("returns the first link's recipe without waiting for a slower later link", async () => {
+      serveCaption(recipePage(firstUrl, "pasta"), new Promise(() => {}));
+      const read = await Promise.race([
+        readPage(postUrl),
+        new Promise((resolve) => setTimeout(resolve, 1000, "waited")),
+      ]);
+      expect(read).toMatchObject({
+        status: "ok",
+        page: { recipe: { ingredients: ["1 pasta"] } },
+      });
+    });
+
+    it("keeps the first link's recipe when a later link answers first", async () => {
+      serveCaption(
+        new Promise((resolve) =>
+          setTimeout(resolve, 50, recipePage(firstUrl, "pasta")),
+        ),
+        recipePage(secondUrl, "bread"),
+      );
+      const read = await readPage(postUrl);
+      expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual([
+        "1 pasta",
+      ]);
+    });
+  });
+});
+
+describe("readPage for TikTok videos", () => {
+  it("keeps an empty oEmbed response retryable", async () => {
+    const url = "https://www.tiktok.com/@cook/video/7350000000000000000";
+    const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+    serve({
+      [endpoint]: json(endpoint, { status_msg: "temporarily unavailable" }),
+    });
+    const read = await readPage(url);
+    expect(read.status).toBe("ok");
+    expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+      "partial",
+    );
+  });
+  it("titles the save with the caption's first line and keeps the rest as content", async () => {
+    const videoUrl = "https://www.tiktok.com/@cook/video/7350000000000000000";
+    const caption = `${"Crispy chilli oil noodles ".repeat(6)}\n\n#noodles #recipe`;
+    serve({
+      [`https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`]: {
+        ok: true,
+        finalUrl: videoUrl,
+        status: 200,
+        contentType: "application/json",
+        bytes: new TextEncoder().encode(
+          JSON.stringify({ title: caption, author_unique_id: "cook" }),
+        ),
+      },
+    });
+    const read = await readPage(videoUrl);
+    expect(read.status === "ok" && read.page.title).toBe(
+      "Crispy chilli oil noodles ".repeat(6).slice(0, 100),
+    );
+    expect(read.status === "ok" && read.page.content).toBe(caption);
   });
 });
 
@@ -417,7 +898,6 @@ describe("readPage for YouTube videos", () => {
         heroAspectRatio: 480 / 360,
       },
     });
-    // The bot-gated watch page is never loaded.
     expect(safeFetch).toHaveBeenCalledTimes(1);
   });
 

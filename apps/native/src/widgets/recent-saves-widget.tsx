@@ -27,7 +27,6 @@ export type WidgetSaveItem = {
   title: string;
   subtitle: string;
   kind: "image" | "link" | "note";
-  /** file:// URI of a pre-sized thumbnail inside `widgetsDirectory`. */
   imageUri?: string;
 };
 
@@ -37,11 +36,6 @@ export type RecentSavesWidgetProps = {
   emptyTitle?: string;
   emptyHint?: string;
   locked?: boolean;
-  /**
-   * Epoch ms the current entitlement stays valid until. The widget locks
-   * itself once its own clock passes this, so a Pro entitlement that lapses
-   * while the app never runs stops showing saves on its own.
-   */
   validUntil?: number;
 };
 
@@ -58,7 +52,6 @@ const RecentSavesWidget = (
       ? props.scheme
       : "shelvr";
   const dark = environment.colorScheme === "dark";
-  // Shelvr palette, mirrored from src/unistyles.ts.
   const c = dark
     ? {
         background: "#191510",
@@ -78,15 +71,10 @@ const RecentSavesWidget = (
   const kindIcon = (kind: "image" | "link" | "note") =>
     kind === "link" ? "link" : kind === "note" ? "note.text" : "photo";
 
-  // Fail closed before the app writes its first snapshot (no `locked`), when
-  // told to lock, and once the widget's own clock passes the snapshot's
-  // expiry. The last covers a Pro entitlement that lapses while the app never
-  // runs: the app cannot republish, so the snapshot must expire on its own.
   const expired =
     props.validUntil !== undefined &&
-    environment.date.getTime() >= props.validUntil;
+    (environment.date ?? new Date()).getTime() >= props.validUntil;
   const locked = (props.locked ?? true) || expired;
-  // A locked widget never shows saved content, even if items came through.
   const items = locked ? [] : (props.items ?? []);
 
   if (items.length === 0) {
@@ -95,7 +83,7 @@ const RecentSavesWidget = (
         spacing={6}
         modifiers={[
           containerBackground(c.background, "widget"),
-          widgetURL(`${scheme}:///${locked ? "paywall" : "add"}`),
+          widgetURL(`${scheme}:///${locked ? "" : "add"}`),
         ]}
       >
         <Image
@@ -118,10 +106,6 @@ const RecentSavesWidget = (
     );
   }
 
-  // A grid cell: thumbnail if the save has one, otherwise a warm tile with
-  // the type icon and title. Every cell is sized to exactly half the widget
-  // minus padding (12pt) and gap (7pt): (side - 12*2 - 7) / 2: an image's
-  // intrinsic size would otherwise skew the HStack split.
   const gridCell = containerRelativeFrame({
     axes: "both",
     count: 2,
@@ -180,7 +164,6 @@ const RecentSavesWidget = (
   };
 
   if (environment.widgetFamily === "systemSmall") {
-    // Last 4 saves in a 2x2 grid.
     return (
       <VStack
         spacing={7}
@@ -202,7 +185,6 @@ const RecentSavesWidget = (
     );
   }
 
-  // systemMedium: the latest save featured on the left, the next 4 as rows.
   const featured = items[0];
   const rest = items.slice(1, 5);
 
@@ -275,7 +257,8 @@ const RecentSavesWidget = (
       <ZStack
         alignment="bottomLeading"
         modifiers={[
-          frame({ width: 112, maxHeight: Infinity }),
+          frame({ width: 112 }),
+          frame({ maxHeight: Infinity }),
           clipShape("roundedRectangle", 14),
         ]}
       >
@@ -285,7 +268,8 @@ const RecentSavesWidget = (
             modifiers={[
               resizable(),
               aspectRatio({ contentMode: "fill" }),
-              frame({ width: 112, maxHeight: Infinity }),
+              frame({ width: 112 }),
+              frame({ maxHeight: Infinity }),
             ]}
           />
         ) : (

@@ -10,9 +10,8 @@ import {
   CONSENT_TEXT,
   CONSENT_VERSION,
   RESEND_MAX_ATTEMPTS,
-  UNKNOWN_IP_LIMITER_KEY,
-  normalizeIp,
 } from "./waitlist";
+import { UNKNOWN_IP_LIMITER_KEY, normalizeIp } from "./model/clientIp";
 import { classifyResendError, formatResendError } from "./model/resend";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
 import { newConvexTest } from "./test.setup";
@@ -28,13 +27,9 @@ afterEach(() => {
 type JoinBody = {
   email: string;
   product?: "shelvr" | "shelvr-android";
-  source?: "hero" | "preview" | "footer" | "unknown";
+  source?: "hero" | "preview" | "footer" | "plan" | "unknown";
 };
 
-/**
- * POST to the waitlist HTTP action the way the Next.js route does: shared
- * secret header plus the visitor IP in its dedicated header.
- */
 function join(
   t: ReturnType<typeof newConvexTest>,
   body: JoinBody,
@@ -140,6 +135,25 @@ describe("POST /waitlist/join", () => {
         )
         .unique();
       expect(signup?.source).toBe("unknown");
+    });
+  });
+
+  it("stores an Android signup from a plan vote page as plan", async () => {
+    const t = setup();
+    const body = {
+      email: "voter@example.com",
+      product: "shelvr-android",
+      source: "plan",
+    } as const;
+    expect((await join(t, body)).status).toBe(200);
+    await t.run(async (ctx) => {
+      const signup = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q.eq("email", "voter@example.com").eq("product", "shelvr-android"),
+        )
+        .unique();
+      expect(signup?.source).toBe("plan");
     });
   });
 
@@ -291,8 +305,6 @@ describe("POST /waitlist/join", () => {
     const t = setup();
     const ip = "203.0.113.7";
 
-    // waitlistJoinIp capacity is 8 bursts; each address is distinct so the
-    // email bucket never trips.
     for (let i = 0; i < 8; i++) {
       const response = await join(
         t,
@@ -308,7 +320,6 @@ describe("POST /waitlist/join", () => {
     );
     expect(ninth.status).toBe(429);
 
-    // A different visitor is unaffected.
     const other = await join(
       t,
       { email: "other@example.com", source: "hero" },
@@ -329,9 +340,6 @@ describe("POST /waitlist/join", () => {
 
   it("counts requests without a usable IP against one shared bucket", async () => {
     const t = setup();
-    // Distinct emails so the per-email bucket never trips. Two requests carry
-    // no IP header and six carry a malformed one; all eight must land in the
-    // same bucket, whose capacity is 8, so the ninth is refused.
     for (let i = 0; i < 2; i++) {
       const response = await join(t, {
         email: `anon-${i}@example.com`,
@@ -353,7 +361,6 @@ describe("POST /waitlist/join", () => {
     });
     expect(ninth.status).toBe(429);
 
-    // A request with a real IP is unaffected by the shared bucket.
     const known = await join(
       t,
       { email: "known@example.com", source: "hero" },
@@ -364,8 +371,6 @@ describe("POST /waitlist/join", () => {
 
   it("applies the shared bucket inside upsertSignup, not only at the HTTP edge", async () => {
     const t = setup();
-    // A missing IP and every malformed spelling must land in the same bucket
-    // even when the mutation is called directly with the raw value.
     const garbage = [
       undefined,
       "::::",
@@ -388,7 +393,6 @@ describe("POST /waitlist/join", () => {
     }
     await expect(direct(8, "::::")).rejects.toThrow();
     expect(UNKNOWN_IP_LIMITER_KEY).toBe("unknown");
-    // A real address is a different bucket and is not affected.
     await expect(direct(9, "198.51.100.9")).resolves.toMatchObject({
       resendStatus: "pending",
     });
@@ -405,7 +409,6 @@ describe("normalizeIp", () => {
   });
 
   it("rejects zone-qualified IPv6 so zone ids cannot mint separate buckets", () => {
-    // ipaddr.js accepts these and keeps the zone in the normalized string.
     expect(normalizeIp("fe80::1%eth0")).toBeUndefined();
     expect(normalizeIp("2001:db8::1%1")).toBeUndefined();
     expect(normalizeIp("2001:db8::1%2")).toBeUndefined();
@@ -461,8 +464,6 @@ describe("POST /waitlist/join authentication", () => {
 
   it("no longer exposes waitlist:join as a public action", async () => {
     const t = setup();
-    // `anyApi` builds an untyped reference, the way an arbitrary Convex client
-    // would call the old endpoint. The function must not exist.
     await expect(
       t.action(anyApi.waitlist.join, {
         email: "direct@example.com",
@@ -482,7 +483,6 @@ describe("Resend failure persistence", () => {
       RESEND_API_KEY: "re_test_key",
       RESEND_SEGMENT_ID: "seg_1",
     });
-    // Resend echoes the address in its validation errors.
     const providerBody = JSON.stringify({
       statusCode: 429,
       name: "rate_limit_exceeded",
@@ -597,7 +597,7 @@ describe("Resend failure persistence", () => {
       t.mutation(internal.waitlist.updateResendStatus, {
         id,
         status: "failed",
-        // @ts-expect-error the old free-text arg must not be accepted
+        // @ts-expect-error
         error: "Resend said: validator@example.com is invalid",
       }),
     ).rejects.toThrow();
@@ -605,7 +605,7 @@ describe("Resend failure persistence", () => {
       t.mutation(internal.waitlist.updateResendStatus, {
         id,
         status: "failed",
-        // @ts-expect-error categories are a closed set
+        // @ts-expect-error
         errorCategory: "validator@example.com is invalid",
       }),
     ).rejects.toThrow();
@@ -645,8 +645,6 @@ describe("waitlist.retryFailedResendSyncs", () => {
         )
         .unique();
       expect(signup?.resendStatus).toBe("unconfigured");
-      // Unconfigured is an operator condition, not a row failure: the last
-      // real error must survive the status patch.
       expect(signup?.resendError).toBe("provider_error:503");
     });
   });
@@ -743,7 +741,6 @@ describe("waitlist.retryFailedResendSyncs", () => {
       expect(capped?.resendError).toBe("invalid_recipient:422");
       expect(capped?.resendAttempts).toBe(RESEND_MAX_ATTEMPTS);
 
-      // The capped row must not crowd the retryable one out of the window.
       const retryable = await byEmail("retryable@example.com");
       expect(retryable?.resendStatus).toBe("unconfigured");
     });

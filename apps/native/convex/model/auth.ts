@@ -1,16 +1,22 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
+import type {
+  RegisteredMutation,
+  RegisteredQuery,
+  ReturnValueForOptionalValidator,
+} from "convex/server";
+import type { ObjectType, PropertyValidators, Validator } from "convex/values";
+import {
+  env,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
 const NOT_AUTHENTICATED = "Not authenticated";
 
-/**
- * The live owner row behind `userId`, or null when the id is not a users id,
- * the row is gone, or deletion has begun: a row may still own data only while
- * it exists and account deletion has not started on it. The one definition
- * every fence in the backend shares. Takes the raw string form because
- * webhook app user ids and the string `userId` columns are not typed ids.
- */
+/** Live owner row for a raw string id (webhook ids are untyped), or null if not a users id, gone, or deleting. */
 export async function liveOwner(
   ctx: QueryCtx | MutationCtx,
   userId: string,
@@ -21,27 +27,7 @@ export async function liveOwner(
   return user !== null && user.deleting !== true ? user : null;
 }
 
-/**
- * Returns the authenticated user's stable users-table id, or throws. Every
- * public function derives its userId from this, never from an argument.
- *
- * Convex Auth puts both the user id and session id in the JWT `sub` claim
- * (`userId|sessionId`). `getAuthUserId` removes the session suffix; using the
- * raw `identity.subject` would make ownership session-scoped and would not
- * match RevenueCat's user id or `getCurrentUser`.
- *
- * A valid JWT is not enough on its own: the owner row must still be live.
- * Account deletion marks the row in its first transaction, so a retained
- * token on another device stops authorizing the moment deletion starts, not
- * only once the batched cleanup reaches the auth tables. The rejection is the
- * same unauthenticated error either way.
- *
- * This stays provider-agnostic: it works identically whether the user signed in
- * via OAuth or Anonymous. Query and mutation contexts only: an action derives
- * the caller through the internal mutation or query it runs (Convex forwards
- * the caller's identity to it), so the authorization and the write stay in one
- * transaction.
- */
+/** Stable users-table id (JWT `sub` is `userId|sessionId`, so not `identity.subject`), or throws. */
 export async function requireUserId(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Id<"users">> {
@@ -53,6 +39,83 @@ export async function requireUserId(
     throw new Error(NOT_AUTHENTICATED);
   }
   return userId;
+}
+
+type Authed<Ctx> = Ctx & { userId: Id<"users"> };
+
+type ReturnsValidator = Validator<unknown, "required", string>;
+
+/**
+ * Every public function declares `args` and `returns`, so both are required here.
+ * `handler` is a method signature so its parameters compare bivariantly, which lets a
+ * definition widen to `Widened` by plain assignment.
+ */
+type AuthedDefinition<
+  Ctx,
+  Args extends PropertyValidators,
+  Returns extends ReturnsValidator,
+  ReturnValue,
+> = {
+  args: Args;
+  returns: Returns;
+  handler(ctx: Authed<Ctx>, args: ObjectType<Args>): ReturnValue;
+};
+
+/**
+ * Inside a builder TypeScript cannot match its generics against `query()`'s conditional
+ * types, so each builder widens the definition to the shapes `query()` resolves. The
+ * registered type is phantom in its arguments, so the result needs no cast back.
+ */
+type Widened<Ctx> = AuthedDefinition<
+  Ctx,
+  PropertyValidators,
+  ReturnsValidator,
+  unknown
+>;
+
+const authedFunctions = new WeakSet<object>();
+
+/** True when `authedQuery` or `authedMutation` built `fn`, so every call runs `requireUserId` first. */
+export function isAuthedFunction(fn: object): boolean {
+  return authedFunctions.has(fn);
+}
+
+/** A public query that runs `requireUserId` before its handler, which gets the id as `ctx.userId`. */
+export function authedQuery<
+  Args extends PropertyValidators,
+  Returns extends ReturnsValidator,
+  ReturnValue extends ReturnValueForOptionalValidator<Returns>,
+>(
+  definition: AuthedDefinition<QueryCtx, Args, Returns, ReturnValue>,
+): RegisteredQuery<"public", ObjectType<Args>, ReturnValue> {
+  const { args, returns, handler }: Widened<QueryCtx> = definition;
+  const built = query({
+    args,
+    returns,
+    handler: async (ctx, input) =>
+      await handler({ ...ctx, userId: await requireUserId(ctx) }, input),
+  });
+  authedFunctions.add(built);
+  return built;
+}
+
+/** A public mutation that runs `requireUserId` before its handler, which gets the id as `ctx.userId`. */
+export function authedMutation<
+  Args extends PropertyValidators,
+  Returns extends ReturnsValidator,
+  ReturnValue extends ReturnValueForOptionalValidator<Returns>,
+>(
+  definition: AuthedDefinition<MutationCtx, Args, Returns, ReturnValue>,
+): RegisteredMutation<"public", ObjectType<Args>, ReturnValue> {
+  const { args, returns, handler }: Widened<MutationCtx> = definition;
+  const built = mutation({
+    args,
+    returns,
+    handler: async (ctx, input) =>
+      await handler({ ...ctx, userId: await requireUserId(ctx) }, input),
+  });
+  authedFunctions.add(built);
+  return built;
 }
 
 export async function isDevelopmentAnonymousUser(
@@ -67,4 +130,19 @@ export async function isDevelopmentAnonymousUser(
     )
     .unique();
   return account !== null;
+}
+
+const MAX_SENDER_NAME_CHARS = 40;
+
+export async function senderFirstName(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<string | undefined> {
+  const id = ctx.db.normalizeId("users", userId);
+  const user = id === null ? null : await ctx.db.get(id);
+  const first = user?.name?.trim().split(/\s+/)[0];
+  if (!first || first.length > MAX_SENDER_NAME_CHARS || first.includes("@")) {
+    return undefined;
+  }
+  return first;
 }

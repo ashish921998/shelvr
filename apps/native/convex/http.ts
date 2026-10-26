@@ -3,6 +3,7 @@ import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { env, httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
+import { isDevDeployment } from "./model/deployment";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
@@ -20,12 +21,14 @@ import {
 } from "./model/captureRequest";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
+import { parsePlanVote, type PlanVoteBody } from "./model/planVote";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
 import {
   RETENTION_MAX_BODY_BYTES,
   answerRetentionRequest,
+  parseRetentionOffers,
 } from "./model/retentionMessaging";
 import { saveErrorCode } from "./model/saveErrors";
 import {
@@ -94,9 +97,7 @@ async function receiveImageUpload(
       return response;
     }
     if (result.kind === "stored") {
-      // This capability already has its immutable receipt. Do not parse or
-      // cancel the irrelevant retry body: cancellation resets HTTP/2, and
-      // revalidation could incorrectly refuse an upload already accepted.
+      // Do not cancel the retry body: cancellation resets HTTP/2.
       return json({ storageId: result.storageId }, 200);
     }
     claim = result;
@@ -126,21 +127,8 @@ async function receiveImageUpload(
   }
 }
 
-// Convex Auth: JWT verification, JWKS, and OAuth callback HTTP actions.
 auth.addHttpRoutes(http);
 
-/**
- * RevenueCat webhook receiver. RevenueCat posts server-to-server events here
- * for every subscription lifecycle change (trial start, conversion, renewal,
- * cancellation, expiration). We authenticate with a shared bearer secret set
- * in the RevenueCat dashboard and stored in the `REVENUECAT_WEBHOOK_SECRET`
- * Convex deployment env var, then map the event to an entitlement row.
- *
- * The Convex Auth user id is configured as the RevenueCat app user id (the
- * client calls `Purchases.logIn(convexUserId)` on sign-in), so the event's
- * current `app_user_id` is the same `userId` every other table keys on. No
- * client-supplied id is trusted.
- */
 http.route({
   path: "/webhooks/revenuecat",
   method: "POST",
@@ -149,8 +137,6 @@ http.route({
     if (!secret) {
       return new Response("Webhook secret not configured", { status: 500 });
     }
-    // Constant-time compare: a plain `!==` returns as soon as one byte
-    // differs, which lets a caller time their way to the secret byte by byte.
     const authHeader = req.headers.get("authorization") ?? "";
     if (!(await secureCompare(`Bearer ${secret}`, authHeader))) {
       return new Response("Unauthorized", { status: 401 });
@@ -160,13 +146,18 @@ http.route({
     try {
       body = await req.json();
     } catch {
-      // Unreadable/non-JSON body: RevenueCat should not retry these.
       return new Response("Bad payload", { status: 400 });
     }
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
-      // Body was not a readable object: reject so RevenueCat doesn't retry.
       return new Response("Bad payload", { status: 400 });
+    }
+    // Test Store purchases cost nothing, so only the dev deployment may grant Pro for one.
+    if (event.testStore && !isDevDeployment()) {
+      logEvent("warn", "revenuecat_test_store_ignored", {
+        event_type: event.type ?? "unknown",
+      });
+      return new Response(null, { status: 200 });
     }
 
     if (event.type === "TRANSFER") {
@@ -192,9 +183,6 @@ http.route({
       return new Response(null, { status: 200 });
     }
 
-    // A readable event missing required identity or ordering fields is
-    // malformed but acknowledged: return 200 so RevenueCat stops retrying a
-    // non-actionable event rather than hammering the endpoint.
     if (
       event.type === undefined ||
       event.userId === undefined ||
@@ -257,13 +245,7 @@ function json(body: unknown, status: number): Response {
   });
 }
 
-/**
- * Apple's Get Retention Message endpoint. The App Store posts a signed request
- * while a subscriber views the page where they can cancel, and the reply picks
- * the message shown on the cancel sheet. The request is authenticated by its
- * signature alone, so there is no shared secret. Apple allows 700 ms, which is
- * why this reads no database.
- */
+/** Apple's Get Retention Message endpoint: authenticated by Apple's request signature alone, and Apple allows 700 ms, so it reads no database. */
 http.route({
   path: "/retention-messaging",
   method: "POST",
@@ -280,19 +262,31 @@ http.route({
       });
       return json({ error: "bad_request" }, 400);
     }
+    const keyId = env.APPLE_IAP_KEY_ID;
+    const issuerId = env.APPLE_IAP_ISSUER_ID;
+    const privateKey = env.APPLE_IAP_PRIVATE_KEY;
     const reply = await answerRetentionRequest(body, {
       root: APPLE_ROOT_CA_G3,
       now: Date.now(),
       messageId: env.APPLE_RETENTION_MESSAGE_ID,
+      offers: parseRetentionOffers(env.APPLE_RETENTION_OFFERS),
+      signingKey:
+        keyId && issuerId && privateKey
+          ? { keyId, issuerId, privateKey }
+          : undefined,
     });
     if (reply.reason)
-      logEvent("warn", "retention_request_rejected", { reason: reply.reason });
+      logEvent(
+        "warn",
+        reply.status === 200
+          ? "retention_offer_skipped"
+          : "retention_request_rejected",
+        { reason: reply.reason },
+      );
     return json(reply.body, reply.status);
   }),
 });
 
-/** The marketing server claims a bounded parsing budget before reading the
- * visitor's request. No visitor body is accepted by this endpoint. */
 http.route({
   path: "/request-body",
   method: "POST",
@@ -300,7 +294,10 @@ http.route({
     const secret = env.WAITLIST_SHARED_SECRET;
     if (
       !secret ||
-      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+      !(await secureCompare(
+        secret,
+        req.headers.get(WAITLIST_SECRET_HEADER) ?? "",
+      ))
     )
       return json({ error: "unauthorized" }, 401);
     const route = req.headers.get("x-shelvr-body-route");
@@ -309,7 +306,7 @@ http.route({
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
         route,
-        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
       return json({ ok: true }, 200);
     } catch (error) {
@@ -322,22 +319,9 @@ http.route({
   }),
 });
 
-/**
- * Header the web server uses to pass the visitor's IP along. A dedicated name
- * (rather than `x-forwarded-for`) means the value cannot be confused with
- * hops Convex's own edge adds, and it is only honoured after the shared
- * secret check below has proven the caller is our server.
- */
 export const WAITLIST_CLIENT_IP_HEADER = "x-shelvr-client-ip";
 export const WAITLIST_SECRET_HEADER = "x-waitlist-secret";
 
-/**
- * Waitlist signup receiver for the marketing site. The Next.js route is the
- * only intended caller: it proves itself with `WAITLIST_SHARED_SECRET` and
- * forwards the real visitor IP, so the per-IP limiter inside `upsertSignup`
- * cannot be skipped by omitting or forging the address. The old public
- * `waitlist:join` action let any Convex client do exactly that.
- */
 http.route({
   path: "/waitlist/join",
   method: "POST",
@@ -386,8 +370,7 @@ http.route({
       if (isRateLimitError(error)) {
         return json({ message: "Too many attempts." }, 429);
       }
-      // Convex argument errors print the failing args, which include the
-      // address. Log the error class only.
+      // Convex argument errors print the failing args, which include the address.
       logEvent("error", "waitlist_join_failed", {
         error_name: errorName(error),
       });
@@ -396,12 +379,6 @@ http.route({
   }),
 });
 
-/**
- * The marketing site's no-login oracle. Same caller and trust model as
- * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
- * and forwards the visitor IP for the per-IP limiter. The body is narrowed
- * before a token is spent, so a malformed request costs the visitor nothing.
- */
 http.route({
   path: "/oracle",
   method: "POST",
@@ -445,12 +422,6 @@ http.route({
   }),
 });
 
-/**
- * Public preview for a branded share link (`shelvr-web.vercel.app/i/:token`).
- * The marketing site's `/i/[token]` route calls this to build the page's OG
- * tags. No secret: the random share token is the capability, and the
- * response is a narrow preview shape (see `getSharePreview`).
- */
 http.route({
   pathPrefix: "/share/links/",
   method: "GET",
@@ -464,17 +435,60 @@ http.route({
   }),
 });
 
-// ---------------------------------------------------------------------------
-// iOS App Intents (Siri, Shortcuts)
-// ---------------------------------------------------------------------------
-//
-// The Swift intents in `apps/native/app-intents/` save without launching the
-// JavaScript app, authenticated by a per-device capture token rather than a
-// Convex Auth JWT (see appIntents.ts). Every route answers JSON with an `error`
-// code the Swift side maps to what Siri says: `unauthorized` (sign in again),
-// `pro_required` (open Shelvr to subscribe), `rate_limited`, a save refusal
-// code (`photo_limit`, `image_too_large`, `image_empty`), `bad_request`, or
-// `failed`.
+http.route({
+  pathPrefix: "/plan/shares/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const share = await ctx.runQuery(internal.planShares.getPublicPlanShare, {
+      token,
+    });
+    if (!share) return json({ message: "Not found." }, 404);
+    return json(share, 200);
+  }),
+});
+
+http.route({
+  path: "/plan/votes",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Vote secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let vote: PlanVoteBody | null;
+    try {
+      vote = parsePlanVote(JSON.parse(await readBoundedText(req, 2048)));
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    if (!vote) return json({ message: "Invalid request." }, 400);
+
+    try {
+      const outcome = await ctx.runMutation(
+        internal.planShares.recordPlanVote,
+        {
+          ...vote,
+          ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+        },
+      );
+      if (outcome === "missing") return json({ outcome }, 404);
+      if (outcome === "full") return json({ outcome }, 409);
+      return json({ outcome }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "plan_vote_failed", { error_name: errorName(error) });
+      return json({ message: "Could not save your vote." }, 500);
+    }
+  }),
+});
 
 type CaptureRoute = "image_begin" | "image_finish" | "link" | "note";
 
@@ -482,7 +496,6 @@ function captureUnauthorized(): Response {
   return json({ error: "unauthorized" }, 401);
 }
 
-/** Maps a refused capture to its response. Never logs content or URLs. */
 function isSavableUrl(url: string): boolean {
   try {
     normalizeExternalUrl(url);
@@ -505,7 +518,6 @@ function captureFailure(route: CaptureRoute, error: unknown): Response {
   return json({ error: "failed" }, 500);
 }
 
-/** The caller's token hash and JSON body, or the response that ends it. */
 async function readCapture(
   ctx: ActionCtx,
   req: Request,
@@ -610,8 +622,6 @@ http.route({
     if (read instanceof Response) return read;
     const request = parseLinkOrNote(read.body);
     if (!request) return json({ error: "bad_request" }, 400);
-    // A link the URL policy refuses is the caller's to report, not a server
-    // failure the app would queue and retry forever.
     if (request.kind === "link" && !isSavableUrl(request.url)) {
       return json({ error: "invalid_url" }, 422);
     }
@@ -644,13 +654,16 @@ http.route({
     const secret = env.WAITLIST_SHARED_SECRET;
     if (
       !secret ||
-      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+      !(await secureCompare(
+        secret,
+        req.headers.get(WAITLIST_SECRET_HEADER) ?? "",
+      ))
     )
       return json({ error: "unauthorized" }, 401);
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
         route: "waitlist",
-        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
       const { token } = JSON.parse(await readBoundedText(req, 1024)) as {
         token?: unknown;

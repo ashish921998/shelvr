@@ -10,6 +10,7 @@ import {
   fakeAiLocks,
   fakeLinkAnalysis,
   fakeNoteAnalysis,
+  fakePlan,
   fakeRecommendation,
   FIXTURE_ORIGIN,
   fixturePage,
@@ -83,6 +84,7 @@ describe("fakeNoteAnalysis", () => {
       spaceNames: [],
       intents: [],
       cities: [],
+      places: [],
     });
   });
 
@@ -101,7 +103,6 @@ describe("fakeNoteAnalysis", () => {
   });
 });
 
-// The shape of analyzeNoteItem's prompt in ai.ts.
 function notePrompt(note: string): string {
   return [
     "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title.",
@@ -130,7 +131,6 @@ describe("noteFromPrompt", () => {
   });
 });
 
-// The keys of itemAnalysisSchema in ai.ts.
 const noteSchema = z.object({
   title: z.string(),
   description: z.string(),
@@ -138,6 +138,7 @@ const noteSchema = z.object({
   spaceNames: z.array(z.string()),
   intents: z.array(z.object({ kind: z.string() })),
   cities: z.array(z.string()),
+  places: z.array(z.string()),
 });
 
 describe("FAKE_MODEL", () => {
@@ -165,7 +166,6 @@ describe("FAKE_MODEL", () => {
   });
 });
 
-// The shape of linkAnalysisPrompt in ai.ts for a plain web page.
 function linkPrompt(content: string): string {
   return [
     "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title.",
@@ -208,11 +208,49 @@ describe("fakeLinkAnalysis", () => {
       spaceNames: [],
       intents: [],
       cities: [],
+      places: [],
     });
   });
 
   it("leaves a page with no title unanswered", () => {
     expect(fakeLinkAnalysis({ content: "text" })).toBeUndefined();
+  });
+});
+
+describe("fakePlan", () => {
+  const prompt = (saves: string) =>
+    [
+      "You help someone decide where to actually go, using what they saved.",
+      saves,
+    ].join("\n\n");
+
+  it("picks every place each save lists, numbered by its save", () => {
+    expect(
+      fakePlan(
+        prompt(
+          "Save 1\nTitle: No places here\n\nSave 2\nTitle: Date night\nPlaces: Manteigaria; Miradouro da Graça",
+        ),
+      ),
+    ).toEqual({
+      places: [
+        {
+          saveNumber: 2,
+          name: "Manteigaria",
+          area: "",
+          why: "Saved for a night out",
+        },
+        {
+          saveNumber: 2,
+          name: "Miradouro da Graça",
+          area: "",
+          why: "Saved for a night out",
+        },
+      ],
+    });
+  });
+
+  it("leaves a prompt that is not a plan unanswered", () => {
+    expect(fakePlan("Save 1\nPlaces: Manteigaria")).toBeUndefined();
   });
 });
 
@@ -248,7 +286,6 @@ describe("FAKE_MODEL on a link", () => {
   });
 });
 
-// The shape of the recommendation prompt in aiRecommendForSpace.ts.
 function recommendPrompt(spaceName: string, description = "Bowls"): string {
   return [
     "You are helping organize a save-it-for-later app. The user just created a space (a themed collection).",

@@ -1,4 +1,3 @@
-import { AiConsentSetting } from "@/components/ai-consent";
 import { LegalConsentPreference } from "@/components/legal-consent";
 import { UpdateSetting } from "@/components/update-setting";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -7,21 +6,27 @@ import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 import { analytics } from "@/lib/analytics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
-import { restorePurchases, useEntitlement } from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
+import {
+  backOrHome,
+  closeScreen,
+  type ClosingScreen,
+} from "@/lib/screen-dismiss";
 import { useNotificationSession } from "@/lib/notifications";
+import { useNotificationPermission } from "@/lib/use-notification-permission";
+import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -30,11 +35,6 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/**
- * The less frequent account settings, one tap from the Profile sheet so the
- * sheet itself fits without scrolling. Restore purchases, the legal links and
- * account deletion live here; App Review expects them in the app's settings.
- */
 export default function SettingsScreen() {
   useAppLocale();
   const { session, operation } = useNotificationSession();
@@ -42,16 +42,24 @@ export default function SettingsScreen() {
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
+  // Typed to what is used here: the native stack's transitionEnd isn't in
+  // expo-router's generic navigation type.
+  const navigation = useNavigation() as ClosingScreen & {
+    getState: () => { routes: { name: string }[] };
+  };
   const { theme } = useUnistyles();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
+  // A preference left on without the device's permission delivers nothing, so
+  // it shows off; turning it on asks for the permission or opens Settings.
+  const permission = useNotificationPermission();
+  const notificationsAllowed =
+    permission === undefined || permission === "granted";
   const { status: entitlementStatus } = useEntitlement();
-  // Deleting the account leaves a store subscription running, so a current
-  // subscriber gets a way to cancel it from the confirmation itself.
   const hasLiveSubscription =
     entitlementStatus === "trialing" || entitlementStatus === "pro";
-  const [restoring, setRestoring] = useState(false);
+  const { restoring, restore } = useRestorePurchases();
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const fixtureResetEnabled = isAnonymousAuthEnabled();
   const { data: canResetFlowFixtures } = useQuery(
@@ -62,12 +70,12 @@ export default function SettingsScreen() {
   );
   const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
 
-  const close = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/");
-    }
+  const close = () => backOrHome(router);
+
+  const closeAllSheets = () => {
+    const profileIsRoot = navigation.getState().routes[0]?.name === "profile";
+    router.dismissAll();
+    if (profileIsRoot) router.replace("/(app)/(tabs)/(home)");
   };
 
   const openExternal = (url: string) => {
@@ -101,8 +109,6 @@ export default function SettingsScreen() {
         );
         return;
       }
-      // Only a saved preference is a decision. `undefined` means another
-      // session operation held the queue and this toggle changed nothing.
       if (saved === true && !enabled)
         analytics.capture("notification_disabled", { notification_kind: kind });
     } catch (error) {
@@ -113,33 +119,6 @@ export default function SettingsScreen() {
         error,
       );
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
-    }
-  };
-
-  const handleRestorePurchases = async () => {
-    if (restoring) return;
-    const storeName = Platform.OS === "ios" ? "App Store" : "Google Play";
-    setRestoring(true);
-    try {
-      const outcome = await restorePurchases();
-      if (outcome === "restored") {
-        Alert.alert(
-          t("pro.restoredTitle"),
-          t("pro.restoredBody", { store: storeName }),
-        );
-      } else if (outcome === "none") {
-        Alert.alert(
-          t("pro.notFoundTitle"),
-          t("pro.notFoundBody", { store: storeName }),
-        );
-      } else {
-        Alert.alert(
-          t("pro.restoreFailed"),
-          t("pro.restoreFailedBody", { store: storeName }),
-        );
-      }
-    } finally {
-      setRestoring(false);
     }
   };
 
@@ -160,10 +139,10 @@ export default function SettingsScreen() {
           ? [
               {
                 text: t("pro.manage"),
-                // Settings sits on the Profile sheet, and Customer Center
-                // presents only once both are gone.
                 onPress: () =>
-                  void manageSubscription(() => router.dismissAll()),
+                  void manageSubscription(() =>
+                    closeScreen(navigation, closeAllSheets),
+                  ),
               },
             ]
           : []),
@@ -229,13 +208,11 @@ export default function SettingsScreen() {
         <Text accessibilityRole="header" style={styles.title}>
           {t("profile.settings")}
         </Text>
-        {Platform.OS === "android" ? (
-          <HeaderIconButton
-            icon="xmark"
-            label={t("common.close")}
-            onPress={close}
-          />
-        ) : null}
+        <HeaderIconButton
+          icon="xmark"
+          label={t("common.close")}
+          onPress={close}
+        />
       </View>
 
       <SettingCard
@@ -244,7 +221,10 @@ export default function SettingsScreen() {
         accessory={
           <Switch
             accessibilityLabel={t("notifications.toggleLabel")}
-            value={notificationPreferences?.weeklyShelfEnabled ?? false}
+            value={
+              notificationsAllowed &&
+              (notificationPreferences?.weeklyShelfEnabled ?? false)
+            }
             disabled={notificationPreferences === undefined || busy}
             onValueChange={(value) =>
               void toggleNotifications("weekly_shelf", value)
@@ -264,8 +244,10 @@ export default function SettingsScreen() {
         accessory={
           <Switch
             accessibilityLabel={t("notifications.remindersToggle")}
-            // Older backends return no field; show it off rather than guess.
-            value={notificationPreferences?.remindersEnabled ?? false}
+            value={
+              notificationsAllowed &&
+              (notificationPreferences?.remindersEnabled ?? false)
+            }
             disabled={notificationPreferences === undefined || busy}
             onValueChange={(value) =>
               void toggleNotifications("save_reminders", value)
@@ -281,8 +263,6 @@ export default function SettingsScreen() {
 
       <UpdateSetting />
 
-      <AiConsentSetting />
-
       <LegalConsentPreference />
 
       <SettingsGroup>
@@ -291,7 +271,7 @@ export default function SettingsScreen() {
           label={restoring ? t("pro.restoring") : t("pro.restore")}
           icon="arrow.clockwise"
           disabled={restoring}
-          onPress={() => void handleRestorePurchases()}
+          onPress={() => void restore()}
         />
         <SettingsRow
           label={t("support.contact")}
@@ -351,7 +331,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: {
     padding: theme.gap(3),
     paddingTop: theme.gap(4),
-    // Keeps Delete account clear of the home indicator at full height.
     paddingBottom: rt.insets.bottom + theme.gap(4),
     gap: theme.gap(1.5),
   },

@@ -3,22 +3,9 @@ import { useConvexAuth } from "convex/react";
 import { useEffect } from "react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
 
-/**
- * Signs this device out once its account is deleted from another device.
- *
- * The deleted account's access token stays valid here until it expires, so
- * Convex Auth still reports signed in. The server stops honouring it the
- * moment deletion starts (`requireUserId` rejects a deleting owner), and
- * `getCurrentUser` answers `null` for that identity. Signing out moves the
- * app to the sign-in screen, and the signed-out edge clears the Convex cache,
- * the widget and the analytics identity like any other sign-out. The local
- * reminders are cleared here as the profile sign-out clears them, so none
- * naming the deleted account's saves fires afterwards.
- */
 export function useSignOutWhenAccountGone(): void {
   const { isAuthenticated } = useConvexAuth();
   const { data: user, isSuccess, isFetching } = useCurrentUser();
@@ -27,11 +14,8 @@ export function useSignOutWhenAccountGone(): void {
 
   useEffect(() => {
     if (!gone) return;
-    // Convex Auth's signOut ignores a server refusal and always erases the
-    // local tokens, so a failure here is local storage only.
     const signOutGone = async () => {
       await signOut();
-      await clearExitOfferReminder();
       await clearFirstSaveReminder();
       await clearTrialReminder();
     };

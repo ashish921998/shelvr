@@ -8,7 +8,6 @@ import {
   isWeeklyNudgePending,
   recordShareSaved,
   shouldOfferWeeklyNudge,
-  shouldShowHowTo,
 } from "./first-share";
 
 const store = vi.hoisted(() => new Map<string, string>());
@@ -57,31 +56,21 @@ describe("first share-sheet save", () => {
   });
 });
 
-describe("shouldShowHowTo", () => {
-  it.each([
-    [false, 0, true],
-    [false, 1, true],
-    [false, 2, false],
-    [true, 0, false],
-    [true, 1, false],
-  ])(
-    "firstShareSaved=%s with %i items shows the how-to: %s",
-    (firstShareSaved, itemCount, expected) => {
-      expect(shouldShowHowTo({ firstShareSaved, itemCount })).toBe(expected);
-    },
-  );
-});
-
 describe("weekly nudge timing", () => {
   beforeEach(() => store.clear());
 
   it("treats the launch that first sees an account as its first session", () => {
     expect(isFirstSession("user_a")).toBe(true);
-    // Same launch, asked again.
     expect(isFirstSession("user_a")).toBe(true);
-    // A later launch stored a different id first.
     store.set("shelvr.firstLaunch.user_b", "an-earlier-launch");
     expect(isFirstSession("user_b")).toBe(false);
+  });
+
+  it("gives every launch its own id", async () => {
+    expect(isFirstSession("user_a")).toBe(true);
+    vi.resetModules();
+    const laterLaunch = await import("./first-share");
+    expect(laterLaunch.isFirstSession("user_a")).toBe(false);
   });
 
   it("waits for three real saves outside the first session", () => {

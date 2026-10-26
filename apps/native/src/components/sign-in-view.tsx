@@ -2,25 +2,21 @@ import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
+import { SignInHero } from "@/components/sign-in-hero";
+import { useLargeText } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   useColorScheme,
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/**
- * Full-page Convex Auth sign-in, shown by the (auth) route and by the
- * onboarding opener. The "Dev login" button renders when
- * isAnonymousAuthEnabled() passes (the build-time flag plus the development
- * variant); the server independently refuses anonymous sign-in unless
- * the deployment sets AUTH_ENABLE_ANONYMOUS=true.
- */
 export function SignInView({
   onCompleted,
   onBack,
@@ -36,6 +32,8 @@ export function SignInView({
     interrupted,
   } = useOAuthSignIn("sign_in_view");
   const colorScheme = useColorScheme();
+  // At large text sizes the buttons and the consent text need the room.
+  const showHero = !useLargeText();
   const { theme } = useUnistyles();
 
   const handleOAuth = async (provider: OAuthProvider) => {
@@ -45,7 +43,11 @@ export function SignInView({
   const anonEnabled = isAnonymousAuthEnabled();
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      alwaysBounceVertical={false}
+    >
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -61,9 +63,13 @@ export function SignInView({
           />
         </Pressable>
       ) : null}
+      {showHero ? <SignInHero /> : null}
       <View style={styles.center}>
         <View style={styles.header}>
-          <Text style={styles.title}>shelvr</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            shelvr
+          </Text>
+          <Text style={styles.tagline}>{t("opener.tagline")}</Text>
           <Text style={styles.subtitle}>{t("account.signInTitle")}</Text>
         </View>
 
@@ -79,7 +85,7 @@ export function SignInView({
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
-              cornerRadius={theme.radius.md}
+              cornerRadius={26}
               style={[
                 styles.appleButton,
                 pending !== null && styles.buttonDisabled,
@@ -133,7 +139,6 @@ export function SignInView({
         </View>
       </View>
 
-      <Text style={styles.terms}>{t("aiConsent.signInNote")}</Text>
       <Text style={styles.terms}>
         {t("legal.consent", {
           terms: "\uE000",
@@ -168,16 +173,21 @@ export function SignInView({
       {pending === null && interrupted && (
         <Text style={styles.error}>{t("account.signInNotFinished")}</Text>
       )}
-    </View>
+    </ScrollView>
   );
 }
 const styles = StyleSheet.create((theme, rt) => ({
-  container: {
+  scroll: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flexGrow: 1,
     padding: theme.gap(2.5),
-    paddingTop: rt.insets.top + theme.gap(3),
-    paddingBottom: rt.insets.bottom + theme.gap(2),
-    alignItems: "center",
+    paddingTop: rt.insets.top + theme.gap(2),
+    paddingBottom: rt.insets.bottom + theme.gap(1),
+    alignItems: "stretch",
+    gap: theme.gap(2),
   },
   back: {
     position: "absolute",
@@ -187,24 +197,29 @@ const styles = StyleSheet.create((theme, rt) => ({
     zIndex: 1,
   },
   center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
     alignSelf: "stretch",
-    gap: theme.gap(8),
+    gap: theme.gap(2.5),
   },
   header: {
+    gap: theme.gap(0.75),
     alignItems: "center",
-    gap: theme.gap(1),
   },
   title: {
     fontFamily: theme.fonts.display,
-    fontSize: 48,
-    color: theme.colors.primary,
+    fontSize: 32,
+    lineHeight: 36,
+    color: theme.colors.primaryText,
+  },
+  tagline: {
+    fontFamily: theme.fonts.display,
+    fontSize: 30,
+    lineHeight: 34,
+    textAlign: "center",
+    color: theme.colors.foreground,
   },
   subtitle: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 16,
+    ...theme.type.subhead,
+    textAlign: "center",
     color: theme.colors.muted,
   },
   buttons: {
@@ -220,7 +235,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.foreground,
     borderWidth: 1,
     borderColor: theme.colors.foreground,
-    borderRadius: theme.radius.md,
+    borderRadius: 999,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
@@ -235,7 +250,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
+    borderRadius: 999,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
@@ -258,12 +273,11 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   terms: {
     fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 17,
     color: theme.colors.faint,
     textAlign: "center",
-    paddingHorizontal: theme.gap(4),
-    marginBottom: theme.gap(2),
+    paddingHorizontal: theme.gap(2),
   },
   termsLink: {
     fontFamily: theme.fonts.medium,

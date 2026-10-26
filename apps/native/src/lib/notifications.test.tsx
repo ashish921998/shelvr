@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { releaseSheetLink, rememberSheetLink } from "./deferred-sheet-link";
 import { ConvexError } from "convex/values";
 import {
   NotificationSessionProvider,
@@ -11,6 +12,7 @@ import {
 const mock = vi.hoisted(() => ({
   authenticated: true,
   locale: "en",
+  timezone: "Asia/Kolkata",
   token: vi.fn(),
   register: vi.fn(),
   otherMutation: vi.fn(),
@@ -26,17 +28,22 @@ const mock = vi.hoisted(() => ({
   appState: null as null | ((state: string) => void),
   tapped: null as null | ((response: unknown) => void),
   rotated: null as null | ((token: { type: string; data: string }) => void),
+  secure: new Map<string, string>(),
+  permission: vi.fn(async () => "granted"),
 }));
 vi.mock("@/lib/i18n", () => ({
   currentLocale: () => mock.locale,
   useAppLocale: () => mock.locale,
 }));
+vi.mock("expo-localization", () => ({
+  getCalendars: () => [{ timeZone: mock.timezone }],
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError, capture: mock.capture },
 }));
-vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
-vi.mock("@/lib/exit-offer-reminder", () => ({
-  clearExitOfferReminder: vi.fn(async () => {}),
+vi.mock("./notification-token", () => ({
+  getExpoPushToken: mock.token,
+  notificationPermissionState: mock.permission,
 }));
 vi.mock("@/lib/first-save-reminder", () => ({
   clearFirstSaveReminder: mock.clearFirstSave,
@@ -73,6 +80,8 @@ vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("expo-secure-store", () => ({
   getItemAsync: async () => "[]",
   setItemAsync: vi.fn(),
+  getItem: (key: string) => mock.secure.get(key) ?? null,
+  setItem: (key: string, value: string) => mock.secure.set(key, value),
 }));
 vi.mock("react-native", () => ({
   Platform: { OS: "android" },
@@ -109,11 +118,15 @@ vi.mock("expo-notifications", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  releaseSheetLink(false);
   mock.authenticated = true;
   mock.locale = "en";
+  mock.timezone = "Asia/Kolkata";
   mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
+  mock.secure.clear();
+  mock.permission.mockReset().mockResolvedValue("granted");
 });
 
 function renderSession() {
@@ -167,7 +180,6 @@ describe("notification session lifecycle", () => {
       await act(async () => {
         await result.current.session[action]();
       });
-      // Deleting also signs out, so the clear can run twice; it is idempotent.
       expect(mock.clearTrial).toHaveBeenCalled();
     },
   );
@@ -184,6 +196,26 @@ describe("notification session lifecycle", () => {
       expect(mock.clearFirstSave).toHaveBeenCalled();
     },
   );
+  it("turns on the weekly shelf onboarding queued, once the session has started", async () => {
+    mock.secure.set("shelvr.pending.weeklyShelf", "1");
+    renderSession();
+    await waitFor(() =>
+      expect(mock.otherMutation).toHaveBeenCalledWith(
+        expect.objectContaining({ weeklyShelfEnabled: true }),
+      ),
+    );
+    expect(mock.secure.get("shelvr.pending.weeklyShelf")).toBe("");
+    expect(mock.captureError).not.toHaveBeenCalled();
+  });
+  it("leaves the weekly shelf alone when onboarding queued nothing", async () => {
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    expect(mock.otherMutation).not.toHaveBeenCalledWith(
+      expect.objectContaining({ weeklyShelfEnabled: true }),
+    );
+  });
   it("turning save reminders off also clears the first-save reminder", async () => {
     const { result } = renderSession();
     await waitFor(() =>
@@ -241,6 +273,27 @@ describe("notification session lifecycle", () => {
     expect(mock.register).toHaveBeenLastCalledWith(
       expect.objectContaining({ locale: "ja" }),
     );
+  });
+
+  it("updates the timezone once on foreground after the device changes zones", async () => {
+    renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Asia/Kolkata" }),
+    );
+    mock.timezone = "Europe/Paris";
+    act(() => mock.appState?.("active"));
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(2));
+    expect(mock.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locale: "en", timezone: "Europe/Paris" }),
+    );
+    await act(async () => {
+      mock.appState?.("active");
+      mock.appState?.("active");
+    });
+    expect(mock.token).toHaveBeenCalledTimes(2);
+    expect(mock.token).not.toHaveBeenCalledWith(true);
+    expect(mock.register).toHaveBeenCalledTimes(2);
   });
 
   it("reports a startup failure once and retries on foreground", async () => {
@@ -324,11 +377,26 @@ describe("notification opens", () => {
       notification_kind: "weekly_shelf",
       notification_id: "abc",
     });
-    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+    expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
-  // Installed builds keep receiving payloads from the currently deployed
-  // backend until it ships, and those carry a url and nothing else.
+  it("holds a tap while the plan loads, in the queue deep links share", () => {
+    releaseSheetLink(true);
+    mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
+    renderHook(() => useNotificationObserver());
+    expect(mock.push).not.toHaveBeenCalled();
+    expect(releaseSheetLink(false)).toEqual({ route: "/item/a", sheet: false });
+  });
+
+  it("lets a newer deep link replace a tap that is still waiting", () => {
+    releaseSheetLink(true);
+    mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });
+    renderHook(() => useNotificationObserver());
+    rememberSheetLink("shelvr://item/b");
+    expect(releaseSheetLink(false)).toBeNull();
+    expect(mock.push).not.toHaveBeenCalled();
+  });
+
   it("still records an open for a payload that predates the kind field", () => {
     mock.lastResponse = opened({ url: "/digest/abc" });
     renderHook(() => useNotificationObserver());
@@ -336,7 +404,7 @@ describe("notification opens", () => {
       notification_kind: "unknown",
       notification_id: "",
     });
-    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+    expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
   it("handles a tap once, however often the observer remounts", () => {
@@ -353,7 +421,6 @@ describe("notification opens", () => {
   });
 
   it("opens a second, distinct notification to the same screen", () => {
-    // Two trial nudges both point at /add; the second tap is its own open.
     renderHook(() => useNotificationObserver());
     act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "a")));
     act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "b")));

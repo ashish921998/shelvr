@@ -25,8 +25,12 @@ function selectRevenueCatApiKey(): string | undefined {
 
 export const REVENUECAT_API_KEY = selectRevenueCatApiKey();
 
-/** True when this build leaves RevenueCat unconfigured on purpose (see
- * above), so callers can skip billing work instead of reporting the missing
- * key as a failure. A production build with no key is still a failure. */
+// Production builds use the production project's keys; every other build uses
+// the Development project, whose Pro entitlement has a different identifier.
+export const REVENUECAT_PRO_ENTITLEMENT =
+  Constants.expoConfig?.extra?.variant === "production"
+    ? "Shelvr Pro"
+    : "shelvr_pro";
+
 export const REVENUECAT_DISABLED_BY_BUILD =
   Constants.expoConfig?.extra?.variant !== "production" && !__DEV__;

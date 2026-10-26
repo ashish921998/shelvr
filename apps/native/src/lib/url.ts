@@ -1,3 +1,5 @@
+import { isYouTubeUrl } from "@convex/model/externalUrl";
+
 const URL_PATTERN = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([/?#]\S*)?$/i;
 
 export function isProbablyUrl(text: string) {
@@ -8,9 +10,6 @@ export function isProbablyUrl(text: string) {
 
 const TRAILING_PUNCTUATION = /[.,;:!?'"]/;
 
-/** A closing bracket only ends the URL when the text never opened it: a caption
- * like "(see https://example.com/a)" borrows the paren, whereas
- * "https://en.wikipedia.org/wiki/Function_(mathematics)" needs its own. */
 function closesMoreThanItOpens(url: string, open: string, close: string) {
   let depth = 0;
   for (const char of url) {
@@ -34,23 +33,12 @@ function trimTrailingPunctuation(url: string) {
   return trimmed;
 }
 
-/** Extracts the first http(s) URL embedded in a block of text, or null.
- * Share-sheet payloads from real apps (TikTok, Instagram, X) usually wrap the
- * URL in template caption text ("Check out this video! https://...") rather
- * than sending a bare URL, so link detection has to look INSIDE the text.
- * Trailing sentence punctuation is stripped so the extracted link saves
- * cleanly. Returns null when the text contains no http(s) URL. */
 export function extractFirstUrl(text: string): string | null {
   const match = text.trim().match(/https?:\/\/[^\s<>"]+/i);
   if (!match) return null;
   return trimTrailingPunctuation(match[0]);
 }
 
-/** The link in text typed into the article composer, or null when it holds
- * none. A single token is passed through untouched (trailing punctuation,
- * internationalized hosts and all) so the server's URL policy stays the judge
- * of anything that could be an address; only text that plainly is not one, a
- * word without a dot or a sentence without a link, is refused here. */
 export function typedLink(text: string): string | null {
   const trimmed = text.trim();
   if (trimmed === "") return null;
@@ -67,4 +55,52 @@ export function displayHost(url: string | undefined) {
   } catch {
     return url;
   }
+}
+
+const REGISTRY_LABELS = new Set([
+  "ac",
+  "co",
+  "com",
+  "edu",
+  "gov",
+  "net",
+  "org",
+]);
+
+function siteLabel(host: string): string {
+  const labels = host.replace(/\.$/, "").split(".");
+  if (labels.length < 2) return host;
+  const second = labels[labels.length - 2];
+  return labels.length > 2 && REGISTRY_LABELS.has(second)
+    ? labels[labels.length - 3]
+    : second;
+}
+
+export function siteMonogram(url: string | undefined): string | undefined {
+  const label = siteLabel(displayHost(url));
+  if (label.startsWith("xn--")) return undefined;
+  return Array.from(label)[0]?.toLocaleUpperCase();
+}
+
+export function youTubeVideo(
+  url: string | undefined,
+): "video" | "short" | undefined {
+  if (!isYouTubeUrl(url)) return undefined;
+  try {
+    const { hostname, pathname, searchParams } = new URL(url ?? "");
+    if (/^\/shorts\/[^/]+/.test(pathname)) return "short";
+    if (hostname.toLowerCase() === "youtu.be") {
+      return pathname.length > 1 ? "video" : undefined;
+    }
+    if (pathname === "/watch") {
+      return searchParams.get("v") ? "video" : undefined;
+    }
+    return /^\/(live|clip|embed|v)\/[^/]+/.test(pathname) ? "video" : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function isYouTubeVideoUrl(url: string | undefined): boolean {
+  return youTubeVideo(url) !== undefined;
 }

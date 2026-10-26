@@ -1,22 +1,16 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
 import { Button } from "./ui/button";
 import { Pressable } from "react-native";
-import { TidyDone } from "./tidy/tidy-done";
-import { SetupStep } from "@/components/onboarding/setup";
-import { onboardingLabel } from "@/lib/onboarding-labels";
-import { getSpacePresets } from "@/lib/save-kinds";
 
 const device = vi.hoisted(() => ({
   tag: "en-US",
   fontReady: true,
   listeners: new Set<() => void>(),
 }));
-// The native asset loader normally handles these requires; Node has no font
-// loader. AnimatedText requires both the display TTF and the Satoshi OTFs.
 vi.hoisted(async () => {
   const { createRequire } = await import("node:module");
   const load = createRequire(import.meta.url);
@@ -99,7 +93,6 @@ const mockTheme = vi.hoisted(() => ({
     xxxl: 32,
     huge: 48,
   },
-  // Any variant a component asks for resolves to an empty style.
   type: new Proxy({}, { get: () => ({}) }) as Record<string, object>,
   opacity: { pressed: 0.7, disabled: 0.4 },
   control: { minHeight: 48, pressRetentionOffset: 12 },
@@ -129,8 +122,6 @@ const mockTheme = vi.hoisted(() => ({
 vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: mockTheme }),
   StyleSheet: {
-    // Evaluate style factories with the mock theme so dynamic variant
-    // styles (styles.text(variant)) keep working.
     create: (factory: (theme: typeof mockTheme) => unknown) =>
       typeof factory === "function" ? factory(mockTheme) : factory,
     absoluteFillObject: {},
@@ -200,12 +191,6 @@ vi.mock("./onboarding/parts", () => ({
   CtaButton: vi.fn(({ label }: { label: string }) => <button>{label}</button>),
 }));
 
-function changeLanguage(tag: string) {
-  act(() => {
-    device.tag = tag;
-    device.listeners.forEach((listener) => listener());
-  });
-}
 beforeEach(() => {
   device.tag = "en-US";
   device.fontReady = true;
@@ -236,70 +221,10 @@ it("keeps the Latin font and punctuation morph, falling back for missing glyphs"
   expect(screen.queryByTestId("canvas")).toBeNull();
 });
 
-it("translates the singular deleted-photo summary on a mounted screen", () => {
-  render(
-    <TidyDone
-      counts={{ kept: 0, saved: 0, deleted: 1 }}
-      pendingDeleteCount={0}
-      sourceTitle="My album"
-      empty={false}
-      loading={false}
-      onContinue={() => {}}
-    />,
-  );
-  expect(screen.getByText(/1 photo deleted/)).toBeTruthy();
-  changeLanguage("ja-JP");
-  expect(screen.queryByText(/1 photo deleted/)).toBeNull();
-  expect(screen.queryByText(/1 deleted/)).toBeNull();
-});
-
-it("preserves selected preset identities and focused setup chips across languages", () => {
-  let selected: string[] = [];
-  const toggleKind = vi.fn();
-  function Setup() {
-    const [spaces, setSpaces] = useState(getSpacePresets(["Recipes"]));
-    selected = spaces;
-    return (
-      <SetupStep
-        kinds={["Recipes"]}
-        spaces={spaces}
-        onToggleKind={toggleKind}
-        onToggleSpace={(name) =>
-          setSpaces((prev) => prev.filter((item) => item !== name))
-        }
-        onAddSpace={() => {}}
-        onAdvance={() => {}}
-      />
-    );
-  }
-  render(<Setup />);
-  const chip = screen.getByRole("button", {
-    name: onboardingLabel("Restaurants to try"),
-  });
-  chip.focus();
-  changeLanguage("de-DE");
-  expect(document.activeElement).toBe(chip);
-  expect(chip.textContent).toBe(onboardingLabel("Restaurants to try"));
-  expect(chip.textContent).not.toBe("Restaurants to try");
-  fireEvent.click(chip);
-  expect(selected).not.toContain("Restaurants to try");
-  expect(selected).toContain("Recipes");
-
-  const kindTile = screen.getByRole("button", {
-    name: onboardingLabel("Fitness"),
-  });
-  kindTile.focus();
-  changeLanguage("ja-JP");
-  expect(document.activeElement).toBe(kindTile);
-  fireEvent.click(kindTile);
-  expect(toggleKind).toHaveBeenCalledWith("Fitness");
-});
-
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),
 }));
-vi.mock("@/components/pro-gate", () => ({ ProGate: vi.fn(() => null) }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true, loading: false }),
 }));
@@ -328,15 +253,6 @@ vi.mock("expo-maps", () => {
     </div>
   );
   return { AppleMaps: { View: map }, GoogleMaps: { View: map } };
-});
-
-it("refreshes loaded map fallback titles without changing saved titles", async () => {
-  const { default: MapScreen } = await import("@/app/(app)/(tabs)/(map)/index");
-  render(<MapScreen />);
-  expect(screen.getByText("Saved photo")).toBeTruthy();
-  changeLanguage("ja-JP");
-  expect(screen.queryByText("Saved photo")).toBeNull();
-  expect(screen.getByText("My own title")).toBeTruthy();
 });
 
 it("keeps long header glyphs inside the available title width", () => {

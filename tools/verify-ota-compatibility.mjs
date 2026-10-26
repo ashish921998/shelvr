@@ -1,37 +1,5 @@
 #!/usr/bin/env node
-/**
- * Block an OTA publish whose update could not reach the released build.
- *
- * `app.json` pins `runtimeVersion` to the `fingerprint` policy, and a binary
- * only accepts updates whose runtime version equals its own. So a native change
- * never makes `eas update` fail. It makes the publish land on a runtime version
- * that no released binary has, and the update silently reaches nobody. #117
- * moved the fingerprint and that is exactly what would have happened.
- *
- * Nothing in the EAS CLI catches it. `eas update` has no flag that fails when
- * no compatible build exists, and `eas fingerprint:compare --build-id <id>
- * --json` exits 0 even when the two hashes differ, so a gate built on its exit
- * code is broken. What does work is comparing the fingerprint this tree
- * produces against the fingerprint of the build users actually have, which
- * {@link BASELINE_FILE} records.
- *
- * It runs inside the publishing job's own `before_update` hook rather than in
- * a separate `type: fingerprint` job, because Expo's docs warn twice that such
- * a job's `environment` and `env` must be kept identical to the publishing
- * job's or the hashes diverge, and this workflow sets `APP_VARIANT` and
- * `ANDROID_BUILD_ARCHS` through `env:`. So {@link generateFingerprint}
- * inherits the ambient environment untouched: on the worker that environment
- * is the publishing job's own. A local run therefore reads the shell it is run
- * from, where `app.config.js` defaults `APP_VARIANT` to `development`, which is
- * why the report ends by naming the variant it used.
- *
- * Every failure mode blocks. An unreadable registry, an unresolvable
- * expo-updates CLI, a non-zero `fingerprint:generate`, and unparseable output
- * are all reported with their reason and exit 1, because none of them
- * establishes that the update can reach anyone.
- *
- * Usage: node tools/verify-ota-compatibility.mjs --profile <profile> --platform <all|ios|android>
- */
+// Usage: node tools/verify-ota-compatibility.mjs --profile <profile> --platform <all|ios|android>
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -46,16 +14,11 @@ const BASELINE_FILE = join(NATIVE_DIR, "released-builds.json");
 const BASELINE_PATH = "apps/native/released-builds.json";
 const PLATFORMS = ["ios", "android"];
 
-/** The platforms a `--platform` value selects, or null if it names none. */
 export function resolvePlatforms(platform) {
   if (platform === "all") return [...PLATFORMS];
   return PLATFORMS.includes(platform) ? [platform] : null;
 }
 
-/** The recorded released build, or null when no maintainer has recorded one.
- * An unknown profile is null rather than an error: an unrecorded release and an
- * unrecognised profile are the same situation, a publish with nothing to
- * compare against. */
 export function baselineFor(baselines, profile, platform) {
   return baselines?.[profile]?.[platform] ?? null;
 }
@@ -71,7 +34,6 @@ function hashFailure(hash) {
   return `fingerprint:generate produced ${kind}, not a hash string`;
 }
 
-/** The verdict for one platform. Only the last line lets a publish through. */
 function statusFor({ reason, baseline, localFingerprint }) {
   if (reason !== null) return "fingerprint-failed";
   if (baseline === null) return "missing-baseline";
@@ -79,14 +41,6 @@ function statusFor({ reason, baseline, localFingerprint }) {
   return "match";
 }
 
-/**
- * One record per platform, in the order given.
- *
- * `fingerprint(platform)` is injected so tests never shell out. It is awaited
- * for every platform, including one with no baseline, so `--platform all` never
- * reports on one platform while the other went unchecked and so a broken
- * toolchain surfaces on the run that broke it.
- */
 export async function checkCompatibility({
   profile,
   platforms,
@@ -95,8 +49,6 @@ export async function checkCompatibility({
 }) {
   return Promise.all(
     platforms.map(async (platform) => {
-      // An entry carrying no usable hash has recorded nothing. Calling that a
-      // mismatch would send a maintainer to ship a store build over a typo.
       const recorded = baselineFor(baselines, profile, platform);
       const baseline =
         typeof recorded?.fingerprint === "string" && recorded.fingerprint !== ""
@@ -119,7 +71,6 @@ export async function checkCompatibility({
   );
 }
 
-/** Anything but a match blocks, and so does an empty result set. */
 export function isBlocked(results) {
   return results.length === 0 || results.some((r) => r.status !== "match");
 }
@@ -200,7 +151,6 @@ function firstLine(text) {
   return String(text).split("\n")[0].trim();
 }
 
-/** The last few meaningful lines, for an error whose detail is at the end. */
 function tail(text, lines = 3) {
   return String(text)
     .split("\n")
@@ -210,14 +160,6 @@ function tail(text, lines = 3) {
     .join(" | ");
 }
 
-/**
- * The hash out of `fingerprint:generate` stdout.
- *
- * The CLI prints `{"sources": [...], "hash": "..."}` and nothing else, but a
- * crashed or half-initialised run prints prose on stdout and still leaves the
- * caller holding a string. Parsing here rather than at the call site keeps that
- * one failure a reason the report can print.
- */
 export function readFingerprintHash(stdout, platform) {
   try {
     return JSON.parse(stdout).hash;
@@ -229,18 +171,9 @@ export function readFingerprintHash(stdout, platform) {
   }
 }
 
-/**
- * The fingerprint of the working tree, as the publish about to run computes it.
- *
- * Every failure is rethrown with a reason the report can print, because the
- * caller renders it as a blocked platform. A bare stack trace would still exit
- * non-zero, but it would not say which platform is unverified or why.
- */
 async function generateFingerprint(platform) {
   let cli;
   try {
-    // expo-updates hoists to the workspace root, and apps/native has no
-    // node_modules/.bin, so resolve it the way the module graph would.
     const require = createRequire(`${NATIVE_DIR}/`);
     cli = join(
       dirname(require.resolve("expo-updates/package.json")),

@@ -19,12 +19,10 @@ import {
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-/** A well-formed vector of the indexed width. */
 function vector(fill = 0.01): number[] {
   return Array.from({ length: EMBEDDING_DIMENSIONS }, () => fill);
 }
 
-/** A fresh harness signed in as a real Pro user. */
 async function as(): Promise<{ t: TestCtx; userId: string }> {
   return await signedInUser(newConvexTest(), { pro: true });
 }
@@ -48,8 +46,6 @@ async function seedItem(
   );
 }
 
-/** The text the sweep would have embedded for `itemId`, so a write-back entry
- * passes the staleness fence the way a real sweep's would. */
 async function embeddedText(t: TestCtx, itemId: Id<"items">): Promise<string> {
   const item = await t.run((ctx) => ctx.db.get(itemId));
   return buildEmbeddingText({
@@ -64,9 +60,6 @@ async function embeddedText(t: TestCtx, itemId: Id<"items">): Promise<string> {
 
 describe("the retrieval vector stays inside the backend", () => {
   it("is absent from every client-facing item read", async () => {
-    // `itemFields` omits the vector and Convex enforces `returns` at runtime,
-    // so a leak here does not merely ship 6 KB per row. It throws and takes
-    // the whole read down. These four are the reads that share enrichItem.
     const { t, userId } = await as();
     await seedItem(t, userId, {
       embedding: vector(),
@@ -81,8 +74,6 @@ describe("the retrieval vector stays inside the backend", () => {
     const found = await t.query(api.items.searchItems, { query: "otters" });
     const detail = await t.query(api.items.getItem, { id: feed[0]._id });
 
-    // Assert the reads actually returned something: a `not.toHaveProperty`
-    // loop over an empty array passes while covering nothing.
     expect(feed).toHaveLength(1);
     expect(page.page).toHaveLength(1);
     expect(found).toHaveLength(1);
@@ -98,8 +89,6 @@ describe("the retrieval vector stays inside the backend", () => {
   });
 
   it("is absent from the internal reads the AI actions use", async () => {
-    // These return raw documents under `v.object(itemFields)`, so they would
-    // also fail validation and would drag a vector per row into the action.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, {
       embedding: vector(),
@@ -126,11 +115,20 @@ describe("finalizeItem", () => {
 
     const outcome = await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Classified",
-      description: "A description",
-      tags: ["cooking"],
-      embedding: vector(0.02),
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Classified",
+        description: "A description",
+        tags: ["cooking"],
+        embedding: {
+          text: buildEmbeddingText({
+            title: "Classified",
+            description: "A description",
+            tags: ["cooking"],
+          }),
+          vector: vector(0.02),
+        },
+      },
     });
 
     expect(outcome).toBe("applied");
@@ -140,9 +138,6 @@ describe("finalizeItem", () => {
   });
 
   it("keeps an existing vector but clears the stamp when a run could not embed", async () => {
-    // A transient provider failure must not delete a good vector (patching
-    // `embedding: undefined` would). Clearing the stamp is what hands the row
-    // to the sweeper to re-embed against the text just written.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, {
       status: "processing",
@@ -152,10 +147,12 @@ describe("finalizeItem", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Reclassified",
-      description: "New text, no new vector",
-      tags: [],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Reclassified",
+        description: "New text, no new vector",
+        tags: [],
+      },
     });
 
     const stored = await t.run((ctx) => ctx.db.get(itemId));
@@ -164,10 +161,6 @@ describe("finalizeItem", () => {
   });
 
   it("resets the attempt budget when it writes text it could not embed", async () => {
-    // The budget belongs to one particular text. Carried across a
-    // reclassification, a row with MAX_EMBEDDING_ATTEMPTS - 1 prior failures
-    // would be stamped current after a single failure on the new text, keeping
-    // a vector that describes what the item used to say.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, {
       status: "processing",
@@ -178,10 +171,12 @@ describe("finalizeItem", () => {
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "Reclassified",
-      description: "New text, and this run could not embed it",
-      tags: [],
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Reclassified",
+        description: "New text, and this run could not embed it",
+        tags: [],
+      },
     });
 
     const stored = await t.run((ctx) => ctx.db.get(itemId));
@@ -200,11 +195,19 @@ describe("finalizeItem", () => {
     const outcome = await t.mutation(internal.items.finalizeItem, {
       itemId,
       runId: "run-superseded",
-      title: "Stale",
-      description: "From a run the user retried past",
-      tags: [],
-      embedding: vector(0.04),
-      status: "ready",
+      reading: {},
+      classification: {
+        title: "Stale",
+        description: "From a run the user retried past",
+        tags: [],
+        embedding: {
+          text: buildEmbeddingText({
+            title: "Stale",
+            description: "From a run the user retried past",
+          }),
+          vector: vector(0.04),
+        },
+      },
     });
 
     expect(outcome).toBe("stale_run");
@@ -232,11 +235,6 @@ describe("updateNoteItem invalidates the vector", () => {
   }
 
   it("clears the stamp and the attempt budget on a title-only edit", async () => {
-    // A title-only edit schedules no re-classify, so the sweep is the only
-    // thing that will re-embed this row: it has to be handed back to it. And
-    // the budget has to go with the stamp: kept, one failure on the edited
-    // note would reach the cap and stamp the row current with a vector
-    // describing the old title.
     const { t, userId } = await as();
     const id = await readyNote(t, userId);
 
@@ -246,25 +244,25 @@ describe("updateNoteItem invalidates the vector", () => {
     expect(stored?.title).toBe("Groceries");
     expect(stored?.embeddingVersion).toBeUndefined();
     expect(stored?.embeddingAttempts).toBeUndefined();
-    // The old vector stays until the sweep replaces it: stale beats absent.
     expect(stored?.embedding).toHaveLength(EMBEDDING_DIMENSIONS);
   });
 });
 
 describe("the article body reaches the full-text index", () => {
   it("matches a word that appears only in the extracted body", async () => {
-    // Before this, searchText held only the classifier's summary, so a phrase
-    // the reader actually remembers from the article was unfindable.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, { status: "processing" });
 
     await t.mutation(internal.items.finalizeItem, {
       itemId,
-      title: "An article",
-      description: "A summary that never says the word",
-      tags: ["reading"],
-      content: "Deep in the third paragraph sits the word pangolin.",
-      status: "ready",
+      reading: {
+        content: "Deep in the third paragraph sits the word pangolin.",
+      },
+      classification: {
+        title: "An article",
+        description: "A summary that never says the word",
+        tags: ["reading"],
+      },
     });
 
     const results = await t.query(api.items.searchItems, {
@@ -286,7 +284,6 @@ describe("the embedding sweep", () => {
       embedding: vector(),
       embeddingVersion: CURRENT_EMBEDDING_VERSION,
     });
-    // Only `ready` rows are worth embedding.
     await seedItem(t, userId, { status: "processing", title: "In flight" });
     await seedItem(t, userId, { status: "failed", title: "Broken" });
 
@@ -301,9 +298,6 @@ describe("the embedding sweep", () => {
   });
 
   it("re-enlists rows stamped by an older generation", async () => {
-    // The migration path after CURRENT_EMBEDDING_VERSION is bumped: a
-    // present-but-stale stamp must fall inside the sweep range, not just an
-    // absent one.
     const { t, userId } = await as();
     const stale = await seedItem(t, userId, {
       embedding: vector(),
@@ -333,9 +327,6 @@ describe("the embedding sweep", () => {
   });
 
   it("stops on the byte budget before the row count", async () => {
-    // A page of long articles would otherwise blow the transaction read limit,
-    // and because the same rows lead the range every run, the sweep would
-    // wedge on them permanently rather than failing once.
     const { t, userId } = await as();
     const huge = "x".repeat(Math.ceil(MAX_SWEEP_READ_BYTES / 2) + 1);
     for (let i = 0; i < 6; i++) {
@@ -387,7 +378,6 @@ describe("the embedding sweep", () => {
     });
 
     expect(result).toEqual({ written: 0, stamped: 1, deferred: 0 });
-    // It leaves the range, so the sweep drains instead of spinning on it.
     expect(
       await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
         limit: EMBEDDING_SWEEP_PAGE,
@@ -396,8 +386,6 @@ describe("the embedding sweep", () => {
   });
 
   it("leaves a deferred item completely alone so an outage cannot strand it", async () => {
-    // Stamping here would delete the item from the vector index permanently.
-    // Across a whole outage that is not one row. It is the entire table.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, { title: "Embeddable" });
 
@@ -411,7 +399,6 @@ describe("the embedding sweep", () => {
     const stored = await t.run((ctx) => ctx.db.get(itemId));
     expect(stored?.embeddingVersion).toBeUndefined();
     expect(stored?.embeddingAttempts).toBeUndefined();
-    // Still queued for a later tick.
     expect(
       await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
         limit: EMBEDDING_SWEEP_PAGE,
@@ -435,8 +422,6 @@ describe("the embedding sweep", () => {
       expect(row?.embeddingVersion).toBeUndefined();
     }
 
-    // The last attempt gives up, so one permanently bad item cannot block
-    // every row behind it in the range forever.
     const final = await t.mutation(internal.items.setEmbeddingsInternal, {
       entries: [
         { itemId, text: await embeddedText(t, itemId), outcome: "failed" },
@@ -453,11 +438,6 @@ describe("the embedding sweep", () => {
   });
 
   it("refuses a vector computed from text the item no longer has", async () => {
-    // The version guard only catches a pipeline run that embedded
-    // successfully. One that re-classified and then FAILED to embed clears the
-    // stamp, so the row looks unembedded while its text is newer than what the
-    // action read. Writing then would pin a vector describing text the item no
-    // longer has, at the current generation, where nothing revisits it.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, { title: "Before" });
     const embeddedBefore = await embeddedText(t, itemId);
@@ -481,7 +461,6 @@ describe("the embedding sweep", () => {
     const stored = await t.run((ctx) => ctx.db.get(itemId));
     expect(stored?.embedding).toBeUndefined();
     expect(stored?.embeddingVersion).toBeUndefined();
-    // Left for the next tick, which reads the new text.
     expect(
       await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
         limit: EMBEDDING_SWEEP_PAGE,
@@ -601,7 +580,6 @@ describe("the embedding sweep", () => {
   });
 
   it("reindexes even when the vector was deferred", async () => {
-    // The Phase 0 backfill is independent of the provider being reachable.
     const { t, userId } = await as();
     const itemId = await seedItem(t, userId, {
       content: "A body mentioning axolotls.",
@@ -624,9 +602,6 @@ describe("the embedding sweep", () => {
 
 describe("similar items", () => {
   it("scores on the summary, not the indexed article body", async () => {
-    // searchText now carries the body, and searchTokens has no stopword list:
-    // scoring over it would have every pair of English articles share "that",
-    // "with", "from" and clear SIMILAR_MIN_SCORE on filler alone.
     const { t, userId } = await as();
     const source = await seedItem(t, userId, {
       title: "Sourdough starter",
@@ -643,7 +618,6 @@ describe("similar items", () => {
 
     const similar = await t.query(api.items.similarItems, { id: source });
 
-    // Shared filler prose must not make two unrelated saves similar.
     expect(similar).toEqual([]);
   });
 
@@ -666,11 +640,6 @@ describe("similar items", () => {
   });
 });
 
-/**
- * A body just over half the hydration budget, so two of them cross it. Derived
- * rather than hard-coded: retuning the budget must move these fixtures with it
- * or the tests stop asserting the boundary they were written for.
- */
 function overBudgetHalf(): string {
   return "x".repeat(Math.ceil(MAX_HYDRATE_READ_BYTES / 2) + 1);
 }
@@ -708,8 +677,6 @@ describe("listReadyItemsByIdInternal", () => {
       limit: 10,
     });
 
-    // The caller's order is a relevance ranking the prompt numbers off, so a
-    // re-sort here would silently hand the model a worse shortlist.
     expect(rows.map((row) => row.title)).toEqual(["C", "A", "B"]);
   });
 
@@ -781,8 +748,6 @@ describe("listReadyItemsByIdInternal", () => {
       limit: 10,
     });
 
-    // `itemFields` has no `embedding`, so a raw document here would fail the
-    // returns validator at runtime rather than merely bloat the payload.
     expect(rows).toHaveLength(1);
     expect("embedding" in rows[0]).toBe(false);
   });
@@ -817,8 +782,6 @@ describe("listReadyItemsByIdInternal", () => {
       limit: 100,
     });
 
-    // The index serves the old vector until the sweep replaces it; scoring a
-    // current query against it ranks two different embeddings together.
     expect(rows.map((row) => row.title)).toEqual(["Current"]);
   });
 
@@ -826,9 +789,6 @@ describe("listReadyItemsByIdInternal", () => {
     const t = newConvexTest();
     const ids = await t.run(async (ctx) => {
       const out: Id<"items">[] = [];
-      // A vector outlives its item's flip to `failed`, so these two hits are
-      // read in full and then dropped. The read has already cost the
-      // transaction by then, which is what the budget is there to bound.
       for (const title of ["Stale one", "Stale two", "Small"]) {
         out.push(
           await ctx.db.insert("items", {
@@ -854,8 +814,6 @@ describe("listReadyItemsByIdInternal", () => {
       limit: 100,
     });
 
-    // Counting only surviving rows would have walked past the whole budget
-    // in dropped reads with it still reading zero, and kept going.
     expect(rows).toEqual([]);
   });
 
@@ -863,7 +821,6 @@ describe("listReadyItemsByIdInternal", () => {
     const t = newConvexTest();
     const ids = await t.run(async (ctx) => {
       const out: Id<"items">[] = [];
-      // Two rows are enough to cross the budget; the third is never read.
       for (const title of ["Big one", "Big two", "Small"]) {
         out.push(
           await ctx.db.insert("items", {
@@ -888,8 +845,6 @@ describe("listReadyItemsByIdInternal", () => {
       limit: 100,
     });
 
-    // Truncation is safe only because the tail is the least relevant end of
-    // the ranking.
     expect(rows.map((row) => row.title)).toEqual(["Big one", "Big two"]);
   });
 });

@@ -1,15 +1,12 @@
 // @vitest-environment edge-runtime
-// Runs under edge-runtime so `crypto.subtle` behaves like the default Convex
-// V8 runtime that http.ts executes in.
 import { describe, expect, it } from "vitest";
 
 import { APPLE_ROOT_CA_G3 } from "./appleJws";
-// A throwaway chain shaped like Apple's: P-384 root and intermediate, P-256
-// leaf, Apple's marker extensions, 100-year validity from 2026-10-03.
-// `unmarkedLeaf` is signed by a leaf without the marker; `otherApp` carries a
-// different appAppleId.
 import fixtures from "./appleJws.fixtures.json";
-import { answerRetentionRequest } from "./retentionMessaging";
+import {
+  answerRetentionRequest,
+  parseRetentionOffers,
+} from "./retentionMessaging";
 
 const now = Date.UTC(2026, 9, 4);
 const messageId = "0f3a6b1e-5d2c-4c7a-9e55-2b1d6f0c8a11";
@@ -84,7 +81,6 @@ describe("answerRetentionRequest", () => {
       Buffer.from(headerSegment, "base64url").toString(),
     );
     const leaf = Buffer.from(header.x5c[0], "base64");
-    // The last byte of the certificate is the end of the issuer's signature.
     leaf[leaf.length - 1] ^= 1;
     header.x5c[0] = leaf.toString("base64");
     const forged = Buffer.from(JSON.stringify(header)).toString("base64url");
@@ -131,5 +127,144 @@ describe("answerRetentionRequest", () => {
       status: 400,
       reason: "jws_shape",
     });
+  });
+});
+
+describe("promotional offers", () => {
+  const offerMessageId = "5b1c2d3e-0000-4000-8000-000000000001";
+  const offers = {
+    shelvr_pro_annual: {
+      offerIdentifier: "annual_half_off",
+      messageIdentifier: offerMessageId,
+    },
+  };
+
+  async function newSigningKey() {
+    const pair = (await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign", "verify"],
+    )) as CryptoKeyPair;
+    const pkcs8 = await crypto.subtle.exportKey("pkcs8", pair.privateKey);
+    const body = Buffer.from(pkcs8).toString("base64");
+    return {
+      publicKey: pair.publicKey,
+      signingKey: {
+        keyId: "KEY123",
+        issuerId: "issuer-uuid",
+        privateKey: `-----BEGIN PRIVATE KEY-----\\n${body}\\n-----END PRIVATE KEY-----`,
+      },
+    };
+  }
+
+  const answerWith = (extra: object) =>
+    answerRetentionRequest(JSON.stringify({ signedPayload: fixtures.valid }), {
+      root: fixtures.root,
+      now,
+      messageId,
+      offers,
+      ...extra,
+    });
+
+  it("signs the configured offer for the subscriber's transaction", async () => {
+    const { publicKey, signingKey } = await newSigningKey();
+    const reply = await answerWith({ signingKey });
+    expect(reply.status).toBe(200);
+    expect(reply.reason).toBeUndefined();
+    const { promotionalOffer } = reply.body as {
+      promotionalOffer: {
+        messageIdentifier: string;
+        promotionalOfferSignatureV2: string;
+      };
+    };
+    expect(promotionalOffer.messageIdentifier).toBe(offerMessageId);
+
+    const [header, payload, signature] =
+      promotionalOffer.promotionalOfferSignatureV2.split(".");
+    const valid = await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      publicKey,
+      Buffer.from(signature, "base64url"),
+      new TextEncoder().encode(`${header}.${payload}`),
+    );
+    expect(valid).toBe(true);
+    expect(JSON.parse(Buffer.from(header, "base64url").toString())).toEqual({
+      alg: "ES256",
+      kid: "KEY123",
+      typ: "JWT",
+    });
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
+    expect(claims).toEqual({
+      iss: "issuer-uuid",
+      iat: Math.floor(now / 1000),
+      aud: "promotional-offer",
+      bid: "app.shelvr.save",
+      nonce: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      productId: "shelvr_pro_annual",
+      offerIdentifier: "annual_half_off",
+      transactionId: "2000000000000001",
+    });
+    expect(claims).not.toHaveProperty("exp");
+  });
+
+  it("sends the plain message for a product with no offer", async () => {
+    const { signingKey } = await newSigningKey();
+    expect(await answerWith({ signingKey, offers: {} })).toEqual({
+      status: 200,
+      body: { message: { messageIdentifier: messageId } },
+    });
+    const inherited = Object.create(offers) as typeof offers;
+    expect(await answerWith({ signingKey, offers: inherited })).toEqual({
+      status: 200,
+      body: { message: { messageIdentifier: messageId } },
+    });
+  });
+
+  it("falls back to the plain message when the key is unset or broken", async () => {
+    expect(await answerWith({})).toEqual({
+      status: 200,
+      body: { message: { messageIdentifier: messageId } },
+      reason: "offer_key_unset",
+    });
+    expect(
+      await answerWith({
+        signingKey: { keyId: "k", issuerId: "i", privateKey: "not a key" },
+      }),
+    ).toEqual({
+      status: 200,
+      body: { message: { messageIdentifier: messageId } },
+      reason: "offer_sign_failed",
+    });
+  });
+
+  it("never offers on a request it refuses", async () => {
+    const { signingKey } = await newSigningKey();
+    const reply = await answerRetentionRequest(
+      JSON.stringify({ signedPayload: fixtures.otherApp }),
+      { root: fixtures.root, now, messageId, offers, signingKey },
+    );
+    expect(reply).toMatchObject({ status: 400, reason: "wrong_app" });
+  });
+});
+
+describe("parseRetentionOffers", () => {
+  it("keeps complete entries and drops the rest", () => {
+    expect(
+      parseRetentionOffers(
+        JSON.stringify({
+          monthly: { offerIdentifier: "m", messageIdentifier: "id1" },
+          noMessage: { offerIdentifier: "x" },
+          empty: { offerIdentifier: "", messageIdentifier: "id2" },
+          wrongType: "annual",
+        }),
+      ),
+    ).toEqual({ monthly: { offerIdentifier: "m", messageIdentifier: "id1" } });
+  });
+
+  it("treats unset or malformed config as no offers", () => {
+    expect(parseRetentionOffers(undefined)).toEqual({});
+    expect(parseRetentionOffers("{not json")).toEqual({});
+    expect(parseRetentionOffers("[]")).toEqual({});
+    expect(parseRetentionOffers("null")).toEqual({});
   });
 });

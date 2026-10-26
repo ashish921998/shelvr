@@ -2,6 +2,9 @@ import { t } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+// Named imports: expo-notifications 58 ships its enums in files the ESLint
+// import plugin cannot parse as modules, so `import/namespace` misses them.
+import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 import { Platform } from "react-native";
 
 function canReceiveNotifications(
@@ -10,22 +13,17 @@ function canReceiveNotifications(
   if (Platform.OS !== "ios") return permission.granted;
   const status = permission.ios?.status;
   return (
-    status === Notifications.IosAuthorizationStatus.AUTHORIZED ||
-    status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
-    status === Notifications.IosAuthorizationStatus.EPHEMERAL
+    status === IosAuthorizationStatus.AUTHORIZED ||
+    status === IosAuthorizationStatus.PROVISIONAL ||
+    status === IosAuthorizationStatus.EPHEMERAL
   );
 }
 
-/** What the user just chose, flattened across the two platforms. Ephemeral
- * authorization counts as granted: it delivers, and no Shelvr build asks for
- * it. */
 function permissionOutcome(
   permission: Notifications.NotificationPermissionsStatus,
 ): "granted" | "provisional" | "denied" {
   if (Platform.OS !== "ios") return permission.granted ? "granted" : "denied";
-  if (
-    permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
-  )
+  if (permission.ios?.status === IosAuthorizationStatus.PROVISIONAL)
     return "provisional";
   return canReceiveNotifications(permission) ? "granted" : "denied";
 }
@@ -36,12 +34,12 @@ async function ensureChannels(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("weekly-shelf", {
     name: t("notifications.weeklyShelf"),
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: AndroidImportance.DEFAULT,
     vibrationPattern: [0, 150],
   });
   await Notifications.setNotificationChannelAsync("save-reminders", {
     name: t("notifications.remindersChannel"),
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: AndroidImportance.DEFAULT,
     vibrationPattern: [0, 150],
   });
 }
@@ -60,7 +58,6 @@ async function askForPermission(
   return canReceiveNotifications(answer);
 }
 
-/** Whether a screen asking for notifications has anything left to ask. */
 export async function notificationPermissionState(): Promise<
   "granted" | "ask" | "blocked"
 > {
@@ -69,7 +66,6 @@ export async function notificationPermissionState(): Promise<
   return permission.canAskAgain === false ? "blocked" : "ask";
 }
 
-/** Shows the OS prompt when it can still appear. Needs no account. */
 export async function requestNotificationPermission(): Promise<boolean> {
   await ensureChannels();
   return askForPermission(await Notifications.getPermissionsAsync());
@@ -90,8 +86,6 @@ export async function getExpoPushToken(
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
   if (!projectId) throw new Error("Expo project ID is unavailable");
-  // Denied permission is the only no-token result. Native configuration and
-  // network failures must remain retryable errors, not a false settings prompt.
   return (
     await Notifications.getExpoPushTokenAsync({ projectId, devicePushToken })
   ).data;

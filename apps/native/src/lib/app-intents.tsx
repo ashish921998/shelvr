@@ -28,7 +28,6 @@ import { Images } from "react-native-nitro-image";
 
 const ITEM_KIND = "item";
 const SPACE_KIND = "space";
-// Catalogs live in UserDefaults, so they carry the newest saves only.
 const ITEM_CATALOG_LIMIT = 300;
 const THUMB_LIMIT = 60;
 const THUMB_MAX_DIM = 256;
@@ -40,15 +39,12 @@ type SetupModule = {
   clearCaptureCredentials(): Promise<void>;
   hasCaptureCredentials(): Promise<boolean>;
   captureToken(): Promise<string | null>;
-  /** Mirrors the `item` catalog into Spotlight; resolves with the indexed count. */
   indexItemsInSpotlight(): Promise<number>;
   clearSpotlight(): Promise<void>;
 };
 
-// Null on Android and on development clients built before the intents existed.
 const setup = requireOptionalNativeModule<SetupModule>("AppIntentsSetup");
 const store = createMMKV({ id: "app-intents" });
-// Which account the keychain token belongs to, so an account switch mints anew.
 const CAPTURE_OWNER_KEY = "captureOwner";
 
 const siteUrl =
@@ -130,8 +126,6 @@ async function buildThumbnail(url: string, thumb: File): Promise<void> {
   }
 }
 
-/** Writes small JPEGs Spotlight and Siri show beside each save, and prunes the
- * rest. Resolves to whether any new thumbnail was written. */
 async function writeThumbnails(
   items: FeedItem[],
   isCurrent: () => boolean,
@@ -161,24 +155,18 @@ async function writeThumbnails(
         }),
       ]).finally(() => clearTimeout(timer));
       created = true;
-    } catch {
-      // A missing thumbnail falls back to a symbol; never block the catalog.
-    }
+    } catch {}
   }
   for (const entry of dir.list()) {
     if (entry instanceof File && !wanted.has(entry.name)) {
       try {
         entry.delete();
-      } catch {
-        // Best effort; the next publish or sign-out removes it.
-      }
+      } catch {}
     }
   }
   return created;
 }
 
-// Serialize publishes so a fast series of Convex pushes can't interleave file
-// work, and let a newer publish (or a clear) supersede an older one.
 let publishChain: Promise<void> = Promise.resolve();
 let publishGeneration = 0;
 
@@ -193,7 +181,6 @@ function publish(work: (isCurrent: () => boolean) => Promise<void>) {
   return publishChain;
 }
 
-/** Empties every catalog Siri and Spotlight read, and the thumbnails. */
 function clearCatalogs() {
   return publish(async () => {
     await AppIntents.setEntityCatalogAsync(ITEM_KIND, []);
@@ -204,11 +191,6 @@ function clearCatalogs() {
   });
 }
 
-/**
- * Forgets everything Siri knows about the signed-out account: capture
- * credentials, queued invocations, and the item and space catalogs (which also
- * empties Spotlight).
- */
 async function resetAppIntents(): Promise<void> {
   if (!AppIntents.isAvailable()) return;
   store.remove(CAPTURE_OWNER_KEY);
@@ -219,11 +201,6 @@ async function resetAppIntents(): Promise<void> {
   ]);
 }
 
-/**
- * Revokes this device's capture token on the server. Called on sign-out while
- * the session can still authenticate; best effort, since the local reset
- * clears the token either way and account deletion drops it server side.
- */
 export async function revokeSiriCapture(
   revoke: (args: { token: string }) => Promise<unknown>,
 ): Promise<void> {
@@ -235,11 +212,6 @@ export async function revokeSiriCapture(
   }
 }
 
-/**
- * The session boundary for Siri data, mounted once at the root: when Convex
- * Auth reports signed out, clear the capture token, queued invocations, and
- * every catalog. Runs once per signed-out interval.
- */
 export function useAppIntentsSignOutReset(): void {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const reset = useRef(false);
@@ -257,14 +229,9 @@ export function useAppIntentsSignOutReset(): void {
   }, [isAuthenticated, isLoading]);
 }
 
-/** Publishes the newest saves and all spaces for Siri, Spotlight, and Visual
- * Intelligence. Saves are Pro content, like the widget: without an active
- * entitlement the catalogs are emptied instead. */
 function useCatalogSync(entitled: boolean, entitlementLoading: boolean) {
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   const enabled = entitled && AppIntents.isAvailable();
-  // The feed loads one page at a time as it scrolls; Spotlight should find
-  // older saves without that, so keep paging up to the catalog limit.
   const loadedCount = items?.length ?? 0;
   useEffect(() => {
     if (
@@ -275,7 +242,6 @@ function useCatalogSync(entitled: boolean, entitlementLoading: boolean) {
     )
       loadMore();
   }, [enabled, canLoadMore, loadingMore, loadedCount, loadMore]);
-  // "skip", not `enabled`: see RecentSavesWidgetSync.
   const { data: spaces } = useQuery(
     convexQuery(api.spaces.listSpaces, enabled ? {} : "skip"),
   );
@@ -301,8 +267,6 @@ function useCatalogSync(entitled: boolean, entitlementLoading: boolean) {
     void publish(async (isCurrent) => {
       await AppIntents.setEntityCatalogAsync(SPACE_KIND, spaceRecords);
       await AppIntents.setEntityCatalogAsync(ITEM_KIND, itemRecords);
-      // Spotlight first without thumbnails so search works right away, then
-      // again once new thumbnails exist.
       await setup?.indexItemsInSpotlight();
       if ((await writeThumbnails(ready, isCurrent)) && isCurrent()) {
         await setup?.indexItemsInSpotlight();
@@ -311,9 +275,6 @@ function useCatalogSync(entitled: boolean, entitlementLoading: boolean) {
   }, [enabled, items, spaces]);
 }
 
-/** Gives the native capture intents a token for this account, minting one
- * when this device has none or it belongs to another account. Any signed-in
- * account gets one: the server checks Pro on every save. */
 function useCaptureCredentials(userId: string | undefined) {
   const issueCaptureToken = useAction(api.appIntents.issueCaptureToken);
 
@@ -360,8 +321,6 @@ function spaceParam(
   return param(invocation, "spaceId") as Id<"spaces"> | undefined;
 }
 
-/** Runs the invocations Siri queued: navigation, and captures that could not
- * reach the server when Siri ran. */
 function useInvocationHandler() {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
@@ -377,22 +336,13 @@ function useInvocationHandler() {
   }
 
   async function handle(invocation: AppIntents.AppIntentInvocation) {
-    // Siri sends the operation id it already tried, so a save the server
-    // committed before its reply was lost is not saved twice. Older queued
-    // invocations fall back to the invocation id.
     const operationId =
       param(invocation, "operationId") ?? `siri:${invocation.id}`;
     switch (invocation.name) {
       case "search": {
         await whenNavigationReady();
-        // `t` makes a repeated query still count as a new navigation.
-        router.navigate({
-          pathname: "/(app)/(tabs)/(search)",
-          params: {
-            q: param(invocation, "query") ?? "",
-            t: String(invocation.createdAt),
-          },
-        });
+        // Search left the tab bar; the intent opens Home, where the cities are.
+        router.navigate("/(app)/(tabs)/(home)");
         return;
       }
       case "openItem": {
@@ -406,7 +356,8 @@ function useInvocationHandler() {
         const id = param(invocation, "id");
         if (!id) return;
         await whenNavigationReady();
-        router.push({ pathname: "/space/[id]", params: { id } });
+        // Spaces left the app; the shortcut opens Home, where the cities are.
+        router.navigate("/(app)/(tabs)/(home)");
         return;
       }
       case "saveNote": {
@@ -422,7 +373,6 @@ function useInvocationHandler() {
       }
       case "saveLink": {
         const url = param(invocation, "url");
-        // A link the server's URL policy refuses would fail on every launch.
         if (url && isSavableUrl(url))
           await createLinkItem({
             url,
@@ -462,8 +412,6 @@ function useInvocationHandler() {
           })),
           { spaceId: spaceParam(invocation), saveSource: "siri" },
         );
-        // A refused image (no Pro, photo limit) would be refused again, so
-        // only a transient failure keeps the invocation for the next launch.
         const retry = results.find(
           (result) => result.status === "failed" && result.code === undefined,
         );
@@ -483,10 +431,8 @@ function useInvocationHandler() {
         await AppIntents.removePendingInvocationAsync(invocation.id);
       } catch (error) {
         if (saveErrorCode(error) !== null) {
-          // Refused (no Pro, photo limit): retrying would only fail again.
           await AppIntents.removePendingInvocationAsync(invocation.id);
         } else {
-          // Left pending, so the next launch or invocation retries it.
           analytics.captureError("app_intents_invocation_failed", error, {
             invocation: invocation.name,
           });
@@ -498,11 +444,6 @@ function useInvocationHandler() {
   });
 }
 
-/**
- * Wires Shelvr into Siri, Shortcuts, and Spotlight. Mount once inside the
- * signed-in tree, under HomeFeedProvider (the catalog reuses the feed's
- * subscription). Renders nothing, and nothing at all off iOS.
- */
 export function AppIntentsBridge() {
   if (!AppIntents.isAvailable()) return null;
   return <SignedInAppIntents />;

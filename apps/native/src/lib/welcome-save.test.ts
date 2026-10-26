@@ -3,8 +3,12 @@
 // sheet settlement, each supplied by the test.
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useCurrentUser } from "@/lib/current-user";
+import { useEntitlement } from "@/lib/entitlement";
 import {
   justStartedPro,
+  noteOnboardingFinished,
+  useWelcomeSaveTracker,
   useWelcomeSheetVisible,
   welcomeSave,
 } from "./welcome-save";
@@ -14,6 +18,19 @@ const mock = vi.hoisted(() => ({
   focused: true,
   focusListeners: new Set<() => void>(),
   settle: [] as (() => void)[],
+  priorSaves: 0 as number | undefined,
+}));
+vi.mock("@convex/_generated/api", () => ({
+  api: { items: { saveProgress: "saveProgress" } },
+}));
+vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({
+    data:
+      mock.priorSaves === undefined
+        ? undefined
+        : { saved: mock.priorSaves, goal: 3 },
+  }),
 }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
@@ -36,8 +53,6 @@ vi.mock("@/lib/trial-reminder", () => ({
 vi.mock("expo-router", async () => {
   const { useEffect, useSyncExternalStore } = await import("react");
   return {
-    // Runs the callback while the screen is focused and its cleanup on blur,
-    // like the real hook.
     useFocusEffect: (callback: () => void | (() => void)) => {
       const focused = useSyncExternalStore(
         (listener) => {
@@ -82,6 +97,52 @@ describe("justStartedPro", () => {
   });
 });
 
+describe("useWelcomeSaveTracker", () => {
+  beforeEach(() => {
+    mock.store.clear();
+    mock.priorSaves = 0;
+  });
+
+  function signIn(userId: string, status: string) {
+    vi.mocked(useCurrentUser).mockReturnValue({
+      data: { _id: userId },
+    } as never);
+    vi.mocked(useEntitlement).mockReturnValue({
+      status,
+      loading: false,
+    } as never);
+  }
+
+  it("queues the letter for the account that signs in after onboarding on this device, once", () => {
+    noteOnboardingFinished();
+    signIn("u1", "trialing");
+    renderHook(() => useWelcomeSaveTracker());
+    expect(welcomeSave.isPending("u1")).toBe(true);
+
+    signIn("u2", "trialing");
+    renderHook(() => useWelcomeSaveTracker());
+    expect(welcomeSave.isPending("u2")).toBe(false);
+  });
+
+  it("spends the flag without a letter when an existing account signs in", () => {
+    noteOnboardingFinished();
+    mock.priorSaves = undefined;
+    signIn("u4", "pro");
+    const { rerender } = renderHook(() => useWelcomeSaveTracker());
+    expect(mock.store.get("shelvr.welcomeAfterOnboarding")).toBe("true");
+    mock.priorSaves = 2;
+    rerender();
+    expect(welcomeSave.isPending("u4")).toBe(false);
+    expect(mock.store.get("shelvr.welcomeAfterOnboarding")).toBe("");
+  });
+
+  it("leaves a returning sign-in alone", () => {
+    signIn("u3", "pro");
+    renderHook(() => useWelcomeSaveTracker());
+    expect(welcomeSave.isPending("u3")).toBe(false);
+  });
+});
+
 describe("useWelcomeSheetVisible", () => {
   beforeEach(() => {
     mock.store.clear();
@@ -94,7 +155,6 @@ describe("useWelcomeSheetVisible", () => {
     expect(result.current).toBe(false);
     expect(mock.settle).toHaveLength(0);
     act(() => welcomeSave.mark("user_a"));
-    // Queued while the RevenueCat sheet is still closing.
     expect(result.current).toBe(false);
     await settleSheets();
     expect(result.current).toBe(true);
@@ -122,7 +182,6 @@ describe("useWelcomeSheetVisible", () => {
     expect(result.current).toBe(false);
     await settleSheets();
     expect(result.current).toBe(true);
-    // Away and back: a sheet opened elsewhere in between is waited out.
     act(() => setFocused(false));
     act(() => setFocused(true));
     expect(result.current).toBe(false);

@@ -1,4 +1,3 @@
-import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
@@ -24,8 +23,11 @@ import {
 } from "react";
 import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
+import { applyQueuedWeeklyShelf } from "./pending-weekly-shelf";
 import { analytics } from "./analytics";
 import { readConvexUrl } from "@/lib/convex-url";
+import { deferLink } from "@/lib/deferred-sheet-link";
+import { resolveRootHref } from "@/lib/home-href";
 
 const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
@@ -85,12 +87,13 @@ export function NotificationSessionProvider({
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
         getLocale: currentLocale,
-        saveToken: (token, locale) =>
+        getTimezone: getNotificationTimezone,
+        saveToken: (token, locale, timezone) =>
           registerDevice({
             token,
             locale,
             platform: Platform.OS === "ios" ? "ios" : "android",
-            timezone: getNotificationTimezone(),
+            timezone,
           }),
         revokeToken: (token) => unregisterDevice({ token }),
         setWeeklyShelf: (enabled) =>
@@ -103,27 +106,20 @@ export function NotificationSessionProvider({
             enabled,
             timezone: getNotificationTimezone(),
           });
-          // The onboarding reminder is a save reminder too, so the switch
-          // turns it off with the rest.
           if (!enabled) await clearFirstSaveReminder();
         },
         signOut: async () => {
-          // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
-          await clearExitOfferReminder();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
-          await clearExitOfferReminder();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
         clearWidget: clearRecentSavesWidget,
-        // Fallback for a failed post-deletion sign-out: no auth edge may fire
-        // promptly, so clear the identity here (idempotent with the hook's).
         resetAnalytics: () => void analytics.resetIfIdentified(),
         reportError: (error) => {
           const event =
@@ -150,6 +146,10 @@ export function NotificationSessionProvider({
       return;
     }
     session.start();
+    applyQueuedWeeklyShelf((enabled) => session.setWeeklyShelf(enabled)).catch(
+      (error: unknown) =>
+        analytics.captureError("weekly_shelf_preference_failed", error),
+    );
 
     const register = async (
       devicePushToken?: Notifications.DevicePushToken,
@@ -185,8 +185,6 @@ export function NotificationSessionProvider({
         .register()
         .catch((error) => analytics.captureError(event, error));
     };
-    // One initial registration also carries the locale. Retry after returning
-    // from Settings or an offline launch without requiring an app restart.
     register(
       localeChanged
         ? "notification_locale_sync_failed"
@@ -216,11 +214,6 @@ function notificationField(
   return typeof value === "string" ? value : null;
 }
 
-/**
- * The route a notification carries, if any. Exported because the splash gate
- * decides whether to stand down from the same rule this navigates by. A push
- * with no `url` goes nowhere, so it is not a reason to skip the animation.
- */
 export function getNotificationUrl(
   notification: Notifications.Notification,
 ): string | null {
@@ -231,10 +224,6 @@ export function useNotificationObserver(): void {
   const nav = useRouter();
 
   useEffect(() => {
-    // Keyed by the notification's own id, not its destination: at launch the
-    // same tap can arrive both as the last response and through the listener,
-    // but a later push to the same screen (two trial nudges to /add) is a new
-    // open and must navigate and be recorded again.
     const handled = new Set<string>();
     const redirect = (notification: Notifications.Notification) => {
       const url = getNotificationUrl(notification);
@@ -244,20 +233,17 @@ export function useNotificationObserver(): void {
         if (handled.has(id)) return;
         handled.add(id);
       }
-      // Recorded before navigating: a push that throws must not lose the one
-      // signal V1 exists to collect.
       analytics.capture("notification_opened", {
         notification_kind: notificationField(notification, "kind") ?? "unknown",
         notification_id:
           notificationField(notification, "notificationId") ?? "",
       });
-      nav.push(url as never);
+      const href = resolveRootHref(url);
+      if (!deferLink(href)) nav.push(href as never);
     };
 
     // Expo keeps the last tap until it is cleared, so a remount of this
     // observer would otherwise navigate and record the same open again.
-    // Cleared after handling, never before: the splash gate reads it once
-    // per process during the first render, ahead of this effect.
     const handle = (response: Notifications.NotificationResponse) => {
       redirect(response.notification);
       Notifications.clearLastNotificationResponse();
