@@ -37,7 +37,7 @@ export const find = internalAction({
     const startedAt = Date.now();
     let budget: ReturnType<typeof setTimeout> | undefined;
     const read = await Promise.race([
-      readPage(url),
+      readPage(url, { captionOnly: true }),
       new Promise<undefined>((resolve) => {
         budget = setTimeout(resolve, PAGE_READ_BUDGET_MS, undefined);
       }),

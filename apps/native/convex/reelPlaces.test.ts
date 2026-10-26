@@ -117,6 +117,14 @@ describe("reelPlaces.find", () => {
     page: { title: "Lisbon food crawl", content },
   });
 
+  it("reads the caption only, without following its links", async () => {
+    pageRead.mockResolvedValue(ok("Time Out Market"));
+    generateObject.mockResolvedValue({ object: { places: [] } });
+    const t = newConvexTest();
+    await t.action(internal.reelPlaces.find, { url: REEL });
+    expect(pageRead).toHaveBeenCalledWith(REEL, { captionOnly: true });
+  });
+
   it("lists the places the caption names and no invented ones", async () => {
     pageRead.mockResolvedValue(ok("Time Out Market then Pastéis de Belém"));
     generateObject.mockResolvedValue({

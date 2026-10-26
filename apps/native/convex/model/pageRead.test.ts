@@ -824,6 +824,19 @@ describe("readPage for Instagram posts", () => {
       });
     });
 
+    it("fetches no caption link when asked for the caption only", async () => {
+      serveCaption(
+        recipePage(firstUrl, "pasta"),
+        recipePage(secondUrl, "bread"),
+      );
+      const read = await readPage(postUrl, { captionOnly: true });
+      expect(read).toMatchObject({ status: "ok" });
+      expect(read.status === "ok" && read.page.recipe).toBeUndefined();
+      const fetched = safeFetch.mock.calls.map(([endpoint]) => endpoint);
+      expect(fetched).not.toContain(firstUrl);
+      expect(fetched).not.toContain(secondUrl);
+    });
+
     it("keeps the first link's recipe when a later link answers first", async () => {
       serveCaption(
         new Promise((resolve) =>

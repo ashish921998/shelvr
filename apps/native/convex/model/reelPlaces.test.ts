@@ -172,6 +172,14 @@ describe("settleReelPlaces", () => {
     ).toBeUndefined();
   });
 
+  it("does not find a city inside a longer word", () => {
+    const settled = settleReelPlaces(
+      raw([["Chrome Cafe", "Rome"]]),
+      "Chrome Cafe is a must",
+    );
+    expect(settled.places).toEqual([{ name: "Chrome Cafe" }]);
+  });
+
   it("drops a city the caption never names but keeps the place", () => {
     const settled = settleReelPlaces(
       raw([["Time Out Market", "Porto"]]),

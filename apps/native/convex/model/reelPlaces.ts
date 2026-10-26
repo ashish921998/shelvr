@@ -96,12 +96,23 @@ function isInText(name: string, foldedText: string): boolean {
   if (words.length === 0) return false;
   const long = words.filter((word) => word.length >= 4);
   if (long.length > 0) return long.every((word) => foldedText.includes(word));
+  return namedTogether(words, foldedText);
+}
+
+/** The words as whole words side by side, so "Rome" is not found inside "Chrome". */
+function namedTogether(words: string[], foldedText: string): boolean {
   const gap = "[^\\p{L}\\p{N}]{1,3}";
   const together = new RegExp(
     `(?<![\\p{L}\\p{N}])${words.join(gap)}(?![\\p{L}\\p{N}])`,
     "u",
   );
   return together.test(foldedText);
+}
+
+/** A city counts only when the caption writes it as a whole word. */
+function cityInText(city: string, foldedText: string): boolean {
+  const words = fold(city).match(WORD) ?? [];
+  return words.length > 0 && namedTogether(words, foldedText);
 }
 
 function clean(value: string, max: number): string {
@@ -129,7 +140,7 @@ export function settleReelPlaces(
     const name = clean(entry.name, MAX_NAME_CHARS);
     const named = clean(entry.city, MAX_CITY_CHARS);
     // A city the caption never names is dropped; the place itself stays.
-    const city = named !== "" && isInText(named, foldedText) ? named : "";
+    const city = named !== "" && cityInText(named, foldedText) ? named : "";
     const key = `${name.toLowerCase()}|${city.toLowerCase()}`;
     if (name === "" || seen.has(key) || !isInText(name, foldedText)) continue;
     seen.add(key);
