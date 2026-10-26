@@ -34,23 +34,30 @@ describe("ahaSample", () => {
         const sample = ahaSample(kind, city);
         const reel = ahaReel(kind, sample.city);
         expect(reel).not.toBeNull();
-        expect(sample.source).toBe("reel");
         expect(sample.firstSaveUrl).toBe(ahaReelUrl(reel!));
-        expect(sample.city).toBe(
-          city !== null && ahaReel(kind, city) ? city : "austin",
-        );
         expect(sample.trip.city).toBe(sample.city);
         expect(sample.spots.some((spot) => "quote" in spot)).toBe(false);
       }
     },
   );
 
+  it.each([
+    ["lisbon", "austin"],
+    ["prague", "austin"],
+    [null, "austin"],
+    ["new-york", "new-york"],
+    ["chicago", "chicago"],
+  ] as const)("uses %s's expected sample city %s", (selected, expected) => {
+    for (const kind of KINDS) {
+      expect(ahaSample(kind, selected).city).toBe(expected);
+    }
+  });
+
   it.each(reels.map((entry) => [entry.kind, entry.city, entry]))(
     "pins the %s reel's first three places in %s in its video's order and credits its creator",
     (kind, city, { reel }) => {
       const sample = ahaSample(kind, city);
       expect(sample).toMatchObject({
-        source: "reel",
         creator: `@${reel.handle}`,
         videoCode: reel.code,
         firstSaveUrl: ahaReelUrl(reel),

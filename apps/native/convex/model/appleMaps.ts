@@ -77,7 +77,8 @@ export function firstPlace(
   body: unknown,
   near?: LatLng,
   skipCityOnly = false,
-): LatLng | null {
+  includeCity = false,
+): (LatLng & { city?: string }) | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
@@ -94,7 +95,12 @@ export function firstPlace(
       const { latitude, longitude } = place.data.coordinate;
       const point = { lat: latitude, lng: longitude };
       if (near && keepNearby([point], near)[0] === null) continue;
-      return point;
+      return {
+        ...point,
+        ...(includeCity && address?.locality?.trim()
+          ? { city: address.locality.trim() }
+          : {}),
+      };
     }
   }
   return null;
@@ -106,7 +112,8 @@ export async function appleMapsLookup(
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
-): Promise<LatLng | null> {
+  includeCity = false,
+): Promise<(LatLng & { city?: string }) | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
@@ -125,6 +132,7 @@ export async function appleMapsLookup(
         await response.json().catch(() => null),
         near,
         kind === "search",
+        includeCity,
       );
       if (found) return found;
     }

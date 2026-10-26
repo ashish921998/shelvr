@@ -68,12 +68,6 @@ type UnplacedSave = {
   url?: string;
 };
 
-function unplacedLabel(save: UnplacedSave): string {
-  if (save.status === "processing") return t("homePlaces.noPlaceReading");
-  if (save.status === "failed") return t("homePlaces.noPlaceFailed");
-  return t("homePlaces.noPlaceNone");
-}
-
 function UnplacedSection({
   saves,
   title,
@@ -83,10 +77,9 @@ function UnplacedSection({
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const all = saves;
-  const unplaced = expanded ? all : all.slice(0, MAX_UNPLACED_ROWS);
-  const hidden = all.length - unplaced.length;
-  if (all.length === 0) return null;
+  const unplaced = expanded ? saves : saves.slice(0, MAX_UNPLACED_ROWS);
+  const hidden = saves.length - unplaced.length;
+  if (saves.length === 0) return null;
   return (
     <View style={styles.unplaced}>
       <Text style={styles.sectionLabel}>{title}</Text>
@@ -108,7 +101,9 @@ function UnplacedSection({
           <Text style={styles.unplacedTitle} numberOfLines={1}>
             {save.title ?? save.url ?? ""}
           </Text>
-          <Text style={styles.muted}>{unplacedLabel(save)}</Text>
+          {save.status === "ready" ? (
+            <Text style={styles.muted}>{t("homePlaces.noPlaceNone")}</Text>
+          ) : null}
         </Pressable>
       ))}
       {hidden > 0 ? (

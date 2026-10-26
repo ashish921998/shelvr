@@ -15,6 +15,7 @@ import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   cityKey,
+  pinsForCity,
   countCities,
   dayOf,
   swapStop,
@@ -133,16 +134,21 @@ export function toPlanSource(
     url: item.url,
     siteName: item.siteName,
     author: item.author,
-    pins: item.placePins,
+    pins: (city ? pinsForCity(item, city) : item.placePins)?.map(
+      ({ name, lat, lng }) => ({ name, lat, lng }),
+    ),
     places: [
       ...[...(item.intents ?? []), ...(join?.intents ?? [])]
         .filter((intent) => intent.kind === "open_maps")
         .map((intent) => intent.value),
       ...(item.places ?? []),
-      ...(item.placePins ?? []).map((pin) => pin.name),
+      ...(city ? pinsForCity(item, city) : (item.placePins ?? [])).map(
+        (pin) => pin.name,
+      ),
     ].filter((name) => {
       const cities = item.cities ?? [];
       if (!city || cities.length <= 1) return true;
+      if (pinsForCity(item, city).some((pin) => pin.name === name)) return true;
       // A multi-city save must explicitly identify this place's city; do not guess.
       return name
         .split(",")
@@ -198,7 +204,9 @@ export const claimTripInternal = internalMutation({
       sources,
       been: await beenPlaces(ctx, userId, sources),
       pins: saves.flatMap(({ item }) =>
-        (item.placePins ?? []).map((pin) => ({ itemId: item._id, ...pin })),
+        (city ? pinsForCity(item, city) : (item.placePins ?? [])).map(
+          ({ name, lat, lng }) => ({ itemId: item._id, name, lat, lng }),
+        ),
       ),
     };
   },

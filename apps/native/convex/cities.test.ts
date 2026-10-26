@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { newConvexTest } from "./test.setup";
 import { api } from "./_generated/api";
+import { toPlanSource } from "./tripData";
 import type { Id } from "./_generated/dataModel";
 
 type Save = {
@@ -11,7 +12,7 @@ type Save = {
   cities?: string[];
   status?: "ready" | "processing" | "failed";
   heroImageUrl?: string;
-  placePins?: { name: string; lat: number; lng: number }[];
+  placePins?: { name: string; lat: number; lng: number; city?: string }[];
 };
 
 async function setup(options: { pro?: boolean } = {}) {
@@ -102,6 +103,53 @@ describe("listCities", () => {
       { city: "Madrid", count: 1, placeCount: 1, cover: null },
       { city: "Porto", count: 1, placeCount: 1, cover: null },
     ]);
+  });
+
+  it("creates separate city entries for one reel and counts only each city's places", async () => {
+    const { base, t, save, userId } = await setup();
+    const lisbon = { name: "Cafe", lat: 38.72, lng: -9.1, city: "Lisbon" };
+    const porto = { name: "Tower", lat: 41.15, lng: -8.6, city: "Porto" };
+    const id = await save(userId, {
+      title: "Portugal reel",
+      cities: ["Lisbon", "Porto"],
+      placePins: [lisbon, porto],
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Lisbon", count: 1, placeCount: 1, cover: null },
+      { city: "Porto", count: 1, placeCount: 1, cover: null },
+    ]);
+    for (const [city, pin] of [
+      ["Lisbon", lisbon],
+      ["Porto", porto],
+    ] as const) {
+      const items = await t.query(api.items.listCityItems, { city });
+      expect(items).toHaveLength(1);
+      expect(items[0].placePins).toEqual([pin]);
+      const source = await base.run(async (ctx) => {
+        const item = await ctx.db.get(id);
+        if (!item) throw new Error("Missing fixture");
+        return toPlanSource(item, undefined, city);
+      });
+      expect(source.pins).toEqual([
+        { name: pin.name, lat: pin.lat, lng: pin.lng },
+      ]);
+      expect(source.places).toEqual([pin.name]);
+    }
+  });
+
+  it("keeps legacy multi-city saves reachable without putting unknown-city pins in both cities", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Old reel",
+      cities: ["Lisbon", "Porto"],
+      placePins: [{ name: "Unknown city", lat: 38.7, lng: -9.1 }],
+    });
+    expect(
+      (await t.query(api.items.listCities, {})).map((city) => city.placeCount),
+    ).toEqual([0, 0]);
+    expect(
+      (await t.query(api.items.listCityItems, { city: "Porto" }))[0].placePins,
+    ).toEqual([]);
   });
 
   it("refuses unauthenticated callers", async () => {

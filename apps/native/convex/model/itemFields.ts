@@ -24,7 +24,12 @@ export const intentValidator = v.object({
 });
 
 export const placePinsValidator = v.array(
-  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+  v.object({
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    city: v.optional(v.string()),
+  }),
 );
 
 export const postMediaValidator = v.object({
@@ -86,7 +91,7 @@ export const MAX_ITEM_TITLE_CHARS = 200;
 
 export const MAX_NOTE_TEXT_CHARS = 100_000;
 
-export const MAX_ITEM_CITIES = 3;
+export const MAX_ITEM_CITIES = 30;
 
 const MAX_CITY_CHARS = 60;
 const NOT_A_CITY = new Set(["unknown", "n/a", "none", "various", "online"]);
