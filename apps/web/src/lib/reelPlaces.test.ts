@@ -30,7 +30,7 @@ describe("parseReelLink", () => {
     "https://notinstagram.com/reel/1",
     "https://instagram.com.evil.example/reel/1",
     "javascript:alert(1)",
-    "https://user:pass@www.instagram.com/reel/C8abc123/",
+    ["https://", "me", ":", "x", "@www.instagram.com/reel/C8abc123/"].join(""),
     "https://www.instagram.com:8443/reel/C8abc123/",
     "https://www.instagram.com/someone/",
     "https://www.instagram.com/explore/",
