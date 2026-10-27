@@ -21,10 +21,13 @@ describe("resolveRootHref", () => {
       "/new-space",
       "/manage-spaces?itemId=1",
       "/camera",
+      "/trip/abc?city=Lisbon",
     ]) {
       expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(home)");
     }
     expect(resolveRootHref("/spaceship")).toBe("/spaceship");
+    expect(resolveRootHref("/trip-plan/abc")).toBe("/trip-plan/abc");
+    expect(resolveRootHref("/(trips)")).toBe("/(trips)");
   });
 
   it("opens the Map tab for its links, keeping the query", () => {

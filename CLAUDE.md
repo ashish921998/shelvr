@@ -455,14 +455,14 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   "Finding places…" for processing saves, "Couldn't read these saves" for failed reads,
   and "No place found" only for finished saves without a city. It loads more saves on scroll, and on its own only
   until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
-  shortcuts to removed screens (spaces, search, digest, camera) open Home, through
+  shortcuts to removed screens (spaces, search, digest, camera, the old trip) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
   city's saves, plus a row for every save not represented by a place row, with Plan a date
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`, `new-trip`,
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `new-trip`,
   `trip-plan/[id]`
 - `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
   Plan a trip opens it): city, days, optional start date, interests, pace and an optional
@@ -471,7 +471,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - `trip-plan/[id]` is a planned trip: a map of the stops (tap a day to focus it), then day by
   day stops badged Yours or Suggested and an unplanned section. A save opens `item/[id]`, a
   suggestion opens Apple's place card or Maps by coordinates; the header menu deletes it.
-  `trip/[id]` stays for the old flow on installed builds
+  The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`
+  stay for installed builds
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
   entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
 - `(auth)` holds a single `sign-in` route

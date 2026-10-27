@@ -1,5 +1,6 @@
 "use node";
 
+import type { FunctionReturnType } from "convex/server";
 import { v } from "convex/values";
 import { action, env } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -16,7 +17,6 @@ import {
   splitSavedPlace,
   suggestSavedPlaces,
   type PlanPlace,
-  type PlanSource,
 } from "./model/plan";
 import {
   dropStrays,
@@ -46,7 +46,6 @@ import {
   tasteQueries,
   type FoundPoi,
   type PlannedStop,
-  type SaveTaste,
   type Suggestion,
 } from "./model/tripSuggest";
 
@@ -57,27 +56,11 @@ const MAX_SAVE_LOOKUPS = 6;
 /** Suggestions past the days' room, left unplanned to swap in. */
 const EXTRA_SUGGESTIONS = 5;
 
-type SavedPin = {
-  itemId: Id<"items">;
-  name: string;
-  lat: number;
-  lng: number;
-  appleId?: string;
-  category?: string;
-};
-
-type Claim = {
-  city: string;
-  days: number;
-  interests: TripInterest[];
-  startDate?: string;
-  stay?: string;
-  sources: PlanSource[];
-  been: string[];
-  pins: SavedPin[];
-  tastes: SaveTaste[];
-  aiAllowed: boolean;
-};
+/** What claimTripPlanInternal returns, read off its validator so the two cannot drift. */
+type Claim = FunctionReturnType<
+  typeof internal.tripPlannerData.claimTripPlanInternal
+>;
+type SavedPin = Claim["pins"][number];
 
 type Maps = { token: string; left: number; lang?: string };
 
@@ -317,7 +300,7 @@ export const createTripPlan = action({
     saves: number;
     suggested: number;
   }> => {
-    const claim: Claim = await ctx.runMutation(
+    const claim = await ctx.runMutation(
       internal.tripPlannerData.claimTripPlanInternal,
       {
         city: args.city,

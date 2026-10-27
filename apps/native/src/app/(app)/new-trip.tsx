@@ -1,4 +1,4 @@
-import { StartDate } from "@/components/trip/trip-plan-form";
+import { StartDate } from "@/components/trip-planner/start-date";
 import {
   CityPicker,
   DaysStepper,

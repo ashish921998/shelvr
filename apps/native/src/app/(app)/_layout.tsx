@@ -100,10 +100,6 @@ export default function AppLayout() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
-            name="trip/[id]"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
-          <Stack.Screen
             name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />

@@ -15,7 +15,6 @@ import {
   tripPaceValidator,
 } from "./model/trip";
 import {
-  TRIP_INTERESTS,
   tripInterestValidator,
   tripPlanDetailValidator,
   tripPlanStopValidator,
@@ -42,11 +41,9 @@ function tripDays(days: number): number {
   return Math.min(MAX_TRIP_DAYS, Math.max(MIN_TRIP_DAYS, whole));
 }
 
-/** Known interests in the order asked, each once. */
+/** The interests in the order asked, each once. */
 function tripInterests(interests: TripInterest[]): TripInterest[] {
-  return [...new Set(interests)]
-    .filter((interest) => TRIP_INTERESTS.includes(interest))
-    .slice(0, TRIP_INTERESTS.length);
+  return [...new Set(interests)];
 }
 
 /** A real calendar day as YYYY-MM-DD, so Feb 30 never shifts into March. */
