@@ -267,7 +267,7 @@ export default function PlanScreen() {
   const spaceId = id as Id<"spaces">;
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
-    convexQuery(api.spaces.getSpace, { id: spaceId }),
+    convexQuery(api.spaces.getSpaceCards, { id: spaceId }),
   );
   const { data: latestLink, isError: linkFailed } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),

@@ -164,7 +164,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `suggestItemsForSpace`, `cleanupStaleImageImports`, and others). `enrichItem` resolves
   `storageId` to an `imageUrl` at read time.
 - **`spaces.ts`**: public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
-  `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
+  `deleteSpace`), `getSpaceCards` (a space's saved items as card rows, which the plan and trip
+  pages read), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
   `acceptAllSuggestions`), `ensureCitySpace`, plus internal join helpers. `ensureCitySpace`
   finds or makes a hidden space named for a city and files that city's ready saves into it

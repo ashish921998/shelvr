@@ -88,7 +88,7 @@ export default function TripScreen() {
   const spaceId = id as Id<"spaces">;
   const router = useRouter();
   const { data: space } = useQuery(
-    convexQuery(api.spaces.getSpace, { id: spaceId }),
+    convexQuery(api.spaces.getSpaceCards, { id: spaceId }),
   );
   const { data: trip } = useQuery(
     convexQuery(api.tripData.getSpaceTrip, { spaceId }),

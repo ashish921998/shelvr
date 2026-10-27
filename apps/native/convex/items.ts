@@ -251,7 +251,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   };
 }
 
-async function toItemCard(
+export async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
 ): Promise<ItemCard> {

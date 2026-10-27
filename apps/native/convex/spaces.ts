@@ -29,6 +29,8 @@ import {
   enrichItem,
   enrichedItemValidator,
   intentValidator,
+  itemCardValidator,
+  toItemCard,
   CITY_SCAN_ROWS,
   readyCitySaves,
 } from "./items";
@@ -238,6 +240,29 @@ export const getSpace = authedQuery({
       ),
     ]);
     return { ...space, items, suggestions };
+  },
+});
+
+/**
+ * A space with its saved items as card rows, for the plan and trip pages,
+ * which show titles, covers and a count. `getSpace` stays for builds that
+ * still read full rows and suggestions.
+ */
+export const getSpaceCards = authedQuery({
+  args: { id: v.id("spaces") },
+  returns: v.union(
+    v.object({ ...spaceFields, items: v.array(itemCardValidator) }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const space = await ctx.db.get(args.id);
+    if (space === null || space.userId !== ctx.userId) {
+      return null;
+    }
+    const { saved } = await splitJoins(ctx, space._id);
+    const rows = await loadItems(ctx, saved);
+    const items = await Promise.all(rows.map((item) => toItemCard(ctx, item)));
+    return { ...space, items };
   },
 });
 
