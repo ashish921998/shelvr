@@ -410,7 +410,12 @@ export const getSpaceTrip = authedQuery({
         (stop): stop is NonNullable<typeof stop> => stop !== null,
       );
 
-    const { userId: _userId, spaceId: _spaceId, ...rest } = trip;
+    const {
+      userId: _userId,
+      spaceId: _spaceId,
+      copiedAt: _copiedAt,
+      ...rest
+    } = trip;
     return {
       ...rest,
       days: await Promise.all(
@@ -438,17 +443,19 @@ function legacyStopPin(
   return pin ? { lat: pin.lat, lng: pin.lng } : null;
 }
 
-/** Copies one old-flow trip into `tripPlans`, keeping the stops its trip page showed. */
+/**
+ * Copies one old-flow trip into `tripPlans` once, keeping the stops its trip page showed that
+ * have a pin. A trip whose owner is being deleted, whose space is gone, or with no such stop is
+ * left out.
+ */
 async function copyLegacyTrip(
   ctx: MutationCtx,
   trip: Doc<"trips">,
 ): Promise<"copied" | "skipped" | "empty"> {
+  if (trip.copiedAt !== undefined) return "skipped";
   if (!(await liveOwner(ctx, trip.userId))) return "skipped";
-  const copied = await ctx.db
-    .query("tripPlans")
-    .withIndex("by_legacy_trip", (q) => q.eq("legacyTripId", trip._id))
-    .first();
-  if (copied !== null) return "skipped";
+  // Stamped before anything else, so a trip that has nothing to copy is not read again either.
+  await ctx.db.patch(trip._id, { copiedAt: Date.now() });
   const space = await ctx.db.get(trip.spaceId);
   if (space === null || space.userId !== trip.userId) return "skipped";
   const city = tidyCity(trip.city ?? space.name).slice(0, MAX_CITY_CHARS);
@@ -500,7 +507,6 @@ async function copyLegacyTrip(
     savedCount: planned,
     createdAt: trip._creationTime,
     updatedAt: Date.now(),
-    legacyTripId: trip._id,
   });
   for (const { day, order, stop, at } of placed) {
     await ctx.db.insert("tripStops", {
@@ -523,8 +529,9 @@ async function copyLegacyTrip(
 
 /**
  * Run once after deploying the Trips tab, so trips made with the old flow show in My trips:
- * convex run tripData:copyLegacyTrips '{"cursor":null}'. Copies each trip once, so a rerun only
- * picks up trips made since, and the `trips` rows stay for installed builds.
+ * convex run tripData:copyLegacyTrips '{"cursor":null}'. Each trip is stamped `copiedAt`, so a
+ * rerun only picks up trips made since and never brings back a copy the person deleted. The
+ * `trips` rows stay for installed builds.
  */
 export const copyLegacyTrips = internalMutation({
   args: { cursor: v.union(v.string(), v.null()) },

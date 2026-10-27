@@ -663,14 +663,27 @@ describe("copyLegacyTrips", () => {
   });
 
   it("copies each trip once and leaves the old row for installed builds", async () => {
-    const { base, t, tripId } = await seedTrip();
+    const { base, t, spaceId } = await seedTrip();
     await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
     await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
 
     expect(await t.query(api.tripPlannerData.listTripPlans, {})).toHaveLength(
       1,
     );
-    expect(await base.run((ctx) => ctx.db.get(tripId))).not.toBeNull();
+    // The old page still reads the row, without the stamp its validator doesn't know.
+    const old = await t.query(api.tripData.getSpaceTrip, { spaceId });
+    expect(old?.city).toBe("Lisbon");
+    expect(old).not.toHaveProperty("copiedAt");
+  });
+
+  it("never brings back a copy the person deleted", async () => {
+    const { base, t } = await seedTrip();
+    await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
+    const [plan] = await t.query(api.tripPlannerData.listTripPlans, {});
+    await t.mutation(api.tripPlannerData.deleteTripPlan, { tripId: plan._id });
+    await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
+
+    expect(await t.query(api.tripPlannerData.listTripPlans, {})).toEqual([]);
   });
 
   it("copies nothing for an account being deleted", async () => {

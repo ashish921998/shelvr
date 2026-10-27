@@ -348,6 +348,8 @@ export default defineSchema({
     startDate: v.optional(v.string()),
     days: v.array(tripDayValidator),
     wishlist: v.array(tripStopValidator),
+    /** When `tripData:copyLegacyTrips` looked at this trip, so a rerun never brings back a deleted copy. */
+    copiedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_space", ["spaceId"]),
@@ -364,11 +366,7 @@ export default defineSchema({
     savedCount: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
-    /** The old-flow `trips` row this plan was copied from by `tripData:copyLegacyTrips`. */
-    legacyTripId: v.optional(v.id("trips")),
-  })
-    .index("by_user", ["userId"])
-    .index("by_legacy_trip", ["legacyTripId"]),
+  }).index("by_user", ["userId"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),
