@@ -62,7 +62,11 @@ export default function MapScreen() {
       };
     }, []),
   );
-  const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
+  // Native tabs mount the Map tab at launch. Until it is first opened it neither reads every ready
+  // save nor re-runs on each save change.
+  const places = useQuery(
+    convexQuery(api.mapPlaces.listMapPlaces, opened ? {} : "skip"),
+  );
   const location = useMapLocation(opened);
   const [kind, setKind] = useState<PlaceKind | null>(null);
   const [searchText, setSearchText] = useState("");
