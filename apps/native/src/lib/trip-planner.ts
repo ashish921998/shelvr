@@ -232,6 +232,17 @@ export function tripCardLine(
   });
 }
 
+/**
+ * The interests a trip was planned for, as the card shows them: "Food, Coffee, Sights &
+ * landmarks", or null when it has none. Trips to one city read apart by what they were for.
+ */
+export function tripInterestsLine(
+  trip: Pick<TripPlanSummary, "interests">,
+): string | null {
+  if (trip.interests.length === 0) return null;
+  return trip.interests.map(interestLabel).join(", ");
+}
+
 /** "8 stops · 5 from your saves" */
 export function tripStopsLine(
   trip: Pick<TripPlanSummary, "stopCount" | "savedCount">,
@@ -384,13 +395,10 @@ type PlanPin = {
   active: boolean;
   /** What the pin shows: its day's number when every day is showing, its stop number in a focused day, nothing when faded. */
   text: string;
-  /** Where the stop sits in the trip: "Day 2 · Stop 3". Google's marker shows it as the snippet under the name. */
-  stopLine: string;
   /**
-   * The pin's title on every pin, faded or not: "Prado · Day 2 · Stop 3". MapKit reads an
-   * annotation's title to VoiceOver and expo-maps has no separate accessibility label or
-   * subtitle, so the title carries the day and stop for everyone. The name leads, so a
-   * title MapKit truncates still shows the place.
+   * The caption MapKit prints under the pin, which VoiceOver also reads: the place's name on
+   * a focused day's pins, and empty (no caption) on faded pins and across "All days", so
+   * the map stays legible. The stop rows carry each place's day and stop for VoiceOver.
    */
   title: string;
 };
@@ -406,26 +414,21 @@ export function planPins(
 ): PlanPin[] {
   return days.flatMap((stops, day) =>
     stops.map((stop, index) => {
-      const active = activeDay === null || activeDay === day;
-      const stopLine = t("tripPlanner.pinStop", {
-        day: String(day + 1),
-        stop: String(index + 1),
-      });
+      const focused = activeDay === day;
       return {
         id: `${day}:${index}`,
         day,
         number: index + 1,
         name: stop.name,
         coordinates: { latitude: stop.lat, longitude: stop.lng },
-        active,
+        active: activeDay === null || focused,
         text:
           activeDay === null
             ? String(day + 1)
-            : active
+            : focused
               ? String(index + 1)
               : "",
-        stopLine,
-        title: t("tripPlanner.pinTitle", { name: stop.name, stop: stopLine }),
+        title: focused ? stop.name : "",
       };
     }),
   );

@@ -849,8 +849,6 @@
   "tripPlanner.stayingAt": "숙소: %{name}",
   "tripPlanner.showDay": "%{day}일차를 지도에 표시",
   "tripPlanner.allDays": "모든 날",
-  "tripPlanner.pinStop": "%{day}일차 · %{stop}번째",
-  "tripPlanner.pinTitle": "%{name} · %{stop}",
   "tripPlanner.stopNumber": "%{number}번째 장소",
   "tripPlanner.fromSave": "‘%{title}’에서",
   "tripPlanner.whereTo": "어디로 가세요?",

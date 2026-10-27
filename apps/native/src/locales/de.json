@@ -871,8 +871,6 @@
   "tripPlanner.stayingAt": "Unterkunft: %{name}",
   "tripPlanner.showDay": "Tag %{day} auf der Karte zeigen",
   "tripPlanner.allDays": "Alle Tage",
-  "tripPlanner.pinStop": "Tag %{day} · Stopp %{stop}",
-  "tripPlanner.pinTitle": "%{name} · %{stop}",
   "tripPlanner.stopNumber": "Stopp %{number}",
   "tripPlanner.fromSave": "Aus „%{title}“",
   "tripPlanner.whereTo": "Wohin?",

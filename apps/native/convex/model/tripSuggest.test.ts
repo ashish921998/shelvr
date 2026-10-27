@@ -16,6 +16,8 @@ import {
   LODGING_CATEGORIES,
   nameWithin,
   nextBatch,
+  routeKm,
+  routeOrder,
   samePlace,
   saveWhy,
   searchPoints,
@@ -533,7 +535,10 @@ describe("layoutTripPlan", () => {
     expect(short.unplanned.map((s) => s.name)).toEqual(["South A", "North C"]);
   });
 
-  it("gives obvious slots from the category and orders the day by them", () => {
+  it("orders the day as a walking route, then gives slots that agree with it", () => {
+    // The day used to run in slot order (cafe, lunch, afternoon, dinner, bar) whatever the
+    // map said; now it walks the shortest way from the cafe to the bar, and only slots
+    // consistent with that order are kept.
     const trip = layoutTripPlan(
       [
         stop("Bar", 38.7, { category: "Nightlife" }),
@@ -547,11 +552,31 @@ describe("layoutTripPlan", () => {
     );
     expect(trip.days[0].map((s) => [s.name, s.slot])).toEqual([
       ["Cafe", "morning"],
-      ["Meal 1", "lunch"],
+      ["Meal 3", "lunch"],
+      ["Meal 2", undefined],
       ["Museum", undefined],
-      ["Meal 3", undefined],
-      ["Meal 2", "dinner"],
+      ["Meal 1", "dinner"],
       ["Bar", "evening"],
+    ]);
+  });
+
+  it("drops slots the route contradicts (a second cafe, a bar before the end) and recomputes a stale one", () => {
+    const trip = layoutTripPlan(
+      [
+        stop("Bakery", 38.7, { category: "Bakery" }),
+        stop("Cafe", 38.7001, { category: "Cafe" }),
+        stop("Bar", 38.7002, { category: "Nightlife" }),
+        stop("Winery", 38.7003, { category: "Winery" }),
+        stop("Meal", 38.7004, { category: "Restaurant", slot: "lunch" }),
+      ],
+      { days: 1, pace: "balanced" },
+    );
+    expect(trip.days[0].map((s) => [s.name, s.slot])).toEqual([
+      ["Bakery", "morning"],
+      ["Cafe", undefined],
+      ["Bar", undefined],
+      ["Meal", "dinner"],
+      ["Winery", "evening"],
     ]);
   });
 
@@ -580,6 +605,121 @@ describe("layoutTripPlan", () => {
       pace: "balanced",
     });
     expect(trip.days.map((d) => d.length)).toEqual([1, 0, 0]);
+  });
+});
+
+describe("routeOrder", () => {
+  const at = (
+    name: string,
+    lat: number,
+    lng: number,
+    category?: string,
+  ): PlannedStop => ({
+    source: "suggested",
+    name,
+    lat,
+    lng,
+    ...(category !== undefined ? { category } : {}),
+  });
+
+  // Planar enough over a few km: longitude scaled to the latitude.
+  const xy = (p: PlannedStop) => [
+    p.lng * Math.cos((p.lat * Math.PI) / 180),
+    p.lat,
+  ];
+  const turn = (a: number[], b: number[], c: number[]) =>
+    Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  function crossings(route: PlannedStop[]): number {
+    let count = 0;
+    for (let i = 0; i + 1 < route.length; i++) {
+      for (let j = i + 2; j + 1 < route.length; j++) {
+        const [a, b, c, d] = [
+          route[i],
+          route[i + 1],
+          route[j],
+          route[j + 1],
+        ].map(xy);
+        if (
+          turn(a, b, c) * turn(a, b, d) < 0 &&
+          turn(c, d, a) * turn(c, d, b) < 0
+        )
+          count++;
+      }
+    }
+    return count;
+  }
+  function permutations<T>(items: T[]): T[][] {
+    if (items.length <= 1) return [items];
+    return items.flatMap((item, i) =>
+      permutations([...items.slice(0, i), ...items.slice(i + 1)]).map(
+        (rest) => [item, ...rest],
+      ),
+    );
+  }
+  const shortest = (orders: PlannedStop[][]) =>
+    Math.min(...orders.map(routeKm));
+
+  it("uncrosses a square visited corner to opposite corner", () => {
+    const square = [
+      at("South west", 38.71, -9.15),
+      at("North east", 38.72, -9.137),
+      at("South east", 38.71, -9.137),
+      at("North west", 38.72, -9.15),
+    ];
+    expect(crossings(square)).toBe(1);
+    const route = routeOrder(square);
+    expect(route.map((s) => s.name).sort()).toEqual(
+      square.map((s) => s.name).sort(),
+    );
+    expect(crossings(route)).toBe(0);
+    expect(routeKm(route)).toBeCloseTo(shortest(permutations(square)), 9);
+  });
+
+  it("starts at the morning stop and ends at the evening stop, shortest between them", () => {
+    const stops = [
+      at("Museum", 38.71, -9.15),
+      at("Bar", 38.715, -9.143, "Nightlife"),
+      at("Park", 38.72, -9.137),
+      at("Cafe", 38.7155, -9.1435, "Cafe"),
+      at("Market", 38.71, -9.137),
+      at("Gallery", 38.72, -9.15),
+    ];
+    const route = routeOrder(stops);
+    expect(route[0].name).toBe("Cafe");
+    expect(route[route.length - 1].name).toBe("Bar");
+    const cafe = stops[3];
+    const bar = stops[1];
+    const middle = stops.filter((s) => s !== cafe && s !== bar);
+    expect(routeKm(route)).toBeCloseTo(
+      shortest(permutations(middle).map((order) => [cafe, ...order, bar])),
+      9,
+    );
+    expect(crossings(route)).toBe(0);
+  });
+
+  it("leaves one-stop and two-stop days in their order", () => {
+    const one = [at("Only", 38.71, -9.14)];
+    expect(routeOrder(one)).toEqual(one);
+    const two = [at("Far", 38.75, -9.1), at("Near", 38.71, -9.14)];
+    expect(routeOrder(two)).toEqual(two);
+  });
+
+  it("gives the same uncrossed route for the same day every time", () => {
+    // A fixed scatter of seven stops across central Lisbon.
+    const stops = [
+      [38.7139, -9.1334],
+      [38.7071, -9.1355],
+      [38.7223, -9.1393],
+      [38.7097, -9.1428],
+      [38.7169, -9.1399],
+      [38.7036, -9.1366],
+      [38.7114, -9.126],
+    ].map(([lat, lng], i) => at(`Stop ${i}`, lat, lng));
+    const first = routeOrder(stops);
+    expect(routeOrder(stops)).toEqual(first);
+    expect(routeOrder([...stops])).toEqual(first);
+    expect(crossings(first)).toBe(0);
+    expect(routeKm(first)).toBeLessThanOrEqual(routeKm(stops));
   });
 });
 

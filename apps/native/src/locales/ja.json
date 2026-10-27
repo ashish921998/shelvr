@@ -849,8 +849,6 @@
   "tripPlanner.stayingAt": "宿泊先：%{name}",
   "tripPlanner.showDay": "%{day}日目を地図に表示",
   "tripPlanner.allDays": "すべての日",
-  "tripPlanner.pinStop": "%{day}日目・%{stop}番目",
-  "tripPlanner.pinTitle": "%{name}・%{stop}",
   "tripPlanner.stopNumber": "スポット%{number}",
   "tripPlanner.fromSave": "「%{title}」から",
   "tripPlanner.whereTo": "行き先は？",

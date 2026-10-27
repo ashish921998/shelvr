@@ -64,6 +64,7 @@ export const tripPlanSummaryValidator = v.object({
   dayCount: v.number(),
   stopCount: v.number(),
   savedCount: v.number(),
+  interests: v.array(tripInterestValidator),
   createdAt: v.number(),
 });
 export type TripPlanSummary = Infer<typeof tripPlanSummaryValidator>;

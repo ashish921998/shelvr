@@ -98,7 +98,7 @@ export function TripPlannerMap({
   const { width } = rt.screen;
   const top = rt.insets.top + theme.gap(6);
   const showChips = days.length > 1;
-  // Room under the lowest pin for its name label.
+  // Room under the lowest pin for its name label (a focused day's pins carry one).
   const bottom = theme.gap(4);
   const camera = useMemo(() => {
     const focused = pins.filter((pin) => pin.active).map((p) => p.coordinates);
@@ -182,7 +182,7 @@ export function TripPlannerMap({
             annotations={pins.map((pin) => ({
               id: pin.id,
               coordinates: pin.coordinates,
-              // VoiceOver reads the title, so every pin, faded ones too, says its day and stop.
+              // MapKit prints the title under the pin: the name on a focused day, nothing elsewhere.
               title: pin.title,
               text: pin.text,
               backgroundColor: colorOf(pin.day, pin.active),
@@ -228,9 +228,8 @@ export function TripPlannerMap({
               .map((pin) => ({
                 id: pin.id,
                 coordinates: pin.coordinates,
-                // Shown in the callout a tap opens: the place, then its day and stop.
+                // Shown in the callout a tap opens.
                 title: pin.name,
-                snippet: pin.stopLine,
               })),
             ...(stayPoint && stay
               ? [{ id: STAY_ID, coordinates: stayPoint, title: stay.name }]

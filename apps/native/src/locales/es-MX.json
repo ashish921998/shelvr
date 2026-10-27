@@ -893,8 +893,6 @@
   "tripPlanner.stayingAt": "Te hospedas en %{name}",
   "tripPlanner.showDay": "Mostrar el día %{day} en el mapa",
   "tripPlanner.allDays": "Todos los días",
-  "tripPlanner.pinStop": "Día %{day} · Parada %{stop}",
-  "tripPlanner.pinTitle": "%{name} · %{stop}",
   "tripPlanner.stopNumber": "Parada %{number}",
   "tripPlanner.fromSave": "De “%{title}”",
   "tripPlanner.whereTo": "¿A dónde?",

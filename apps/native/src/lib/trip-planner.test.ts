@@ -39,6 +39,7 @@ import {
   tripLengthLine,
   tripPlanFailure,
   tripPlanMessage,
+  tripInterestsLine,
   tripStopsLine,
   tripTitle,
 } from "./trip-planner";
@@ -187,6 +188,13 @@ describe("trip lines", () => {
     ).toBe("3 days · Nov 4 – Nov 6");
   });
 
+  it("lists a trip's interests by name so trips to one city read apart", () => {
+    expect(
+      tripInterestsLine({ interests: ["food", "coffee", "sights"] }),
+    ).toBe("Food, Coffee, Sights & landmarks");
+    expect(tripInterestsLine({ interests: [] })).toBeNull();
+  });
+
   it("counts stops and how many came from the person's saves", () => {
     expect(tripStopsLine({ stopCount: 8, savedCount: 5 })).toBe(
       "8 stops · 5 from your saves",
@@ -318,30 +326,26 @@ describe("trip page focus", () => {
     ]);
   });
 
-  it("titles every pin with its name, day and stop, faded or not, since VoiceOver reads the title", () => {
-    const focused = planPins(
-      [[stop(), stop({ name: "Tasca" })], [stop({ name: "Prado" })]],
-      0,
-    );
-    expect(focused.map((pin) => pin.title)).toEqual([
-      "Miradouro da Graça · Day 1 · Stop 1",
-      "Tasca · Day 1 · Stop 2",
-      "Prado · Day 2 · Stop 1",
+  it("captions only the focused day's pins, with just the place name", () => {
+    const days = [
+      [stop(), stop({ name: "Tasca" })],
+      [stop({ name: "Prado" })],
+    ];
+    const focused = planPins(days, 0);
+    expect(focused.map((pin) => [pin.title, pin.text, pin.active])).toEqual([
+      ["Miradouro da Graça", "1", true],
+      ["Tasca", "2", true],
+      // Another day's faded pin keeps no caption and no number.
+      ["", "", false],
     ]);
-    expect(focused[2]?.active).toBe(false);
-    expect(focused.map((pin) => pin.stopLine)).toEqual([
-      "Day 1 · Stop 1",
-      "Day 1 · Stop 2",
-      "Day 2 · Stop 1",
+    // Across "All days" no pin has a caption; the glyph carries the day number.
+    expect(
+      planPins(days, null).map((pin) => [pin.title, pin.text, pin.name]),
+    ).toEqual([
+      ["", "1", "Miradouro da Graça"],
+      ["", "1", "Tasca"],
+      ["", "2", "Prado"],
     ]);
-    // The title does not depend on which day is focused.
-    const all = planPins(
-      [[stop(), stop({ name: "Tasca" })], [stop({ name: "Prado" })]],
-      null,
-    );
-    expect(all.map((pin) => pin.title)).toEqual(
-      focused.map((pin) => pin.title),
-    );
   });
 
   it("colours each day from the palette, cycling once a trip outruns it", () => {

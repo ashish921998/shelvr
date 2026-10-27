@@ -2,7 +2,12 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import { tripCardLine, tripStopsLine, tripTitle } from "@/lib/trip-planner";
+import {
+  tripCardLine,
+  tripInterestsLine,
+  tripStopsLine,
+  tripTitle,
+} from "@/lib/trip-planner";
 import type { TripPlanSummary } from "@convex/model/tripPlan";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -17,12 +22,14 @@ export function TripCard({ trip, onOpen, onDelete }: Props) {
   const { theme } = useUnistyles();
   const title = tripTitle(trip.city);
   const length = tripCardLine(trip);
+  const interests = tripInterestsLine(trip);
   const stops = tripStopsLine(trip);
+  const label = [title, length, interests, stops].filter(Boolean).join(", ");
   return (
     <View style={styles.card}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${title}, ${length}, ${stops}`}
+        accessibilityLabel={label}
         onPress={onOpen}
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
@@ -40,6 +47,15 @@ export function TripCard({ trip, onOpen, onDelete }: Props) {
           <ThemedText variant="subhead" style={styles.muted} numberOfLines={1}>
             {length}
           </ThemedText>
+          {interests === null ? null : (
+            <ThemedText
+              variant="footnote"
+              style={styles.muted}
+              numberOfLines={1}
+            >
+              {interests}
+            </ThemedText>
+          )}
           <ThemedText variant="footnote" style={styles.muted} numberOfLines={1}>
             {stops}
           </ThemedText>

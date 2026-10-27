@@ -262,6 +262,7 @@ export const listTripPlans = authedQuery({
       dayCount: plan.dayCount,
       stopCount: plan.stopCount,
       savedCount: plan.savedCount,
+      interests: plan.interests,
       createdAt: plan.createdAt,
     }));
   },
