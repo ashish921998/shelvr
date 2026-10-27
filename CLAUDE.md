@@ -287,7 +287,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   reads as gone. Other Google Maps links read as pages. The list's places (name, note,
   address, point, at most 150) ride on `PageData.placeList`; `ai.ts` asks the model for
   each place's city once and `model/placeList.ts` (pure) splits the list into one save per
-  city, at most 30 places each and 10 saves in all, biggest city first. The save itself
+  city, at most 30 places each, biggest city first. The save itself
   becomes the first part and `items.addPlaceListParts` inserts the rest as ready saves
   (skipping a part whose title that link already has) and schedules their pins.
   Host-specific knowledge stays in the page readers, never in `ai.ts`.

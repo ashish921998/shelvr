@@ -229,7 +229,7 @@ export function isGoogleMapsUrl(url: string | undefined): boolean {
     if (host === "goo.gl") return parsed.pathname.startsWith("/maps/");
     if (host === "maps.google.com") return true;
     return (
-      /^(?:www\.)?google\.(?:com|(?:com?\.)?[a-z]{2})$/.test(host) &&
+      /^(?:www\.)?google\.(?:com|cat|(?:com?\.)?[a-z]{2})$/.test(host) &&
       (parsed.pathname === "/maps" || parsed.pathname.startsWith("/maps/"))
     );
   } catch {

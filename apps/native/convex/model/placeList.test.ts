@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   intentsForPart,
-  MAX_LIST_PARTS,
+  MAX_LIST_PLACES,
   partIndexFor,
   placeListCitiesPrompt,
   placeListContent,
@@ -127,8 +127,8 @@ describe("splitPlaceList", () => {
     ]);
   });
 
-  it("stops at the part cap", () => {
-    const places = Array.from({ length: MAX_LIST_PARTS + 3 }, (_, i) =>
+  it("keeps every city of a list with a city per place", () => {
+    const places = Array.from({ length: MAX_LIST_PLACES }, (_, i) =>
       place(`Spot ${i}`),
     );
     const parts = splitPlaceList(
@@ -136,7 +136,8 @@ describe("splitPlaceList", () => {
       places,
       named(...places.map((_, i) => `City ${i}`)),
     );
-    expect(parts).toHaveLength(MAX_LIST_PARTS);
+    expect(parts).toHaveLength(MAX_LIST_PLACES);
+    expect(parts.flatMap((part) => part.places)).toHaveLength(MAX_LIST_PLACES);
   });
 });
 

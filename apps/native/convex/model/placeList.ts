@@ -24,7 +24,8 @@ export type PlaceListPart = {
 };
 
 export const MAX_LIST_PLACES = 150;
-export const MAX_LIST_PARTS = 10;
+/** Every part holds at least one place, so no list a reader returns loses a city to this cap. */
+export const MAX_LIST_PARTS = MAX_LIST_PLACES;
 /** A place the list gives no city for takes the city of a listed place this close. */
 const SAME_CITY_KM = 40;
 const MAX_NOTE_CHARS = 200;
@@ -122,7 +123,7 @@ function partTitle(
 
 /**
  * Splits a list into saves the city pages can show: one city per save, at most a save's worth of places each,
- * biggest city first. Places with no city share a save with no city. Parts past the cap are left out.
+ * biggest city first. Places with no city share a save with no city.
  */
 export function splitPlaceList(
   listTitle: string,

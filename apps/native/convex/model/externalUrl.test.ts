@@ -413,6 +413,7 @@ describe("isGoogleMapsUrl", () => {
     "https://maps.google.com/?cid=123",
     "https://www.google.de/maps/@52.5,13.4,12z",
     "https://www.google.com.au/maps/@-33.8,151.2,12z",
+    "https://www.google.cat/maps/placelists/list/PiSwyqmbpwpP_Nr5sAang4x5QxbKwA",
   ])("accepts %s", (url) => {
     expect(isGoogleMapsUrl(url)).toBe(true);
   });
