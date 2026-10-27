@@ -67,13 +67,6 @@ crons.interval(
 );
 
 crons.interval(
-  "sweep item embeddings",
-  { minutes: 30 },
-  internal.aiEmbeddingSweep.sweepItemEmbeddings,
-  {},
-);
-
-crons.interval(
   "recover notification deliveries",
   { minutes: 5 },
   internal.notificationDelivery.recover,

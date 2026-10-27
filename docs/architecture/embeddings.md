@@ -1,6 +1,12 @@
 # Embeddings and semantic retrieval
 
-Status: **Phases 0-2 implemented.** Phases 3-4 remain proposed.
+Status: **Retired (October 2026).** Saves no longer get embeddings. The app stopped
+showing spaces, so space suggestions, the only reader of the vectors, run only for
+old builds, and they now draw from the 100 newest ready saves. Each vector cost about
+16 KB of the 4 MB read budget behind Home, city pages and the Map, which cut those
+off at about 230 saves. The sweep cron and the vector index are gone, and
+`items:clearEmbeddings` removes stored vectors. The rest of this page records the
+design as it was.
 
 ## Why
 
