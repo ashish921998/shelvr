@@ -102,6 +102,8 @@ export default defineSchema({
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
+    /** True while `placePins` holds at least one pin, so the Map tab reads only pinned saves. */
+    hasMapPins: v.optional(v.boolean()),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
@@ -150,6 +152,11 @@ export default defineSchema({
     .index("by_user_and_type", ["userId", "type"])
     .index("by_user_and_url", ["userId", "url"])
     .index("by_user_and_status", ["userId", "status"])
+    .index("by_user_and_status_and_hasMapPins", [
+      "userId",
+      "status",
+      "hasMapPins",
+    ])
     .index("by_status_and_processingStartedAt", [
       "status",
       "processingStartedAt",

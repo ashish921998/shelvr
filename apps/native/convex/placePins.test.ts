@@ -831,4 +831,74 @@ describe("placePins", () => {
     }
     expect((await pins())?.[0].category).toBe("Cafe");
   });
+
+  it("flags a save while it has pins and clears the flag when they go", async () => {
+    const { t, itemId } = await setup([]);
+    const flag = async () =>
+      (await t.run(async (ctx) => ctx.db.get(itemId)))?.hasMapPins;
+    const pin = { name: "Cafe", lat: 38.7, lng: -9.1, city: "Lisbon" };
+    await t.run(async (ctx) => ctx.db.patch(itemId, { places: ["Cafe"] }));
+    await t.mutation(internal.placePins.storePins, { itemId, found: [pin] });
+    expect(await flag()).toBe(true);
+
+    await t.run(async (ctx) => ctx.db.patch(itemId, { places: [] }));
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect(await flag()).toBe(false);
+  });
+
+  it("sets the flag on a save whose unchanged pins predate it", async () => {
+    const { t, itemId } = await setup(["Micho"], { pins: true });
+    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.hasMapPins).toBe(true);
+  });
+
+  it("flag backfill marks pinned saves across pages and leaves the rest alone", async () => {
+    const { t, itemId } = await setup(["Micho"], { pins: true });
+    const unpinned = await t.run(async (ctx) => {
+      const item = (await ctx.db.get(itemId))!;
+      const ids: Id<"items">[] = [];
+      // More than one backfill page, so the scheduled continuation runs too.
+      for (let i = 0; i < 60; i++)
+        ids.push(
+          await ctx.db.insert("items", {
+            userId: item.userId,
+            type: "note",
+            status: "ready",
+            tags: [],
+            searchText: "",
+          }),
+        );
+      return ids;
+    });
+    const lastPinned = await t.run(async (ctx) => {
+      const item = (await ctx.db.get(itemId))!;
+      return await ctx.db.insert("items", {
+        userId: item.userId,
+        type: "link",
+        status: "ready",
+        tags: [],
+        searchText: "",
+        placePins: [{ name: "Bar", lat: 1, lng: 2 }],
+      });
+    });
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.placePins.backfillMapPinsFlag, {
+        cursor: null,
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    const flags = await t.run(async (ctx) => ({
+      first: (await ctx.db.get(itemId))?.hasMapPins,
+      last: (await ctx.db.get(lastPinned))?.hasMapPins,
+      unpinnedFlagged: (
+        await Promise.all(unpinned.map((id) => ctx.db.get(id)))
+      ).filter((item) => item?.hasMapPins !== undefined).length,
+    }));
+    expect(flags.first).toBe(true);
+    expect(flags.last).toBe(true);
+    expect(flags.unpinnedFlagged).toBe(0);
+  });
 });

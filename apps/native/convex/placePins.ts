@@ -35,6 +35,8 @@ import {
 
 const MAX_PINS = MAX_ITEM_PLACES;
 const BACKFILL_PAGE = 100;
+/** Saves carry their embedding and page text, so a flag page stays well inside one transaction's reads. */
+const FLAG_BACKFILL_PAGE = 50;
 const BACKFILL_STAGGER_MS = 250;
 
 type Pin = {
@@ -222,13 +224,16 @@ export const storePins = internalMutation({
         : normalizePlaces(item.places, item.cities);
     const samePlaces = JSON.stringify(places) === JSON.stringify(item.places);
     const searchText = buildSearchText({ ...item, places, placePins: pins });
+    const hasMapPins = pins.length > 0;
     if (
       !same ||
       !samePlaces ||
-      (pins.length > 0 && searchText !== item.searchText)
+      (hasMapPins && searchText !== item.searchText) ||
+      hasMapPins !== (item.hasMapPins === true)
     )
       await ctx.db.patch(item._id, {
         placePins: pins,
+        hasMapPins,
         searchText,
         ...(places === undefined ? {} : { places }),
       });
@@ -315,6 +320,31 @@ export const locateItem = internalAction({
       itemId: args.itemId,
       found,
     });
+    return null;
+  },
+});
+
+/**
+ * Run by hand once after deploying `hasMapPins`:
+ * `convex run placePins:backfillMapPinsFlag '{"cursor":null}'`. It only sets the flag from the pins a
+ * save already has, schedules its remaining pages, and is safe to restart.
+ */
+export const backfillMapPinsFlag = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("items")
+      .paginate({ numItems: FLAG_BACKFILL_PAGE, cursor: args.cursor });
+    for (const item of page) {
+      const hasMapPins = (item.placePins?.length ?? 0) > 0;
+      if (hasMapPins !== (item.hasMapPins === true))
+        await ctx.db.patch(item._id, { hasMapPins });
+    }
+    if (!isDone)
+      await ctx.scheduler.runAfter(0, internal.placePins.backfillMapPinsFlag, {
+        cursor: continueCursor,
+      });
     return null;
   },
 });

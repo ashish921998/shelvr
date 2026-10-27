@@ -337,7 +337,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
   membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older pins with no city or no category, run by hand after deployment:
   `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
-  when AI is declined or the Maps key is unset.
+  when AI is declined or the Maps key is unset. `storePins` also keeps `items.hasMapPins` true
+  while a save has pins, in the same write, behind the `by_user_and_status_and_hasMapPins` index
+  the Map tab will read. Older saves get the flag from a one-time run after deploying:
+  `pnpm exec convex run --prod placePins:backfillMapPinsFlag '{"cursor":null}'` from `apps/native`
+  (paginated, schedules its remaining pages, safe to restart).
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.

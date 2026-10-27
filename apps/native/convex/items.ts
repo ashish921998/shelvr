@@ -227,8 +227,10 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
+  | "hasMapPins"
 > {
   const {
+    hasMapPins: _hasMapPins,
     places: _places,
     placesHeard: _placesHeard,
     embedding: _embedding,
