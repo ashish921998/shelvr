@@ -78,6 +78,10 @@ const SF_TO_MATERIAL = {
   "cup.and.saucer.fill": "local_cafe",
   "binoculars.fill": "landscape",
   "paintpalette.fill": "palette",
+  "line.3.horizontal": "drag_handle",
+  "minus.circle.fill": "remove_circle",
+  "plus.circle.fill": "add_circle",
+  pencil: "edit",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;

@@ -93,7 +93,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `tripPlans`: one planned trip ("Plan a trip" v2) for a city: days, pace, interests,
     optional start date and stay, plus stop and saved counts. Every new plan is a new row
   - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
-    from a save (`itemId`) or an Apple Maps suggestion, carrying its own name, pin, Apple id
+    from a save (`itemId`), an Apple Maps suggestion or a place found with Add a place, carrying its own name, pin, Apple id
     and category. Deleting the save keeps the stop; a trip read opens only live saves
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
@@ -355,6 +355,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Without the Maps key it plans from saves only. `tripPlannerData.ts` serves
   `listTripPlans`, `getTripPlan` and `deleteTripPlan`, plus `claimTripPlanInternal` and
   `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
+  Editing (Pro, `tripEdit` rate limit) is single-row writes in `tripPlannerData.ts`:
+  `moveTripStop` (a day and position, day 0 is Unplanned), `removeTripStop` (to the top of
+  Unplanned, never a delete) and `restoreTripStop`, `addTripStop` (a search result as an
+  `added` stop, or a pin the city's save already has), `renameTripPlan`, and
+  `tripSavePlaces` for Add a place. Moves and removes return where the stop was, which
+  the app's Undo sends back. Stop ids survive every edit; only `deleteTripPlan` deletes
+  stops. `tripPlanner.ts` `searchTripPlaces` (`tripPlaceSearch` rate limit) is Add a
+  place's Apple search near the trip, refused like `createTripPlan` when AI is declined.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
@@ -477,14 +485,20 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `new-trip`,
-  `trip-plan/[id]`
+  `trip-plan/[id]`, `add-trip-stop`
 - `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
   Plan a trip opens it): city, days, optional start date, interests, pace and an optional
   stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then
   replaces itself with `trip-plan/[id]`
 - `trip-plan/[id]` is a planned trip: a map of the stops (tap a day to focus it), then day by
   day stops badged Yours or Suggested and an unplanned section. A save opens `item/[id]`, a
-  suggestion opens Apple's place card or Maps by coordinates; the header menu deletes it.
+  suggestion opens Apple's place card or Maps by coordinates. The header menu edits, adds a
+  place, or deletes it. Edit mode (`src/components/trip-planner/trip-edit-list.tsx`, rules in
+  `src/lib/trip-edit.ts`) lays stops out in fixed-height rows: hold one to drag it within a
+  day or onto another, minus sends it to Unplanned, plus puts an unplanned one on a day, the
+  name is editable, and an Undo bar takes back the last move or remove
+- `add-trip-stop` is Add a place, a modal with `tripId` and `day` params: Apple Maps search
+  near the trip plus the city's saved places not on it yet
   The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`
   stay for installed builds
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active

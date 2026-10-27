@@ -20,6 +20,7 @@ import {
   type PlanPlace,
 } from "./model/plan";
 import {
+  distanceKm,
   dropStrays,
   lookupQuery,
   middleOf,
@@ -32,8 +33,10 @@ import {
 } from "./model/trip";
 import {
   createTripPlanResultValidator,
+  searchTripPlacesResultValidator,
   tripInterestValidator,
   type TripInterest,
+  type TripPlace,
 } from "./model/tripPlan";
 import {
   balanceSuggestions,
@@ -44,6 +47,7 @@ import {
   nextBatch,
   saveWhy,
   searchQueues,
+  SUGGEST_RADIUS_KM,
   tasteQueries,
   type PlannedStop,
   type Suggestion,
@@ -354,5 +358,68 @@ export const createTripPlan = action({
       saves: saves.length,
       suggested: suggested.stops.length,
     };
+  },
+});
+
+const MIN_SEARCH_CHARS = 2;
+const MAX_SEARCH_CHARS = 100;
+const MAX_SEARCH_RESULTS = 15;
+/** Add a place looks a little wider than suggestions do: a day trip out of town is fine. */
+const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
+
+/** Add a place: an Apple Maps search for what the person typed, near the trip. */
+export const searchTripPlaces = action({
+  args: {
+    tripId: v.id("tripPlans"),
+    query: v.string(),
+    locale: v.optional(v.string()),
+  },
+  returns: searchTripPlacesResultValidator,
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ available: boolean; places: TripPlace[] }> => {
+    const query = args.query
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, MAX_SEARCH_CHARS);
+    if (query.length < MIN_SEARCH_CHARS) return { available: true, places: [] };
+    const claim = await ctx.runMutation(
+      internal.tripPlannerData.claimTripSearchInternal,
+      { tripId: args.tripId },
+    );
+    // The trip's centre comes from the saves' pins, so a declined account sends Apple nothing,
+    // as createTripPlan does.
+    const maps = claim.aiAllowed
+      ? await openMaps(appleLang(args.locale))
+      : null;
+    if (maps === null) return { available: false, places: [] };
+    const centre =
+      claim.centre ??
+      (await appleMapsLookup(maps.token, "geocode", claim.city));
+    if (centre === null) {
+      logEvent("info", "trip_search_no_centre", {});
+      return { available: true, places: [] };
+    }
+    const found = await appleMapsSearchPlaces(maps.token, query, {
+      near: centre,
+      ...(maps.lang !== undefined ? { lang: maps.lang } : {}),
+    });
+    const places = found
+      .filter((place) => distanceKm(place, centre) <= SEARCH_RADIUS_KM)
+      .slice(0, MAX_SEARCH_RESULTS)
+      .map(({ name, lat, lng, appleId, category, area }) => ({
+        name,
+        lat,
+        lng,
+        ...(appleId !== undefined ? { appleId } : {}),
+        ...(category !== undefined ? { category } : {}),
+        ...(area !== undefined ? { area } : {}),
+      }));
+    logEvent("info", "trip_search_done", {
+      found: found.length,
+      kept: places.length,
+    });
+    return { available: true, places };
   },
 });

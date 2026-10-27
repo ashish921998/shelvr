@@ -152,6 +152,17 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
+          <Stack.Screen
+            name="add-trip-stop"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">
           <Stack.Screen
