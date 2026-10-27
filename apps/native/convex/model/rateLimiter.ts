@@ -26,6 +26,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   makeTrip: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
+  createTripPlan: {
+    kind: "token bucket",
+    rate: 10,
+    period: HOUR,
+    capacity: 5,
+  },
   videoTranscript: {
     kind: "token bucket",
     rate: 20,

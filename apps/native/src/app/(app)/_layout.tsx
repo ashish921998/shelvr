@@ -100,11 +100,11 @@ export default function AppLayout() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
-            name="trip/[id]"
+            name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
-            name="city/[name]"
+            name="trip-plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
         </Stack.Protected>
@@ -140,6 +140,17 @@ export default function AppLayout() {
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
             }
+          />
+          <Stack.Screen
+            name="new-trip"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">

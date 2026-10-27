@@ -9,7 +9,7 @@ const MAX_CITY_DISTANCE_KM = 80;
 export type LatLng = { lat: number; lng: number };
 
 // Two lookups of one venue can land a few doors apart.
-const SAME_PLACE_KM = 0.3;
+export const SAME_PLACE_KM = 0.3;
 
 /** Count and draw the same mapped place once even when several saves mention it. */
 export function uniquePlacePins<
@@ -410,6 +410,19 @@ export function dropStrays<T extends LatLng>(
   return after * 2 > before
     ? points.map((p, i) => (kept[i] ? p : null))
     : points;
+}
+
+/** The Apple Maps query for a saved place: its name and area, plus the city when the area does not name it. */
+export function lookupQuery(
+  place: { name: string; area?: string },
+  city: string | undefined,
+): string {
+  const area = place.area?.trim() ?? "";
+  const parts = [place.name.trim(), area];
+  if (city && !area.toLowerCase().includes(city.trim().toLowerCase())) {
+    parts.push(city.trim());
+  }
+  return parts.filter(Boolean).join(", ");
 }
 
 export type SavedPin = { itemId: Id<"items">; name: string } & LatLng;

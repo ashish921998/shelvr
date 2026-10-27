@@ -41,7 +41,7 @@ export type RawPlanPlace = {
   why: string;
 };
 
-function clip(text: string, max: number): string {
+export function clip(text: string, max: number): string {
   const trimmed = text.replace(/\s+/g, " ").trim();
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
 }

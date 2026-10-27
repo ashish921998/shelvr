@@ -207,6 +207,28 @@ export type AnalyticsEventProperties = {
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };
+  trip_plan_started: {
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    interest_count: number;
+    dated: boolean;
+    has_stay: boolean;
+    saved_city: boolean;
+  };
+  trip_plan_made: {
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    saves: number;
+    suggested: number;
+    made: boolean;
+  };
+  trip_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
+  trip_plan_opened: { days: number; stops: number; saved: number };
+  trip_plan_stop_opened: {
+    source: "save" | "suggested";
+    action: "save" | "card" | "maps";
+  };
+  trip_plan_deleted: Record<string, never>;
   onboarding_completed: {
     save_pileup: string[];
     interests: string[];

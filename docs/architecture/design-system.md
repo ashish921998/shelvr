@@ -47,8 +47,9 @@ Components never hardcode hex values; they read `theme.colors.*` roles. Roles
 are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `foreground`, `muted`, `faint`, `primary`, `primaryForeground`, `primarySoft`,
 `primaryText`, `border`, `imageBorder`, `frame`, `danger`, `overlay`,
-`onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, and the Trip Reveal
-globe's `globeOcean`, `globeLand` and `globeLandEdge`. `frame` is the mat
+`onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, the Trip Reveal
+globe's `globeOcean`, `globeLand` and `globeLandEdge`, and the trip page's
+`tripDays` palette with its `onTripDay` label color. `frame` is the mat
 around a saved picture (the save page's hero and the onboarding collage): paper
 white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint
@@ -65,6 +66,21 @@ same accessible color for small captions; `primaryText` and `danger` just over
 text color must clear 4.5:1 for body text or 3:1 for large text against every
 surface it renders on, including `surfaceMuted` and `primarySoft`, not the
 paper background alone. Check the dark themes for legibility too.
+
+`tripDays` is the one categorical palette: five calm hues, one per trip day, read
+through `dayColor(day, theme.colors.tripDays)` in `src/lib/trip-planner.ts`,
+which cycles past day five. A day's pins, its route, its chip, the swatch on
+its header and its stops' number badges all take the same slot, so the list
+and the map match, and each of them also carries the day or stop number, so
+color is never the only cue. The order is fixed (orange, green, violet, gold,
+blue) and has no red or pink: on a trip, red reads as an error. Neighbouring
+days, including the wrap from blue back to orange, stay at least ΔE 6 apart in
+OKLab under protanopia, deuteranopia and tritanopia, and day 1 and day 3 differ
+in hue as well as shade. The light steps are deep enough that `onTripDay`
+(white) clears 4.5:1 on every fill. The dark themes share lighter steps of the
+same hues with a near-black `onTripDay` (at least 6.4:1 on every fill). Re-run
+those contrast and separation checks before changing a value, and keep
+`tripDays` for trip days rather than using it as a general accent.
 
 ## Themes and appearance
 

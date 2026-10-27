@@ -23,8 +23,14 @@ import {
 import {
   tripDayValidator,
   tripPaceValidator,
+  tripSlotValidator,
   tripStopValidator,
 } from "./model/trip";
+import {
+  tripInterestValidator,
+  tripStayValidator,
+  tripStopSourceValidator,
+} from "./model/tripPlan";
 
 export default defineSchema({
   ...authTables,
@@ -345,6 +351,37 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_space", ["spaceId"]),
+
+  tripPlans: defineTable({
+    userId: v.string(),
+    city: v.string(),
+    startDate: v.optional(v.string()),
+    dayCount: v.number(),
+    pace: tripPaceValidator,
+    interests: v.array(tripInterestValidator),
+    stay: v.optional(tripStayValidator),
+    stopCount: v.number(),
+    savedCount: v.number(),
+  }).index("by_user", ["userId"]),
+
+  tripStops: defineTable({
+    tripId: v.id("tripPlans"),
+    userId: v.string(),
+    day: v.number(),
+    order: v.number(),
+    source: tripStopSourceValidator,
+    itemId: v.optional(v.id("items")),
+    name: v.string(),
+    area: v.optional(v.string()),
+    lat: v.number(),
+    lng: v.number(),
+    appleId: v.optional(v.string()),
+    category: v.optional(v.string()),
+    why: v.optional(v.string()),
+    slot: v.optional(tripSlotValidator),
+  })
+    .index("by_trip_and_day", ["tripId", "day", "order"])
+    .index("by_user", ["userId"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),

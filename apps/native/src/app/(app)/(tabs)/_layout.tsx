@@ -32,6 +32,15 @@ export default function TabsLayout() {
           {t("navigation.map")}
         </NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(trips)">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "suitcase", selected: "suitcase.fill" }}
+          md="luggage"
+        />
+        <NativeTabs.Trigger.Label>
+          {t("navigation.trips")}
+        </NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

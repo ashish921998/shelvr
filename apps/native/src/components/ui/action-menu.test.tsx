@@ -96,6 +96,19 @@ function tap(element: HTMLElement) {
   fireEvent.mouseUp(element);
 }
 
+it("is one labelled element for VoiceOver, around the menu's own button", () => {
+  renderCard(vi.fn());
+
+  const labelled = vi
+    .mocked(View)
+    .mock.calls.map(([props]) => props)
+    .filter((props) => props.accessibilityLabel === "Item actions");
+
+  expect(labelled.length).toBeGreaterThan(0);
+  expect(labelled.every((props) => props.accessible === true)).toBe(true);
+  expect(labelled.every((props) => props.onStartShouldSetResponder)).toBe(true);
+});
+
 it("keeps a tap on the trigger away from a pressable ancestor", () => {
   const cardPress = vi.fn();
   renderCard(cardPress);

@@ -25,23 +25,12 @@ import {
   MIN_TRIP_DAYS,
   tripPaceValidator,
   tripPlaceCap,
+  lookupQuery,
   savedPinFor,
   type LatLng,
   type SavedPin,
   type TripCandidate,
 } from "./model/trip";
-
-function lookupQuery(
-  candidate: TripCandidate,
-  city: string | undefined,
-): string {
-  const area = candidate.area?.trim() ?? "";
-  const parts = [candidate.name.trim(), area];
-  if (city && !area.toLowerCase().includes(city.trim().toLowerCase())) {
-    parts.push(city.trim());
-  }
-  return parts.filter(Boolean).join(", ");
-}
 
 async function locate(
   candidates: TripCandidate[],
