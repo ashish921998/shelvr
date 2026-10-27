@@ -216,6 +216,22 @@ export function tripLengthLine(
     : t("tripPlanner.lengthWithDates", { days, dates });
 }
 
+/**
+ * The length line on a trip's card. Without dates it says when the trip was planned, so two
+ * trips to one city still read apart: "3 days · Planned Oct 27".
+ */
+export function tripCardLine(
+  trip: Pick<TripPlanSummary, "dayCount" | "startDate" | "createdAt">,
+): string {
+  if (tripDateRange(trip.startDate, trip.dayCount) !== null) {
+    return tripLengthLine(trip);
+  }
+  return t("tripPlanner.lengthPlanned", {
+    days: t("trip.dayCount", { count: trip.dayCount }),
+    date: shortDate(new Date(trip.createdAt)),
+  });
+}
+
 /** "8 stops · 5 from your saves" */
 export function tripStopsLine(
   trip: Pick<TripPlanSummary, "stopCount" | "savedCount">,
@@ -312,6 +328,19 @@ export function revealDelay(step: number, ready: boolean): number | null {
   return step < REVEAL_STEPS.length - 1 ? REVEAL_STEP_MS : null;
 }
 
+/**
+ * A trip day's colour: its slot in the theme's `tripDays` palette, cycling once a trip
+ * runs past the palette's length, so the map, the chips and the list agree on it.
+ */
+export function dayColor(
+  day: number,
+  palette: readonly [string, ...string[]],
+): string {
+  const slot = Number.isInteger(day) ? day : 0;
+  const n = palette.length;
+  return palette[((slot % n) + n) % n] ?? palette[0];
+}
+
 type PlanPin = {
   id: string;
   day: number;
@@ -323,6 +352,8 @@ type PlanPin = {
   text: string;
   /** The label under the pin; faded pins carry none so the focused day reads cleanly. */
   title: string;
+  /** What VoiceOver and TalkBack say for the pin, faded or not: "Day 2, stop 3, Prado". */
+  label: string;
 };
 
 /**
@@ -351,6 +382,11 @@ export function planPins(
               ? String(index + 1)
               : "",
         title: active ? stop.name : "",
+        label: t("tripPlanner.pinLabel", {
+          day: String(day + 1),
+          stop: String(index + 1),
+          name: stop.name,
+        }),
       };
     }),
   );
@@ -371,6 +407,40 @@ export function dayScrollOffset(
   gap: number,
 ): number {
   return Math.max(0, headerY - mapHeight - gap);
+}
+
+/**
+ * The day whose section sits under the pinned map once the list has scrolled to `scrollY`:
+ * the last day whose header has reached `probe` points below the top, the first day before
+ * any has. At the very end of the list the last day wins, since its header may never reach
+ * the probe. `dayTops` holds each day's header offset in the scroll content, or undefined
+ * before that day has laid out.
+ */
+export function dayAtScroll(
+  scrollY: number,
+  probe: number,
+  dayTops: readonly (number | undefined)[],
+  atEnd: boolean,
+): number | null {
+  const laidOut = dayTops.flatMap((top, day) =>
+    top === undefined ? [] : [{ top, day }],
+  );
+  if (laidOut.length === 0) return null;
+  if (atEnd) return laidOut[laidOut.length - 1]?.day ?? null;
+  const reached = laidOut.filter(({ top }) => top <= scrollY + probe);
+  return (reached[reached.length - 1] ?? laidOut[0])?.day ?? null;
+}
+
+/** True when the list is scrolled to (or within a point of) its end. */
+export function scrolledToEnd(
+  scrollY: number,
+  viewportHeight: number,
+  contentHeight: number,
+): boolean {
+  return (
+    contentHeight > viewportHeight &&
+    scrollY + viewportHeight >= contentHeight - 1
+  );
 }
 
 /**

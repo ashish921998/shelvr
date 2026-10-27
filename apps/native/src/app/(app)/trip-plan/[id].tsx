@@ -15,8 +15,11 @@ import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import {
+  dayAtScroll,
+  dayColor,
   dayScrollOffset,
   firstFocusDay,
+  scrolledToEnd,
   sharedSaveStops,
   type StopAction,
   stopAction,
@@ -42,6 +45,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Linking,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -51,17 +56,22 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.42;
+// Long enough for an animated scrollTo to settle; the person dragging ends it sooner.
+const PROGRAMMATIC_SCROLL_MS = 700;
 
 function DayHeader({
   index,
   startDate,
   stops,
+  color,
   active,
   onPress,
 }: {
   index: number;
   startDate: string | undefined;
   stops: number;
+  /** The day's colour on the map, so the list and its pins and route match up. */
+  color: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -74,6 +84,7 @@ function DayHeader({
       onPress={onPress}
       style={({ pressed }) => [styles.dayHeader, pressed && styles.pressed]}
     >
+      <View style={[styles.daySwatch, { backgroundColor: color }]} />
       <View style={styles.dayHeaderText}>
         <ThemedText variant="header" accessibilityRole="header">
           {tripDayLabel(index, startDate)}
@@ -206,6 +217,10 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
   );
   const contentY = useRef(0);
   const dayY = useRef<number[]>([]);
+  // The map and its chip row, pinned over the list; the chip row adds to the map's height.
+  const headerHeight = useRef(0);
+  // While a chip's scroll animates, the list's position says nothing about the person's focus.
+  const ignoreScrollUntil = useRef(0);
   const openStop = useStopOpener();
   const hasMap = hasMapPoints(trip);
   const mapHeight = rt.screen.height * MAP_SHARE;
@@ -223,10 +238,38 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
     setActiveDay(day);
     const y = day === null ? undefined : dayY.current[day];
     if (y === undefined) return;
+    ignoreScrollUntil.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
     scroll.current?.scrollTo({
-      y: dayScrollOffset(contentY.current + y, mapHeight, theme.gap(1)),
+      y: dayScrollOffset(
+        contentY.current + y,
+        headerHeight.current || mapHeight,
+        theme.gap(1),
+      ),
       animated: true,
     });
+  };
+
+  // The focused day follows the list as the person scrolls; "All days" stays put.
+  const followScroll = ({
+    nativeEvent,
+  }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!hasMap || activeDay === null) return;
+    if (Date.now() < ignoreScrollUntil.current) return;
+    const scrollY = nativeEvent.contentOffset.y;
+    const day = dayAtScroll(
+      scrollY,
+      (headerHeight.current || mapHeight) + theme.gap(2),
+      trip.days.map((_, index) => {
+        const y = dayY.current[index];
+        return y === undefined ? undefined : contentY.current + y;
+      }),
+      scrolledToEnd(
+        scrollY,
+        nativeEvent.layoutMeasurement.height,
+        nativeEvent.contentSize.height,
+      ),
+    );
+    if (day !== null && day !== activeDay) setActiveDay(day);
   };
 
   return (
@@ -237,6 +280,11 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
       contentContainerStyle={styles.scrollContent}
       // The map stays pinned while the days scroll under it, so a focused day is always in view.
       stickyHeaderIndices={hasMap ? [0] : undefined}
+      onScroll={followScroll}
+      scrollEventThrottle={32}
+      onScrollBeginDrag={() => {
+        ignoreScrollUntil.current = 0;
+      }}
     >
       {hasMap ? (
         <TripPlannerMap
@@ -245,6 +293,9 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
           activeDay={activeDay}
           height={mapHeight}
           onSelectDay={pickOnMap}
+          onLayout={({ nativeEvent }) => {
+            headerHeight.current = nativeEvent.layout.height;
+          }}
         />
       ) : null}
       <View
@@ -282,6 +333,7 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
               index={index}
               startDate={trip.startDate}
               stops={stops.length}
+              color={dayColor(index, theme.colors.tripDays)}
               active={activeDay === index}
               onPress={() => setActiveDay(index)}
             />
@@ -295,6 +347,10 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
                   key={stop._id}
                   stop={stop}
                   number={stopIndex + 1}
+                  dayColor={{
+                    color: dayColor(index, theme.colors.tripDays),
+                    on: theme.colors.onTripDay,
+                  }}
                   fromSave={fromSave.has(stop._id)}
                   onPress={() => {
                     // The map follows the list: coming back, it shows the day this stop is on.
@@ -435,5 +491,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: theme.gap(0.5),
   },
   dayHeaderText: { flex: 1, gap: theme.gap(0.25) },
+  daySwatch: { width: 12, height: 12, borderRadius: 6 },
   pressed: { opacity: theme.opacity.pressed },
 }));

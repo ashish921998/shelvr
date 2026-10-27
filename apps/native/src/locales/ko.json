@@ -829,6 +829,7 @@
   "tripPlanner.tripTitle": "%{city} 여행",
   "tripPlanner.dateRange": "%{start}~%{end}",
   "tripPlanner.lengthWithDates": "%{days} · %{dates}",
+  "tripPlanner.lengthPlanned": "%{days} · %{date}에 계획함",
   "tripPlanner.stopsFromSaves": {
     "other": "%{stops} · 저장한 곳 %{formattedCount}곳"
   },
@@ -848,6 +849,7 @@
   "tripPlanner.stayingAt": "숙소: %{name}",
   "tripPlanner.showDay": "%{day}일차를 지도에 표시",
   "tripPlanner.allDays": "모든 날",
+  "tripPlanner.pinLabel": "%{day}일차, %{stop}번째 장소, %{name}",
   "tripPlanner.fromSave": "‘%{title}’에서",
   "tripPlanner.whereTo": "어디로 가세요?",
   "tripPlanner.cityPlaceholder": "도시 이름 입력",

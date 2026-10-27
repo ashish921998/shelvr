@@ -11,6 +11,7 @@ import {
   isKnownChain,
   keepSuggestion,
   layoutTripPlan,
+  namesake,
   LODGING_CATEGORIES,
   nameWithin,
   nextBatch,
@@ -281,11 +282,11 @@ describe("keeping suggestions", () => {
         taken: [{ name: "Café Santa Joana", ...LISBON }],
       }),
     ).toBe(false);
-    // Far apart, the same words are another venue.
+    // Far apart, a one-word name is another venue.
     expect(
-      keepSuggestion(suggestion("Locke de Santa Joana", { lat: 38.74 }), {
+      keepSuggestion(suggestion("Prado Bar", { lat: 38.74 }), {
         ...context,
-        taken: [saved],
+        taken: [{ name: "Prado", ...LISBON }],
       }),
     ).toBe(true);
     // Only whole words count.
@@ -325,6 +326,28 @@ describe("keeping suggestions", () => {
         },
       ),
     ).toBe(false);
+  });
+
+  it("drops a saved place's namesake anywhere in the city, but not one-word matches", () => {
+    // The saved pin is a lookup miss 8 km away, so the 300 m rule alone would keep the hotel.
+    const savedFar = {
+      name: "Santa Joana",
+      lat: LISBON.lat + 0.07,
+      lng: LISBON.lng,
+    };
+    const hotel = suggestion("Locke de Santa Joana");
+    expect(namesake(savedFar, hotel)).toBe(true);
+    expect(keepSuggestion(hotel, { ...context, taken: [savedFar] })).toBe(
+      false,
+    );
+    const oneWord = { name: "Prado", lat: LISBON.lat + 0.07, lng: LISBON.lng };
+    expect(namesake(oneWord, suggestion("Museo do Prado"))).toBe(false);
+    expect(
+      keepSuggestion(suggestion("Museo do Prado"), {
+        ...context,
+        taken: [oneWord],
+      }),
+    ).toBe(true);
   });
 
   it("balances across interests in turn and never repeats a venue", () => {

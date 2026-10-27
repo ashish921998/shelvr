@@ -829,6 +829,7 @@
   "tripPlanner.tripTitle": "%{city}旅行",
   "tripPlanner.dateRange": "%{start}〜%{end}",
   "tripPlanner.lengthWithDates": "%{days}・%{dates}",
+  "tripPlanner.lengthPlanned": "%{days}・%{date}に作成",
   "tripPlanner.stopsFromSaves": {
     "other": "%{stops}・うち保存から%{formattedCount}か所"
   },
@@ -848,6 +849,7 @@
   "tripPlanner.stayingAt": "宿泊先：%{name}",
   "tripPlanner.showDay": "%{day}日目を地図に表示",
   "tripPlanner.allDays": "すべての日",
+  "tripPlanner.pinLabel": "%{day}日目、%{stop}番目、%{name}",
   "tripPlanner.fromSave": "「%{title}」から",
   "tripPlanner.whereTo": "行き先は？",
   "tripPlanner.cityPlaceholder": "都市名を入力",

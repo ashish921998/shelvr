@@ -414,6 +414,16 @@ export function samePlace(a: Placed, b: Placed): boolean {
   return placeKey(a.name) === placeKey(b.name) || nameWithin(a.name, b.name);
 }
 
+/**
+ * A suggestion named after a place already in the trip ("Locke de Santa Joana" beside the saved
+ * "Santa Joana") wherever its pin is: a saved pin can be a lookup miss across town, so distance
+ * alone lets the venue's hotel back in. One-word names are too common to match city-wide.
+ */
+export function namesake(a: Placed, b: Placed): boolean {
+  const shorter = Math.min(nameWords(a.name).length, nameWords(b.name).length);
+  return shorter >= 2 && nameWithin(a.name, b.name);
+}
+
 /** Keeps a result that is near the centre, of the interest's kind, not lodging, not a chain, not visited, and new. */
 export function keepSuggestion(
   found: Suggestion,
@@ -434,7 +444,9 @@ export function keepSuggestion(
     return false;
   if (isKnownChain(found.name)) return false;
   if (context.been.has(placeKey(found.name))) return false;
-  return !context.taken.some((place) => samePlace(place, found));
+  return !context.taken.some(
+    (place) => samePlace(place, found) || namesake(place, found),
+  );
 }
 
 /** Takes suggestions in turn across the interests (each list best first) until `count`, never the same venue twice. */

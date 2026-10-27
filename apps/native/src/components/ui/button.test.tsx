@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -20,11 +20,22 @@ vi.mock("react-native", () => ({
     ({
       children,
       style,
+      disabled,
+      accessibilityState,
     }: {
       children: ReactNode;
       style?: { opacity?: number }[];
+      disabled?: boolean;
+      accessibilityState?: { disabled?: boolean; busy?: boolean };
     }) => (
-      <button data-opacity={String(style?.[0]?.opacity)}>{children}</button>
+      <button
+        data-opacity={String(style?.[0]?.opacity)}
+        data-pressable-disabled={String(!!disabled)}
+        aria-disabled={accessibilityState?.disabled ? "true" : "false"}
+        aria-busy={accessibilityState?.busy ? "true" : "false"}
+      >
+        {children}
+      </button>
     ),
   ),
   View: vi.fn(
@@ -66,7 +77,9 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-async function renderButton(props: { loading?: boolean } = {}) {
+async function renderButton(
+  props: { loading?: boolean; disabled?: boolean } = {},
+) {
   const { Button } = await import("./button");
   render(<Button title="Continue" {...props} />);
 }
@@ -90,4 +103,16 @@ it("dims a loading button without a spinner", async () => {
   await renderButton({ loading: true });
   expect(screen.getByRole("button").getAttribute("data-opacity")).toBe("0.7");
   expect(screen.getByText("Continue")).toBeTruthy();
+});
+
+it("tells VoiceOver and TalkBack a disabled button is disabled, glass or solid", async () => {
+  for (const available of [true, false]) {
+    glass.available = available;
+    await renderButton({ disabled: true });
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("data-pressable-disabled")).toBe("true");
+    expect(button.getAttribute("data-opacity")).toBe("0.4");
+    cleanup();
+  }
 });

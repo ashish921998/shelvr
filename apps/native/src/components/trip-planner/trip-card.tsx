@@ -2,7 +2,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import { tripLengthLine, tripStopsLine, tripTitle } from "@/lib/trip-planner";
+import { tripCardLine, tripStopsLine, tripTitle } from "@/lib/trip-planner";
 import type { TripPlanSummary } from "@convex/model/tripPlan";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -16,7 +16,7 @@ type Props = {
 export function TripCard({ trip, onOpen, onDelete }: Props) {
   const { theme } = useUnistyles();
   const title = tripTitle(trip.city);
-  const length = tripLengthLine(trip);
+  const length = tripCardLine(trip);
   const stops = tripStopsLine(trip);
   return (
     <View style={styles.card}>

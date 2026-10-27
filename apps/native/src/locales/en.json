@@ -850,6 +850,7 @@
   "tripPlanner.tripTitle": "%{city} trip",
   "tripPlanner.dateRange": "%{start} – %{end}",
   "tripPlanner.lengthWithDates": "%{days} · %{dates}",
+  "tripPlanner.lengthPlanned": "%{days} · Planned %{date}",
   "tripPlanner.stopsFromSaves": {
     "one": "%{stops} · %{formattedCount} from your saves",
     "other": "%{stops} · %{formattedCount} from your saves"
@@ -870,6 +871,7 @@
   "tripPlanner.stayingAt": "Staying at %{name}",
   "tripPlanner.showDay": "Show day %{day} on the map",
   "tripPlanner.allDays": "All days",
+  "tripPlanner.pinLabel": "Day %{day}, stop %{stop}, %{name}",
   "tripPlanner.fromSave": "From “%{title}”",
   "tripPlanner.whereTo": "Where to?",
   "tripPlanner.cityPlaceholder": "Type any city",

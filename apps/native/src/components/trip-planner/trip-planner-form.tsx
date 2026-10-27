@@ -1,14 +1,16 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
-import { MAX_TRIP_DAYS, MIN_TRIP_DAYS } from "@/lib/trip";
+import { MAX_TRIP_DAYS, MIN_TRIP_DAYS, type TripPace } from "@/lib/trip";
 import {
   type CityChoice,
   interestLabel,
   MAX_CITY_LENGTH,
   MAX_STAY_LENGTH,
+  paceLabel,
   sameCity,
   toggleInterest,
+  TRIP_PACES,
 } from "@/lib/trip-planner";
 import { TRIP_INTERESTS, type TripInterest } from "@convex/model/tripPlan";
 import * as Haptics from "expo-haptics";
@@ -51,19 +53,29 @@ export function FormSection({
  * ("radio") or one of several that can be on together ("checkbox"), each with its
  * checked state, so the selection is announced on both platforms.
  */
+/** A colour a chip carries: a dot while it is off, its whole fill (with `on` for the label) once picked. */
+type ChipSwatch = { color: string; on: string };
+
 export function Chip({
   label,
   detail,
   selected,
   pick,
+  swatch,
   onPress,
 }: {
   label: string;
   detail?: string;
   selected: boolean;
   pick: "radio" | "checkbox";
+  swatch?: ChipSwatch;
   onPress: () => void;
 }) {
+  const labelStyle = selected
+    ? swatch
+      ? { color: swatch.on }
+      : styles.onTint
+    : undefined;
   return (
     <Pressable
       accessibilityRole={pick}
@@ -77,15 +89,24 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         selected && styles.chipSelected,
+        selected &&
+          swatch && {
+            borderColor: swatch.color,
+            backgroundColor: swatch.color,
+          },
         pressed && styles.pressed,
       ]}
     >
+      {swatch ? (
+        <View
+          style={[
+            styles.swatch,
+            { backgroundColor: selected ? swatch.on : swatch.color },
+          ]}
+        />
+      ) : null}
       {/* One weight in both states: a bolder selected label would widen the chip and rewrap the row. */}
-      <ThemedText
-        variant="label"
-        numberOfLines={1}
-        style={selected ? styles.onTint : undefined}
-      >
+      <ThemedText variant="label" numberOfLines={1} style={labelStyle}>
         {label}
       </ThemedText>
       {detail ? (
@@ -255,6 +276,34 @@ export function InterestChips({
   );
 }
 
+/** Easy, balanced or packed, as radio chips so the picked pace is announced on both platforms. */
+export function PaceChips({
+  selected,
+  onChange,
+}: {
+  selected: TripPace;
+  onChange: (pace: TripPace) => void;
+}) {
+  useAppLocale();
+  return (
+    <View
+      style={styles.wrapChips}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={t("trip.pace")}
+    >
+      {TRIP_PACES.map((pace) => (
+        <Chip
+          key={pace}
+          label={paceLabel(pace)}
+          selected={pace === selected}
+          pick="radio"
+          onPress={() => onChange(pace)}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function StayField({
   value,
   onChange,
@@ -315,6 +364,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primary,
   },
+  swatch: { width: 8, height: 8, borderRadius: 4 },
   input: {
     ...theme.type.body,
     color: theme.colors.foreground,

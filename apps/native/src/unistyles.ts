@@ -81,6 +81,19 @@ const lightTheme = {
     globeOcean: "#e9eef0",
     globeLand: "#e4d6bb",
     globeLandEdge: "#cdbb98",
+    // One hue per trip day, cycling past eight. Deep steps so a white day number clears
+    // 4.5:1 on every fill and each route clears 3:1 on the light map and the paper surfaces.
+    tripDays: [
+      "#c25100",
+      "#2563c9",
+      "#a01c1c",
+      "#8b6a00",
+      "#be2d6d",
+      "#7a45c9",
+      "#15803d",
+      "#00578a",
+    ],
+    onTripDay: "#ffffff",
   },
 } as const;
 
@@ -111,6 +124,18 @@ const darkTheme = {
     globeOcean: "#1f2a2e",
     globeLand: "#3b3427",
     globeLandEdge: "#54493a",
+    // The same eight hues lifted for the dark map: a dark day number clears 4.5:1 on each fill.
+    tripDays: [
+      "#e8833a",
+      "#6f9cf5",
+      "#e8625b",
+      "#dcbf4c",
+      "#f08cc0",
+      "#9d82f0",
+      "#3fae62",
+      "#6acdf2",
+    ],
+    onTripDay: "#191510",
   },
 } as const;
 
@@ -141,6 +166,17 @@ const darkNeutralTheme = {
     globeOcean: "#1a2530",
     globeLand: "#30363d",
     globeLandEdge: "#48505a",
+    tripDays: [
+      "#e8833a",
+      "#6f9cf5",
+      "#e8625b",
+      "#dcbf4c",
+      "#f08cc0",
+      "#9d82f0",
+      "#3fae62",
+      "#6acdf2",
+    ],
+    onTripDay: "#111417",
   },
 } as const;
 

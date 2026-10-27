@@ -11,10 +11,18 @@ type Props = {
   number?: number;
   /** The stop's `why` is the title of a save several stops come from, so it reads "From …". */
   fromSave?: boolean;
+  /** Its day's colour for the number badge, matching the day's pins and route on the map. */
+  dayColor?: { color: string; on: string };
   onPress: () => void;
 };
 
-export function TripStopRow({ stop, number, fromSave, onPress }: Props) {
+export function TripStopRow({
+  stop,
+  number,
+  fromSave,
+  dayColor,
+  onPress,
+}: Props) {
   const badgeKey = stopBadge(stop.source);
   const badge = badgeKey === null ? null : t(badgeKey);
   const yours = stop.source === "save";
@@ -28,8 +36,16 @@ export function TripStopRow({ stop, number, fromSave, onPress }: Props) {
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       {number !== undefined ? (
-        <View style={styles.number}>
-          <ThemedText variant="badge" style={styles.numberText}>
+        <View
+          style={[
+            styles.number,
+            dayColor && { backgroundColor: dayColor.color },
+          ]}
+        >
+          <ThemedText
+            variant="badge"
+            style={[styles.numberText, dayColor && { color: dayColor.on }]}
+          >
             {number}
           </ThemedText>
         </View>

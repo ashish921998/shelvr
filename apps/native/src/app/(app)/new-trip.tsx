@@ -1,9 +1,10 @@
-import { Segmented, StartDate } from "@/components/trip/trip-plan-form";
+import { StartDate } from "@/components/trip/trip-plan-form";
 import {
   CityPicker,
   DaysStepper,
   FormSection,
   InterestChips,
+  PaceChips,
   StayField,
 } from "@/components/trip-planner/trip-planner-form";
 import { TripPlannerReveal } from "@/components/trip-planner/trip-planner-reveal";
@@ -18,8 +19,6 @@ import {
   clampDays,
   initialTripForm,
   paceHint,
-  paceLabel,
-  TRIP_PACES,
   type TripForm,
   tripFormProblem,
   tripPlanMessage,
@@ -146,19 +145,12 @@ export default function NewTripScreen() {
           />
         </FormSection>
 
-        <View style={styles.pace}>
-          <Segmented
-            label={t("trip.pace")}
-            values={TRIP_PACES.map(paceLabel)}
-            selected={TRIP_PACES.indexOf(form.pace)}
-            onSelect={(index) =>
-              update({ pace: TRIP_PACES[index] ?? form.pace })
-            }
+        <FormSection title={t("trip.pace")} hint={paceHint(form.pace)}>
+          <PaceChips
+            selected={form.pace}
+            onChange={(pace) => update({ pace })}
           />
-          <ThemedText variant="caption" style={styles.muted}>
-            {paceHint(form.pace)}
-          </ThemedText>
-        </View>
+        </FormSection>
 
         <FormSection title={t("tripPlanner.stay")}>
           <StayField value={form.stay} onChange={(stay) => update({ stay })} />
@@ -205,8 +197,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     minHeight: theme.control.minHeight,
     gap: theme.gap(2),
   },
-  pace: { gap: theme.gap(0.75) },
-  muted: { color: theme.colors.muted },
   footer: {
     gap: theme.gap(1),
     paddingHorizontal: theme.gap(2.5),

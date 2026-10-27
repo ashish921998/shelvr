@@ -78,7 +78,7 @@ function Row({
   );
 }
 
-export function Segmented({
+function Segmented({
   label,
   values,
   selected,

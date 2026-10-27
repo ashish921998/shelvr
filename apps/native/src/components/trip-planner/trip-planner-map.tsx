@@ -5,11 +5,12 @@ import { withAlpha } from "@/lib/color";
 import { moveCamera } from "@/lib/map-camera";
 import { t } from "@/lib/i18n";
 import { fitCamera, type LatLng } from "@/lib/trip";
-import { pinDay, planPins } from "@/lib/trip-planner";
+import { dayColor, pinDay, planPins } from "@/lib/trip-planner";
+import { useScreenReader } from "@/lib/use-screen-reader";
 import type { TripPlanDetail } from "@convex/model/tripPlan";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { type LayoutChangeEvent, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const FADED = 0.35;
@@ -23,9 +24,15 @@ type Props = {
   height: number;
   /** A pin or a day chip picked a day; null is the "All days" chip. */
   onSelectDay: (day: number | null) => void;
+  /** The map and its chip row together, which stay pinned over the list. */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
-/** Over the map's foot: "All days" and one chip per day, so the whole trip is one tap away. */
+/**
+ * Under the map: "All days" and one chip per day in that day's colour, so the whole trip is
+ * one tap away. The row sits below the map, never over it, so Apple's logo and Legal link stay
+ * visible.
+ */
 function DayChips({
   dayCount,
   activeDay,
@@ -35,6 +42,7 @@ function DayChips({
   activeDay: number | null;
   onSelectDay: (day: number | null) => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <ScrollView
       horizontal
@@ -54,6 +62,10 @@ function DayChips({
           label={t("trip.dayTab", { day: String(day + 1) })}
           selected={activeDay === day}
           pick="radio"
+          swatch={{
+            color: dayColor(day, theme.colors.tripDays),
+            on: theme.colors.onTripDay,
+          }}
           onPress={() => onSelectDay(day)}
         />
       ))}
@@ -67,8 +79,10 @@ export function TripPlannerMap({
   activeDay,
   height,
   onSelectDay,
+  onLayout,
 }: Props) {
   const { theme, rt } = useUnistyles();
+  const screenReader = useScreenReader();
   const ref = useRef<AppleMaps.MapView>(null);
   const pins = useMemo(() => planPins(days, activeDay), [days, activeDay]);
   const stayLat = stay?.lat;
@@ -84,8 +98,8 @@ export function TripPlannerMap({
   const { width } = rt.screen;
   const top = rt.insets.top + theme.gap(6);
   const showChips = days.length > 1;
-  // Room under the lowest pin for its name label, and for the day chips when they show.
-  const bottom = showChips ? theme.gap(8) : theme.gap(4);
+  // Room under the lowest pin for its name label.
+  const bottom = theme.gap(4);
   const camera = useMemo(() => {
     const focused = pins.filter((pin) => pin.active).map((p) => p.coordinates);
     const all = pins.map((pin) => pin.coordinates);
@@ -128,10 +142,17 @@ export function TripPlannerMap({
       coordinates: stops.map((s) => ({ latitude: s.lat, longitude: s.lng })),
     }))
     .filter((route) => route.coordinates.length >= 2);
+  // Every day keeps its own colour; days out of focus fade to it at a third.
+  const colorOf = (day: number, active: boolean) => {
+    const color = dayColor(day, theme.colors.tripDays);
+    return active ? color : withAlpha(color, FADED);
+  };
   const routeColor = (day: number) =>
-    activeDay === null || activeDay === day
-      ? theme.colors.primary
-      : withAlpha(theme.colors.muted, FADED);
+    colorOf(day, activeDay === null || activeDay === day);
+  // MapKit reads a pin's title to VoiceOver, so with a screen reader on every pin, faded
+  // ones included, carries its day, stop and name.
+  const titleOf = (pin: (typeof pins)[number], visible: string) =>
+    screenReader ? pin.label : visible;
 
   const select = (id: string | undefined) => {
     const day = pinDay(id);
@@ -148,98 +169,106 @@ export function TripPlannerMap({
 
   if (process.env.EXPO_OS === "ios") {
     return (
-      <View style={[styles.map, { height }]}>
-        <AppleMaps.View
-          ref={ref}
-          style={StyleSheet.absoluteFill}
-          cameraPosition={firstCamera}
-          colorScheme={
-            isDarkThemeName(rt.themeName)
-              ? AppleMaps.MapColorScheme.DARK
-              : AppleMaps.MapColorScheme.LIGHT
-          }
-          uiSettings={{
-            compassEnabled: false,
-            myLocationButtonEnabled: false,
-          }}
-          annotations={pins.map((pin) => ({
-            id: pin.id,
-            coordinates: pin.coordinates,
-            title: pin.title,
-            text: pin.text,
-            backgroundColor: pin.active
-              ? theme.colors.primary
-              : withAlpha(theme.colors.muted, FADED),
-            textColor: theme.colors.onTint,
-          }))}
-          markers={
-            stayPoint && stay
-              ? [
-                  {
-                    id: STAY_ID,
-                    coordinates: stayPoint,
-                    title: stay.name,
-                    systemImage: "bed.double.fill",
-                    tintColor: theme.colors.foreground,
-                  },
-                ]
-              : []
-          }
-          polylines={routes.map((route) => ({
-            id: `route-${route.day}`,
-            coordinates: route.coordinates,
-            color: routeColor(route.day),
-            width: activeDay === route.day ? 4 : 3,
-          }))}
-          onAnnotationClick={(pin) => select(pin.id)}
-        />
+      <View style={styles.header} onLayout={onLayout}>
+        <View style={[styles.map, { height }]}>
+          <AppleMaps.View
+            ref={ref}
+            style={StyleSheet.absoluteFill}
+            cameraPosition={firstCamera}
+            colorScheme={
+              isDarkThemeName(rt.themeName)
+                ? AppleMaps.MapColorScheme.DARK
+                : AppleMaps.MapColorScheme.LIGHT
+            }
+            uiSettings={{
+              compassEnabled: false,
+              myLocationButtonEnabled: false,
+            }}
+            annotations={pins.map((pin) => ({
+              id: pin.id,
+              coordinates: pin.coordinates,
+              title: titleOf(pin, pin.title),
+              text: pin.text,
+              backgroundColor: colorOf(pin.day, pin.active),
+              textColor: theme.colors.onTripDay,
+            }))}
+            markers={
+              stayPoint && stay
+                ? [
+                    {
+                      id: STAY_ID,
+                      coordinates: stayPoint,
+                      title: stay.name,
+                      systemImage: "bed.double.fill",
+                      tintColor: theme.colors.foreground,
+                    },
+                  ]
+                : []
+            }
+            polylines={routes.map((route) => ({
+              id: `route-${route.day}`,
+              coordinates: route.coordinates,
+              color: routeColor(route.day),
+              width: activeDay === route.day ? 4 : 3,
+            }))}
+            onAnnotationClick={(pin) => select(pin.id)}
+          />
+        </View>
         {chips}
       </View>
     );
   }
 
   return (
-    <View style={[styles.map, { height }]}>
-      <GoogleMaps.View
-        style={StyleSheet.absoluteFill}
-        cameraPosition={camera}
-        markers={[
-          // Google's markers cannot fade, so a focused day shows only its own.
-          ...pins
-            .filter((pin) => activeDay === null || pin.active)
-            .map((pin) => ({
-              id: pin.id,
-              coordinates: pin.coordinates,
-              title:
-                activeDay === null ? pin.name : `${pin.number}. ${pin.name}`,
-            })),
-          ...(stayPoint && stay
-            ? [{ id: STAY_ID, coordinates: stayPoint, title: stay.name }]
-            : []),
-        ]}
-        polylines={routes.map((route) => ({
-          coordinates: route.coordinates,
-          color: routeColor(route.day),
-          width: activeDay === route.day ? 10 : 7,
-        }))}
-        onMarkerClick={(marker) => select(marker.id)}
-      />
+    <View style={styles.header} onLayout={onLayout}>
+      <View style={[styles.map, { height }]}>
+        <GoogleMaps.View
+          style={StyleSheet.absoluteFill}
+          cameraPosition={camera}
+          markers={[
+            // Google's markers cannot fade, so a focused day shows only its own.
+            ...pins
+              .filter((pin) => activeDay === null || pin.active)
+              .map((pin) => ({
+                id: pin.id,
+                coordinates: pin.coordinates,
+                title: titleOf(
+                  pin,
+                  activeDay === null ? pin.name : `${pin.number}. ${pin.name}`,
+                ),
+              })),
+            ...(stayPoint && stay
+              ? [{ id: STAY_ID, coordinates: stayPoint, title: stay.name }]
+              : []),
+          ]}
+          polylines={routes.map((route) => ({
+            coordinates: route.coordinates,
+            color: routeColor(route.day),
+            width: activeDay === route.day ? 10 : 7,
+          }))}
+          onMarkerClick={(marker) => select(marker.id)}
+        />
+      </View>
       {chips}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  header: { width: "100%", backgroundColor: theme.colors.background },
   map: {
     width: "100%",
     overflow: "hidden",
     backgroundColor: theme.colors.surfaceMuted,
   },
   chips: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: theme.gap(1.5),
+    flexGrow: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
-  chipRow: { gap: theme.gap(1), paddingHorizontal: theme.gap(2) },
+  chipRow: {
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
+    paddingVertical: theme.gap(1),
+  },
 }));

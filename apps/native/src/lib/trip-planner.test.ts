@@ -6,6 +6,8 @@ import type { TripPlanStop } from "@convex/model/tripPlan";
 import {
   cityChoices,
   clampDays,
+  dayAtScroll,
+  dayColor,
   dayScrollOffset,
   DEFAULT_INTERESTS,
   firstFocusDay,
@@ -16,12 +18,14 @@ import {
   planPins,
   REVEAL_STEPS,
   revealDelay,
+  scrolledToEnd,
   sharedSaveStops,
   stopAction,
   stopBadge,
   toggleInterest,
   tripDateRange,
   tripBackTitle,
+  tripCardLine,
   tripDayLabel,
   tripFormArgs,
   tripFormProblem,
@@ -163,6 +167,19 @@ describe("trip lines", () => {
     expect(tripDateRange(undefined, 3)).toBeNull();
   });
 
+  it("tells same-city trips apart on their cards by when they were planned", () => {
+    const createdAt = new Date(2026, 9, 27, 15).getTime();
+    expect(tripCardLine({ dayCount: 3, createdAt })).toBe(
+      "3 days · Planned Oct 27",
+    );
+    expect(tripCardLine({ dayCount: 3, startDate: "soon", createdAt })).toBe(
+      "3 days · Planned Oct 27",
+    );
+    expect(
+      tripCardLine({ dayCount: 3, startDate: "2026-11-04", createdAt }),
+    ).toBe("3 days · Nov 4 – Nov 6");
+  });
+
   it("counts stops and how many came from the person's saves", () => {
     expect(tripStopsLine({ stopCount: 8, savedCount: 5 })).toBe(
       "8 stops · 5 from your saves",
@@ -255,6 +272,64 @@ describe("trip page focus", () => {
       ["1", "Tasca", true],
       ["2", "LX Factory", true],
     ]);
+  });
+
+  it("gives every pin a spoken label with its day, stop and name, faded or not", () => {
+    const pins = planPins(
+      [[stop(), stop({ name: "Tasca" })], [stop({ name: "Prado" })]],
+      0,
+    );
+    expect(pins.map((pin) => pin.label)).toEqual([
+      "Day 1, stop 1, Miradouro da Graça",
+      "Day 1, stop 2, Tasca",
+      "Day 2, stop 1, Prado",
+    ]);
+    expect(pins[2]?.title).toBe("");
+  });
+
+  it("colours each day from the palette, cycling once a trip outruns it", () => {
+    const palette = ["#a", "#b", "#c"] as const;
+    expect([0, 1, 2, 3, 4, 7].map((day) => dayColor(day, palette))).toEqual([
+      "#a",
+      "#b",
+      "#c",
+      "#a",
+      "#b",
+      "#b",
+    ]);
+    expect(dayColor(-1, palette)).toBe("#c");
+    expect(dayColor(1.5, palette)).toBe("#a");
+  });
+
+  it("follows the list to the day whose header has reached the pinned map", () => {
+    const tops = [400, 900, 1500];
+    // Map and chips are 360 tall; a header counts once it is 16 under them.
+    expect(dayAtScroll(0, 376, tops, false)).toBe(0);
+    expect(dayAtScroll(523, 376, tops, false)).toBe(0);
+    expect(dayAtScroll(524, 376, tops, false)).toBe(1);
+    expect(dayAtScroll(1200, 376, tops, false)).toBe(2);
+    // Scrolled to the end, the last day wins even if its header never reached the map.
+    expect(dayAtScroll(700, 376, tops, true)).toBe(2);
+  });
+
+  it("follows only the days that have laid out", () => {
+    expect(dayAtScroll(0, 376, [], false)).toBeNull();
+    expect(dayAtScroll(0, 376, [undefined, 900], false)).toBe(1);
+    expect(dayAtScroll(2000, 376, [400, undefined], true)).toBe(0);
+  });
+
+  it("lands a chip's scroll on the day the scroll-follow then reports", () => {
+    const tops = [400, 900, 1500];
+    const offset = dayScrollOffset(900, 360, 8);
+    expect(dayAtScroll(offset, 360 + 16, tops, false)).toBe(1);
+  });
+
+  it("knows when the list is at its end", () => {
+    expect(scrolledToEnd(1200, 800, 2000)).toBe(true);
+    expect(scrolledToEnd(1199.5, 800, 2000)).toBe(true);
+    expect(scrolledToEnd(1000, 800, 2000)).toBe(false);
+    // A list shorter than the screen never scrolls, so it is never "at the end".
+    expect(scrolledToEnd(0, 800, 600)).toBe(false);
   });
 
   it("opens on the first day with a stop, or the whole trip when none has one", () => {

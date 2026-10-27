@@ -788,6 +788,7 @@ export type MessageParams = {
   "tripPlanner.tripTitle": { city: string };
   "tripPlanner.dateRange": { start: string; end: string };
   "tripPlanner.lengthWithDates": { days: string; dates: string };
+  "tripPlanner.lengthPlanned": { days: string; date: string };
   "tripPlanner.stopsFromSaves": { stops: string; count: number };
   "tripPlanner.dayWithDate": { day: string; date: string };
   "tripPlanner.tripActions": undefined;
@@ -805,6 +806,7 @@ export type MessageParams = {
   "tripPlanner.stayingAt": { name: string };
   "tripPlanner.showDay": { day: string };
   "tripPlanner.allDays": undefined;
+  "tripPlanner.pinLabel": { day: string; stop: string; name: string };
   "tripPlanner.fromSave": { title: string };
   "tripPlanner.whereTo": undefined;
   "tripPlanner.cityPlaceholder": undefined;
