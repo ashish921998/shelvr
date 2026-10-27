@@ -1880,6 +1880,9 @@ export const reprocessItem = authedMutation({
   },
 });
 
+// One save sits in few trips; any stop past this keeps a dangling id, which getTripPlan never reads.
+const TRIP_STOP_UNLINKS = 200;
+
 export const deleteItem = authedMutation({
   args: { id: v.id("items") },
   returns: v.null(),
@@ -1910,6 +1913,14 @@ export const deleteItem = authedMutation({
       .collect();
     for (const link of shareLinks) {
       await ctx.db.delete(link._id);
+    }
+    // A trip keeps the stop (it has its own name and pin) but stops pointing at the save.
+    const tripStops = await ctx.db
+      .query("tripStops")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .take(TRIP_STOP_UNLINKS);
+    for (const stop of tripStops) {
+      await ctx.db.patch(stop._id, { itemId: undefined });
     }
     if (item.storageId) {
       await safeDeleteStorage(ctx, item.storageId);

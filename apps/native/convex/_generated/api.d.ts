@@ -97,6 +97,7 @@ import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
 import type * as model_trip from "../model/trip.js";
 import type * as model_tripPlan from "../model/tripPlan.js";
+import type * as model_tripSuggest from "../model/tripSuggest.js";
 import type * as model_videoTranscript from "../model/videoTranscript.js";
 import type * as model_weeklyShelf from "../model/weeklyShelf.js";
 import type * as notificationDelivery from "../notificationDelivery.js";
@@ -214,6 +215,7 @@ declare const fullApi: ApiFromModules<{
   "model/storedImage": typeof model_storedImage;
   "model/trip": typeof model_trip;
   "model/tripPlan": typeof model_tripPlan;
+  "model/tripSuggest": typeof model_tripSuggest;
   "model/videoTranscript": typeof model_videoTranscript;
   "model/weeklyShelf": typeof model_weeklyShelf;
   notificationDelivery: typeof notificationDelivery;

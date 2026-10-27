@@ -4,7 +4,9 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsLookup,
+  appleMapsSearchPlaces,
   firstPlace,
+  placesOf,
 } from "./appleMaps";
 import { distanceKm } from "./trip";
 
@@ -274,5 +276,106 @@ describe("distanceKm", () => {
     );
     expect(km).toBeGreaterThan(270);
     expect(km).toBeLessThan(280);
+  });
+});
+
+describe("appleMapsSearchPlaces", () => {
+  const near = { lat: 38.7223, lng: -9.1393 };
+
+  it("asks for points of interest of the given categories near a point", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "Manteigaria",
+            id: "I1",
+            poiCategory: "Bakery",
+            structuredAddress: { locality: "Lisbon", subLocality: "Chiado" },
+            coordinate: { latitude: 38.71, longitude: -9.14 },
+          },
+          {
+            name: "Time Out Market",
+            structuredAddress: {
+              locality: "Lisbon",
+              dependentLocalities: ["Cais do Sodré"],
+            },
+            coordinate: { latitude: 38.707, longitude: -9.146 },
+          },
+          { name: "No coordinate" },
+          { coordinate: { latitude: 1, longitude: 1 } },
+        ],
+      }),
+    );
+    const found = await appleMapsSearchPlaces(
+      "maps",
+      "pastel de nata",
+      { near, categories: ["Restaurant", "Bakery"], lang: "pt-PT" },
+      fetchImpl as unknown as typeof fetch,
+    );
+    expect(found).toEqual([
+      {
+        name: "Manteigaria",
+        lat: 38.71,
+        lng: -9.14,
+        appleId: "I1",
+        category: "Bakery",
+        area: "Chiado",
+      },
+      {
+        name: "Time Out Market",
+        lat: 38.707,
+        lng: -9.146,
+        area: "Cais do Sodré",
+      },
+    ]);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe("/v1/search");
+    expect(Object.fromEntries(parsed.searchParams)).toEqual({
+      q: "pastel de nata",
+      searchLocation: "38.7223,-9.1393",
+      resultTypeFilter: "Poi",
+      includePoiCategories: "Restaurant,Bakery",
+      lang: "pt-PT",
+    });
+    expect(init.headers.Authorization).toBe("Bearer maps");
+  });
+
+  it("answers an empty list when Apple fails or replies with nonsense", async () => {
+    const failing = vi.fn(async () => new Response("no", { status: 429 }));
+    expect(
+      await appleMapsSearchPlaces(
+        "maps",
+        "bars",
+        { near },
+        failing as unknown as typeof fetch,
+      ),
+    ).toEqual([]);
+    const throwing = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    expect(
+      await appleMapsSearchPlaces(
+        "maps",
+        "bars",
+        { near },
+        throwing as unknown as typeof fetch,
+      ),
+    ).toEqual([]);
+    expect(placesOf({ nope: true })).toEqual([]);
+    expect(placesOf(null)).toEqual([]);
+  });
+
+  it("keeps at most fifteen results and clips long names", () => {
+    const results = Array.from({ length: 20 }, (_, i) => ({
+      name: `${"x".repeat(100)}${i}`,
+      coordinate: { latitude: 1, longitude: 1 },
+    }));
+    const places = placesOf({ results });
+    expect(places).toHaveLength(15);
+    expect(places[0].name).toHaveLength(80);
   });
 });

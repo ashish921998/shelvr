@@ -107,6 +107,10 @@ export default function AppLayout() {
             name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen
+            name="trip-plan/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
         <Stack.Protected
@@ -140,6 +144,17 @@ export default function AppLayout() {
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
             }
+          />
+          <Stack.Screen
+            name="new-trip"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">

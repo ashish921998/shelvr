@@ -78,7 +78,7 @@ function Row({
   );
 }
 
-function Segmented({
+export function Segmented({
   label,
   values,
   selected,
@@ -168,7 +168,7 @@ function Days({
   );
 }
 
-function StartDate({
+export function StartDate({
   value,
   onChange,
 }: {

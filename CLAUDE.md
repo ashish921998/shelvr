@@ -89,7 +89,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `planVotes`: one visitor's ✓/✕ picks on a `planShares` link, keyed by a browser id,
     at most 20 voters per link
   - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
-    user's saves; a new trip replaces the old one
+    user's saves; a new trip replaces the old one. Old builds only; new trips are `tripPlans`
+  - `tripPlans`: one planned trip ("Plan a trip" v2) for a city: days, pace, interests,
+    optional start date and stay, plus stop and saved counts. Every new plan is a new row
+  - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
+    from a save (`itemId`) or an Apple Maps suggestion, carrying its own name, pin, Apple id
+    and category. Deleting the save clears `itemId` and keeps the stop
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
@@ -323,6 +328,18 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   saved membership to remain visible, while city-matching saves need no membership row.
   Without the Maps key, trips
   still work using stored pins where available.
+- **`tripPlanner.ts`** (`"use node"` action), **`tripPlannerData.ts`**: "Plan a trip" v2.
+  `createTripPlan` (Pro only, `createTripPlan` rate limit) puts the city's unvisited, pinned
+  saves first, then adds suggestions from the Apple Maps Server API only (`/v1/search` with
+  `resultTypeFilter=Poi` and `includePoiCategories` per interest, from the centre and four
+  offset points; no Gemini or other source). Queries use the saves' own tags only while AI
+  is allowed, otherwise plain interest words. Chains, results over 25 km from the centre,
+  visited places and duplicates are dropped, and a trip makes at most 24 Apple calls. The
+  pure rules (category map, queries, filters, balancing, day layout) are in
+  `model/tripSuggest.ts`; `model/appleMaps.ts` `appleMapsSearchPlaces` is the search.
+  Without the Maps key it plans from saves only. `tripPlannerData.ts` serves
+  `listTripPlans`, `getTripPlan` and `deleteTripPlan`, plus `claimTripPlanInternal` and
+  `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
@@ -427,7 +444,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- `(app)/(tabs)` holds two native tabs, `(home)` and `(map)`. `(map)` is every mapped place on
+- `(app)/(tabs)` holds three native tabs, `(home)`, `(map)` and `(trips)`. `(trips)` is
+  "My trips", the person's trip plans newest first, each opening `trip-plan/[id]`, with
+  Plan a trip in the header and the empty state. `(map)` is every mapped place on
   one full-screen map, opening on the person's location (iOS asks once, when the tab first opens)
   unless none of their places is within 50 km; otherwise on the city with the most places, with a search field over your own places (name or city, matched on the phone) and filter chips
   for the kinds that have three or more places (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
@@ -442,7 +461,16 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`, `new-trip`,
+  `trip-plan/[id]`
+- `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
+  Plan a trip opens it): city, days, optional start date, interests, pace and an optional
+  stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then
+  replaces itself with `trip-plan/[id]`
+- `trip-plan/[id]` is a planned trip: a map of the stops (tap a day to focus it), then day by
+  day stops badged Yours or Suggested and an unplanned section. A save opens `item/[id]`, a
+  suggestion opens Apple's place card or Maps by coordinates; the header menu deletes it.
+  `trip/[id]` stays for the old flow on installed builds
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
   entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
 - `(auth)` holds a single `sign-in` route
