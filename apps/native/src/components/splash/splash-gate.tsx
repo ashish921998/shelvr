@@ -6,6 +6,10 @@ import { analytics } from "@/lib/analytics";
 import { getNotificationUrl } from "@/lib/notifications";
 import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 import {
+  playedSplashToday,
+  recordSplashPlayed,
+} from "@/lib/splash/daily-splash";
+import {
   isDirectLaunch,
   subscribeDirectLaunch,
 } from "@/lib/splash/launch-intent";
@@ -35,13 +39,19 @@ export function useSplashGate() {
       !hasPlayed &&
       !isDirectLaunch() &&
       !launchedByNotificationRoute() &&
-      !hasResumableSharedPayloads();
+      !hasResumableSharedPayloads() &&
+      !playedSplashToday();
     hasPlayed = true;
     return play;
   });
   const [finished, setFinished] = useState(false);
 
-  const finishSplash = useCallback(() => setFinished(true), []);
+  const finishSplash = useCallback(() => {
+    // Only a splash that played to the end, or was tapped away, uses up the
+    // day's showing.
+    recordSplashPlayed();
+    setFinished(true);
+  }, []);
 
   return {
     showSplash: wantsSplash && !finished && !directLaunch,
