@@ -348,8 +348,6 @@ export default defineSchema({
     startDate: v.optional(v.string()),
     days: v.array(tripDayValidator),
     wishlist: v.array(tripStopValidator),
-    /** When `tripData:copyLegacyTrips` looked at this trip, so a rerun never brings back a deleted copy. */
-    copiedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_space", ["spaceId"]),
