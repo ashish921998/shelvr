@@ -364,7 +364,11 @@ export default defineSchema({
     savedCount: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+    /** The old-flow `trips` row this plan was copied from by `tripData:copyLegacyTrips`. */
+    legacyTripId: v.optional(v.id("trips")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_legacy_trip", ["legacyTripId"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),

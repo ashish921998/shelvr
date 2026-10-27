@@ -1,8 +1,14 @@
 import { ConvexError, v } from "convex/values";
+import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireUserId, authedMutation, authedQuery } from "./model/auth";
+import {
+  authedMutation,
+  authedQuery,
+  liveOwner,
+  requireUserId,
+} from "./model/auth";
 import {
   MAX_PLAN_ITEMS,
   PLAN_CONTENT_CHARS,
@@ -11,6 +17,7 @@ import {
   splitSavedPlace,
   type PlanSource,
 } from "./model/plan";
+import { logEvent } from "./model/log";
 import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -18,6 +25,8 @@ import {
   pinsForCity,
   countCities,
   dayOf,
+  MAX_TRIP_DAYS,
+  MIN_TRIP_DAYS,
   swapStop,
   tidyCity,
   tripDayValidator,
@@ -26,6 +35,7 @@ import {
   tripStopValidator,
   type TripStop,
 } from "./model/trip";
+import { UNPLANNED_DAY } from "./model/tripPlan";
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 import { readyCitySaves } from "./items";
@@ -408,6 +418,134 @@ export const getSpaceTrip = authedQuery({
       ),
       wishlist: await viewAll(trip.wishlist),
     };
+  },
+});
+
+/** Where a stop sits on the map: its own pin, else the save's pin of the same name. */
+function legacyStopPin(
+  stop: TripStop,
+  item: Doc<"items">,
+): { lat: number; lng: number } | null {
+  if (stop.lat !== undefined && stop.lng !== undefined) {
+    return { lat: stop.lat, lng: stop.lng };
+  }
+  const key = placeKey(stop.name);
+  const pin = (item.placePins ?? []).find(
+    (p) =>
+      placeKey(p.name) === key ||
+      placeKey(splitSavedPlace(p.name).name) === key,
+  );
+  return pin ? { lat: pin.lat, lng: pin.lng } : null;
+}
+
+/** Copies one old-flow trip into `tripPlans`, keeping the stops its trip page showed. */
+async function copyLegacyTrip(
+  ctx: MutationCtx,
+  trip: Doc<"trips">,
+): Promise<"copied" | "skipped" | "empty"> {
+  if (!(await liveOwner(ctx, trip.userId))) return "skipped";
+  const copied = await ctx.db
+    .query("tripPlans")
+    .withIndex("by_legacy_trip", (q) => q.eq("legacyTripId", trip._id))
+    .first();
+  if (copied !== null) return "skipped";
+  const space = await ctx.db.get(trip.spaceId);
+  if (space === null || space.userId !== trip.userId) return "skipped";
+  const city = tidyCity(trip.city ?? space.name).slice(0, MAX_CITY_CHARS);
+  if (city === "") return "skipped";
+
+  const dayCount = Math.min(
+    MAX_TRIP_DAYS,
+    Math.max(MIN_TRIP_DAYS, trip.days.length),
+  );
+  const groups = [
+    ...trip.days.slice(0, dayCount).map((day, i) => ({
+      day: i + 1,
+      stops: day.stops,
+    })),
+    { day: UNPLANNED_DAY, stops: trip.wishlist },
+  ];
+  const placed: {
+    day: number;
+    order: number;
+    stop: TripStop;
+    at: { lat: number; lng: number };
+  }[] = [];
+  for (const { day, stops } of groups) {
+    let order = 0;
+    for (const stop of stops) {
+      const item = await liveSave(
+        ctx,
+        stop,
+        trip.userId,
+        trip.spaceId,
+        trip.city,
+      );
+      const at = item === null ? null : legacyStopPin(stop, item);
+      if (at === null) continue;
+      placed.push({ day, order: order++, stop, at });
+    }
+  }
+  if (placed.length === 0) return "empty";
+
+  const planned = placed.filter(({ day }) => day !== UNPLANNED_DAY).length;
+  const tripId = await ctx.db.insert("tripPlans", {
+    userId: trip.userId,
+    city,
+    ...(trip.startDate !== undefined ? { startDate: trip.startDate } : {}),
+    dayCount,
+    pace: trip.pace,
+    interests: [],
+    stopCount: planned,
+    savedCount: planned,
+    createdAt: trip._creationTime,
+    updatedAt: Date.now(),
+    legacyTripId: trip._id,
+  });
+  for (const { day, order, stop, at } of placed) {
+    await ctx.db.insert("tripStops", {
+      tripId,
+      userId: trip.userId,
+      day,
+      order,
+      source: "save",
+      itemId: stop.itemId,
+      name: stop.name,
+      ...(stop.area !== undefined ? { area: stop.area } : {}),
+      lat: at.lat,
+      lng: at.lng,
+      why: stop.why,
+      slot: stop.slot,
+    });
+  }
+  return "copied";
+}
+
+/**
+ * Run once after deploying the Trips tab, so trips made with the old flow show in My trips:
+ * convex run tripData:copyLegacyTrips '{"cursor":null}'. Copies each trip once, so a rerun only
+ * picks up trips made since, and the `trips` rows stay for installed builds.
+ */
+export const copyLegacyTrips = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("trips").paginate({
+      cursor,
+      numItems: 10,
+      maximumBytesRead: 4 * 1024 * 1024,
+    });
+    const counts = { copied: 0, skipped: 0, empty: 0 };
+    for (const trip of batch.page) {
+      counts[await copyLegacyTrip(ctx, trip)] += 1;
+    }
+    logEvent("info", "legacy_trips_copied", counts);
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.tripData.copyLegacyTrips, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
   },
 });
 

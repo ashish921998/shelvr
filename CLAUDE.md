@@ -341,6 +341,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Without the Maps key it plans from saves only. `tripPlannerData.ts` serves
   `listTripPlans`, `getTripPlan` and `deleteTripPlan`, plus `claimTripPlanInternal` and
   `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
+  `tripData:copyLegacyTrips` copies each old-flow `trips` row into `tripPlans` once (stamped
+  `legacyTripId`), keeping the stops its old page showed that have a pin, so My trips lists it.
+  Run it after deploying, from `apps/native`:
+  `pnpm exec convex run --prod tripData:copyLegacyTrips '{"cursor":null}'`. It schedules its
+  remaining pages, skips accounts being deleted, and is safe to rerun.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),

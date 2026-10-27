@@ -588,3 +588,100 @@ it("deduplicates supported aliases after Maps resolves previously unpinned place
     true,
   );
 });
+
+describe("copyLegacyTrips", () => {
+  async function seedTrip() {
+    const seeded = await setup([
+      { title: "Ramen", places: ["Ramen Shop"] },
+      { title: "Bar", places: ["Red Frog"] },
+      { title: "Tiles", places: ["Museu do Azulejo"] },
+      { title: "Gone", places: ["Old Cafe"] },
+    ]);
+    const [ramen, bar, tiles, gone] = seeded.itemIds;
+    const tripId = await seeded.base.run(async (ctx) => {
+      await ctx.db.patch(bar, {
+        placePins: [{ name: "Red Frog", lat: 38.72, lng: -9.145 }],
+      });
+      const stop = (itemId: Id<"items">, name: string, pin = true) => ({
+        itemId,
+        name,
+        why: `Saved for ${name}`,
+        slot: "afternoon" as const,
+        ...(pin ? { lat: 38.71, lng: -9.14 } : {}),
+      });
+      const id = await ctx.db.insert("trips", {
+        userId: seeded.userId,
+        spaceId: seeded.spaceId,
+        city: "Lisbon",
+        pace: "balanced",
+        startDate: "2026-11-02",
+        days: [
+          {
+            areas: [],
+            stops: [stop(ramen, "Ramen Shop"), stop(gone, "Old Cafe")],
+            gaps: [],
+          },
+          { areas: [], stops: [stop(bar, "Red Frog", false)], gaps: [] },
+        ],
+        wishlist: [stop(tiles, "Museu do Azulejo", false)],
+      });
+      await ctx.db.delete(gone);
+      return id;
+    });
+    return { ...seeded, tripId, ramen, bar };
+  }
+
+  it("shows an old trip in My trips, keeping the stops its page showed", async () => {
+    const { base, t, ramen, bar } = await seedTrip();
+    await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
+
+    const plans = await t.query(api.tripPlannerData.listTripPlans, {});
+    expect(plans).toHaveLength(1);
+    expect(plans[0]).toMatchObject({
+      city: "Lisbon",
+      startDate: "2026-11-02",
+      dayCount: 2,
+      stopCount: 2,
+      savedCount: 2,
+      interests: [],
+    });
+    const plan = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: plans[0]._id,
+    });
+    // The deleted save's stop is gone; the unpinned stop takes its save's pin; the
+    // wishlist stop has no pin anywhere, so it cannot sit on the map.
+    expect(
+      plan?.days.map((day) =>
+        day.map(({ itemId, name }) => ({ itemId, name })),
+      ),
+    ).toEqual([
+      [{ itemId: ramen, name: "Ramen Shop" }],
+      [{ itemId: bar, name: "Red Frog" }],
+    ]);
+    expect(plan?.days[1][0]).toMatchObject({ lat: 38.72, lng: -9.145 });
+    expect(plan?.unplanned).toEqual([]);
+  });
+
+  it("copies each trip once and leaves the old row for installed builds", async () => {
+    const { base, t, tripId } = await seedTrip();
+    await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
+    await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
+
+    expect(await t.query(api.tripPlannerData.listTripPlans, {})).toHaveLength(
+      1,
+    );
+    expect(await base.run((ctx) => ctx.db.get(tripId))).not.toBeNull();
+  });
+
+  it("copies nothing for an account being deleted", async () => {
+    const { base, userId } = await seedTrip();
+    await base.run((ctx) =>
+      ctx.db.patch(userId as Id<"users">, { deleting: true }),
+    );
+    await base.mutation(internal.tripData.copyLegacyTrips, { cursor: null });
+
+    expect(
+      await base.run((ctx) => ctx.db.query("tripPlans").collect()),
+    ).toEqual([]);
+  });
+});
