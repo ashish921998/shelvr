@@ -696,10 +696,18 @@
   "goal.citySearch": "Search cities",
   "homePlaces.yourCities": "Your cities",
   "homePlaces.citiesHint": "Places from the reels and TikToks you saved",
-  "homePlaces.noPlaceTitle": "No place found",
   "homePlaces.noPlaceReading": "Finding places…",
-  "homePlaces.noPlaceFailed": "Couldn't read these saves",
   "homePlaces.noPlaceNone": "No place in this one",
+  "homePlaces.reviewCount": {
+    "one": "%{formattedCount} save without a place",
+    "other": "%{formattedCount} saves without a place"
+  },
+  "homePlaces.review": "Review",
+  "homePlaces.reviewTitle": "Saves without a place",
+  "homePlaces.reviewBody": "Shelvr couldn't read these, or they didn't name a place. Try one again or delete it.",
+  "homePlaces.reviewFailed": "Couldn't read this link",
+  "homePlaces.toastNoPlace": "Couldn't find places in that link",
+  "homePlaces.toastView": "View",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} place",
     "other": "%{formattedCount} places"

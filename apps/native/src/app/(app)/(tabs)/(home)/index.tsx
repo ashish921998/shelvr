@@ -11,6 +11,7 @@ import {
   HomePlacesEmptyCard,
   UnplacedSaves,
 } from "@/components/home/home-places";
+import { ReviewSaves } from "@/components/home/review-saves";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
@@ -125,6 +126,7 @@ export default function HomeScreen() {
               <>
                 <HomePlaces />
                 <UnplacedSaves saves={items} />
+                <ReviewSaves saves={items} />
               </>
             ) : (
               <View style={styles.empty}>

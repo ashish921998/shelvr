@@ -715,10 +715,19 @@
   "goal.citySearch": "Buscar ciudades",
   "homePlaces.yourCities": "Tus ciudades",
   "homePlaces.citiesHint": "Lugares de los reels y TikToks que guardaste",
-  "homePlaces.noPlaceTitle": "Sin lugar encontrado",
   "homePlaces.noPlaceReading": "Buscando lugares…",
-  "homePlaces.noPlaceFailed": "No se pudieron leer estos guardados",
   "homePlaces.noPlaceNone": "Aquí no se menciona ningún lugar",
+  "homePlaces.reviewCount": {
+    "one": "%{formattedCount} guardado sin lugar",
+    "many": "%{formattedCount} guardados sin lugar",
+    "other": "%{formattedCount} guardados sin lugar"
+  },
+  "homePlaces.review": "Revisar",
+  "homePlaces.reviewTitle": "Guardados sin lugar",
+  "homePlaces.reviewBody": "Shelvr no pudo leerlos o no mencionan ningún lugar. Vuelve a intentarlo o elimínalos.",
+  "homePlaces.reviewFailed": "No se pudo leer este enlace",
+  "homePlaces.toastNoPlace": "No encontramos lugares en ese enlace",
+  "homePlaces.toastView": "Ver",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",

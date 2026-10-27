@@ -1,3 +1,4 @@
+import { UnplacedToast } from "@/components/home/unplaced-toast";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
@@ -197,6 +198,7 @@ export default function AppLayout() {
         />
       </Stack>
       {onboarded && planUnknown ? <PlanLoadingCover /> : null}
+      {onboarded && !gated ? <UnplacedToast /> : null}
     </HomeFeedProvider>
   );
 }

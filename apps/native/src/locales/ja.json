@@ -677,10 +677,17 @@
   "goal.citySearch": "都市を検索",
   "homePlaces.yourCities": "あなたの都市",
   "homePlaces.citiesHint": "保存したリールやTikTokに出てくる場所",
-  "homePlaces.noPlaceTitle": "場所が見つからない保存",
   "homePlaces.noPlaceReading": "場所を検索中…",
-  "homePlaces.noPlaceFailed": "これらの保存を読み取れませんでした",
   "homePlaces.noPlaceNone": "場所の記載がありません",
+  "homePlaces.reviewCount": {
+    "other": "場所のない保存 %{formattedCount}件"
+  },
+  "homePlaces.review": "確認",
+  "homePlaces.reviewTitle": "場所のない保存",
+  "homePlaces.reviewBody": "Shelvrで読み取れなかったか、場所が書かれていませんでした。もう一度試すか、削除してください。",
+  "homePlaces.reviewFailed": "このリンクを読み取れませんでした",
+  "homePlaces.toastNoPlace": "このリンクから場所が見つかりませんでした",
+  "homePlaces.toastView": "見る",
   "homePlaces.spotCount": {
     "other": "%{formattedCount}か所"
   },

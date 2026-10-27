@@ -640,10 +640,15 @@ export type MessageParams = {
   "goal.citySearch": undefined;
   "homePlaces.yourCities": undefined;
   "homePlaces.citiesHint": undefined;
-  "homePlaces.noPlaceTitle": undefined;
   "homePlaces.noPlaceReading": undefined;
-  "homePlaces.noPlaceFailed": undefined;
   "homePlaces.noPlaceNone": undefined;
+  "homePlaces.reviewCount": { count: number };
+  "homePlaces.review": undefined;
+  "homePlaces.reviewTitle": undefined;
+  "homePlaces.reviewBody": undefined;
+  "homePlaces.reviewFailed": undefined;
+  "homePlaces.toastNoPlace": undefined;
+  "homePlaces.toastView": undefined;
   "homePlaces.spotCount": { count: number };
   "homePlaces.moreCities": { n: string };
   "homePlaces.yourSpaces": undefined;
