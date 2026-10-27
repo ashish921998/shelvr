@@ -118,6 +118,16 @@ describe("ReviewSaves", () => {
     expect(screen.queryByText("New reel")).toBeNull();
   });
 
+  it("doesn't reopen on its own after the last save in it goes away", () => {
+    const view = render(<ReviewSaves saves={[recipe, placed]} />);
+    fireEvent.click(screen.getByText("Review"));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    view.rerender(<ReviewSaves saves={[placed]} />);
+    view.rerender(<ReviewSaves saves={[timeout, placed]} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Review")).toBeTruthy();
+  });
+
   it("names a save by its site, never its raw URL", () => {
     render(<ReviewSaves saves={[timeout, recipe]} />);
     fireEvent.click(screen.getByText("Review"));

@@ -154,6 +154,33 @@ describe("listCities", () => {
     });
   });
 
+  it("moves a later city to the next photo when an earlier city already shows the first", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Older trip",
+      cities: ["Lisbon", "Sintra", "Tomar"],
+      heroImageUrl: "https://img/older.jpg",
+    });
+    await save(userId, {
+      title: "Newer trip",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/newer.jpg",
+    });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    // No pin carries a city, so all three tie and sort by name. Lisbon takes
+    // the newer photo; Sintra, with the same two to choose from,
+    // takes the one Lisbon doesn't show; Tomar has only an already-shown photo
+    // and repeats it rather than go blank.
+    expect(covers).toEqual({
+      Lisbon: "https://img/newer.jpg",
+      Sintra: "https://img/older.jpg",
+      Tomar: "https://img/older.jpg",
+    });
+  });
+
   it("creates separate city entries for one reel and counts only each city's places", async () => {
     const { base, t, save, userId } = await setup();
     const lisbon = { name: "Cafe", lat: 38.72, lng: -9.1, city: "Lisbon" };

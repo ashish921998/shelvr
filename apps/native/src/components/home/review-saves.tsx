@@ -88,7 +88,11 @@ export function ReviewSaves({ saves }: { saves: ReviewSave[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const toReview = savesToReview(saves);
-  if (toReview.length === 0) return null;
+  if (toReview.length === 0) {
+    // Close it too, so the next save to review doesn't reopen the sheet unasked.
+    if (open) setOpen(false);
+    return null;
+  }
   const count = t("homePlaces.reviewCount", { count: toReview.length });
   return (
     <>
