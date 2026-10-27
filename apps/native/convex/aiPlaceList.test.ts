@@ -92,7 +92,16 @@ const NAMED = async () => ({
 });
 
 async function saveList(t: ReturnType<typeof newConvexTest>) {
-  const userId = await t.run((ctx) => insertConsentingUser(ctx));
+  const userId = await t.run(async (ctx) => {
+    const userId = await insertConsentingUser(ctx);
+    await ctx.db.insert("subscriptions", {
+      userId,
+      status: "pro",
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      updatedAt: Date.now(),
+    });
+    return userId;
+  });
   const itemId = await t.run((ctx) =>
     ctx.db.insert("items", {
       userId,
@@ -280,5 +289,25 @@ describe("addPlaceListParts", () => {
       parts: [PART],
     });
     expect(added).toBe(0);
+  });
+
+  it("adds no other parts once the owner's Pro has lapsed", async () => {
+    const t = newConvexTest();
+    const { userId, itemId } = await saveList(t);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, { status: "ready" });
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      await ctx.db.patch(sub!._id, { expiresAt: Date.now() - 1000 });
+    });
+    const added = await t.mutation(internal.items.addPlaceListParts, {
+      itemId,
+      runId: "run-1",
+      parts: [PART],
+    });
+    expect(added).toBe(0);
+    expect(await savesOf(t, userId)).toHaveLength(1);
   });
 });

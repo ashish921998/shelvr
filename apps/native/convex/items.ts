@@ -2193,7 +2193,7 @@ export const pinListPlaces = internalMutation({
 
 /**
  * Once the run settled a list save: names its list pins, and adds the rest of the list as one ready save per
- * part; a part already saved stays as it is.
+ * part while the owner still has Pro; a part already saved stays as it is.
  */
 export const addPlaceListParts = internalMutation({
   args: {
@@ -2204,12 +2204,13 @@ export const addPlaceListParts = internalMutation({
   returns: v.number(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
+    const owner = item === null ? null : await liveOwner(ctx, item.userId);
     if (
       item === null ||
+      owner === null ||
       item.url === undefined ||
       item.status !== "ready" ||
       !ownsRun(item, args.runId) ||
-      (await liveOwner(ctx, item.userId)) === null ||
       !(await aiAllowed(ctx, item.userId))
     ) {
       return 0;
@@ -2219,6 +2220,8 @@ export const addPlaceListParts = internalMutation({
         itemId: args.itemId,
       });
     }
+    // The other parts are new saves, so they need Pro now, not just when the list was saved.
+    if (!(await hasProEntitlement(ctx, owner._id))) return 0;
     const url = item.url;
     const saved = await ctx.db
       .query("items")
