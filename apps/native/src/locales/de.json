@@ -696,10 +696,18 @@
   "goal.citySearch": "Städte suchen",
   "homePlaces.yourCities": "Deine Städte",
   "homePlaces.citiesHint": "Orte aus den Reels und TikToks, die du gespeichert hast",
-  "homePlaces.noPlaceTitle": "Kein Ort gefunden",
   "homePlaces.noPlaceReading": "Orte werden gesucht…",
-  "homePlaces.noPlaceFailed": "Diese gespeicherten Inhalte konnten nicht gelesen werden",
   "homePlaces.noPlaceNone": "Hier wird kein Ort genannt",
+  "homePlaces.reviewCount": {
+    "one": "%{formattedCount} Speicherung ohne Ort",
+    "other": "%{formattedCount} Speicherungen ohne Ort"
+  },
+  "homePlaces.review": "Ansehen",
+  "homePlaces.reviewTitle": "Gespeichertes ohne Ort",
+  "homePlaces.reviewBody": "Shelvr konnte diese nicht lesen, oder sie nennen keinen Ort. Versuch es erneut oder lösche sie.",
+  "homePlaces.reviewFailed": "Dieser Link konnte nicht gelesen werden",
+  "homePlaces.toastNoPlace": "In diesem Link wurden keine Orte gefunden",
+  "homePlaces.toastView": "Ansehen",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} Ort",
     "other": "%{formattedCount} Orte"

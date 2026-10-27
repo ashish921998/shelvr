@@ -677,10 +677,17 @@
   "goal.citySearch": "도시 검색",
   "homePlaces.yourCities": "내 도시",
   "homePlaces.citiesHint": "저장한 릴스와 TikTok에 나온 장소",
-  "homePlaces.noPlaceTitle": "장소를 찾지 못한 저장",
   "homePlaces.noPlaceReading": "장소 찾는 중…",
-  "homePlaces.noPlaceFailed": "이 저장 항목들을 읽을 수 없어요",
   "homePlaces.noPlaceNone": "장소가 없어요",
+  "homePlaces.reviewCount": {
+    "other": "장소가 없는 저장 %{formattedCount}개"
+  },
+  "homePlaces.review": "확인",
+  "homePlaces.reviewTitle": "장소가 없는 저장",
+  "homePlaces.reviewBody": "Shelvr가 읽을 수 없었거나 장소가 언급되지 않았어요. 다시 시도하거나 삭제하세요.",
+  "homePlaces.reviewFailed": "이 링크를 읽을 수 없어요",
+  "homePlaces.toastNoPlace": "이 링크에서 장소를 찾지 못했어요",
+  "homePlaces.toastView": "보기",
   "homePlaces.spotCount": {
     "other": "장소 %{formattedCount}곳"
   },

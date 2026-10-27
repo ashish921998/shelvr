@@ -105,6 +105,55 @@ describe("listCities", () => {
     ]);
   });
 
+  it("gives two cities from one reel different covers when another photo exists", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Sintra palace",
+      cities: ["Sintra"],
+      heroImageUrl: "https://img/sintra.jpg",
+    });
+    await save(userId, {
+      title: "Lisbon and a day in Sintra",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/both.jpg",
+    });
+    await save(userId, { title: "Alfama", cities: ["Lisbon"] });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    expect(covers).toEqual({
+      Lisbon: "https://img/both.jpg",
+      Sintra: "https://img/sintra.jpg",
+    });
+  });
+
+  it("prefers a photo no earlier city shows, and repeats one only when a city has no other", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Day trip",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/both.jpg",
+    });
+    await save(userId, {
+      title: "Lisbon only",
+      cities: ["Lisbon"],
+      heroImageUrl: "https://img/lisbon.jpg",
+      placePins: [
+        { name: "A", lat: 38.7, lng: -9.1 },
+        { name: "B", lat: 38.71, lng: -9.1 },
+      ],
+    });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    expect(covers).toEqual({
+      Lisbon: "https://img/lisbon.jpg",
+      Sintra: "https://img/both.jpg",
+    });
+  });
+
   it("creates separate city entries for one reel and counts only each city's places", async () => {
     const { base, t, save, userId } = await setup();
     const lisbon = { name: "Cafe", lat: 38.72, lng: -9.1, city: "Lisbon" };

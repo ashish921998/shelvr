@@ -296,6 +296,61 @@ export async function readyCitySaves(
     .slice(0, limit);
 }
 
+/**
+ * One photo per city, in display order. A save naming several cities (a
+ * Lisbon reel with a Sintra day trip) would otherwise give each the same
+ * cover, so a city takes the newest photo from a save naming fewest cities
+ * that no earlier city already shows, and repeats one only when it has no other.
+ */
+async function cityCovers(
+  ctx: QueryCtx,
+  items: Doc<"items">[],
+  cities: string[],
+): Promise<Map<string, string>> {
+  const urls = new Map<Id<"items">, string | null>();
+  const photo = async (item: Doc<"items">) => {
+    if (!urls.has(item._id)) {
+      const url = item.storageId
+        ? await ctx.storage.getUrl(item.storageId)
+        : (item.heroImageUrl ?? null);
+      urls.set(item._id, url ?? null);
+    }
+    return urls.get(item._id) ?? null;
+  };
+  const shown = new Set<string>();
+  const covers = new Map<string, string>();
+  for (const city of cities) {
+    const key = cityKey(city);
+    if (key === "" || covers.has(key)) continue;
+    const candidates = items
+      .filter(
+        (item) =>
+          (item.storageId !== undefined || item.heroImageUrl !== undefined) &&
+          (item.cities ?? []).some((name) => cityKey(name) === key),
+      )
+      // Stable, so saves naming as many cities stay newest first.
+      .sort(
+        (a, b) =>
+          new Set((a.cities ?? []).map(cityKey)).size -
+          new Set((b.cities ?? []).map(cityKey)).size,
+      );
+    let fallback: string | null = null;
+    for (const item of candidates) {
+      const url = await photo(item);
+      if (url === null) continue;
+      fallback ??= url;
+      if (!shown.has(url)) {
+        covers.set(key, url);
+        break;
+      }
+    }
+    if (!covers.has(key) && fallback !== null) covers.set(key, fallback);
+    const cover = covers.get(key);
+    if (cover !== undefined) shown.add(cover);
+  }
+  return covers;
+}
+
 export const listCities = authedQuery({
   args: {},
   returns: v.array(
@@ -308,18 +363,7 @@ export const listCities = authedQuery({
   ),
   handler: async (ctx) => {
     const items = await readySavesNewestFirst(ctx, ctx.userId);
-    const covers = new Map<string, string>();
-    for (const item of items) {
-      const keys = new Set((item.cities ?? []).map(cityKey));
-      for (const key of keys) {
-        if (key === "" || covers.has(key)) continue;
-        const url = item.storageId
-          ? await ctx.storage.getUrl(item.storageId)
-          : (item.heroImageUrl ?? null);
-        if (url !== null && url !== undefined) covers.set(key, url);
-      }
-    }
-    return countCities(items)
+    const cities = countCities(items)
       .map(({ city, count }) => ({
         city,
         // Older installed clients use count as the number of saves.
@@ -334,11 +378,19 @@ export const listCities = authedQuery({
             .slice(0, CITY_ITEMS_MAX)
             .flatMap((item) => pinsForCity(item, city)),
         ).length,
-        cover: covers.get(cityKey(city)) ?? null,
       }))
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
+    const covers = await cityCovers(
+      ctx,
+      items,
+      cities.map(({ city }) => city),
+    );
+    return cities.map((entry) => ({
+      ...entry,
+      cover: covers.get(cityKey(entry.city)) ?? null,
+    }));
   },
 });
 

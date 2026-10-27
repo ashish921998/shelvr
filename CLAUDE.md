@@ -431,9 +431,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   one full-screen map, opening on the person's location (iOS asks once, when the tab first opens)
   unless none of their places is within 50 km; otherwise on the city with the most places, with a search field over your own places (name or city, matched on the phone) and filter chips
   for the kinds that have three or more places (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
-  `(home)` is Home. It lists "Your cities",
-  "Finding places…" for processing saves, "Couldn't read these saves" for failed reads,
-  and "No place found" only for finished saves without a city. It loads more saves on scroll, and on its own only
+  `(home)` is Home. It lists "Your cities" and
+  "Finding places…" for processing saves. Failed reads and finished saves without a city
+  sit behind one "N saves without a place · Review" line, whose sheet has Retry and Delete
+  (`src/components/home/review-saves.tsx`); a save that lands that way while the app is open
+  shows a toast instead (`unplaced-toast.tsx`). It loads more saves on scroll, and on its own only
   until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
   shortcuts to removed screens (spaces, search, digest, camera) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`

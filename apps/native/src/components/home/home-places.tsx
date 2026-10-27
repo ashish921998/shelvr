@@ -102,9 +102,6 @@ function UnplacedSection({
           <Text style={styles.unplacedTitle} numberOfLines={1}>
             {save.title ?? save.url ?? ""}
           </Text>
-          {save.status === "ready" ? (
-            <Text style={styles.muted}>{t("homePlaces.noPlaceNone")}</Text>
-          ) : null}
         </Pressable>
       ))}
       {hidden > 0 ? (
@@ -122,25 +119,16 @@ function UnplacedSection({
   );
 }
 
-/** Keep pending and failed reads separate from completed saves without a city. */
+/** Saves still being read. Failed and placeless saves wait behind one line (`ReviewSaves`). */
 export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
   useAppLocale();
-  const all = unplacedSaves(saves);
   return (
-    <>
-      <UnplacedSection
-        saves={all.filter((save) => save.status === "processing")}
-        title={t("homePlaces.noPlaceReading")}
-      />
-      <UnplacedSection
-        saves={all.filter((save) => save.status === "failed")}
-        title={t("homePlaces.noPlaceFailed")}
-      />
-      <UnplacedSection
-        saves={all.filter((save) => save.status === "ready")}
-        title={t("homePlaces.noPlaceTitle")}
-      />
-    </>
+    <UnplacedSection
+      saves={unplacedSaves(saves).filter(
+        (save) => save.status === "processing",
+      )}
+      title={t("homePlaces.noPlaceReading")}
+    />
   );
 }
 

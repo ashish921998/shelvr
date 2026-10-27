@@ -715,10 +715,19 @@
   "goal.citySearch": "Buscar cidades",
   "homePlaces.yourCities": "Suas cidades",
   "homePlaces.citiesHint": "Lugares dos reels e TikToks que você salvou",
-  "homePlaces.noPlaceTitle": "Nenhum lugar encontrado",
   "homePlaces.noPlaceReading": "Buscando lugares…",
-  "homePlaces.noPlaceFailed": "Não foi possível ler estes itens salvos",
   "homePlaces.noPlaceNone": "Nenhum lugar neste",
+  "homePlaces.reviewCount": {
+    "one": "%{formattedCount} item salvo sem lugar",
+    "many": "%{formattedCount} itens salvos sem lugar",
+    "other": "%{formattedCount} itens salvos sem lugar"
+  },
+  "homePlaces.review": "Revisar",
+  "homePlaces.reviewTitle": "Itens salvos sem lugar",
+  "homePlaces.reviewBody": "O Shelvr não conseguiu lê-los, ou eles não citam nenhum lugar. Tente de novo ou exclua.",
+  "homePlaces.reviewFailed": "Não foi possível ler este link",
+  "homePlaces.toastNoPlace": "Não encontramos lugares nesse link",
+  "homePlaces.toastView": "Ver",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",

@@ -715,10 +715,19 @@
   "goal.citySearch": "Rechercher une ville",
   "homePlaces.yourCities": "Vos villes",
   "homePlaces.citiesHint": "Les lieux des reels et TikToks que tu as enregistrés",
-  "homePlaces.noPlaceTitle": "Aucun lieu trouvé",
   "homePlaces.noPlaceReading": "Recherche de lieux…",
-  "homePlaces.noPlaceFailed": "Impossible de lire ces éléments enregistrés",
   "homePlaces.noPlaceNone": "Aucun lieu dans celui-ci",
+  "homePlaces.reviewCount": {
+    "one": "%{formattedCount} élément sans lieu",
+    "many": "%{formattedCount} éléments sans lieu",
+    "other": "%{formattedCount} éléments sans lieu"
+  },
+  "homePlaces.review": "Voir",
+  "homePlaces.reviewTitle": "Éléments sans lieu",
+  "homePlaces.reviewBody": "Shelvr n'a pas pu les lire, ou ils ne citent aucun lieu. Réessayez ou supprimez-les.",
+  "homePlaces.reviewFailed": "Impossible de lire ce lien",
+  "homePlaces.toastNoPlace": "Aucun lieu trouvé dans ce lien",
+  "homePlaces.toastView": "Voir",
   "homePlaces.spotCount": {
     "one": "%{formattedCount} lieu",
     "many": "%{formattedCount} lieux",
