@@ -10,6 +10,7 @@ import {
 } from "./safeFetch";
 import { isPinterestHost, normalizeExternalUrl } from "./externalUrl";
 import type { PostMedia, Recipe } from "./itemFields";
+import type { ListedPlace } from "./placeList";
 import { extractRecipeMarkup, sanitizeRecipe } from "./recipeMarkup";
 import { readImageSize } from "./imageSize";
 
@@ -267,6 +268,8 @@ export type PageData = {
   linkedTitle?: string;
   linkedUrl?: string;
   postUrl?: string;
+  /** The places of a shared list (a Google Maps list), which a save splits by city. */
+  placeList?: ListedPlace[];
 };
 
 export function postField(postUrl: string | undefined): { postUrl?: string } {

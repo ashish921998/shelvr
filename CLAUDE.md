@@ -284,6 +284,20 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   **`model/readers/pinterest.ts`** and **`model/readers/tiktok.ts`** own each platform's
   reader and fallback. Full YouTube descriptions and verified Instagram captions follow linked
   recipe markup first, then the existing complete-caption recipe path.
+  **`model/readers/googleMaps.ts`** reads a shared Google Maps list (a `maps.app.goo.gl`
+  share link or a `/maps/placelists/list/` URL) through Google's undocumented public list
+  endpoint, the one its own list page calls; Google offers no API for lists, so a format
+  change breaks it and the save falls back to a plain page read. A private or deleted list
+  reads as gone. Other Google Maps links read as pages. The list's places (name, note,
+  address, point, at most 150) ride on `PageData.placeList`; `ai.ts` asks the model for
+  each place's city once and `model/placeList.ts` (pure) splits the list into one save per
+  city, at most 30 places each, biggest city first. The save itself
+  becomes the first part and `items.addPlaceListParts` inserts the rest as ready saves
+  (skipping a part whose title that link already has). Every listed place is pinned at the
+  list's own point (`items.pinListPlaces` before the save settles, so the Apple lookup finds
+  it pinned); `placePins.identifyPins` then adds Apple's place id and category only from a
+  match within 300 m, never moving the pin. A manual `backfillPage` refresh still re-looks
+  up a list pin that has no category.
   Host-specific knowledge stays in the page readers, never in `ai.ts`.
 - **`model/safeFetch.ts`**, **`model/externalUrl.ts`**: every backend fetch of an external URL
   goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).

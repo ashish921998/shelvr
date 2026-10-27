@@ -25,8 +25,10 @@ import { logEvent } from "./model/log";
 import { buildSearchText } from "./model/searchText";
 import { effectiveStatus } from "./model/memberships";
 import { placeKey } from "./model/plan";
+import { SAME_SPOT_KM } from "./model/placeList";
 import {
   cityKey,
+  distanceKm,
   dropStrays,
   keepNearby,
   middleOf,
@@ -314,6 +316,69 @@ export const locateItem = internalAction({
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,
+    });
+    return null;
+  },
+});
+
+export const toIdentify = internalQuery({
+  args: { itemId: v.id("items") },
+  returns: v.array(
+    v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+  ),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    // Before the save settles its places are not set yet, and storePins would drop every pin.
+    if (item === null || item.status !== "ready") return [];
+    if (!(await aiAllowed(ctx, item.userId))) return [];
+    return (item.placePins ?? [])
+      .filter((pin) => pin.appleId === undefined)
+      .map(({ name, lat, lng }) => ({ name, lat, lng }));
+  },
+});
+
+/**
+ * Names the places a shared list pinned at its own points: Apple's place id and category, taken only from a
+ * match at that spot, so the pin itself never moves.
+ */
+export const identifyPins = internalAction({
+  args: { itemId: v.id("items") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const pins = await ctx.runQuery(internal.placePins.toIdentify, args);
+    if (pins.length === 0) return null;
+    const config = appleMapsConfig(env);
+    if (config === null) {
+      logEvent("info", "place_pins_unconfigured", {});
+      return null;
+    }
+    const token = await appleMapsAccessToken(config);
+    if (token === null) {
+      logEvent("warn", "place_pins_token_failed", {});
+      return null;
+    }
+    const found = await Promise.all(
+      pins.map(async (pin) => {
+        const at = await appleMapsLookup(token, "search", pin.name, pin);
+        return at?.appleId !== undefined && distanceKm(at, pin) <= SAME_SPOT_KM
+          ? [
+              {
+                ...pin,
+                appleId: at.appleId,
+                ...(at.category ? { category: at.category } : {}),
+              },
+            ]
+          : [];
+      }),
+    );
+    logEvent("info", "place_pins_identified", {
+      item_id: args.itemId,
+      pins: pins.length,
+      identified: found.flat().length,
+    });
+    await ctx.runMutation(internal.placePins.storePins, {
+      itemId: args.itemId,
+      found: found.flat(),
     });
     return null;
   },

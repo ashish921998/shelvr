@@ -36,6 +36,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import { MAX_LIST_PARTS, withListPins } from "./model/placeList";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -47,6 +48,8 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  normalizeCities,
+  normalizePlaces,
   placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
@@ -2140,6 +2143,142 @@ export const finalizeItem = internalMutation({
       });
     }
     return "applied";
+  },
+});
+
+const listPinsValidator = v.array(
+  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+);
+
+const placeListPartValidator = v.object({
+  title: v.string(),
+  cities: v.array(v.string()),
+  places: v.array(v.string()),
+  pins: listPinsValidator,
+  content: v.string(),
+});
+
+/**
+ * Pins a list save's places at the points the list gives, before the run settles it, so the Apple lookup
+ * finalizeItem schedules finds them pinned and cannot move them to a same-named place elsewhere.
+ */
+export const pinListPlaces = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    runId: v.optional(v.string()),
+    cities: v.array(v.string()),
+    pins: listPinsValidator,
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      !ownsRun(item, args.runId) ||
+      (await liveOwner(ctx, item.userId)) === null ||
+      !(await aiAllowed(ctx, item.userId))
+    ) {
+      return false;
+    }
+    await ctx.db.patch(args.itemId, {
+      placePins: withListPins(
+        item.placePins ?? [],
+        args.pins,
+        normalizeCities(args.cities),
+      ),
+    });
+    return true;
+  },
+});
+
+/**
+ * Once the run settled a list save: names its list pins, and adds the rest of the list as one ready save per
+ * part while the owner still has Pro; a part already saved stays as it is.
+ */
+export const addPlaceListParts = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    runId: v.optional(v.string()),
+    parts: v.array(placeListPartValidator),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    const owner = item === null ? null : await liveOwner(ctx, item.userId);
+    if (
+      item === null ||
+      owner === null ||
+      item.url === undefined ||
+      item.status !== "ready" ||
+      !ownsRun(item, args.runId) ||
+      !(await aiAllowed(ctx, item.userId))
+    ) {
+      return 0;
+    }
+    if ((item.placePins?.length ?? 0) > 0) {
+      await ctx.scheduler.runAfter(0, internal.placePins.identifyPins, {
+        itemId: args.itemId,
+      });
+    }
+    // The other parts are new saves, so they need Pro now, not just when the list was saved.
+    if (!(await hasProEntitlement(ctx, owner._id))) return 0;
+    const url = item.url;
+    const saved = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_url", (q) =>
+        q.eq("userId", item.userId).eq("url", url),
+      )
+      .take(MAX_LIST_PARTS * 2);
+    const titles = new Set(saved.map((row) => row.title));
+    let added = 0;
+    for (const part of args.parts.slice(0, MAX_LIST_PARTS)) {
+      if (titles.has(part.title)) continue;
+      titles.add(part.title);
+      const cities = normalizeCities(part.cities);
+      const places = normalizePlaces(part.places, cities);
+      const placePins = withListPins([], part.pins, cities);
+      const partId = await ctx.db.insert("items", {
+        userId: item.userId,
+        type: "link",
+        status: "ready",
+        url,
+        title: part.title,
+        ...(item.description !== undefined
+          ? { description: item.description }
+          : {}),
+        tags: item.tags,
+        content: part.content,
+        ...(item.siteName !== undefined ? { siteName: item.siteName } : {}),
+        ...(item.author !== undefined ? { author: item.author } : {}),
+        intents: [],
+        cities,
+        places,
+        placePins,
+        searchText: buildSearchText({
+          title: part.title,
+          cities,
+          places,
+          placePins,
+          description: item.description,
+          tags: item.tags,
+          siteName: item.siteName,
+          content: part.content,
+        }),
+      });
+      if (places.length > 0) {
+        // Finds a pin for any place the list gave no point for; pinned places are skipped.
+        await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+          itemId: partId,
+        });
+      }
+      if (placePins.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.placePins.identifyPins, {
+          itemId: partId,
+        });
+      }
+      added++;
+    }
+    return added;
   },
 });
 

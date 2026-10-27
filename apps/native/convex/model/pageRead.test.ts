@@ -948,3 +948,206 @@ describe("readPage for YouTube videos", () => {
     });
   });
 });
+
+describe("readPage on a Google Maps list", () => {
+  const LIST_ID = "PiSwyqmbpwpP_Nr5sAang4x5QxbKwA";
+  const SHORT = "https://maps.app.goo.gl/MMjvFNWpUTjiupHc9";
+  const LANDED = `https://www.google.com/maps/@35.68,136.48,8z/data=!4m2!11m1!2s${LIST_ID}?entry=ttu`;
+  const ENDPOINT = `https://www.google.com/maps/preview/entitylist/getlist?authuser=0&hl=en&gl=us&pb=!1m4!1s${LIST_ID}!2e1!3m1!1e1!2e2!3e2!4i500!16b1`;
+
+  function entry(
+    name: string,
+    note: string,
+    address: string,
+    lat: number,
+    lng: number,
+  ) {
+    return [
+      null,
+      [
+        null,
+        null,
+        `${name}, ${address}`,
+        null,
+        address,
+        [null, null, lat, lng],
+        ["1", "2"],
+        "/g/x",
+      ],
+      name,
+      note,
+    ];
+  }
+
+  function listBody(entries: unknown[]) {
+    return (
+      ")]}'\n" +
+      JSON.stringify([
+        [
+          [LIST_ID, 1],
+          4,
+          [2, 1, `https://www.google.com/maps/placelists/list/${LIST_ID}`],
+          ["Sam Lee", "https://example.invalid/a.png", "1"],
+          "Tokyo",
+          "Where to eat",
+          null,
+          null,
+          entries,
+          null,
+          null,
+          null,
+          entries.length,
+        ],
+      ])
+    );
+  }
+
+  function text(url: string, body: string) {
+    return {
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      bytes: new TextEncoder().encode(body),
+    };
+  }
+
+  const ENTRIES = [
+    entry("Marcy Land", "Uni ramen", "Minato City, Tokyo", 35.6669, 139.712),
+    entry("Mori Mori Tei", "", "115 Oiwake, Karuizawa", 36.34, 138.59),
+  ];
+
+  it("follows a share link to the list and reads its places", async () => {
+    safeFetch.mockImplementation(async (url: string) =>
+      url === SHORT
+        ? html(LANDED, "<html></html>")
+        : url === ENDPOINT
+          ? text(ENDPOINT, listBody(ENTRIES))
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(SHORT);
+    expect(read).toMatchObject({
+      status: "ok",
+      page: {
+        title: "Tokyo",
+        description: "Where to eat",
+        author: "Sam Lee",
+        siteName: "Google Maps",
+        content: "Marcy Land — Uni ramen\nMori Mori Tei",
+        placeList: [
+          {
+            name: "Marcy Land",
+            note: "Uni ramen",
+            address: "Minato City, Tokyo",
+            lat: 35.6669,
+            lng: 139.712,
+          },
+          {
+            name: "Mori Mori Tei",
+            address: "115 Oiwake, Karuizawa",
+            lat: 36.34,
+            lng: 138.59,
+          },
+        ],
+      },
+    });
+    expect(safeFetch.mock.calls[0][1].headers["User-Agent"]).toBe(
+      "Mozilla/5.0",
+    );
+  });
+
+  it("reads a list link without following anything", async () => {
+    const url = `https://www.google.com/maps/placelists/list/${LIST_ID}`;
+    serve({ [ENDPOINT]: text(ENDPOINT, listBody(ENTRIES)) });
+    const read = await readPage(url);
+    expect(read.status === "ok" && read.page.placeList).toHaveLength(2);
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("finds the list in the page Google serves in place of the redirect", async () => {
+    safeFetch.mockImplementation(async (url: string) =>
+      url === SHORT
+        ? html(
+            SHORT,
+            `<script>location.href="https:\\/\\/www.google.com\\/maps\\/placelists\\/list\\/${LIST_ID}"</script>`.replaceAll(
+              "\\/",
+              "/",
+            ),
+          )
+        : url === ENDPOINT
+          ? text(ENDPOINT, listBody(ENTRIES))
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(SHORT);
+    expect(read.status === "ok" && read.page.title).toBe("Tokyo");
+  });
+
+  it("reads a shared single place as a page, not as a list another page names", async () => {
+    const place = "https://www.google.com/maps/place/Savoy/@35.65,139.73,17z";
+    safeFetch.mockImplementation(async (url: string) =>
+      url === SHORT
+        ? html(
+            place,
+            `<html><head><title>Savoy</title></head><body>/placelists/list/${LIST_ID}</body></html>`,
+          )
+        : url === place
+          ? html(place, "<html><head><title>Savoy</title></head></html>")
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(SHORT);
+    expect(read.status === "ok" && read.page.placeList).toBeUndefined();
+    expect(safeFetch).not.toHaveBeenCalledWith(ENDPOINT, expect.anything());
+  });
+
+  it("reads a list Google no longer shows as gone", async () => {
+    serve({ [ENDPOINT]: text(ENDPOINT, `)]}'\n[null,null,[4,"${LIST_ID}"]]`) });
+    const read = await readPage(
+      `https://www.google.com/maps/placelists/list/${LIST_ID}`,
+    );
+    expect(read.status).toBe("gone");
+  });
+
+  it("reads the link as a page when Google answers with something else", async () => {
+    const url = `https://www.google.com/maps/placelists/list/${LIST_ID}`;
+    serve({
+      [ENDPOINT]: text(ENDPOINT, "<html>Before you continue</html>"),
+      [url]: html(url, "<html><head><title>Tokyo</title></head></html>"),
+    });
+    const read = await readPage(url);
+    expect(read).toMatchObject({ status: "ok", page: { title: "Tokyo" } });
+    expect(read.status === "ok" && read.page.placeList).toBeUndefined();
+  });
+
+  it.each([403, 404, 429])(
+    "reads the link as a page when the list endpoint answers %i",
+    async (status) => {
+      const url = `https://www.google.com/maps/placelists/list/${LIST_ID}`;
+      safeFetch.mockImplementation(async (requested: string) =>
+        requested === url
+          ? html(url, "<html><head><title>Tokyo</title></head></html>")
+          : { ok: false, code: "http_error", status },
+      );
+      const read = await readPage(url);
+      expect(read).toMatchObject({ status: "ok", page: { title: "Tokyo" } });
+      expect(safeFetch).toHaveBeenCalledWith(ENDPOINT, expect.anything());
+    },
+  );
+
+  it("skips entries with no name and coordinates out of range", async () => {
+    serve({
+      [ENDPOINT]: text(
+        ENDPOINT,
+        listBody([
+          [null, [null, null, "x", null, "", [null, null, 999, 139]], null, ""],
+          entry("Savoy", "", "", 95, 139),
+        ]),
+      ),
+    });
+    const read = await readPage(
+      `https://www.google.com/maps/placelists/list/${LIST_ID}`,
+    );
+    expect(read.status === "ok" && read.page.placeList).toEqual([
+      { name: "Savoy" },
+    ]);
+  });
+});

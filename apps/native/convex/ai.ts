@@ -26,6 +26,15 @@ import {
   normalizePlaces,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
+import {
+  PLACE_LIST_CITIES_SYSTEM,
+  PLACE_LIST_CITY_DESCRIPTION,
+  intentsForPart,
+  partIndexFor,
+  placeListCitiesPrompt,
+  splitPlaceList,
+  type PlaceListPart,
+} from "./model/placeList";
 import { sanitizeRecipe } from "./model/recipeMarkup";
 import { type Classification, type Reading } from "./model/settlement";
 import {
@@ -206,6 +215,17 @@ const intentSchema = z.object({
 
 const PLACES_DESCRIPTION = `Every specific place this item names (restaurants, cafés, bars, bakeries, food stalls, markets, shops, hotels, museums, parks, sights), at most ${MAX_ITEM_PLACES}, each its name as written, e.g. 'Café de Flore', without address or description. For a single-city item, leave the city out of every place name. When more than one city is mentioned, append each place's explicitly stated city (e.g. 'Café de Flore, Paris'); never assign every place to the first city. Include a place named only by its @handle when the handle clearly is the place. Empty if it names none; never add a place it does not name.`;
 
+const placeListCitiesSchema = z.object({
+  cities: z
+    .array(
+      z.object({
+        index: z.number().int().describe("The place's number in the list"),
+        city: z.string().describe(PLACE_LIST_CITY_DESCRIPTION),
+      }),
+    )
+    .describe("One entry per numbered place, in list order"),
+});
+
 const itemAnalysisSchema = z.object({
   title: z
     .string()
@@ -363,6 +383,10 @@ type Analysis = {
   result?: ModelResult;
   page?: PageData;
   linkRead?: LinkRead;
+  /** The part of a shared list this save becomes. */
+  listPart?: PlaceListPart;
+  /** The rest of a shared list, each part a save of its own city. */
+  listParts?: PlaceListPart[];
 };
 
 type AnalysisOutcome = Analysis | { terminal: true };
@@ -519,11 +543,82 @@ async function analyzeLinkItem(
     read.status === "ok" && read.shortForm?.video === true,
   );
   const spoken = await fromSpeech(ctx, item, read, result, aiAllowed);
+  const parts = page?.placeList
+    ? await placeListParts(ctx, item, page, aiAllowed)
+    : undefined;
+  if (page === undefined || parts === undefined || parts.length === 0) {
+    return { result: { ...result, ...spoken }, page, linkRead: read };
+  }
+  const index = partIndexFor(parts, item.title);
+  const part = parts[index];
   return {
-    result: { ...result, ...spoken },
-    page,
+    result: {
+      ...result,
+      ...spoken,
+      intents: intentsForPart(result.intents, part),
+      places: part.places,
+      cities: part.cities,
+      ...(parts.length > 1 ? { title: part.title } : {}),
+    },
+    page: { ...page, content: part.content },
     linkRead: read,
+    listPart: part,
+    listParts: parts.filter((_, i) => i !== index),
   };
+}
+
+/** A list save's places sit at the list's own points before it settles, so no lookup can move them. */
+async function pinListPart(
+  ctx: ActionCtx,
+  run: { itemId: Id<"items">; runId?: string },
+  part: PlaceListPart | undefined,
+): Promise<void> {
+  if (part === undefined || part.pins.length === 0) return;
+  await ctx.runMutation(internal.items.pinListPlaces, {
+    itemId: run.itemId,
+    runId: run.runId,
+    cities: part.cities,
+    pins: part.pins,
+  });
+}
+
+/** A shared list's places, one part per city; undefined when the model could not name their cities. */
+async function placeListParts(
+  ctx: ActionCtx,
+  item: Doc<"items">,
+  page: PageData,
+  aiAllowed: boolean,
+): Promise<PlaceListPart[] | undefined> {
+  const places = page.placeList ?? [];
+  if (places.length === 0 || !(await stillAllowed(ctx, aiAllowed, item))) {
+    return undefined;
+  }
+  try {
+    const { object } = await generateObject({
+      model: MODEL,
+      ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
+      system: PLACE_LIST_CITIES_SYSTEM,
+      schema: placeListCitiesSchema,
+      prompt: placeListCitiesPrompt(places),
+    });
+    const parts = splitPlaceList(
+      page.title ?? item.title ?? "Google Maps",
+      places,
+      object,
+    );
+    logEvent("info", "place_list_split", {
+      item_id: item._id,
+      places: places.length,
+      parts: parts.length,
+    });
+    return parts;
+  } catch (error) {
+    logEvent("warn", "place_list_split_failed", {
+      item_id: item._id,
+      error_category: modelFailure(error),
+    });
+    return undefined;
+  }
 }
 
 function fixtureRead(
@@ -1073,6 +1168,7 @@ export const processItem = internalAction({
       const reading = readingOf(item, outcome, posterStorageId);
       const classification = model && classificationOf(model);
 
+      if (model) await pinListPart(ctx, args, outcome.listPart);
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
@@ -1087,6 +1183,13 @@ export const processItem = internalAction({
           });
         }
         return null;
+      }
+      if (model && outcome.listPart) {
+        await ctx.runMutation(internal.items.addPlaceListParts, {
+          itemId: args.itemId,
+          runId: args.runId,
+          parts: outcome.listParts ?? [],
+        });
       }
       const autoFiled = model
         ? await ctx.runMutation(internal.items.setSpacesForItem, {
