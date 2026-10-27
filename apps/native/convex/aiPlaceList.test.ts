@@ -34,7 +34,7 @@ const PLACES: [string, string, string, string][] = [
 function listBody() {
   const entries = PLACES.map(([name, note, address], i) => [
     null,
-    [null, null, name, null, address, [null, null, 35.6 + i / 100, 139.7]],
+    [null, null, name, null, address, [null, null, (3560 + i) / 100, 139.7]],
     name,
     note,
   ]);
@@ -117,12 +117,15 @@ async function savesOf(t: ReturnType<typeof newConvexTest>, userId: string) {
   );
 }
 
-async function located(t: ReturnType<typeof newConvexTest>) {
+async function located(
+  t: ReturnType<typeof newConvexTest>,
+  job = "locateItem",
+) {
   const jobs = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
   return jobs
-    .filter((job) => job.name.includes("locateItem"))
+    .filter((scheduled) => scheduled.name.includes(job))
     .map((job) => (job.args[0] as { itemId: Id<"items"> }).itemId);
 }
 
@@ -163,7 +166,7 @@ describe("processItem on a shared Google Maps list", () => {
           "Marcy Land — Uni ramen\nSavoy Azabujuban — Bluefin tuna pizza\nNoyanopan",
       },
       {
-        title: "Tokyo · Karuizawa",
+        title: "Karuizawa · Tokyo",
         cities: ["Karuizawa"],
         places: ["Mori Mori Tei"],
         status: "ready",
@@ -183,6 +186,31 @@ describe("processItem on a shared Google Maps list", () => {
     expect(new Set(await located(t))).toEqual(
       new Set(saves.map((save) => save._id)),
     );
+    expect(new Set(await located(t, "identifyPins"))).toEqual(
+      new Set(saves.map((save) => save._id)),
+    );
+    expect(saves.map((save) => save.placePins)).toEqual([
+      [
+        { name: "Marcy Land", lat: 35.6, lng: 139.7, city: "Tokyo" },
+        { name: "Savoy Azabujuban", lat: 35.61, lng: 139.7, city: "Tokyo" },
+        { name: "Noyanopan", lat: 35.63, lng: 139.7, city: "Tokyo" },
+      ],
+      [{ name: "Mori Mori Tei", lat: 35.62, lng: 139.7, city: "Karuizawa" }],
+    ]);
+  });
+
+  it("leaves a list place pinned at the list's point when Apple's lookup runs", async () => {
+    model(NAMED);
+    const t = newConvexTest();
+    const { userId, itemId } = await saveList(t);
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    const before = (await savesOf(t, userId)).map((save) => save.placePins);
+    for (const id of await located(t)) {
+      await t.action(internal.placePins.locateItem, { itemId: id });
+    }
+    expect((await savesOf(t, userId)).map((save) => save.placePins)).toEqual(
+      before,
+    );
   });
 
   it("adds no second copy of a part when the list is read again", async () => {
@@ -196,7 +224,7 @@ describe("processItem on a shared Google Maps list", () => {
     await t.action(internal.ai.processItem, { itemId, runId: "run-2" });
 
     const titles = (await savesOf(t, userId)).map((save) => save.title);
-    expect(titles).toEqual(["Tokyo", "Tokyo · Karuizawa"]);
+    expect(titles).toEqual(["Tokyo", "Karuizawa · Tokyo"]);
   });
 
   it("keeps the model's reading when it cannot name the cities", async () => {
@@ -222,6 +250,7 @@ describe("addPlaceListParts", () => {
     title: "Tokyo · Kyoto",
     cities: ["Kyoto"],
     places: ["Ippodo"],
+    pins: [],
     content: "Ippodo",
   };
 

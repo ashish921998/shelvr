@@ -832,3 +832,57 @@ describe("placePins", () => {
     expect((await pins())?.[0].category).toBe("Cafe");
   });
 });
+
+describe("identifyPins", () => {
+  async function appleAnswers(at: Record<string, [number, number]>) {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token") {
+          return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+        }
+        const q = url.searchParams.get("q") ?? "";
+        const point = at[q];
+        return Response.json({
+          results: point
+            ? [
+                {
+                  id: `ID-${q}`,
+                  poiCategory: "Restaurant",
+                  coordinate: { latitude: point[0], longitude: point[1] },
+                },
+              ]
+            : [],
+        });
+      }),
+    );
+  }
+
+  it("names a list pin from a match at its spot without moving it, and ignores a namesake elsewhere", async () => {
+    await appleAnswers({
+      Savoy: [35.65492, 139.73661],
+      "Marcy Land": [35.6745, 139.7307],
+    });
+    const { t, itemId, pins } = await setup([], {
+      read: ["Savoy", "Marcy Land"],
+    });
+    const listed = [
+      { name: "Savoy", lat: 35.6548, lng: 139.7364, city: "Lisbon" },
+      { name: "Marcy Land", lat: 35.6655, lng: 139.7088, city: "Lisbon" },
+    ];
+    await t.run((ctx) => ctx.db.patch(itemId, { placePins: listed }));
+    await t.action(internal.placePins.identifyPins, { itemId });
+    expect(await pins()).toEqual([
+      {
+        ...listed[0],
+        appleId: "ID-Savoy",
+        category: "Restaurant",
+      },
+      listed[1],
+    ]);
+  });
+});

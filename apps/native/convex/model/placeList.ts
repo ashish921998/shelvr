@@ -15,11 +15,15 @@ export type ListedPlace = {
   lng?: number;
 };
 
+/** A listed place at the point the list itself gives, which beats looking its name up again. */
+export type ListPin = { name: string; lat: number; lng: number };
+
 /** One save a list becomes: a single city's places, at most a save's worth. */
 export type PlaceListPart = {
   title: string;
   cities: string[];
   places: string[];
+  pins: ListPin[];
   content: string;
 };
 
@@ -117,7 +121,7 @@ function partTitle(
       ? listTitle
       : cityKey(listTitle) === cityKey(city)
         ? city
-        : `${listTitle} · ${city}`;
+        : `${city} · ${listTitle}`;
   return chunks > 1 ? `${base} ${chunk + 1}` : base;
 }
 
@@ -156,11 +160,16 @@ export function splitPlaceList(
         (chunk + 1) * MAX_ITEM_PLACES,
       );
       const sourceCities = group.city === undefined ? [] : [group.city];
+      const named = slice.map((place) => ({
+        place,
+        name: normalizePlaceName(place.name, sourceCities),
+      }));
       parts.push({
         title: partTitle(listTitle, group.city, chunk, chunks, wholeList),
         cities: sourceCities,
-        places: slice.map((place) =>
-          normalizePlaceName(place.name, sourceCities),
+        places: named.map(({ name }) => name),
+        pins: named.flatMap(({ place, name }) =>
+          located(place) ? [{ name, lat: place.lat, lng: place.lng }] : [],
         ),
         content: placeListContent(slice),
       });
@@ -208,4 +217,43 @@ export function intentsForPart<T extends { kind: string; value: string }>(
       intent.kind !== "open_maps" ||
       keys.has(placeKey(normalizePlaceName(intent.value, part.cities))),
   );
+}
+
+type StoredPin = ListPin & {
+  city?: string;
+  appleId?: string;
+  category?: string;
+};
+
+// The list's point and Apple's for one venue can sit a few doors apart.
+export const SAME_SPOT_KM = 0.3;
+
+/**
+ * A save's pins once its list points are in: each listed place sits at the list's point, keeping the
+ * Apple id and category of a stored pin for it only when that pin is the same spot. Other stored pins stay.
+ */
+export function withListPins(
+  stored: readonly StoredPin[],
+  pins: readonly ListPin[],
+  cities: readonly string[],
+): StoredPin[] {
+  const city = cities.length === 1 ? cities[0] : undefined;
+  const byKey = new Map(stored.map((pin) => [placeKey(pin.name), pin]));
+  const listed = pins.map((pin): StoredPin => {
+    const known = byKey.get(placeKey(pin.name));
+    const same = known !== undefined && distanceKm(known, pin) <= SAME_SPOT_KM;
+    return {
+      name: pin.name,
+      lat: pin.lat,
+      lng: pin.lng,
+      ...(city ? { city } : {}),
+      ...(same && known.appleId ? { appleId: known.appleId } : {}),
+      ...(same && known.category ? { category: known.category } : {}),
+    };
+  });
+  const keys = new Set(listed.map((pin) => placeKey(pin.name)));
+  return [
+    ...listed,
+    ...stored.filter((pin) => !keys.has(placeKey(pin.name))),
+  ].slice(0, MAX_ITEM_PLACES);
 }

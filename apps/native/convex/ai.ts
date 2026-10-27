@@ -388,6 +388,8 @@ type Analysis = {
   result?: ModelResult;
   page?: PageData;
   linkRead?: LinkRead;
+  /** The part of a shared list this save becomes. */
+  listPart?: PlaceListPart;
   /** The rest of a shared list, each part a save of its own city. */
   listParts?: PlaceListPart[];
 };
@@ -565,8 +567,24 @@ async function analyzeLinkItem(
     },
     page: { ...page, content: part.content },
     linkRead: read,
+    listPart: part,
     listParts: parts.filter((_, i) => i !== index),
   };
+}
+
+/** A list save's places sit at the list's own points before it settles, so no lookup can move them. */
+async function pinListPart(
+  ctx: ActionCtx,
+  run: { itemId: Id<"items">; runId?: string },
+  part: PlaceListPart | undefined,
+): Promise<void> {
+  if (part === undefined || part.pins.length === 0) return;
+  await ctx.runMutation(internal.items.pinListPlaces, {
+    itemId: run.itemId,
+    runId: run.runId,
+    cities: part.cities,
+    pins: part.pins,
+  });
 }
 
 /** A shared list's places, one part per city; undefined when the model could not name their cities. */
@@ -1166,6 +1184,7 @@ export const processItem = internalAction({
           embeddingText(item, { keepTitle, reading, classification }),
         ));
 
+      if (model) await pinListPart(ctx, args, outcome.listPart);
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
@@ -1181,11 +1200,11 @@ export const processItem = internalAction({
         }
         return null;
       }
-      if (model && outcome.listParts && outcome.listParts.length > 0) {
+      if (model && outcome.listPart) {
         await ctx.runMutation(internal.items.addPlaceListParts, {
           itemId: args.itemId,
           runId: args.runId,
-          parts: outcome.listParts,
+          parts: outcome.listParts ?? [],
         });
       }
       const autoFiled = model

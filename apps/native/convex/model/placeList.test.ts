@@ -6,6 +6,7 @@ import {
   placeListCitiesPrompt,
   placeListContent,
   splitPlaceList,
+  withListPins,
   type ListedPlace,
 } from "./placeList";
 
@@ -33,6 +34,7 @@ describe("splitPlaceList", () => {
         title: "Date night",
         cities: ["Lisbon"],
         places: ["Bar A", "Bar B"],
+        pins: [],
         content: "Bar A\nBar B",
       },
     ]);
@@ -46,8 +48,8 @@ describe("splitPlaceList", () => {
     );
     expect(parts.map((part) => [part.title, part.cities, part.places])).toEqual(
       [
-        ["Japan · Tokyo", ["Tokyo"], ["Savoy", "Noyanopan"]],
-        ["Japan · Karuizawa", ["Karuizawa"], ["Mori Mori"]],
+        ["Tokyo · Japan", ["Tokyo"], ["Savoy", "Noyanopan"]],
+        ["Karuizawa · Japan", ["Karuizawa"], ["Mori Mori"]],
       ],
     );
   });
@@ -60,7 +62,7 @@ describe("splitPlaceList", () => {
     );
     expect(parts.map((part) => part.title)).toEqual([
       "Tokyo",
-      "Tokyo · Karuizawa",
+      "Karuizawa · Tokyo",
     ]);
   });
 
@@ -149,7 +151,7 @@ describe("partIndexFor", () => {
   );
 
   it("keeps a save the part it was named for", () => {
-    expect(partIndexFor(parts, "Japan · Kyoto")).toBe(1);
+    expect(partIndexFor(parts, "Kyoto · Japan")).toBe(1);
   });
 
   it("gives a new or renamed save the first part", () => {
@@ -189,5 +191,53 @@ describe("intentsForPart", () => {
       { kind: "web_search", label: "Search", value: "Ippodo" },
     ];
     expect(intentsForPart(intents, tokyo)).toEqual([intents[0], intents[2]]);
+  });
+});
+
+describe("list pins", () => {
+  it("pins each part's places at the list's own points", () => {
+    const [part] = splitPlaceList(
+      "Lisbon",
+      [place("Manteigaria, Lisbon", 38.7104, -9.1426), place("No point")],
+      named("Lisbon", "Lisbon"),
+    );
+    expect(part.pins).toEqual([
+      { name: "Manteigaria", lat: 38.7104, lng: -9.1426 },
+    ]);
+  });
+
+  it("keeps a stored Apple id only for the same spot, and other stored pins", () => {
+    const stored = [
+      {
+        name: "Savoy",
+        lat: 35.655,
+        lng: 139.7366,
+        appleId: "A1",
+        category: "Restaurant",
+      },
+      { name: "Marcy Land", lat: 35.6745, lng: 139.7307, appleId: "A2" },
+      { name: "From a Maps link", lat: 35.7, lng: 139.8 },
+    ];
+    expect(
+      withListPins(
+        stored,
+        [
+          { name: "Savoy", lat: 35.6548, lng: 139.7364 },
+          { name: "Marcy Land", lat: 35.6655, lng: 139.7088 },
+        ],
+        ["Tokyo"],
+      ),
+    ).toEqual([
+      {
+        name: "Savoy",
+        lat: 35.6548,
+        lng: 139.7364,
+        city: "Tokyo",
+        appleId: "A1",
+        category: "Restaurant",
+      },
+      { name: "Marcy Land", lat: 35.6655, lng: 139.7088, city: "Tokyo" },
+      stored[2],
+    ]);
   });
 });

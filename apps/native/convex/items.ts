@@ -36,7 +36,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
-import { MAX_LIST_PARTS } from "./model/placeList";
+import { MAX_LIST_PARTS, withListPins } from "./model/placeList";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -2139,14 +2139,55 @@ export const finalizeItem = internalMutation({
   },
 });
 
+const listPinsValidator = v.array(
+  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+);
+
 const placeListPartValidator = v.object({
   title: v.string(),
   cities: v.array(v.string()),
   places: v.array(v.string()),
+  pins: listPinsValidator,
   content: v.string(),
 });
 
-/** The rest of a shared list the run just settled, one ready save per part; a part already saved stays as it is. */
+/**
+ * Pins a list save's places at the points the list gives, before the run settles it, so the Apple lookup
+ * finalizeItem schedules finds them pinned and cannot move them to a same-named place elsewhere.
+ */
+export const pinListPlaces = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    runId: v.optional(v.string()),
+    cities: v.array(v.string()),
+    pins: listPinsValidator,
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      !ownsRun(item, args.runId) ||
+      (await liveOwner(ctx, item.userId)) === null ||
+      !(await aiAllowed(ctx, item.userId))
+    ) {
+      return false;
+    }
+    await ctx.db.patch(args.itemId, {
+      placePins: withListPins(
+        item.placePins ?? [],
+        args.pins,
+        normalizeCities(args.cities),
+      ),
+    });
+    return true;
+  },
+});
+
+/**
+ * Once the run settled a list save: names its list pins, and adds the rest of the list as one ready save per
+ * part; a part already saved stays as it is.
+ */
 export const addPlaceListParts = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -2166,6 +2207,11 @@ export const addPlaceListParts = internalMutation({
     ) {
       return 0;
     }
+    if ((item.placePins?.length ?? 0) > 0) {
+      await ctx.scheduler.runAfter(0, internal.placePins.identifyPins, {
+        itemId: args.itemId,
+      });
+    }
     const url = item.url;
     const saved = await ctx.db
       .query("items")
@@ -2180,6 +2226,7 @@ export const addPlaceListParts = internalMutation({
       titles.add(part.title);
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
+      const placePins = withListPins([], part.pins, cities);
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
         type: "link",
@@ -2196,10 +2243,12 @@ export const addPlaceListParts = internalMutation({
         intents: [],
         cities,
         places,
+        placePins,
         searchText: buildSearchText({
           title: part.title,
           cities,
           places,
+          placePins,
           description: item.description,
           tags: item.tags,
           siteName: item.siteName,
@@ -2207,7 +2256,13 @@ export const addPlaceListParts = internalMutation({
         }),
       });
       if (places.length > 0) {
+        // Finds a pin for any place the list gave no point for; pinned places are skipped.
         await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+          itemId: partId,
+        });
+      }
+      if (placePins.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.placePins.identifyPins, {
           itemId: partId,
         });
       }
