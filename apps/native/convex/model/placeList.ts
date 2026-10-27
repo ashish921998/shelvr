@@ -3,6 +3,7 @@ import {
   normalizeCities,
   normalizePlaceName,
 } from "./itemFields";
+import { placeKey } from "./plan";
 import { cityKey, distanceKm } from "./trip";
 
 /** One place on a list someone shared, such as a Google Maps list. */
@@ -164,7 +165,25 @@ export function splitPlaceList(
       });
     }
   }
-  return parts.slice(0, MAX_LIST_PARTS);
+  return withUniqueTitles(parts.slice(0, MAX_LIST_PARTS));
+}
+
+/** A save finds its part again by title, so no two parts may share one (a list named for a city plus its unplaced places). */
+function withUniqueTitles(parts: PlaceListPart[]): PlaceListPart[] {
+  const taken = new Set(parts.map((part) => part.title));
+  const seen = new Set<string>();
+  return parts.map((part) => {
+    if (!seen.has(part.title)) {
+      seen.add(part.title);
+      return part;
+    }
+    let n = 2;
+    while (taken.has(`${part.title} (${n})`)) n++;
+    const title = `${part.title} (${n})`;
+    taken.add(title);
+    seen.add(title);
+    return { ...part, title };
+  });
 }
 
 /** The part a save becomes: the one it was named for on an earlier run, otherwise the first. */
@@ -175,4 +194,17 @@ export function partIndexFor(
   const index =
     title === undefined ? -1 : parts.findIndex((part) => part.title === title);
   return index === -1 ? 0 : index;
+}
+
+/** Maps intents pin places too, so a part keeps only those naming one of its own places. */
+export function intentsForPart<T extends { kind: string; value: string }>(
+  intents: readonly T[],
+  part: PlaceListPart,
+): T[] {
+  const keys = new Set(part.places.map(placeKey));
+  return intents.filter(
+    (intent) =>
+      intent.kind !== "open_maps" ||
+      keys.has(placeKey(normalizePlaceName(intent.value, part.cities))),
+  );
 }

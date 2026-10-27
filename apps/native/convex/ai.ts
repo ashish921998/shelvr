@@ -29,6 +29,7 @@ import { logEvent } from "./model/log";
 import {
   PLACE_LIST_CITIES_SYSTEM,
   PLACE_LIST_CITY_DESCRIPTION,
+  intentsForPart,
   partIndexFor,
   placeListCitiesPrompt,
   splitPlaceList,
@@ -557,6 +558,7 @@ async function analyzeLinkItem(
     result: {
       ...result,
       ...spoken,
+      intents: intentsForPart(result.intents, part),
       places: part.places,
       cities: part.cities,
       ...(parts.length > 1 ? { title: part.title } : {}),

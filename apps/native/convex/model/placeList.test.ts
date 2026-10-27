@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  intentsForPart,
   MAX_LIST_PARTS,
   partIndexFor,
   placeListCitiesPrompt,
@@ -114,6 +115,18 @@ describe("splitPlaceList", () => {
     expect(parts[0].places).toEqual(["Manteigaria"]);
   });
 
+  it("gives every part its own title, even a city's and the unplaced places'", () => {
+    const parts = splitPlaceList(
+      "Tokyo",
+      [place("Savoy"), place("Noyanopan"), place("Somewhere")],
+      named("Tokyo", "Tokyo", ""),
+    );
+    expect(parts.map((part) => [part.title, part.places])).toEqual([
+      ["Tokyo", ["Savoy", "Noyanopan"]],
+      ["Tokyo (2)", ["Somewhere"]],
+    ]);
+  });
+
   it("stops at the part cap", () => {
     const places = Array.from({ length: MAX_LIST_PARTS + 3 }, (_, i) =>
       place(`Spot ${i}`),
@@ -158,5 +171,22 @@ describe("place list text", () => {
         { name: "Noyanopan" },
       ]),
     ).toBe("Marcy Land — Uni ramen\nNoyanopan");
+  });
+});
+
+describe("intentsForPart", () => {
+  const [tokyo] = splitPlaceList(
+    "Japan",
+    [place("Savoy"), place("Noyanopan"), place("Ippodo")],
+    named("Tokyo", "Tokyo", "Kyoto"),
+  );
+
+  it("keeps Maps intents for the part's own places and every other kind", () => {
+    const intents = [
+      { kind: "open_maps", label: "Map", value: "Savoy, Tokyo" },
+      { kind: "open_maps", label: "Map", value: "Ippodo" },
+      { kind: "web_search", label: "Search", value: "Ippodo" },
+    ];
+    expect(intentsForPart(intents, tokyo)).toEqual([intents[0], intents[2]]);
   });
 });

@@ -1107,6 +1107,17 @@ describe("readPage on a Google Maps list", () => {
     expect(read.status).toBe("gone");
   });
 
+  it("reads the link as a page when Google answers with something else", async () => {
+    const url = `https://www.google.com/maps/placelists/list/${LIST_ID}`;
+    serve({
+      [ENDPOINT]: text(ENDPOINT, "<html>Before you continue</html>"),
+      [url]: html(url, "<html><head><title>Tokyo</title></head></html>"),
+    });
+    const read = await readPage(url);
+    expect(read).toMatchObject({ status: "ok", page: { title: "Tokyo" } });
+    expect(read.status === "ok" && read.page.placeList).toBeUndefined();
+  });
+
   it("skips entries with no name and coordinates out of range", async () => {
     serve({
       [ENDPOINT]: text(

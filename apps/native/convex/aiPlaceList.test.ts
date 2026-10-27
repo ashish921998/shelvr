@@ -74,7 +74,10 @@ function model(cityCall: () => Promise<unknown>) {
             description: "Places to eat in Tokyo.",
             tags: ["restaurants"],
             spaceNames: [],
-            intents: [],
+            intents: [
+              { kind: "open_maps", label: "Map", value: "Mori Mori Tei" },
+              { kind: "open_maps", label: "Map", value: "Marcy Land" },
+            ],
             cities: ["Tokyo"],
             places: ["Marcy Land"],
           },
@@ -174,6 +177,9 @@ describe("processItem on a shared Google Maps list", () => {
       description: "Places to eat in Tokyo.",
     });
     expect(saves[1].searchText).toContain("mori mori tei");
+    expect(saves[0].intents?.map((intent) => intent.value)).toEqual([
+      "Marcy Land",
+    ]);
     expect(new Set(await located(t))).toEqual(
       new Set(saves.map((save) => save._id)),
     );

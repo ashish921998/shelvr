@@ -84,8 +84,13 @@ export type GoogleMapsList = {
   places: ListedPlace[];
 };
 
-/** Reads the body Google's list endpoint answers with, or undefined when it holds no list (private or deleted). */
-export function parseGoogleMapsList(body: string): GoogleMapsList | undefined {
+/**
+ * Reads the body Google's list endpoint answers with: the list, "missing" when Google says it holds
+ * no list it will show (private or deleted), or undefined for anything it does not recognize.
+ */
+export function parseGoogleMapsList(
+  body: string,
+): GoogleMapsList | "missing" | undefined {
   let data: unknown;
   try {
     data = JSON.parse(body.replace(/^\)\]\}'\s*/, ""));
@@ -93,7 +98,8 @@ export function parseGoogleMapsList(body: string): GoogleMapsList | undefined {
     return undefined;
   }
   const list = at(data, 0);
-  const entries = at(list, 8);
+  if (list === null && Array.isArray(at(data, 2))) return "missing";
+  const entries = at(list, 8) ?? [];
   if (!Array.isArray(list) || !Array.isArray(entries)) return undefined;
   const places = entries
     .map(listedPlace)
@@ -138,7 +144,8 @@ async function resolveListId(url: string): Promise<string | undefined> {
 
 /**
  * A shared Google Maps list as a page: its title, owner and places with their notes, addresses and points.
- * Undefined when the link is not a list (a single place, directions), so the caller reads it as a page.
+ * Undefined when the link is not a list (a single place, directions) or Google's answer is not one this
+ * reader recognizes, so the caller reads it as a page.
  * A list Google no longer shows, private or deleted, reads as gone.
  */
 export async function fetchGoogleMapsList(
@@ -161,9 +168,14 @@ export async function fetchGoogleMapsList(
   const list = parseGoogleMapsList(
     decodeWithContentType(result.bytes, result.contentType),
   );
-  if (list === undefined) {
+  if (list === "missing") {
     logEvent("info", "google_maps_list_missing", {});
     throw new PageFetchError("http_error", 404);
+  }
+  if (list === undefined) {
+    // A changed format or a consent page: read the link as a plain page instead.
+    logEvent("warn", "google_maps_list_unrecognized", {});
+    return undefined;
   }
   logEvent("info", "google_maps_list_read", { count: list.places.length });
   return {
