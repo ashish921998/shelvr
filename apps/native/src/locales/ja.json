@@ -527,7 +527,7 @@
   "appearance.warmDark": "暖色ダーク",
   "appearance.neutralDark": "ダーク（ニュートラル）",
   "widget.emptyTitle": "まだ保存されていません",
-  "widget.emptyBody": "リールやTikTokをShelvrに共有して、場所を保存",
+  "widget.emptyBody": "リールやTikTokをShelvrに共有",
   "widget.proTitle": "最近の保存はProの機能です",
   "widget.proBody": "Shelvr Proに登録すると、保存した項目をここで確認できます",
   "item.savedItem": "保存した項目",
