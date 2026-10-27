@@ -150,12 +150,18 @@ export function PlacesMap({
 
   // A new filter whose places are all out of reach brings them into view. While the opening move is
   // still deciding where to go, its check frames the new filter instead. Search does not refit:
-  // picking a result flies to it.
-  const fitted = useRef(fit);
+  // picking a result flies to it. Keyed on the places, so a layout change (the keyboard) never moves
+  // the camera, and an empty map (a search with no match) stays where it is.
+  const fitted = useRef(framed);
   useEffect(() => {
-    if (fit === fitted.current) return;
-    fitted.current = fit;
-    if (!fit || checkNearby.current || hasPlaceNear(centre.current, pins))
+    if (framed === fitted.current) return;
+    fitted.current = framed;
+    if (
+      !fit ||
+      pins.length === 0 ||
+      checkNearby.current ||
+      hasPlaceNear(centre.current, pins)
+    )
       return;
     map()
       ?.setCameraPosition(fit)
@@ -163,7 +169,7 @@ export function PlacesMap({
         analytics.captureError("places_map_camera_failed", error),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new framing moves the camera; search narrowing pins must not
-  }, [fit]);
+  }, [framed]);
 
   const select = (id: string | undefined) => {
     if (id) onSelect(id);
