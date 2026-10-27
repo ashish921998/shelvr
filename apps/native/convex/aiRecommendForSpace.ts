@@ -7,10 +7,9 @@ import type { FunctionReturnType, GenericActionCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { buildEmbeddingText, RECOMMEND_CANDIDATES } from "./model/embedding";
-import { logEvent, errorName } from "./model/log";
+import { RECOMMEND_CANDIDATES } from "./model/embedding";
+import { logEvent } from "./model/log";
 import { MODEL, modelCallOptions } from "./model/aiProvider";
-import { embedQuery } from "./aiEmbeddingSweep";
 import { summarizeError } from "./ai";
 
 const RECOMMEND_TIMEOUT_MS = 45_000;
@@ -25,81 +24,26 @@ const recommendSchema = z.object({
 
 const MAX_RECOMMENDATIONS = 8;
 
-const RECOMMEND_VECTOR_LIMIT = 256;
-
 type RecommendationCandidate = FunctionReturnType<
   typeof internal.items.listReadyItemsInternal
 >[number];
 
-async function searchCandidates(
-  ctx: GenericActionCtx<DataModel>,
-  space: Doc<"spaces">,
-  vector: number[],
-  memberIds: Set<Id<"items">>,
-): Promise<RecommendationCandidate[]> {
-  try {
-    const matches = await ctx.vectorSearch("items", "by_embedding", {
-      vector,
-      limit: RECOMMEND_VECTOR_LIMIT,
-      filter: (q) => q.eq("userId", space.userId),
-    });
-    const itemIds = matches
-      .map((match) => match._id)
-      .filter((itemId) => !memberIds.has(itemId));
-    if (itemIds.length === 0) {
-      return [];
-    }
-    return await ctx.runQuery(internal.items.listReadyItemsByIdInternal, {
-      userId: space.userId,
-      itemIds,
-      limit: RECOMMEND_CANDIDATES,
-    });
-  } catch (error) {
-    logEvent("warn", "recommend_vector_search_failed", {
-      space_id: space._id,
-      error: errorName(error),
-    });
-    return [];
-  }
-}
-
+/** The newest ready saves not already in the space; the model picks which belong. */
 async function recommendationCandidates(
   ctx: GenericActionCtx<DataModel>,
   space: Doc<"spaces">,
   memberIds: Set<Id<"items">>,
 ): Promise<RecommendationCandidate[]> {
-  const queryText = buildEmbeddingText({
-    title: space.name,
-    description: space.description,
-  });
-  const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
-  const ranked =
-    vector === undefined
-      ? []
-      : await searchCandidates(ctx, space, vector, memberIds);
-
-  if (ranked.length >= RECOMMEND_CANDIDATES) {
-    logEvent("info", "recommend_candidates", {
-      space_id: space._id,
-      source: "vector",
-      count: ranked.length,
-    });
-    return ranked;
-  }
-
-  const seen = new Set(ranked.map((item) => item._id));
-  const recent = (
+  const candidates = (
     await ctx.runQuery(internal.items.listReadyItemsInternal, {
       userId: space.userId,
       limit: RECOMMEND_CANDIDATES,
     })
-  ).filter((item) => !memberIds.has(item._id) && !seen.has(item._id));
-  const candidates = [...ranked, ...recent].slice(0, RECOMMEND_CANDIDATES);
+  ).filter((item) => !memberIds.has(item._id));
   logEvent("info", "recommend_candidates", {
     space_id: space._id,
-    source: ranked.length === 0 ? "recent" : "mixed",
+    source: "recent",
     count: candidates.length,
-    ranked: ranked.length,
   });
   return candidates;
 }

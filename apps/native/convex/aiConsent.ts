@@ -7,10 +7,7 @@ import {
 } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
-import {
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_SWEEP_PAGE,
-} from "./model/embedding";
+import { CURRENT_EMBEDDING_VERSION } from "./model/embedding";
 
 async function consentRow(ctx: QueryCtx, userId: string) {
   return await ctx.db
@@ -35,51 +32,6 @@ export const isAllowed = internalQuery({
     const item = await ctx.db.get(args.itemId);
     if (item === null || item.userId !== args.userId) return false;
     return await aiAllowed(ctx, args.userId);
-  },
-});
-
-export const revalidateEmbeddingBatch = internalQuery({
-  args: {
-    entries: v.array(v.object({ itemId: v.id("items"), userId: v.string() })),
-  },
-  returns: v.array(
-    v.object({
-      itemId: v.id("items"),
-      disposition: v.union(
-        v.literal("allowed"),
-        v.literal("declined"),
-        v.literal("gone"),
-      ),
-    }),
-  ),
-  handler: async (ctx, { entries }) => {
-    if (entries.length > EMBEDDING_SWEEP_PAGE)
-      throw new Error("Too many embedding entries");
-    type Disposition = "allowed" | "declined" | "gone";
-    const owners = new Map<string, Disposition>();
-    const results: {
-      itemId: (typeof entries)[number]["itemId"];
-      disposition: Disposition;
-    }[] = [];
-    for (const { itemId, userId } of entries) {
-      const item = await ctx.db.get(itemId);
-      if (item === null || item.userId !== userId) {
-        results.push({ itemId, disposition: "gone" });
-        continue;
-      }
-      let disposition = owners.get(userId);
-      if (disposition === undefined) {
-        const ownerId = ctx.db.normalizeId("users", userId);
-        const owner = ownerId === null ? null : await ctx.db.get(ownerId);
-        disposition =
-          owner !== null && (await aiAllowed(ctx, userId))
-            ? "allowed"
-            : "declined";
-        owners.set(userId, disposition);
-      }
-      results.push({ itemId, disposition });
-    }
-    return results;
   },
 });
 
@@ -135,47 +87,6 @@ export const setConsent = authedMutation({
 });
 
 const SYNC_BATCH = 50;
-
-/** One-time repair after deploying automatic AI: convex run aiConsent:repairUnansweredEmbeddings '{"cursor":null}' */
-export const repairUnansweredEmbeddings = internalMutation({
-  args: { cursor: v.union(v.string(), v.null()) },
-  returns: v.object({ repaired: v.number(), done: v.boolean() }),
-  handler: async (ctx, args) => {
-    const { page, isDone, continueCursor } = await ctx.db
-      .query("items")
-      .withIndex("by_status_and_embeddingVersion", (q) =>
-        q
-          .eq("status", "ready")
-          .eq("embeddingVersion", CURRENT_EMBEDDING_VERSION),
-      )
-      .paginate({
-        numItems: SYNC_BATCH,
-        cursor: args.cursor,
-        maximumBytesRead: 1_000_000,
-      });
-    let repaired = 0;
-    for (const item of page) {
-      if (item.embedding !== undefined) continue;
-      if ((await liveOwner(ctx, item.userId)) === null) continue;
-      if ((await consentRow(ctx, item.userId)) !== null) continue;
-      await ctx.db.patch(item._id, {
-        embeddingVersion: undefined,
-        embeddingAttempts: undefined,
-      });
-      repaired++;
-    }
-    if (!isDone) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.aiConsent.repairUnansweredEmbeddings,
-        {
-          cursor: continueCursor,
-        },
-      );
-    }
-    return { repaired, done: isDone };
-  },
-});
 
 export const syncEmbeddings = internalMutation({
   args: { userId: v.string(), cursor: v.union(v.string(), v.null()) },

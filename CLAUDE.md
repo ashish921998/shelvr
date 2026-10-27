@@ -183,19 +183,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   preference record use AI automatically; no grant record is fabricated. The current
   client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
   reports `unset` for an unanswered account, so old clients retain their existing UI.
-  `repairUnansweredEmbeddings` is a bounded, resumable one-time repair for older ready
-  saves stamped at the current embedding version but missing a vector. It clears the
-  stamp only for live owners with no preference row; the normal embedding sweep then
-  fills them. After deploying this change, run from `apps/native`:
-  `pnpm exec convex run --prod aiConsent:repairUnansweredEmbeddings '{"cursor":null}'`.
-  The function schedules its remaining pages. Rerunning it preserves existing vectors
-  and all explicit preferences; it does not reclassify saves or manufacture consent.
   A declined user's saves still finish `ready` from what Shelvr read itself, without AI.
   `model/aiConsent.ts` retains `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
   and `survivingCandidates` (up to 100 candidate saves, loaded and checked again before
-  classification). The embedding sweep checks each cached save again in one batch and maps
-  vectors to the surviving list. These checks run before a request goes out. They cannot
+  classification). These checks run before a request goes out. They cannot
   cancel or recall a request already sent, because a database check and an external provider
   call cannot share a transaction.
 - **`appleRevoke.ts`** (`"use node"` action): revokes a Sign in with Apple refresh token
@@ -236,7 +228,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
-  recovery, hourly feedback inbox delivery retry, embedding sweep, daily payment-receipt
+  recovery, hourly feedback inbox delivery retry, daily payment-receipt
   retention purge, and the daily expired plan vote link purge.
 - **`auth.ts`**: `convexAuth()` setup with Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
@@ -268,11 +260,18 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
-- **`aiEmbeddingSweep.ts`** (`"use node"`): the embedding sweep cron and best-effort
-  `embedTexts` / `embedQuery` provider calls. See [embeddings](docs/architecture/embeddings.md).
-- **`aiRecommendForSpace.ts`** (`"use node"`): ranked-plus-recency recommendations,
-  scheduled by space creation and dynamic enabling; creates suggestions only.
-  Both modules and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
+- **`aiEmbeddingSweep.ts`** (`"use node"`): retired. Saves no longer get embeddings, because
+  nothing the app shows read them, and each one made every save about 16 KB heavier in
+  the city scan's read budget. Its cron is gone; the action is a no-op kept so a queued
+  sweep ends quietly. `items:clearEmbeddings` removes old vectors; run it once after
+  deploying, from `apps/native`: `pnpm exec convex run --prod items:clearEmbeddings '{"cursor":null}'`.
+  It schedules its remaining pages and is safe to rerun. `items.embedding`,
+  `embeddingVersion` and `embeddingAttempts` stay declared until no row carries them.
+  See [embeddings](docs/architecture/embeddings.md).
+- **`aiRecommendForSpace.ts`** (`"use node"`): recommendations from the 100 newest ready
+  saves, scheduled by space creation and dynamic enabling (old builds only); creates
+  suggestions only.
+  It and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
 - **`model/pageRead.ts`**: the single `readPage(url)` entry point and host dispatcher.
   **`model/pageReadCore.ts`** holds shared page data, bounded fetches, HTML extraction
   (Mozilla **Readability** via `linkedom`) and schema.org recipe helpers.
