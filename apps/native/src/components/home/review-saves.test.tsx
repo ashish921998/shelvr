@@ -151,6 +151,25 @@ describe("ReviewSaves", () => {
     expect(mock.remove).toHaveBeenCalledWith(recipe);
   });
 
+  it("says a partly read save couldn't be read, since Retry is offered for it", () => {
+    const partial = save({
+      _id: "partial" as ReviewSave["_id"],
+      status: "ready",
+      cities: [],
+      enrichment: "partial",
+      title: "Coffee Spots List",
+      url: "https://qa-broken-link.invalid/coffee",
+    });
+    render(<ReviewSaves saves={[partial]} />);
+    fireEvent.click(screen.getByText("Review"));
+    expect(
+      screen.getByText("qa-broken-link.invalid · Couldn't read this link"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Retry, Coffee Spots List" }),
+    ).toBeTruthy();
+  });
+
   it("opens a save from its row and closes the sheet", () => {
     render(<ReviewSaves saves={[recipe]} />);
     fireEvent.click(screen.getByText("Review"));

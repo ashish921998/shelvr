@@ -29,7 +29,8 @@ function ReviewRow({ save, onOpen }: { save: ReviewSave; onOpen: () => void }) {
   const source = saveSource(save);
   const name = save.title?.trim() || source || t("homePlaces.untitled");
   const reason =
-    save.status === "failed"
+    // A partial save never got its page read, so it reads as failed too.
+    save.status === "failed" || canRetrySave(save)
       ? t("homePlaces.reviewFailed")
       : t("homePlaces.noPlaceNone");
   const detail = source && source !== name ? `${source} · ${reason}` : reason;
