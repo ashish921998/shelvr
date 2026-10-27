@@ -1,6 +1,11 @@
 import { CityCover } from "@/components/city/city-cover";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
-import { type City, unplacedSaves, visibleCities } from "@/lib/home-places";
+import {
+  type City,
+  saveSource,
+  unplacedSaves,
+  visibleCities,
+} from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -66,6 +71,7 @@ type UnplacedSave = {
   cities?: string[];
   title?: string;
   url?: string;
+  siteName?: string;
 };
 
 function UnplacedSection({
@@ -87,7 +93,7 @@ function UnplacedSection({
         <Pressable
           key={save._id}
           accessibilityRole="button"
-          accessibilityLabel={`${save.title ?? save.url ?? ""}, ${title}`}
+          accessibilityLabel={`${save.title ?? saveSource(save)}, ${title}`}
           onPress={() =>
             router.push({
               pathname: "/item/[id]",
@@ -100,7 +106,7 @@ function UnplacedSection({
           ]}
         >
           <Text style={styles.unplacedTitle} numberOfLines={1}>
-            {save.title ?? save.url ?? ""}
+            {save.title ?? saveSource(save)}
           </Text>
         </Pressable>
       ))}

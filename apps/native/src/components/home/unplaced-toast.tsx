@@ -6,7 +6,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, Text, View } from "react-native";
-import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
 const TOAST_MS = 6000;
@@ -52,8 +52,8 @@ export function UnplacedToast() {
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
       <Animated.View
-        entering={FadeInUp}
-        exiting={FadeOutUp}
+        entering={FadeInDown}
+        exiting={FadeOutDown}
         style={styles.toast}
         accessibilityRole="alert"
         testID="unplaced-toast"
@@ -101,7 +101,8 @@ export function UnplacedToast() {
 const styles = StyleSheet.create((theme, rt) => ({
   overlay: {
     position: "absolute",
-    top: rt.insets.top + theme.gap(1),
+    // Above the floating tab bar, clear of the header's Profile and Add buttons.
+    bottom: rt.insets.bottom + theme.gap(8),
     left: theme.gap(2),
     right: theme.gap(2),
   },

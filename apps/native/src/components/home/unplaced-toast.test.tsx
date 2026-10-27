@@ -24,8 +24,8 @@ vi.mock("react-native-reanimated", () => ({
       <div role="alert">{children}</div>
     )),
   },
-  FadeInUp: {},
-  FadeOutUp: {},
+  FadeInDown: {},
+  FadeOutDown: {},
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },

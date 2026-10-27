@@ -44,7 +44,7 @@ function ReviewRow({ save, onOpen }: { save: ReviewSave; onOpen: () => void }) {
         <Text style={styles.rowTitle} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={styles.muted} numberOfLines={1}>
+        <Text style={styles.muted} numberOfLines={2}>
           {detail}
         </Text>
       </Pressable>

@@ -76,6 +76,22 @@ describe("unplaced save states", () => {
     expect(screen.queryByText("Empty reel")).toBeNull();
   });
 
+  it("names an untitled save that is still reading by its site, not its URL", () => {
+    render(
+      <UnplacedSaves
+        saves={[
+          {
+            _id: "new",
+            status: "processing",
+            url: "https://www.timeout.com/lisbon/restaurants",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("timeout.com")).toBeTruthy();
+    expect(screen.queryByText(/https:/)).toBeNull();
+  });
+
   it("expands processing saves", () => {
     render(
       <UnplacedSaves
