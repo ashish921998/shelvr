@@ -229,6 +229,23 @@ export type AnalyticsEventProperties = {
     action: "save" | "card" | "maps";
   };
   trip_plan_deleted: Record<string, never>;
+  date_plan_started: { kind: "classic" | "lowkey" | "surprise" };
+  date_plan_made: {
+    kind: "classic" | "lowkey";
+    asked: "classic" | "lowkey" | "surprise";
+    status: "ready" | "no_anchor" | "no_pair";
+    evenings: number;
+    suggested: number;
+  };
+  date_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
+  date_plan_another: { index: number };
+  date_plan_swapped: { slot: "first" | "second"; swapped: boolean };
+  date_plan_stop_opened: {
+    source: "save" | "suggested";
+    action: "save" | "card" | "maps";
+  };
+  date_plan_go: Record<string, never>;
+  date_plan_sent: { shared: boolean };
   onboarding_completed: {
     save_pileup: string[];
     interests: string[];

@@ -6,7 +6,7 @@ import { moveCamera } from "@/lib/map-camera";
 import { t } from "@/lib/i18n";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { dayColor, planPins } from "@/lib/trip-planner";
-import type { TripPlanDetail } from "@convex/model/tripPlan";
+import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type LayoutChangeEvent, ScrollView, View } from "react-native";
@@ -16,7 +16,8 @@ const FADED = 0.35;
 const STAY_ID = "stay";
 
 type Props = {
-  days: TripPlanDetail["days"];
+  /** Only each stop's name and point are drawn, so a date's evening can use the map too. */
+  days: readonly Pick<TripPlanStop, "name" | "lat" | "lng">[][];
   stay: TripPlanDetail["stay"];
   /** The day in focus, or null for the whole trip. */
   activeDay: number | null;

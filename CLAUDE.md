@@ -174,8 +174,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
   `acceptAllSuggestions`), `ensureCitySpace`, plus internal join helpers. `ensureCitySpace`
   finds or makes a hidden space named for a city and files that city's ready saves into it
-  as `saved`; the city page calls it before Plan a date / Plan a trip, and plan shares and
-  stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
+  as `saved`; older builds call it before Plan a date (the current one opens `date-plan`,
+  which needs no space), and plan shares and stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
   functions stay for old builds.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
@@ -318,6 +318,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   No AI call or AI permission is needed to plan.
   "We went" places never return as fallback picks. A multi-city save contributes only
   place labels explicitly carrying the chosen city; ambiguous labels are skipped.
+- **`datePlans.ts`** (`"use node"` action), **`datePlanData.ts`**: "Plan a date". `makeDatePlan`
+  takes a city and a kind (`classic`: dinner, then drinks or dessert; `lowkey`: coffee, then a
+  walk; `surprise`: one the saves can make) and returns ranked evenings of two stops a walk
+  (1.5 km) apart, at least one of them a saved, pinned, unvisited place. `claimDatePlanInternal`
+  checks Pro and spends the `makePlan` rate limit before reading the city's saves. The pure
+  rules (which category or tag fits which stop, pair ranking, Apple result filters) are in
+  `model/dateRank.ts`; the result shape and the swap rule the app shares are in
+  `model/datePlan.ts`. With fewer than three evenings from the saves alone, it asks Apple Maps
+  for the missing stop near up to three saved ones (one search each, 10 s deadline, none when
+  AI is declined or the Maps key is unset). Nothing is stored; swaps and "Try another evening"
+  run on the phone.
 - **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
   (newest first, one entry per spot) for the Map tab, each with its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
@@ -478,8 +489,13 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `new-trip`,
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `date-plan`, `new-trip`,
   `trip-plan/[id]`
+- `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
+  date?" (Classic, Low-key, Surprise me; Something new and Big night show as coming soon),
+  then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info
+  and Swap, the approximate walk between, Let's go (Maps directions to the first stop), Try
+  another evening, and Send to your date (plain share text with Maps links)
 - `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
   Plan a trip opens it): city, days, optional start date, interests, pace and an optional
   stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then
