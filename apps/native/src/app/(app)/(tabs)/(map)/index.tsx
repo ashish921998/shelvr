@@ -24,6 +24,7 @@ import {
   topSearchResults,
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
+import { useMapPlacesWanted } from "@/lib/map-prefetch";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
@@ -62,7 +63,10 @@ export default function MapScreen() {
       };
     }, []),
   );
-  const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
+  const wanted = useMapPlacesWanted(opened);
+  const places = useQuery(
+    convexQuery(api.mapPlaces.listMapPlaces, wanted ? {} : "skip"),
+  );
   const location = useMapLocation(opened);
   const [kind, setKind] = useState<PlaceKind | null>(null);
   const [searchText, setSearchText] = useState("");
