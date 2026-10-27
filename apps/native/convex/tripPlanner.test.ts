@@ -354,8 +354,8 @@ describe("createTripPlan without Apple Maps", () => {
     const trip = await t.query(api.tripPlannerData.getTripPlan, {
       tripId: result.tripId!,
     });
+    expect(trip).not.toHaveProperty("name");
     expect(trip).toMatchObject({
-      name: "Lisbon",
       city: "Lisbon",
       startDate: "2026-11-02",
       dayCount: 2,
@@ -534,6 +534,25 @@ describe("createTripPlan with Apple Maps", () => {
     // My Trips counts what the days hold, not the unplanned extras.
     const [summary] = await t.query(api.tripPlannerData.listTripPlans, {});
     expect(summary).toMatchObject({ stopCount: 10, savedCount: 3 });
+  });
+
+  it("stores the interests sent and suggests nothing when none are", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t } = await setup();
+
+    const result = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 2,
+      pace: "balanced",
+      interests: [],
+      locale: "en-GB",
+    });
+    expect(result).toMatchObject({ suggested: 0 });
+    expect(searches(fetchMock)).toEqual([]);
+    const [summary] = await t.query(api.tripPlannerData.listTripPlans, {});
+    expect(summary.interests).toEqual([]);
   });
 
   it("suggests no lodging and not a saved place's namesake next door", async () => {

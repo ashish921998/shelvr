@@ -20,6 +20,7 @@ import {
 } from "./model/plan";
 import {
   dropStrays,
+  lookupQuery,
   middleOf,
   STOPS_PER_DAY,
   tripPaceValidator,
@@ -55,7 +56,6 @@ const MAX_APPLE_CALLS = 24;
 const MAX_SAVE_LOOKUPS = 6;
 /** Suggestions past the days' room, left unplanned to swap in. */
 const EXTRA_SUGGESTIONS = 5;
-const DEFAULT_INTERESTS: TripInterest[] = ["food", "sights", "culture"];
 
 type SavedPin = {
   itemId: Id<"items">;
@@ -144,13 +144,6 @@ function saveStop(
     ...(at.category !== undefined ? { category: at.category } : {}),
     ...(why !== undefined ? { why } : {}),
   };
-}
-
-function lookupQuery(place: PlanPlace, city: string): string {
-  const area = place.area?.trim() ?? "";
-  const parts = [place.name.trim(), area];
-  if (!area.toLowerCase().includes(city.toLowerCase())) parts.push(city);
-  return parts.filter(Boolean).join(", ");
 }
 
 /** The city's unvisited saved places with a pin: stored pins first, then a few looked up near the city. */
@@ -334,8 +327,8 @@ export const createTripPlan = action({
         ...(args.stay !== undefined ? { stay: args.stay } : {}),
       },
     );
-    const interests =
-      claim.interests.length > 0 ? claim.interests : DEFAULT_INTERESTS;
+    // No interests means no suggestions: the trip is planned from the saves alone.
+    const interests = claim.interests;
     // The city, the stay and points from the saves would all reach Apple, so a declined
     // account plans from its stored pins alone, as pin lookup does.
     const maps = claim.aiAllowed
@@ -345,7 +338,7 @@ export const createTripPlan = action({
     const stay = await locateStay(claim, maps, centre);
     const wanted = suggestionRoom(args.pace, claim.days, saves.length);
     const suggested =
-      maps !== null && centre !== null && wanted > 0
+      maps !== null && centre !== null && wanted > 0 && interests.length > 0
         ? await suggestStops(claim, maps, centre, saves, wanted, interests)
         : { stops: [], searches: 0 };
     const fields = {

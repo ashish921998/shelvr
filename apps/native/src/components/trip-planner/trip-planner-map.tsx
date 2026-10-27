@@ -1,4 +1,4 @@
-import { Chip } from "@/components/trip-planner/trip-planner-form";
+import { Chip } from "@/components/trip-planner/chip";
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { withAlpha } from "@/lib/color";
@@ -54,22 +54,27 @@ function DayChips({
         label={t("tripPlanner.allDays")}
         selected={activeDay === null}
         pick="radio"
-        tone="ink"
+        fill={{
+          background: theme.colors.foreground,
+          foreground: theme.colors.background,
+        }}
         onPress={() => onSelectDay(null)}
       />
-      {Array.from({ length: dayCount }, (_, day) => (
-        <Chip
-          key={day}
-          label={t("trip.dayTab", { day: String(day + 1) })}
-          selected={activeDay === day}
-          pick="radio"
-          swatch={{
-            color: dayColor(day, theme.colors.tripDays),
-            on: theme.colors.onTripDay,
-          }}
-          onPress={() => onSelectDay(day)}
-        />
-      ))}
+      {Array.from({ length: dayCount }, (_, day) => {
+        // The day's colour: a dot while off, the whole fill once picked.
+        const color = dayColor(day, theme.colors.tripDays);
+        return (
+          <Chip
+            key={day}
+            label={t("trip.dayTab", { day: String(day + 1) })}
+            selected={activeDay === day}
+            pick="radio"
+            fill={{ background: color, foreground: theme.colors.onTripDay }}
+            dot={color}
+            onPress={() => onSelectDay(day)}
+          />
+        );
+      })}
     </ScrollView>
   );
 }

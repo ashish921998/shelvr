@@ -17,7 +17,6 @@ import {
   type TripPlanStop,
   type TripPlanSummary,
 } from "@convex/model/tripPlan";
-import { ConvexError } from "convex/values";
 import { Platform } from "react-native";
 
 export const TRIP_PACES: TripPace[] = ["easy", "balanced", "packed"];
@@ -162,18 +161,8 @@ export function tripFormArgs(
 
 export type TripPlanFailure = "rate_limited" | "pro_required" | "error";
 
-function errorCode(error: unknown): unknown {
-  if (!(error instanceof ConvexError)) return undefined;
-  const data: unknown = error.data;
-  return typeof data === "object" && data !== null
-    ? (data as { code?: unknown }).code
-    : undefined;
-}
-
 export function tripPlanFailure(error: unknown): TripPlanFailure {
-  if (isRateLimitedError(error) || errorCode(error) === "rate_limited") {
-    return "rate_limited";
-  }
+  if (isRateLimitedError(error)) return "rate_limited";
   if (saveErrorCode(error) === "pro_required") return "pro_required";
   return "error";
 }

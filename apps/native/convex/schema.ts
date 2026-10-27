@@ -354,7 +354,6 @@ export default defineSchema({
 
   tripPlans: defineTable({
     userId: v.string(),
-    name: v.string(),
     city: v.string(),
     startDate: v.optional(v.string()),
     dayCount: v.number(),
@@ -365,9 +364,7 @@ export default defineSchema({
     savedCount: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_user_and_city", ["userId", "city"]),
+  }).index("by_user", ["userId"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),

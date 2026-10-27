@@ -1,4 +1,5 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { Chip, type ChipFill } from "@/components/trip-planner/chip";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { MAX_TRIP_DAYS, MIN_TRIP_DAYS, type TripPace } from "@/lib/trip";
@@ -48,83 +49,10 @@ export function FormSection({
   );
 }
 
-/** A colour a chip carries: a dot while it is off, its whole fill (with `on` for the label) once picked. */
-type ChipSwatch = { color: string; on: string };
-
-/**
- * A selectable pill. `pick` says how it reads to VoiceOver and TalkBack: one of a set
- * ("radio") or one of several that can be on together ("checkbox"), each with its
- * checked state, so the selection is announced on both platforms. A picked chip fills
- * with its swatch, or else with amber (`tone` "accent") or ink (`tone` "ink"), for a
- * chip that must not look like any coloured one beside it.
- */
-export function Chip({
-  label,
-  detail,
-  selected,
-  pick,
-  swatch,
-  tone = "accent",
-  onPress,
-}: {
-  label: string;
-  detail?: string;
-  selected: boolean;
-  pick: "radio" | "checkbox";
-  swatch?: ChipSwatch;
-  tone?: "accent" | "ink";
-  onPress: () => void;
-}) {
-  const onFill = tone === "ink" ? styles.onInk : styles.onTint;
-  const labelStyle = selected
-    ? swatch
-      ? { color: swatch.on }
-      : onFill
-    : undefined;
-  return (
-    <Pressable
-      accessibilityRole={pick}
-      accessibilityLabel={detail ? `${label}, ${detail}` : label}
-      accessibilityState={{ checked: selected }}
-      hitSlop={4}
-      onPress={() => {
-        tick();
-        onPress();
-      }}
-      style={({ pressed }) => [
-        styles.chip,
-        selected &&
-          (tone === "ink" ? styles.chipSelectedInk : styles.chipSelected),
-        selected &&
-          swatch && {
-            borderColor: swatch.color,
-            backgroundColor: swatch.color,
-          },
-        pressed && styles.pressed,
-      ]}
-    >
-      {swatch ? (
-        <View
-          style={[
-            styles.swatch,
-            { backgroundColor: selected ? swatch.on : swatch.color },
-          ]}
-        />
-      ) : null}
-      {/* One weight in both states: a bolder selected label would widen the chip and rewrap the row. */}
-      <ThemedText variant="label" numberOfLines={1} style={labelStyle}>
-        {label}
-      </ThemedText>
-      {detail ? (
-        <ThemedText
-          variant="captionLabel"
-          style={selected ? onFill : styles.muted}
-        >
-          {detail}
-        </ThemedText>
-      ) : null}
-    </Pressable>
-  );
+/** Form chips fill amber once picked, with the dark text the amber needs. */
+function useAccentFill(): ChipFill {
+  const { theme } = useUnistyles();
+  return { background: theme.colors.primary, foreground: theme.colors.onTint };
 }
 
 export function CityPicker({
@@ -138,6 +66,7 @@ export function CityPicker({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const fill = useAccentFill();
   return (
     <View style={styles.cityPicker}>
       {cities.length > 0 ? (
@@ -155,6 +84,7 @@ export function CityPicker({
               detail={t("trip.revealSaves", { count: choice.count })}
               selected={sameCity(choice.city, value)}
               pick="radio"
+              fill={fill}
               onPress={() => onChange(choice.city)}
             />
           ))}
@@ -267,6 +197,7 @@ export function InterestChips({
   onChange: (interests: TripInterest[]) => void;
 }) {
   useAppLocale();
+  const fill = useAccentFill();
   return (
     <View style={styles.wrapChips}>
       {TRIP_INTERESTS.map((interest) => (
@@ -275,6 +206,7 @@ export function InterestChips({
           label={interestLabel(interest)}
           selected={selected.includes(interest)}
           pick="checkbox"
+          fill={fill}
           onPress={() => onChange(toggleInterest(selected, interest))}
         />
       ))}
@@ -291,6 +223,7 @@ export function PaceChips({
   onChange: (pace: TripPace) => void;
 }) {
   useAppLocale();
+  const fill = useAccentFill();
   return (
     <View
       style={styles.wrapChips}
@@ -303,6 +236,7 @@ export function PaceChips({
           label={paceLabel(pace)}
           selected={pace === selected}
           pick="radio"
+          fill={fill}
           onPress={() => onChange(pace)}
         />
       ))}
@@ -339,8 +273,6 @@ const styles = StyleSheet.create((theme) => ({
   section: { gap: theme.gap(1.25) },
   sectionHeading: { gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
-  onTint: { color: theme.colors.onTint },
-  onInk: { color: theme.colors.background },
   pressed: { opacity: theme.opacity.pressed },
   disabled: { opacity: theme.opacity.disabled },
   cityPicker: { gap: theme.gap(1.25) },
@@ -355,27 +287,6 @@ const styles = StyleSheet.create((theme) => ({
     flexWrap: "wrap",
     gap: theme.gap(1),
   },
-  chip: {
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-    paddingHorizontal: theme.gap(1.75),
-    borderRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  chipSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
-  },
-  chipSelectedInk: {
-    borderColor: theme.colors.foreground,
-    backgroundColor: theme.colors.foreground,
-  },
-  swatch: { width: 8, height: 8, borderRadius: 4 },
   input: {
     ...theme.type.body,
     color: theme.colors.foreground,

@@ -58,7 +58,6 @@ export type TripPlanStop = Infer<typeof tripPlanStopValidator>;
 
 export const tripPlanSummaryValidator = v.object({
   _id: v.id("tripPlans"),
-  name: v.string(),
   city: v.string(),
   startDate: v.optional(v.string()),
   dayCount: v.number(),
@@ -71,7 +70,6 @@ export type TripPlanSummary = Infer<typeof tripPlanSummaryValidator>;
 
 export const tripPlanDetailValidator = v.object({
   _id: v.id("tripPlans"),
-  name: v.string(),
   city: v.string(),
   startDate: v.optional(v.string()),
   dayCount: v.number(),

@@ -1,4 +1,5 @@
 import type { Id } from "../_generated/dataModel";
+import type { ApplePoi } from "./appleMaps";
 import {
   clip,
   MAX_WHY_CHARS,
@@ -11,6 +12,7 @@ import {
   clusterPlaces,
   distanceKm,
   middleOf,
+  SAME_PLACE_KM,
   STOPS_PER_DAY,
   type LatLng,
   type TripPace,
@@ -362,14 +364,8 @@ export function chainNames(
 
 /** Results farther than this from the city centre are another town, whatever Apple calls the locality. */
 export const SUGGEST_RADIUS_KM = 25;
-const SAME_PLACE_KM = 0.3;
 
-export type FoundPoi = LatLng & {
-  name: string;
-  appleId?: string;
-  category?: string;
-  area?: string;
-};
+export type FoundPoi = ApplePoi;
 
 export type Suggestion = FoundPoi & { interest: TripInterest };
 
@@ -404,7 +400,12 @@ export function nameWithin(a: string, b: string): boolean {
   return false;
 }
 
-/** The same venue: one Apple id, or a few doors apart under one name or one name inside the other (often its hotel). */
+/**
+ * The same venue: one Apple id, or a few doors apart under one name or one name inside the other
+ * (often its hotel). Two different Apple ids still match on name within SAME_PLACE_KM, so a
+ * restaurant and the hotel it sits in become one stop; uniquePlacePins must not do that, since
+ * there distinct Apple ids are distinct places on the map.
+ */
 export function samePlace(a: Placed, b: Placed): boolean {
   if (a.appleId !== undefined && b.appleId !== undefined) {
     if (a.appleId === b.appleId) return true;

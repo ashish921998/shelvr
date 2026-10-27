@@ -226,7 +226,6 @@ export const saveTripPlanInternal = internalMutation({
     const now = Date.now();
     const tripId = await ctx.db.insert("tripPlans", {
       userId,
-      name: tidyCity(args.city).slice(0, MAX_CITY_CHARS),
       city: tidyCity(args.city).slice(0, MAX_CITY_CHARS),
       ...(args.startDate !== undefined ? { startDate: args.startDate } : {}),
       dayCount,
@@ -264,7 +263,6 @@ export const listTripPlans = authedQuery({
       .take(LIST_LIMIT);
     return plans.map((plan) => ({
       _id: plan._id,
-      name: plan.name,
       city: plan.city,
       ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
       dayCount: plan.dayCount,
@@ -360,7 +358,6 @@ export const getTripPlan = authedQuery({
     }
     return {
       _id: plan._id,
-      name: plan.name,
       city: plan.city,
       ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
       dayCount: plan.dayCount,
