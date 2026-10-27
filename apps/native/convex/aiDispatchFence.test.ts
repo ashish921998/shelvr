@@ -9,12 +9,7 @@ import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 import { findProductLinks, processItem, steerItemForSpace } from "./ai";
 import { recommendForSpace } from "./aiRecommendForSpace";
-import { sweepItemEmbeddings } from "./aiEmbeddingSweep";
-import {
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_DIMENSIONS,
-  EMBEDDING_SWEEP_PAGE,
-} from "./model/embedding";
+import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   newConvexTest,
   insertConsentingUser,
@@ -211,63 +206,6 @@ async function paused(
 }
 
 describe("AI dispatch uses fresh live ownership", () => {
-  it("revalidates a mixed sweep in one query and maps distinct vectors around empty and gone slots", async () => {
-    const f = await fixture();
-    const [declinedId, goneId, secondId] = await f.t.run(async (ctx) => {
-      await setTestConsent(ctx, f.foreignId, "declined");
-      const insert = (userId: string, title: string) =>
-        ctx.db.insert("items", {
-          userId,
-          title,
-          type: "note",
-          status: "ready",
-          tags: [],
-          searchText: "",
-        });
-      return [
-        await insert(f.foreignId, "Declined synthetic"),
-        await insert(f.userId, "Gone synthetic"),
-        await insert(f.userId, "Second allowed"),
-      ];
-    });
-    const secondVector = vector.map((value, i) =>
-      i === 1 ? 1 : value === 1 ? 0 : value,
-    );
-    embedMany.mockResolvedValue({ embeddings: [vector, secondVector] });
-    await f.t.action(async (ctx) => {
-      let batches = 0;
-      const runQuery: ActionCtx["runQuery"] = async (ref, ...args) => {
-        const name = getFunctionName(ref);
-        expect(["aiConsent:isAllowed", "items:getItemInternal"]).not.toContain(
-          name,
-        );
-        if (name === "aiConsent:revalidateEmbeddingBatch") batches++;
-        const result = await ctx.runQuery(ref, ...args);
-        if (name === "items:listItemsNeedingEmbeddingInternal")
-          await f.t.run((db) => db.db.delete(goneId));
-        return result;
-      };
-      await handler(sweepItemEmbeddings)({ ...ctx, runQuery }, {});
-      expect(batches).toBe(1);
-    });
-    expect(embedMany.mock.calls[0][0].values).toEqual([
-      expect.stringContaining("Synthetic save"),
-      "Second allowed",
-    ]);
-    expect(await f.t.run((ctx) => ctx.db.get(f.itemId))).toMatchObject({
-      embedding: vector,
-    });
-    expect(await f.t.run((ctx) => ctx.db.get(secondId))).toMatchObject({
-      embedding: secondVector,
-    });
-    expect(await f.t.run((ctx) => ctx.db.get(declinedId))).toMatchObject({
-      embeddingVersion: CURRENT_EMBEDDING_VERSION,
-    });
-    expect(
-      (await f.t.run((ctx) => ctx.db.get(declinedId)))?.embedding,
-    ).toBeUndefined();
-  });
-
   it("reads recommendation context once before embedding and survivors once after hydration", async () => {
     const f = await fixture();
     const calls: string[] = [];
@@ -300,16 +238,8 @@ describe("AI dispatch uses fresh live ownership", () => {
     expect(generateObject).toHaveBeenCalledOnce();
   });
 
-  it("rejects oversized sweep batches and empty recommendation validation", async () => {
+  it("rejects empty recommendation validation", async () => {
     const f = await fixture();
-    await expect(
-      f.t.query(internal.aiConsent.revalidateEmbeddingBatch, {
-        entries: Array.from({ length: EMBEDDING_SWEEP_PAGE + 1 }, () => ({
-          itemId: f.itemId,
-          userId: f.userId,
-        })),
-      }),
-    ).rejects.toThrow("Too many embedding entries");
     await expect(
       f.t.query(internal.spaces.survivingCandidates, {
         spaceId: f.spaceId,
@@ -349,64 +279,6 @@ describe("AI dispatch uses fresh live ownership", () => {
     },
   );
 
-  it("excludes declined sweep text after consent removal following fresh denial", async () => {
-    const f = await fixture();
-    await f.t.run((ctx) => setTestConsent(ctx, f.userId, "declined"));
-    await f.t.run((ctx) =>
-      ctx.db.insert("items", {
-        userId: f.foreignId,
-        type: "note",
-        status: "ready",
-        title: "Allowed synthetic save",
-        note: "Allowed synthetic note",
-        tags: [],
-        searchText: "",
-      }),
-    );
-    await paused(
-      f,
-      "aiConsent:revalidateEmbeddingBatch",
-      (ctx) => handler(sweepItemEmbeddings)(ctx, {}),
-      async (query) => {
-        expect(query?.name).toBe("aiConsent:revalidateEmbeddingBatch");
-        expect(query?.args).toMatchObject({
-          entries: expect.arrayContaining([
-            { userId: f.userId, itemId: f.itemId },
-          ]),
-        });
-        expect(query?.result).toEqual(
-          expect.arrayContaining([
-            { itemId: f.itemId, disposition: "declined" },
-          ]),
-        );
-        expect(
-          await f.t.query(internal.aiConsent.isAllowed, {
-            userId: f.userId,
-            itemId: f.itemId,
-          }),
-        ).toBe(false);
-        await f.t.run(async (ctx) => {
-          const row = await ctx.db
-            .query("aiConsents")
-            .withIndex("by_user", (q) => q.eq("userId", f.userId))
-            .unique();
-          if (row !== null) await ctx.db.delete(row._id);
-        });
-        expect(
-          await f.t.run(
-            async (ctx) => (await ctx.db.get(f.userId))?.deleting !== true,
-          ),
-        ).toBe(true);
-      },
-    );
-    expect(embedMany).toHaveBeenCalledOnce();
-    expect(embedMany.mock.calls[0][0].values).toEqual([
-      expect.stringContaining("Allowed synthetic note"),
-    ]);
-    expect(embedMany.mock.calls[0][0].values).not.toEqual(
-      expect.arrayContaining([expect.stringContaining("Synthetic note")]),
-    );
-  });
   it.each(["removed owner", "deleting owner", "declined"] as const)(
     "rejects %s even without an item identity",
     async (kind) => {
@@ -568,46 +440,6 @@ describe("AI dispatch uses fresh live ownership", () => {
     "deleted item",
     "foreign item",
     "declined",
-  ] as const)("omits sweep input after %s", async (kind) => {
-    const f = await fixture();
-    await paused(
-      f,
-      "items:listItemsNeedingEmbeddingInternal",
-      (ctx) => handler(sweepItemEmbeddings)(ctx, {}),
-      () => invalidate(f, kind),
-    );
-    expect(embedMany).not.toHaveBeenCalled();
-  });
-
-  it("maps mixed sweep vectors to only surviving items", async () => {
-    const f = await fixture();
-    const survivingId = await f.t.run((ctx) =>
-      ctx.db.insert("items", {
-        userId: f.userId,
-        type: "note",
-        status: "ready",
-        title: "Surviving synthetic",
-        tags: [],
-        searchText: "",
-      }),
-    );
-    await paused(
-      f,
-      "items:listItemsNeedingEmbeddingInternal",
-      (ctx) => handler(sweepItemEmbeddings)(ctx, {}),
-      () => invalidate(f, "deleted item"),
-    );
-    expect(embedMany.mock.calls[0][0].values).toEqual(["Surviving synthetic"]);
-    expect(await f.t.run((ctx) => ctx.db.get(survivingId))).toMatchObject({
-      embedding: vector,
-    });
-  });
-
-  it.each([
-    "removed owner",
-    "deleting owner",
-    "deleted item",
-    "foreign item",
   ] as const)(
     "does not classify recommendations after hydrated %s",
     async (kind) => {
@@ -619,7 +451,7 @@ describe("AI dispatch uses fresh live ownership", () => {
         () => invalidate(f, kind),
       );
       expect(generateObject).not.toHaveBeenCalled();
-      expect(embedMany).toHaveBeenCalledOnce();
+      expect(embedMany).not.toHaveBeenCalled();
     },
   );
 

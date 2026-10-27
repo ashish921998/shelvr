@@ -7,7 +7,7 @@ import { inAppBrowser, platform } from "@/lib/bioLink";
 export const metadata: Metadata = {
   title: "Get Shelvr",
   description:
-    "Save food and travel finds from any video. Shelvr pins them and plans the day.",
+    "Share a reel or TikTok to Shelvr. Its places land on a map of their city, ready for a date night or a trip.",
   robots: { index: false, follow: false },
   alternates: { canonical: "/get" },
 };

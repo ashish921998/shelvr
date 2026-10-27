@@ -11,7 +11,6 @@ import {
   postMediaValidator,
   recipeValidator,
 } from "./model/itemFields";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   cancelSurveyOutcomeValidator,
   cancelSurveyReasonValidator,
@@ -142,6 +141,8 @@ export default defineSchema({
     processingRunId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
+    // Retired: nothing reads it, and `items:clearEmbeddings` removes it. Stays declared
+    // until no row carries it (one-way door).
     embedding: v.optional(v.array(v.float64())),
     embeddingVersion: v.optional(v.number()),
     embeddingAttempts: v.optional(v.number()),
@@ -158,11 +159,6 @@ export default defineSchema({
     .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
       searchField: "searchText",
-      filterFields: ["userId"],
-    })
-    .vectorIndex("by_embedding", {
-      vectorField: "embedding",
-      dimensions: EMBEDDING_DIMENSIONS,
       filterFields: ["userId"],
     }),
 

@@ -56,15 +56,6 @@ import {
   recipeValidator,
 } from "./model/itemFields";
 import {
-  buildEmbeddingText,
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_SWEEP_PAGE,
-  isValidEmbedding,
-  MAX_HYDRATE_READ_BYTES,
-  MAX_EMBEDDING_ATTEMPTS,
-  MAX_SWEEP_READ_BYTES,
-} from "./model/embedding";
-import {
   imageSizeError,
   imageSizeErrorCode,
   MAX_PHOTOS_PER_ACCOUNT,
@@ -275,7 +266,7 @@ export async function readySavesNewestFirst(
   ctx: QueryCtx,
   userId: string,
 ): Promise<Doc<"items">[]> {
-  const { rows } = await takeWithinBytes(
+  const { rows, bytes } = await takeWithinBytes(
     ctx.db
       .query("items")
       .withIndex("by_user_and_status", (q) =>
@@ -284,6 +275,13 @@ export async function readySavesNewestFirst(
       .order("desc"),
     { maxRows: CITY_SCAN_ROWS, maxBytes: CITY_SCAN_BYTES },
   );
+  // Home, Map and city pages show only these saves, so a cut here hides older cities.
+  if (rows.length >= CITY_SCAN_ROWS || bytes >= CITY_SCAN_BYTES) {
+    logEvent("info", "ready_scan_limit_reached", {
+      rows: rows.length,
+      limit: rows.length >= CITY_SCAN_ROWS ? "rows" : "bytes",
+    });
+  }
   return rows;
 }
 
@@ -625,6 +623,49 @@ export const backfillPlaceSearch = internalMutation({
     }
     if (!batch.isDone) {
       await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
+  },
+});
+
+/**
+ * Run once after deploying the end of embeddings, to shrink every save:
+ * convex run items:clearEmbeddings '{"cursor":null}'. Safe to restart from a null cursor.
+ */
+export const clearEmbeddings = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("items").paginate({
+      cursor,
+      numItems: 25,
+      maximumBytesRead: 2 * 1024 * 1024,
+    });
+    let cleared = 0;
+    for (const item of batch.page) {
+      if (
+        item.embedding === undefined &&
+        item.embeddingVersion === undefined &&
+        item.embeddingAttempts === undefined
+      ) {
+        continue;
+      }
+      await ctx.db.patch(item._id, {
+        embedding: undefined,
+        embeddingVersion: undefined,
+        embeddingAttempts: undefined,
+      });
+      cleared++;
+    }
+    logEvent("info", "embeddings_cleared", {
+      scanned: batch.page.length,
+      cleared,
+      done: batch.isDone,
+    });
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.clearEmbeddings, {
         cursor: batch.continueCursor,
       });
     }
@@ -2034,40 +2075,6 @@ export const listReadyItemsInternal = internalQuery({
   },
 });
 
-/** Convex vector filters cannot AND fields, so non-ready and old-generation hits are dropped here. */
-export const listReadyItemsByIdInternal = internalQuery({
-  args: {
-    userId: v.string(),
-    itemIds: v.array(v.id("items")),
-    limit: v.number(),
-  },
-  returns: v.array(v.object(itemFields)),
-  handler: async (ctx, args) => {
-    const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
-    const rows: Doc<"items">[] = [];
-    let bytes = 0;
-    for (const itemId of args.itemIds) {
-      if (rows.length >= limit || bytes >= MAX_HYDRATE_READ_BYTES) {
-        break;
-      }
-      const item = await ctx.db.get(itemId);
-      if (item === null) {
-        continue;
-      }
-      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
-      if (
-        item.userId !== args.userId ||
-        item.status !== "ready" ||
-        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
-      ) {
-        continue;
-      }
-      rows.push(item);
-    }
-    return rows.map(stripEmbedding);
-  },
-});
-
 function ownsRun(item: Doc<"items">, runId: string | undefined): boolean {
   return item.processingRunId === runId;
 }
@@ -2284,201 +2291,6 @@ export const deleteStorageIfUnreferenced = internalMutation({
       await safeDeleteStorage(ctx, args.storageId);
     }
     return null;
-  },
-});
-
-export const listItemsNeedingEmbeddingInternal = internalQuery({
-  args: { limit: v.number() },
-  returns: v.array(
-    v.object({
-      itemId: v.id("items"),
-      userId: v.string(),
-      text: v.string(),
-      aiDeclined: v.optional(v.boolean()),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const limit = Math.min(
-      Math.max(1, Math.floor(args.limit)),
-      EMBEDDING_SWEEP_PAGE,
-    );
-    // In a Convex index undefined sorts before every number, so this also matches rows never embedded.
-    const rows = ctx.db
-      .query("items")
-      .withIndex("by_status_and_embeddingVersion", (q) =>
-        q
-          .eq("status", "ready")
-          .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
-      );
-    const page: {
-      itemId: Id<"items">;
-      userId: string;
-      text: string;
-      aiDeclined?: true;
-    }[] = [];
-    const allowedByUser = new Map<string, boolean>();
-    let bytes = 0;
-    for await (const item of rows) {
-      let allowed = allowedByUser.get(item.userId);
-      if (allowed === undefined) {
-        allowed = await aiAllowed(ctx, item.userId);
-        allowedByUser.set(item.userId, allowed);
-      }
-      page.push({
-        itemId: item._id,
-        userId: item.userId,
-        ...(allowed ? {} : { aiDeclined: true as const }),
-        text: buildEmbeddingText({
-          title: item.title,
-          description: item.description,
-          tags: item.tags,
-          siteName: item.siteName,
-          note: item.note,
-          content: item.content,
-        }),
-      });
-      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
-      if (page.length >= limit || bytes >= MAX_SWEEP_READ_BYTES) {
-        break;
-      }
-    }
-    return page;
-  },
-});
-
-const embeddingOutcomeValidator = v.union(
-  v.literal("ai_declined"),
-  v.literal("embedded"),
-  v.literal("nothing_to_embed"),
-  v.literal("failed"),
-  v.literal("deferred"),
-);
-
-export const setEmbeddingsInternal = internalMutation({
-  args: {
-    entries: v.array(
-      v.object({
-        itemId: v.id("items"),
-        text: v.string(),
-        embedding: v.optional(v.array(v.float64())),
-        outcome: embeddingOutcomeValidator,
-      }),
-    ),
-  },
-  returns: v.object({
-    written: v.number(),
-    stamped: v.number(),
-    deferred: v.number(),
-  }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ written: number; stamped: number; deferred: number }> => {
-    let written = 0;
-    let stamped = 0;
-    let deferred = 0;
-    for (const entry of args.entries) {
-      const item = await ctx.db.get(entry.itemId);
-      if (item === null) {
-        continue;
-      }
-      if ((item.embeddingVersion ?? -1) >= CURRENT_EMBEDDING_VERSION) {
-        continue;
-      }
-
-      const nextSearchText = buildSearchText({
-        title: item.title,
-        cities: item.cities,
-        places: item.places,
-        description: item.description,
-        placePins: item.placePins,
-        tags: item.tags,
-        siteName: item.siteName,
-        note: item.note,
-        content: item.content,
-      });
-      const reindex =
-        nextSearchText === item.searchText
-          ? {}
-          : { searchText: nextSearchText };
-
-      if (entry.outcome === "ai_declined") {
-        if (await aiAllowed(ctx, item.userId)) continue;
-        await ctx.db.patch(entry.itemId, {
-          ...reindex,
-          embedding: undefined,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          embeddingAttempts: undefined,
-        });
-        stamped++;
-        continue;
-      }
-
-      const currentText = buildEmbeddingText({
-        title: item.title,
-        description: item.description,
-        tags: item.tags,
-        siteName: item.siteName,
-        note: item.note,
-        content: item.content,
-      });
-      if (currentText !== entry.text) {
-        if (reindex.searchText !== undefined) {
-          await ctx.db.patch(entry.itemId, reindex);
-        }
-        deferred++;
-        continue;
-      }
-
-      const usable =
-        entry.outcome === "embedded" &&
-        entry.embedding !== undefined &&
-        isValidEmbedding(entry.embedding);
-
-      if (usable) {
-        if (!(await aiAllowed(ctx, item.userId))) continue;
-        await ctx.db.patch(entry.itemId, {
-          ...reindex,
-          embedding: entry.embedding,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          embeddingAttempts: undefined,
-        });
-        written++;
-        stamped++;
-        continue;
-      }
-
-      if (entry.outcome === "nothing_to_embed") {
-        await ctx.db.patch(entry.itemId, {
-          ...reindex,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-        });
-        stamped++;
-        continue;
-      }
-
-      if (entry.outcome === "deferred") {
-        if (reindex.searchText !== undefined) {
-          await ctx.db.patch(entry.itemId, reindex);
-        }
-        deferred++;
-        continue;
-      }
-
-      const attempts = (item.embeddingAttempts ?? 0) + 1;
-      const givingUp = attempts >= MAX_EMBEDDING_ATTEMPTS;
-      await ctx.db.patch(entry.itemId, {
-        ...reindex,
-        embeddingAttempts: attempts,
-        ...(givingUp ? { embeddingVersion: CURRENT_EMBEDDING_VERSION } : {}),
-      });
-      if (givingUp) {
-        stamped++;
-      } else {
-        deferred++;
-      }
-    }
-    return { written, stamped, deferred };
   },
 });
 

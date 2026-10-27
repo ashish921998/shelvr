@@ -36,11 +36,7 @@ import {
   type PlaceListPart,
 } from "./model/placeList";
 import { sanitizeRecipe } from "./model/recipeMarkup";
-import {
-  embeddingText,
-  type Classification,
-  type Reading,
-} from "./model/settlement";
+import { type Classification, type Reading } from "./model/settlement";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -56,7 +52,6 @@ import {
   isModelTimeout,
 } from "./model/aiProvider";
 import { fixturePage } from "./model/fakeAi";
-import { embedTexts } from "./aiEmbeddingSweep";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   fetchVideoTranscript,
@@ -1101,12 +1096,6 @@ async function refreshClaimed(
   });
 }
 
-async function embedText(text: string): Promise<Classification["embedding"]> {
-  const { vectors } = await embedTexts([text]);
-  const vector = vectors[0];
-  return vector === undefined ? undefined : { text, vector };
-}
-
 export const processItem = internalAction({
   args: {
     itemId: v.id("items"),
@@ -1178,11 +1167,6 @@ export const processItem = internalAction({
       const keepTitle = args.refresh === true;
       const reading = readingOf(item, outcome, posterStorageId);
       const classification = model && classificationOf(model);
-      const embedding =
-        classification &&
-        (await embedText(
-          embeddingText(item, { keepTitle, reading, classification }),
-        ));
 
       if (model) await pinListPart(ctx, args, outcome.listPart);
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
@@ -1190,7 +1174,7 @@ export const processItem = internalAction({
         runId: args.runId,
         keepTitle,
         reading,
-        classification: classification && { ...classification, embedding },
+        classification,
       });
       if (finalized !== "applied") {
         if (posterStorageId !== undefined) {
