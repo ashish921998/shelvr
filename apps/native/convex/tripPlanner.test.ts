@@ -258,6 +258,22 @@ describe("claimTripPlanInternal", () => {
     await expect(claim()).rejects.toThrow();
   });
 
+  it("keeps only a start date that is a real calendar day", async () => {
+    const { t } = await setup();
+    const startDate = async (date: string) =>
+      (
+        await t.mutation(internal.tripPlannerData.claimTripPlanInternal, {
+          city: "Lisbon",
+          days: 2,
+          interests: [],
+          startDate: date,
+        })
+      ).startDate;
+    expect(await startDate("2026-02-30")).toBeUndefined();
+    expect(await startDate("2026-13-01")).toBeUndefined();
+    expect(await startDate(" 2028-02-29 ")).toBe("2028-02-29");
+  });
+
   it("tidies the request and reads the city's saves, pins, visits and taste", async () => {
     const { base, t, userId, itemIds } = await setup();
     await base.run(async (ctx) => {

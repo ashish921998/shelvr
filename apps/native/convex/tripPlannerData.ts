@@ -49,9 +49,17 @@ function tripInterests(interests: TripInterest[]): TripInterest[] {
     .slice(0, TRIP_INTERESTS.length);
 }
 
+/** A real calendar day as YYYY-MM-DD, so Feb 30 never shifts into March. */
 function tidyStartDate(date: string | undefined): string | undefined {
-  return date !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())
-    ? date.trim()
+  const text = date?.trim();
+  const match = text?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!text || !match) return undefined;
+  const [year, month, day] = match.slice(1).map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+    ? text
     : undefined;
 }
 
