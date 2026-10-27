@@ -132,7 +132,12 @@ async function resolveListId(url: string): Promise<string | undefined> {
     },
   });
   if (!result.ok) {
-    throw new PageFetchError(result.code, result.status);
+    // A blocked, moved or rate-limited endpoint is not a dead list: read the link as a page instead.
+    logEvent("warn", "google_maps_list_fetch_failed", {
+      code: result.code,
+      ...(result.status === undefined ? {} : { status: result.status }),
+    });
+    return undefined;
   }
   const landed = googleMapsListId(result.finalUrl);
   if (landed !== undefined) return landed;
@@ -163,7 +168,12 @@ export async function fetchGoogleMapsList(
     },
   });
   if (!result.ok) {
-    throw new PageFetchError(result.code, result.status);
+    // A blocked, moved or rate-limited endpoint is not a dead list: read the link as a page instead.
+    logEvent("warn", "google_maps_list_fetch_failed", {
+      code: result.code,
+      ...(result.status === undefined ? {} : { status: result.status }),
+    });
+    return undefined;
   }
   const list = parseGoogleMapsList(
     decodeWithContentType(result.bytes, result.contentType),

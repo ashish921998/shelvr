@@ -411,6 +411,8 @@ describe("isGoogleMapsUrl", () => {
     "https://www.google.co.uk/maps/@51.5,-0.1,12z",
     "https://google.com/maps",
     "https://maps.google.com/?cid=123",
+    "https://www.google.de/maps/@52.5,13.4,12z",
+    "https://www.google.com.au/maps/@-33.8,151.2,12z",
   ])("accepts %s", (url) => {
     expect(isGoogleMapsUrl(url)).toBe(true);
   });
@@ -420,6 +422,9 @@ describe("isGoogleMapsUrl", () => {
     "https://goo.gl/abc123",
     "https://mapsgoogle.com/maps/x",
     "https://www.google.com/mapsfoo",
+    "https://google.evil.com/maps/x",
+    "https://www.google.com.evil.com/maps/x",
+    "https://google.co.uk.evil.com/maps/x",
     "not a url",
     undefined,
   ])("refuses %s", (url) => {

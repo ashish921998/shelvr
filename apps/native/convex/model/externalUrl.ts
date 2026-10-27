@@ -218,7 +218,8 @@ export function isPinterestShortUrl(url: string | undefined): boolean {
   }
 }
 
-/** A Google Maps link: a maps.app.goo.gl share link, goo.gl/maps, or a google.<tld>/maps page. */
+/** A Google Maps link: a maps.app.goo.gl share link, goo.gl/maps, or a google.<tld>/maps page
+ * (google.com, google.de, google.co.uk or google.com.au; look-alikes such as google.evil.com are refused). */
 export function isGoogleMapsUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {
@@ -228,7 +229,7 @@ export function isGoogleMapsUrl(url: string | undefined): boolean {
     if (host === "goo.gl") return parsed.pathname.startsWith("/maps/");
     if (host === "maps.google.com") return true;
     return (
-      /^(?:www\.)?google\.[a-z.]+$/.test(host) &&
+      /^(?:www\.)?google\.(?:com|(?:com?\.)?[a-z]{2})$/.test(host) &&
       (parsed.pathname === "/maps" || parsed.pathname.startsWith("/maps/"))
     );
   } catch {

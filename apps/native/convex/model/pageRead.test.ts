@@ -1118,6 +1118,21 @@ describe("readPage on a Google Maps list", () => {
     expect(read.status === "ok" && read.page.placeList).toBeUndefined();
   });
 
+  it.each([403, 404, 429])(
+    "reads the link as a page when the list endpoint answers %i",
+    async (status) => {
+      const url = `https://www.google.com/maps/placelists/list/${LIST_ID}`;
+      safeFetch.mockImplementation(async (requested: string) =>
+        requested === url
+          ? html(url, "<html><head><title>Tokyo</title></head></html>")
+          : { ok: false, code: "http_error", status },
+      );
+      const read = await readPage(url);
+      expect(read).toMatchObject({ status: "ok", page: { title: "Tokyo" } });
+      expect(safeFetch).toHaveBeenCalledWith(ENDPOINT, expect.anything());
+    },
+  );
+
   it("skips entries with no name and coordinates out of range", async () => {
     serve({
       [ENDPOINT]: text(
