@@ -1,4 +1,4 @@
-import { EmptyState } from "@/components/empty-state";
+import { AccountGoneBoundary } from "@/components/account-gone-boundary";
 import { AppSymbolIcon } from "@/components/symbol";
 import { TripCard } from "@/components/trip-planner/trip-card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,7 @@ import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn } from "@/lib/motion";
 import { api } from "@convex/_generated/api";
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useConvexAuth, usePaginatedQuery } from "convex/react";
 import { useIsFocused, useRouter } from "expo-router";
 import { FlatList, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -42,27 +41,34 @@ function NoTrips({ onPlan }: { onPlan: () => void }) {
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function TripsScreen() {
+  const { isAuthenticated } = useConvexAuth();
+  return (
+    <AccountGoneBoundary signedIn={isAuthenticated}>
+      <TripsList signedIn={isAuthenticated} />
+    </AccountGoneBoundary>
+  );
+}
+
+function TripsList({ signedIn }: { signedIn: boolean }) {
   useAppLocale();
   const router = useRouter();
-  const trips = useQuery(convexQuery(api.tripPlannerData.listTripPlans, {}));
-  const deleteTrip = useDeleteTripPlan();
   // listTripPlans answers newest first.
-  const sorted = trips.data ?? [];
+  const trips = usePaginatedQuery(
+    api.tripPlannerData.listTripPlans,
+    signedIn ? {} : "skip",
+    { initialNumItems: PAGE_SIZE },
+  );
+  const deleteTrip = useDeleteTripPlan();
+  const sorted = trips.results;
   const plan = () => router.push("/new-trip");
   // Under the Plan a trip sheet the list is still on screen; hidden from VoiceOver and TalkBack
   // then, so a swipe cannot leave the sheet for the list behind it.
   const focused = useIsFocused();
 
-  if (trips.isError) {
-    return (
-      <EmptyState
-        title={t("errors.unexpectedTitle")}
-        message={t("errors.retrySoon")}
-      />
-    );
-  }
-  if (trips.data === undefined) {
+  if (trips.status === "LoadingFirstPage") {
     return <ScreenLoader label={t("tripPlanner.loading")} />;
   }
 
@@ -90,6 +96,10 @@ export default function TripsScreen() {
           onDelete={() => deleteTrip(trip._id)}
         />
       )}
+      onEndReached={() => {
+        if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
+      }}
+      onEndReachedThreshold={0.5}
       ListEmptyComponent={<NoTrips onPlan={plan} />}
       ListFooterComponent={
         sorted.length > 0 ? (

@@ -27,6 +27,7 @@ type Save = {
 };
 
 const LISBON = { latitude: 38.7223, longitude: -9.1393 };
+const FIRST_PAGE = { paginationOpts: { numItems: 50, cursor: null } };
 
 const SAVES: Save[] = [
   {
@@ -389,7 +390,8 @@ describe("createTripPlan without Apple Maps", () => {
       pace: "packed",
       interests: [],
     });
-    const list = await t.query(api.tripPlannerData.listTripPlans, {});
+    const list = (await t.query(api.tripPlannerData.listTripPlans, FIRST_PAGE))
+      .page;
     expect(list.map((plan) => plan._id)).toEqual([again.tripId, result.tripId]);
     expect(list[1]).toMatchObject({
       dayCount: 2,
@@ -532,7 +534,9 @@ describe("createTripPlan with Apple Maps", () => {
     expect(azulejo).toMatchObject({ source: "save", lat: 38.715 });
 
     // My Trips counts what the days hold, not the unplanned extras.
-    const [summary] = await t.query(api.tripPlannerData.listTripPlans, {});
+    const [summary] = (
+      await t.query(api.tripPlannerData.listTripPlans, FIRST_PAGE)
+    ).page;
     expect(summary).toMatchObject({ stopCount: 10, savedCount: 3 });
   });
 
@@ -551,7 +555,9 @@ describe("createTripPlan with Apple Maps", () => {
     });
     expect(result).toMatchObject({ suggested: 0 });
     expect(searches(fetchMock)).toEqual([]);
-    const [summary] = await t.query(api.tripPlannerData.listTripPlans, {});
+    const [summary] = (
+      await t.query(api.tripPlannerData.listTripPlans, FIRST_PAGE)
+    ).page;
     expect(summary.interests).toEqual([]);
   });
 
@@ -732,9 +738,9 @@ describe("trip ownership", () => {
         tripId: tripId!,
       }),
     ).toBeNull();
-    expect(await other.t.query(api.tripPlannerData.listTripPlans, {})).toEqual(
-      [],
-    );
+    expect(
+      (await other.t.query(api.tripPlannerData.listTripPlans, FIRST_PAGE)).page,
+    ).toEqual([]);
     await expect(
       other.t.mutation(api.tripPlannerData.deleteTripPlan, { tripId: tripId! }),
     ).rejects.toThrow("Trip not found");
@@ -749,6 +755,35 @@ describe("trip ownership", () => {
     await expect(
       t.mutation(api.tripPlannerData.deleteTripPlan, { tripId: tripId! }),
     ).rejects.toThrow("Trip not found");
+  });
+
+  it("pages My trips newest first, so no trip falls off the end", async () => {
+    const { t } = await setup();
+    const saved: Id<"tripPlans">[] = [];
+    for (let i = 0; i < 3; i++) {
+      saved.push(
+        await t.mutation(internal.tripPlannerData.saveTripPlanInternal, {
+          city: "Lisbon",
+          dayCount: 1,
+          pace: "easy",
+          interests: [],
+          days: [
+            [{ source: "suggested", name: `Stop ${i}`, lat: 38.7, lng: -9.1 }],
+          ],
+          unplanned: [],
+        }),
+      );
+    }
+    const first = await t.query(api.tripPlannerData.listTripPlans, {
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    expect(first.page.map((plan) => plan._id)).toEqual([saved[2], saved[1]]);
+    expect(first.isDone).toBe(false);
+    const rest = await t.query(api.tripPlannerData.listTripPlans, {
+      paginationOpts: { numItems: 2, cursor: first.continueCursor },
+    });
+    expect(rest.page.map((plan) => plan._id)).toEqual([saved[0]]);
+    expect(rest.isDone).toBe(true);
   });
 
   it("keeps a stop when its save is deleted, without pointing at it", async () => {

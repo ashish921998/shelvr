@@ -1,3 +1,7 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -31,7 +35,8 @@ const MAX_CITY_CHARS = 80;
 const MAX_STAY_CHARS = 120;
 /** Days of a packed 15-day trip, plus room for unplanned extras. */
 const MAX_TRIP_STOPS = 150;
-const LIST_LIMIT = 50;
+/** The most trips one page of My trips reads, whatever the client asks for. */
+const LIST_PAGE_MAX = 50;
 /** Recent "We went" marks a suggestion is checked against, beyond the saves' own places. */
 const RECENT_VISITS = 200;
 const TAGS_PER_SAVE = 8;
@@ -226,24 +231,28 @@ export const saveTripPlanInternal = internalMutation({
 });
 
 export const listTripPlans = authedQuery({
-  args: {},
-  returns: v.array(tripPlanSummaryValidator),
-  handler: async (ctx) => {
-    const plans = await ctx.db
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(tripPlanSummaryValidator),
+  handler: async (ctx, args) => {
+    const opts = args.paginationOpts;
+    const result = await ctx.db
       .query("tripPlans")
       .withIndex("by_user", (q) => q.eq("userId", ctx.userId))
       .order("desc")
-      .take(LIST_LIMIT);
-    return plans.map((plan) => ({
-      _id: plan._id,
-      city: plan.city,
-      ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
-      dayCount: plan.dayCount,
-      stopCount: plan.stopCount,
-      savedCount: plan.savedCount,
-      interests: plan.interests,
-      createdAt: plan._creationTime,
-    }));
+      .paginate({ ...opts, numItems: Math.min(opts.numItems, LIST_PAGE_MAX) });
+    return {
+      ...result,
+      page: result.page.map((plan) => ({
+        _id: plan._id,
+        city: plan.city,
+        ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
+        dayCount: plan.dayCount,
+        stopCount: plan.stopCount,
+        savedCount: plan.savedCount,
+        interests: plan.interests,
+        createdAt: plan._creationTime,
+      })),
+    };
   },
 });
 
