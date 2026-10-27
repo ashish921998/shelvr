@@ -170,23 +170,6 @@ const { _id: _stopId, ...stopFields } = tripPlanStopValidator.fields;
 const stopInputValidator = v.object(stopFields);
 type StopInput = Omit<TripPlanStop, "_id">;
 
-async function ownedStops(
-  ctx: QueryCtx,
-  userId: string,
-  stops: StopInput[],
-): Promise<StopInput[]> {
-  const kept: StopInput[] = [];
-  for (const stop of stops) {
-    if (stop.itemId !== undefined) {
-      const item = await ctx.db.get(stop.itemId);
-      // A save deleted since the claim leaves the trip; a stop never points at someone else's save.
-      if (item === null || item.userId !== userId) continue;
-    }
-    kept.push(stop);
-  }
-  return kept;
-}
-
 /** Stores a new trip (older trips stay) with its stops; day 0 holds the unplanned ones. */
 export const saveTripPlanInternal = internalMutation({
   args: {
@@ -202,17 +185,17 @@ export const saveTripPlanInternal = internalMutation({
   returns: v.id("tripPlans"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const dayCount = tripDays(args.dayCount);
+    // The claim already tidied the city, clamped the days and deduplicated the interests.
     let room = MAX_TRIP_STOPS;
     const placed: { day: number; stops: StopInput[] }[] = [];
     const groups = [
       ...args.days
-        .slice(0, dayCount)
+        .slice(0, args.dayCount)
         .map((stops, i) => ({ day: i + 1, stops })),
       { day: UNPLANNED_DAY, stops: args.unplanned },
     ];
     for (const { day, stops } of groups) {
-      const kept = (await ownedStops(ctx, userId, stops)).slice(0, room);
+      const kept = stops.slice(0, room);
       room -= kept.length;
       placed.push({ day, stops: kept });
     }
@@ -220,19 +203,12 @@ export const saveTripPlanInternal = internalMutation({
     const planned = placed
       .filter(({ day }) => day !== UNPLANNED_DAY)
       .flatMap(({ stops }) => stops);
-    const now = Date.now();
+    const { days: _days, unplanned: _unplanned, ...trip } = args;
     const tripId = await ctx.db.insert("tripPlans", {
+      ...trip,
       userId,
-      city: tidyCity(args.city).slice(0, MAX_CITY_CHARS),
-      ...(args.startDate !== undefined ? { startDate: args.startDate } : {}),
-      dayCount,
-      pace: args.pace,
-      interests: tripInterests(args.interests),
-      ...(args.stay !== undefined ? { stay: args.stay } : {}),
       stopCount: planned.length,
       savedCount: planned.filter((stop) => stop.source === "save").length,
-      createdAt: now,
-      updatedAt: now,
     });
     for (const { day, stops } of placed) {
       for (const [order, stop] of stops.entries()) {
@@ -266,7 +242,7 @@ export const listTripPlans = authedQuery({
       stopCount: plan.stopCount,
       savedCount: plan.savedCount,
       interests: plan.interests,
-      createdAt: plan.createdAt,
+      createdAt: plan._creationTime,
     }));
   },
 });
@@ -294,7 +270,7 @@ function stopView(
   stop: Doc<"tripStops">,
   live: ReadonlySet<Id<"items">>,
 ): TripPlanStop {
-  // A save deleted past what deleteItem unlinks in one go must not open from the trip.
+  // Deleting a save leaves its stops pointing at it; only a live save of the caller opens.
   const itemId =
     stop.itemId !== undefined && live.has(stop.itemId)
       ? stop.itemId
@@ -361,7 +337,7 @@ export const getTripPlan = authedQuery({
       pace: plan.pace,
       interests: plan.interests,
       ...(plan.stay !== undefined ? { stay: plan.stay } : {}),
-      createdAt: plan.createdAt,
+      createdAt: plan._creationTime,
       days,
       unplanned,
     };

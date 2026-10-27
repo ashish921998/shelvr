@@ -362,8 +362,6 @@ export default defineSchema({
     stay: v.optional(tripStayValidator),
     stopCount: v.number(),
     savedCount: v.number(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
   tripStops: defineTable({
@@ -383,8 +381,7 @@ export default defineSchema({
     slot: v.optional(tripSlotValidator),
   })
     .index("by_trip_and_day", ["tripId", "day", "order"])
-    .index("by_user", ["userId"])
-    .index("by_item", ["itemId"]),
+    .index("by_user", ["userId"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),

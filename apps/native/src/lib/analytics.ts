@@ -225,7 +225,7 @@ export type AnalyticsEventProperties = {
   trip_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
   trip_plan_opened: { days: number; stops: number; saved: number };
   trip_plan_stop_opened: {
-    source: "save" | "suggested" | "added";
+    source: "save" | "suggested";
     action: "save" | "card" | "maps";
   };
   trip_plan_deleted: Record<string, never>;

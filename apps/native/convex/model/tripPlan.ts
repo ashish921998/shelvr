@@ -13,22 +13,16 @@ export const TRIP_INTERESTS = [
   "shopping",
 ] as const;
 
-export const tripInterestValidator = v.union(
-  v.literal("food"),
-  v.literal("coffee"),
-  v.literal("drinks"),
-  v.literal("culture"),
-  v.literal("sights"),
-  v.literal("outdoors"),
-  v.literal("shopping"),
+const [firstInterest, ...otherInterests] = TRIP_INTERESTS.map((interest) =>
+  v.literal(interest),
 );
+export const tripInterestValidator = v.union(firstInterest, ...otherInterests);
 export type TripInterest = Infer<typeof tripInterestValidator>;
 
-/** Where a stop came from: one of the person's saves, an Apple Maps suggestion, or added by hand. */
+/** Where a stop came from: one of the person's saves, or an Apple Maps suggestion. */
 export const tripStopSourceValidator = v.union(
   v.literal("save"),
   v.literal("suggested"),
-  v.literal("added"),
 );
 export type TripStopSource = Infer<typeof tripStopSourceValidator>;
 

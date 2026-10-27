@@ -10,6 +10,7 @@ import {
   appleMapsConfig,
   appleMapsLookup,
   appleMapsSearchPlaces,
+  type ApplePoi,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
 import {
@@ -44,7 +45,6 @@ import {
   saveWhy,
   searchQueues,
   tasteQueries,
-  type FoundPoi,
   type PlannedStop,
   type Suggestion,
 } from "./model/tripSuggest";
@@ -187,15 +187,8 @@ async function savedStops(
 }
 
 function suggestedStop(found: Suggestion): PlannedStop {
-  return {
-    source: "suggested",
-    name: found.name,
-    ...(found.area !== undefined ? { area: found.area } : {}),
-    lat: found.lat,
-    lng: found.lng,
-    ...(found.appleId !== undefined ? { appleId: found.appleId } : {}),
-    ...(found.category !== undefined ? { category: found.category } : {}),
-  };
+  const { interest: _interest, ...poi } = found;
+  return { source: "suggested", ...poi };
 }
 
 /** Apple Maps places for the chosen interests, searched from the saves' taste first, balanced across interests. */
@@ -216,7 +209,7 @@ async function suggestStops(
     interests.map((interest) => [interest, []]),
   );
   const been = new Set(claim.been.map(placeKey));
-  const seen: FoundPoi[] = [];
+  const seen: ApplePoi[] = [];
   const kept: { name: string; lat: number; lng: number; appleId?: string }[] = [
     ...taken,
   ];

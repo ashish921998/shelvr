@@ -15,11 +15,8 @@ import {
   firstFocusDay,
   initialDayFocus,
   initialTripForm,
-  newestFirst,
   nextDayFocus,
-  opensOverTripsTab,
   paceHint,
-  pinDay,
   planPins,
   REVEAL_STEPS,
   revealDelay,
@@ -31,7 +28,6 @@ import {
   stopWhyLine,
   toggleInterest,
   tripDateRange,
-  tripBackTitle,
   tripCardLine,
   tripDayLabel,
   tripFormArgs,
@@ -82,7 +78,7 @@ describe("interests", () => {
 describe("tripFormArgs", () => {
   const form = initialTripForm("  Lisbon  ");
 
-  it("tidies the city and stay and sends only what was given", () => {
+  it("sends what was given and leaves tidying the stay to the server", () => {
     const result = tripFormArgs(
       { ...form, stay: "  Bairro   Alto ", days: 4, pace: "packed" },
       "pt-BR",
@@ -94,7 +90,7 @@ describe("tripFormArgs", () => {
         days: 4,
         pace: "packed",
         interests: ["food", "coffee", "sights"],
-        stay: "Bairro Alto",
+        stay: "  Bairro   Alto ",
         locale: "pt-BR",
       },
     });
@@ -115,17 +111,9 @@ describe("tripFormArgs", () => {
     });
   });
 
-  it("asks for an interest before planning", () => {
-    expect(tripFormArgs({ ...form, interests: [] }, "en")).toEqual({
-      ok: false,
-      problem: "interests",
-    });
-  });
-
   it("keeps the submit button off until a city is in", () => {
     expect(tripFormProblem(initialTripForm())).toBe("city");
     expect(tripFormProblem({ ...form, city: "  " })).toBe("city");
-    expect(tripFormProblem({ ...form, interests: [] })).toBe("interests");
     expect(tripFormProblem(form)).toBeNull();
   });
 
@@ -211,22 +199,12 @@ describe("trip lines", () => {
     expect(paceHint("easy")).toBe("About 3 stops a day");
   });
 
-  it("puts the newest trip first", () => {
-    expect(
-      newestFirst([
-        { _id: "a", createdAt: 1 },
-        { _id: "b", createdAt: 3 },
-        { _id: "c", createdAt: 2 },
-      ]).map((trip) => trip._id),
-    ).toEqual(["b", "c", "a"]);
-  });
 });
 
 describe("stops", () => {
-  it("badges saves and suggestions, not hand-added stops", () => {
+  it("badges saves and suggestions", () => {
     expect(stopBadge("save")).toBe("tripPlanner.badgeYours");
     expect(stopBadge("suggested")).toBe("tripPlanner.badgeSuggested");
-    expect(stopBadge("added")).toBeNull();
   });
 
   it("reads a stop row with its number and the line under it, as it shows", () => {
@@ -249,12 +227,12 @@ describe("stops", () => {
         fromSave: false,
       }),
     ).toBe("Stop 1, Miradouro da Graça, Suggested, Sunset over the old town");
-    // Unplanned and hand-added stops have no number or badge, and skip what they lack.
+    // Unplanned stops have no number, and skip what they lack.
     expect(
-      stopRowLabel(stop({ source: "added", name: "Hotel bar" }), {
+      stopRowLabel(stop({ name: "Hotel bar" }), {
         fromSave: false,
       }),
-    ).toBe("Hotel bar");
+    ).toBe("Hotel bar, Suggested");
   });
 
   it("shows a stop's why as a From line only for a shared save", () => {
@@ -300,16 +278,13 @@ describe("stops", () => {
       1,
     );
     expect(
-      pins.map((pin) => [pin.id, pin.number, pin.active, pin.text]),
+      pins.map((pin) => [pin.id, pin.day, pin.active, pin.text]),
     ).toEqual([
-      ["0:0", 1, false, ""],
-      ["0:1", 2, false, ""],
+      ["0:0", 0, false, ""],
+      ["0:1", 0, false, ""],
       ["1:0", 1, true, "1"],
     ]);
     expect(planPins([[stop()]], null)[0]?.active).toBe(true);
-    expect(pinDay("1:0")).toBe(1);
-    expect(pinDay("stay")).toBeNull();
-    expect(pinDay(undefined)).toBeNull();
   });
 });
 
@@ -358,8 +333,6 @@ describe("trip page focus", () => {
       "#b",
       "#b",
     ]);
-    expect(dayColor(-1, palette)).toBe("#c");
-    expect(dayColor(1.5, palette)).toBe("#a");
   });
 
   it("follows the list to the day whose header has reached the pinned map", () => {
@@ -419,82 +392,6 @@ describe("trip page focus", () => {
       stop({ _id: "e" as Id<"tripStops">, why: "Best of Lisbon" }),
     ]);
     expect([...shared].sort()).toEqual(["a", "b"]);
-  });
-
-  it("titles the back button after the trips list only over the Trips tab", () => {
-    expect(tripBackTitle(true)).toBe("My trips");
-    expect(tripBackTitle(false)).toBe("Back");
-  });
-});
-
-describe("trip page back title", () => {
-  const tabs = (index: number | undefined) => ({
-    key: "tabs-1",
-    name: "(tabs)",
-    state: {
-      ...(index === undefined ? {} : { index }),
-      routes: [{ name: "(home)" }, { name: "(map)" }, { name: "(trips)" }],
-    },
-  });
-  const trip = { key: "trip-1", name: "trip-plan/[id]" };
-
-  it("is over the Trips tab when the tab bar under it shows Trips", () => {
-    // Opened from the Trips list, and after planning (the sheet replaced by the trip).
-    expect(
-      opensOverTripsTab({ index: 1, routes: [tabs(2), trip] }, "trip-1"),
-    ).toBe(true);
-  });
-
-  it("finds the trip by its key, not by the stack's index", () => {
-    // Something pushed over the trip moves the index, not what sits below the trip.
-    expect(
-      opensOverTripsTab(
-        {
-          index: 2,
-          routes: [tabs(2), trip, { key: "item-1", name: "item/[id]" }],
-        },
-        "trip-1",
-      ),
-    ).toBe(true);
-  });
-
-  it("is not over the Trips tab before the push reaches the state", () => {
-    // A first render can still see the stack without this screen: the list's tab bar is
-    // on top there, and must not be mistaken for the screen below.
-    expect(opensOverTripsTab({ index: 0, routes: [tabs(2)] }, "trip-1")).toBe(
-      false,
-    );
-    expect(opensOverTripsTab(undefined, "trip-1")).toBe(false);
-  });
-
-  it("is not over the Trips tab over another tab or another screen", () => {
-    expect(
-      opensOverTripsTab({ index: 1, routes: [tabs(0), trip] }, "trip-1"),
-    ).toBe(false);
-    expect(
-      opensOverTripsTab(
-        {
-          index: 2,
-          routes: [tabs(0), { key: "city-1", name: "city/[name]" }, trip],
-        },
-        "trip-1",
-      ),
-    ).toBe(false);
-    expect(opensOverTripsTab({ index: 0, routes: [trip] }, "trip-1")).toBe(
-      false,
-    );
-  });
-
-  it("reads a tab state without an index as focused on its last route", () => {
-    expect(
-      opensOverTripsTab({ routes: [tabs(undefined), trip] }, "trip-1"),
-    ).toBe(true);
-    expect(
-      opensOverTripsTab(
-        { routes: [{ key: "tabs-1", name: "(tabs)" }, trip] },
-        "trip-1",
-      ),
-    ).toBe(false);
   });
 });
 

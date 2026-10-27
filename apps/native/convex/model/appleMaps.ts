@@ -117,6 +117,18 @@ export function firstPlace(
   return null;
 }
 
+function appleGet(
+  accessToken: string,
+  path: "search" | "geocode",
+  params: URLSearchParams,
+  fetchImpl: typeof fetch,
+): Promise<Response> {
+  return fetchImpl(`${API}/${path}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+  });
+}
+
 export async function appleMapsLookup(
   accessToken: string,
   kind: "search" | "geocode",
@@ -134,10 +146,7 @@ export async function appleMapsLookup(
     // retry as a point of interest instead of pretending that centre is the place.
     for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
       if (filter) params.set("resultTypeFilter", filter);
-      const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-      });
+      const response = await appleGet(accessToken, kind, params, fetchImpl);
       if (!response.ok) return null;
       const found = firstPlace(
         await response.json().catch(() => null),
@@ -153,7 +162,7 @@ export async function appleMapsLookup(
   }
 }
 
-const poiSchema = z.object({
+const poiSchema = placeSchema.extend({
   name: z.string().trim().min(1),
   structuredAddress: z
     .object({
@@ -162,12 +171,6 @@ const poiSchema = z.object({
       dependentLocalities: z.array(z.string()).optional(),
     })
     .optional(),
-  id: z.string().min(1).optional(),
-  poiCategory: z.string().min(1).optional(),
-  coordinate: z.object({
-    latitude: z.number().min(-90).max(90),
-    longitude: z.number().min(-180).max(180),
-  }),
 });
 
 const MAX_POI_NAME_CHARS = 80;
@@ -226,10 +229,7 @@ export async function appleMapsSearchPlaces(
   }
   if (options.lang !== undefined) params.set("lang", options.lang);
   try {
-    const response = await fetchImpl(`${API}/search?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
+    const response = await appleGet(accessToken, "search", params, fetchImpl);
     if (!response.ok) return [];
     return placesOf(await response.json().catch(() => null));
   } catch {

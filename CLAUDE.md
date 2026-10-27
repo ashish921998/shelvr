@@ -94,7 +94,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
     optional start date and stay, plus stop and saved counts. Every new plan is a new row
   - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
     from a save (`itemId`) or an Apple Maps suggestion, carrying its own name, pin, Apple id
-    and category. Deleting the save clears `itemId` and keeps the stop
+    and category. Deleting the save keeps the stop; a trip read opens only live saves
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state

@@ -23,8 +23,7 @@ export function TripStopRow({
   dayColor,
   onPress,
 }: Props) {
-  const badgeKey = stopBadge(stop.source);
-  const badge = badgeKey === null ? null : t(badgeKey);
+  const badge = t(stopBadge(stop.source));
   const yours = stop.source === "save";
   const why = stopWhyLine(stop, fromSave === true);
   return (
@@ -63,16 +62,14 @@ export function TripStopRow({
           >
             {stop.name}
           </ThemedText>
-          {badge !== null ? (
-            <View style={[styles.badge, yours && styles.badgeYours]}>
-              <ThemedText
-                variant="captionStrong"
-                style={yours ? styles.badgeYoursText : styles.badgeText}
-              >
-                {badge}
-              </ThemedText>
-            </View>
-          ) : null}
+          <View style={[styles.badge, yours && styles.badgeYours]}>
+            <ThemedText
+              variant="captionStrong"
+              style={yours ? styles.badgeYoursText : styles.badgeText}
+            >
+              {badge}
+            </ThemedText>
+          </View>
         </View>
         {stop.area ? (
           <ThemedText variant="footnote" numberOfLines={1} style={styles.muted}>

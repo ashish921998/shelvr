@@ -766,29 +766,11 @@ describe("trip ownership", () => {
     const ramen = trip!.days[0].find((stop) => stop.name === "Ramen Shop");
     expect(ramen).toMatchObject({ source: "save", lat: 38.712 });
     expect(ramen?.itemId).toBeUndefined();
-  });
-
-  it("hides a link to a save that is gone even when deletion left the stop linked", async () => {
-    const { base, t, itemIds } = await setup();
-    const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
-      city: "Lisbon",
-      days: 1,
-      pace: "easy",
-      interests: [],
-    });
-    // Past the batch deleteItem unlinks, a stop can still carry the id.
-    await base.run((ctx) => ctx.db.delete(itemIds[0]));
-    const trip = await t.query(api.tripPlannerData.getTripPlan, {
-      tripId: tripId!,
-    });
-    const ramen = trip!.days[0].find((stop) => stop.name === "Ramen Shop");
-    expect(ramen).toMatchObject({ source: "save" });
-    expect(ramen?.itemId).toBeUndefined();
     const frog = trip!.days[0].find((stop) => stop.name === "Red Frog");
     expect(frog?.itemId).toBe(itemIds[1]);
   });
 
-  it("stores only stops whose save the caller owns", async () => {
+  it("never opens someone else's save from a trip", async () => {
     const { base, t } = await setup();
     const other = await addUser(base, [SAVES[0]]);
     const tripId = await t.mutation(
@@ -814,8 +796,10 @@ describe("trip ownership", () => {
       },
     );
     const trip = await t.query(api.tripPlannerData.getTripPlan, { tripId });
-    expect(trip!.days[0].map((stop) => stop.name)).toEqual(["Somewhere"]);
-    const [summary] = await t.query(api.tripPlannerData.listTripPlans, {});
-    expect(summary).toMatchObject({ stopCount: 1, savedCount: 0 });
+    expect(trip!.days[0].map((stop) => stop.name)).toEqual([
+      "Ramen Shop",
+      "Somewhere",
+    ]);
+    expect(trip!.days[0][0].itemId).toBeUndefined();
   });
 });

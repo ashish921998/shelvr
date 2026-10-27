@@ -121,40 +121,32 @@ type TripPlanArgs = {
   locale?: string;
 };
 
-export type TripFormProblem = "city" | "interests";
+export type TripFormProblem = "city";
 
 /** What stops the form from planning yet, or null once it can; the submit button stays off until then. */
 export function tripFormProblem(
-  form: Pick<TripForm, "city" | "interests">,
+  form: Pick<TripForm, "city">,
 ): TripFormProblem | null {
-  if (tidyCity(form.city) === "") return "city";
-  if (!TRIP_INTERESTS.some((each) => form.interests.includes(each))) {
-    return "interests";
-  }
-  return null;
+  return tidyCity(form.city) === "" ? "city" : null;
 }
 
 export function tripFormArgs(
   form: TripForm,
   locale: string,
 ): { ok: true; args: TripPlanArgs } | { ok: false; problem: TripFormProblem } {
+  // The server tidies the city and stay; the stepper and the chips keep days and interests valid.
   const problem = tripFormProblem(form);
   if (problem !== null) return { ok: false, problem };
-  const city = tidyCity(form.city).slice(0, MAX_CITY_LENGTH);
-  const interests = TRIP_INTERESTS.filter((each) =>
-    form.interests.includes(each),
-  );
-  const stay = tidyCity(form.stay).slice(0, MAX_STAY_LENGTH);
   return {
     ok: true,
     args: {
-      city,
-      days: clampDays(form.days),
+      city: form.city,
+      days: form.days,
       pace: form.pace,
-      interests,
+      interests: form.interests,
       locale,
       ...(form.startDate ? { startDate: toDateKey(form.startDate) } : {}),
-      ...(stay ? { stay } : {}),
+      ...(form.stay.trim() ? { stay: form.stay } : {}),
     },
   };
 }
@@ -186,8 +178,8 @@ export function tripDateRange(
   const start = tripDayDate(startDate, 0);
   if (start === null) return null;
   if (dayCount <= 1) return shortDate(start);
-  const end = tripDayDate(startDate, dayCount - 1);
-  if (end === null) return shortDate(start);
+  // A start that parsed always has an end.
+  const end = tripDayDate(startDate, dayCount - 1) ?? start;
   return t("tripPlanner.dateRange", {
     start: shortDate(start),
     end: shortDate(end),
@@ -256,22 +248,12 @@ export function tripDayLabel(
     : t("tripPlanner.dayWithDate", { day, date: formatTripDay(date) });
 }
 
-export function newestFirst<T extends { createdAt: number }>(
-  trips: readonly T[],
-): T[] {
-  return [...trips].sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function stopBadge(
-  source: TripPlanStop["source"],
-): TextMessageKey | null {
+export function stopBadge(source: TripPlanStop["source"]): TextMessageKey {
   switch (source) {
     case "save":
       return "tripPlanner.badgeYours";
     case "suggested":
       return "tripPlanner.badgeSuggested";
-    case "added":
-      return null;
   }
 }
 
@@ -295,13 +277,12 @@ export function stopRowLabel(
   stop: Pick<TripPlanStop, "name" | "source" | "area" | "why">,
   { number, fromSave }: { number?: number; fromSave: boolean },
 ): string {
-  const badge = stopBadge(stop.source);
   return [
     number === undefined
       ? null
       : t("tripPlanner.stopNumber", { number: String(number) }),
     stop.name,
-    badge === null ? null : t(badge),
+    t(stopBadge(stop.source)),
     stop.area,
     stopWhyLine(stop, fromSave),
   ]
@@ -328,7 +309,6 @@ export function stopAction(
   if (stop.appleId !== undefined && cardAvailable) {
     return { kind: "card", appleId: stop.appleId };
   }
-  if (stop.itemId !== undefined) return { kind: "save", itemId: stop.itemId };
   return { kind: "maps", url: placeMapsUrl(stop) };
 }
 
@@ -370,15 +350,12 @@ export function dayColor(
   day: number,
   palette: readonly [string, ...string[]],
 ): string {
-  const slot = Number.isInteger(day) ? day : 0;
-  const n = palette.length;
-  return palette[((slot % n) + n) % n] ?? palette[0];
+  return palette[day % palette.length] ?? palette[0];
 }
 
 type PlanPin = {
   id: string;
   day: number;
-  number: number;
   name: string;
   coordinates: { latitude: number; longitude: number };
   active: boolean;
@@ -407,7 +384,6 @@ export function planPins(
       return {
         id: `${day}:${index}`,
         day,
-        number: index + 1,
         name: stop.name,
         coordinates: { latitude: stop.lat, longitude: stop.lng },
         active: activeDay === null || focused,
@@ -577,45 +553,6 @@ export function sharedSaveStops(
   );
 }
 
-/** The slice of a navigator's state the back title reads; nested navigators hang off `state`. */
-type NavState = {
-  index?: number;
-  routes: readonly { key?: string; name: string; state?: NavState }[];
-};
-
-/**
- * Whether the screen under the route `key` is the tab bar showing the Trips tab. The route
- * is found by its key, not by the stack's index: a screen's first render can read the
- * stack as it was before the push that added it, which named the wrong screen as the one
- * below. A route not in the state yet reads as false until the state catches up.
- */
-export function opensOverTripsTab(
-  state: NavState | undefined,
-  key: string,
-): boolean {
-  const routes = state?.routes ?? [];
-  const at = routes.findIndex((route) => route.key === key);
-  const below = at > 0 ? routes[at - 1] : undefined;
-  if (below?.name !== "(tabs)") return false;
-  const tabs = below.state;
-  if (!tabs || tabs.routes.length === 0) return false;
-  // A partial state without an index focuses its last route.
-  const focused = tabs.routes[tabs.index ?? tabs.routes.length - 1];
-  return focused?.name === "(trips)";
-}
-
-/** The trip page's back button title: "My trips" over the Trips tab, a plain "Back" over anything else. */
-export function tripBackTitle(overTripsTab: boolean): string {
-  return overTripsTab ? t("tripPlanner.listTitle") : t("common.back");
-}
-
-export function pinDay(id: string | undefined): number | null {
-  const day = Number((id ?? "").split(":")[0]);
-  return id !== undefined && id.includes(":") && Number.isInteger(day)
-    ? day
-    : null;
-}
-
 /** Why the form is showing a message instead of planning; kept as data so the copy follows a language change. */
 export type TripPlanProblem =
   | { kind: TripFormProblem }
@@ -626,8 +563,6 @@ export function tripPlanMessage(problem: TripPlanProblem): string {
   switch (problem.kind) {
     case "city":
       return t("tripPlanner.cityRequired");
-    case "interests":
-      return t("tripPlanner.interestsHint");
     case "empty":
       return t("tripPlanner.emptyResult", { city: problem.city });
     case "rate_limited":

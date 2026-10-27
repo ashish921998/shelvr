@@ -126,7 +126,7 @@ const GENERIC_TAGS = new Set(
     "hotel",
     "hotels",
     "stay",
-  ].map((tag) => tag.toLowerCase()),
+  ],
 );
 
 const MAX_TASTE_CHARS = 30;
@@ -365,9 +365,7 @@ export function chainNames(
 /** Results farther than this from the city centre are another town, whatever Apple calls the locality. */
 export const SUGGEST_RADIUS_KM = 25;
 
-export type FoundPoi = ApplePoi;
-
-export type Suggestion = FoundPoi & { interest: TripInterest };
+export type Suggestion = ApplePoi & { interest: TripInterest };
 
 type Placed = LatLng & { name: string; appleId?: string };
 
@@ -555,84 +553,36 @@ export function routeKm(stops: LatLng[]): number {
   return km;
 }
 
-/** Shorter by more than rounding: keeps ties on the earlier candidate, so the result is deterministic. */
+/** Shorter by more than rounding: keeps ties on the earlier order, so the result is deterministic. */
 const EPSILON_KM = 1e-9;
 
-/** Nearest next stop from `start` through `middle`, then `end` when the day must finish there. */
-function nearestNeighbour(
-  start: PlannedStop,
-  middle: PlannedStop[],
-  end: PlannedStop | undefined,
-): PlannedStop[] {
-  const route = [start];
-  const left = [...middle];
-  while (left.length > 0) {
-    const from = route[route.length - 1];
-    let pick = 0;
-    for (let i = 1; i < left.length; i++) {
-      if (distanceKm(from, left[i]) < distanceKm(from, left[pick]) - EPSILON_KM)
-        pick = i;
-    }
-    route.push(left.splice(pick, 1)[0]);
-  }
-  if (end !== undefined) route.push(end);
-  return route;
-}
-
-/** Reverses any stretch that shortens the route until none does, so no two legs cross. The first stop stays, and the last when `endFixed`. */
-function twoOpt(route: PlannedStop[], endFixed: boolean): PlannedStop[] {
-  const r = [...route];
-  const last = endFixed ? r.length - 2 : r.length - 1;
-  let improved = true;
-  while (improved) {
-    improved = false;
-    for (let i = 1; i < last; i++) {
-      for (let j = i + 1; j <= last; j++) {
-        const after = r[j + 1];
-        const before =
-          distanceKm(r[i - 1], r[i]) +
-          (after === undefined ? 0 : distanceKm(r[j], after));
-        const swapped =
-          distanceKm(r[i - 1], r[j]) +
-          (after === undefined ? 0 : distanceKm(r[i], after));
-        if (swapped < before - EPSILON_KM) {
-          r.splice(i, j - i + 1, ...r.slice(i, j + 1).reverse());
-          improved = true;
-        }
-      }
-    }
-  }
-  return r;
-}
-
 /**
- * Orders a day's stops as a short walking route: from each sensible start, nearest next
- * stop, then 2-opt until no reversal shortens it; the shortest wins, ties to the earlier
- * stop. A day with a cafe or bakery starts at one, and a day with a bar ends at one.
+ * Orders a day's stops as the shortest walking route, trying every order (a day holds at most
+ * `STOPS_PER_DAY.packed` stops, so at most 5,040). A day with a cafe or bakery starts at one,
+ * and a day with a bar ends at one; ties go to the earlier order.
  */
 export function routeOrder(stops: PlannedStop[]): PlannedStop[] {
   if (stops.length <= 1) return [...stops];
-  const evenings = stops.filter(isEvening);
-  const ends: (PlannedStop | undefined)[] =
-    evenings.length > 0 ? evenings : [undefined];
+  const mornings = stops.some(isMorning);
+  const evenings = stops.some(isEvening);
   let best: PlannedStop[] = [];
   let bestKm = Infinity;
-  for (const end of ends) {
-    const open = stops.filter((stop) => stop !== end);
-    const mornings = open.filter(isMorning);
-    for (const start of mornings.length > 0 ? mornings : open) {
-      const middle = open.filter((stop) => stop !== start);
-      const route = twoOpt(
-        nearestNeighbour(start, middle, end),
-        end !== undefined,
-      );
-      const km = routeKm(route);
-      if (km < bestKm - EPSILON_KM) {
+  const extend = (route: PlannedStop[], left: PlannedStop[], km: number) => {
+    if (km >= bestKm - EPSILON_KM) return;
+    if (left.length === 0) {
+      if (!evenings || isEvening(route[route.length - 1])) {
         best = route;
         bestKm = km;
       }
+      return;
     }
-  }
+    for (const [i, next] of left.entries()) {
+      if (route.length === 0 && mornings && !isMorning(next)) continue;
+      const leg = route.length === 0 ? 0 : distanceKm(route[route.length - 1], next);
+      extend([...route, next], left.filter((_, j) => j !== i), km + leg);
+    }
+  };
+  extend([], stops, 0);
   return best;
 }
 

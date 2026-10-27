@@ -5,7 +5,7 @@ import { withAlpha } from "@/lib/color";
 import { moveCamera } from "@/lib/map-camera";
 import { t } from "@/lib/i18n";
 import { fitCamera, type LatLng } from "@/lib/trip";
-import { dayColor, pinDay, planPins } from "@/lib/trip-planner";
+import { dayColor, planPins } from "@/lib/trip-planner";
 import type { TripPlanDetail } from "@convex/model/tripPlan";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -155,8 +155,8 @@ export function TripPlannerMap({
   const routeColor = (day: number) =>
     colorOf(day, activeDay === null || activeDay === day);
   const select = (id: string | undefined) => {
-    const day = pinDay(id);
-    if (day !== null) onSelectDay(day);
+    const day = pins.find((pin) => pin.id === id)?.day;
+    if (day !== undefined) onSelectDay(day);
   };
 
   const chips = showChips ? (

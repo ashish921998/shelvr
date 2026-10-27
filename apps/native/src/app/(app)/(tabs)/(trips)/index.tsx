@@ -7,12 +7,10 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn } from "@/lib/motion";
-import { newestFirst } from "@/lib/trip-planner";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused, useRouter } from "expo-router";
-import { useMemo } from "react";
 import { FlatList, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -49,7 +47,8 @@ export default function TripsScreen() {
   const router = useRouter();
   const trips = useQuery(convexQuery(api.tripPlannerData.listTripPlans, {}));
   const deleteTrip = useDeleteTripPlan();
-  const sorted = useMemo(() => newestFirst(trips.data ?? []), [trips.data]);
+  // listTripPlans answers newest first.
+  const sorted = trips.data ?? [];
   const plan = () => router.push("/new-trip");
   // Under the Plan a trip sheet the list is still on screen; hidden from VoiceOver and TalkBack
   // then, so a swipe cannot leave the sheet for the list behind it.
