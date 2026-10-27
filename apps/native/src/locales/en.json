@@ -929,7 +929,7 @@
   "datePlan.slotAfter": "Drinks or dessert",
   "datePlan.slotCoffee": "Coffee",
   "datePlan.slotWalk": "A walk",
-  "datePlan.walk": "About a %{minutes} min walk",
+  "datePlan.walk": "About %{minutes} min on foot",
   "datePlan.approximate": "Walk times are approximate.",
   "datePlan.hours": "Hours and info",
   "datePlan.hoursFor": "Hours and info for %{name}",

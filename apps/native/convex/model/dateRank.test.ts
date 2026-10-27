@@ -189,6 +189,16 @@ describe("rankEvenings", () => {
     expect(names).toHaveLength(4);
   });
 
+  it("puts the closer of two otherwise equal evenings first", () => {
+    const near = stop({ name: "Near Bar", slot: "second", ...north(1) });
+    const far = stop({ name: "Far Bar", slot: "second", ...north(12) });
+    const { stops, evenings } = rankEvenings(
+      [scored(dinner), scored(far), scored(near)],
+      fixed,
+    );
+    expect(stops[evenings[0].second].name).toBe("Near Bar");
+  });
+
   it("offers at most a handful of evenings", () => {
     const many = Array.from({ length: 6 }, (_, i) => [
       scored(stop({ name: `Dinner ${i}`, slot: "first", ...north(i) })),

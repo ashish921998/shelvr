@@ -166,6 +166,8 @@ export function DateEvening({
     <ScrollView
       style={styles.screen}
       contentInsetAdjustmentBehavior="never"
+      // The map stays pinned while the cards scroll under it, so both pins stay in view.
+      stickyHeaderIndices={[0]}
       contentContainerStyle={styles.scrollContent}
     >
       <TripPlannerMap

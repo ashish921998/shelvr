@@ -191,9 +191,18 @@ export function savedDateStops(
   return kept;
 }
 
+/** Up to two points for a pair next door, falling to none at the walk limit. */
+function closeness(a: DateStop, b: DateStop): number {
+  return 2 * Math.max(0, 1 - distanceKm(a, b) / MAX_WALK_KM);
+}
+
+/** A playground is a park to Apple, not somewhere for a date's walk. */
+const PLAYGROUND =
+  /playground|spielplatz|aire de jeux|parque infantil|parquinho|児童遊園|어린이\s*공원|놀이터/i;
+
 /**
- * Ranks every evening the stops can make, as whole pairs: the pair's weights plus up to two
- * points of chance, so the same saves deal a different order each time. Stops come back each
+ * Ranks every evening the stops can make, as whole pairs: the pair's weights, up to two points
+ * for being close, and up to two points of chance, so the same saves deal a different order each time. Stops come back each
  * slot's best first, and evenings point into that order. The first evenings use each stop
  * once where they can, so "Try another evening" shows somewhere new.
  */
@@ -213,7 +222,7 @@ export function rankEvenings(
       candidates.push({
         first,
         second,
-        rank: a.score + b.score + random() * 2,
+        rank: a.score + b.score + closeness(a.stop, b.stop) + random() * 2,
       });
     });
   });
@@ -266,7 +275,7 @@ export function keepDateSuggestion(
   const key = placeKey(found.name);
   if (key === "" || context.been.has(key) || context.chains.has(key))
     return false;
-  if (isKnownChain(found.name)) return false;
+  if (isKnownChain(found.name) || PLAYGROUND.test(found.name)) return false;
   // A result with no category cannot show it is a bar or a park.
   if (found.category === undefined) return false;
   if (dateSlotOf(context.kind, found.category, [], true) !== context.slot)
