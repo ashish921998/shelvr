@@ -104,6 +104,15 @@ describe("UnplacedToast", () => {
     });
   });
 
+  it("stays quiet for a note or photo, which the toast's link copy doesn't fit", () => {
+    feed([link("processing", { type: "note" })]);
+    const view = render(<UnplacedToast />);
+    feed([link("ready", { type: "note", cities: [] })], () =>
+      view.rerender(<UnplacedToast />),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("stays quiet when the save lands in a city", () => {
     feed([link("processing")]);
     const view = render(<UnplacedToast />);

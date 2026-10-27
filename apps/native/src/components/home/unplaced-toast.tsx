@@ -19,7 +19,10 @@ function useNewlyUnplaced(
   const [save, setSave] = useState<ReviewSave | null>(null);
   useEffect(() => {
     if (items === undefined) return;
-    const landed = newlyUnplaced(statuses.current, items);
+    // The toast speaks of a link; a note or photo without a place waits for Review.
+    const landed = newlyUnplaced(statuses.current, items).filter(
+      (item) => item.type === "link",
+    );
     statuses.current = new Map(items.map((item) => [item._id, item.status]));
     if (landed.length > 0) setSave(landed[0]);
   }, [items]);
