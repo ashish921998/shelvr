@@ -486,6 +486,33 @@ export type PlannedStop = LatLng & {
   slot?: TripSlot;
 };
 
+function isLodging(stop: PlannedStop): boolean {
+  return stop.category !== undefined && LODGING_CATEGORIES.has(stop.category);
+}
+
+/**
+ * One stop per venue among the saves: a guide can name a restaurant and the hotel it sits in
+ * ("Santa Joana", "Locke de Santa Joana"), and their pins can land apart when one lookup missed.
+ * The venue keeps the name that isn't lodging, and the pin Apple matched when its own wasn't.
+ */
+export function mergeSavedNamesakes(stops: PlannedStop[]): PlannedStop[] {
+  const kept: PlannedStop[] = [];
+  for (const stop of stops) {
+    const at = kept.findIndex((other) => namesake(other, stop));
+    if (at === -1) {
+      kept.push(stop);
+      continue;
+    }
+    const other = kept[at];
+    const [keep, drop] =
+      isLodging(other) && !isLodging(stop) ? [stop, other] : [other, stop];
+    const matched = keep.appleId === undefined && drop.appleId !== undefined;
+    // Only the pin moves: the other venue's Apple id would open the hotel's place card.
+    kept[at] = matched ? { ...keep, lat: drop.lat, lng: drop.lng } : keep;
+  }
+  return kept;
+}
+
 /** Distinct places a save names, by name. */
 function namedPlaces(source: PlanSource): number {
   return new Set(

@@ -332,9 +332,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `createTripPlan` (Pro only, `createTripPlan` rate limit) puts the city's unvisited, pinned
   saves first, then adds suggestions from the Apple Maps Server API only (`/v1/search` with
   `resultTypeFilter=Poi` and `includePoiCategories` per interest, from the centre and four
-  offset points; no Gemini or other source). Queries use the saves' own tags only while AI
-  is allowed, otherwise plain interest words. Chains, results over 25 km from the centre,
-  visited places and duplicates are dropped, and a trip makes at most 24 Apple calls. The
+  offset points; no Gemini or other source), with queries from the saves' own tags. With AI
+  declined it makes no Apple call at all and plans from stored pins. Chains, lodging, results
+  over 25 km from the centre, visited places and namesakes are dropped, and a trip makes at
+  most 24 Apple requests. The
   pure rules (category map, queries, filters, balancing, day layout) are in
   `model/tripSuggest.ts`; `model/appleMaps.ts` `appleMapsSearchPlaces` is the search.
   Without the Maps key it plans from saves only. `tripPlannerData.ts` serves

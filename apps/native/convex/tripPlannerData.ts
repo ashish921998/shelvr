@@ -286,11 +286,19 @@ async function stopsOf(
     .take(MAX_TRIP_STOPS);
 }
 
-function stopView(stop: Doc<"tripStops">): TripPlanStop {
+function stopView(
+  stop: Doc<"tripStops">,
+  live: ReadonlySet<Id<"items">>,
+): TripPlanStop {
+  // A save deleted past what deleteItem unlinks in one go must not open from the trip.
+  const itemId =
+    stop.itemId !== undefined && live.has(stop.itemId)
+      ? stop.itemId
+      : undefined;
   return {
     _id: stop._id,
     source: stop.source,
-    ...(stop.itemId !== undefined ? { itemId: stop.itemId } : {}),
+    ...(itemId !== undefined ? { itemId } : {}),
     name: stop.name,
     ...(stop.area !== undefined ? { area: stop.area } : {}),
     lat: stop.lat,
@@ -300,6 +308,26 @@ function stopView(stop: Doc<"tripStops">): TripPlanStop {
     ...(stop.why !== undefined ? { why: stop.why } : {}),
     ...(stop.slot !== undefined ? { slot: stop.slot } : {}),
   };
+}
+
+/** The saves the trip's stops link to that still exist and belong to the caller. */
+async function liveSaves(
+  ctx: QueryCtx,
+  stops: Doc<"tripStops">[],
+  userId: string,
+): Promise<Set<Id<"items">>> {
+  const ids = [
+    ...new Set(
+      stops.flatMap((stop) => (stop.itemId !== undefined ? [stop.itemId] : [])),
+    ),
+  ];
+  const items = await Promise.all(ids.map((id) => ctx.db.get(id)));
+  return new Set(
+    ids.filter((_, i) => {
+      const item = items[i];
+      return item !== null && item.userId === userId;
+    }),
+  );
 }
 
 /** The trip with its days and unplanned stops. Stops carry their own name and pin, so a deleted save never breaks it. */
@@ -315,9 +343,11 @@ export const getTripPlan = authedQuery({
     );
     const unplanned: TripPlanStop[] = [];
     // The index orders stops by day, then by their order within it.
-    for (const stop of await stopsOf(ctx, plan._id)) {
-      if (stop.day === UNPLANNED_DAY) unplanned.push(stopView(stop));
-      else days[stop.day - 1]?.push(stopView(stop));
+    const stops = await stopsOf(ctx, plan._id);
+    const live = await liveSaves(ctx, stops, ctx.userId);
+    for (const stop of stops) {
+      if (stop.day === UNPLANNED_DAY) unplanned.push(stopView(stop, live));
+      else days[stop.day - 1]?.push(stopView(stop, live));
     }
     return {
       _id: plan._id,

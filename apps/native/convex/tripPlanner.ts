@@ -38,6 +38,7 @@ import {
   chainNames,
   keepSuggestion,
   layoutTripPlan,
+  mergeSavedNamesakes,
   nextBatch,
   saveWhy,
   searchQueues,
@@ -105,11 +106,15 @@ async function openMaps(lang: string | undefined): Promise<Maps | null> {
   };
 }
 
-function spend(maps: Maps | null): maps is Maps {
-  if (maps === null || maps.left <= 0) return false;
-  maps.left--;
+/** Charges `calls` requests to the trip's Apple budget, when there is room for all of them. */
+function spend(maps: Maps | null, calls = 1): maps is Maps {
+  if (maps === null || maps.left < calls) return false;
+  maps.left -= calls;
   return true;
 }
+
+// appleMapsLookup's search retries as a point of interest when the first answer is only a city.
+const SEARCH_LOOKUP_CALLS = 2;
 
 function pinFor(place: PlanPlace, pins: SavedPin[]): SavedPin | null {
   const key = placeKey(place.name);
@@ -154,10 +159,12 @@ async function savedStops(
   maps: Maps | null,
 ): Promise<{ stops: PlannedStop[]; centre: LatLng | null }> {
   const been = new Set(claim.been.map(placeKey));
+  const cap = tripPlaceCap(claim.days);
+  // Every candidate first, so the cap keeps pinned places over ones that would need a lookup.
   const places = suggestSavedPlaces(
     claim.sources,
     been,
-    tripPlaceCap(claim.days),
+    Number.MAX_SAFE_INTEGER,
   );
   // An older pin can be a stray from before storePins dropped them; that place is looked up again.
   const pinned = dropStrays(places.map((place) => pinFor(place, claim.pins)));
@@ -169,8 +176,8 @@ async function savedStops(
   const unpinned: PlanPlace[] = [];
   places.forEach((place, i) => {
     const pin = pinned[i];
-    if (pin) stops.push(saveStop(place, pin, why(place)));
-    else unpinned.push(place);
+    if (pin && stops.length < cap) stops.push(saveStop(place, pin, why(place)));
+    else if (!pin) unpinned.push(place);
   });
   let centre = middleOf(stops);
   if (centre === null && spend(maps)) {
@@ -178,8 +185,13 @@ async function savedStops(
   }
   // Place names come from the model's reading of a save, so they reach Apple only while AI is allowed.
   if (centre !== null && claim.aiAllowed && maps !== null) {
-    const asked = unpinned.slice(0, Math.min(MAX_SAVE_LOOKUPS, maps.left));
-    maps.left -= asked.length;
+    const room = Math.min(
+      MAX_SAVE_LOOKUPS,
+      cap - stops.length,
+      Math.floor(maps.left / SEARCH_LOOKUP_CALLS),
+    );
+    const asked = unpinned.slice(0, Math.max(0, room));
+    maps.left -= asked.length * SEARCH_LOOKUP_CALLS;
     const found = await Promise.all(
       asked.map((place) =>
         appleMapsLookup(
@@ -195,7 +207,7 @@ async function savedStops(
       if (at) stops.push(saveStop(place, at, why(place)));
     });
   }
-  return { stops: uniquePlacePins(stops), centre };
+  return { stops: mergeSavedNamesakes(uniquePlacePins(stops)), centre };
 }
 
 function suggestedStop(found: Suggestion): PlannedStop {
@@ -279,7 +291,8 @@ async function locateStay(
   centre: LatLng | null,
 ): Promise<{ name: string; lat?: number; lng?: number } | undefined> {
   if (claim.stay === undefined) return undefined;
-  if (centre === null || !spend(maps)) return { name: claim.stay };
+  if (centre === null || !spend(maps, SEARCH_LOOKUP_CALLS))
+    return { name: claim.stay };
   const found = await appleMapsLookup(maps.token, "search", claim.stay, centre);
   return found
     ? { name: claim.stay, lat: found.lat, lng: found.lng }
@@ -323,7 +336,11 @@ export const createTripPlan = action({
     );
     const interests =
       claim.interests.length > 0 ? claim.interests : DEFAULT_INTERESTS;
-    const maps = await openMaps(appleLang(args.locale));
+    // The city, the stay and points from the saves would all reach Apple, so a declined
+    // account plans from its stored pins alone, as pin lookup does.
+    const maps = claim.aiAllowed
+      ? await openMaps(appleLang(args.locale))
+      : null;
     const { stops: saves, centre } = await savedStops(claim, maps);
     const stay = await locateStay(claim, maps, centre);
     const wanted = suggestionRoom(args.pace, claim.days, saves.length);

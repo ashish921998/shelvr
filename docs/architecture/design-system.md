@@ -67,24 +67,19 @@ text color must clear 4.5:1 for body text or 3:1 for large text against every
 surface it renders on, including `surfaceMuted` and `primarySoft`, not the
 paper background alone. Check the dark themes for legibility too.
 
-`tripDays` is the one categorical palette: eight hues, one per trip day, read
+`tripDays` is the one categorical palette: five calm hues, one per trip day, read
 through `dayColor(day, theme.colors.tripDays)` in `src/lib/trip-planner.ts`,
-which cycles past day eight. A day's pins, its route, its chip, the swatch on
+which cycles past day five. A day's pins, its route, its chip, the swatch on
 its header and its stops' number badges all take the same slot, so the list
 and the map match, and each of them also carries the day or stop number, so
-color is never the only cue. The order is fixed (orange, blue, red, ochre,
-magenta, violet, green, petrol). It was checked with the dataviz palette
-validator so consecutive days, including day eight to day nine, stay apart
-under protanopia, deuteranopia and tritanopia (OKLab ΔE at least 8 light, 9
-dark) and with full color vision (ΔE at least 16). The light steps are deep
-enough that `onTripDay` (white) clears 4.5:1 on every fill and each fill clears
-3:1 on the light map and on `surfaceMuted`. The dark themes share lighter steps
-of the same hues with a near-black `onTripDay` (at least 5.4:1 on every fill);
-each fill clears 4.2:1 on the dark map and every dark surface. Those dark
-steps sit above the validator's chart lightness band (OKLCH L 0.68 to 0.81
-against its 0.67 ceiling) on purpose: a pin carries its number on the fill,
-and a darker fill would leave no label color that reads. Re-run the
-validator and those contrast checks before changing a value, and keep
+color is never the only cue. The order is fixed (orange, green, violet, gold,
+blue) and has no red or pink: on a trip, red reads as an error. Neighbouring
+days, including the wrap from blue back to orange, stay at least ΔE 6 apart in
+OKLab under protanopia, deuteranopia and tritanopia, and day 1 and day 3 differ
+in hue as well as shade. The light steps are deep enough that `onTripDay`
+(white) clears 4.5:1 on every fill. The dark themes share lighter steps of the
+same hues with a near-black `onTripDay` (at least 6.4:1 on every fill). Re-run
+those contrast and separation checks before changing a value, and keep
 `tripDays` for trip days rather than using it as a general accent.
 
 ## Themes and appearance

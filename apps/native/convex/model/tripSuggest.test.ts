@@ -11,6 +11,7 @@ import {
   isKnownChain,
   keepSuggestion,
   layoutTripPlan,
+  mergeSavedNamesakes,
   namesake,
   LODGING_CATEGORIES,
   nameWithin,
@@ -579,5 +580,46 @@ describe("layoutTripPlan", () => {
       pace: "balanced",
     });
     expect(trip.days.map((d) => d.length)).toEqual([1, 0, 0]);
+  });
+});
+
+describe("merging saved namesakes", () => {
+  const itemId = "item1" as Id<"items">;
+  const restaurant = {
+    source: "save" as const,
+    itemId,
+    name: "Santa Joana",
+    lat: 38.7546,
+    lng: -9.1365,
+  };
+  const hotel = {
+    source: "save" as const,
+    itemId,
+    name: "Locke de Santa Joana",
+    lat: 38.7254,
+    lng: -9.1477,
+    appleId: "hotel",
+    category: "Hotel",
+  };
+
+  it("keeps the venue once, under the name that isn't lodging, at the matched pin", () => {
+    for (const order of [
+      [restaurant, hotel],
+      [hotel, restaurant],
+    ]) {
+      expect(mergeSavedNamesakes(order)).toEqual([
+        { ...restaurant, lat: hotel.lat, lng: hotel.lng },
+      ]);
+    }
+  });
+
+  it("leaves different venues and one-word names alone", () => {
+    const prado = { ...restaurant, name: "Prado", lat: 38.71, lng: -9.13 };
+    const pradoBar = { ...hotel, name: "Prado Bar", category: "Nightlife" };
+    expect(mergeSavedNamesakes([restaurant, prado, pradoBar])).toEqual([
+      restaurant,
+      prado,
+      pradoBar,
+    ]);
   });
 });

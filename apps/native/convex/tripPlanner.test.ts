@@ -581,7 +581,7 @@ describe("createTripPlan with Apple Maps", () => {
     expect(names.sort()).toEqual(["Santa Joana", "Taberna Sal Grosso"]);
   });
 
-  it("searches plain words and looks up no saved place for an account that declined AI", async () => {
+  it("makes no Apple call for an account that declined AI and plans from stored pins", async () => {
     await stubMaps();
     const fetchMock = fakeApple();
     vi.stubGlobal("fetch", fetchMock);
@@ -593,19 +593,63 @@ describe("createTripPlan with Apple Maps", () => {
       days: 1,
       pace: "easy",
       interests: ["food"],
+      stay: "Hotel Avenida",
     });
-    expect(result.saves).toBe(2);
-    const queries = searches(fetchMock).map((s) => s.q);
-    expect(queries[0]).toBe("restaurants");
-    expect(queries).not.toContain("ramen");
-    const lookups = fetchMock.mock.calls
-      .map(([input]) => new URL(input))
-      .filter(
-        (url) =>
-          url.pathname === "/v1/search" &&
-          !url.searchParams.has("includePoiCategories"),
-      );
-    expect(lookups).toEqual([]);
+    expect(result).toMatchObject({ saves: 2, suggested: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: result.tripId!,
+    });
+    expect(trip?.stay).toEqual({ name: "Hotel Avenida" });
+  });
+
+  it("keeps pinned saves within the cap when many saves have no pin and Maps is off", async () => {
+    const unpinned: Save[] = Array.from({ length: 40 }, (_, i) => ({
+      title: `Guide ${i}`,
+      places: [`Unpinned Place ${i}`],
+    }));
+    const pinned: Save = {
+      title: "One pinned",
+      places: ["Pinned Place"],
+      pins: [{ name: "Pinned Place", lat: 38.71, lng: -9.14 }],
+    };
+    const { t } = await setup([...unpinned, pinned]);
+    for (let run = 0; run < 3; run++) {
+      const result = await t.action(api.tripPlanner.createTripPlan, {
+        city: "Lisbon",
+        days: 1,
+        pace: "easy",
+        interests: ["food"],
+      });
+      expect(result.saves).toBe(1);
+    }
+  });
+
+  it("charges both attempts of a saved-place lookup to the call budget", async () => {
+    await stubMaps();
+    // Every search finds nothing, so each lookup also makes its second attempt.
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token")
+        return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+      if (url.pathname === "/v1/geocode")
+        return Response.json({ results: [{ coordinate: LISBON }] });
+      return reply([]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const unpinned: Save[] = Array.from({ length: 12 }, (_, i) => ({
+      title: `Guide ${i}`,
+      places: [`Unpinned Place ${i}`],
+    }));
+    const { t } = await setup(unpinned);
+    await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 3,
+      pace: "packed",
+      interests: ["food", "coffee", "drinks", "culture"],
+      stay: "Hotel Avenida",
+    });
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(24);
   });
 
   it("geocodes the city when no save has a pin, and keeps within the call budget", async () => {
@@ -687,6 +731,26 @@ describe("trip ownership", () => {
     const ramen = trip!.days[0].find((stop) => stop.name === "Ramen Shop");
     expect(ramen).toMatchObject({ source: "save", lat: 38.712 });
     expect(ramen?.itemId).toBeUndefined();
+  });
+
+  it("hides a link to a save that is gone even when deletion left the stop linked", async () => {
+    const { base, t, itemIds } = await setup();
+    const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+    });
+    // Past the batch deleteItem unlinks, a stop can still carry the id.
+    await base.run((ctx) => ctx.db.delete(itemIds[0]));
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    const ramen = trip!.days[0].find((stop) => stop.name === "Ramen Shop");
+    expect(ramen).toMatchObject({ source: "save" });
+    expect(ramen?.itemId).toBeUndefined();
+    const frog = trip!.days[0].find((stop) => stop.name === "Red Frog");
+    expect(frog?.itemId).toBe(itemIds[1]);
   });
 
   it("stores only stops whose save the caller owns", async () => {
