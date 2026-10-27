@@ -154,6 +154,34 @@ describe("listCities", () => {
     });
   });
 
+  it("prefers a photo from a save naming only that city over a newer shared one", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Sintra palace",
+      cities: ["Sintra"],
+      heroImageUrl: "https://img/sintra.jpg",
+    });
+    await save(userId, {
+      title: "Day trip",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/both.jpg",
+    });
+    await save(userId, {
+      title: "Lisbon only",
+      cities: ["Lisbon"],
+      heroImageUrl: "https://img/lisbon.jpg",
+    });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    // Newest first alone would hand Sintra the unshown, newer both.jpg.
+    expect(covers).toEqual({
+      Lisbon: "https://img/lisbon.jpg",
+      Sintra: "https://img/sintra.jpg",
+    });
+  });
+
   it("moves a later city to the next photo when an earlier city already shows the first", async () => {
     const { t, save, userId } = await setup();
     await save(userId, {
