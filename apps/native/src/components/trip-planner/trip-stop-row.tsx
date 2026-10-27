@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import { stopBadge } from "@/lib/trip-planner";
+import { stopBadge, stopRowLabel, stopWhyLine } from "@/lib/trip-planner";
 import type { TripPlanStop } from "@convex/model/tripPlan";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -26,12 +26,14 @@ export function TripStopRow({
   const badgeKey = stopBadge(stop.source);
   const badge = badgeKey === null ? null : t(badgeKey);
   const yours = stop.source === "save";
+  const why = stopWhyLine(stop, fromSave === true);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[stop.name, badge, stop.area]
-        .filter(Boolean)
-        .join(", ")}
+      accessibilityLabel={stopRowLabel(stop, {
+        number,
+        fromSave: fromSave === true,
+      })}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
@@ -77,13 +79,13 @@ export function TripStopRow({
             {stop.area}
           </ThemedText>
         ) : null}
-        {stop.why && fromSave ? (
+        {why !== null && fromSave ? (
           <ThemedText variant="footnote" numberOfLines={2} style={styles.muted}>
-            {t("tripPlanner.fromSave", { title: stop.why })}
+            {why}
           </ThemedText>
-        ) : stop.why ? (
+        ) : why !== null ? (
           <ThemedText variant="footnote" numberOfLines={3}>
-            {stop.why}
+            {why}
           </ThemedText>
         ) : null}
       </View>

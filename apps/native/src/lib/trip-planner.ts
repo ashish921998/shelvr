@@ -275,6 +275,40 @@ export function stopBadge(
   }
 }
 
+/**
+ * The explanation line under a stop: "From “Best of Lisbon”" when its `why` is the title of a
+ * save several stops share, the `why` itself otherwise, or null when it has none.
+ */
+export function stopWhyLine(
+  stop: Pick<TripPlanStop, "why">,
+  fromSave: boolean,
+): string | null {
+  if (!stop.why) return null;
+  return fromSave ? t("tripPlanner.fromSave", { title: stop.why }) : stop.why;
+}
+
+/**
+ * What VoiceOver and TalkBack say for a stop row, in the order it reads on screen:
+ * "Stop 3, Kafeine, Yours, Alfama, From “Best of Lisbon”". Unplanned stops have no number.
+ */
+export function stopRowLabel(
+  stop: Pick<TripPlanStop, "name" | "source" | "area" | "why">,
+  { number, fromSave }: { number?: number; fromSave: boolean },
+): string {
+  const badge = stopBadge(stop.source);
+  return [
+    number === undefined
+      ? null
+      : t("tripPlanner.stopNumber", { number: String(number) }),
+    stop.name,
+    badge === null ? null : t(badge),
+    stop.area,
+    stopWhyLine(stop, fromSave),
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 /** What tapping a stop does: open its save, Apple's place card, or the place in Maps. */
 export type StopAction =
   | { kind: "save"; itemId: NonNullable<TripPlanStop["itemId"]> }
@@ -350,10 +384,15 @@ type PlanPin = {
   active: boolean;
   /** What the pin shows: its day's number when every day is showing, its stop number in a focused day, nothing when faded. */
   text: string;
-  /** The label under the pin; faded pins carry none so the focused day reads cleanly. */
+  /** Where the stop sits in the trip: "Day 2 · Stop 3". Google's marker shows it as the snippet under the name. */
+  stopLine: string;
+  /**
+   * The pin's title on every pin, faded or not: "Prado · Day 2 · Stop 3". MapKit reads an
+   * annotation's title to VoiceOver and expo-maps has no separate accessibility label or
+   * subtitle, so the title carries the day and stop for everyone. The name leads, so a
+   * title MapKit truncates still shows the place.
+   */
   title: string;
-  /** What VoiceOver and TalkBack say for the pin, faded or not: "Day 2, stop 3, Prado". */
-  label: string;
 };
 
 /**
@@ -368,6 +407,10 @@ export function planPins(
   return days.flatMap((stops, day) =>
     stops.map((stop, index) => {
       const active = activeDay === null || activeDay === day;
+      const stopLine = t("tripPlanner.pinStop", {
+        day: String(day + 1),
+        stop: String(index + 1),
+      });
       return {
         id: `${day}:${index}`,
         day,
@@ -381,12 +424,8 @@ export function planPins(
             : active
               ? String(index + 1)
               : "",
-        title: active ? stop.name : "",
-        label: t("tripPlanner.pinLabel", {
-          day: String(day + 1),
-          stop: String(index + 1),
-          name: stop.name,
-        }),
+        stopLine,
+        title: t("tripPlanner.pinTitle", { name: stop.name, stop: stopLine }),
       };
     }),
   );
@@ -444,6 +483,82 @@ export function scrolledToEnd(
 }
 
 /**
+ * The trip page's focused day and whether the list is moving under the person's finger.
+ * `day` null is "All days". `scroll` is `dragging` from the moment a finger moves the list,
+ * `released` once it lifts, `momentum` while a flick decelerates, and `idle` otherwise,
+ * including while a picked day's scroll animates and while layout or VoiceOver moves the list.
+ */
+export type DayFocus = {
+  day: number | null;
+  scroll: "idle" | "dragging" | "released" | "momentum";
+};
+
+/**
+ * What can move the trip page's focus. `pick` is a chip, a day header, a pin or a stop;
+ * the scroll events carry the day `dayAtScroll` reports for the list's position then, or
+ * null when no day has laid out.
+ */
+export type DayFocusEvent =
+  | { type: "pick"; day: number | null }
+  | { type: "dragStart" }
+  | { type: "dragEnd"; day: number | null }
+  | { type: "momentumStart" }
+  | { type: "momentumEnd"; day: number | null }
+  | { type: "scroll"; day: number | null };
+
+export function initialDayFocus(
+  days: readonly (readonly unknown[])[],
+): DayFocus {
+  return { day: firstFocusDay(days), scroll: "idle" };
+}
+
+function follow(focus: DayFocus, day: number | null): number | null {
+  // "All days" holds until the person picks a day; the list's position never replaces it.
+  if (focus.day === null || day === null) return focus.day;
+  return day;
+}
+
+function withFocus(
+  focus: DayFocus,
+  day: number | null,
+  scroll: DayFocus["scroll"],
+): DayFocus {
+  return focus.day === day && focus.scroll === scroll ? focus : { day, scroll };
+}
+
+/**
+ * The focus after `event`. Only the person's own scrolling (a drag and the flick after it)
+ * moves the focused day, and never away from "All days"; a pick always wins, and ends any
+ * scroll still settling, so what the person tapped is what stays focused. Scroll events
+ * outside a drag (a picked day's animation, layout, VoiceOver bringing an element into view)
+ * change nothing. Returns `focus` itself when nothing changes, so React skips the render.
+ */
+export function nextDayFocus(focus: DayFocus, event: DayFocusEvent): DayFocus {
+  switch (event.type) {
+    case "pick":
+      return withFocus(focus, event.day, "idle");
+    case "dragStart":
+      return withFocus(focus, focus.day, "dragging");
+    case "dragEnd":
+      return focus.scroll === "dragging"
+        ? withFocus(focus, follow(focus, event.day), "released")
+        : focus;
+    case "momentumStart":
+      return focus.scroll === "released"
+        ? withFocus(focus, focus.day, "momentum")
+        : focus;
+    case "momentumEnd":
+      return focus.scroll === "momentum"
+        ? withFocus(focus, follow(focus, event.day), "idle")
+        : withFocus(focus, focus.day, "idle");
+    case "scroll":
+      return focus.scroll === "dragging" || focus.scroll === "momentum"
+        ? withFocus(focus, follow(focus, event.day), focus.scroll)
+        : focus;
+  }
+}
+
+/**
  * The stops whose `why` is the title of a save several of the trip's stops come from,
  * so the row can say where they came from. A save naming one place sends its own
  * description instead, which reads on its own.
@@ -470,11 +585,36 @@ export function sharedSaveStops(
   );
 }
 
-/** The trip page's back button title: the trips list it was opened from, or a plain "Back". */
-export function tripBackTitle(previousRoute: string | undefined): string {
-  return previousRoute === "(tabs)"
-    ? t("tripPlanner.listTitle")
-    : t("common.back");
+/** The slice of a navigator's state the back title reads; nested navigators hang off `state`. */
+type NavState = {
+  index?: number;
+  routes: readonly { key?: string; name: string; state?: NavState }[];
+};
+
+/**
+ * Whether the screen under the route `key` is the tab bar showing the Trips tab. The route
+ * is found by its key, not by the stack's index: a screen's first render can read the
+ * stack as it was before the push that added it, which named the wrong screen as the one
+ * below. A route not in the state yet reads as false until the state catches up.
+ */
+export function opensOverTripsTab(
+  state: NavState | undefined,
+  key: string,
+): boolean {
+  const routes = state?.routes ?? [];
+  const at = routes.findIndex((route) => route.key === key);
+  const below = at > 0 ? routes[at - 1] : undefined;
+  if (below?.name !== "(tabs)") return false;
+  const tabs = below.state;
+  if (!tabs || tabs.routes.length === 0) return false;
+  // A partial state without an index focuses its last route.
+  const focused = tabs.routes[tabs.index ?? tabs.routes.length - 1];
+  return focused?.name === "(trips)";
+}
+
+/** The trip page's back button title: "My trips" over the Trips tab, a plain "Back" over anything else. */
+export function tripBackTitle(overTripsTab: boolean): string {
+  return overTripsTab ? t("tripPlanner.listTitle") : t("common.back");
 }
 
 export function pinDay(id: string | undefined): number | null {

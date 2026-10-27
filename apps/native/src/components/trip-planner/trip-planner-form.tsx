@@ -48,20 +48,23 @@ export function FormSection({
   );
 }
 
-/**
- * A selectable pill. `pick` says how it reads to VoiceOver and TalkBack: one of a set
- * ("radio") or one of several that can be on together ("checkbox"), each with its
- * checked state, so the selection is announced on both platforms.
- */
 /** A colour a chip carries: a dot while it is off, its whole fill (with `on` for the label) once picked. */
 type ChipSwatch = { color: string; on: string };
 
+/**
+ * A selectable pill. `pick` says how it reads to VoiceOver and TalkBack: one of a set
+ * ("radio") or one of several that can be on together ("checkbox"), each with its
+ * checked state, so the selection is announced on both platforms. A picked chip fills
+ * with its swatch, or else with amber (`tone` "accent") or ink (`tone` "ink"), for a
+ * chip that must not look like any coloured one beside it.
+ */
 export function Chip({
   label,
   detail,
   selected,
   pick,
   swatch,
+  tone = "accent",
   onPress,
 }: {
   label: string;
@@ -69,12 +72,14 @@ export function Chip({
   selected: boolean;
   pick: "radio" | "checkbox";
   swatch?: ChipSwatch;
+  tone?: "accent" | "ink";
   onPress: () => void;
 }) {
+  const onFill = tone === "ink" ? styles.onInk : styles.onTint;
   const labelStyle = selected
     ? swatch
       ? { color: swatch.on }
-      : styles.onTint
+      : onFill
     : undefined;
   return (
     <Pressable
@@ -88,7 +93,8 @@ export function Chip({
       }}
       style={({ pressed }) => [
         styles.chip,
-        selected && styles.chipSelected,
+        selected &&
+          (tone === "ink" ? styles.chipSelectedInk : styles.chipSelected),
         selected &&
           swatch && {
             borderColor: swatch.color,
@@ -112,7 +118,7 @@ export function Chip({
       {detail ? (
         <ThemedText
           variant="captionLabel"
-          style={selected ? styles.onTint : styles.muted}
+          style={selected ? onFill : styles.muted}
         >
           {detail}
         </ThemedText>
@@ -334,6 +340,7 @@ const styles = StyleSheet.create((theme) => ({
   sectionHeading: { gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
   onTint: { color: theme.colors.onTint },
+  onInk: { color: theme.colors.background },
   pressed: { opacity: theme.opacity.pressed },
   disabled: { opacity: theme.opacity.disabled },
   cityPicker: { gap: theme.gap(1.25) },
@@ -363,6 +370,10 @@ const styles = StyleSheet.create((theme) => ({
   chipSelected: {
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primary,
+  },
+  chipSelectedInk: {
+    borderColor: theme.colors.foreground,
+    backgroundColor: theme.colors.foreground,
   },
   swatch: { width: 8, height: 8, borderRadius: 4 },
   input: {

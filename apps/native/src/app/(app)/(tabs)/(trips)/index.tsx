@@ -11,7 +11,7 @@ import { newestFirst } from "@/lib/trip-planner";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useIsFocused, useRouter } from "expo-router";
 import { useMemo } from "react";
 import { FlatList, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -51,6 +51,9 @@ export default function TripsScreen() {
   const deleteTrip = useDeleteTripPlan();
   const sorted = useMemo(() => newestFirst(trips.data ?? []), [trips.data]);
   const plan = () => router.push("/new-trip");
+  // Under the Plan a trip sheet the list is still on screen; hidden from VoiceOver and TalkBack
+  // then, so a swipe cannot leave the sheet for the list behind it.
+  const focused = useIsFocused();
 
   if (trips.isError) {
     return (
@@ -67,6 +70,8 @@ export default function TripsScreen() {
   return (
     <FlatList
       style={styles.screen}
+      accessibilityElementsHidden={!focused}
+      importantForAccessibility={focused ? "auto" : "no-hide-descendants"}
       data={sorted}
       keyExtractor={(trip) => trip._id}
       contentInsetAdjustmentBehavior="automatic"

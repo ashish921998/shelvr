@@ -4,6 +4,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { TripPlanStop } from "@convex/model/tripPlan";
 
 import {
+  type DayFocus,
+  type DayFocusEvent,
   cityChoices,
   clampDays,
   dayAtScroll,
@@ -11,8 +13,11 @@ import {
   dayScrollOffset,
   DEFAULT_INTERESTS,
   firstFocusDay,
+  initialDayFocus,
   initialTripForm,
   newestFirst,
+  nextDayFocus,
+  opensOverTripsTab,
   paceHint,
   pinDay,
   planPins,
@@ -22,6 +27,8 @@ import {
   sharedSaveStops,
   stopAction,
   stopBadge,
+  stopRowLabel,
+  stopWhyLine,
   toggleInterest,
   tripDateRange,
   tripBackTitle,
@@ -214,6 +221,43 @@ describe("stops", () => {
     expect(stopBadge("added")).toBeNull();
   });
 
+  it("reads a stop row with its number and the line under it, as it shows", () => {
+    const itemId = "item1" as Id<"items">;
+    expect(
+      stopRowLabel(
+        stop({
+          source: "save",
+          itemId,
+          name: "Kafeine",
+          area: "Alfama",
+          why: "Best of Lisbon",
+        }),
+        { number: 3, fromSave: true },
+      ),
+    ).toBe("Stop 3, Kafeine, Yours, Alfama, From “Best of Lisbon”");
+    expect(
+      stopRowLabel(stop({ why: "Sunset over the old town" }), {
+        number: 1,
+        fromSave: false,
+      }),
+    ).toBe("Stop 1, Miradouro da Graça, Suggested, Sunset over the old town");
+    // Unplanned and hand-added stops have no number or badge, and skip what they lack.
+    expect(
+      stopRowLabel(stop({ source: "added", name: "Hotel bar" }), {
+        fromSave: false,
+      }),
+    ).toBe("Hotel bar");
+  });
+
+  it("shows a stop's why as a From line only for a shared save", () => {
+    expect(stopWhyLine({ why: "Best of Lisbon" }, true)).toBe(
+      "From “Best of Lisbon”",
+    );
+    expect(stopWhyLine({ why: "Rich tonkotsu" }, false)).toBe("Rich tonkotsu");
+    expect(stopWhyLine({ why: "" }, true)).toBeNull();
+    expect(stopWhyLine({}, false)).toBeNull();
+  });
+
   it("opens a save from the person's shelf", () => {
     const itemId = "item1" as Id<"items">;
     expect(
@@ -248,11 +292,11 @@ describe("stops", () => {
       1,
     );
     expect(
-      pins.map((pin) => [pin.id, pin.number, pin.active, pin.text, pin.title]),
+      pins.map((pin) => [pin.id, pin.number, pin.active, pin.text]),
     ).toEqual([
-      ["0:0", 1, false, "", ""],
-      ["0:1", 2, false, "", ""],
-      ["1:0", 1, true, "1", "LX Factory"],
+      ["0:0", 1, false, ""],
+      ["0:1", 2, false, ""],
+      ["1:0", 1, true, "1"],
     ]);
     expect(planPins([[stop()]], null)[0]?.active).toBe(true);
     expect(pinDay("1:0")).toBe(1);
@@ -267,24 +311,37 @@ describe("trip page focus", () => {
       [[stop(), stop({ name: "Tasca" })], [stop({ name: "LX Factory" })]],
       null,
     );
-    expect(pins.map((pin) => [pin.text, pin.title, pin.active])).toEqual([
-      ["1", "Miradouro da Graça", true],
-      ["1", "Tasca", true],
-      ["2", "LX Factory", true],
+    expect(pins.map((pin) => [pin.text, pin.active])).toEqual([
+      ["1", true],
+      ["1", true],
+      ["2", true],
     ]);
   });
 
-  it("gives every pin a spoken label with its day, stop and name, faded or not", () => {
-    const pins = planPins(
+  it("titles every pin with its name, day and stop, faded or not, since VoiceOver reads the title", () => {
+    const focused = planPins(
       [[stop(), stop({ name: "Tasca" })], [stop({ name: "Prado" })]],
       0,
     );
-    expect(pins.map((pin) => pin.label)).toEqual([
-      "Day 1, stop 1, Miradouro da Graça",
-      "Day 1, stop 2, Tasca",
-      "Day 2, stop 1, Prado",
+    expect(focused.map((pin) => pin.title)).toEqual([
+      "Miradouro da Graça · Day 1 · Stop 1",
+      "Tasca · Day 1 · Stop 2",
+      "Prado · Day 2 · Stop 1",
     ]);
-    expect(pins[2]?.title).toBe("");
+    expect(focused[2]?.active).toBe(false);
+    expect(focused.map((pin) => pin.stopLine)).toEqual([
+      "Day 1 · Stop 1",
+      "Day 1 · Stop 2",
+      "Day 2 · Stop 1",
+    ]);
+    // The title does not depend on which day is focused.
+    const all = planPins(
+      [[stop(), stop({ name: "Tasca" })], [stop({ name: "Prado" })]],
+      null,
+    );
+    expect(all.map((pin) => pin.title)).toEqual(
+      focused.map((pin) => pin.title),
+    );
   });
 
   it("colours each day from the palette, cycling once a trip outruns it", () => {
@@ -360,10 +417,197 @@ describe("trip page focus", () => {
     expect([...shared].sort()).toEqual(["a", "b"]);
   });
 
-  it("titles the back button after the trips list it came from", () => {
-    expect(tripBackTitle("(tabs)")).toBe("My trips");
-    expect(tripBackTitle("city/[name]")).toBe("Back");
-    expect(tripBackTitle(undefined)).toBe("Back");
+  it("titles the back button after the trips list only over the Trips tab", () => {
+    expect(tripBackTitle(true)).toBe("My trips");
+    expect(tripBackTitle(false)).toBe("Back");
+  });
+});
+
+describe("trip page back title", () => {
+  const tabs = (index: number | undefined) => ({
+    key: "tabs-1",
+    name: "(tabs)",
+    state: {
+      ...(index === undefined ? {} : { index }),
+      routes: [{ name: "(home)" }, { name: "(map)" }, { name: "(trips)" }],
+    },
+  });
+  const trip = { key: "trip-1", name: "trip-plan/[id]" };
+
+  it("is over the Trips tab when the tab bar under it shows Trips", () => {
+    // Opened from the Trips list, and after planning (the sheet replaced by the trip).
+    expect(
+      opensOverTripsTab({ index: 1, routes: [tabs(2), trip] }, "trip-1"),
+    ).toBe(true);
+  });
+
+  it("finds the trip by its key, not by the stack's index", () => {
+    // Something pushed over the trip moves the index, not what sits below the trip.
+    expect(
+      opensOverTripsTab(
+        {
+          index: 2,
+          routes: [tabs(2), trip, { key: "item-1", name: "item/[id]" }],
+        },
+        "trip-1",
+      ),
+    ).toBe(true);
+  });
+
+  it("is not over the Trips tab before the push reaches the state", () => {
+    // A first render can still see the stack without this screen: the list's tab bar is
+    // on top there, and must not be mistaken for the screen below.
+    expect(opensOverTripsTab({ index: 0, routes: [tabs(2)] }, "trip-1")).toBe(
+      false,
+    );
+    expect(opensOverTripsTab(undefined, "trip-1")).toBe(false);
+  });
+
+  it("is not over the Trips tab over another tab or another screen", () => {
+    expect(
+      opensOverTripsTab({ index: 1, routes: [tabs(0), trip] }, "trip-1"),
+    ).toBe(false);
+    expect(
+      opensOverTripsTab(
+        {
+          index: 2,
+          routes: [tabs(0), { key: "city-1", name: "city/[name]" }, trip],
+        },
+        "trip-1",
+      ),
+    ).toBe(false);
+    expect(opensOverTripsTab({ index: 0, routes: [trip] }, "trip-1")).toBe(
+      false,
+    );
+  });
+
+  it("reads a tab state without an index as focused on its last route", () => {
+    expect(
+      opensOverTripsTab({ routes: [tabs(undefined), trip] }, "trip-1"),
+    ).toBe(true);
+    expect(
+      opensOverTripsTab(
+        { routes: [{ key: "tabs-1", name: "(tabs)" }, trip] },
+        "trip-1",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("trip page focus state", () => {
+  const run = (start: DayFocus, events: DayFocusEvent[]) =>
+    events.reduce(nextDayFocus, start);
+  const opened: DayFocus = { day: 0, scroll: "idle" };
+
+  it("opens on the first day with a stop, still", () => {
+    expect(initialDayFocus([[], [stop()]])).toEqual({ day: 1, scroll: "idle" });
+    expect(initialDayFocus([[], []])).toEqual({ day: null, scroll: "idle" });
+  });
+
+  it("keeps All days through scroll events nobody dragged for", () => {
+    // The reported race: All days tapped just after opening, then layout scrolls the list.
+    expect(
+      run(opened, [
+        { type: "pick", day: null },
+        { type: "scroll", day: 2 },
+        { type: "momentumEnd", day: 2 },
+        { type: "scroll", day: 2 },
+      ]),
+    ).toEqual({ day: null, scroll: "idle" });
+  });
+
+  it("keeps All days while the person scrolls the list", () => {
+    expect(
+      run(opened, [
+        { type: "pick", day: null },
+        { type: "dragStart" },
+        { type: "scroll", day: 1 },
+        { type: "dragEnd", day: 2 },
+        { type: "momentumStart" },
+        { type: "scroll", day: 2 },
+        { type: "momentumEnd", day: 2 },
+      ]).day,
+    ).toBeNull();
+  });
+
+  it("leaves All days only for a day the person picks", () => {
+    const all = run(opened, [{ type: "pick", day: null }]);
+    expect(run(all, [{ type: "pick", day: 2 }]).day).toBe(2);
+  });
+
+  it("drops a pick's settling scroll even when a flick was still running", () => {
+    // A flick runs, the person taps All days mid-flight; the flick's last events change nothing.
+    expect(
+      run(opened, [
+        { type: "dragStart" },
+        { type: "dragEnd", day: 1 },
+        { type: "momentumStart" },
+        { type: "pick", day: null },
+        { type: "scroll", day: 2 },
+        { type: "momentumEnd", day: 2 },
+      ]),
+    ).toEqual({ day: null, scroll: "idle" });
+  });
+
+  it("follows a focused day through the person's drag and flick", () => {
+    expect(
+      run(opened, [{ type: "dragStart" }, { type: "scroll", day: 1 }]).day,
+    ).toBe(1);
+    expect(
+      run(opened, [
+        { type: "dragStart" },
+        { type: "scroll", day: 1 },
+        { type: "dragEnd", day: 1 },
+        { type: "momentumStart" },
+        { type: "scroll", day: 2 },
+        { type: "momentumEnd", day: 2 },
+      ]),
+    ).toEqual({ day: 2, scroll: "idle" });
+  });
+
+  it("ignores a picked day's own scroll animation and layout scrolls", () => {
+    // Day 3 picked on the map: its scroll passes day 2 on the way and ends with a momentum end.
+    expect(
+      run(opened, [
+        { type: "pick", day: 2 },
+        { type: "scroll", day: 1 },
+        { type: "momentumEnd", day: 1 },
+      ]),
+    ).toEqual({ day: 2, scroll: "idle" });
+    expect(run(opened, [{ type: "scroll", day: 2 }])).toBe(opened);
+  });
+
+  it("hands the focus back to the person who drags during a picked day's scroll", () => {
+    expect(
+      run(opened, [
+        { type: "pick", day: 2 },
+        { type: "dragStart" },
+        { type: "scroll", day: 1 },
+      ]).day,
+    ).toBe(1);
+  });
+
+  it("ignores scroll events after a drag that ended without a flick", () => {
+    expect(
+      run(opened, [
+        { type: "dragStart" },
+        { type: "dragEnd", day: 1 },
+        { type: "scroll", day: 2 },
+      ]),
+    ).toEqual({ day: 1, scroll: "released" });
+  });
+
+  it("keeps the focused day when the list reports no laid-out day", () => {
+    expect(
+      run(opened, [{ type: "dragStart" }, { type: "scroll", day: null }]).day,
+    ).toBe(0);
+  });
+
+  it("returns the same state when nothing changes, so React skips the render", () => {
+    const idle = run(opened, [{ type: "scroll", day: 1 }]);
+    expect(idle).toBe(opened);
+    const dragging = run(opened, [{ type: "dragStart" }]);
+    expect(nextDayFocus(dragging, { type: "scroll", day: 0 })).toBe(dragging);
   });
 });
 

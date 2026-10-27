@@ -95,9 +95,10 @@ export default function NewTripScreen() {
     [theme, close, locale],
   );
 
+  // The sheet is modal to VoiceOver too, so a swipe never leaves it for the Trips list behind.
   if (state.status !== "idle") {
     return (
-      <View style={styles.screen}>
+      <View style={styles.screen} accessibilityViewIsModal>
         {header}
         <TripPlannerReveal city={state.city} ready={ready} onDone={open} />
       </View>
@@ -105,7 +106,7 @@ export default function NewTripScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={styles.screen} accessibilityViewIsModal>
       {header}
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"

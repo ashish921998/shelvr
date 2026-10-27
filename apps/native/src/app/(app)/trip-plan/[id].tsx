@@ -18,7 +18,9 @@ import {
   dayAtScroll,
   dayColor,
   dayScrollOffset,
-  firstFocusDay,
+  initialDayFocus,
+  nextDayFocus,
+  opensOverTripsTab,
   scrolledToEnd,
   sharedSaveStops,
   type StopAction,
@@ -40,9 +42,17 @@ import {
   useFocusEffect,
   useLocalSearchParams,
   useNavigation,
+  useRoute,
   useRouter,
 } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import {
   Linking,
   type NativeScrollEvent,
@@ -56,8 +66,6 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.42;
-// Long enough for an animated scrollTo to settle; the person dragging ends it sooner.
-const PROGRAMMATIC_SCROLL_MS = 700;
 
 function DayHeader({
   index,
@@ -212,15 +220,18 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
   const { rt, theme } = useUnistyles();
   const scroll = useRef<ScrollViewInstance>(null);
   // The trip opens on its first day, so the map starts on a handful of pins, not the whole region.
-  const [activeDay, setActiveDay] = useState<number | null>(() =>
-    firstFocusDay(trip.days),
+  // A reducer, not a closure over the focused day: a scroll event handled before React re-renders
+  // still sees a pick made just before it, so "All days" can never be undone by a stale handler.
+  const [focus, dispatch] = useReducer(
+    nextDayFocus,
+    trip.days,
+    initialDayFocus,
   );
+  const activeDay = focus.day;
   const contentY = useRef(0);
   const dayY = useRef<number[]>([]);
   // The map and its chip row, pinned over the list; the chip row adds to the map's height.
   const headerHeight = useRef(0);
-  // While a chip's scroll animates, the list's position says nothing about the person's focus.
-  const ignoreScrollUntil = useRef(0);
   const openStop = useStopOpener();
   const hasMap = hasMapPoints(trip);
   const mapHeight = rt.screen.height * MAP_SHARE;
@@ -233,12 +244,14 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
     [trip.days, trip.unplanned],
   );
 
-  // A day picked on the map brings its header up under the map; picking one in the list leaves the list where it is.
+  const pick = (day: number | null) => dispatch({ type: "pick", day });
+
+  // A day picked on the map brings its header up under the map; "All days" and a pick in the
+  // list leave the list where it is.
   const pickOnMap = (day: number | null) => {
-    setActiveDay(day);
+    pick(day);
     const y = day === null ? undefined : dayY.current[day];
     if (y === undefined) return;
-    ignoreScrollUntil.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
     scroll.current?.scrollTo({
       y: dayScrollOffset(
         contentY.current + y,
@@ -249,14 +262,13 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
     });
   };
 
-  // The focused day follows the list as the person scrolls; "All days" stays put.
-  const followScroll = ({
+  // The day under the pinned map at this scroll position; the reducer decides whether it counts.
+  const dayAt = ({
     nativeEvent,
-  }: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!hasMap || activeDay === null) return;
-    if (Date.now() < ignoreScrollUntil.current) return;
+  }: NativeSyntheticEvent<NativeScrollEvent>): number | null => {
+    if (!hasMap) return null;
     const scrollY = nativeEvent.contentOffset.y;
-    const day = dayAtScroll(
+    return dayAtScroll(
       scrollY,
       (headerHeight.current || mapHeight) + theme.gap(2),
       trip.days.map((_, index) => {
@@ -269,7 +281,6 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
         nativeEvent.contentSize.height,
       ),
     );
-    if (day !== null && day !== activeDay) setActiveDay(day);
   };
 
   return (
@@ -280,11 +291,17 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
       contentContainerStyle={styles.scrollContent}
       // The map stays pinned while the days scroll under it, so a focused day is always in view.
       stickyHeaderIndices={hasMap ? [0] : undefined}
-      onScroll={followScroll}
+      // The focused day follows the person's own scrolling only; see `nextDayFocus`.
+      onScroll={(event) => dispatch({ type: "scroll", day: dayAt(event) })}
       scrollEventThrottle={32}
-      onScrollBeginDrag={() => {
-        ignoreScrollUntil.current = 0;
-      }}
+      onScrollBeginDrag={() => dispatch({ type: "dragStart" })}
+      onScrollEndDrag={(event) =>
+        dispatch({ type: "dragEnd", day: dayAt(event) })
+      }
+      onMomentumScrollBegin={() => dispatch({ type: "momentumStart" })}
+      onMomentumScrollEnd={(event) =>
+        dispatch({ type: "momentumEnd", day: dayAt(event) })
+      }
     >
       {hasMap ? (
         <TripPlannerMap
@@ -335,7 +352,7 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
               stops={stops.length}
               color={dayColor(index, theme.colors.tripDays)}
               active={activeDay === index}
-              onPress={() => setActiveDay(index)}
+              onPress={() => pick(index)}
             />
             {stops.length === 0 ? (
               <ThemedText variant="footnote" style={styles.muted}>
@@ -354,7 +371,7 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
                   fromSave={fromSave.has(stop._id)}
                   onPress={() => {
                     // The map follows the list: coming back, it shows the day this stop is on.
-                    setActiveDay(index);
+                    pick(index);
                     openStop(stop);
                   }}
                 />
@@ -388,19 +405,26 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
   );
 }
 
-/** The back button's title; without one VoiceOver read the tab group's route name, "(tabs)". */
+/**
+ * The back button's title; without one VoiceOver read the tab group's route name, "(tabs)".
+ * Read from this route's place in the stack, by key, and again whenever the stack changes: the
+ * first render can see the stack from before the push that added this screen.
+ */
 function useBackTitleOptions() {
   const locale = useAppLocale();
   const navigation = useNavigation();
-  // Read once: the screen under this one does not change while it is open.
-  const [previous] = useState(() => {
-    const state = navigation.getState();
-    return state?.routes[state.index - 1]?.name;
-  });
+  const { key } = useRoute();
+  const overTripsTab = useSyncExternalStore(
+    useCallback(
+      (onChange: () => void) => navigation.addListener("state", onChange),
+      [navigation],
+    ),
+    () => opensOverTripsTab(navigation.getState(), key),
+  );
   return useMemo(
-    () => ({ headerBackTitle: tripBackTitle(previous) }),
+    () => ({ headerBackTitle: tripBackTitle(overTripsTab) }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `t()` reads the locale, so a language change must rebuild the title
-    [previous, locale],
+    [overTripsTab, locale],
   );
 }
 

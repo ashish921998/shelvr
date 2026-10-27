@@ -6,7 +6,6 @@ import { moveCamera } from "@/lib/map-camera";
 import { t } from "@/lib/i18n";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { dayColor, pinDay, planPins } from "@/lib/trip-planner";
-import { useScreenReader } from "@/lib/use-screen-reader";
 import type { TripPlanDetail } from "@convex/model/tripPlan";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -50,10 +49,12 @@ function DayChips({
       style={styles.chips}
       contentContainerStyle={styles.chipRow}
     >
+      {/* Ink, not amber, when picked: the amber fill read as day 1's orange. */}
       <Chip
         label={t("tripPlanner.allDays")}
         selected={activeDay === null}
         pick="radio"
+        tone="ink"
         onPress={() => onSelectDay(null)}
       />
       {Array.from({ length: dayCount }, (_, day) => (
@@ -82,7 +83,6 @@ export function TripPlannerMap({
   onLayout,
 }: Props) {
   const { theme, rt } = useUnistyles();
-  const screenReader = useScreenReader();
   const ref = useRef<AppleMaps.MapView>(null);
   const pins = useMemo(() => planPins(days, activeDay), [days, activeDay]);
   const stayLat = stay?.lat;
@@ -149,11 +149,6 @@ export function TripPlannerMap({
   };
   const routeColor = (day: number) =>
     colorOf(day, activeDay === null || activeDay === day);
-  // MapKit reads a pin's title to VoiceOver, so with a screen reader on every pin, faded
-  // ones included, carries its day, stop and name.
-  const titleOf = (pin: (typeof pins)[number], visible: string) =>
-    screenReader ? pin.label : visible;
-
   const select = (id: string | undefined) => {
     const day = pinDay(id);
     if (day !== null) onSelectDay(day);
@@ -187,7 +182,8 @@ export function TripPlannerMap({
             annotations={pins.map((pin) => ({
               id: pin.id,
               coordinates: pin.coordinates,
-              title: titleOf(pin, pin.title),
+              // VoiceOver reads the title, so every pin, faded ones too, says its day and stop.
+              title: pin.title,
               text: pin.text,
               backgroundColor: colorOf(pin.day, pin.active),
               textColor: theme.colors.onTripDay,
@@ -232,10 +228,9 @@ export function TripPlannerMap({
               .map((pin) => ({
                 id: pin.id,
                 coordinates: pin.coordinates,
-                title: titleOf(
-                  pin,
-                  activeDay === null ? pin.name : `${pin.number}. ${pin.name}`,
-                ),
+                // Shown in the callout a tap opens: the place, then its day and stop.
+                title: pin.name,
+                snippet: pin.stopLine,
               })),
             ...(stayPoint && stay
               ? [{ id: STAY_ID, coordinates: stayPoint, title: stay.name }]

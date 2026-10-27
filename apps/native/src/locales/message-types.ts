@@ -806,7 +806,9 @@ export type MessageParams = {
   "tripPlanner.stayingAt": { name: string };
   "tripPlanner.showDay": { day: string };
   "tripPlanner.allDays": undefined;
-  "tripPlanner.pinLabel": { day: string; stop: string; name: string };
+  "tripPlanner.pinStop": { day: string; stop: string };
+  "tripPlanner.pinTitle": { name: string; stop: string };
+  "tripPlanner.stopNumber": { number: string };
   "tripPlanner.fromSave": { title: string };
   "tripPlanner.whereTo": undefined;
   "tripPlanner.cityPlaceholder": undefined;
