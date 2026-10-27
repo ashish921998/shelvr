@@ -36,6 +36,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import { MAX_LIST_PARTS } from "./model/placeList";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -47,6 +48,8 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  normalizeCities,
+  normalizePlaces,
   placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
@@ -2133,6 +2136,84 @@ export const finalizeItem = internalMutation({
       });
     }
     return "applied";
+  },
+});
+
+const placeListPartValidator = v.object({
+  title: v.string(),
+  cities: v.array(v.string()),
+  places: v.array(v.string()),
+  content: v.string(),
+});
+
+/** The rest of a shared list the run just settled, one ready save per part; a part already saved stays as it is. */
+export const addPlaceListParts = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    runId: v.optional(v.string()),
+    parts: v.array(placeListPartValidator),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      item.url === undefined ||
+      item.status !== "ready" ||
+      !ownsRun(item, args.runId) ||
+      (await liveOwner(ctx, item.userId)) === null ||
+      !(await aiAllowed(ctx, item.userId))
+    ) {
+      return 0;
+    }
+    const url = item.url;
+    const saved = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_url", (q) =>
+        q.eq("userId", item.userId).eq("url", url),
+      )
+      .take(MAX_LIST_PARTS * 2);
+    const titles = new Set(saved.map((row) => row.title));
+    let added = 0;
+    for (const part of args.parts.slice(0, MAX_LIST_PARTS)) {
+      if (titles.has(part.title)) continue;
+      titles.add(part.title);
+      const cities = normalizeCities(part.cities);
+      const places = normalizePlaces(part.places, cities);
+      const partId = await ctx.db.insert("items", {
+        userId: item.userId,
+        type: "link",
+        status: "ready",
+        url,
+        title: part.title,
+        ...(item.description !== undefined
+          ? { description: item.description }
+          : {}),
+        tags: item.tags,
+        content: part.content,
+        ...(item.siteName !== undefined ? { siteName: item.siteName } : {}),
+        ...(item.author !== undefined ? { author: item.author } : {}),
+        intents: [],
+        cities,
+        places,
+        searchText: buildSearchText({
+          title: part.title,
+          cities,
+          places,
+          description: item.description,
+          tags: item.tags,
+          siteName: item.siteName,
+          content: part.content,
+        }),
+      });
+      if (places.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+          itemId: partId,
+        });
+      }
+      added++;
+    }
+    return added;
   },
 });
 

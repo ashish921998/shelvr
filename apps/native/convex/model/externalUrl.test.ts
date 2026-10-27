@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   instagramMedia,
+  isGoogleMapsUrl,
   isInstagramUrl,
   isPinterestHost,
   isPinterestShortUrl,
@@ -399,5 +400,29 @@ describe("linkSource", () => {
     ).toBeUndefined();
     expect(linkSource("https://example.com/post")).toBeUndefined();
     expect(linkSource(undefined)).toBeUndefined();
+  });
+});
+
+describe("isGoogleMapsUrl", () => {
+  it.each([
+    "https://maps.app.goo.gl/MMjvFNWpUTjiupHc9",
+    "https://goo.gl/maps/abc123",
+    "https://www.google.com/maps/placelists/list/PiSwyqmbpwpP_Nr5sAang4x5QxbKwA",
+    "https://www.google.co.uk/maps/@51.5,-0.1,12z",
+    "https://google.com/maps",
+    "https://maps.google.com/?cid=123",
+  ])("accepts %s", (url) => {
+    expect(isGoogleMapsUrl(url)).toBe(true);
+  });
+
+  it.each([
+    "https://www.google.com/search?q=maps",
+    "https://goo.gl/abc123",
+    "https://mapsgoogle.com/maps/x",
+    "https://www.google.com/mapsfoo",
+    "not a url",
+    undefined,
+  ])("refuses %s", (url) => {
+    expect(isGoogleMapsUrl(url)).toBe(false);
   });
 });

@@ -62,7 +62,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   those rather than grepping call sites.
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
-  per-host readers in `convex/model/readers/`, on top of
+  per-host readers in `convex/model/readers/` (Google Maps lists split by city in
+  `convex/model/placeList.ts`), on top of
   `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
   `convex/ai.ts` only orchestrates the model call.
 - **Domain language:** `GLOSSARY.md` at the repo root defines the terms to use in

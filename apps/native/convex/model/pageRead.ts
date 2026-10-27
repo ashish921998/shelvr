@@ -1,7 +1,12 @@
 "use node";
 
 import type { Id } from "../_generated/dataModel";
-import { linkSource, shortFormSource, type LinkSource } from "./externalUrl";
+import {
+  isGoogleMapsUrl,
+  linkSource,
+  shortFormSource,
+  type LinkSource,
+} from "./externalUrl";
 import {
   safeFetch,
   BROWSER_USER_AGENT,
@@ -17,6 +22,7 @@ import { fetchYouTube } from "./readers/youtube";
 import { fetchXPost } from "./readers/x";
 import { fetchInstagram } from "./readers/instagram";
 import { fetchPinterestPin } from "./readers/pinterest";
+import { fetchGoogleMapsList } from "./readers/googleMaps";
 
 export {
   extractBodyText,
@@ -132,6 +138,13 @@ const SOURCE_READERS = {
   (url: string, options: ReadOptions) => Promise<PageData>
 >;
 
+async function readUnsourced(url: string): Promise<PageData> {
+  const list = isGoogleMapsUrl(url)
+    ? await fetchGoogleMapsList(url)
+    : undefined;
+  return list ?? (await fetchPage(url));
+}
+
 export async function readPage(
   url: string,
   options: ReadOptions = {},
@@ -140,7 +153,7 @@ export async function readPage(
     const source = linkSource(url);
     const page = source
       ? await SOURCE_READERS[source](url, options)
-      : await fetchPage(url);
+      : await readUnsourced(url);
     const urlShortForm = shortFormSource(url);
     const shortForm = urlShortForm && {
       ...urlShortForm,
