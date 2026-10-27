@@ -124,16 +124,27 @@ type TripPlanArgs = {
 
 export type TripFormProblem = "city" | "interests";
 
+/** What stops the form from planning yet, or null once it can; the submit button stays off until then. */
+export function tripFormProblem(
+  form: Pick<TripForm, "city" | "interests">,
+): TripFormProblem | null {
+  if (tidyCity(form.city) === "") return "city";
+  if (!TRIP_INTERESTS.some((each) => form.interests.includes(each))) {
+    return "interests";
+  }
+  return null;
+}
+
 export function tripFormArgs(
   form: TripForm,
   locale: string,
 ): { ok: true; args: TripPlanArgs } | { ok: false; problem: TripFormProblem } {
+  const problem = tripFormProblem(form);
+  if (problem !== null) return { ok: false, problem };
   const city = tidyCity(form.city).slice(0, MAX_CITY_LENGTH);
-  if (city === "") return { ok: false, problem: "city" };
   const interests = TRIP_INTERESTS.filter((each) =>
     form.interests.includes(each),
   );
-  if (interests.length === 0) return { ok: false, problem: "interests" };
   const stay = tidyCity(form.stay).slice(0, MAX_STAY_LENGTH);
   return {
     ok: true,
@@ -308,23 +319,92 @@ type PlanPin = {
   name: string;
   coordinates: { latitude: number; longitude: number };
   active: boolean;
+  /** What the pin shows: its day's number when every day is showing, its stop number in a focused day, nothing when faded. */
+  text: string;
+  /** The label under the pin; faded pins carry none so the focused day reads cleanly. */
+  title: string;
 };
 
-/** One numbered pin per stop, numbered within its day; `activeDay` null means every day is in focus. */
+/**
+ * One pin per stop, numbered within its day; `activeDay` null means every day is in focus.
+ * With every day showing, each pin carries its day's number, so day 1's first stop and
+ * day 2's first stop never both read "1".
+ */
 export function planPins(
   days: readonly Pick<TripPlanStop, "name" | "lat" | "lng">[][],
   activeDay: number | null,
 ): PlanPin[] {
   return days.flatMap((stops, day) =>
-    stops.map((stop, index) => ({
-      id: `${day}:${index}`,
-      day,
-      number: index + 1,
-      name: stop.name,
-      coordinates: { latitude: stop.lat, longitude: stop.lng },
-      active: activeDay === null || activeDay === day,
-    })),
+    stops.map((stop, index) => {
+      const active = activeDay === null || activeDay === day;
+      return {
+        id: `${day}:${index}`,
+        day,
+        number: index + 1,
+        name: stop.name,
+        coordinates: { latitude: stop.lat, longitude: stop.lng },
+        active,
+        text:
+          activeDay === null
+            ? String(day + 1)
+            : active
+              ? String(index + 1)
+              : "",
+        title: active ? stop.name : "",
+      };
+    }),
   );
+}
+
+/** The day a trip opens on: its first day with a stop, or every day when none has one. */
+export function firstFocusDay(
+  days: readonly (readonly unknown[])[],
+): number | null {
+  const day = days.findIndex((stops) => stops.length > 0);
+  return day === -1 ? null : day;
+}
+
+/** Where to scroll so a day's header sits just under the map pinned over the list. */
+export function dayScrollOffset(
+  headerY: number,
+  mapHeight: number,
+  gap: number,
+): number {
+  return Math.max(0, headerY - mapHeight - gap);
+}
+
+/**
+ * The stops whose `why` is the title of a save several of the trip's stops come from,
+ * so the row can say where they came from. A save naming one place sends its own
+ * description instead, which reads on its own.
+ */
+export function sharedSaveStops(
+  stops: readonly Pick<TripPlanStop, "_id" | "itemId" | "why">[],
+): Set<string> {
+  const counts = new Map<string, number>();
+  const key = (stop: Pick<TripPlanStop, "itemId" | "why">) =>
+    stop.itemId === undefined || !stop.why
+      ? null
+      : `${stop.itemId}:${stop.why}`;
+  for (const stop of stops) {
+    const k = key(stop);
+    if (k !== null) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return new Set(
+    stops
+      .filter((stop) => {
+        const k = key(stop);
+        return k !== null && (counts.get(k) ?? 0) > 1;
+      })
+      .map((stop) => stop._id),
+  );
+}
+
+/** The trip page's back button title: the trips list it was opened from, or a plain "Back". */
+export function tripBackTitle(previousRoute: string | undefined): string {
+  return previousRoute === "(tabs)"
+    ? t("tripPlanner.listTitle")
+    : t("common.back");
 }
 
 export function pinDay(id: string | undefined): number | null {

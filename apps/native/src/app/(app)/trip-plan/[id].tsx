@@ -15,8 +15,12 @@ import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import {
+  dayScrollOffset,
+  firstFocusDay,
+  sharedSaveStops,
   type StopAction,
   stopAction,
+  tripBackTitle,
   tripDayLabel,
   tripLengthLine,
   tripStopsLine,
@@ -32,9 +36,10 @@ import {
   Stack,
   useFocusEffect,
   useLocalSearchParams,
+  useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Linking,
   Platform,
@@ -193,19 +198,35 @@ function useStopOpener() {
 }
 
 function TripBody({ trip }: { trip: TripPlanDetail }) {
-  const { rt } = useUnistyles();
+  const { rt, theme } = useUnistyles();
   const scroll = useRef<ScrollViewInstance>(null);
-  const [activeDay, setActiveDay] = useState<number | null>(null);
+  // The trip opens on its first day, so the map starts on a handful of pins, not the whole region.
+  const [activeDay, setActiveDay] = useState<number | null>(() =>
+    firstFocusDay(trip.days),
+  );
+  const contentY = useRef(0);
+  const dayY = useRef<number[]>([]);
   const openStop = useStopOpener();
   const hasMap = hasMapPoints(trip);
+  const mapHeight = rt.screen.height * MAP_SHARE;
   const stopCount = trip.days.reduce((sum, day) => sum + day.length, 0);
   const savedCount = trip.days
     .flat()
     .filter((stop) => stop.source === "save").length;
+  const fromSave = useMemo(
+    () => sharedSaveStops([...trip.days.flat(), ...trip.unplanned]),
+    [trip.days, trip.unplanned],
+  );
 
-  const focusDay = (day: number) => {
-    setActiveDay((current) => (current === day ? null : day));
-    scroll.current?.scrollTo({ y: 0, animated: true });
+  // A day picked on the map brings its header up under the map; picking one in the list leaves the list where it is.
+  const pickOnMap = (day: number | null) => {
+    setActiveDay(day);
+    const y = day === null ? undefined : dayY.current[day];
+    if (y === undefined) return;
+    scroll.current?.scrollTo({
+      y: dayScrollOffset(contentY.current + y, mapHeight, theme.gap(1)),
+      animated: true,
+    });
   };
 
   return (
@@ -214,17 +235,24 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
       style={styles.screen}
       contentInsetAdjustmentBehavior={hasMap ? "never" : "automatic"}
       contentContainerStyle={styles.scrollContent}
+      // The map stays pinned while the days scroll under it, so a focused day is always in view.
+      stickyHeaderIndices={hasMap ? [0] : undefined}
     >
       {hasMap ? (
         <TripPlannerMap
           days={trip.days}
           stay={trip.stay}
           activeDay={activeDay}
-          height={rt.screen.height * MAP_SHARE}
-          onSelectDay={(day) => setActiveDay(day)}
+          height={mapHeight}
+          onSelectDay={pickOnMap}
         />
       ) : null}
-      <View style={styles.content}>
+      <View
+        style={styles.content}
+        onLayout={({ nativeEvent }) => {
+          contentY.current = nativeEvent.layout.y;
+        }}
+      >
         <View style={styles.heading}>
           <ThemedText variant="largeTitle" accessibilityRole="header">
             {tripTitle(trip.city)}
@@ -243,13 +271,19 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
         </View>
 
         {trip.days.map((stops, index) => (
-          <View key={`day-${index}`} style={styles.day}>
+          <View
+            key={`day-${index}`}
+            style={styles.day}
+            onLayout={({ nativeEvent }) => {
+              dayY.current[index] = nativeEvent.layout.y;
+            }}
+          >
             <DayHeader
               index={index}
               startDate={trip.startDate}
               stops={stops.length}
               active={activeDay === index}
-              onPress={() => focusDay(index)}
+              onPress={() => setActiveDay(index)}
             />
             {stops.length === 0 ? (
               <ThemedText variant="footnote" style={styles.muted}>
@@ -261,7 +295,12 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
                   key={stop._id}
                   stop={stop}
                   number={stopIndex + 1}
-                  onPress={() => openStop(stop)}
+                  fromSave={fromSave.has(stop._id)}
+                  onPress={() => {
+                    // The map follows the list: coming back, it shows the day this stop is on.
+                    setActiveDay(index);
+                    openStop(stop);
+                  }}
                 />
               ))
             )}
@@ -282,6 +321,7 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
               <TripStopRow
                 key={stop._id}
                 stop={stop}
+                fromSave={fromSave.has(stop._id)}
                 onPress={() => openStop(stop)}
               />
             ))}
@@ -292,9 +332,26 @@ function TripBody({ trip }: { trip: TripPlanDetail }) {
   );
 }
 
+/** The back button's title; without one VoiceOver read the tab group's route name, "(tabs)". */
+function useBackTitleOptions() {
+  const locale = useAppLocale();
+  const navigation = useNavigation();
+  // Read once: the screen under this one does not change while it is open.
+  const [previous] = useState(() => {
+    const state = navigation.getState();
+    return state?.routes[state.index - 1]?.name;
+  });
+  return useMemo(
+    () => ({ headerBackTitle: tripBackTitle(previous) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t()` reads the locale, so a language change must rebuild the title
+    [previous, locale],
+  );
+}
+
 export default function TripPlanScreen() {
   useAppLocale();
   const router = useRouter();
+  const backOptions = useBackTitleOptions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const tripId = id as Id<"tripPlans">;
   const trip = useQuery(
@@ -315,18 +372,30 @@ export default function TripPlanScreen() {
     });
   }, [data]);
 
+  const backTitle = <Stack.Screen options={backOptions} />;
   if (trip.isError) {
     return (
-      <EmptyState
-        title={t("errors.unexpectedTitle")}
-        message={t("errors.retrySoon")}
-      />
+      <>
+        {backTitle}
+        <EmptyState
+          title={t("errors.unexpectedTitle")}
+          message={t("errors.retrySoon")}
+        />
+      </>
     );
   }
-  if (data === undefined) return <ScreenLoader label={t("trip.loading")} />;
+  if (data === undefined) {
+    return (
+      <>
+        {backTitle}
+        <ScreenLoader label={t("trip.loading")} />
+      </>
+    );
+  }
   if (data === null) {
     return (
       <View style={styles.screen}>
+        {backTitle}
         <EmptyState
           title={t("tripPlanner.goneTitle")}
           message={t("tripPlanner.goneBody")}
@@ -337,6 +406,7 @@ export default function TripPlanScreen() {
 
   return (
     <>
+      {backTitle}
       <TripHeader
         overMap={hasMapPoints(data)}
         onDelete={() => deleteTrip(data._id, () => backOrHome(router))}

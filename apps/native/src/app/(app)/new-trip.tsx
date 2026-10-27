@@ -21,6 +21,7 @@ import {
   paceLabel,
   TRIP_PACES,
   type TripForm,
+  tripFormProblem,
   tripPlanMessage,
 } from "@/lib/trip-planner";
 import { api } from "@convex/_generated/api";
@@ -28,7 +29,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -43,7 +44,8 @@ export default function NewTripScreen() {
   const { state, submit, open, loading } = useCreateTripPlan(locale, choices);
   const update = (patch: Partial<TripForm>) =>
     setForm((current) => ({ ...current, ...patch }));
-  const close = () => backOrHome(router);
+  const close = useCallback(() => backOrHome(router), [router]);
+  const problem = tripFormProblem(form);
 
   const ready = state.status === "ready";
   useEffect(() => {
@@ -52,40 +54,46 @@ export default function NewTripScreen() {
     }
   }, [ready]);
 
-  const header = (
-    <>
-      <Stack.Screen
-        options={{
-          title: t("tripPlanner.planTrip"),
-          headerTitleStyle: {
-            ...theme.type.title,
-            color: theme.colors.foreground,
-          },
-          ...(Platform.OS === "android"
-            ? {
-                headerLeft: () => (
-                  <HeaderIconButton
-                    icon="xmark"
-                    label={t("common.close")}
-                    onPress={close}
-                  />
-                ),
-              }
-            : {}),
-        }}
-      />
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="xmark"
-            tintColor={theme.colors.foreground}
-            onPress={close}
-          >
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      ) : null}
-    </>
+  // Memoised so a form change does not push new header options: each push re-lays out the
+  // modal's navigation bar, and the form under it jumped a few points with every tap.
+  const header = useMemo(
+    () => (
+      <>
+        <Stack.Screen
+          options={{
+            title: t("tripPlanner.planTrip"),
+            headerTitleStyle: {
+              ...theme.type.title,
+              color: theme.colors.foreground,
+            },
+            ...(Platform.OS === "android"
+              ? {
+                  headerLeft: () => (
+                    <HeaderIconButton
+                      icon="xmark"
+                      label={t("common.close")}
+                      onPress={close}
+                    />
+                  ),
+                }
+              : {}),
+          }}
+        />
+        {Platform.OS === "ios" ? (
+          <Stack.Toolbar placement="left">
+            <Stack.Toolbar.Button
+              icon="xmark"
+              tintColor={theme.colors.foreground}
+              onPress={close}
+            >
+              {t("common.close")}
+            </Stack.Toolbar.Button>
+          </Stack.Toolbar>
+        ) : null}
+      </>
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t()` reads the locale, so a language change must rebuild the header
+    [theme, close, locale],
   );
 
   if (state.status !== "idle") {
@@ -170,6 +178,10 @@ export default function NewTripScreen() {
         <Button
           testID="new-trip-submit"
           title={t("trip.make")}
+          disabled={problem !== null}
+          accessibilityHint={
+            problem === null ? undefined : tripPlanMessage({ kind: problem })
+          }
           loading={loading}
           onPress={() => void submit(form)}
         />

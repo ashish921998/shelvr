@@ -13,6 +13,7 @@ import {
 
 type Save = {
   title: string;
+  description?: string;
   places: string[];
   pins?: {
     name: string;
@@ -94,6 +95,9 @@ async function addUser(
           type: "link",
           status: "ready",
           title: save.title,
+          ...(save.description !== undefined
+            ? { description: save.description }
+            : {}),
           cities: [save.city ?? "Lisbon"],
           places: save.places,
           placePins: save.pins?.map((pin) => ({
@@ -379,6 +383,44 @@ describe("createTripPlan without Apple Maps", () => {
     });
   });
 
+  it("gives a guide's places its title, and a single-place save its description", async () => {
+    const description = "A curated list of top-rated Lisbon eateries";
+    const { t } = await setup([
+      {
+        title: "The best restaurants in Lisbon",
+        description,
+        places: ["Santa Joana", "Prado"],
+        pins: [
+          { name: "Santa Joana", lat: 38.72, lng: -9.145 },
+          { name: "Prado", lat: 38.709, lng: -9.134 },
+        ],
+      },
+      {
+        title: "Ramen night",
+        description: "Rich tonkotsu and a long queue",
+        places: ["Ramen Shop"],
+        pins: [{ name: "Ramen Shop", lat: 38.712, lng: -9.14 }],
+      },
+    ]);
+    const result = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: result.tripId!,
+    });
+    const why = Object.fromEntries(
+      trip!.days.flat().map((stop) => [stop.name, stop.why]),
+    );
+    expect(why).toEqual({
+      "Santa Joana": "The best restaurants in Lisbon",
+      Prado: "The best restaurants in Lisbon",
+      "Ramen Shop": "Rich tonkotsu and a long queue",
+    });
+  });
+
   it("returns no trip and stores nothing when there is nothing to plan", async () => {
     const { t, base } = await setup([]);
     expect(
@@ -472,6 +514,71 @@ describe("createTripPlan with Apple Maps", () => {
     });
     const azulejo = stops.find((stop) => stop.name === "Museu do Azulejo");
     expect(azulejo).toMatchObject({ source: "save", lat: 38.715 });
+
+    // My Trips counts what the days hold, not the unplanned extras.
+    const [summary] = await t.query(api.tripPlannerData.listTripPlans, {});
+    expect(summary).toMatchObject({ stopCount: 10, savedCount: 3 });
+  });
+
+  it("suggests no lodging and not a saved place's namesake next door", async () => {
+    await stubMaps();
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token") {
+        return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+      }
+      return reply([
+        {
+          name: "Locke de Santa Joana",
+          id: "locke",
+          poiCategory: "Restaurant",
+          latitude: 38.7201,
+          longitude: -9.1451,
+        },
+        {
+          name: "Pousada de Lisboa",
+          id: "pousada",
+          poiCategory: "Hotel",
+          latitude: 38.71,
+          longitude: -9.14,
+        },
+        {
+          name: "Taberna Sal Grosso",
+          id: "taberna",
+          poiCategory: "Restaurant",
+          latitude: 38.712,
+          longitude: -9.13,
+        },
+      ]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { t } = await setup([
+      {
+        title: "Santa Joana",
+        places: ["Santa Joana"],
+        pins: [
+          {
+            name: "Santa Joana",
+            lat: 38.72,
+            lng: -9.145,
+            category: "Restaurant",
+          },
+        ],
+      },
+    ]);
+    const result = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: ["food"],
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: result.tripId!,
+    });
+    const names = [...trip!.days.flat(), ...trip!.unplanned].map(
+      (stop) => stop.name,
+    );
+    expect(names.sort()).toEqual(["Santa Joana", "Taberna Sal Grosso"]);
   });
 
   it("searches plain words and looks up no saved place for an account that declined AI", async () => {

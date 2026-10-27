@@ -9,10 +9,12 @@ type Props = {
   stop: TripPlanStop;
   /** The stop's place in its day; unplanned stops have none. */
   number?: number;
+  /** The stop's `why` is the title of a save several stops come from, so it reads "From …". */
+  fromSave?: boolean;
   onPress: () => void;
 };
 
-export function TripStopRow({ stop, number, onPress }: Props) {
+export function TripStopRow({ stop, number, fromSave, onPress }: Props) {
   const badgeKey = stopBadge(stop.source);
   const badge = badgeKey === null ? null : t(badgeKey);
   const yours = stop.source === "save";
@@ -59,7 +61,11 @@ export function TripStopRow({ stop, number, onPress }: Props) {
             {stop.area}
           </ThemedText>
         ) : null}
-        {stop.why ? (
+        {stop.why && fromSave ? (
+          <ThemedText variant="footnote" numberOfLines={2} style={styles.muted}>
+            {t("tripPlanner.fromSave", { title: stop.why })}
+          </ThemedText>
+        ) : stop.why ? (
           <ThemedText variant="footnote" numberOfLines={3}>
             {stop.why}
           </ThemedText>

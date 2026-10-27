@@ -1,8 +1,16 @@
 import type { Id } from "../_generated/dataModel";
-import { placeKey } from "./plan";
+import {
+  clip,
+  MAX_WHY_CHARS,
+  placeKey,
+  splitSavedPlace,
+  type PlanPlace,
+  type PlanSource,
+} from "./plan";
 import {
   clusterPlaces,
   distanceKm,
+  middleOf,
   STOPS_PER_DAY,
   TRIP_SLOTS,
   type LatLng,
@@ -368,17 +376,45 @@ export type Suggestion = FoundPoi & { interest: TripInterest };
 
 type Placed = LatLng & { name: string; appleId?: string };
 
-/** The same venue: one Apple id, or one name a few doors apart. */
+/** Apple `PoiCategory` values for somewhere to sleep, never a stop. */
+export const LODGING_CATEGORIES: ReadonlySet<string> = new Set([
+  "Hotel",
+  "Campground",
+  "RVPark",
+]);
+
+function nameWords(name: string): string[] {
+  return name
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/['\u2019\u02bc]/g, "")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+/** One name's whole words run inside the other's ("Santa Joana" in "Locke de Santa Joana"), ignoring case and accents. */
+export function nameWithin(a: string, b: string): boolean {
+  const [short, long] = [nameWords(a), nameWords(b)].sort(
+    (x, y) => x.length - y.length,
+  );
+  if (short.length === 0) return false;
+  for (let start = 0; start + short.length <= long.length; start++) {
+    if (short.every((word, i) => long[start + i] === word)) return true;
+  }
+  return false;
+}
+
+/** The same venue: one Apple id, or a few doors apart under one name or one name inside the other (often its hotel). */
 export function samePlace(a: Placed, b: Placed): boolean {
   if (a.appleId !== undefined && b.appleId !== undefined) {
     if (a.appleId === b.appleId) return true;
   }
-  return (
-    placeKey(a.name) === placeKey(b.name) && distanceKm(a, b) <= SAME_PLACE_KM
-  );
+  if (distanceKm(a, b) > SAME_PLACE_KM) return false;
+  return placeKey(a.name) === placeKey(b.name) || nameWithin(a.name, b.name);
 }
 
-/** Keeps a result that is near the centre, of the interest's kind, not a chain, not visited, and new. */
+/** Keeps a result that is near the centre, of the interest's kind, not lodging, not a chain, not visited, and new. */
 export function keepSuggestion(
   found: Suggestion,
   context: {
@@ -389,6 +425,8 @@ export function keepSuggestion(
 ): boolean {
   if (placeKey(found.name) === "") return false;
   if (distanceKm(found, context.centre) > SUGGEST_RADIUS_KM) return false;
+  if (found.category !== undefined && LODGING_CATEGORIES.has(found.category))
+    return false;
   if (
     found.category !== undefined &&
     interestOfCategory(found.category) !== found.interest
@@ -435,6 +473,32 @@ export type PlannedStop = LatLng & {
   why?: string;
   slot?: TripSlot;
 };
+
+/** Distinct places a save names, by name. */
+function namedPlaces(source: PlanSource): number {
+  return new Set(
+    source.places
+      .map((value) => placeKey(splitSavedPlace(value).name))
+      .filter(Boolean),
+  ).size;
+}
+
+/**
+ * Why a saved place is on the trip. A save naming one place keeps its own reason; a guide
+ * naming several gives its title (else its site), since its description is about the
+ * whole list, not this place. Saves carry no per-place note to prefer.
+ */
+export function saveWhy(
+  place: PlanPlace,
+  source: PlanSource | undefined,
+): string | undefined {
+  if (source === undefined || namedPlaces(source) <= 1) return place.why;
+  const label = clip(
+    source.title?.trim() || source.siteName?.trim() || "",
+    MAX_WHY_CHARS,
+  );
+  return label === "" ? undefined : label;
+}
 
 const MORNING = new Set(["Cafe", "Bakery"]);
 const EVENING = new Set(["Nightlife", "Brewery", "Distillery", "Winery"]);
@@ -483,7 +547,69 @@ function orderStops(stops: PlannedStop[]): PlannedStop[] {
   return ordered;
 }
 
-/** Lays out ranked stops (saves first) as `days` nearby groups at `pace`; the rest are unplanned, in rank order. */
+function savesIn(day: PlannedStop[]): number {
+  return day.filter((stop) => stop.source === "save").length;
+}
+
+function nearestIndex(
+  stops: PlannedStop[],
+  to: LatLng | null,
+  source: PlannedStop["source"],
+): number {
+  let pick = -1;
+  let best = Infinity;
+  stops.forEach((stop, i) => {
+    if (stop.source !== source) return;
+    const d = to === null ? 0 : distanceKm(stop, to);
+    if (d < best) {
+      best = d;
+      pick = i;
+    }
+  });
+  return pick;
+}
+
+/**
+ * Gives every day at least its whole share of the saves (saves ÷ days, rounded down), so
+ * one day is not all suggestions. A short day takes the save nearest it from a day with
+ * more than its share, and hands that day its own nearest suggestion so day lengths hold.
+ */
+export function spreadSaves(groups: PlannedStop[][]): PlannedStop[][] {
+  const days = groups.map((day) => [...day]);
+  const share = Math.floor(
+    days.reduce((n, day) => n + savesIn(day), 0) / Math.max(1, days.length),
+  );
+  for (;;) {
+    const short = days.findIndex((day) => savesIn(day) < share);
+    if (short === -1) return days;
+    const target = middleOf(days[short]);
+    let from = -1;
+    let at = -1;
+    let best = Infinity;
+    days.forEach((day, i) => {
+      if (i === short || savesIn(day) <= share) return;
+      const pick = nearestIndex(day, target, "save");
+      const d = target === null ? -savesIn(day) : distanceKm(day[pick], target);
+      if (d < best) {
+        best = d;
+        from = i;
+        at = pick;
+      }
+    });
+    // Unreachable: a day under the share means another is over it.
+    if (from === -1) return days;
+    const [save] = days[from].splice(at, 1);
+    const back = nearestIndex(
+      days[short],
+      middleOf(days[from]) ?? save,
+      "suggested",
+    );
+    if (back !== -1) days[from].push(days[short].splice(back, 1)[0]);
+    days[short].push(save);
+  }
+}
+
+/** Lays out ranked stops (saves first) as `days` nearby groups at `pace`, saves spread across them; the rest are unplanned, in rank order. */
 export function layoutTripPlan(
   stops: PlannedStop[],
   options: { days: number; pace: TripPace },
@@ -508,7 +634,7 @@ export function layoutTripPlan(
       ? Infinity
       : Math.min(...group.map((stop) => rank.get(stop) ?? Infinity));
   return {
-    days: [...groups]
+    days: spreadSaves(groups)
       .sort((a, b) => firstRank(a) - firstRank(b))
       .map((group) => orderStops(slotsFor(group))),
     unplanned: unplanned.sort(

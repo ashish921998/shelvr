@@ -39,6 +39,7 @@ import {
   keepSuggestion,
   layoutTripPlan,
   nextBatch,
+  saveWhy,
   searchQueues,
   tasteQueries,
   type FoundPoi,
@@ -125,6 +126,7 @@ function pinFor(place: PlanPlace, pins: SavedPin[]): SavedPin | null {
 function saveStop(
   place: PlanPlace,
   at: LatLng & { appleId?: string; category?: string },
+  why: string | undefined,
 ): PlannedStop {
   return {
     source: "save",
@@ -135,7 +137,7 @@ function saveStop(
     lng: at.lng,
     ...(at.appleId !== undefined ? { appleId: at.appleId } : {}),
     ...(at.category !== undefined ? { category: at.category } : {}),
-    why: place.why,
+    ...(why !== undefined ? { why } : {}),
   };
 }
 
@@ -159,11 +161,15 @@ async function savedStops(
   );
   // An older pin can be a stray from before storePins dropped them; that place is looked up again.
   const pinned = dropStrays(places.map((place) => pinFor(place, claim.pins)));
+  const sources = new Map(
+    claim.sources.map((source) => [source.itemId, source]),
+  );
+  const why = (place: PlanPlace) => saveWhy(place, sources.get(place.itemId));
   const stops: PlannedStop[] = [];
   const unpinned: PlanPlace[] = [];
   places.forEach((place, i) => {
     const pin = pinned[i];
-    if (pin) stops.push(saveStop(place, pin));
+    if (pin) stops.push(saveStop(place, pin, why(place)));
     else unpinned.push(place);
   });
   let centre = middleOf(stops);
@@ -186,7 +192,7 @@ async function savedStops(
     );
     asked.forEach((place, i) => {
       const at = found[i];
-      if (at) stops.push(saveStop(place, at));
+      if (at) stops.push(saveStop(place, at, why(place)));
     });
   }
   return { stops: uniquePlacePins(stops), centre };

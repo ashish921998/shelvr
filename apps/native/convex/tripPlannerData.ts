@@ -211,7 +211,10 @@ export const saveTripPlanInternal = internalMutation({
       room -= kept.length;
       placed.push({ day, stops: kept });
     }
-    const all = placed.flatMap(({ stops }) => stops);
+    // My Trips counts the stops the days hold; the unplanned extras are not part of the trip yet.
+    const planned = placed
+      .filter(({ day }) => day !== UNPLANNED_DAY)
+      .flatMap(({ stops }) => stops);
     const now = Date.now();
     const tripId = await ctx.db.insert("tripPlans", {
       userId,
@@ -222,8 +225,8 @@ export const saveTripPlanInternal = internalMutation({
       pace: args.pace,
       interests: tripInterests(args.interests),
       ...(args.stay !== undefined ? { stay: args.stay } : {}),
-      stopCount: all.length,
-      savedCount: all.filter((stop) => stop.source === "save").length,
+      stopCount: planned.length,
+      savedCount: planned.filter((stop) => stop.source === "save").length,
       createdAt: now,
       updatedAt: now,
     });

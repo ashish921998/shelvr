@@ -41,7 +41,13 @@ export function ActionMenu({
   }, []);
   const isAndroid = process.env.EXPO_OS === "android";
   return (
+    // On iOS the SwiftUI menu is an unlabelled button of its own around the trigger, so
+    // VoiceOver found two elements. This outer view is the one element instead: it carries
+    // the label, hides both from VoiceOver, and a double tap lands on the menu at its centre.
     <View
+      accessible={isAndroid ? undefined : true}
+      accessibilityRole={isAndroid ? undefined : "button"}
+      accessibilityLabel={isAndroid ? undefined : label}
       onStartShouldSetResponder={claimTouch}
       onResponderTerminationRequest={keepTouch}
       onResponderGrant={({ nativeEvent }) => {
@@ -80,8 +86,8 @@ export function ActionMenu({
         }}
       >
         <View
-          accessibilityRole="button"
-          accessibilityLabel={label}
+          accessibilityRole={isAndroid ? "button" : undefined}
+          accessibilityLabel={isAndroid ? label : undefined}
           accessible={isAndroid ? true : undefined}
           accessibilityActions={isAndroid ? [{ name: "activate" }] : undefined}
           onAccessibilityAction={

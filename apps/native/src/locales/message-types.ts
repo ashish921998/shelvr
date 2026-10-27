@@ -804,6 +804,8 @@ export type MessageParams = {
   "tripPlanner.emptyDay": undefined;
   "tripPlanner.stayingAt": { name: string };
   "tripPlanner.showDay": { day: string };
+  "tripPlanner.allDays": undefined;
+  "tripPlanner.fromSave": { title: string };
   "tripPlanner.whereTo": undefined;
   "tripPlanner.cityPlaceholder": undefined;
   "tripPlanner.fewerDays": undefined;

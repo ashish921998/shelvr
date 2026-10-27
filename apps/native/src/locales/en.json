@@ -869,6 +869,8 @@
   "tripPlanner.emptyDay": "Nothing planned this day. Leave it free to wander.",
   "tripPlanner.stayingAt": "Staying at %{name}",
   "tripPlanner.showDay": "Show day %{day} on the map",
+  "tripPlanner.allDays": "All days",
+  "tripPlanner.fromSave": "From “%{title}”",
   "tripPlanner.whereTo": "Where to?",
   "tripPlanner.cityPlaceholder": "Type any city",
   "tripPlanner.fewerDays": "One day fewer",

@@ -1,13 +1,15 @@
+import { Chip } from "@/components/trip-planner/trip-planner-form";
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { withAlpha } from "@/lib/color";
 import { moveCamera } from "@/lib/map-camera";
+import { t } from "@/lib/i18n";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { pinDay, planPins } from "@/lib/trip-planner";
 import type { TripPlanDetail } from "@convex/model/tripPlan";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const FADED = 0.35;
@@ -19,8 +21,45 @@ type Props = {
   /** The day in focus, or null for the whole trip. */
   activeDay: number | null;
   height: number;
-  onSelectDay: (day: number) => void;
+  /** A pin or a day chip picked a day; null is the "All days" chip. */
+  onSelectDay: (day: number | null) => void;
 };
+
+/** Over the map's foot: "All days" and one chip per day, so the whole trip is one tap away. */
+function DayChips({
+  dayCount,
+  activeDay,
+  onSelectDay,
+}: {
+  dayCount: number;
+  activeDay: number | null;
+  onSelectDay: (day: number | null) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.chips}
+      contentContainerStyle={styles.chipRow}
+    >
+      <Chip
+        label={t("tripPlanner.allDays")}
+        selected={activeDay === null}
+        pick="radio"
+        onPress={() => onSelectDay(null)}
+      />
+      {Array.from({ length: dayCount }, (_, day) => (
+        <Chip
+          key={day}
+          label={t("trip.dayTab", { day: String(day + 1) })}
+          selected={activeDay === day}
+          pick="radio"
+          onPress={() => onSelectDay(day)}
+        />
+      ))}
+    </ScrollView>
+  );
+}
 
 export function TripPlannerMap({
   days,
@@ -44,6 +83,9 @@ export function TripPlannerMap({
 
   const { width } = rt.screen;
   const top = rt.insets.top + theme.gap(6);
+  const showChips = days.length > 1;
+  // Room under the lowest pin for its name label, and for the day chips when they show.
+  const bottom = showChips ? theme.gap(8) : theme.gap(4);
   const camera = useMemo(() => {
     const focused = pins.filter((pin) => pin.active).map((p) => p.coordinates);
     const all = pins.map((pin) => pin.coordinates);
@@ -59,7 +101,7 @@ export function TripPlannerMap({
       width,
       height,
       top,
-      bottom: theme.gap(2),
+      bottom,
       ...(process.env.EXPO_OS === "ios"
         ? {
             worldWidth: width,
@@ -67,7 +109,7 @@ export function TripPlannerMap({
           }
         : { worldWidth: 256, centerY: height / 2 }),
     });
-  }, [pins, stayPoint, width, height, top, theme, rt.insets.top]);
+  }, [pins, stayPoint, width, height, top, bottom, rt.insets.top]);
 
   // expo-maps applies every cameraPosition change without animation, so the prop holds the first camera only.
   const [firstCamera, setFirstCamera] = useState(camera);
@@ -96,6 +138,14 @@ export function TripPlannerMap({
     if (day !== null) onSelectDay(day);
   };
 
+  const chips = showChips ? (
+    <DayChips
+      dayCount={days.length}
+      activeDay={activeDay}
+      onSelectDay={onSelectDay}
+    />
+  ) : null;
+
   if (process.env.EXPO_OS === "ios") {
     return (
       <View style={[styles.map, { height }]}>
@@ -115,8 +165,8 @@ export function TripPlannerMap({
           annotations={pins.map((pin) => ({
             id: pin.id,
             coordinates: pin.coordinates,
-            title: pin.name,
-            text: String(pin.number),
+            title: pin.title,
+            text: pin.text,
             backgroundColor: pin.active
               ? theme.colors.primary
               : withAlpha(theme.colors.muted, FADED),
@@ -143,6 +193,7 @@ export function TripPlannerMap({
           }))}
           onAnnotationClick={(pin) => select(pin.id)}
         />
+        {chips}
       </View>
     );
   }
@@ -153,11 +204,15 @@ export function TripPlannerMap({
         style={StyleSheet.absoluteFill}
         cameraPosition={camera}
         markers={[
-          ...pins.map((pin) => ({
-            id: pin.id,
-            coordinates: pin.coordinates,
-            title: `${pin.number}. ${pin.name}`,
-          })),
+          // Google's markers cannot fade, so a focused day shows only its own.
+          ...pins
+            .filter((pin) => activeDay === null || pin.active)
+            .map((pin) => ({
+              id: pin.id,
+              coordinates: pin.coordinates,
+              title:
+                activeDay === null ? pin.name : `${pin.number}. ${pin.name}`,
+            })),
           ...(stayPoint && stay
             ? [{ id: STAY_ID, coordinates: stayPoint, title: stay.name }]
             : []),
@@ -169,6 +224,7 @@ export function TripPlannerMap({
         }))}
         onMarkerClick={(marker) => select(marker.id)}
       />
+      {chips}
     </View>
   );
 }
@@ -179,4 +235,11 @@ const styles = StyleSheet.create((theme) => ({
     overflow: "hidden",
     backgroundColor: theme.colors.surfaceMuted,
   },
+  chips: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: theme.gap(1.5),
+  },
+  chipRow: { gap: theme.gap(1), paddingHorizontal: theme.gap(2) },
 }));

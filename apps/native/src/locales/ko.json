@@ -847,6 +847,8 @@
   "tripPlanner.emptyDay": "이날은 계획이 없어요. 자유롭게 돌아다녀 보세요.",
   "tripPlanner.stayingAt": "숙소: %{name}",
   "tripPlanner.showDay": "%{day}일차를 지도에 표시",
+  "tripPlanner.allDays": "모든 날",
+  "tripPlanner.fromSave": "‘%{title}’에서",
   "tripPlanner.whereTo": "어디로 가세요?",
   "tripPlanner.cityPlaceholder": "도시 이름 입력",
   "tripPlanner.fewerDays": "하루 줄이기",

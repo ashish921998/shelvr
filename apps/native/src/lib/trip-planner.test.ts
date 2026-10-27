@@ -6,7 +6,9 @@ import type { TripPlanStop } from "@convex/model/tripPlan";
 import {
   cityChoices,
   clampDays,
+  dayScrollOffset,
   DEFAULT_INTERESTS,
+  firstFocusDay,
   initialTripForm,
   newestFirst,
   paceHint,
@@ -14,12 +16,15 @@ import {
   planPins,
   REVEAL_STEPS,
   revealDelay,
+  sharedSaveStops,
   stopAction,
   stopBadge,
   toggleInterest,
   tripDateRange,
+  tripBackTitle,
   tripDayLabel,
   tripFormArgs,
+  tripFormProblem,
   tripLengthLine,
   tripPlanFailure,
   tripPlanMessage,
@@ -103,6 +108,13 @@ describe("tripFormArgs", () => {
       ok: false,
       problem: "interests",
     });
+  });
+
+  it("keeps the submit button off until a city is in", () => {
+    expect(tripFormProblem(initialTripForm())).toBe("city");
+    expect(tripFormProblem({ ...form, city: "  " })).toBe("city");
+    expect(tripFormProblem({ ...form, interests: [] })).toBe("interests");
+    expect(tripFormProblem(form)).toBeNull();
   });
 
   it("keeps the trip length inside what the planner accepts", () => {
@@ -218,15 +230,65 @@ describe("stops", () => {
       [[stop(), stop({ name: "Tasca" })], [stop({ name: "LX Factory" })]],
       1,
     );
-    expect(pins.map((pin) => [pin.id, pin.number, pin.active])).toEqual([
-      ["0:0", 1, false],
-      ["0:1", 2, false],
-      ["1:0", 1, true],
+    expect(
+      pins.map((pin) => [pin.id, pin.number, pin.active, pin.text, pin.title]),
+    ).toEqual([
+      ["0:0", 1, false, "", ""],
+      ["0:1", 2, false, "", ""],
+      ["1:0", 1, true, "1", "LX Factory"],
     ]);
     expect(planPins([[stop()]], null)[0]?.active).toBe(true);
     expect(pinDay("1:0")).toBe(1);
     expect(pinDay("stay")).toBeNull();
     expect(pinDay(undefined)).toBeNull();
+  });
+});
+
+describe("trip page focus", () => {
+  it("labels every pin with its day when the whole trip shows", () => {
+    const pins = planPins(
+      [[stop(), stop({ name: "Tasca" })], [stop({ name: "LX Factory" })]],
+      null,
+    );
+    expect(pins.map((pin) => [pin.text, pin.title, pin.active])).toEqual([
+      ["1", "Miradouro da Graça", true],
+      ["1", "Tasca", true],
+      ["2", "LX Factory", true],
+    ]);
+  });
+
+  it("opens on the first day with a stop, or the whole trip when none has one", () => {
+    expect(firstFocusDay([[stop()], [stop()]])).toBe(0);
+    expect(firstFocusDay([[], [stop()]])).toBe(1);
+    expect(firstFocusDay([[], []])).toBeNull();
+    expect(firstFocusDay([])).toBeNull();
+  });
+
+  it("scrolls a day's header to just under the pinned map, never above the top", () => {
+    expect(dayScrollOffset(900, 360, 8)).toBe(532);
+    expect(dayScrollOffset(300, 360, 8)).toBe(0);
+  });
+
+  it("marks stops whose why is the title of a save several stops share", () => {
+    const itemId = "item1" as Id<"items">;
+    const shared = sharedSaveStops([
+      stop({ _id: "a" as Id<"tripStops">, itemId, why: "Best of Lisbon" }),
+      stop({ _id: "b" as Id<"tripStops">, itemId, why: "Best of Lisbon" }),
+      stop({
+        _id: "c" as Id<"tripStops">,
+        itemId: "item2" as Id<"items">,
+        why: "Rich tonkotsu",
+      }),
+      stop({ _id: "d" as Id<"tripStops">, why: "Best of Lisbon" }),
+      stop({ _id: "e" as Id<"tripStops">, why: "Best of Lisbon" }),
+    ]);
+    expect([...shared].sort()).toEqual(["a", "b"]);
+  });
+
+  it("titles the back button after the trips list it came from", () => {
+    expect(tripBackTitle("(tabs)")).toBe("My trips");
+    expect(tripBackTitle("city/[name]")).toBe("Back");
+    expect(tripBackTitle(undefined)).toBe("Back");
   });
 });
 

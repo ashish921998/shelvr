@@ -46,22 +46,29 @@ export function FormSection({
   );
 }
 
-function Chip({
+/**
+ * A selectable pill. `pick` says how it reads to VoiceOver and TalkBack: one of a set
+ * ("radio") or one of several that can be on together ("checkbox"), each with its
+ * checked state, so the selection is announced on both platforms.
+ */
+export function Chip({
   label,
   detail,
   selected,
+  pick,
   onPress,
 }: {
   label: string;
   detail?: string;
   selected: boolean;
+  pick: "radio" | "checkbox";
   onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={pick}
       accessibilityLabel={detail ? `${label}, ${detail}` : label}
-      accessibilityState={{ selected }}
+      accessibilityState={{ checked: selected }}
       hitSlop={4}
       onPress={() => {
         tick();
@@ -73,8 +80,9 @@ function Chip({
         pressed && styles.pressed,
       ]}
     >
+      {/* One weight in both states: a bolder selected label would widen the chip and rewrap the row. */}
       <ThemedText
-        variant={selected ? "labelStrong" : "label"}
+        variant="label"
         numberOfLines={1}
         style={selected ? styles.onTint : undefined}
       >
@@ -119,6 +127,7 @@ export function CityPicker({
               label={choice.city}
               detail={t("trip.revealSaves", { count: choice.count })}
               selected={sameCity(choice.city, value)}
+              pick="radio"
               onPress={() => onChange(choice.city)}
             />
           ))}
@@ -238,6 +247,7 @@ export function InterestChips({
           key={interest}
           label={interestLabel(interest)}
           selected={selected.includes(interest)}
+          pick="checkbox"
           onPress={() => onChange(toggleInterest(selected, interest))}
         />
       ))}

@@ -847,6 +847,8 @@
   "tripPlanner.emptyDay": "この日は予定なし。気ままに歩いてみましょう。",
   "tripPlanner.stayingAt": "宿泊先：%{name}",
   "tripPlanner.showDay": "%{day}日目を地図に表示",
+  "tripPlanner.allDays": "すべての日",
+  "tripPlanner.fromSave": "「%{title}」から",
   "tripPlanner.whereTo": "行き先は？",
   "tripPlanner.cityPlaceholder": "都市名を入力",
   "tripPlanner.fewerDays": "1日減らす",

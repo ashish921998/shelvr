@@ -11,9 +11,14 @@ import {
   isKnownChain,
   keepSuggestion,
   layoutTripPlan,
+  LODGING_CATEGORIES,
+  nameWithin,
   nextBatch,
+  samePlace,
+  saveWhy,
   searchPoints,
   searchQueues,
+  spreadSaves,
   SUGGEST_RADIUS_KM,
   tasteQueries,
   tasteWord,
@@ -21,6 +26,7 @@ import {
   type Suggestion,
 } from "./tripSuggest";
 import { TRIP_INTERESTS } from "./tripPlan";
+import type { PlanPlace, PlanSource } from "./plan";
 
 const LISBON = { lat: 38.7223, lng: -9.1393 };
 
@@ -33,10 +39,12 @@ const APPLE_POI_CATEGORIES = new Set([
   "Beach",
   "Brewery",
   "Cafe",
+  "Campground",
   "Castle",
   "Distillery",
   "FoodMarket",
   "Fortress",
+  "Hotel",
   "Landmark",
   "Library",
   "Marina",
@@ -48,6 +56,7 @@ const APPLE_POI_CATEGORIES = new Set([
   "Park",
   "Planetarium",
   "Restaurant",
+  "RVPark",
   "Store",
   "Theater",
   "Winery",
@@ -70,6 +79,12 @@ describe("interest categories", () => {
     expect(interestOfCategory("Nightlife")).toBe("drinks");
     expect(interestOfCategory("Hospital")).toBeUndefined();
     expect(interestOfCategory(undefined)).toBeUndefined();
+  });
+
+  it("names only real Apple categories as lodging", () => {
+    expect(
+      [...LODGING_CATEGORIES].filter((c) => !APPLE_POI_CATEGORIES.has(c)),
+    ).toEqual([]);
   });
 
   it("never searches the bare word landmark", () => {
@@ -234,6 +249,84 @@ describe("keeping suggestions", () => {
     ).toBe(false);
   });
 
+  it("drops lodging, whatever interest searched it", () => {
+    for (const category of ["Hotel", "Campground", "RVPark"]) {
+      expect(
+        keepSuggestion(
+          suggestion("Somewhere to sleep", { category, interest: "food" }),
+          context,
+        ),
+      ).toBe(false);
+    }
+    expect(
+      keepSuggestion(
+        suggestion("Taberna", { category: "Restaurant" }),
+        context,
+      ),
+    ).toBe(true);
+  });
+
+  it("drops a result whose name holds a saved place's name a few doors away, like its hotel", () => {
+    const saved = { name: "Santa Joana", ...LISBON };
+    const nextDoor = { lat: LISBON.lat + 0.001, lng: LISBON.lng };
+    expect(
+      keepSuggestion(suggestion("Locke de Santa Joana", nextDoor), {
+        ...context,
+        taken: [saved],
+      }),
+    ).toBe(false);
+    expect(
+      keepSuggestion(suggestion("Santa", nextDoor), {
+        ...context,
+        taken: [{ name: "Café Santa Joana", ...LISBON }],
+      }),
+    ).toBe(false);
+    // Far apart, the same words are another venue.
+    expect(
+      keepSuggestion(suggestion("Locke de Santa Joana", { lat: 38.74 }), {
+        ...context,
+        taken: [saved],
+      }),
+    ).toBe(true);
+    // Only whole words count.
+    expect(
+      keepSuggestion(suggestion("Santa Joanas", nextDoor), {
+        ...context,
+        taken: [saved],
+      }),
+    ).toBe(true);
+  });
+
+  it("matches names inside names by whole words, ignoring case and accents", () => {
+    expect(nameWithin("Santa Joana", "Locke de Santa Joana")).toBe(true);
+    expect(nameWithin("LOCKE DE SANTA JOANA", "santa joana")).toBe(true);
+    expect(nameWithin("Cafe Sao Bento", "Café São Bento Lisboa")).toBe(true);
+    expect(nameWithin("O'Kilo", "Okilo Bar")).toBe(true);
+    expect(nameWithin("Santa Joana", "Santa Joanas")).toBe(false);
+    expect(nameWithin("Joana Santa", "Santa Joana")).toBe(false);
+    expect(nameWithin("", "Santa Joana")).toBe(false);
+    expect(
+      samePlace(
+        { name: "Santa Joana", ...LISBON },
+        {
+          name: "Locke de Santa Joana",
+          lat: LISBON.lat + 0.002,
+          lng: LISBON.lng,
+        },
+      ),
+    ).toBe(true);
+    expect(
+      samePlace(
+        { name: "Santa Joana", ...LISBON },
+        {
+          name: "Locke de Santa Joana",
+          lat: LISBON.lat + 0.01,
+          lng: LISBON.lng,
+        },
+      ),
+    ).toBe(false);
+  });
+
   it("balances across interests in turn and never repeats a venue", () => {
     const lists = new Map([
       [
@@ -260,6 +353,121 @@ describe("keeping suggestions", () => {
         (p) => p.name,
       ),
     ).toEqual(["F2", "C1", "F3", "C2"]);
+  });
+});
+
+describe("saveWhy", () => {
+  const itemId = "items|1" as Id<"items">;
+  const place: PlanPlace = {
+    name: "Santa Joana",
+    why: "A curated list of top-rated Lisbon eateries",
+    itemId,
+  };
+  const source = (fields: Partial<PlanSource>): PlanSource => ({
+    itemId,
+    description: "A curated list of top-rated Lisbon eateries",
+    places: ["Santa Joana"],
+    ...fields,
+  });
+
+  it("keeps a single-place save's own reason", () => {
+    expect(saveWhy(place, source({ title: "Santa Joana review" }))).toBe(
+      place.why,
+    );
+    expect(
+      saveWhy(
+        place,
+        source({ places: ["Santa Joana", "Santa Joana, Lisbon"] }),
+      ),
+    ).toBe(place.why);
+    expect(saveWhy(place, undefined)).toBe(place.why);
+  });
+
+  it("names a guide by its title, not its description, for each of its places", () => {
+    const guide = source({
+      title: "The best restaurants in Lisbon",
+      siteName: "Condé Nast Traveler",
+      places: ["Santa Joana", "Prado", "Taberna da Rua das Flores, Lisbon"],
+    });
+    expect(saveWhy(place, guide)).toBe("The best restaurants in Lisbon");
+    expect(saveWhy(place, { ...guide, title: undefined })).toBe(
+      "Condé Nast Traveler",
+    );
+    expect(
+      saveWhy(place, { ...guide, title: "  ", siteName: undefined }),
+    ).toBeUndefined();
+    const long = saveWhy(place, { ...guide, title: "word ".repeat(60) });
+    expect(long).toHaveLength(140);
+    expect(long?.endsWith("…")).toBe(true);
+  });
+});
+
+describe("spreadSaves", () => {
+  const itemId = "items|1" as Id<"items">;
+  const at = (
+    source: PlannedStop["source"],
+    name: string,
+    lat: number,
+  ): PlannedStop => ({
+    source,
+    name,
+    lat,
+    lng: -9.14,
+    ...(source === "save" ? { itemId } : {}),
+  });
+  const counts = (days: PlannedStop[][]) =>
+    days.map((day) => day.filter((s) => s.source === "save").length);
+
+  it("moves the nearest spare save to a short day and swaps a suggestion back", () => {
+    const days = [
+      [
+        at("save", "N1", 38.8),
+        at("save", "N2", 38.801),
+        at("save", "N3", 38.802),
+        at("save", "N4", 38.803),
+        at("suggested", "N5", 38.804),
+      ],
+      [
+        at("save", "M1", 38.75),
+        at("save", "M2", 38.751),
+        at("save", "M3", 38.752),
+        at("suggested", "M4", 38.753),
+        at("suggested", "M5", 38.754),
+      ],
+      [
+        at("save", "S1", 38.7),
+        at("suggested", "S2", 38.701),
+        at("suggested", "S3", 38.702),
+        at("suggested", "S4", 38.703),
+        at("suggested", "S5", 38.704),
+      ],
+    ];
+    const spread = spreadSaves(days);
+    expect(counts(spread)).toEqual([4, 2, 2]);
+    expect(spread.map((day) => day.length)).toEqual([5, 5, 5]);
+    // The middle day is nearer the south than the north, so it gives the save.
+    expect(spread[2].map((s) => s.name)).toContain("M1");
+    expect(spread[1].map((s) => s.name)).toContain("S5");
+    expect(counts(days)).toEqual([4, 3, 1]);
+  });
+
+  it("leaves days alone with fewer saves than days, or already even", () => {
+    const few = [
+      [at("save", "A", 38.8), at("suggested", "B", 38.8)],
+      [at("suggested", "C", 38.7)],
+    ];
+    expect(spreadSaves([...few, []])).toEqual([...few, []]);
+    const even = [[at("save", "A", 38.8)], [at("save", "B", 38.7)]];
+    expect(spreadSaves(even)).toEqual(even);
+  });
+
+  it("fills an empty day from the day with the most saves", () => {
+    const spread = spreadSaves([
+      [at("save", "A", 38.8), at("save", "B", 38.8)],
+      [at("save", "C", 38.7), at("save", "D", 38.7), at("save", "E", 38.7)],
+      [],
+    ]);
+    expect(counts(spread)).toEqual([2, 2, 1]);
   });
 });
 
@@ -321,6 +529,25 @@ describe("layoutTripPlan", () => {
       ["Meal 2", "dinner"],
       ["Bar", "evening"],
     ]);
+  });
+
+  it("spreads saves so no day is all suggestions", () => {
+    const saves = Array.from({ length: 9 }, (_, i) =>
+      stop(`Save ${i}`, 38.8 + i * 0.001, { source: "save", itemId }),
+    );
+    const suggested = Array.from({ length: 6 }, (_, i) =>
+      stop(`Suggested ${i}`, 38.7 + i * 0.001),
+    );
+    const trip = layoutTripPlan([...saves, ...suggested], {
+      days: 3,
+      pace: "balanced",
+    });
+    const savesPerDay = trip.days.map(
+      (day) => day.filter((s) => s.source === "save").length,
+    );
+    expect(savesPerDay.every((n) => n >= 3)).toBe(true);
+    expect(trip.days.map((day) => day.length)).toEqual([5, 5, 5]);
+    expect(trip.unplanned).toEqual([]);
   });
 
   it("keeps empty days when there are fewer stops than days", () => {
