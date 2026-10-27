@@ -68,18 +68,26 @@ const placeSchema = z.object({
     })
     .optional(),
   id: z.string().min(1).optional(),
+  poiCategory: z.string().min(1).optional(),
   coordinate: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
 });
 
+/** Apple's `poiCategory` (Restaurant, Cafe, Bakery...) rides along when the result is a point of interest. */
+type FoundPlace = LatLng & {
+  city?: string;
+  appleId?: string;
+  category?: string;
+};
+
 export function firstPlace(
   body: unknown,
   near?: LatLng,
   skipCityOnly = false,
   includeCity = false,
-): (LatLng & { city?: string; appleId?: string }) | null {
+): FoundPlace | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
@@ -102,6 +110,7 @@ export function firstPlace(
           ? { city: address.locality.trim() }
           : {}),
         ...(place.data.id ? { appleId: place.data.id } : {}),
+        ...(place.data.poiCategory ? { category: place.data.poiCategory } : {}),
       };
     }
   }
@@ -115,7 +124,7 @@ export async function appleMapsLookup(
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
   includeCity = false,
-): Promise<(LatLng & { city?: string; appleId?: string }) | null> {
+): Promise<FoundPlace | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);

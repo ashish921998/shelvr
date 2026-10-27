@@ -268,7 +268,7 @@ async function toItemCard(
   return recipe ? { ...card, hasRecipe: true } : card;
 }
 
-async function readySavesNewestFirst(
+export async function readySavesNewestFirst(
   ctx: QueryCtx,
   userId: string,
 ): Promise<Doc<"items">[]> {

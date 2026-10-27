@@ -14,15 +14,26 @@ const SAME_PLACE_KM = 0.3;
 /** Count and draw the same mapped place once even when several saves mention it. */
 export function uniquePlacePins<
   T extends LatLng & { name: string; appleId?: string },
->(pins: T[]): T[] {
-  const byApple = new Set<string>();
+>(pins: T[], merge?: (kept: T, repeat: T) => T): T[] {
+  // Index into `kept` of the pin each Apple id was merged into.
+  const byApple = new Map<string, number>();
   // Indexes into `kept` of each name's pins, to merge a nearby repeat into.
   const byName = new Map<string, number[]>();
   const kept: T[] = [];
+  const absorb = (index: number, pin: T) => {
+    if (merge) kept[index] = merge(kept[index], pin);
+  };
   for (const pin of pins) {
-    if (pin.appleId !== undefined && byApple.has(pin.appleId)) continue;
+    const sameVenue =
+      pin.appleId === undefined ? undefined : byApple.get(pin.appleId);
     const key = placeKey(pin.name);
     const named = byName.get(key) ?? [];
+    if (sameVenue !== undefined) {
+      // Another name for a kept venue: a later pin under it without an Apple id joins it too.
+      if (!named.includes(sameVenue)) byName.set(key, [...named, sameVenue]);
+      absorb(sameVenue, pin);
+      continue;
+    }
     const same = named.find(
       (index) =>
         !otherVenue(kept[index], pin) &&
@@ -32,14 +43,15 @@ export function uniquePlacePins<
       if (pin.appleId !== undefined) {
         // A later pin under another name may carry this id for the same venue,
         // and the kept pin needs it to open Apple's place card.
-        byApple.add(pin.appleId);
+        byApple.set(pin.appleId, same);
         if (kept[same].appleId === undefined) {
           kept[same] = { ...kept[same], appleId: pin.appleId };
         }
       }
+      absorb(same, pin);
       continue;
     }
-    if (pin.appleId !== undefined) byApple.add(pin.appleId);
+    if (pin.appleId !== undefined) byApple.set(pin.appleId, kept.length);
     byName.set(key, [...named, kept.length]);
     kept.push(pin);
   }

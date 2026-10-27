@@ -30,6 +30,8 @@ export const placePinsValidator = v.array(
     lng: v.number(),
     city: v.optional(v.string()),
     appleId: v.optional(v.string()),
+    /** Apple Maps' point-of-interest category, e.g. "Bakery"; the Map tab's filters read it. */
+    category: v.optional(v.string()),
   }),
 );
 

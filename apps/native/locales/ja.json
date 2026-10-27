@@ -2,6 +2,7 @@
   "ios": {
     "NSPhotoLibraryUsageDescription": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
     "NSCalendarsUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。",
-    "NSCalendarsFullAccessUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。"
+    "NSCalendarsFullAccessUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。",
+    "NSLocationWhenInUseUsageDescription": "保存した場所を近くで見つけられるよう、Shelvrは地図に現在地を表示します。"
   }
 }

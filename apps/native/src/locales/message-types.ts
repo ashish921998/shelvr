@@ -552,6 +552,7 @@ export type MessageParams = {
   "widget.description": undefined;
   "permissions.photosUsage": undefined;
   "permissions.calendarUsage": undefined;
+  "permissions.locationUsage": undefined;
   "share.savedCount": { saved: number; total: number };
   "legal.consent": { terms: string; privacy: string };
   "errors.photoTooLarge": undefined;
@@ -764,6 +765,19 @@ export type MessageParams = {
   "signInScene.dinner": undefined;
   "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
+  "map.filterAll": undefined;
+  "map.kindFood": undefined;
+  "map.kindCoffee": undefined;
+  "map.kindDessert": undefined;
+  "map.kindDrinks": undefined;
+  "map.kindDateNight": undefined;
+  "map.kindActivities": undefined;
+  "map.kindShopping": undefined;
+  "map.kindStay": undefined;
+  "map.filters": undefined;
+  "map.searchPlaceholder": undefined;
+  "map.searchNoResults": { query: string };
+  "map.searchMore": { count: number; total: number };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

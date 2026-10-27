@@ -54,9 +54,9 @@ white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` was the tab bar tint. The app has no tab bar now, so nothing reads it.
-iOS `NativeTabs` painted the selected tab's icon and its label with it, so it
-carried normal-size text: the light theme darkens
+`tabTint` is the tab bar tint (Home and Map).
+iOS `NativeTabs` paints the selected tab's icon and its label with it, so it
+carries normal-size text: the light theme darkens
 it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
 4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the

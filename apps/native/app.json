@@ -27,6 +27,7 @@
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
         "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
+        "NSLocationWhenInUseUsageDescription": "Shelvr shows where you are on the map so you can find the places you saved nearby.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": true,
         "CFBundleDevelopmentRegion": "en"

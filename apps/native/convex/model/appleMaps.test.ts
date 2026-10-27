@@ -119,6 +119,20 @@ describe("firstPlace", () => {
     ).toEqual({ lat: 1, lng: 2, appleId: "I91A40F8387BB823E" });
   });
 
+  it("carries Apple's place id and point-of-interest category", () => {
+    expect(
+      firstPlace({
+        results: [
+          {
+            id: "I1",
+            poiCategory: "Bakery",
+            coordinate: { latitude: 30.26, longitude: -97.74 },
+          },
+        ],
+      }),
+    ).toEqual({ lat: 30.26, lng: -97.74, appleId: "I1", category: "Bakery" });
+  });
+
   it("is null for an empty or malformed reply", () => {
     expect(firstPlace({ results: [] })).toBeNull();
     expect(firstPlace({ results: "x" })).toBeNull();
