@@ -24,7 +24,7 @@ import {
   topSearchResults,
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
-import { placeSymbol } from "@/lib/map-pin-symbol";
+import { placeEmoji } from "@/lib/map-pin-emoji";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
@@ -87,7 +87,7 @@ export default function MapScreen() {
       matches.map((place) => ({
         ...place,
         id: placeId(place),
-        symbol: placeSymbol(place),
+        emoji: placeEmoji(place),
       })),
     [matches],
   );

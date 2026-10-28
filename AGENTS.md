@@ -48,7 +48,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
-  `convex/model/placeKinds.ts`, each pin's icon in `src/lib/map-pin-symbol.ts`, data from
+  `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
   `convex/mapPlaces.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.

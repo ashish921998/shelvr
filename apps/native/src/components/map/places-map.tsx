@@ -6,7 +6,6 @@ import { hasPlaceNear } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
-import type { SFSymbol } from "expo-symbols";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -20,8 +19,8 @@ export type MapPin = {
   name: string;
   lat: number;
   lng: number;
-  /** iOS: the icon inside the pin, saying what the place is. */
-  symbol?: SFSymbol;
+  /** iOS: the emoji inside the pin, saying what the place is. */
+  emoji?: string;
 };
 
 /** A place the camera flies to; a new key moves it again even to the same spot. */
@@ -208,7 +207,7 @@ export function PlacesMap({
           id: pin.id,
           coordinates: { latitude: pin.lat, longitude: pin.lng },
           title: pin.name,
-          systemImage: pin.symbol,
+          monogram: pin.emoji,
           tintColor: theme.colors.primary,
         }))}
         onMarkerClick={(marker) => select(marker.id)}
