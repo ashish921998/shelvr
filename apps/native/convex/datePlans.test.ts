@@ -386,6 +386,24 @@ describe("makeDatePlan", () => {
     expect(result.status).toBe("no_anchor");
   });
 
+  it("does not read a save's tags as its places' when it pins two branches of one name", async () => {
+    const branches: Save = {
+      title: "Fábrica, both shops",
+      places: ["Fábrica"],
+      pins: [
+        { name: "Fábrica", ...CHIADO },
+        { name: "Fábrica", ...near(10) },
+      ],
+      tags: ["coffee"],
+    };
+    const { t } = await setup([branches]);
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "lowkey",
+    });
+    expect(result.status).toBe("no_anchor");
+  });
+
   it("never plans from another account's saves", async () => {
     const { base } = await setup([DINNER, BAR]);
     const other = await base.run(async (ctx) => {

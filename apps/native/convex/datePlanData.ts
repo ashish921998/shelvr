@@ -10,6 +10,7 @@ import {
   planSourceValidator,
   splitSavedPlace,
 } from "./model/plan";
+import { sameVenue } from "./model/datePlan";
 import { rateLimiter } from "./model/rateLimiter";
 import { pinsForCity, tidyCity } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
@@ -28,19 +29,26 @@ const TAGS_PER_SAVE = 8;
  * counted once.
  */
 function namesOneVenue(item: Doc<"items">): boolean {
+  const pins = item.placePins ?? [];
+  const keyOf = (name: string) => placeKey(splitSavedPlace(name).name);
   const names = [
     ...(item.intents ?? [])
       .filter((intent) => intent.kind === "open_maps")
       .map((intent) => intent.value),
     ...(item.places ?? []),
-    ...(item.placePins ?? []).map((pin) => pin.name),
+    ...pins.map((pin) => pin.name),
   ];
-  const venues = new Set(
-    names
-      .map((name) => placeKey(splitSavedPlace(name).name))
-      .filter((key) => key !== ""),
+  const venues = new Set(names.map(keyOf).filter((key) => key !== ""));
+  // Two pins of one name in different spots are two branches, not one venue.
+  const branches = pins.some((pin, i) =>
+    pins
+      .slice(0, i)
+      .some(
+        (other) =>
+          keyOf(other.name) === keyOf(pin.name) && !sameVenue(other, pin),
+      ),
   );
-  return venues.size === 1;
+  return venues.size === 1 && !branches;
 }
 
 /**
