@@ -7,6 +7,7 @@ import {
   type DateStop,
   MAX_WALK_KM,
   pairs,
+  sameVenue,
 } from "./datePlan";
 import { placeKey } from "./plan";
 import { placeKinds } from "./placeKinds";
@@ -264,7 +265,7 @@ export function keepDateSuggestion(
   if (dateSlotOf(context.kind, found.category, [], true) !== context.slot)
     return false;
   if (distanceKm(found, context.anchor) > MAX_WALK_KM) return false;
-  return !context.taken.some((stop) => samePlace(stop, found));
+  return !context.taken.some((stop) => sameVenue(stop, found));
 }
 
 export function suggestedDateStop(found: ApplePoi, slot: DateSlot): DateStop {

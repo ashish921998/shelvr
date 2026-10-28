@@ -346,6 +346,16 @@ describe("keepDateSuggestion", () => {
     ).toBe(false);
   });
 
+  it("keeps a nearby namesake Apple tells apart from a saved stop", () => {
+    const garden = stop({ name: "Garden", slot: "first", appleId: "G1" });
+    const park = poi({ name: "Garden Bar", appleId: "G2", ...north(1) });
+    const withGarden = { ...context, anchor: garden, taken: [garden] };
+    expect(keepDateSuggestion(park, withGarden)).toBe(true);
+    expect(keepDateSuggestion({ ...park, appleId: "G1" }, withGarden)).toBe(
+      false,
+    );
+  });
+
   it("drops a place already in the plan", () => {
     expect(
       keepDateSuggestion(

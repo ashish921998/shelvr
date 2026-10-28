@@ -71,7 +71,10 @@ export const datePlanResultValidator = v.object({
 export type DatePlanResult = Infer<typeof datePlanResultValidator>;
 
 /** One venue for a date: Apple's ids decide when both stops have one, else `samePlace`. */
-function sameVenue(a: DateStop, b: DateStop): boolean {
+export function sameVenue(
+  a: Pick<DateStop, "appleId" | "name" | "lat" | "lng">,
+  b: Pick<DateStop, "appleId" | "name" | "lat" | "lng">,
+): boolean {
   if (a.appleId !== undefined && b.appleId !== undefined) {
     return a.appleId === b.appleId;
   }
