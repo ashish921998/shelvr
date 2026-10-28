@@ -38,7 +38,7 @@ function CardAction({
   );
 }
 
-/** One stop of the evening: what it is for, the place, and its two actions. */
+/** One stop of the evening: what it is for, the place, and its actions. */
 export function DateStopCard({
   stop,
   number,
@@ -56,7 +56,8 @@ export function DateStopCard({
   color: string;
   onColor: string;
   onOpen: () => void;
-  onSwap: () => void;
+  /** Absent when nothing nearby fits, so the card offers no change it cannot make. */
+  onSwap?: () => void;
 }) {
   const yours = stop.source === "save";
   return (
@@ -99,12 +100,14 @@ export function DateStopCard({
           accessibilityLabel={t("datePlan.hoursFor", { name: stop.name })}
           onPress={onOpen}
         />
-        <CardAction
-          icon="arrow.left.arrow.right"
-          label={t("datePlan.swap")}
-          accessibilityLabel={t("datePlan.swapFor", { name: stop.name })}
-          onPress={onSwap}
-        />
+        {onSwap ? (
+          <CardAction
+            icon="arrow.2.circlepath"
+            label={t("datePlan.change")}
+            accessibilityLabel={t("datePlan.changeFor", { name: stop.name })}
+            onPress={onSwap}
+          />
+        ) : null}
       </View>
     </View>
   );

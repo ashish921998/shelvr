@@ -327,8 +327,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `model/dateRank.ts`; the result shape and the swap rule the app shares are in
   `model/datePlan.ts`. With fewer than three evenings from the saves alone, it asks Apple Maps
   for the missing stop near up to three saved ones (one search each, 10 s deadline, none when
-  AI is declined or the Maps key is unset). Nothing is stored; swaps and "Try another evening"
-  run on the phone.
+  AI is declined or the Maps key is unset). Nothing is stored; the app shows the best evening and changes a
+  stop on the phone.
 - **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
   (newest first, one entry per spot) for the Map tab, each with its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
@@ -494,8 +494,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
   date?" (Classic, Low-key, Surprise me; Something new and Big night show as coming soon),
   then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info
-  and Swap, the approximate walk between, Let's go (Maps directions to the first stop), Try
-  another evening, and Send to your date (plain share text with Maps links)
+  and Change (only when another nearby stop fits), the approximate walk between, Send to your
+  date (plain share text with Maps links) and Directions to stop 1 (Maps directions)
 - `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
   Plan a trip opens it): city, days, optional start date, interests, pace and an optional
   stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then

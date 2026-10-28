@@ -17,7 +17,7 @@ export default function DatePlanScreen() {
   const locale = useAppLocale();
   const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
   const city = tidyCity(cityParam ?? "");
-  const { state, plan, another, swap, restart } = useDatePlan(city, locale);
+  const { state, plan, swap, restart } = useDatePlan(city, locale);
 
   const ready = state.status === "ready";
   useEffect(() => {
@@ -48,7 +48,6 @@ export default function DatePlanScreen() {
           <DateEvening
             result={state.result}
             evening={state.evening}
-            onAnother={another}
             onSwap={swap}
             onRestart={restart}
           />

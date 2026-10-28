@@ -238,7 +238,6 @@ export type AnalyticsEventProperties = {
     suggested: number;
   };
   date_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
-  date_plan_another: { index: number };
   date_plan_swapped: { slot: "first" | "second"; swapped: boolean };
   date_plan_stop_opened: {
     source: "save" | "suggested";

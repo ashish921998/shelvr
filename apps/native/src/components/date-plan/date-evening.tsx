@@ -10,6 +10,7 @@ import {
   openPlaceDetails,
 } from "@/lib/apple-place-card";
 import {
+  canChange,
   dateShareText,
   directionsUrl,
   infoAction,
@@ -28,14 +29,7 @@ import type {
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
-import {
-  Alert,
-  Linking,
-  Pressable,
-  ScrollView,
-  Share,
-  View,
-} from "react-native";
+import { Linking, Pressable, ScrollView, Share, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.38;
@@ -92,7 +86,7 @@ function TextButton({
   label,
   onPress,
 }: {
-  icon: "square.and.arrow.up";
+  icon: "map";
   label: string;
   onPress: () => void;
 }) {
@@ -120,14 +114,12 @@ function TextButton({
 export function DateEvening({
   result,
   evening,
-  onAnother,
   onSwap,
   onRestart,
 }: {
   result: DatePlanResult;
   evening: Evening;
-  onAnother: () => void;
-  onSwap: (slot: DateSlot) => boolean;
+  onSwap: (slot: DateSlot) => void;
   onRestart: () => void;
 }) {
   const { rt, theme } = useUnistyles();
@@ -135,14 +127,16 @@ export function DateEvening({
   const first = result.stops[evening.first];
   const second = result.stops[evening.second];
   const color = dayColor(0, theme.colors.tripDays);
-  const many = result.evenings.length > 1;
   // One array per evening: a new one each render would move the map's camera every render.
   const days = useMemo(() => [[first, second]], [first, second]);
 
-  const swap = (slot: DateSlot) => {
-    if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
-    if (!onSwap(slot)) Alert.alert(t("datePlan.noSwap"));
-  };
+  const change = (slot: DateSlot) =>
+    canChange(result, evening, slot)
+      ? () => {
+          if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+          onSwap(slot);
+        }
+      : undefined;
   const go = () => {
     analytics.capture("date_plan_go", {});
     Linking.openURL(directionsUrl(first)).catch((error: unknown) =>
@@ -179,33 +173,9 @@ export function DateEvening({
       />
       <View style={styles.content}>
         <View style={styles.heading}>
-          <View style={styles.titleRow}>
-            <ThemedText
-              variant="largeTitle"
-              accessibilityRole="header"
-              style={styles.title}
-            >
-              {t("datePlan.eveningTitle", { city: result.city })}
-            </ThemedText>
-            {many ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("datePlan.another")}
-                onPress={onAnother}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  styles.another,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <AppSymbolIcon
-                  name="arrow.clockwise"
-                  size={18}
-                  tintColor={theme.colors.primaryText}
-                />
-              </Pressable>
-            ) : null}
-          </View>
+          <ThemedText variant="largeTitle" accessibilityRole="header">
+            {t("datePlan.eveningTitle", { city: result.city })}
+          </ThemedText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("datePlan.changeKindFor", {
@@ -233,7 +203,7 @@ export function DateEvening({
           color={color}
           onColor={theme.colors.onTripDay}
           onOpen={() => openInfo(first)}
-          onSwap={() => swap("first")}
+          onSwap={change("first")}
         />
         <View style={styles.walk}>
           <View style={styles.walkLine} />
@@ -250,15 +220,15 @@ export function DateEvening({
           color={color}
           onColor={theme.colors.onTripDay}
           onOpen={() => openInfo(second)}
-          onSwap={() => swap("second")}
+          onSwap={change("second")}
         />
 
         <View style={styles.buttons}>
-          <Button title={t("datePlan.letsGo")} onPress={go} />
+          <Button title={t("datePlan.send")} onPress={() => void send()} />
           <TextButton
-            icon="square.and.arrow.up"
-            label={t("datePlan.send")}
-            onPress={() => void send()}
+            icon="map"
+            label={t("datePlan.directions")}
+            onPress={go}
           />
         </View>
         <ThemedText variant="caption" style={[styles.muted, styles.note]}>
@@ -278,16 +248,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.gap(2),
   },
   heading: { gap: theme.gap(0.5), paddingBottom: theme.gap(1) },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: theme.gap(1) },
-  title: { flex: 1 },
-  another: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.primarySoft,
-  },
   kind: {
     alignSelf: "flex-start",
     flexDirection: "row",

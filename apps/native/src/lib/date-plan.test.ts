@@ -7,8 +7,8 @@ import {
   DATE_OPTIONS,
   directionsUrl,
   emptyMessage,
+  canChange,
   infoAction,
-  nextEvening,
   slotLabel,
   walkMinutes,
 } from "./date-plan";
@@ -124,22 +124,15 @@ describe("dateShareText", () => {
   });
 });
 
-describe("nextEvening", () => {
-  it("walks down the evenings and wraps back to the first", () => {
-    const plan = result({
-      evenings: [
-        { first: 0, second: 1 },
-        { first: 0, second: 2 },
-      ],
-    });
-    expect(nextEvening(plan, 0)).toEqual({
-      index: 1,
-      evening: { first: 0, second: 2 },
-    });
-    expect(nextEvening(plan, 1)).toEqual({
-      index: 0,
-      evening: { first: 0, second: 1 },
-    });
+describe("canChange", () => {
+  it("offers a change only when another stop nearby still pairs with the kept one", () => {
+    const evening = { first: 0, second: 1 };
+    expect(canChange(result(), evening, "first")).toBe(false);
+    expect(canChange(result(), evening, "second")).toBe(false);
+    const sushi: DateStop = { ...dinner, name: "Sushi Bar", lng: -9.141 };
+    const more = result({ stops: [dinner, bar, sushi] });
+    expect(canChange(more, evening, "first")).toBe(true);
+    expect(canChange(more, evening, "second")).toBe(false);
   });
 });
 

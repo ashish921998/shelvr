@@ -93,7 +93,7 @@ export function infoAction(stop: DateStop, cardAvailable: boolean): StopAction {
   return { kind: "maps", url: placeMapsUrl(stop) };
 }
 
-/** "Let's go": directions in Maps to the evening's first stop, from wherever the person is. */
+/** "Directions to stop 1": directions in Maps to the evening's first stop, from wherever the person is. */
 export function directionsUrl(
   stop: Pick<DateStop, "name" | "lat" | "lng">,
 ): string {
@@ -149,22 +149,20 @@ type DatePlanState =
   | {
       status: "ready";
       result: DatePlanResult;
-      /** Which of the result's evenings "Try another evening" has reached. */
-      index: number;
-      /** That evening, after any swaps. */
+      /** The best evening, after any changes. */
       evening: DateEvening;
     };
 
-/** The next evening after `index`, wrapping round to the first. */
-export function nextEvening(
+/** Whether a stop can change: something else nearby still makes an evening with the other. */
+export function canChange(
   result: DatePlanResult,
-  index: number,
-): { index: number; evening: DateEvening } {
-  const next = (index + 1) % result.evenings.length;
-  return { index: next, evening: result.evenings[next] };
+  evening: DateEvening,
+  slot: DateSlot,
+): boolean {
+  return swapStop(result.stops, evening, slot) !== null;
 }
 
-/** Plans a date for the city: asks the planner, then deals evenings and swaps stops on the phone. */
+/** Plans a date for the city: asks the planner, then changes stops on the phone. */
 export function useDatePlan(city: string, locale: string) {
   const router = useRouter();
   const make = useAction(api.datePlans.makeDatePlan);
@@ -204,7 +202,6 @@ export function useDatePlan(city: string, locale: string) {
             ? {
                 status: "ready",
                 result,
-                index: 0,
                 evening: result.evenings[0],
               }
             : { status: "empty", result },
@@ -230,26 +227,16 @@ export function useDatePlan(city: string, locale: string) {
     [make, city, locale, router],
   );
 
-  const another = useCallback(() => {
-    setState((current) => {
-      if (current.status !== "ready") return current;
-      analytics.capture("date_plan_another", { index: current.index + 1 });
-      return { ...current, ...nextEvening(current.result, current.index) };
-    });
-  }, []);
-
-  /** Swaps one stop; false when nothing else nearby makes an evening with the other. */
+  /** Changes one stop; the screen offers it only when `canChange` says something fits. */
   const swap = useCallback(
-    (slot: DateSlot): boolean => {
-      if (state.status !== "ready") return false;
+    (slot: DateSlot) => {
+      if (state.status !== "ready") return;
       const evening = swapStop(state.result.stops, state.evening, slot);
       analytics.capture("date_plan_swapped", {
         slot,
         swapped: evening !== null,
       });
-      if (evening === null) return false;
-      setState({ ...state, evening });
-      return true;
+      if (evening !== null) setState({ ...state, evening });
     },
     [state],
   );
@@ -259,5 +246,5 @@ export function useDatePlan(city: string, locale: string) {
     [],
   );
 
-  return { state, plan, another, swap, restart };
+  return { state, plan, swap, restart };
 }

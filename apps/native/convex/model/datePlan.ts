@@ -64,7 +64,7 @@ export const datePlanResultValidator = v.object({
   kind: dateKindValidator,
   /** Each slot's stops, best first. */
   stops: v.array(dateStopValidator),
-  /** Evenings best first; "Try another evening" walks down this list. */
+  /** Evenings best first. Current builds show the first and change stops with `swapStop`. */
   evenings: v.array(dateEveningValidator),
 });
 export type DatePlanResult = Infer<typeof datePlanResultValidator>;

@@ -862,11 +862,9 @@ export type MessageParams = {
   "datePlan.approximate": undefined;
   "datePlan.hours": undefined;
   "datePlan.hoursFor": { name: string };
-  "datePlan.swap": undefined;
-  "datePlan.swapFor": { name: string };
-  "datePlan.noSwap": undefined;
-  "datePlan.letsGo": undefined;
-  "datePlan.another": undefined;
+  "datePlan.change": undefined;
+  "datePlan.changeFor": { name: string };
+  "datePlan.directions": undefined;
   "datePlan.send": undefined;
   "datePlan.shareIntro": { city: string };
   "datePlan.noAnchorTitle": undefined;

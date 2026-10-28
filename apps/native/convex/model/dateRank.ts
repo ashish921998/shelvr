@@ -16,7 +16,7 @@ import { isKnownChain, LODGING_CATEGORIES, samePlace } from "./tripSuggest";
 // The date planner's pure rules: which places fit which stop of which kind of date, and how
 // evenings are ranked. Server only: the app reads the result through `./datePlan`.
 
-/** Evenings one plan offers; "Try another evening" walks down them. */
+/** Evenings one plan offers, best first. */
 export const MAX_EVENINGS = 8;
 /** Below this many evenings from the saves alone, Apple Maps is asked for second stops. */
 export const MIN_SAVED_EVENINGS = 3;
@@ -204,7 +204,7 @@ const PLAYGROUND =
  * Ranks every evening the stops can make, as whole pairs: the pair's weights, up to two points
  * for being close, and up to two points of chance, so the same saves deal a different order each time. Stops come back each
  * slot's best first, and evenings point into that order. The first evenings use each stop
- * once where they can, so "Try another evening" shows somewhere new.
+ * once where they can, so the list is not one place paired with every other.
  */
 export function rankEvenings(
   scored: readonly ScoredStop[],
