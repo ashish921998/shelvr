@@ -187,6 +187,7 @@ export function useDatePlan(city: string, locale: string) {
       busy.current = true;
       setState({ status: "planning", ask });
       analytics.capture("date_plan_started", { kind: ask });
+      let paywall = false;
       try {
         const result = await make({ city, kind: ask, locale });
         analytics.capture("date_plan_made", {
@@ -214,19 +215,17 @@ export function useDatePlan(city: string, locale: string) {
         if (reason === "error")
           analytics.captureError("date_plan_failed", error);
         if (!alive.current) return;
-        if (reason === "pro_required") {
-          // Stay on "planning" until the paywall is up, so the picker takes no taps meanwhile.
-          try {
-            await openPaywall(router, PLACEMENT);
-          } finally {
-            if (alive.current) setState({ status: "picking", problem: null });
-          }
-          return;
-        }
-        setState({ status: "picking", problem: reason });
+        setState({
+          status: "picking",
+          problem: reason === "pro_required" ? null : reason,
+        });
+        paywall = reason === "pro_required";
       } finally {
         busy.current = false;
       }
+      // Opened after `busy` is released: a tap before the sheet appears plans again and
+      // joins (or, if iOS refused it, replaces) the same sheet instead of being dropped.
+      if (paywall) await openPaywall(router, PLACEMENT);
     },
     [make, city, locale, router],
   );
