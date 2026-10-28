@@ -298,7 +298,7 @@
   "plan.been": "Déjà fait",
   "plan.beenHint": "La prochaine fois, %{name} ne sera pas proposé.",
   "plan.deckHint": "Touchez une carte pour la retourner. Glissez pour la suivante.",
-  "plan.flipHint": "Retourne la carte",
+  "plan.flipHint": "Retournez la carte",
   "plan.nextCard": "Carte suivante",
   "plan.why": "Pourquoi celui-ci",
   "plan.from": "Tiré de « %{title} »",
