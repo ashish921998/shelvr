@@ -218,7 +218,7 @@ export function rankEvenings(
   order.forEach((a, first) => {
     if (a.stop.slot !== "first") return;
     order.forEach((b, second) => {
-      if (!pairs(a.stop, b.stop) || samePlace(a.stop, b.stop)) return;
+      if (!pairs(a.stop, b.stop)) return;
       candidates.push({
         first,
         second,

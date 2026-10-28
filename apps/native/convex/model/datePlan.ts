@@ -1,5 +1,6 @@
 import { type Infer, v } from "convex/values";
 import { distanceKm } from "./trip";
+import { samePlace } from "./tripSuggest";
 
 // "Plan a date": an evening of two stops near each other in one city. The app imports this
 // module for the result's types and the swap rule, so it stays free of server-only imports.
@@ -69,12 +70,13 @@ export const datePlanResultValidator = v.object({
 });
 export type DatePlanResult = Infer<typeof datePlanResultValidator>;
 
-/** Whether two stops make an evening: a walk apart, and at least one of them the person's own. */
+/** Whether two stops make an evening: two venues a walk apart, at least one the person's own. */
 export function pairs(a: DateStop, b: DateStop): boolean {
   return (
     a.slot !== b.slot &&
     (a.source === "save" || b.source === "save") &&
-    distanceKm(a, b) <= MAX_WALK_KM
+    distanceKm(a, b) <= MAX_WALK_KM &&
+    !samePlace(a, b)
   );
 }
 

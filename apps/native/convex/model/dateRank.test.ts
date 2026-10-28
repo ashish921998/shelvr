@@ -238,6 +238,13 @@ describe("swapStop", () => {
     });
   });
 
+  it("never swaps in the same venue as the stop kept", () => {
+    const sameVenue = { ...dinner, name: "Uchi", slot: "second" as const };
+    expect(
+      swapStop([dinner, bar, sameVenue], { first: 0, second: 1 }, "second"),
+    ).toBeNull();
+  });
+
   it("has nothing to swap when no other stop pairs", () => {
     expect(
       swapStop([dinner, bar, farBar], { first: 0, second: 1 }, "second"),
