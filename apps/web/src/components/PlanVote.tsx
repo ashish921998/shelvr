@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import PlanSketchbook, { type Choice } from "@/components/PlanSketchbook";
 import type { PlanSharePlace } from "@/lib/planShare";
 
-type Choice = "pick" | "pass";
 type Choices = Record<string, Choice>;
 type Status = "idle" | "saving" | "saved" | "error";
 
@@ -222,58 +222,10 @@ export default function PlanVote({
 
   return (
     <div>
-      <ul className="space-y-2.5">
-        {places.map((place) => (
-          <li
-            key={place.key}
-            className="flex items-center gap-3 rounded-2xl border border-line bg-card p-2.5"
-          >
-            {place.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={place.imageUrl}
-                alt=""
-                className="h-14 w-14 flex-none rounded-xl object-cover"
-              />
-            ) : (
-              <div
-                aria-hidden="true"
-                className="flex h-14 w-14 flex-none items-center justify-center rounded-xl bg-ember-soft font-display text-2xl text-shelf"
-              >
-                {place.name.slice(0, 1)}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-bold text-ink">
-                {place.name}
-              </p>
-              <p className="mt-0.5 line-clamp-2 text-[13px] leading-5 text-muted">
-                {place.area ? `${place.area} · ${place.why}` : place.why}
-              </p>
-            </div>
-            <div className="flex flex-none gap-1.5">
-              <VoteButton
-                label={`Not ${place.name}`}
-                active={choices[place.key] === "pass"}
-                onClick={() => choose(place.key, "pass")}
-              >
-                ✕
-              </VoteButton>
-              <VoteButton
-                label={`Yes to ${place.name}`}
-                active={choices[place.key] === "pick"}
-                tone="yes"
-                onClick={() => choose(place.key, "pick")}
-              >
-                ✓
-              </VoteButton>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <PlanSketchbook places={places} choices={choices} onChoose={choose} />
       <p
         role="status"
-        className={`mt-3 rounded-2xl px-4 py-3 text-sm ${
+        className={`mt-5 rounded-2xl px-4 py-3 text-sm ${
           status === "error"
             ? "bg-terracotta/10 text-terracotta"
             : "bg-paper-deep text-ink-soft"
@@ -282,37 +234,5 @@ export default function PlanVote({
         {note}
       </p>
     </div>
-  );
-}
-
-function VoteButton({
-  label,
-  active,
-  tone = "no",
-  onClick,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  tone?: "yes" | "no";
-  onClick: () => void;
-  children: string;
-}) {
-  const on =
-    tone === "yes"
-      ? "border-ember bg-ember text-dark"
-      : "border-ink-soft bg-ink-soft text-cream";
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={`flex h-11 w-11 items-center justify-center rounded-full border text-lg font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
-        active ? on : "border-line-strong bg-cream text-muted hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

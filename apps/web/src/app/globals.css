@@ -160,3 +160,23 @@
     transform: translate(-50%, -50%) scale(1) rotate(var(--r, 0deg));
   }
 }
+
+/* A hand-drawn stroke that draws itself in, as the plan sketchbook's ring does. */
+@keyframes ink-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ink-draw {
+  stroke-dasharray: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ink-draw {
+    animation: ink-draw 320ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+  }
+}
