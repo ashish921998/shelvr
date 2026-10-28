@@ -215,8 +215,12 @@ export function useDatePlan(city: string, locale: string) {
           analytics.captureError("date_plan_failed", error);
         if (!alive.current) return;
         if (reason === "pro_required") {
-          setState({ status: "picking", problem: null });
-          await openPaywall(router, PLACEMENT);
+          // Stay on "planning" until the paywall is up, so the picker takes no taps meanwhile.
+          try {
+            await openPaywall(router, PLACEMENT);
+          } finally {
+            if (alive.current) setState({ status: "picking", problem: null });
+          }
           return;
         }
         setState({ status: "picking", problem: reason });

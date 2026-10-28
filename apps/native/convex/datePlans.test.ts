@@ -253,6 +253,7 @@ describe("makeDatePlan", () => {
   it("stops waiting on Apple at the deadline and aborts its searches", async () => {
     await stubMaps();
     const aborted: boolean[] = [];
+    let started = 0;
     let searching: () => void = () => undefined;
     const searchStarted = new Promise<void>((resolve) => {
       searching = resolve;
@@ -263,6 +264,7 @@ describe("makeDatePlan", () => {
         if (new URL(input).pathname === "/v1/token") {
           return Response.json({ accessToken: "maps" });
         }
+        started++;
         searching();
         // A search that never answers until something aborts it.
         return new Promise<Response>((_, reject) => {
@@ -284,7 +286,8 @@ describe("makeDatePlan", () => {
       await vi.advanceTimersByTimeAsync(10_000);
       const result = await planned;
       expect(evenings(result)).toEqual([["Ramen Shop", "Red Frog"]]);
-      expect(aborted.length).toBeGreaterThan(0);
+      expect(started).toBeGreaterThan(0);
+      expect(aborted).toHaveLength(started);
     } finally {
       vi.useRealTimers();
     }
