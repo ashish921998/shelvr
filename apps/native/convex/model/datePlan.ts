@@ -81,28 +81,26 @@ export function pairs(a: DateStop, b: DateStop): boolean {
 }
 
 /**
- * The stop that takes `slot`'s place in the evening. Every stop in that slot that still pairs
- * with the stop kept is lined up nearest the kept stop first, and the change moves to the one
- * after the current stop in that line, wrapping round, so the walk grows only once the nearer
- * choices have been seen. Null when no other stop pairs.
+ * The stop that takes `slot`'s place in the evening: the nearest one to the stop kept that
+ * still pairs with it and is not in `tried` (the stops already shown against it). Once every
+ * one has been tried it starts over from the nearest. Null when no other stop pairs.
  */
 export function swapStop(
   stops: readonly DateStop[],
   evening: DateEvening,
   slot: DateSlot,
+  tried: readonly number[] = [],
 ): DateEvening | null {
   const current = evening[slot];
   const kept = stops[slot === "first" ? evening.second : evening.first];
   if (kept === undefined) return null;
   const line = stops
-    .map((stop, index) => ({ index, km: distanceKm(stop, kept) }))
+    .map((stop, index) => ({ stop, index, km: distanceKm(stop, kept) }))
     .filter(
-      ({ index }) =>
-        index === current ||
-        (stops[index].slot === slot && pairs(stops[index], kept)),
+      ({ stop, index }) =>
+        index !== current && stop.slot === slot && pairs(stop, kept),
     )
     .sort((a, b) => a.km - b.km || a.index - b.index);
-  if (line.length < 2) return null;
-  const at = line.findIndex(({ index }) => index === current);
-  return { ...evening, [slot]: line[(at + 1) % line.length].index };
+  const next = line.find(({ index }) => !tried.includes(index)) ?? line[0];
+  return next === undefined ? null : { ...evening, [slot]: next.index };
 }

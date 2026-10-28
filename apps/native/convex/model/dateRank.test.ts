@@ -218,12 +218,18 @@ describe("swapStop", () => {
   });
   const farBar = stop({ name: "Far Bar", slot: "second", ...north(30) });
 
-  it("swaps in the nearest stop not yet tried, then wraps back to the nearest", () => {
+  it("swaps in the nearest stop not yet tried, then starts over from the nearest", () => {
     const wideBar = stop({ name: "Wide Bar", slot: "second", ...north(12) });
-    const stops = [dinner, bar, wideBar, otherBar];
-    expect(swapStop(stops, { first: 0, second: 1 }, "second")?.second).toBe(3);
-    expect(swapStop(stops, { first: 0, second: 3 }, "second")?.second).toBe(2);
-    expect(swapStop(stops, { first: 0, second: 2 }, "second")?.second).toBe(1);
+    const stops = [dinner, otherBar, wideBar, bar];
+    // Shown first: Roosevelt Room (2 steps); Small Victory (1 step) is nearer and untried.
+    const shown = { first: 0, second: 1 };
+    expect(swapStop(stops, shown, "second", [1])?.second).toBe(3);
+    expect(
+      swapStop(stops, { first: 0, second: 3 }, "second", [1, 3])?.second,
+    ).toBe(2);
+    expect(
+      swapStop(stops, { first: 0, second: 2 }, "second", [1, 3, 2])?.second,
+    ).toBe(3);
   });
 
   it("swaps in the next stop that still makes an evening with the one kept", () => {

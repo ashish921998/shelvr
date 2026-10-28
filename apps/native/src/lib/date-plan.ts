@@ -151,6 +151,8 @@ type DatePlanState =
       result: DatePlanResult;
       /** The best evening, after any changes. */
       evening: DateEvening;
+      /** Per slot, the stops already shown against the other slot's current stop. */
+      tried: Record<DateSlot, number[]>;
     };
 
 /** Whether a stop can change: something else nearby still makes an evening with the other. */
@@ -203,6 +205,7 @@ export function useDatePlan(city: string, locale: string) {
                 status: "ready",
                 result,
                 evening: result.evenings[0],
+                tried: { first: [], second: [] },
               }
             : { status: "empty", result },
         );
@@ -231,12 +234,24 @@ export function useDatePlan(city: string, locale: string) {
   const swap = useCallback(
     (slot: DateSlot) => {
       if (state.status !== "ready") return;
-      const evening = swapStop(state.result.stops, state.evening, slot);
+      const shown = [...state.tried[slot], state.evening[slot]];
+      const evening = swapStop(state.result.stops, state.evening, slot, shown);
       analytics.capture("date_plan_swapped", {
         slot,
         swapped: evening !== null,
       });
-      if (evening !== null) setState({ ...state, evening });
+      if (evening === null) return;
+      // Back to one already shown: every stop has been tried, so the round starts over.
+      const round = shown.includes(evening[slot]) ? [] : shown;
+      // The other slot's stops were tried against the stop just replaced, so they reset.
+      setState({
+        ...state,
+        evening,
+        tried:
+          slot === "first"
+            ? { first: round, second: [] }
+            : { first: [], second: round },
+      });
     },
     [state],
   );
