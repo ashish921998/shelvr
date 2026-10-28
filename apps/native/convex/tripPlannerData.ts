@@ -658,12 +658,7 @@ export const tripSavePlaces = authedQuery({
     if (plan === null) return [];
     const stops = await stopsOf(ctx, plan._id);
     const listed = new Set<string>();
-    const saves = await readyCitySaves(
-      ctx,
-      ctx.userId,
-      plan.city,
-      MAX_PLAN_ITEMS,
-    );
+    const saves = await readyCitySaves(ctx, ctx.userId, plan.city);
     const places: TripSavePlace[] = [];
     for (const item of saves) {
       for (const pin of pinsForCity(item, plan.city)) {

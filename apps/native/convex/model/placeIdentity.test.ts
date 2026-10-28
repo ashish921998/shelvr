@@ -31,6 +31,15 @@ describe("sameTripPlace", () => {
     ).toBe(false);
   });
 
+  it("keeps one save's same-named pins apart when their Apple ids differ", () => {
+    expect(
+      sameTripPlace(
+        { name: "Starbucks", appleId: "A-1", itemId: "item-1", ...LISBON },
+        { name: "Starbucks", appleId: "A-2", itemId: "item-1", ...NEXT_DOOR },
+      ),
+    ).toBe(false);
+  });
+
   it("matches the same save's place by name", () => {
     expect(
       sameTripPlace(

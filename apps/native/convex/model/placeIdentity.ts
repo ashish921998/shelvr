@@ -50,12 +50,14 @@ export function samePlace(a: Placed, b: Placed): boolean {
 
 /**
  * Whether a place someone adds is a stop the trip already has. Unlike samePlace, two different
- * Apple ids are two places even next door: the person picked that branch. Otherwise it is the
- * same save's place, or a near namesake when either side has no Apple id. Adding a stop, the
- * "From your saves" list and the "On trip" label all use this.
+ * Apple ids are two places even next door or in one save: the person picked that branch.
+ * Otherwise it is the same save's place, or a near namesake, when either side has no Apple id.
+ * Adding a stop, the "From your saves" list and the "On trip" label all use this.
  */
 export function sameTripPlace(a: TripPlaceRef, b: TripPlaceRef): boolean {
-  if (a.appleId !== undefined && a.appleId === b.appleId) return true;
+  if (a.appleId !== undefined && b.appleId !== undefined) {
+    return a.appleId === b.appleId;
+  }
   if (
     a.itemId !== undefined &&
     a.itemId === b.itemId &&
@@ -63,6 +65,5 @@ export function sameTripPlace(a: TripPlaceRef, b: TripPlaceRef): boolean {
   ) {
     return true;
   }
-  if (a.appleId !== undefined && b.appleId !== undefined) return false;
   return nearNamesake(a, b);
 }
