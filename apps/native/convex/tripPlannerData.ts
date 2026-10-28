@@ -45,7 +45,7 @@ import {
 import { requireProEntitlement } from "./subscriptions";
 import { beenPlaces, toPlanSource } from "./tripData";
 
-const MAX_CITY_CHARS = 80;
+export const MAX_CITY_CHARS = 80;
 const MAX_STAY_CHARS = 120;
 /** Days of a packed 15-day trip, plus room for unplanned extras. */
 const MAX_TRIP_STOPS = 150;
@@ -84,7 +84,7 @@ function tidyStay(stay: string | undefined): string | undefined {
   return text ? text : undefined;
 }
 
-const savedPinValidator = v.object({
+export const savedPinValidator = v.object({
   itemId: v.id("items"),
   name: v.string(),
   lat: v.number(),
@@ -98,7 +98,10 @@ const saveTasteValidator = v.object({
   categories: v.array(v.string()),
 });
 
-async function recentVisits(ctx: QueryCtx, userId: string): Promise<string[]> {
+export async function recentVisits(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<string[]> {
   const visits = await ctx.db
     .query("placeVisits")
     .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))

@@ -42,6 +42,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`home-places.tsx`); failed and placeless saves are in `review-saves.tsx` and
   `unplaced-toast.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
+  Plan a date is the `src/app/(app)/date-plan.tsx` route, with its screens in
+  `src/components/date-plan`, state in `src/lib/date-plan.ts` and backend in
+  `convex/datePlans.ts` (rules in `convex/model/dateRank.ts`).
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and

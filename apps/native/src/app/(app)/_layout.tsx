@@ -108,6 +108,10 @@ export default function AppLayout() {
             name="trip-plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen
+            name="date-plan"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
         <Stack.Protected

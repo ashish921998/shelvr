@@ -68,7 +68,7 @@ type SavedPin = Claim["pins"][number];
 
 type Maps = { token: string; left: number; lang?: string };
 
-function appleLang(locale: string | undefined): string | undefined {
+export function appleLang(locale: string | undefined): string | undefined {
   const tag = locale?.trim();
   return tag && tag.length <= 20 && /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag)
     ? tag
@@ -103,7 +103,7 @@ function spend(maps: Maps | null, calls = 1): maps is Maps {
 // appleMapsLookup's search retries as a point of interest when the first answer is only a city.
 const SEARCH_LOOKUP_CALLS = 2;
 
-function pinFor(place: PlanPlace, pins: SavedPin[]): SavedPin | null {
+export function pinFor(place: PlanPlace, pins: SavedPin[]): SavedPin | null {
   const key = placeKey(place.name);
   return (
     pins.find(

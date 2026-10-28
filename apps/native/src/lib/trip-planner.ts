@@ -319,7 +319,7 @@ export function stopAction(
   return { kind: "maps", url: placeMapsUrl(stop) };
 }
 
-function placeMapsUrl(
+export function placeMapsUrl(
   stop: Pick<TripPlanStop, "name" | "lat" | "lng">,
 ): string {
   const at = `${stop.lat},${stop.lng}`;
