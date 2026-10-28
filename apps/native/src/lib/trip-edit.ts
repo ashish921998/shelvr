@@ -3,6 +3,7 @@ import { t } from "@/lib/i18n";
 import { tripDayLabel } from "@/lib/trip-planner";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { sameTripPlace } from "@convex/model/placeIdentity";
 import {
   type TripPlace,
   type TripPlanDetail,
@@ -398,16 +399,10 @@ export function matchSavePlaces(
   });
 }
 
-/** Whether a search result is already one of the trip's stops, by Apple id or name. */
-export function onTrip(
-  trip: TripLayout,
-  place: Pick<TripPlace, "name" | "appleId">,
-): boolean {
-  const name = place.name.trim().toLocaleLowerCase();
-  return [...trip.days.flat(), ...trip.unplanned].some(
-    (stop) =>
-      (place.appleId !== undefined && stop.appleId === place.appleId) ||
-      stop.name.trim().toLocaleLowerCase() === name,
+/** Whether a search result is already one of the trip's stops, by the rule adding it uses. */
+export function onTrip(trip: TripLayout, place: TripPlace): boolean {
+  return [...trip.days.flat(), ...trip.unplanned].some((stop) =>
+    sameTripPlace(stop, place),
   );
 }
 

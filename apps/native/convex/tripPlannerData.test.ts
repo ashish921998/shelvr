@@ -313,6 +313,62 @@ describe("addTripStop", () => {
     });
   });
 
+  it("adds another branch with its own Apple id instead of moving the first", async () => {
+    const { t, tripId } = await setup(TRIP);
+    const branch = (appleId: string, lat: number) => ({
+      kind: "search" as const,
+      place: { name: "Starbucks", lat, lng: -9.131, appleId },
+    });
+    const first = await t.mutation(api.tripPlannerData.addTripStop, {
+      tripId,
+      day: 1,
+      place: branch("A-sb1", 38.716),
+    });
+    const second = await t.mutation(api.tripPlannerData.addTripStop, {
+      tripId,
+      day: 2,
+      place: branch("A-sb2", 38.76),
+    });
+    expect(second).not.toBe(first);
+    expect(await layout(t, tripId)).toEqual({
+      days: [
+        ["A", "B", "C", "Starbucks"],
+        ["D", "Starbucks"],
+      ],
+      unplanned: ["Extra"],
+    });
+  });
+
+  it("hides a saved place added from search, and adding it again keeps one stop", async () => {
+    const { t, tripId, itemId } = await setup(TRIP);
+    const searched = await t.mutation(api.tripPlannerData.addTripStop, {
+      tripId,
+      day: 2,
+      place: {
+        kind: "search",
+        place: { name: "Manteigaria", lat: 38.711, lng: -9.143 },
+      },
+    });
+    expect(
+      (await t.query(api.tripPlannerData.tripSavePlaces, { tripId })).map(
+        (place) => place.name,
+      ),
+    ).toEqual(["Time Out Market"]);
+    const saved = await t.mutation(api.tripPlannerData.addTripStop, {
+      tripId,
+      day: 2,
+      place: { kind: "save", itemId, name: "Manteigaria" },
+    });
+    expect(saved).toBe(searched);
+    expect(await layout(t, tripId)).toEqual({
+      days: [
+        ["A", "B", "C"],
+        ["D", "Manteigaria"],
+      ],
+      unplanned: ["Extra"],
+    });
+  });
+
   it("refuses a pin the save doesn't have, another account's save, and a bad point", async () => {
     const { base, t, tripId, itemId } = await setup(TRIP);
     await expect(

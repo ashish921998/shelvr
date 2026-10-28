@@ -16,6 +16,7 @@ import {
   placeKey,
   planSourceValidator,
 } from "./model/plan";
+import { sameTripPlace } from "./model/placeIdentity";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   MAX_TRIP_DAYS,
@@ -581,20 +582,6 @@ async function savedStop(
   };
 }
 
-/** The stop already on the trip for this place: the same save's place, the same Apple place, or the same name. */
-function sameStop(
-  stops: Doc<"tripStops">[],
-  next: NewStop,
-): Doc<"tripStops"> | undefined {
-  const key = placeKey(next.name);
-  return stops.find(
-    (stop) =>
-      (next.appleId !== undefined && stop.appleId === next.appleId) ||
-      (placeKey(stop.name) === key &&
-        (next.itemId === undefined || stop.itemId === next.itemId)),
-  );
-}
-
 /**
  * Adds a place to `day` at `index` (the end when left out): a search result from
  * `searchTripPlaces`, or one of the city's saved places. A place already on the trip moves
@@ -623,7 +610,7 @@ export const addTripStop = authedMutation({
         ? addedStop(args.place.place)
         : await savedStop(ctx, plan, args.place.itemId, args.place.name);
     const stops = await stopsOf(ctx, plan._id);
-    const existing = sameStop(stops, next);
+    const existing = stops.find((stop) => sameTripPlace(stop, next));
     let stopId: Id<"tripStops">;
     if (existing !== undefined) {
       stopId = existing._id;
@@ -670,9 +657,7 @@ export const tripSavePlaces = authedQuery({
     const plan = await ownedPlan(ctx, args.tripId, ctx.userId);
     if (plan === null) return [];
     const stops = await stopsOf(ctx, plan._id);
-    const taken = new Set(
-      stops.map((stop) => `${stop.itemId ?? ""}|${placeKey(stop.name)}`),
-    );
+    const listed = new Set<string>();
     const saves = await readyCitySaves(
       ctx,
       ctx.userId,
@@ -683,8 +668,15 @@ export const tripSavePlaces = authedQuery({
     for (const item of saves) {
       for (const pin of pinsForCity(item, plan.city)) {
         if (places.length >= MAX_SAVE_PLACES) return places;
-        if (taken.has(`${item._id}|${placeKey(pin.name)}`)) continue;
-        taken.add(`${item._id}|${placeKey(pin.name)}`);
+        const key = `${item._id}|${placeKey(pin.name)}`;
+        if (listed.has(key)) continue;
+        if (
+          stops.some((stop) =>
+            sameTripPlace(stop, { ...pin, itemId: item._id }),
+          )
+        )
+          continue;
+        listed.add(key);
         places.push({
           itemId: item._id,
           name: pin.name,

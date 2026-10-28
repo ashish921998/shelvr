@@ -179,13 +179,22 @@ describe("Add a place helpers", () => {
     expect(matchSavePlaces(places, "frog")).toHaveLength(1);
   });
 
-  it("knows a result already on the trip by Apple id or name", () => {
+  it("knows a result already on the trip by the rule adding it uses", () => {
     const trip: TripLayout = {
-      days: [[stop("Kafeine", "A-1")]],
+      days: [[stop("Starbucks", "A-1")]],
       unplanned: [stop("Red Frog")],
     };
-    expect(onTrip(trip, { name: "Other", appleId: "A-1" })).toBe(true);
-    expect(onTrip(trip, { name: " red frog " })).toBe(true);
-    expect(onTrip(trip, { name: "New place", appleId: "A-2" })).toBe(false);
+    const here = { lat: 38.7, lng: -9.1 };
+    const across = { lat: 38.75, lng: -9.1 };
+    expect(onTrip(trip, { name: "Other", appleId: "A-1", ...across })).toBe(
+      true,
+    );
+    expect(onTrip(trip, { name: " red frog ", appleId: "A-9", ...here })).toBe(
+      true,
+    );
+    expect(onTrip(trip, { name: "Red Frog", ...across })).toBe(false);
+    expect(onTrip(trip, { name: "Starbucks", appleId: "A-2", ...across })).toBe(
+      false,
+    );
   });
 });

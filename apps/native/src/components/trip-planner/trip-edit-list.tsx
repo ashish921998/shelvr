@@ -173,7 +173,8 @@ type RowProps = {
   index: number;
   drag: DragValues;
   onDragStart: (stopId: Id<"tripStops">) => void;
-  onDragEnd: () => void;
+  /** Ends a drag; only a drag that succeeded (not one the system cancelled) saves the move. */
+  onDragEnd: (commit: boolean) => void;
   onMove: (stop: TripPlanStop, to: StopPlace) => void;
   onRemove: (stop: TripPlanStop) => void;
 };
@@ -207,10 +208,10 @@ function StopEditRow(props: RowProps) {
         .onChange((event) => {
           drag.translation.set(event.translationY);
         })
-        .onFinalize(() => {
+        .onFinalize((_event, success) => {
           if (drag.activeId.get() !== stop._id) return;
           drag.activeId.set(null);
-          scheduleOnRN(onDragEnd);
+          scheduleOnRN(onDragEnd, success);
         }),
     [drag, onDragEnd, onDragStart, slot, stop._id],
   );
@@ -467,11 +468,16 @@ export function TripEditList({
       scheduleOnRN(setTarget, day, index);
     },
   );
-  const onDragEnd = useCallback(() => {
-    const done = dragRef.current;
-    setDrag(null);
-    if (done !== null) void editor.moveStop(done.stopId, done.to, "drag");
-  }, [editor, setDrag]);
+  const onDragEnd = useCallback(
+    (commit: boolean) => {
+      const done = dragRef.current;
+      setDrag(null);
+      if (commit && done !== null) {
+        void editor.moveStop(done.stopId, done.to, "drag");
+      }
+    },
+    [editor, setDrag],
+  );
   const onMove = useCallback(
     (stop: TripPlanStop, to: StopPlace) => {
       tick();
