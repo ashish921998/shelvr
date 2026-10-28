@@ -11,6 +11,7 @@ describe("placeEmoji", () => {
     );
     // Two "things to do" places still look different.
     expect(placeEmoji({ category: "Park", kinds: ["activities"] })).toBe("🌳");
+    expect(placeEmoji({ category: "FitnessCenter", kinds: [] })).toBe("🏋️");
   });
 
   it("keeps the category over the save's tags", () => {
