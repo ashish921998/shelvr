@@ -64,6 +64,7 @@ const TAG_KINDS: Record<CategoryKind, readonly string[]> = {
     "brunch",
     "lunch",
     "dinner",
+    "dining",
     "street food",
     "pizza",
     "sushi",
@@ -135,8 +136,47 @@ const DATE_KINDS = new Set<PlaceKind>([
   "activities",
 ]);
 
+/** Every word or phrase a kind or date night listens for. */
+const KNOWN_WORDS = [...Object.values(TAG_KINDS).flat(), ...DATE_TAGS];
+
+/** A tag or known phrase as its lowercase words, punctuation dropped. */
+function wordsOf(text: string): string[] {
+  return text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+const KNOWN_PHRASES = KNOWN_WORDS.map((word) => ({
+  word,
+  parts: wordsOf(word),
+}));
+
+/**
+ * The known words and phrases a tag names, whole words only, so "parking" never reads as "park".
+ * Read left to right, taking the longest phrase at each word: "sf coffee shop" names
+ * "coffee shop", not "shop", while "coffee shop and vintage shop" names both.
+ */
+function tagWords(tag: string): string[] {
+  const parts = wordsOf(tag);
+  const found: string[] = [];
+  let at = 0;
+  while (at < parts.length) {
+    const longest = KNOWN_PHRASES.filter((phrase) =>
+      phrase.parts.every((part, index) => parts[at + index] === part),
+    ).reduce<(typeof KNOWN_PHRASES)[number] | undefined>(
+      (best, phrase) =>
+        !best || phrase.parts.length > best.parts.length ? phrase : best,
+      undefined,
+    );
+    if (longest) found.push(longest.word);
+    at += longest ? longest.parts.length : 1;
+  }
+  return found;
+}
+
+/** Whether a save's tags name one of these words, alone ("bars") or inside a longer tag ("sf restaurants"). */
 function tagged(tags: ReadonlySet<string>, words: readonly string[]): boolean {
-  return words.some((word) => tags.has(word));
+  return [...tags].some((tag) =>
+    tagWords(tag).some((word) => words.includes(word)),
+  );
 }
 
 export function placeKinds(
