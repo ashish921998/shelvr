@@ -179,7 +179,7 @@ describe("makeDatePlan", () => {
     await expect(claim()).rejects.toThrow();
   });
 
-  it("plans dinner then drinks from two saves a walk apart, with no Apple call", async () => {
+  it("plans dinner then drinks from two saves a walk apart, ranked ahead of Apple's fill", async () => {
     await stubMaps();
     const fetchMock = fakeApple();
     vi.stubGlobal("fetch", fetchMock);
@@ -248,6 +248,46 @@ describe("makeDatePlan", () => {
       kind: "classic",
     });
     expect(evenings(result)).toEqual([["Ramen Shop", "Red Frog"]]);
+  });
+
+  it("stops waiting on Apple at the deadline and aborts its searches", async () => {
+    await stubMaps();
+    const aborted: boolean[] = [];
+    let searching: () => void = () => undefined;
+    const searchStarted = new Promise<void>((resolve) => {
+      searching = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string, init?: RequestInit) => {
+        if (new URL(input).pathname === "/v1/token") {
+          return Response.json({ accessToken: "maps" });
+        }
+        searching();
+        // A search that never answers until something aborts it.
+        return new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            aborted.push(true);
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        });
+      }),
+    );
+    const { t } = await setup([DINNER, BAR]);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const planned = t.action(api.datePlans.makeDatePlan, {
+        city: "Lisbon",
+        kind: "classic",
+      });
+      await searchStarted;
+      await vi.advanceTimersByTimeAsync(10_000);
+      const result = await planned;
+      expect(evenings(result)).toEqual([["Ramen Shop", "Red Frog"]]);
+      expect(aborted.length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says when no saved place fits the kind of date", async () => {

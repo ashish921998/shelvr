@@ -100,16 +100,32 @@ function chooseKind(
   );
 }
 
+/** Runs `work`, and at `ms` aborts its fetches and settles on `fallback`. */
 function withDeadline<T>(
-  work: Promise<T>,
+  work: (signal: AbortSignal) => Promise<T>,
   ms: number,
   fallback: T,
 ): Promise<T> {
+  const deadline = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), ms);
+    timer = setTimeout(() => {
+      deadline.abort();
+      resolve(fallback);
+    }, ms);
   });
-  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+  return Promise.race([work(deadline.signal), late]).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
+/** `fetch` that also stops when `signal` aborts, on top of each request's own timeout. */
+function fetchUntil(signal: AbortSignal): typeof fetch {
+  return (input, init) =>
+    fetch(input, {
+      ...init,
+      signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal,
+    });
 }
 
 /** Apple Maps places for the stop each top saved place is missing: one search per anchor. */
@@ -118,13 +134,16 @@ async function suggestStops(
   scored: ScoredStop[],
   been: ReadonlySet<string>,
   lang: string | undefined,
+  signal: AbortSignal,
 ): Promise<{ stops: ScoredStop[]; searches: number }> {
   const config = appleMapsConfig(env);
   if (config === null) {
     logEvent("info", "date_plan_maps_unconfigured", {});
     return { stops: [], searches: 0 };
   }
-  const token = await appleMapsAccessToken(config);
+  const fetchImpl = fetchUntil(signal);
+  const token = await appleMapsAccessToken(config, fetchImpl);
+  if (signal.aborted) return { stops: [], searches: 0 };
   if (token === null) {
     logEvent("warn", "date_plan_map_token_failed", {});
     return { stops: [], searches: 0 };
@@ -132,11 +151,16 @@ async function suggestStops(
   const targets = fillTargets(scored);
   const replies = await Promise.all(
     targets.map(({ anchor, slot }) =>
-      appleMapsSearchPlaces(token, SLOT_SEARCHES[kind][slot].query, {
-        near: anchor,
-        categories: SLOT_SEARCHES[kind][slot].categories,
-        ...(lang !== undefined ? { lang } : {}),
-      }),
+      appleMapsSearchPlaces(
+        token,
+        SLOT_SEARCHES[kind][slot].query,
+        {
+          near: anchor,
+          categories: SLOT_SEARCHES[kind][slot].categories,
+          ...(lang !== undefined ? { lang } : {}),
+        },
+        fetchImpl,
+      ),
     ),
   );
   const chains = chainNames(replies.flat());
@@ -199,14 +223,19 @@ export const makeDatePlan = action({
     if (plan.evenings.length < MIN_SAVED_EVENINGS && claim.aiAllowed) {
       const been = new Set(claim.been.map(placeKey));
       const found = await withDeadline(
-        suggestStops(kind, scored, been, appleLang(args.locale)).catch(
-          (error: unknown) => {
+        (signal) =>
+          suggestStops(
+            kind,
+            scored,
+            been,
+            appleLang(args.locale),
+            signal,
+          ).catch((error: unknown) => {
             logEvent("warn", "date_plan_suggest_failed", {
               error_name: error instanceof Error ? error.name : "unknown",
             });
             return { stops: [], searches: 0 };
-          },
-        ),
+          }),
         FILL_DEADLINE_MS,
         { stops: [], searches: -1 },
       );

@@ -321,10 +321,13 @@ describe("keepDateSuggestion", () => {
 
   it("drops a place already in the plan", () => {
     expect(
-      keepDateSuggestion(poi({ name: "Uchi", ...AUSTIN }), {
-        ...context,
-        slot: "first",
-      }),
+      keepDateSuggestion(
+        poi({ name: "Uchi", category: "Restaurant", ...AUSTIN }),
+        {
+          ...context,
+          slot: "first",
+        },
+      ),
     ).toBe(false);
   });
 });
