@@ -119,6 +119,20 @@ describe("PlanSketchbook", () => {
     delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
   });
 
+  it("draws a whole emoji, not half of it, as a place's initial", () => {
+    act(() =>
+      root.render(
+        <PlanSketchbook
+          places={[{ key: "p0", name: "🌮 Taco Stand", why: "Tacos" }]}
+          choices={{}}
+          onChoose={() => undefined}
+        />,
+      ),
+    );
+    const initial = container.querySelector('section span[aria-hidden="true"]');
+    expect(initial?.textContent).toBe("🌮");
+  });
+
   it("rings the chosen answer and lists the yeses on the last page", () => {
     render({ p0: "pick", p1: "pass" });
     expect(button("Yes to Bastian").getAttribute("aria-pressed")).toBe("true");

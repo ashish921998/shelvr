@@ -232,7 +232,7 @@ function Spread({ place }: { place: PlanSharePlace }) {
             aria-hidden="true"
             className="font-display text-[clamp(64px,22vw,120px)] leading-none text-ember-deep"
           >
-            {place.name.slice(0, 1)}
+            {Array.from(place.name)[0] ?? ""}
           </span>
         )
       }
