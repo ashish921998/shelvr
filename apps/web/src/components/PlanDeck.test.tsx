@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import PlanSketchbook, { type Choice } from "./PlanSketchbook";
+import PlanDeck, { type Choice } from "./PlanDeck";
 
 const places = [
   { key: "p0", name: "Bastian", area: "Soho", why: "Seafood" },
@@ -33,7 +33,7 @@ function render(
 ) {
   act(() =>
     root.render(
-      <PlanSketchbook places={places} choices={choices} onChoose={onChoose} />,
+      <PlanDeck places={places} choices={choices} onChoose={onChoose} />,
     ),
   );
 }
@@ -44,17 +44,17 @@ function button(label: string) {
   )!;
 }
 
-describe("PlanSketchbook", () => {
-  it("gives every place its own spread, area and labelled buttons", () => {
+describe("PlanDeck", () => {
+  it("gives every place its own card, area and labelled buttons", () => {
     render({});
     expect(container.querySelectorAll("section")).toHaveLength(3);
     expect(container.textContent).toContain("Soho");
-    expect(container.textContent).toContain("I'd go");
+    expect(container.textContent).toContain("I’d go");
     expect(button("Yes to Masque")).not.toBeNull();
     expect(button("Not Bastian")).not.toBeNull();
   });
 
-  it("flips to the next spread after a new answer, but not when one is undone", () => {
+  it("flips to the next card after a new answer, but not when one is undone", () => {
     const scrollTo = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "scrollTo", {
       configurable: true,
@@ -119,14 +119,17 @@ describe("PlanSketchbook", () => {
     delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
   });
 
-  it("rings the chosen answer and lists the yeses on the last page", () => {
+  it("marks each card with its answer and lists the yeses on the last card", () => {
     render({ p0: "pick", p1: "pass" });
     expect(button("Yes to Bastian").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Yes to Bastian").querySelector("svg")).not.toBeNull();
-    expect(button("Yes to Masque").querySelector("svg")).toBeNull();
-    const end = container.querySelector('[aria-label="End of the shortlist"]')!;
-    expect(end.textContent).toContain("1of 2 places");
-    expect(end.textContent).toContain("✓ Bastian");
-    expect(end.textContent).not.toContain("Masque");
+    expect(button("Yes to Masque").getAttribute("aria-pressed")).toBe("false");
+    const card = (label: string) =>
+      container.querySelector(`[aria-label="${label}"]`)!.textContent;
+    expect(card("1 of 2: Bastian")).toContain("You’d go");
+    expect(card("2 of 2: Masque")).toContain("Skipped");
+    const end = card("End of the shortlist");
+    expect(end).toContain("You’d go to 1 of 2");
+    expect(end).toContain("Bastian");
+    expect(end).not.toContain("Masque");
   });
 });
