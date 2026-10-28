@@ -31,6 +31,10 @@ const TAGS_PER_SAVE = 8;
 function namesOneVenue(item: Doc<"items">): boolean {
   const pins = item.placePins ?? [];
   const keyOf = (name: string) => placeKey(splitSavedPlace(name).name);
+  const venueOf = (pin: (typeof pins)[number]) => ({
+    ...pin,
+    name: splitSavedPlace(pin.name).name,
+  });
   const names = [
     ...(item.intents ?? [])
       .filter((intent) => intent.kind === "open_maps")
@@ -45,7 +49,8 @@ function namesOneVenue(item: Doc<"items">): boolean {
       .slice(0, i)
       .some(
         (other) =>
-          keyOf(other.name) === keyOf(pin.name) && !sameVenue(other, pin),
+          keyOf(other.name) === keyOf(pin.name) &&
+          !sameVenue(venueOf(other), venueOf(pin)),
       ),
   );
   return venues.size === 1 && !branches;

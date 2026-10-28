@@ -404,6 +404,24 @@ describe("makeDatePlan", () => {
     expect(result.status).toBe("no_anchor");
   });
 
+  it("counts one venue pinned twice with different area labels once", async () => {
+    const coffee: Save = {
+      title: "Best flat white",
+      places: ["Fábrica, Chiado"],
+      pins: [
+        { name: "Fábrica, Chiado", ...CHIADO },
+        { name: "Fábrica, Bairro Alto", ...CHIADO },
+      ],
+      tags: ["coffee"],
+    };
+    const { t } = await setup([coffee]);
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "lowkey",
+    });
+    expect(result.stops).toMatchObject([{ name: "Fábrica", slot: "first" }]);
+  });
+
   it("never plans from another account's saves", async () => {
     const { base } = await setup([DINNER, BAR]);
     const other = await base.run(async (ctx) => {
