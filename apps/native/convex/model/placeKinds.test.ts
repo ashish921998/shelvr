@@ -53,6 +53,11 @@ describe("placeKinds", () => {
     expect(placeKinds(undefined, ["coffee shop coffee shop"])).toEqual([
       "coffee",
     ]);
+    // Removing one phrase must not join its neighbours into a new one.
+    expect(placeKinds(undefined, ["coffee / coffee shop / shop"])).toEqual([
+      "coffee",
+      "shopping",
+    ]);
     expect(placeKinds(undefined, ["coffee shop and vintage shop"])).toEqual([
       "coffee",
       "shopping",

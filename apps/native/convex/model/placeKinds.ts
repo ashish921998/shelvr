@@ -139,36 +139,37 @@ const DATE_KINDS = new Set<PlaceKind>([
 /** Every word or phrase a kind or date night listens for. */
 const KNOWN_WORDS = [...Object.values(TAG_KINDS).flat(), ...DATE_TAGS];
 
-/** Words joined by single spaces and padded, so a lookup matches whole words only. */
-function padded(text: string): string {
-  return ` ${text
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean)
-    .join(" ")} `;
+/** A tag or known phrase as its lowercase words, punctuation dropped. */
+function wordsOf(text: string): string[] {
+  return text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
+
+const KNOWN_PHRASES = KNOWN_WORDS.map((word) => ({
+  word,
+  parts: wordsOf(word),
+}));
 
 /**
  * The known words and phrases a tag names, whole words only, so "parking" never reads as "park".
- * A phrase hides the words inside it: "sf coffee shop" names "coffee shop", not "shop", unless the
- * word also stands on its own elsewhere in the tag.
+ * Read left to right, taking the longest phrase at each word: "sf coffee shop" names
+ * "coffee shop", not "shop", while "coffee shop and vintage shop" names both.
  */
 function tagWords(tag: string): string[] {
-  const text = padded(tag);
-  const found = KNOWN_WORDS.filter((word) => text.includes(padded(word)));
-  return found.filter((word) => {
-    // What is left once every longer phrase holding this word is taken out.
-    const rest = found
-      .filter((other) => other !== word && padded(other).includes(padded(word)))
-      .reduce((left, other) => without(left, padded(other)), text);
-    return rest.includes(padded(word));
-  });
-}
-
-/** Text with every whole-word copy of a padded phrase taken out, back-to-back copies included. */
-function without(text: string, phrase: string): string {
-  let left = text;
-  while (left.includes(phrase)) left = left.replace(phrase, " ");
-  return left;
+  const parts = wordsOf(tag);
+  const found: string[] = [];
+  let at = 0;
+  while (at < parts.length) {
+    const longest = KNOWN_PHRASES.filter((phrase) =>
+      phrase.parts.every((part, index) => parts[at + index] === part),
+    ).reduce<(typeof KNOWN_PHRASES)[number] | undefined>(
+      (best, phrase) =>
+        !best || phrase.parts.length > best.parts.length ? phrase : best,
+      undefined,
+    );
+    if (longest) found.push(longest.word);
+    at += longest ? longest.parts.length : 1;
+  }
+  return found;
 }
 
 /** Whether a save's tags name one of these words, alone ("bars") or inside a longer tag ("sf restaurants"). */
