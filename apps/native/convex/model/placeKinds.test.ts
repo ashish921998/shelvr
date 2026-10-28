@@ -50,6 +50,13 @@ describe("placeKinds", () => {
     // "coffee shop" is a coffee word, not shopping.
     expect(placeKinds(undefined, ["coffee shop"])).toEqual(["coffee"]);
     expect(placeKinds(undefined, ["sf coffee shop"])).toEqual(["coffee"]);
+    expect(placeKinds(undefined, ["coffee shop coffee shop"])).toEqual([
+      "coffee",
+    ]);
+    expect(placeKinds(undefined, ["coffee shop and vintage shop"])).toEqual([
+      "coffee",
+      "shopping",
+    ]);
   });
 
   it("ignores a category it does not know", () => {

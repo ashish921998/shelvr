@@ -149,17 +149,26 @@ function padded(text: string): string {
 
 /**
  * The known words and phrases a tag names, whole words only, so "parking" never reads as "park".
- * A phrase hides the words inside it: "sf coffee shop" names "coffee shop", not "shop".
+ * A phrase hides the words inside it: "sf coffee shop" names "coffee shop", not "shop", unless the
+ * word also stands on its own elsewhere in the tag.
  */
 function tagWords(tag: string): string[] {
   const text = padded(tag);
   const found = KNOWN_WORDS.filter((word) => text.includes(padded(word)));
-  return found.filter(
-    (word) =>
-      !found.some(
-        (other) => other !== word && padded(other).includes(padded(word)),
-      ),
-  );
+  return found.filter((word) => {
+    // What is left once every longer phrase holding this word is taken out.
+    const rest = found
+      .filter((other) => other !== word && padded(other).includes(padded(word)))
+      .reduce((left, other) => without(left, padded(other)), text);
+    return rest.includes(padded(word));
+  });
+}
+
+/** Text with every whole-word copy of a padded phrase taken out, back-to-back copies included. */
+function without(text: string, phrase: string): string {
+  let left = text;
+  while (left.includes(phrase)) left = left.replace(phrase, " ");
+  return left;
 }
 
 /** Whether a save's tags name one of these words, alone ("bars") or inside a longer tag ("sf restaurants"). */
