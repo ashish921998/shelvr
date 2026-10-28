@@ -202,6 +202,8 @@ export function useTripEditor(trip: TripPlanDetail) {
 
   const [undo, setUndo] = useState<TripUndo | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Undo belongs to the latest edit only; one that answers after a newer edit began offers none.
+  const latest = useRef(0);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -229,12 +231,15 @@ export function useTripEditor(trip: TripPlanDetail) {
         return;
       }
       const name = stopName(stopId);
+      const edit = ++latest.current;
+      offerUndo(null);
       try {
         const before = await optimistic.move({ stopId, ...to });
         analytics.capture("trip_plan_stop_moved", {
           across_days: from.day !== to.day,
           method,
         });
+        if (edit !== latest.current) return;
         offerUndo({
           kind: "move",
           stopId,
@@ -256,9 +261,12 @@ export function useTripEditor(trip: TripPlanDetail) {
 
   const removeStop = useCallback(
     async (stop: TripPlanStop) => {
+      const edit = ++latest.current;
+      offerUndo(null);
       try {
         const before = await optimistic.remove({ stopId: stop._id });
         analytics.capture("trip_plan_stop_removed", { source: stop.source });
+        if (edit !== latest.current) return;
         offerUndo({
           kind: "remove",
           stopId: stop._id,
@@ -274,6 +282,7 @@ export function useTripEditor(trip: TripPlanDetail) {
 
   const undoLast = useCallback(async () => {
     if (undo === null) return;
+    latest.current++;
     offerUndo(null);
     try {
       await optimistic.move({ stopId: undo.stopId, ...undo.before });
