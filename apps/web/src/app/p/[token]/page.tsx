@@ -51,11 +51,11 @@ export default async function PlanVotePage({ params }: PageProps) {
 
         {share ? (
           <>
-            <h1 className="mt-8 font-display text-[30px] leading-[1.1] text-ink sm:mt-10 sm:text-4xl">
+            <h1 className="mt-10 font-display text-[32px] leading-tight text-ink sm:text-4xl">
               {planTitle(share)}
             </h1>
             <p className="mt-1 mb-5 text-[15px] text-muted">
-              Swipe, and tap I’d go on the places you like.
+              Flip through and tap ✓ on the ones you&apos;d go to.
             </p>
             <PlanVote
               token={token}

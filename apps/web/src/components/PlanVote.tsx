@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import PlanDeck, { type Choice } from "@/components/PlanDeck";
+import PlanSketchbook, { type Choice } from "@/components/PlanSketchbook";
 import type { PlanSharePlace } from "@/lib/planShare";
 
 type Choices = Record<string, Choice>;
@@ -222,7 +222,7 @@ export default function PlanVote({
 
   return (
     <div>
-      <PlanDeck places={places} choices={choices} onChoose={choose} />
+      <PlanSketchbook places={places} choices={choices} onChoose={choose} />
       <p
         role="status"
         className={`mt-5 text-center text-sm ${
