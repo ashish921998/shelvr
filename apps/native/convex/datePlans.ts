@@ -73,7 +73,7 @@ function savedCandidates(claim: Claim): DateCandidate[] {
         ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
         ...(pin.category !== undefined ? { category: pin.category } : {}),
         tags: save.tags,
-        ownTags: source.places.length === 1,
+        ownTags: save.ownTags,
         savedAt: save.savedAt,
       },
     ];

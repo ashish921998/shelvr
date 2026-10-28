@@ -1,9 +1,15 @@
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { requireUserId } from "./model/auth";
-import { MAX_PLAN_ITEMS, planSourceValidator } from "./model/plan";
+import {
+  MAX_PLAN_ITEMS,
+  placeKey,
+  planSourceValidator,
+  splitSavedPlace,
+} from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import { pinsForCity, tidyCity } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
@@ -15,6 +21,27 @@ import {
 } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
+
+/**
+ * Whether the save names one venue, so its tags describe that venue. Counted over the whole
+ * save before any city filter, with a place named in its places, its pins and its Maps links
+ * counted once.
+ */
+function namesOneVenue(item: Doc<"items">): boolean {
+  const names = [
+    ...(item.intents ?? [])
+      .filter((intent) => intent.kind === "open_maps")
+      .map((intent) => intent.value),
+    ...(item.places ?? []),
+    ...(item.placePins ?? []).map((pin) => pin.name),
+  ];
+  const venues = new Set(
+    names
+      .map((name) => placeKey(splitSavedPlace(name).name))
+      .filter((key) => key !== ""),
+  );
+  return venues.size === 1;
+}
 
 /**
  * Checks the caller may plan a date, spends one plan from the rate limit before anything is
@@ -31,6 +58,7 @@ export const claimDatePlanInternal = internalMutation({
       v.object({
         itemId: v.id("items"),
         tags: v.array(v.string()),
+        ownTags: v.boolean(),
         savedAt: v.number(),
       }),
     ),
@@ -66,6 +94,7 @@ export const claimDatePlanInternal = internalMutation({
       saves: items.map((item) => ({
         itemId: item._id,
         tags: item.tags.slice(0, TAGS_PER_SAVE),
+        ownTags: namesOneVenue(item),
         savedAt: item._creationTime,
       })),
       aiAllowed: await aiAllowed(ctx, userId),

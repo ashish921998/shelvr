@@ -337,6 +337,55 @@ describe("makeDatePlan", () => {
     }
   });
 
+  it("reads a single-place save's tags even when the place is also its pin", async () => {
+    // Apple files most gelato shops as restaurants; the save's tags say it is dessert.
+    const gelato: Save = {
+      title: "Gelato worth the queue",
+      places: ["Gelato Lab, Chiado"],
+      pins: [{ name: "Gelato Lab", ...near(3), category: "Restaurant" }],
+      tags: ["gelato"],
+    };
+    const { t } = await setup([DINNER, gelato]);
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+    });
+    expect(evenings(result)).toEqual([["Ramen Shop", "Gelato Lab"]]);
+  });
+
+  it("keeps a single-place coffee save Apple gave no category", async () => {
+    const coffee: Save = {
+      title: "Best flat white",
+      places: ["Fábrica"],
+      pins: [{ name: "Fábrica", ...CHIADO }],
+      tags: ["coffee"],
+    };
+    const { t } = await setup([coffee]);
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "lowkey",
+    });
+    expect(result.stops).toMatchObject([{ name: "Fábrica", slot: "first" }]);
+  });
+
+  it("does not read a save's tags as its places' when it names two", async () => {
+    const guide: Save = {
+      title: "Two coffee spots",
+      places: ["Fábrica", "Copenhagen Coffee Lab"],
+      pins: [
+        { name: "Fábrica", ...CHIADO },
+        { name: "Copenhagen Coffee Lab", ...near(2) },
+      ],
+      tags: ["coffee"],
+    };
+    const { t } = await setup([guide]);
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "lowkey",
+    });
+    expect(result.status).toBe("no_anchor");
+  });
+
   it("never plans from another account's saves", async () => {
     const { base } = await setup([DINNER, BAR]);
     const other = await base.run(async (ctx) => {
