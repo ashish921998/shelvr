@@ -1,5 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import type { ApplePoi } from "./appleMaps";
+import { nameWithin, nameWords, samePlace, type Placed } from "./placeIdentity";
 import {
   clip,
   MAX_WHY_CHARS,
@@ -12,7 +13,6 @@ import {
   clusterPlaces,
   distanceKm,
   middleOf,
-  SAME_PLACE_KM,
   STOPS_PER_DAY,
   type LatLng,
   type TripPace,
@@ -58,76 +58,74 @@ const TASTE_HINTS: Record<TripInterest, readonly string[]> = {
 };
 
 /** Tags too broad to search by: the interest's own query covers them. */
-const GENERIC_TAGS = new Set(
-  [
-    "food",
-    "foodie",
-    "restaurant",
-    "restaurants",
-    "eats",
-    "lunch",
-    "dinner",
-    "breakfast",
-    "coffee",
-    "cafe",
-    "café",
-    "cafes",
-    "coffee shop",
-    "bar",
-    "bars",
-    "drinks",
-    "nightlife",
-    "museum",
-    "museums",
-    "art",
-    "culture",
-    "park",
-    "parks",
-    "nature",
-    "outdoors",
-    "shopping",
-    "shop",
-    "shops",
-    "store",
-    "sightseeing",
-    "sights",
-    "attractions",
-    "landmark",
-    "landmarks",
-    "history",
-    "travel",
-    "trip",
-    "travel tips",
-    "vacation",
-    "holiday",
-    "places",
-    "things to do",
-    "activities",
-    "date",
-    "date night",
-    "date ideas",
-    "romantic",
-    "hidden gem",
-    "hidden gems",
-    "must try",
-    "must visit",
-    "bucket list",
-    "recommendations",
-    "guide",
-    "list",
-    "best",
-    "top",
-    "local",
-    "tiktok",
-    "instagram",
-    "reel",
-    "video",
-    "recipe",
-    "hotel",
-    "hotels",
-    "stay",
-  ],
-);
+const GENERIC_TAGS = new Set([
+  "food",
+  "foodie",
+  "restaurant",
+  "restaurants",
+  "eats",
+  "lunch",
+  "dinner",
+  "breakfast",
+  "coffee",
+  "cafe",
+  "café",
+  "cafes",
+  "coffee shop",
+  "bar",
+  "bars",
+  "drinks",
+  "nightlife",
+  "museum",
+  "museums",
+  "art",
+  "culture",
+  "park",
+  "parks",
+  "nature",
+  "outdoors",
+  "shopping",
+  "shop",
+  "shops",
+  "store",
+  "sightseeing",
+  "sights",
+  "attractions",
+  "landmark",
+  "landmarks",
+  "history",
+  "travel",
+  "trip",
+  "travel tips",
+  "vacation",
+  "holiday",
+  "places",
+  "things to do",
+  "activities",
+  "date",
+  "date night",
+  "date ideas",
+  "romantic",
+  "hidden gem",
+  "hidden gems",
+  "must try",
+  "must visit",
+  "bucket list",
+  "recommendations",
+  "guide",
+  "list",
+  "best",
+  "top",
+  "local",
+  "tiktok",
+  "instagram",
+  "reel",
+  "video",
+  "recipe",
+  "hotel",
+  "hotels",
+  "stay",
+]);
 
 const MAX_TASTE_CHARS = 30;
 const MAX_TASTE_WORDS = 3;
@@ -367,50 +365,12 @@ export const SUGGEST_RADIUS_KM = 25;
 
 export type Suggestion = ApplePoi & { interest: TripInterest };
 
-type Placed = LatLng & { name: string; appleId?: string };
-
 /** Apple `PoiCategory` values for somewhere to sleep, never a stop. */
 export const LODGING_CATEGORIES: ReadonlySet<string> = new Set([
   "Hotel",
   "Campground",
   "RVPark",
 ]);
-
-function nameWords(name: string): string[] {
-  return name
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .replace(/['\u2019\u02bc]/g, "")
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean);
-}
-
-/** One name's whole words run inside the other's ("Santa Joana" in "Locke de Santa Joana"), ignoring case and accents. */
-export function nameWithin(a: string, b: string): boolean {
-  const [short, long] = [nameWords(a), nameWords(b)].sort(
-    (x, y) => x.length - y.length,
-  );
-  if (short.length === 0) return false;
-  for (let start = 0; start + short.length <= long.length; start++) {
-    if (short.every((word, i) => long[start + i] === word)) return true;
-  }
-  return false;
-}
-
-/**
- * The same venue: one Apple id, or a few doors apart under one name or one name inside the other
- * (often its hotel). Two different Apple ids still match on name within SAME_PLACE_KM, so a
- * restaurant and the hotel it sits in become one stop; uniquePlacePins must not do that, since
- * there distinct Apple ids are distinct places on the map.
- */
-export function samePlace(a: Placed, b: Placed): boolean {
-  if (a.appleId !== undefined && b.appleId !== undefined) {
-    if (a.appleId === b.appleId) return true;
-  }
-  if (distanceKm(a, b) > SAME_PLACE_KM) return false;
-  return placeKey(a.name) === placeKey(b.name) || nameWithin(a.name, b.name);
-}
 
 /**
  * A suggestion named after a place already in the trip ("Locke de Santa Joana" beside the saved
@@ -578,8 +538,13 @@ export function routeOrder(stops: PlannedStop[]): PlannedStop[] {
     }
     for (const [i, next] of left.entries()) {
       if (route.length === 0 && mornings && !isMorning(next)) continue;
-      const leg = route.length === 0 ? 0 : distanceKm(route[route.length - 1], next);
-      extend([...route, next], left.filter((_, j) => j !== i), km + leg);
+      const leg =
+        route.length === 0 ? 0 : distanceKm(route[route.length - 1], next);
+      extend(
+        [...route, next],
+        left.filter((_, j) => j !== i),
+        km + leg,
+      );
     }
   };
   extend([], stops, 0);

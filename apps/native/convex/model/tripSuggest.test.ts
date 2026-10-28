@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
+import { nameWithin, samePlace } from "./placeIdentity";
 import { distanceKm } from "./trip";
 import {
   balanceSuggestions,
@@ -14,11 +15,9 @@ import {
   mergeSavedNamesakes,
   namesake,
   LODGING_CATEGORIES,
-  nameWithin,
   nextBatch,
   routeKm,
   routeOrder,
-  samePlace,
   saveWhy,
   searchPoints,
   searchQueues,

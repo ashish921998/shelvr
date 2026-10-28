@@ -3,64 +3,124 @@ import {
   hasMapPoints,
   TripPlanBody,
 } from "@/components/trip-planner/trip-plan-body";
-import { HeaderActionMenu } from "@/components/ui/header-icon-button";
+import {
+  TripEditHeader,
+  TripEditList,
+} from "@/components/trip-planner/trip-edit-list";
+import {
+  HeaderActionMenu,
+  HeaderIconButton,
+} from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
+import { useRenameTrip } from "@/lib/trip-edit";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function TripHeader({
   overMap,
+  editing,
+  onEdit,
+  onDone,
+  onAddPlace,
   onDelete,
 }: {
   overMap: boolean;
+  editing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+  onAddPlace: () => void;
   onDelete: () => void;
 }) {
   const { theme } = useUnistyles();
+  const actions = [
+    { label: t("tripPlanner.edit"), onPress: onEdit },
+    { label: t("tripPlanner.addPlace"), onPress: onAddPlace },
+    { label: t("tripPlanner.delete"), destructive: true, onPress: onDelete },
+  ];
   if (Platform.OS === "android") {
     return (
       <Stack.Screen
         options={{
           // Over the map the header floats; without one it needs its own background.
-          headerTransparent: overMap,
-          headerStyle: overMap
-            ? undefined
-            : { backgroundColor: theme.colors.background },
-          headerRight: () => (
-            <HeaderActionMenu
-              icon="ellipsis"
-              label={t("tripPlanner.tripActions")}
-              title={t("tripPlanner.tripActions")}
-              actions={[
-                {
-                  label: t("tripPlanner.delete"),
-                  destructive: true,
-                  onPress: onDelete,
-                },
-              ]}
-            />
-          ),
+          headerTransparent: overMap && !editing,
+          headerStyle:
+            overMap && !editing
+              ? undefined
+              : { backgroundColor: theme.colors.background },
+          headerRight: () =>
+            editing ? (
+              <HeaderIconButton
+                icon="checkmark"
+                label={t("common.done")}
+                onPress={onDone}
+              />
+            ) : (
+              <HeaderActionMenu
+                icon="ellipsis"
+                label={t("tripPlanner.tripActions")}
+                title={t("tripPlanner.tripActions")}
+                actions={actions}
+              />
+            ),
         }}
       />
     );
   }
+  // The edit list has no map under the header, so its rows would scroll under the buttons.
+  // Both states set it, since options a screen set stay after it unmounts.
+  const iosHeader = (
+    <Stack.Screen
+      options={{
+        headerTransparent: !editing,
+        headerStyle: editing
+          ? { backgroundColor: theme.colors.background }
+          : undefined,
+      }}
+    />
+  );
+  if (editing) {
+    return (
+      <>
+        {iosHeader}
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="checkmark"
+            tintColor={theme.colors.primary}
+            onPress={onDone}
+          >
+            {t("common.done")}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      </>
+    );
+  }
   return (
-    <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
-        <Stack.Toolbar.MenuAction icon="trash" destructive onPress={onDelete}>
-          {t("tripPlanner.delete")}
-        </Stack.Toolbar.MenuAction>
-      </Stack.Toolbar.Menu>
-    </Stack.Toolbar>
+    <>
+      {iosHeader}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
+          <Stack.Toolbar.MenuAction icon="pencil" onPress={onEdit}>
+            {t("tripPlanner.edit")}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction icon="plus" onPress={onAddPlace}>
+            {t("tripPlanner.addPlace")}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction icon="trash" destructive onPress={onDelete}>
+            {t("tripPlanner.delete")}
+          </Stack.Toolbar.MenuAction>
+        </Stack.Toolbar.Menu>
+      </Stack.Toolbar>
+    </>
   );
 }
 
@@ -73,6 +133,9 @@ export default function TripPlanScreen() {
     convexQuery(api.tripPlannerData.getTripPlan, { tripId }),
   );
   const deleteTrip = useDeleteTripPlan();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState<string | null>(null);
+  const rename = useRenameTrip(tripId, trip.data?.name);
 
   const data = trip.data;
   const opened = useRef(false);
@@ -122,14 +185,49 @@ export default function TripPlanScreen() {
     );
   }
 
+  const addPlace = (day: number) =>
+    router.push({
+      pathname: "/add-trip-stop",
+      params: { tripId: data._id, day: String(day) },
+    });
   return (
     <>
       {backTitle}
       <TripHeader
         overMap={hasMapPoints(data)}
+        editing={editing}
+        onEdit={() => {
+          analytics.capture("trip_plan_edit_started", {
+            stops: data.days.flat().length,
+          });
+          setName(data.name ?? "");
+          setEditing(true);
+        }}
+        onDone={() => {
+          if (name !== null) void rename(name);
+          setEditing(false);
+        }}
+        onAddPlace={() => addPlace(1)}
         onDelete={() => deleteTrip(data._id, () => backOrHome(router))}
       />
-      <TripPlanBody trip={data} />
+      {editing ? (
+        <TripEditList
+          trip={data}
+          onAddPlace={addPlace}
+          header={
+            <TripEditHeader
+              city={data.city}
+              name={name ?? ""}
+              onChangeName={setName}
+              onSubmitName={() => {
+                if (name !== null) void rename(name);
+              }}
+            />
+          }
+        />
+      ) : (
+        <TripPlanBody trip={data} />
+      )}
     </>
   );
 }
