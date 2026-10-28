@@ -12,7 +12,8 @@ import {
 import { placeKey } from "./plan";
 import { placeKinds } from "./placeKinds";
 import { distanceKm } from "./trip";
-import { isKnownChain, LODGING_CATEGORIES, samePlace } from "./tripSuggest";
+import { samePlace } from "./placeIdentity";
+import { isKnownChain, LODGING_CATEGORIES } from "./tripSuggest";
 
 // The date planner's pure rules: which places fit which stop of which kind of date, and how
 // evenings are ranked. Server only: the app reads the result through `./datePlan`.

@@ -1,6 +1,6 @@
 import { type Infer, v } from "convex/values";
 import { distanceKm } from "./trip";
-import { samePlace } from "./tripSuggest";
+import { samePlace } from "./placeIdentity";
 
 // "Plan a date": an evening of two stops near each other in one city. The app imports this
 // module for the result's types and the swap rule, so it stays free of server-only imports.
