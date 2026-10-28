@@ -243,6 +243,13 @@ describe("swapStop", () => {
     });
   });
 
+  it("pairs a café and the park named after it when Apple says they differ", () => {
+    const cafe = stop({ name: "Garden", slot: "first", appleId: "A" });
+    const park = stop({ name: "Garden Park", slot: "second", appleId: "B" });
+    expect(pairs(cafe, park)).toBe(true);
+    expect(pairs(cafe, { ...park, appleId: "A" })).toBe(false);
+  });
+
   it("never swaps in the same venue as the stop kept", () => {
     const sameVenue = { ...dinner, name: "Uchi", slot: "second" as const };
     expect(

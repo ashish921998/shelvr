@@ -70,13 +70,21 @@ export const datePlanResultValidator = v.object({
 });
 export type DatePlanResult = Infer<typeof datePlanResultValidator>;
 
+/** One venue for a date: Apple's ids decide when both stops have one, else `samePlace`. */
+function sameVenue(a: DateStop, b: DateStop): boolean {
+  if (a.appleId !== undefined && b.appleId !== undefined) {
+    return a.appleId === b.appleId;
+  }
+  return samePlace(a, b);
+}
+
 /** Whether two stops make an evening: two venues a walk apart, at least one the person's own. */
 export function pairs(a: DateStop, b: DateStop): boolean {
   return (
     a.slot !== b.slot &&
     (a.source === "save" || b.source === "save") &&
     distanceKm(a, b) <= MAX_WALK_KM &&
-    !samePlace(a, b)
+    !sameVenue(a, b)
   );
 }
 
