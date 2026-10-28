@@ -92,7 +92,7 @@ function TextButton({
   label,
   onPress,
 }: {
-  icon: "arrow.clockwise" | "square.and.arrow.up";
+  icon: "square.and.arrow.up";
   label: string;
   onPress: () => void;
 }) {
@@ -179,9 +179,33 @@ export function DateEvening({
       />
       <View style={styles.content}>
         <View style={styles.heading}>
-          <ThemedText variant="largeTitle" accessibilityRole="header">
-            {t("datePlan.eveningTitle", { city: result.city })}
-          </ThemedText>
+          <View style={styles.titleRow}>
+            <ThemedText
+              variant="largeTitle"
+              accessibilityRole="header"
+              style={styles.title}
+            >
+              {t("datePlan.eveningTitle", { city: result.city })}
+            </ThemedText>
+            {many ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("datePlan.another")}
+                onPress={onAnother}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.another,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <AppSymbolIcon
+                  name="arrow.clockwise"
+                  size={18}
+                  tintColor={theme.colors.primaryText}
+                />
+              </Pressable>
+            ) : null}
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("datePlan.changeKindFor", {
@@ -231,13 +255,6 @@ export function DateEvening({
 
         <View style={styles.buttons}>
           <Button title={t("datePlan.letsGo")} onPress={go} />
-          {many ? (
-            <TextButton
-              icon="arrow.clockwise"
-              label={t("datePlan.another")}
-              onPress={onAnother}
-            />
-          ) : null}
           <TextButton
             icon="square.and.arrow.up"
             label={t("datePlan.send")}
@@ -261,6 +278,16 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.gap(2),
   },
   heading: { gap: theme.gap(0.5), paddingBottom: theme.gap(1) },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: theme.gap(1) },
+  title: { flex: 1 },
+  another: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primarySoft,
+  },
   kind: {
     alignSelf: "flex-start",
     flexDirection: "row",
