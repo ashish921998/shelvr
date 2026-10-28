@@ -6,7 +6,7 @@ import {
   tripCardLine,
   tripInterestsLine,
   tripStopsLine,
-  tripTitle,
+  tripName,
 } from "@/lib/trip-planner";
 import type { TripPlanSummary } from "@convex/model/tripPlan";
 import { Pressable, View } from "react-native";
@@ -20,7 +20,7 @@ type Props = {
 
 export function TripCard({ trip, onOpen, onDelete }: Props) {
   const { theme } = useUnistyles();
-  const title = tripTitle(trip.city);
+  const title = tripName(trip);
   const length = tripCardLine(trip);
   const interests = tripInterestsLine(trip);
   const stops = tripStopsLine(trip);
