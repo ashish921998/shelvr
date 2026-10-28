@@ -466,7 +466,6 @@ async function recount(ctx: MutationCtx, plan: Doc<"tripPlans">) {
   await ctx.db.patch(plan._id, {
     stopCount: planned.length,
     savedCount: planned.filter((stop) => stop.source === "save").length,
-    updatedAt: Date.now(),
   });
 }
 
@@ -513,24 +512,6 @@ export const removeTripStop = authedMutation({
       await recount(ctx, plan);
     }
     return before;
-  },
-});
-
-/** Undo for a remove: puts the stop back where `removeTripStop` said it was. */
-export const restoreTripStop = authedMutation({
-  args: { stopId: v.id("tripStops"), day: v.number(), index: v.number() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const { plan, stop } = await ownedStop(ctx, args.stopId, ctx.userId);
-    await placeStop(
-      ctx,
-      plan,
-      stop._id,
-      checkedDay(plan, args.day),
-      args.index,
-    );
-    await recount(ctx, plan);
-    return null;
   },
 });
 
@@ -676,7 +657,6 @@ export const renameTripPlan = authedMutation({
     const plan = await editablePlan(ctx, args.tripId, ctx.userId);
     await ctx.db.patch(plan._id, {
       name: tidyText(args.name, MAX_TRIP_NAME_CHARS),
-      updatedAt: Date.now(),
     });
     return null;
   },

@@ -90,7 +90,6 @@ async function counts(base: TestBackend, tripId: Id<"tripPlans">) {
     return {
       stopCount: plan?.stopCount,
       savedCount: plan?.savedCount,
-      updated: plan?.updatedAt !== undefined,
     };
   });
 }
@@ -145,7 +144,6 @@ describe("moveTripStop", () => {
     expect(await counts(base, tripId)).toEqual({
       stopCount: 5,
       savedCount: 0,
-      updated: true,
     });
   });
 
@@ -200,7 +198,7 @@ describe("moveTripStop", () => {
   });
 });
 
-describe("removeTripStop and restoreTripStop", () => {
+describe("removeTripStop", () => {
   it("sends a stop to the top of Unplanned and puts it back on undo", async () => {
     const { base, t, tripId, ids } = await setup(TRIP);
     const was = await t.mutation(api.tripPlannerData.removeTripStop, {
@@ -212,7 +210,7 @@ describe("removeTripStop and restoreTripStop", () => {
       unplanned: ["B", "Extra"],
     });
     expect((await counts(base, tripId)).stopCount).toBe(3);
-    await t.mutation(api.tripPlannerData.restoreTripStop, {
+    await t.mutation(api.tripPlannerData.moveTripStop, {
       stopId: ids.B,
       ...was,
     });

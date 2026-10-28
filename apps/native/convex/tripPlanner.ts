@@ -407,15 +407,7 @@ export const searchTripPlaces = action({
     });
     const places = found
       .filter((place) => distanceKm(place, centre) <= SEARCH_RADIUS_KM)
-      .slice(0, MAX_SEARCH_RESULTS)
-      .map(({ name, lat, lng, appleId, category, area }) => ({
-        name,
-        lat,
-        lng,
-        ...(appleId !== undefined ? { appleId } : {}),
-        ...(category !== undefined ? { category } : {}),
-        ...(area !== undefined ? { area } : {}),
-      }));
+      .slice(0, MAX_SEARCH_RESULTS);
     logEvent("info", "trip_search_done", {
       found: found.length,
       kept: places.length,

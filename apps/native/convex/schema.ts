@@ -363,8 +363,6 @@ export default defineSchema({
     stay: v.optional(tripStayValidator),
     stopCount: v.number(),
     savedCount: v.number(),
-    /** The last edit's time; unset until the trip is first edited. */
-    updatedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
   tripStops: defineTable({

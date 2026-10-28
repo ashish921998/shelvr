@@ -6,7 +6,6 @@ import {
 import {
   TripEditHeader,
   TripEditList,
-  TripUndoBar,
 } from "@/components/trip-planner/trip-edit-list";
 import {
   HeaderActionMenu,
@@ -17,10 +16,9 @@ import { analytics } from "@/lib/analytics";
 import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
-import { useRenameTrip, useTripEditor } from "@/lib/trip-edit";
+import { useRenameTrip } from "@/lib/trip-edit";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import type { TripPlanDetail } from "@convex/model/tripPlan";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -126,41 +124,6 @@ function TripHeader({
   );
 }
 
-/** Edit mode: the trip's name, its days as draggable rows, and Undo for the last change. */
-function TripEditor({
-  trip,
-  onAddPlace,
-  name,
-  onChangeName,
-  onSubmitName,
-}: {
-  trip: TripPlanDetail;
-  onAddPlace: (day: number) => void;
-  name: string;
-  onChangeName: (name: string) => void;
-  onSubmitName: () => void;
-}) {
-  const editor = useTripEditor(trip);
-  return (
-    <TripEditList
-      trip={trip}
-      editor={editor}
-      onAddPlace={onAddPlace}
-      header={
-        <TripEditHeader
-          city={trip.city}
-          name={name}
-          onChangeName={onChangeName}
-          onSubmitName={onSubmitName}
-        />
-      }
-      footer={
-        <TripUndoBar undo={editor.undo} onUndo={() => void editor.undoLast()} />
-      }
-    />
-  );
-}
-
 export default function TripPlanScreen() {
   useAppLocale();
   const router = useRouter();
@@ -248,14 +211,19 @@ export default function TripPlanScreen() {
         onDelete={() => deleteTrip(data._id, () => backOrHome(router))}
       />
       {editing ? (
-        <TripEditor
+        <TripEditList
           trip={data}
           onAddPlace={addPlace}
-          name={name ?? ""}
-          onChangeName={setName}
-          onSubmitName={() => {
-            if (name !== null) void rename(name);
-          }}
+          header={
+            <TripEditHeader
+              city={data.city}
+              name={name ?? ""}
+              onChangeName={setName}
+              onSubmitName={() => {
+                if (name !== null) void rename(name);
+              }}
+            />
+          }
         />
       ) : (
         <TripPlanBody trip={data} />

@@ -357,10 +357,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
   Editing (Pro, `tripEdit` rate limit) is single-row writes in `tripPlannerData.ts`:
   `moveTripStop` (a day and position, day 0 is Unplanned), `removeTripStop` (to the top of
-  Unplanned, never a delete) and `restoreTripStop`, `addTripStop` (a search result as an
+  Unplanned, never a delete), `addTripStop` (a search result as an
   `added` stop, or a pin the city's save already has), `renameTripPlan`, and
   `tripSavePlaces` for Add a place. Moves and removes return where the stop was, which
-  the app's Undo sends back. Stop ids survive every edit; only `deleteTripPlan` deletes
+  the app's Undo sends back to `moveTripStop`. Stop ids survive every edit; only `deleteTripPlan` deletes
   stops. `tripPlanner.ts` `searchTripPlaces` (`tripPlaceSearch` rate limit) is Add a
   place's Apple search near the trip, refused like `createTripPlan` when AI is declined.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the

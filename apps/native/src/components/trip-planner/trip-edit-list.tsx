@@ -14,8 +14,8 @@ import {
   moveTargets,
   placeOf,
   type StopPlace,
-  type TripEditor,
   type TripUndo,
+  useTripEditor,
 } from "@/lib/trip-edit";
 import { stopBadge, tripTitle } from "@/lib/trip-planner";
 import type { Id } from "@convex/_generated/dataModel";
@@ -378,19 +378,15 @@ function useEdgeScroll(
  */
 export function TripEditList({
   trip,
-  editor,
   header,
-  footer,
   onAddPlace,
 }: {
   trip: TripPlanDetail;
-  editor: TripEditor;
   /** The name field and hint, above the days. */
   header: ReactNode;
-  /** The Undo bar, pinned over the list. */
-  footer: ReactNode;
   onAddPlace: (day: number) => void;
 }) {
+  const editor = useTripEditor(trip);
   const ref = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useScrollViewOffset(ref);
   const listTop = useSharedValue(0);
@@ -413,27 +409,18 @@ export function TripEditList({
   const [drag, setDragState] = useState<Drag | null>(null);
   // Mirrored for the drop, which must read the last target without a state updater's side effect.
   const dragRef = useRef<Drag | null>(null);
-  const setDrag = useCallback(
-    (next: Drag | null | ((current: Drag | null) => Drag | null)) => {
-      dragRef.current =
-        typeof next === "function" ? next(dragRef.current) : next;
-      setDragState(dragRef.current);
-    },
-    [],
-  );
+  const setDrag = useCallback((next: Drag | null) => {
+    dragRef.current = next;
+    setDragState(next);
+  }, []);
   // The other entries while a stop is held, for the UI thread to work out where it would land.
   const others = useSharedValue<{ isStop: boolean[]; days: number[] }>({
     isStop: [],
     days: [],
   });
 
-  // A removed stop leaves its row at once, before the server answers.
-  const [removing, setRemoving] = useState<Id<"tripStops"> | null>(null);
   const removedAt = useRef(0);
-  const settled = removing
-    ? moveInLayout(trip, removing, { day: UNPLANNED_DAY, index: 0 })
-    : trip;
-  const shown = drag ? moveInLayout(settled, drag.stopId, drag.to) : settled;
+  const shown = drag ? moveInLayout(trip, drag.stopId, drag.to) : trip;
   const entries = editEntries(shown);
   const { tops, height } = entryTops(entries);
 
@@ -457,9 +444,7 @@ export function TripEditList({
   const setTarget = useCallback(
     (day: number, index: number) => {
       tick();
-      setDrag((current) =>
-        current === null ? null : { ...current, to: { day, index } },
-      );
+      setDrag(dragRef.current && { ...dragRef.current, to: { day, index } });
     },
     [setDrag],
   );
@@ -498,8 +483,7 @@ export function TripEditList({
       if (Date.now() - removedAt.current < REMOVE_SETTLE_MS) return;
       removedAt.current = Date.now();
       tick();
-      setRemoving(stop._id);
-      void editor.removeStop(stop).finally(() => setRemoving(null));
+      void editor.removeStop(stop);
     },
     [editor],
   );
@@ -560,7 +544,7 @@ export function TripEditList({
           })}
         </View>
       </Animated.ScrollView>
-      {footer}
+      <TripUndoBar undo={editor.undo} onUndo={() => void editor.undoLast()} />
     </View>
   );
 }
@@ -651,7 +635,7 @@ export function TripEditHeader({
 }
 
 /** "Removed Kafeine · Undo", pinned at the bottom for a few seconds after an edit. */
-export function TripUndoBar({
+function TripUndoBar({
   undo,
   onUndo,
 }: {

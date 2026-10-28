@@ -11,6 +11,7 @@ import {
   UNPLANNED_DAY,
 } from "@convex/model/tripPlan";
 import type { OptimisticLocalStore } from "convex/browser";
+import type { FunctionArgs } from "convex/server";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -37,10 +38,6 @@ export function editEntries(trip: TripLayout): EditEntry[] {
   ]);
 }
 
-function entryHeight(entry: { kind: EditEntry["kind"] }): number {
-  return entry.kind === "header" ? EDIT_HEADER_HEIGHT : EDIT_ROW_HEIGHT;
-}
-
 /** Each entry's top, from the first header at 0, and the height of them all. */
 export function entryTops(entries: { kind: EditEntry["kind"] }[]): {
   tops: number[];
@@ -50,7 +47,7 @@ export function entryTops(entries: { kind: EditEntry["kind"] }[]): {
   let y = 0;
   for (const entry of entries) {
     tops.push(y);
-    y += entryHeight(entry);
+    y += entry.kind === "header" ? EDIT_HEADER_HEIGHT : EDIT_ROW_HEIGHT;
   }
   return { tops, height: y };
 }
@@ -66,7 +63,7 @@ export function dropPlace(
   isStop: readonly boolean[],
   days: readonly number[],
   centreY: number,
-): StopPlace & { slot: number } {
+): StopPlace {
   "worklet";
   let best = 1;
   let bestGap = Number.POSITIVE_INFINITY;
@@ -81,7 +78,7 @@ export function dropPlace(
   }
   let index = 0;
   for (let i = best - 1; i >= 0 && isStop[i]; i--) index++;
-  return { slot: best, day: days[best - 1] ?? 1, index };
+  return { day: days[best - 1] ?? 1, index };
 }
 
 /** The trip with `stopId` moved to `index` of `day`; the trip as it was when the stop is not on it. */
@@ -174,7 +171,6 @@ export function useTripEditor(trip: TripPlanDetail) {
   const tripId = trip._id;
   const move = useMutation(api.tripPlannerData.moveTripStop);
   const remove = useMutation(api.tripPlannerData.removeTripStop);
-  const restore = useMutation(api.tripPlannerData.restoreTripStop);
   const optimistic = useMemo(() => {
     // Every edit here is a stop landing somewhere; the optimistic trip is the move made locally.
     const land =
@@ -198,12 +194,11 @@ export function useTripEditor(trip: TripPlanDetail) {
     });
     return {
       move: move.withOptimisticUpdate(land(asked)),
-      restore: restore.withOptimisticUpdate(land(asked)),
       remove: remove.withOptimisticUpdate(
         land(() => ({ day: UNPLANNED_DAY, index: 0 })),
       ),
     };
-  }, [move, remove, restore, tripId]);
+  }, [move, remove, tripId]);
 
   const [undo, setUndo] = useState<TripUndo | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -281,9 +276,7 @@ export function useTripEditor(trip: TripPlanDetail) {
     if (undo === null) return;
     offerUndo(null);
     try {
-      const args = { stopId: undo.stopId, ...undo.before };
-      if (undo.kind === "remove") await optimistic.restore(args);
-      else await optimistic.move(args);
+      await optimistic.move({ stopId: undo.stopId, ...undo.before });
       analytics.capture("trip_plan_edit_undone", { action: undo.kind });
     } catch (error) {
       showEditFailed(error);
@@ -298,8 +291,6 @@ export function useTripEditor(trip: TripPlanDetail) {
     dismissUndo: () => offerUndo(null),
   };
 }
-
-export type TripEditor = ReturnType<typeof useTripEditor>;
 
 /** Renames the trip; an unchanged name sends nothing, and an empty one goes back to "<city> trip". */
 export function useRenameTrip(
@@ -404,9 +395,9 @@ export function onTrip(
   );
 }
 
-export type NewTripStop =
-  | { kind: "search"; place: TripPlace }
-  | { kind: "save"; itemId: Id<"items">; name: string };
+export type NewTripStop = FunctionArgs<
+  typeof api.tripPlannerData.addTripStop
+>["place"];
 
 /** Adds a place to a day of the trip; resolves true once it is on. */
 export function useAddTripStop(tripId: Id<"tripPlans">) {
