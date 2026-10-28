@@ -93,16 +93,13 @@ export default function PlanSketchbook({
               }}
               tabIndex={-1}
               aria-label={`${index + 1} of ${places.length}: ${place.name}`}
-              className="w-full flex-none snap-center rounded-[18px] px-2 pt-1 pb-2 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
+              className={SPREAD}
             >
               <Spread place={place} />
-              <Captions
-                left={place.area}
-                right={`${index + 1} / ${places.length}`}
-              />
-              <div className="mt-4 flex justify-center gap-6">
+              <div className="mt-6 flex justify-center gap-10">
                 <VoteButton
                   label={`Not ${place.name}`}
+                  caption="Skip"
                   active={choices[place.key] === "pass"}
                   onClick={() => choose(index, place.key, "pass")}
                 >
@@ -110,6 +107,7 @@ export default function PlanSketchbook({
                 </VoteButton>
                 <VoteButton
                   label={`Yes to ${place.name}`}
+                  caption="I'd go"
                   active={choices[place.key] === "pick"}
                   tone="yes"
                   onClick={() => choose(index, place.key, "pick")}
@@ -125,11 +123,10 @@ export default function PlanSketchbook({
             }}
             tabIndex={-1}
             aria-label="End of the shortlist"
-            className="w-full flex-none snap-center rounded-[18px] px-2 pt-1 pb-2 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
+            className={SPREAD}
           >
             <EndSpread picks={picks} total={places.length} />
-            <Captions note="That's the lot" right={`${pages - 1} places`} />
-            <div className="mt-4 flex justify-center">
+            <div className="mt-6 flex justify-center">
               <button
                 type="button"
                 onClick={() => flipTo(0)}
@@ -152,28 +149,67 @@ export default function PlanSketchbook({
           onClick={() => flipTo(page + 1)}
         />
       </div>
+      <PageDots places={places} choices={choices} page={page} />
     </div>
   );
 }
 
+const SPREAD =
+  "w-full flex-none snap-center rounded-[18px] px-2 pt-1 pb-2 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink";
+
+// The dot grid printed on a sketchbook page.
+const DOT_GRID = {
+  backgroundImage:
+    "radial-gradient(circle, var(--color-line-strong) 0.9px, transparent 1.2px)",
+  backgroundSize: "14px 14px",
+  backgroundPosition: "7px 7px",
+};
+
+/**
+ * An open hardback sketchbook: cream pages on a deep ember cover, a shadowed
+ * spine, and a ribbon bookmark hanging out of the bottom.
+ */
 function Notebook({ left, right }: { left: ReactNode; right: ReactNode }) {
   return (
-    <div className="mx-auto grid aspect-[3/2] w-full max-w-[460px] grid-cols-2 rounded-[14px] bg-ember shadow-[0_10px_20px_-12px_rgba(43,36,24,0.45)]">
-      <div className="relative flex items-center justify-center p-[7%]">
-        {left}
+    <div className="relative mx-auto w-full max-w-[460px] pb-4">
+      <div className="relative grid aspect-[3/2] grid-cols-2 rounded-[16px] bg-ember-deep p-[5px] pb-[11px] shadow-[0_14px_24px_-14px_rgba(43,36,24,0.55)]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-black/15 to-transparent"
+          className="pointer-events-none absolute inset-x-[7px] bottom-[5px] h-[8px] rounded-b-[10px] bg-[repeating-linear-gradient(to_bottom,var(--color-cream)_0_1px,var(--color-line-strong)_1px_2px)]"
         />
-      </div>
-      <div className="relative flex flex-col justify-center gap-2 p-[8%] text-ink">
+        <div className="relative flex items-center justify-center rounded-l-[11px] bg-cream p-[8%]">
+          {left}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-ink/15 to-transparent"
+          />
+        </div>
         <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/10 to-transparent"
-        />
-        {right}
+          className="relative flex flex-col justify-center gap-2 rounded-r-[11px] bg-cream p-[9%] text-ink"
+          style={DOT_GRID}
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-ink/10 to-transparent"
+          />
+          {right}
+        </div>
+        <Ribbon />
       </div>
     </div>
+  );
+}
+
+function Ribbon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 10 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute top-0 left-[calc(50%-18px)] h-[calc(100%+14px)] w-2.5"
+    >
+      <path d="M0 0h10v100l-5-6-5 6z" className="fill-terracotta" />
+    </svg>
   );
 }
 
@@ -182,18 +218,19 @@ function Spread({ place }: { place: PlanSharePlace }) {
     <Notebook
       left={
         place.imageUrl ? (
-          <div className="w-[82%] -rotate-3 bg-cream p-1.5 pb-4 shadow-card">
+          <div className="relative w-[84%] -rotate-3 bg-white p-1.5 pb-5 shadow-card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={place.imageUrl}
               alt=""
               className="aspect-square w-full object-cover"
             />
+            <Tape />
           </div>
         ) : (
           <span
             aria-hidden="true"
-            className="font-display text-[clamp(64px,22vw,120px)] leading-none text-ink"
+            className="font-display text-[clamp(64px,22vw,120px)] leading-none text-ember-deep"
           >
             {place.name.slice(0, 1)}
           </span>
@@ -201,15 +238,31 @@ function Spread({ place }: { place: PlanSharePlace }) {
       }
       right={
         <>
-          <h2 className="font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
+          <h2 className="font-display text-[clamp(21px,5.8vw,30px)] leading-[1.02] break-words">
             {place.name}
           </h2>
           <InkUnderline />
-          <p className="text-[clamp(12px,3.4vw,14px)] leading-snug">
+          <p className="text-[clamp(12px,3.4vw,14px)] leading-snug text-ink-soft">
             {place.why}
           </p>
+          {place.area ? (
+            <p className="mt-1 flex items-center gap-1 text-[clamp(11px,3vw,13px)] text-muted">
+              <Pin />
+              <span className="truncate">{place.area}</span>
+            </p>
+          ) : null}
         </>
       }
+    />
+  );
+}
+
+/** A strip of washi tape holding the photo to the page. */
+function Tape() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -top-2.5 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[4deg] bg-ember-light/70"
     />
   );
 }
@@ -224,27 +277,29 @@ function EndSpread({
   return (
     <Notebook
       left={
-        <span
-          aria-hidden="true"
-          className="font-display text-[clamp(56px,18vw,96px)] leading-none text-ink"
-        >
-          {picks.length}/{total}
+        <span className="flex flex-col items-center text-ink">
+          <span className="font-display text-[clamp(56px,18vw,96px)] leading-none">
+            {picks.length}
+          </span>
+          <span className="mt-1 text-[clamp(11px,3vw,13px)] text-muted">
+            of {total} {total === 1 ? "place" : "places"}
+          </span>
         </span>
       }
       right={
         <>
-          <h2 className="font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
+          <h2 className="font-display text-[clamp(21px,5.8vw,30px)] leading-[1.02] break-words">
             {picks.length === 0 ? "No yeses yet" : "Your yeses"}
           </h2>
           <InkUnderline />
           {picks.length === 0 ? (
-            <p className="text-[clamp(12px,3.4vw,14px)] leading-snug">
+            <p className="text-[clamp(12px,3.4vw,14px)] leading-snug text-ink-soft">
               Flip back and tap ✓ on the places you&apos;d go to.
             </p>
           ) : (
-            <ul className="space-y-0.5 text-[clamp(12px,3.4vw,14px)] leading-snug">
+            <ul className="space-y-0.5 text-[clamp(12px,3.4vw,14px)] leading-snug text-ink-soft">
               {picks.slice(0, 5).map((place) => (
-                <li key={place.key} className="truncate">
+                <li key={place.key} className="break-words">
                   ✓ {place.name}
                 </li>
               ))}
@@ -256,28 +311,37 @@ function EndSpread({
   );
 }
 
-function Captions({
-  left,
-  note,
-  right,
+/**
+ * One dot per page: the open page is a bar, and answered places take the
+ * colour of their answer, so the voter sees what's left at a glance.
+ */
+function PageDots({
+  places,
+  choices,
+  page,
 }: {
-  left?: string;
-  note?: string;
-  right: string;
+  places: PlanSharePlace[];
+  choices: Record<string, Choice>;
+  page: number;
 }) {
+  const tone = (index: number) => {
+    if (index === page) return "w-5 bg-ink";
+    const choice = places[index] ? choices[places[index].key] : undefined;
+    if (choice === "pick") return "w-2 bg-ember";
+    if (choice === "pass") return "w-2 bg-muted-soft";
+    return "w-2 bg-line-strong";
+  };
   return (
-    <div className="mx-auto mt-3 flex w-full max-w-[460px] items-center justify-between gap-3 px-1 text-[13px]">
-      <span className="flex min-w-0 items-center gap-1.5 text-muted">
-        {left ? (
-          <>
-            <Globe />
-            <span className="truncate">{left}</span>
-          </>
-        ) : (
-          note
-        )}
-      </span>
-      <span className="flex-none font-semibold text-ink">{right}</span>
+    <div
+      aria-hidden="true"
+      className="mt-4 flex items-center justify-center gap-1.5"
+    >
+      {Array.from({ length: places.length + 1 }, (_, index) => (
+        <span
+          key={index}
+          className={`h-2 rounded-full transition-all motion-reduce:transition-none ${tone(index)}`}
+        />
+      ))}
     </div>
   );
 }
@@ -297,8 +361,8 @@ function FlipButton({
       aria-label={side === "left" ? "Previous page" : "Next page"}
       disabled={disabled}
       onClick={onClick}
-      className={`absolute top-[32%] hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-2xl text-ink-soft transition-opacity hover:text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-0 sm:flex ${
-        side === "left" ? "-left-12" : "-right-12"
+      className={`absolute top-[30%] hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-line-strong bg-cream text-xl text-ink-soft transition-opacity hover:text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-0 sm:flex ${
+        side === "left" ? "-left-14" : "-right-14"
       }`}
     >
       {side === "left" ? "‹" : "›"}
@@ -308,32 +372,48 @@ function FlipButton({
 
 function VoteButton({
   label,
+  caption,
   active,
   tone = "no",
   onClick,
   children,
 }: {
   label: string;
+  caption: string;
   active: boolean;
   tone?: "yes" | "no";
   onClick: () => void;
   children: string;
 }) {
+  const idle =
+    tone === "yes"
+      ? "border-ember-deep/40 bg-cream text-ember-deep hover:border-ember-deep"
+      : "border-line-strong bg-cream text-muted hover:text-ink";
+  const on =
+    tone === "yes"
+      ? "border-transparent bg-ember text-ink"
+      : "border-transparent bg-ink-soft text-cream";
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={`relative flex h-14 w-14 items-center justify-center rounded-full border text-2xl font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink ${
-        active
-          ? `border-transparent text-ink ${tone === "yes" ? "bg-ember-soft" : "bg-paper-deep"}`
-          : "border-line-strong bg-cream text-muted hover:text-ink"
-      }`}
-    >
-      {children}
-      {active ? <InkOval /> : null}
-    </button>
+    <div className="flex flex-col items-center gap-2">
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        onClick={onClick}
+        className={`relative flex h-16 w-16 items-center justify-center rounded-full border-[1.5px] text-2xl font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink ${
+          active ? on : idle
+        }`}
+      >
+        {children}
+        {active ? <InkOval /> : null}
+      </button>
+      <span
+        aria-hidden="true"
+        className={`text-[13px] font-semibold ${active ? "text-ink" : "text-muted"}`}
+      >
+        {caption}
+      </span>
+    </div>
   );
 }
 
@@ -363,7 +443,7 @@ function InkUnderline() {
     <svg
       aria-hidden="true"
       viewBox="0 0 120 8"
-      className="h-2 w-16 text-ink"
+      className="h-2 w-16 text-ember-deep"
       preserveAspectRatio="none"
     >
       <path
@@ -377,7 +457,7 @@ function InkUnderline() {
   );
 }
 
-function Globe() {
+function Pin() {
   return (
     <svg
       aria-hidden="true"
@@ -385,10 +465,10 @@ function Globe() {
       className="h-3.5 w-3.5 flex-none"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.3"
+      strokeWidth="1.4"
     >
-      <circle cx="8" cy="8" r="6.3" />
-      <path d="M1.8 8h12.4M8 1.7c2 2 2 10.6 0 12.6M8 1.7c-2 2-2 10.6 0 12.6" />
+      <path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z" />
+      <circle cx="8" cy="6.6" r="1.6" />
     </svg>
   );
 }

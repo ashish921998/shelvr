@@ -45,11 +45,11 @@ function button(label: string) {
 }
 
 describe("PlanSketchbook", () => {
-  it("gives every place its own spread, caption and buttons", () => {
+  it("gives every place its own spread, area and labelled buttons", () => {
     render({});
     expect(container.querySelectorAll("section")).toHaveLength(3);
     expect(container.textContent).toContain("Soho");
-    expect(container.textContent).toContain("1 / 2");
+    expect(container.textContent).toContain("I'd go");
     expect(button("Yes to Masque")).not.toBeNull();
     expect(button("Not Bastian")).not.toBeNull();
   });
@@ -125,7 +125,7 @@ describe("PlanSketchbook", () => {
     expect(button("Yes to Bastian").querySelector("svg")).not.toBeNull();
     expect(button("Yes to Masque").querySelector("svg")).toBeNull();
     const end = container.querySelector('[aria-label="End of the shortlist"]')!;
-    expect(end.textContent).toContain("1/2");
+    expect(end.textContent).toContain("1of 2 places");
     expect(end.textContent).toContain("✓ Bastian");
     expect(end.textContent).not.toContain("Masque");
   });

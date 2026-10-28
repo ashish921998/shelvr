@@ -225,10 +225,10 @@ export default function PlanVote({
       <PlanSketchbook places={places} choices={choices} onChoose={choose} />
       <p
         role="status"
-        className={`mt-5 rounded-2xl px-4 py-3 text-sm ${
+        className={`mt-5 text-center text-sm ${
           status === "error"
-            ? "bg-terracotta/10 text-terracotta"
-            : "bg-paper-deep text-ink-soft"
+            ? "rounded-2xl bg-terracotta/10 px-4 py-3 text-terracotta"
+            : "text-muted"
         }`}
       >
         {note}
