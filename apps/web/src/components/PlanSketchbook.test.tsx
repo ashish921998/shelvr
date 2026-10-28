@@ -99,6 +99,9 @@ describe("PlanSketchbook", () => {
       });
 
     act(() => button("Next page").click());
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(
+      "2 of 2: Masque",
+    );
     scrollAt(100);
     act(() => button("Next page").click());
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 600 });

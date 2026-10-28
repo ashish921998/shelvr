@@ -32,6 +32,9 @@ export default function PlanSketchbook({
     const element = track.current;
     const target = Math.max(0, Math.min(pages - 1, next));
     setPage(target);
+    // Keep keyboard focus with the page on screen, so Tab reaches its buttons
+    // instead of walking into a spread that is off screen.
+    spreads.current[target]?.focus({ preventScroll: true });
     if (!element?.scrollTo) return;
     flipping.current = target;
     element.scrollTo({ left: target * element.clientWidth });
@@ -50,11 +53,7 @@ export default function PlanSketchbook({
   const choose = (index: number, key: string, choice: Choice) => {
     const turningOn = choices[key] !== choice;
     onChoose(key, choice);
-    if (!turningOn) return;
-    flipTo(index + 1);
-    // Keep keyboard focus with the page on screen, so Tab doesn't walk back
-    // into the spread just answered.
-    spreads.current[index + 1]?.focus({ preventScroll: true });
+    if (turningOn) flipTo(index + 1);
   };
 
   const picks = places.filter((place) => choices[place.key] === "pick");
@@ -94,7 +93,7 @@ export default function PlanSketchbook({
               }}
               tabIndex={-1}
               aria-label={`${index + 1} of ${places.length}: ${place.name}`}
-              className="w-full flex-none snap-center px-2 pt-1 pb-2 outline-none"
+              className="w-full flex-none snap-center rounded-[18px] px-2 pt-1 pb-2 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
             >
               <Spread place={place} />
               <Captions
@@ -126,7 +125,7 @@ export default function PlanSketchbook({
             }}
             tabIndex={-1}
             aria-label="End of the shortlist"
-            className="w-full flex-none snap-center px-2 pt-1 pb-2 outline-none"
+            className="w-full flex-none snap-center rounded-[18px] px-2 pt-1 pb-2 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
           >
             <EndSpread picks={picks} total={places.length} />
             <Captions note="That's the lot" right={`${pages - 1} places`} />
