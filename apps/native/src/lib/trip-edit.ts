@@ -298,15 +298,20 @@ export function useRenameTrip(
   current: string | undefined,
 ) {
   const rename = useMutation(api.tripPlannerData.renameTripPlan);
+  // Ending the edit and submitting both send the name; one mutation per name in flight.
+  const sending = useRef(new Set<string>());
   return useCallback(
     async (text: string) => {
       const name = text.replace(/\s+/g, " ").trim();
-      if (name === (current ?? "")) return;
+      if (name === (current ?? "") || sending.current.has(name)) return;
+      sending.current.add(name);
       try {
         await rename({ tripId, name });
         analytics.capture("trip_plan_renamed", { cleared: name === "" });
       } catch (error) {
         showEditFailed(error);
+      } finally {
+        sending.current.delete(name);
       }
     },
     [current, rename, tripId],

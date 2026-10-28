@@ -35,6 +35,7 @@ import {
   useState,
 } from "react";
 import {
+  AccessibilityInfo,
   type AccessibilityActionEvent,
   Pressable,
   TextInput,
@@ -642,6 +643,11 @@ function TripUndoBar({
   undo: TripUndo | null;
   onUndo: () => void;
 }) {
+  // The live region below speaks only on Android; VoiceOver needs telling.
+  const message = undo?.message;
+  useEffect(() => {
+    if (message) AccessibilityInfo.announceForAccessibility(message);
+  }, [message]);
   if (undo === null) return null;
   return (
     <Animated.View

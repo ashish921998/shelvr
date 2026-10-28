@@ -104,7 +104,7 @@ function SearchNote({ search }: { search: PlaceSearch }) {
     case "failed":
       return (
         <ThemedText variant="footnote" style={[styles.note, styles.muted]}>
-          {t("tripPlanner.addFailed")}
+          {t("tripPlanner.searchUnavailable")}
         </ThemedText>
       );
     case "done":
