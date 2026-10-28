@@ -24,6 +24,7 @@ import {
   topSearchResults,
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
+import { placeSymbol } from "@/lib/map-pin-symbol";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
@@ -82,7 +83,12 @@ export default function MapScreen() {
     [searching, shown, searchText],
   );
   const pins: MapPin[] = useMemo(
-    () => matches.map((place) => ({ ...place, id: placeId(place) })),
+    () =>
+      matches.map((place) => ({
+        ...place,
+        id: placeId(place),
+        symbol: placeSymbol(place),
+      })),
     [matches],
   );
   const framed = useMemo(

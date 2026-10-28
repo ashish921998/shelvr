@@ -73,6 +73,7 @@ describe("listMapPlaces", () => {
         name: "Le Bar",
         lat: 48.86,
         lng: 2.35,
+        category: "Nightlife",
         kinds: ["drinks"],
       },
       {
@@ -82,6 +83,7 @@ describe("listMapPlaces", () => {
         lng: -97.74,
         city: "Austin",
         appleId: "I1",
+        category: "Bakery",
         kinds: ["dessert", "dateNight"],
       },
       {
@@ -89,6 +91,7 @@ describe("listMapPlaces", () => {
         name: "Zilker Park",
         lat: 30.27,
         lng: -97.77,
+        category: "Park",
         kinds: ["dateNight", "activities"],
       },
     ]);
@@ -101,6 +104,16 @@ describe("listMapPlaces", () => {
     const newer = await save(userId, [pin], { tags: ["dessert"] });
     expect(await t.query(api.mapPlaces.listMapPlaces, {})).toEqual([
       { ...pin, itemId: newer, kinds: ["coffee", "dessert"] },
+    ]);
+  });
+
+  it("keeps a category an older save found when the newest one has none", async () => {
+    const { t, save, userId } = await setup();
+    const pin = { name: "Le Bar", lat: 48.86, lng: 2.35 };
+    await save(userId, [{ ...pin, category: "Nightlife" }]);
+    const newer = await save(userId, [pin]);
+    expect(await t.query(api.mapPlaces.listMapPlaces, {})).toEqual([
+      { ...pin, itemId: newer, category: "Nightlife", kinds: ["drinks"] },
     ]);
   });
 

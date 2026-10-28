@@ -330,7 +330,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   AI is declined or the Maps key is unset). Nothing is stored; the app shows the best evening and changes a
   stop on the phone.
 - **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
-  (newest first, one entry per spot) for the Map tab, each with its filter kinds from
+  (newest first, one entry per spot) for the Map tab, each with Apple's category (which picks
+  the pin's icon) and its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
   the save's tags; "date night" always comes from the tags.
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
