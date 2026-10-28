@@ -2,7 +2,6 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { DATE_OPTIONS, type DateOption } from "@/lib/date-plan";
 import { t } from "@/lib/i18n";
-import type { DateAsk } from "@convex/model/datePlan";
 import * as Haptics from "expo-haptics";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -11,8 +10,6 @@ const ICONS: Record<DateOption["ask"], AppSymbolName> = {
   classic: "fork.knife",
   lowkey: "cup.and.saucer.fill",
   surprise: "sparkles",
-  new: "paintpalette.fill",
-  big: "star.fill",
 };
 
 function OptionRow({
@@ -25,32 +22,21 @@ function OptionRow({
   const { theme } = useUnistyles();
   const label = t(option.label);
   const hint = t(option.hint);
-  const soon = option.soon === true;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={
-        soon
-          ? `${label}, ${hint}, ${t("datePlan.comingSoon")}`
-          : `${label}, ${hint}`
-      }
-      accessibilityState={{ disabled: soon }}
-      disabled={soon}
+      accessibilityLabel={`${label}, ${hint}`}
       onPress={() => {
         if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
         onPress();
       }}
-      style={({ pressed }) => [
-        styles.row,
-        soon && styles.soon,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={[styles.icon, soon && styles.iconSoon]}>
+      <View style={styles.icon}>
         <AppSymbolIcon
           name={ICONS[option.ask]}
           size={18}
-          tintColor={soon ? theme.colors.muted : theme.colors.primaryText}
+          tintColor={theme.colors.primaryText}
         />
       </View>
       <View style={styles.text}>
@@ -59,24 +45,16 @@ function OptionRow({
           {hint}
         </ThemedText>
       </View>
-      {soon ? (
-        <View style={styles.badge}>
-          <ThemedText variant="captionStrong" style={styles.muted}>
-            {t("datePlan.comingSoon")}
-          </ThemedText>
-        </View>
-      ) : (
-        <AppSymbolIcon
-          name="chevron.right"
-          size={14}
-          tintColor={theme.colors.muted}
-        />
-      )}
+      <AppSymbolIcon
+        name="chevron.right"
+        size={14}
+        tintColor={theme.colors.muted}
+      />
     </Pressable>
   );
 }
 
-/** "What kind of date?": the kinds the planner makes, then the ones on the way. */
+/** "What kind of date?": the kinds the planner makes. */
 export function DateKindPicker({
   city,
   problem,
@@ -84,7 +62,7 @@ export function DateKindPicker({
 }: {
   city: string;
   problem: string | null;
-  onPick: (ask: DateAsk) => void;
+  onPick: (ask: DateOption["ask"]) => void;
 }) {
   return (
     <View style={styles.container}>
@@ -110,10 +88,7 @@ export function DateKindPicker({
           <OptionRow
             key={option.ask}
             option={option}
-            onPress={() => {
-              if (option.ask !== "new" && option.ask !== "big")
-                onPick(option.ask);
-            }}
+            onPress={() => onPick(option.ask)}
           />
         ))}
       </View>
@@ -140,7 +115,6 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
   },
-  soon: { backgroundColor: theme.colors.background },
   pressed: { opacity: theme.opacity.pressed },
   icon: {
     width: 36,
@@ -150,13 +124,5 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.primarySoft,
   },
-  iconSoon: { backgroundColor: theme.colors.surfaceMuted },
   text: { flex: 1, gap: theme.gap(0.25) },
-  badge: {
-    paddingHorizontal: theme.gap(1),
-    paddingVertical: theme.gap(0.25),
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
 }));

@@ -492,7 +492,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `date-plan`, `new-trip`,
   `trip-plan/[id]`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
-  date?" (Classic, Low-key, Surprise me; Something new and Big night show as coming soon),
+  date?" (Classic, Low-key, Surprise me),
   then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info
   and Change (only when another nearby stop fits), the approximate walk between, Send to your
   date (plain share text with Maps links) and Directions to stop 1 (Maps directions)

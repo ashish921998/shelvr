@@ -845,11 +845,6 @@ export type MessageParams = {
   "datePlan.lowkeyHint": undefined;
   "datePlan.surprise": undefined;
   "datePlan.surpriseHint": undefined;
-  "datePlan.somethingNew": undefined;
-  "datePlan.somethingNewHint": undefined;
-  "datePlan.bigNight": undefined;
-  "datePlan.bigNightHint": undefined;
-  "datePlan.comingSoon": undefined;
   "datePlan.planning": undefined;
   "datePlan.eveningTitle": { city: string };
   "datePlan.changeKindFor": { kind: string };

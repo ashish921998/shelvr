@@ -29,11 +29,9 @@ const STREET_FACTOR = 1.3;
 const WALK_KMH = 4.8;
 
 export type DateOption = {
-  ask: DateAsk | "new" | "big";
+  ask: DateAsk;
   label: TextMessageKey;
   hint: TextMessageKey;
-  /** Shown, so people see where this is going, but not plannable yet. */
-  soon?: boolean;
 };
 
 /** "What kind of date?", in the order the app asks it. */
@@ -48,18 +46,6 @@ export const DATE_OPTIONS: readonly DateOption[] = [
     ask: "surprise",
     label: "datePlan.surprise",
     hint: "datePlan.surpriseHint",
-  },
-  {
-    ask: "new",
-    label: "datePlan.somethingNew",
-    hint: "datePlan.somethingNewHint",
-    soon: true,
-  },
-  {
-    ask: "big",
-    label: "datePlan.bigNight",
-    hint: "datePlan.bigNightHint",
-    soon: true,
   },
 ];
 

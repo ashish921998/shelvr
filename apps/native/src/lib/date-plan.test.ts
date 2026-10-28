@@ -51,13 +51,11 @@ function result(fields: Partial<DatePlanResult> = {}): DatePlanResult {
 }
 
 describe("DATE_OPTIONS", () => {
-  it("asks for the two kinds the planner makes, then surprise, then the two on the way", () => {
-    expect(DATE_OPTIONS.map((o) => [o.ask, o.soon === true])).toEqual([
-      ["classic", false],
-      ["lowkey", false],
-      ["surprise", false],
-      ["new", true],
-      ["big", true],
+  it("asks for the two kinds the planner makes, then surprise", () => {
+    expect(DATE_OPTIONS.map((o) => o.ask)).toEqual([
+      "classic",
+      "lowkey",
+      "surprise",
     ]);
   });
 });
