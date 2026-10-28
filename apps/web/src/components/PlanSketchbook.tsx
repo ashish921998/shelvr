@@ -71,7 +71,7 @@ export default function PlanSketchbook({
               event.currentTarget.clientWidth,
             )
           }
-          className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink [&::-webkit-scrollbar]:hidden"
         >
           {places.map((place, index) => (
             <section
@@ -138,7 +138,7 @@ export default function PlanSketchbook({
 
 function Notebook({ left, right }: { left: ReactNode; right: ReactNode }) {
   return (
-    <div className="mx-auto grid aspect-[3/2] w-full max-w-[460px] grid-cols-2 overflow-hidden rounded-[14px] bg-ember shadow-[0_10px_20px_-12px_rgba(43,36,24,0.45)]">
+    <div className="mx-auto grid aspect-[3/2] w-full max-w-[460px] grid-cols-2 rounded-[14px] bg-ember shadow-[0_10px_20px_-12px_rgba(43,36,24,0.45)]">
       <div className="relative flex items-center justify-center p-[7%]">
         {left}
         <div
@@ -146,7 +146,7 @@ function Notebook({ left, right }: { left: ReactNode; right: ReactNode }) {
           className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-black/15 to-transparent"
         />
       </div>
-      <div className="relative flex min-h-0 flex-col justify-center gap-2 overflow-hidden p-[8%] text-ink">
+      <div className="relative flex flex-col justify-center gap-2 p-[8%] text-ink">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/10 to-transparent"
@@ -181,11 +181,11 @@ function Spread({ place }: { place: PlanSharePlace }) {
       }
       right={
         <>
-          <h2 className="line-clamp-3 font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
+          <h2 className="font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
             {place.name}
           </h2>
           <InkUnderline />
-          <p className="line-clamp-4 text-[clamp(12px,3.4vw,14px)] leading-snug">
+          <p className="text-[clamp(12px,3.4vw,14px)] leading-snug">
             {place.why}
           </p>
         </>
@@ -213,7 +213,7 @@ function EndSpread({
       }
       right={
         <>
-          <h2 className="line-clamp-3 font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
+          <h2 className="font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
             {picks.length === 0 ? "No yeses yet" : "Your yeses"}
           </h2>
           <InkUnderline />
