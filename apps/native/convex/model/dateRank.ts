@@ -166,22 +166,13 @@ export function savedDateStops(
     );
     if (slot === null) continue;
     const score = savedScore(candidate, now);
-    const stop: DateStop = {
-      slot,
-      source: "save",
-      itemId: candidate.itemId,
-      name: candidate.name,
-      ...(candidate.area ? { area: candidate.area } : {}),
-      lat: candidate.lat,
-      lng: candidate.lng,
-      ...(candidate.appleId !== undefined
-        ? { appleId: candidate.appleId }
-        : {}),
-      ...(candidate.category !== undefined
-        ? { category: candidate.category }
-        : {}),
-      ...(candidate.why ? { why: candidate.why } : {}),
-    };
+    const {
+      tags: _tags,
+      ownTags: _ownTags,
+      savedAt: _savedAt,
+      ...place
+    } = candidate;
+    const stop: DateStop = { ...place, slot, source: "save" };
     const twin = kept.findIndex(
       (other) => other.stop.slot === slot && samePlace(other.stop, stop),
     );
@@ -203,8 +194,7 @@ const PLAYGROUND =
 /**
  * Ranks every evening the stops can make, as whole pairs: the pair's weights, up to two points
  * for being close, and up to two points of chance, so the same saves deal a different order each time. Stops come back each
- * slot's best first, and evenings point into that order. The first evenings use each stop
- * once where they can, so the list is not one place paired with every other.
+ * slot's best first, and evenings point into that order.
  */
 export function rankEvenings(
   scored: readonly ScoredStop[],
@@ -227,19 +217,12 @@ export function rankEvenings(
     });
   });
   candidates.sort((a, b) => b.rank - a.rank);
-  const used = new Set<number>();
-  const fresh: DateEvening[] = [];
-  const rest: DateEvening[] = [];
-  for (const { first, second } of candidates) {
-    if (used.has(first) || used.has(second)) {
-      rest.push({ first, second });
-      continue;
-    }
-    used.add(first);
-    used.add(second);
-    fresh.push({ first, second });
-  }
-  return { stops, evenings: [...fresh, ...rest].slice(0, MAX_EVENINGS) };
+  return {
+    stops,
+    evenings: candidates
+      .slice(0, MAX_EVENINGS)
+      .map(({ first, second }) => ({ first, second })),
+  };
 }
 
 /** Saved stops to search around, best first, and the stop each one is missing. */

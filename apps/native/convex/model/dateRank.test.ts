@@ -173,7 +173,7 @@ describe("rankEvenings", () => {
     expect(evenings).toEqual([]);
   });
 
-  it("ranks the strongest pair first and shows new places before repeats", () => {
+  it("ranks the strongest pair first", () => {
     const best = stop({ name: "Best", slot: "first", ...north(1) });
     const second = stop({ name: "Bar Two", slot: "second", ...north(2) });
     const { stops, evenings } = rankEvenings(
@@ -185,7 +185,6 @@ describe("rankEvenings", () => {
       stops[e.second].name,
     ]);
     expect(names[0]).toEqual(["Best", "Small Victory"]);
-    expect(names[1]).toEqual(["Uchi", "Bar Two"]);
     expect(names).toHaveLength(4);
   });
 

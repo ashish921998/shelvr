@@ -8,7 +8,6 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsSearchPlaces,
-  type ApplePoi,
 } from "./model/appleMaps";
 import {
   fillTargets,
@@ -68,7 +67,7 @@ function savedCandidates(claim: Claim): DateCandidate[] {
         itemId: place.itemId,
         name: place.name,
         ...(place.area ? { area: place.area } : {}),
-        ...(why !== undefined ? { why } : {}),
+        ...(why ? { why } : {}),
         lat: pin.lat,
         lng: pin.lng,
         ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
@@ -167,14 +166,14 @@ async function suggestStops(
   const taken = scored.map((entry) => entry.stop);
   const stops: ScoredStop[] = [];
   targets.forEach(({ anchor, slot }, i) => {
-    const kept: ApplePoi[] = [];
+    let kept = 0;
     for (const found of replies[i]) {
-      if (kept.length >= SUGGESTIONS_PER_ANCHOR) break;
+      if (kept >= SUGGESTIONS_PER_ANCHOR) break;
       if (
         !keepDateSuggestion(found, { kind, slot, anchor, been, taken, chains })
       )
         continue;
-      kept.push(found);
+      kept++;
       const stop = suggestedDateStop(found, slot);
       taken.push(stop);
       stops.push({ stop, score: 0 });

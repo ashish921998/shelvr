@@ -10,7 +10,6 @@ import {
   openPlaceDetails,
 } from "@/lib/apple-place-card";
 import {
-  canChange,
   dateShareText,
   directionsUrl,
   infoAction,
@@ -20,11 +19,12 @@ import {
 } from "@/lib/date-plan";
 import { t } from "@/lib/i18n";
 import { dayColor, type StopAction } from "@/lib/trip-planner";
-import type {
-  DateEvening as Evening,
-  DatePlanResult,
-  DateSlot,
-  DateStop,
+import {
+  type DateEvening as Evening,
+  type DatePlanResult,
+  type DateSlot,
+  type DateStop,
+  swapStop,
 } from "@convex/model/datePlan";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -81,35 +81,6 @@ function useInfoOpener() {
   );
 }
 
-function TextButton({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: "map";
-  label: string;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
-    >
-      <AppSymbolIcon
-        name={icon}
-        size={16}
-        tintColor={theme.colors.primaryText}
-      />
-      <ThemedText variant="button" style={styles.secondaryText}>
-        {label}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
 /** The evening: both stops on the map, a card for each with the walk between, and what to do next. */
 export function DateEvening({
   result,
@@ -131,7 +102,7 @@ export function DateEvening({
   const days = useMemo(() => [[first, second]], [first, second]);
 
   const change = (slot: DateSlot) =>
-    canChange(result, evening, slot)
+    swapStop(result.stops, evening, slot) !== null
       ? () => {
           if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
           onSwap(slot);
@@ -225,11 +196,24 @@ export function DateEvening({
 
         <View style={styles.buttons}>
           <Button title={t("datePlan.send")} onPress={() => void send()} />
-          <TextButton
-            icon="map"
-            label={t("datePlan.directions")}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("datePlan.directions")}
             onPress={go}
-          />
+            style={({ pressed }) => [
+              styles.secondary,
+              pressed && styles.pressed,
+            ]}
+          >
+            <AppSymbolIcon
+              name="map"
+              size={16}
+              tintColor={theme.colors.primaryText}
+            />
+            <ThemedText variant="button" style={styles.secondaryText}>
+              {t("datePlan.directions")}
+            </ThemedText>
+          </Pressable>
         </View>
         <ThemedText variant="caption" style={[styles.muted, styles.note]}>
           {t("datePlan.approximate")}

@@ -7,7 +7,6 @@ import {
   DATE_OPTIONS,
   directionsUrl,
   emptyMessage,
-  canChange,
   infoAction,
   slotLabel,
   walkMinutes,
@@ -121,18 +120,6 @@ describe("dateShareText", () => {
         "https://maps.apple.com/?ll=38.715,-9.142&q=Red%20Frog",
       ].join("\n"),
     );
-  });
-});
-
-describe("canChange", () => {
-  it("offers a change only when another stop nearby still pairs with the kept one", () => {
-    const evening = { first: 0, second: 1 };
-    expect(canChange(result(), evening, "first")).toBe(false);
-    expect(canChange(result(), evening, "second")).toBe(false);
-    const sushi: DateStop = { ...dinner, name: "Sushi Bar", lng: -9.141 };
-    const more = result({ stops: [dinner, bar, sushi] });
-    expect(canChange(more, evening, "first")).toBe(true);
-    expect(canChange(more, evening, "second")).toBe(false);
   });
 });
 

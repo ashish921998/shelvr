@@ -155,15 +155,6 @@ type DatePlanState =
       tried: Record<DateSlot, number[]>;
     };
 
-/** Whether a stop can change: something else nearby still makes an evening with the other. */
-export function canChange(
-  result: DatePlanResult,
-  evening: DateEvening,
-  slot: DateSlot,
-): boolean {
-  return swapStop(result.stops, evening, slot) !== null;
-}
-
 /** Plans a date for the city: asks the planner, then changes stops on the phone. */
 export function useDatePlan(city: string, locale: string) {
   const router = useRouter();
