@@ -62,10 +62,18 @@ describe("PlanSketchbook", () => {
     });
     const onChoose = vi.fn();
     render({ p1: "pick" }, onChoose);
+    Object.defineProperty(
+      container.querySelector('[aria-label="Shortlist"]'),
+      "clientWidth",
+      { value: 300 },
+    );
 
     act(() => button("Yes to Bastian").click());
     expect(onChoose).toHaveBeenCalledWith("p0", "pick");
-    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 300 });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(
+      "2 of 2: Masque",
+    );
 
     act(() => button("Yes to Masque").click());
     expect(onChoose).toHaveBeenCalledWith("p1", "pick");
@@ -96,6 +104,14 @@ describe("PlanSketchbook", () => {
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 600 });
 
     scrollAt(600);
+    expect(button("Next page").disabled).toBe(true);
+
+    // A wheel that stops the next flip short hands the page back to the scroll.
+    act(() => button("Previous page").click());
+    act(() => {
+      track.dispatchEvent(new WheelEvent("wheel", { bubbles: true }));
+    });
+    scrollAt(580);
     expect(button("Next page").disabled).toBe(true);
     delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
   });

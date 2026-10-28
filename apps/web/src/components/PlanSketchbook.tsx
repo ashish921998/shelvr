@@ -25,6 +25,7 @@ export default function PlanSketchbook({
   // The page a flip is smooth-scrolling to. Until the track reaches it, scroll
   // events still read the old page and must not move `page` back.
   const flipping = useRef<number | null>(null);
+  const spreads = useRef<(HTMLElement | null)[]>([]);
   const pages = places.length + 1;
 
   const flipTo = (next: number) => {
@@ -49,7 +50,11 @@ export default function PlanSketchbook({
   const choose = (index: number, key: string, choice: Choice) => {
     const turningOn = choices[key] !== choice;
     onChoose(key, choice);
-    if (turningOn) flipTo(index + 1);
+    if (!turningOn) return;
+    flipTo(index + 1);
+    // Keep keyboard focus with the page on screen, so Tab doesn't walk back
+    // into the spread just answered.
+    spreads.current[index + 1]?.focus({ preventScroll: true });
   };
 
   const picks = places.filter((place) => choices[place.key] === "pick");
@@ -62,7 +67,15 @@ export default function PlanSketchbook({
           role="region"
           aria-label="Shortlist"
           tabIndex={0}
+          // Any hand on the track (touch, wheel, keys) can stop a smooth flip
+          // short of its target, so the visible spread wins again.
           onPointerDown={() => {
+            flipping.current = null;
+          }}
+          onWheel={() => {
+            flipping.current = null;
+          }}
+          onKeyDown={() => {
             flipping.current = null;
           }}
           onScroll={(event) =>
@@ -76,8 +89,12 @@ export default function PlanSketchbook({
           {places.map((place, index) => (
             <section
               key={place.key}
+              ref={(element) => {
+                spreads.current[index] = element;
+              }}
+              tabIndex={-1}
               aria-label={`${index + 1} of ${places.length}: ${place.name}`}
-              className="w-full flex-none snap-center px-2 pt-1 pb-2"
+              className="w-full flex-none snap-center px-2 pt-1 pb-2 outline-none"
             >
               <Spread place={place} />
               <Captions
@@ -104,8 +121,12 @@ export default function PlanSketchbook({
             </section>
           ))}
           <section
+            ref={(element) => {
+              spreads.current[places.length] = element;
+            }}
+            tabIndex={-1}
             aria-label="End of the shortlist"
-            className="w-full flex-none snap-center px-2 pt-1 pb-2"
+            className="w-full flex-none snap-center px-2 pt-1 pb-2 outline-none"
           >
             <EndSpread picks={picks} total={places.length} />
             <Captions note="That's the lot" right={`${pages - 1} places`} />
