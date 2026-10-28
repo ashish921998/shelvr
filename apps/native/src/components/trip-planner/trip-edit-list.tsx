@@ -646,7 +646,9 @@ function TripUndoBar({
   // The live region below speaks only on Android; VoiceOver needs telling.
   const message = undo?.message;
   useEffect(() => {
-    if (message) AccessibilityInfo.announceForAccessibility(message);
+    if (message && process.env.EXPO_OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(message);
+    }
   }, [message]);
   if (undo === null) return null;
   return (

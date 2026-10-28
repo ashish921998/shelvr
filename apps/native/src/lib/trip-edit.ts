@@ -307,20 +307,22 @@ export function useRenameTrip(
   current: string | undefined,
 ) {
   const rename = useMutation(api.tripPlannerData.renameTripPlan);
-  // Ending the edit and submitting both send the name; one mutation per name in flight.
-  const sending = useRef(new Set<string>());
+  // Ending the edit and submitting both send the name. Each one is compared with the newest
+  // name still on its way, else the saved one; only that newest send clears the record.
+  const pending = useRef<{ name: string } | null>(null);
   return useCallback(
     async (text: string) => {
       const name = text.replace(/\s+/g, " ").trim();
-      if (name === (current ?? "") || sending.current.has(name)) return;
-      sending.current.add(name);
+      if (name === (pending.current?.name ?? current ?? "")) return;
+      const sent = { name };
+      pending.current = sent;
       try {
         await rename({ tripId, name });
         analytics.capture("trip_plan_renamed", { cleared: name === "" });
       } catch (error) {
         showEditFailed(error);
       } finally {
-        sending.current.delete(name);
+        if (pending.current === sent) pending.current = null;
       }
     },
     [current, rename, tripId],
