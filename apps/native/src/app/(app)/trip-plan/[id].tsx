@@ -78,33 +78,51 @@ function TripHeader({
       />
     );
   }
+  // The edit list has no map under the header, so its rows would scroll under the buttons.
+  // Both states set it, since options a screen set stay after it unmounts.
+  const iosHeader = (
+    <Stack.Screen
+      options={{
+        headerTransparent: !editing,
+        headerStyle: editing
+          ? { backgroundColor: theme.colors.background }
+          : undefined,
+      }}
+    />
+  );
   if (editing) {
     return (
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          icon="checkmark"
-          tintColor={theme.colors.primary}
-          onPress={onDone}
-        >
-          {t("common.done")}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+      <>
+        {iosHeader}
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="checkmark"
+            tintColor={theme.colors.primary}
+            onPress={onDone}
+          >
+            {t("common.done")}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      </>
     );
   }
   return (
-    <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
-        <Stack.Toolbar.MenuAction icon="pencil" onPress={onEdit}>
-          {t("tripPlanner.edit")}
-        </Stack.Toolbar.MenuAction>
-        <Stack.Toolbar.MenuAction icon="plus" onPress={onAddPlace}>
-          {t("tripPlanner.addPlace")}
-        </Stack.Toolbar.MenuAction>
-        <Stack.Toolbar.MenuAction icon="trash" destructive onPress={onDelete}>
-          {t("tripPlanner.delete")}
-        </Stack.Toolbar.MenuAction>
-      </Stack.Toolbar.Menu>
-    </Stack.Toolbar>
+    <>
+      {iosHeader}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
+          <Stack.Toolbar.MenuAction icon="pencil" onPress={onEdit}>
+            {t("tripPlanner.edit")}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction icon="plus" onPress={onAddPlace}>
+            {t("tripPlanner.addPlace")}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction icon="trash" destructive onPress={onDelete}>
+            {t("tripPlanner.delete")}
+          </Stack.Toolbar.MenuAction>
+        </Stack.Toolbar.Menu>
+      </Stack.Toolbar>
+    </>
   );
 }
 

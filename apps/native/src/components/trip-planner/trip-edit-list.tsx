@@ -62,6 +62,8 @@ const SCROLL_EDGE = 72;
 /** The fastest the list scrolls under a dragged stop, in points a frame. */
 const SCROLL_STEP = 12;
 const LONG_PRESS_MS = 220;
+/** After a remove, rows slide up under the finger; a tap this soon after is ignored. */
+const REMOVE_SETTLE_MS = 450;
 // Big text still fits the fixed rows that drag maths depends on.
 const MAX_FONT_SCALE = 1.4;
 
@@ -425,7 +427,13 @@ export function TripEditList({
     days: [],
   });
 
-  const shown = drag ? moveInLayout(trip, drag.stopId, drag.to) : trip;
+  // A removed stop leaves its row at once, before the server answers.
+  const [removing, setRemoving] = useState<Id<"tripStops"> | null>(null);
+  const removedAt = useRef(0);
+  const settled = removing
+    ? moveInLayout(trip, removing, { day: UNPLANNED_DAY, index: 0 })
+    : trip;
+  const shown = drag ? moveInLayout(settled, drag.stopId, drag.to) : settled;
   const entries = editEntries(shown);
   const { tops, height } = entryTops(entries);
 
@@ -487,8 +495,11 @@ export function TripEditList({
   );
   const onRemove = useCallback(
     (stop: TripPlanStop) => {
+      if (Date.now() - removedAt.current < REMOVE_SETTLE_MS) return;
+      removedAt.current = Date.now();
       tick();
-      void editor.removeStop(stop);
+      setRemoving(stop._id);
+      void editor.removeStop(stop).finally(() => setRemoving(null));
     },
     [editor],
   );

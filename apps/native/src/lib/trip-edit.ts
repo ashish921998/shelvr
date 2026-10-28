@@ -159,7 +159,7 @@ export type TripUndo = {
 };
 
 /** How long the Undo bar stays after an edit. */
-const UNDO_MS = 6000;
+const UNDO_MS = 10_000;
 
 function showEditFailed(error: unknown) {
   analytics.captureError("trip_plan_edit_failed", error);
