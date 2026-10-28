@@ -43,12 +43,13 @@ describe("placeKinds", () => {
     expect(placeKinds(undefined, ["first date ideas"])).toEqual(["dateNight"]);
   });
 
-  it("matches whole words only, and a tag that is a known word means just that", () => {
+  it("matches whole words only, and a phrase hides the words inside it", () => {
     expect(placeKinds(undefined, ["parking", "seafood", "cheesecake"])).toEqual(
       [],
     );
     // "coffee shop" is a coffee word, not shopping.
     expect(placeKinds(undefined, ["coffee shop"])).toEqual(["coffee"]);
+    expect(placeKinds(undefined, ["sf coffee shop"])).toEqual(["coffee"]);
   });
 
   it("ignores a category it does not know", () => {

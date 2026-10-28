@@ -136,13 +136,10 @@ const DATE_KINDS = new Set<PlaceKind>([
   "activities",
 ]);
 
-/** Every word a kind or date night listens for, so a tag that is one of them is read as just that. */
-const KNOWN_WORDS = new Set<string>([
-  ...Object.values(TAG_KINDS).flat(),
-  ...DATE_TAGS,
-]);
+/** Every word or phrase a kind or date night listens for. */
+const KNOWN_WORDS = [...Object.values(TAG_KINDS).flat(), ...DATE_TAGS];
 
-/** A tag's words joined by single spaces and padded, so a lookup matches whole words only. */
+/** Words joined by single spaces and padded, so a lookup matches whole words only. */
 function padded(text: string): string {
   return ` ${text
     .split(/[^\p{L}\p{N}]+/u)
@@ -151,15 +148,24 @@ function padded(text: string): string {
 }
 
 /**
- * Whether a save's tags name one of these words. A tag that is itself a known word ("coffee shop")
- * means only that; any other tag counts each known word or phrase it contains ("sf restaurants",
- * "rooftop bars nyc"), whole words only, so "parking" never reads as "park".
+ * The known words and phrases a tag names, whole words only, so "parking" never reads as "park".
+ * A phrase hides the words inside it: "sf coffee shop" names "coffee shop", not "shop".
  */
+function tagWords(tag: string): string[] {
+  const text = padded(tag);
+  const found = KNOWN_WORDS.filter((word) => text.includes(padded(word)));
+  return found.filter(
+    (word) =>
+      !found.some(
+        (other) => other !== word && padded(other).includes(padded(word)),
+      ),
+  );
+}
+
+/** Whether a save's tags name one of these words, alone ("bars") or inside a longer tag ("sf restaurants"). */
 function tagged(tags: ReadonlySet<string>, words: readonly string[]): boolean {
   return [...tags].some((tag) =>
-    KNOWN_WORDS.has(tag)
-      ? words.includes(tag)
-      : words.some((word) => padded(tag).includes(padded(word))),
+    tagWords(tag).some((word) => words.includes(word)),
   );
 }
 
