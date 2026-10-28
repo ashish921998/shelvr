@@ -73,6 +73,33 @@ describe("PlanSketchbook", () => {
     delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
   });
 
+  it("keeps flipping forward while a smooth scroll is still on the old page", () => {
+    const scrollTo = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollTo,
+    });
+    render({});
+    const track = container.querySelector<HTMLElement>(
+      '[aria-label="Shortlist"]',
+    )!;
+    Object.defineProperty(track, "clientWidth", { value: 300 });
+    const scrollAt = (left: number) =>
+      act(() => {
+        track.scrollLeft = left;
+        track.dispatchEvent(new Event("scroll", { bubbles: true }));
+      });
+
+    act(() => button("Next page").click());
+    scrollAt(100);
+    act(() => button("Next page").click());
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 600 });
+
+    scrollAt(600);
+    expect(button("Next page").disabled).toBe(true);
+    delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
+  });
+
   it("rings the chosen answer and lists the yeses on the last page", () => {
     render({ p0: "pick", p1: "pass" });
     expect(button("Yes to Bastian").getAttribute("aria-pressed")).toBe("true");

@@ -22,13 +22,28 @@ export default function PlanSketchbook({
 }) {
   const track = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
+  // The page a flip is smooth-scrolling to. Until the track reaches it, scroll
+  // events still read the old page and must not move `page` back.
+  const flipping = useRef<number | null>(null);
   const pages = places.length + 1;
 
   const flipTo = (next: number) => {
     const element = track.current;
     const target = Math.max(0, Math.min(pages - 1, next));
     setPage(target);
-    element?.scrollTo?.({ left: target * element.clientWidth });
+    if (!element?.scrollTo) return;
+    flipping.current = target;
+    element.scrollTo({ left: target * element.clientWidth });
+  };
+
+  const onScroll = (scrollLeft: number, clientWidth: number) => {
+    if (clientWidth <= 0) return;
+    const shown = Math.round(scrollLeft / clientWidth);
+    if (flipping.current !== null) {
+      if (Math.abs(scrollLeft - flipping.current * clientWidth) > 1) return;
+      flipping.current = null;
+    }
+    setPage(shown);
   };
 
   const choose = (index: number, key: string, choice: Choice) => {
@@ -47,10 +62,15 @@ export default function PlanSketchbook({
           role="region"
           aria-label="Shortlist"
           tabIndex={0}
-          onScroll={(event) => {
-            const { scrollLeft, clientWidth } = event.currentTarget;
-            if (clientWidth > 0) setPage(Math.round(scrollLeft / clientWidth));
+          onPointerDown={() => {
+            flipping.current = null;
           }}
+          onScroll={(event) =>
+            onScroll(
+              event.currentTarget.scrollLeft,
+              event.currentTarget.clientWidth,
+            )
+          }
           className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink [&::-webkit-scrollbar]:hidden"
         >
           {places.map((place, index) => (
@@ -126,7 +146,7 @@ function Notebook({ left, right }: { left: ReactNode; right: ReactNode }) {
           className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-black/15 to-transparent"
         />
       </div>
-      <div className="relative flex flex-col justify-center gap-2 p-[8%] text-ink">
+      <div className="relative flex min-h-0 flex-col justify-center gap-2 overflow-hidden p-[8%] text-ink">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/10 to-transparent"
@@ -161,11 +181,11 @@ function Spread({ place }: { place: PlanSharePlace }) {
       }
       right={
         <>
-          <h2 className="font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05]">
+          <h2 className="line-clamp-3 font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
             {place.name}
           </h2>
           <InkUnderline />
-          <p className="line-clamp-5 text-[clamp(12px,3.4vw,14px)] leading-snug">
+          <p className="line-clamp-4 text-[clamp(12px,3.4vw,14px)] leading-snug">
             {place.why}
           </p>
         </>
@@ -193,7 +213,7 @@ function EndSpread({
       }
       right={
         <>
-          <h2 className="font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05]">
+          <h2 className="line-clamp-3 font-display text-[clamp(20px,5.6vw,28px)] leading-[1.05] break-words">
             {picks.length === 0 ? "No yeses yet" : "Your yeses"}
           </h2>
           <InkUnderline />
