@@ -64,6 +64,7 @@ const TAG_KINDS: Record<CategoryKind, readonly string[]> = {
     "brunch",
     "lunch",
     "dinner",
+    "dining",
     "street food",
     "pizza",
     "sushi",
@@ -135,8 +136,31 @@ const DATE_KINDS = new Set<PlaceKind>([
   "activities",
 ]);
 
+/** Every word a kind or date night listens for, so a tag that is one of them is read as just that. */
+const KNOWN_WORDS = new Set<string>([
+  ...Object.values(TAG_KINDS).flat(),
+  ...DATE_TAGS,
+]);
+
+/** A tag's words joined by single spaces and padded, so a lookup matches whole words only. */
+function padded(text: string): string {
+  return ` ${text
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .join(" ")} `;
+}
+
+/**
+ * Whether a save's tags name one of these words. A tag that is itself a known word ("coffee shop")
+ * means only that; any other tag counts each known word or phrase it contains ("sf restaurants",
+ * "rooftop bars nyc"), whole words only, so "parking" never reads as "park".
+ */
 function tagged(tags: ReadonlySet<string>, words: readonly string[]): boolean {
-  return words.some((word) => tags.has(word));
+  return [...tags].some((tag) =>
+    KNOWN_WORDS.has(tag)
+      ? words.includes(tag)
+      : words.some((word) => padded(tag).includes(padded(word))),
+  );
 }
 
 export function placeKinds(

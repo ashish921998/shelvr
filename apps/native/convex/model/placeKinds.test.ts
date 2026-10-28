@@ -34,6 +34,23 @@ describe("placeKinds", () => {
     expect(placeKinds("Hotel", ["date night"])).toEqual(["stay"]);
   });
 
+  it("reads a known word or phrase inside a longer tag", () => {
+    expect(placeKinds(undefined, ["sf restaurants", "dining out"])).toEqual([
+      "food",
+    ]);
+    expect(placeKinds(undefined, ["Rooftop Bars NYC"])).toEqual(["drinks"]);
+    expect(placeKinds(undefined, ["best café in town"])).toEqual(["coffee"]);
+    expect(placeKinds(undefined, ["first date ideas"])).toEqual(["dateNight"]);
+  });
+
+  it("matches whole words only, and a tag that is a known word means just that", () => {
+    expect(placeKinds(undefined, ["parking", "seafood", "cheesecake"])).toEqual(
+      [],
+    );
+    // "coffee shop" is a coffee word, not shopping.
+    expect(placeKinds(undefined, ["coffee shop"])).toEqual(["coffee"]);
+  });
+
   it("ignores a category it does not know", () => {
     expect(placeKinds("Pharmacy", ["food"])).toEqual([]);
   });
