@@ -96,6 +96,14 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
   setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
   paywall.
+  For local development and agent testing, use the `E2E_DEVICE` in the
+  gitignored `tools/e2e/.env.local` when present, including when passing
+  `--device` to an Expo build. Final QA uses its `E2E_QA_DEVICE` explicitly;
+  keep that simulator stock and never apply SimSlim to it. An explicit user
+  device request takes precedence. If the configured development device is
+  missing, report it rather than falling back to the final-QA device.
+  New worktrees copy that local file from the main checkout before choosing
+  a development device.
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
 - **Proving account deletion:** `.agents/skills/account-deletion` runs
@@ -250,6 +258,7 @@ cannot happen.
 | Complexity limits, zero lint warnings                                              | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
 | No `console.*` in app code outside the loggers                                     | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
 | `check:code` is the one gate                                                       | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
+| Local E2E settings precede launch values; overrides and CI semantics hold          | `tools/e2e-config.test.mjs` imports config and launch settings in isolated processes                             | `check:code`                         |
 | The pre-push hook gates a push of branch commits, not deletes or tags              | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
 | Convex modules the app imports pull in no server-only package (zod, ai, linkedom)  | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
 | `_generated/api.d.ts` lists every Convex module                                    | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
