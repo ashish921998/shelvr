@@ -62,6 +62,8 @@ const SF_TO_MATERIAL = {
   speedometer: "speed",
   viewfinder: "center_focus_strong",
   "figure.run": "directions_run",
+  "figure.walk": "directions_walk",
+  "car.fill": "directions_car",
   "hand.tap": "pan_tool",
   "tray.and.arrow.up": "move_up",
   "arrow.up": "arrow_upward",

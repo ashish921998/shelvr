@@ -1,3 +1,8 @@
+import {
+  TripDayStops,
+  TravelModePicker,
+} from "@/components/trip-planner/trip-day-stops";
+import type { TravelMode } from "@convex/model/tripTravel";
 import { AppSymbolIcon } from "@/components/symbol";
 import { TripPlannerMap } from "@/components/trip-planner/trip-planner-map";
 import { TripStopRow } from "@/components/trip-planner/trip-stop-row";
@@ -27,7 +32,7 @@ import {
 import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import {
   Linking,
   type NativeScrollEvent,
@@ -161,6 +166,7 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
     initialDayFocus,
   );
   const activeDay = focus.day;
+  const [travelMode, setTravelMode] = useState<TravelMode>("walking");
   const contentY = useRef(0);
   const dayY = useRef<number[]>([]);
   // The map and its chip row, pinned over the list; the chip row adds to the map's height.
@@ -271,6 +277,10 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
           ) : null}
         </View>
 
+        {trip.days.some((stops) => stops.length > 1) ? (
+          <TravelModePicker mode={travelMode} onChange={setTravelMode} />
+        ) : null}
+
         {trip.days.map((stops, index) => (
           <View
             key={`day-${index}`}
@@ -292,23 +302,19 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
                 {t("tripPlanner.emptyDay")}
               </ThemedText>
             ) : (
-              stops.map((stop, stopIndex) => (
-                <TripStopRow
-                  key={stop._id}
-                  stop={stop}
-                  number={stopIndex + 1}
-                  dayColor={{
-                    color: dayColor(index, theme.colors.tripDays),
-                    on: theme.colors.onTripDay,
-                  }}
-                  fromSave={fromSave.has(stop._id)}
-                  onPress={() => {
-                    // The map follows the list: coming back, it shows the day this stop is on.
-                    pick(index);
-                    openStop(stop);
-                  }}
-                />
-              ))
+              <TripDayStops
+                tripId={trip._id}
+                day={index + 1}
+                stops={stops}
+                mode={travelMode}
+                active={activeDay === index}
+                color={dayColor(index, theme.colors.tripDays)}
+                fromSave={fromSave}
+                onOpen={(stop) => {
+                  pick(index);
+                  openStop(stop);
+                }}
+              />
             )}
           </View>
         ))}

@@ -1001,5 +1001,15 @@
   "tripShare.title": "Partager le voyage",
   "tripShare.hint": "Toute personne ayant le lien peut voir vos jours, dates et étapes, y compris les modifications ultérieures. Votre hébergement et vos sources restent privés.",
   "tripShare.stop": "Arrêter le partage",
-  "tripShare.stopHint": "Ce lien ne fonctionnera plus pour personne."
+  "tripShare.stopHint": "Ce lien ne fonctionnera plus pour personne.",
+  "tripTravel.walking": "À pied",
+  "tripTravel.driving": "En voiture",
+  "tripTravel.hint": "Estimations actuelles de Plans Apple. Touchez une durée pour voir le trajet.",
+  "tripTravel.minutes": "~%{count} min",
+  "tripTravel.loading": "Calcul du temps de trajet…",
+  "tripTravel.unavailable": "Durée indisponible · Itinéraire",
+  "tripTravel.directions": "Itinéraire",
+  "tripTravel.leg": "%{mode} : de %{from} à %{to}. %{summary}. Itinéraire.",
+  "tripTravel.kilometers": "%{distance} km",
+  "tripTravel.meters": "%{distance} m"
 }

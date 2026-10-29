@@ -977,5 +977,15 @@
   "tripShare.title": "Reise teilen",
   "tripShare.hint": "Alle mit dem Link können deine Tage, Daten und Stopps sehen, auch spätere Änderungen. Unterkunft und gespeicherte Quellen bleiben privat.",
   "tripShare.stop": "Teilen beenden",
-  "tripShare.stopHint": "Dieser Link funktioniert dann für niemanden mehr."
+  "tripShare.stopHint": "Dieser Link funktioniert dann für niemanden mehr.",
+  "tripTravel.walking": "Zu Fuß",
+  "tripTravel.driving": "Mit dem Auto",
+  "tripTravel.hint": "Aktuelle Schätzungen von Apple Karten. Tippe auf eine Zeit für die Route.",
+  "tripTravel.minutes": "~%{count} Min.",
+  "tripTravel.loading": "Reisezeit wird ermittelt…",
+  "tripTravel.unavailable": "Zeit nicht verfügbar · Route",
+  "tripTravel.directions": "Route",
+  "tripTravel.leg": "%{mode}: von %{from} nach %{to}. %{summary}. Route.",
+  "tripTravel.kilometers": "%{distance} km",
+  "tripTravel.meters": "%{distance} m"
 }

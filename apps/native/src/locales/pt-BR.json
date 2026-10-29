@@ -1001,5 +1001,15 @@
   "tripShare.title": "Compartilhar viagem",
   "tripShare.hint": "Qualquer pessoa com o link pode ver seus dias, datas e paradas, incluindo alterações futuras. Sua hospedagem e fontes salvas continuam privadas.",
   "tripShare.stop": "Parar de compartilhar",
-  "tripShare.stopHint": "Este link deixará de funcionar para todos."
+  "tripShare.stopHint": "Este link deixará de funcionar para todos.",
+  "tripTravel.walking": "A pé",
+  "tripTravel.driving": "De carro",
+  "tripTravel.hint": "Estimativas atuais do Apple Maps. Toque no tempo para ver a rota.",
+  "tripTravel.minutes": "~%{count} min",
+  "tripTravel.loading": "Calculando o tempo…",
+  "tripTravel.unavailable": "Tempo indisponível · Rota",
+  "tripTravel.directions": "Como chegar",
+  "tripTravel.leg": "%{mode}: de %{from} a %{to}. %{summary}. Como chegar.",
+  "tripTravel.kilometers": "%{distance} km",
+  "tripTravel.meters": "%{distance} m"
 }

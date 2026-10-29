@@ -337,6 +337,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
   and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
 - **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. Corrections update city grouping and search; existing trip stops remain unchanged.
+- **`tripTravel.ts`**, **`tripTravelData.ts`**: Pro-only walking/driving estimates between adjacent stops on one trip day. The authenticated claim reads ordered owned stops, rejects stale layouts, respects AI eligibility and charges one rate-limit unit per leg. `model/appleTravel.ts` calls Apple ETA through bounded `safeFetch`; only the selected day is fetched and the client caches each layout/mode for five minutes. Route gaps have directions links rather than invented durations.
 - **`tripShares.ts`**: revocable view-only trip links. `tripPlans.shareToken` is indexed by token; `/trip/shares/` returns days, dates and stop names/coordinates only while the owner and trip exist. The web page is `/t/[token]`; stays, source saves and account details are private.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and

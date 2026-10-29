@@ -977,5 +977,15 @@
   "tripShare.title": "Share trip",
   "tripShare.hint": "Anyone with the link can view your days, dates and stops, including later edits. Your accommodation and source saves stay private.",
   "tripShare.stop": "Stop sharing",
-  "tripShare.stopHint": "This link will stop working for everyone who has it."
+  "tripShare.stopHint": "This link will stop working for everyone who has it.",
+  "tripTravel.walking": "Walking",
+  "tripTravel.driving": "Driving",
+  "tripTravel.hint": "Apple Maps estimates for now. Tap a time for directions.",
+  "tripTravel.minutes": "~%{count} min",
+  "tripTravel.loading": "Checking travel time…",
+  "tripTravel.unavailable": "Time unavailable · Directions",
+  "tripTravel.directions": "Directions",
+  "tripTravel.leg": "%{mode}: %{from} to %{to}. %{summary}. Directions.",
+  "tripTravel.kilometers": "%{distance} km",
+  "tripTravel.meters": "%{distance} m"
 }
