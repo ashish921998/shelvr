@@ -34,8 +34,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     padding: theme.gap(2),
     gap: theme.gap(1),
-    marginHorizontal: theme.gap(2),
-    marginTop: theme.gap(1),
   },
   title: {
     fontFamily: theme.fonts.bold,

@@ -227,7 +227,6 @@ export type MessageParams = {
   "legal.continueFragment": undefined;
   "legal.privacyFragment": undefined;
   "feedback.invitationTitle": undefined;
-  "feedback.invitationBody": undefined;
   "feedback.dismissInvitation": undefined;
   "feedback.close": undefined;
   "feedback.thanks": undefined;
