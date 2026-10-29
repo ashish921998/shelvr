@@ -52,7 +52,6 @@ export function FeedbackInvitation({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("feedback.dismissInvitation")}
-        hitSlop={8}
         style={({ pressed }) => [
           styles.dismiss,
           pressed && { opacity: theme.opacity.pressed },
